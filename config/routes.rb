@@ -285,6 +285,9 @@ Rails.application.routes.draw do
     get "notes/card", to: "note_inbox#card", as: :notes_card
     get "notes/open_threads", to: "note_inbox#open_threads", as: :open_note_threads
     get "notes/unread", to: "note_inbox#unread", as: :unread_notes, defaults: { format: :json }
+    # One delivery of the viewer's own, as data (notes spec §6.1, §6.4): what
+    # a tab asks for when a signal names its id, before it says anything.
+    get "notes/deliveries/:id", to: "note_inbox#delivery", as: :note_delivery, constraints: { id: /\d+/ }, defaults: { format: :json }
 
     # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):
     # quick create, "Your drafts", "Going live next", "Needs translation"

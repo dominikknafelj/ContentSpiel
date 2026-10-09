@@ -5,15 +5,23 @@ module Admin
   # so someone with no rights gets empty lists, and a record that left the
   # viewer's scope or went to the trash is simply not there.
   #
-  # Five answers: the full list, "Mark all read", and the three parts a page
+  # Six answers: the full list, "Mark all read", the three parts a page
   # shows of the inbox, each fetched again on its own -- the two dashboard
-  # cards as their frames, and the sidebar's number as JSON. None of the
-  # three renders the layout, so none pays for the sidebar.
+  # cards as their frames, and the sidebar's number as JSON -- and one
+  # delivery as data, for the toast. None of the last four renders the
+  # layout, so none pays for the sidebar.
   #
   # Nothing here marks one row read: a row is read by opening its thread
   # (`Admin::NoteThreadsController#show`), which is where its link leads.
   class NoteInboxController < BaseController
     PER_PAGE = 50
+
+    # Which tab this is (`X-Notes-Tab`, as `Admin::NoteContainer#note_tab`
+    # reads it for a record's notes): "Mark all read" is a notes write too,
+    # and its signal (`Notes::Signals.inbox`) names the tab that pressed it,
+    # whose page the redirect draws again anyway. Checked for shape and used
+    # for nothing but being echoed.
+    before_action { Current.notes_tab = request.headers["X-Notes-Tab"].to_s[Notes::Signals::TAB] }
 
     def index
       @inbox = inbox
@@ -42,7 +50,38 @@ module Admin
       render json: { unread: inbox.unread_count }
     end
 
+    # One of the viewer's own deliveries as data (notes spec §6.1, §6.4): what
+    # a tab asks for after a signal named its id, for the toast and the
+    # desktop notification. THE SIGNAL SAID NOTHING, and may have reached
+    # someone who has since lost the right to read the record: this is where
+    # that is decided, through `Dashboard::NotesForYou#find` -- the viewer's
+    # own row on a record they may read now, or not found, and not found says
+    # nothing about which.
+    #
+    # The sentence is the inbox row's, from the same keys
+    # (`Admin::NotesScreen::InboxRowComponent#sentence`), as TEXT: `I18n.t`,
+    # not the view's `t`, which would escape the name for a page -- the
+    # script writes it with `textContent`. A GET that writes nothing: only
+    # opening the thread reads a delivery.
+    def delivery
+      row = inbox.find(params[:id]) or raise ActiveRecord::RecordNotFound
+
+      render json: { id: row.id, reason: row.reason, sentence: delivery_sentence(row), title: row.title || t("admin.components.notes_screen.inbox_row.untitled"),
+        excerpt: row.excerpt, url: public_send(row.route.name, *row.route.args, **row.route.params, **admin_url_options), thread_id: row.thread_id }
+    end
+
     private
+
+    # A named person, one who is gone, or nobody (a reopen names nobody, and
+    # neither does a note whose author was deleted): the row component's
+    # three cases.
+    def delivery_sentence(row)
+      scope = "admin.components.notes_screen.inbox_row.#{row.reason}"
+      return I18n.t("#{scope}.nobody") unless row.by || row.by_id
+      return I18n.t("#{scope}.deleted") unless row.by
+
+      I18n.t("#{scope}.somebody_html", name: row.by.display_name)
+    end
 
     def inbox = @inbox ||= Dashboard::NotesForYou.new(actor: Current.actor, locale: admin_locale)
   end

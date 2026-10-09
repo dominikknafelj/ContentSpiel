@@ -1,0 +1,460 @@
+require "application_system_test_case"
+
+# Live delivery (notes spec §6): a signal over the cable, then a scoped fetch.
+# The cable needs nothing set up here: the suite's `test` adapter is the
+# in-process `async` adapter with a record of what it sent
+# (`ActionCable::SubscriptionAdapter::Test < Async`), and the system test's
+# server runs in this process, so a service called from the test thread
+# reaches the browsers.
+#
+# Every assertion that waits for a signal's effect waits `LIVE` seconds: the
+# signal is coalesced for half a second before anything is fetched.
+class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
+  LIVE = 8
+
+  setup do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    users(:two).update!(name: "Dana")
+    @page = create_page(title: "Pricing")
+    @block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    @thread = as(users(:two)) { Notes::Start.call(@block, body: "Is this right?") }.record
+    sign_in_via_form(users(:one))
+  end
+
+  # "Open" is remembered in this browser, and the browser is shared with the
+  # tests that follow: every notes system test forgets it again.
+  teardown { page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}") }
+
+  def open_thread
+    visit "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}"
+    await_notes_live
+    assert_selector "#notes-drawer [data-notes-view=thread]"
+    # A link with `?notes=open` gives the thread the focus once its frame has
+    # loaded (`admin--notes#loaded`): a test that puts the focus somewhere
+    # itself must not do it before that.
+    assert_eventually(message: "the thread never took the focus") { focused?("#note-thread-#{@thread.id}") }
+  end
+
+  def open_list
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list"
+  end
+
+  def reply_field = find("#note-thread-#{@thread.id}-reply textarea[name=body]")
+
+  # The reply field as the element it is now, to be asked about later: a
+  # field drawn again would get its text back from the draft and could be
+  # given the focus again, and would still have lost the caret, the open
+  # picker and what was chosen in it.
+  def keep_reply_field = page.execute_script("window.__reply = document.querySelector('#note-thread-#{@thread.id}-reply textarea[name=body]')")
+
+  def same_reply_field? = page.evaluate_script("window.__reply.isConnected && window.__reply === document.querySelector('#note-thread-#{@thread.id}-reply textarea[name=body]')")
+
+  def reply_as_dana(body) = as(users(:two)) { Notes::Reply.call(@thread, body: body) }.tap { |result| assert result.ok?, result.errors.inspect }
+
+  def focused?(selector) = page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})")
+
+  def drawer_scroll = page.evaluate_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop")
+
+  # Counts the GETs this tab makes for notes from here on -- a live refresh
+  # is one; a note the tab sends is a POST, whose redirect the browser follows
+  # by itself -- and keeps the status of the last answer about one delivery.
+  def watch_notes_fetches
+    page.execute_script(<<~JS)
+      window.__notesFetches = 0
+      window.__deliveryStatus = null
+      const original = window.fetch
+      window.fetch = (...args) => {
+        const url = String(args[0].url || args[0])
+        const method = String(args[1]?.method || args[0].method || "GET").toUpperCase()
+        if (method === "GET" && url.includes("/notes/")) window.__notesFetches += 1
+        const answer = original(...args)
+        if (url.includes("/notes/deliveries/")) answer.then((response) => { window.__deliveryStatus = response.status })
+        return answer
+      }
+    JS
+  end
+
+  # The tab's cable consumer, where a test can reach it.
+  def hold_consumer
+    page.execute_script("import('@hotwired/turbo-rails').then((turbo) => turbo.cable.getConsumer()).then((consumer) => { window.__consumer = consumer })")
+    await_js("Boolean(window.__consumer)")
+  end
+
+  # --- the person's stream --------------------------------------------------------
+
+  test "a mention by someone in another session reaches the badge, the inbox and a toast without a reload" do
+    visit "/cs-studio"
+    await_notes_live
+    assert_no_selector "#sidebar-badge-dashboard"
+
+    using_session(:dana) do
+      sign_in_via_form(users(:two))
+      visit "/cs-studio/notes/page/#{@page.id}?compose=Page-#{@page.id}"
+      await_admin_controllers
+      find("#notes-new textarea[name=body]").send_keys("Look at this, @one")
+      assert_selector "#notes-new [role=option]", text: "one@example.com"
+      find("#notes-new textarea[name=body]").send_keys(:enter, "please")
+      within("#notes-new") { press "Add note" }
+      assert_selector "[data-note-thread] [data-note-mention]"
+    end
+
+    assert_selector "#sidebar-badge-dashboard", text: "1", wait: LIVE
+    assert_selector "turbo-frame#notes-for-you [data-delivery][data-unread]", text: "Dana mentioned you"
+    # The existing inverted toast, with an accent dot before the sentence.
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: "Dana mentioned you on Pricing"
+    assert_selector "#toasts .admin-toast > span[aria-hidden=true][class~='bg-accent']:first-child"
+    within("#toasts .admin-toast") { press "Open" }
+    assert_selector "#notes-drawer [data-notes-view=thread]", text: "Look at this"
+    assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=\d+\z/)
+  end
+
+  # The signal says nothing and may reach someone who has since lost the right
+  # to read the record: the tab asks for the delivery, is refused, and says
+  # nothing. (The row is still theirs; it is only hidden.)
+  test "a delivery on a record the person can no longer read raises no toast" do
+    hidden = as(users(:two)) { Notes::Start.call(create_page(title: "Secret plans"), body: "For @[#{users(:one).id}]") }.record
+    hidden.container.update!(trashed_at: Time.current)
+    visit "/cs-studio"
+    await_notes_live
+    watch_notes_fetches
+
+    Notes::Signals.delivery(Notes::Delivery.find_by!(user: users(:one), thread: hidden))
+
+    await_js("window.__deliveryStatus === 404", wait: LIVE)
+    await_frames
+    assert_no_selector "#toasts .admin-toast"
+    assert_no_selector "#sidebar-badge-dashboard"
+    assert_no_text "Secret plans"
+  end
+
+  test "deliveries read elsewhere take the badge and the card's unread rows with them, and nothing is said" do
+    as(users(:two)) { Notes::Start.call(@page, body: "For @[#{users(:one).id}]") }
+    visit "/cs-studio"
+    await_notes_live
+    assert_selector "#sidebar-badge-dashboard", text: "1"
+    assert_selector "turbo-frame#notes-for-you [data-delivery][data-unread]"
+
+    as(users(:one)) { assert Notes::MarkRead.call.ok? }
+
+    assert_no_selector "#sidebar-badge-dashboard", wait: LIVE
+    assert_no_selector "turbo-frame#notes-for-you [data-delivery][data-unread]"
+    assert_selector "turbo-frame#notes-for-you [data-delivery]"
+    assert_no_selector "#toasts .admin-toast"
+  end
+
+  # --- an open thread ---------------------------------------------------------------
+
+  test "a reply arrives in the open thread under a NEW divider while a half-typed reply is kept" do
+    open_thread
+    reply_field.send_keys("Half a thou")
+    keep_reply_field
+
+    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__delivery = event.detail })")
+
+    # Addressed to the viewer, so that there IS a delivery the lines at the
+    # end are about: without the mention this person, who never wrote in the
+    # thread, would be told nothing and they would pass with nothing tested.
+    reply_as_dana("One more thing, @[#{users(:one).id}]")
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-new-divider] + [data-note-message]", text: "One more thing", wait: LIVE
+    assert_selector "[data-note-new-divider]", text: /new/i, count: 1
+    assert_equal "Half a thou", reply_field.value
+    assert same_reply_field?, "the reply field was drawn again"
+    assert focused?("#note-thread-#{@thread.id}-reply textarea[name=body]"), "the reply field lost the focus"
+    assert_eventually(message: "the delivery was not marked read") { Notes::Delivery.where(user: users(:one)).pluck(:read_at).then { |read| read.any? && read.all? } }
+    # The thread is open in this tab, which is visible and focused: the
+    # delivery is announced as shown (what `admin--notes-alert` hears), no
+    # toast is raised, and the delivery is read -- the badge does not stay up.
+    await_js("Boolean(window.__delivery)", wait: LIVE)
+    delivery = Notes::Delivery.find_by!(user: users(:one))
+    assert_equal({ "id" => delivery.id, "reason" => "mention", "sentence" => "Dana mentioned you", "title" => "Pricing", "excerpt" => "One more thing, @one@example.com",
+      "url" => "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}", "threadId" => @thread.id, "shown" => true }, page.evaluate_script("window.__delivery"))
+    await_frames
+    assert_no_selector "#toasts .admin-toast"
+    assert_no_selector "#sidebar-badge-dashboard", wait: LIVE
+
+    # A second reply: the divider stays above the first that arrived.
+    reply_as_dana("And another")
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "And another", wait: LIVE
+    assert_selector "[data-note-new-divider]", count: 1
+    assert_selector "[data-note-new-divider] + [data-note-message]", text: "One more thing"
+    assert_equal "Half a thou", reply_field.value
+  end
+
+  # The ruling for the toast: no toast only while the person is looking. A tab
+  # that shows the thread but is not the focused window says it.
+  test "with the thread open in a tab that does not have the focus, the toast is raised" do
+    open_thread
+    page.execute_script("document.hasFocus = () => false")
+
+    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__shown = event.detail.shown })")
+
+    reply_as_dana("Are you there, @[#{users(:one).id}]?")
+
+    assert_selector "#toasts .admin-toast", text: "Dana mentioned you on Pricing", wait: LIVE
+    assert_equal false, page.evaluate_script("window.__shown")
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Are you there"
+  end
+
+  test "a reader who is not at the bottom is not moved: a button says what arrived and leads there" do
+    as(users(:two)) { 2.times { |index| Notes::Reply.call(@thread, body: ([ "A long line #{index}" ] * 40).join("\n")) } }
+    open_thread
+    page.execute_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop = 0")
+    assert_equal 0, drawer_scroll
+
+    reply_as_dana("Down here")
+
+    assert_selector "#note-thread-#{@thread.id}-reply button[data-note-jump]", text: "1 new message ↓", wait: LIVE
+    assert_equal 0, drawer_scroll
+    assert_selector "[data-note-new-divider] + [data-note-message]", text: "Down here", visible: :all
+    # 12px above the reply field's dock, which is fixed at the bottom.
+    gap = page.evaluate_script("document.querySelector('#note-thread-#{@thread.id}-reply').getBoundingClientRect().top - document.querySelector('[data-note-jump]').getBoundingClientRect().bottom")
+    assert_in_delta 12, gap, 0.5
+
+    reply_as_dana("And here")
+    assert_selector "button[data-note-jump]", text: "2 new messages ↓", count: 1, wait: LIVE
+    assert_equal 0, drawer_scroll
+    assert_selector "[data-note-new-divider]", count: 1
+
+    find("button[data-note-jump]").click
+    assert_no_selector "button[data-note-jump]"
+    at_bottom = page.evaluate_script("(() => { const s = document.querySelector('#notes-drawer [data-notes-scroller]'); return s.scrollHeight - s.scrollTop - s.clientHeight < 2 })()")
+    assert at_bottom, "the button did not lead to the bottom"
+    assert_equal true, page.evaluate_script("document.activeElement.closest('#notes-drawer') !== null"), "the focus left the drawer with the button"
+  end
+
+  # Back, Close, Notify and Pin are inside the part a refresh draws again.
+  test "a control of the thread's first rows that has the focus has it after a refresh" do
+    open_thread
+    controls = {
+      "a[data-note-back]" => "document.activeElement.matches('a[data-note-back]')",
+      "button[data-note-close]" => "document.activeElement.matches('button[data-note-close]')",
+      "[data-note-actions] form[action*='follow'] button" => "/follow/.test(document.activeElement.form?.action || '')",
+      "[data-note-actions] form[action$='/pin'] button" => "/\\/pin$/.test(document.activeElement.form?.action || '')"
+    }
+
+    controls.each_with_index do |(selector, same), index|
+      page.execute_script("window.__held = document.querySelector(#{selector.to_json}); window.__held.focus()")
+      reply_as_dana("Reply #{index}")
+
+      assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Reply #{index}", wait: LIVE
+      assert_equal false, page.evaluate_script("window.__held.isConnected"), "#{selector} was not drawn again"
+      assert_equal true, page.evaluate_script(same), "#{selector} lost the focus to #{page.evaluate_script('document.activeElement.outerHTML.slice(0, 120)')}"
+    end
+  end
+
+  test "a message being edited, and one being asked about, stay as they are while the thread around them is refreshed" do
+    edited, asked = as(users(:one)) { [ "My first", "My second" ].map { |body| Notes::Reply.call(@thread, body: body).record } }
+    open_thread
+    within("#note-message-#{edited.id}") do
+      find("button[aria-label='Note actions']").click
+      press "Edit"
+    end
+    field = "#note-message-#{edited.id} form[data-note-composer='message-#{edited.id}'] textarea[name=body]"
+    find(field).send_keys(", changed")
+
+    reply_as_dana("Meanwhile")
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Meanwhile", wait: LIVE
+    assert_equal "My first, changed", find(field).value
+    assert focused?(field), "the edit field lost the focus"
+    within("#note-message-#{edited.id}") { press "Save" }
+    # Saved, it is one of the folded messages again (four in the thread now).
+    assert_selector "#note-message-#{edited.id}", text: "My first, changed", visible: :all
+    assert_equal "My first, changed", edited.reload.body
+
+    within("#note-message-#{asked.id}") do
+      find("button[aria-label='Note actions']").click
+      press "Delete"
+    end
+    assert_selector "#note-message-#{asked.id} [data-note-delete-question]"
+
+    reply_as_dana("And again")
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "And again", wait: LIVE
+    assert_selector "#note-message-#{asked.id} [data-note-delete-question]", text: "Delete this note?"
+  end
+
+  test "a thread resolved elsewhere under a typed reply: the button reads Reopen and works, and the reply is kept" do
+    open_thread
+    reply_field.send_keys("Before you close this")
+    keep_reply_field
+    assert_selector "#note-thread-#{@thread.id}-reply button[data-note-state=resolve]", text: "Resolve"
+
+    as(users(:two)) { assert Notes::Resolve.call(@thread).ok? }
+
+    assert_selector "#note-thread-#{@thread.id}-reply button[data-note-state=reopen]", text: "Reopen", wait: LIVE
+    assert_no_selector "button[data-note-state=resolve]"
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-badge=resolved]"
+    assert_equal "Before you close this", reply_field.value
+    assert same_reply_field?, "the reply field was drawn again"
+    assert focused?("#note-thread-#{@thread.id}-reply textarea[name=body]"), "the reply field lost the focus"
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reopen" }
+
+    assert_selector "#note-thread-#{@thread.id}-reply button[data-note-state=resolve]"
+    assert_not @thread.reload.resolved?
+    assert_equal "Before you close this", reply_field.value
+  end
+
+  test "a thread deleted under a typed reply keeps the reply and says so" do
+    open_thread
+    reply_field.send_keys("Still typing")
+
+    as_owner { assert ContentBlocks::Destroy.call(@block).ok? }
+
+    assert_selector "#note-thread-#{@thread.id}-reply [data-note-gone]", text: "This thread was deleted", wait: LIVE
+    assert_equal "Still typing", reply_field.value
+    # Nothing is left that would send the text to a thread that is not there
+    # (each such answer is the list, over the text): typing more does not
+    # bring Reply back, and the send key sends nothing.
+    assert_no_selector "#note-thread-#{@thread.id} [data-note-message]"
+    reply_field.send_keys(" on")
+    assert_selector "#note-thread-#{@thread.id}-reply button[type=submit][disabled]", count: 2
+    reply_field.send_keys([ :control, :enter ])
+    await_frames
+    assert_equal "Still typing on", reply_field.value
+    assert_no_selector "#note-thread-#{@thread.id} [data-note-actions] form"
+    assert_no_selector "#notes-open-count"
+
+    # Back is still there, and leads to the list.
+    find("#notes-drawer a[data-note-back]").click
+    assert_selector "#notes-drawer #notes-list"
+  end
+
+  test "a thread deleted while it is open with nothing typed gives way to the list, which says so" do
+    open_thread
+
+    as_owner { assert ContentBlocks::Destroy.call(@block).ok? }
+
+    assert_selector "#notes-drawer #notes-list [role=status]", text: "This note is gone", wait: LIVE
+    assert_no_selector "#notes-drawer [data-notes-view=thread]"
+    assert_no_selector "#notes-open-count"
+  end
+
+  test "the tab that sent a note does not fetch it again, and the page is never refreshed" do
+    open_thread
+    page.execute_script("window.__stay = true")
+    watch_notes_fetches
+    reply_field.send_keys("From this tab")
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+    assert_selector "[data-note-message]", text: "From this tab"
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "nothing was fetched" means anything
+
+    assert_equal 0, page.evaluate_script("window.__notesFetches") # no GET: the answer to the tab's own POST drew the reply
+    assert_equal true, page.evaluate_script("window.__stay") # the document was never replaced
+    assert_no_selector "[data-note-new-divider]"
+    assert_writes_settled
+  end
+
+  # --- the list and the counts ------------------------------------------------------
+
+  test "the list and the count markers follow a note started elsewhere, and a new note's typed text is kept" do
+    open_list
+    within("#notes-drawer") { press "New note" }
+    find("#notes-new textarea[name=body]").send_keys("Mine, unfinished")
+    page.execute_script("window.__field = document.querySelector('#notes-new')")
+
+    other = as(users(:two)) { Notes::Start.call(@page, body: "Started elsewhere") }.record
+
+    assert_selector "#notes-list a#note-row-#{other.id}", text: "Started elsewhere", wait: LIVE
+    assert_selector "#notes-open-count", text: "2"
+    assert_equal "Mine, unfinished", find("#notes-new textarea[name=body]").value
+    # The very field, not a copy, and never out of the page: the focus is in it.
+    assert_equal true, page.evaluate_script("window.__field === document.querySelector('#notes-new')")
+    assert focused?("#notes-new textarea[name=body]"), "the new note's field lost the focus"
+    assert_selector "#notes-list #notes-new", count: 1
+  end
+
+  test "a block deleted elsewhere takes its group out of the open list, and the counts follow" do
+    as(users(:two)) { Notes::Start.call(@page, body: "On the page itself") }
+    open_list
+    assert_selector "#notes-group-ContentBlock-#{@block.id}"
+    assert_selector "#notes-open-count", text: "2"
+
+    as_owner { assert ContentBlocks::Destroy.call(@block).ok? }
+
+    assert_no_selector "#notes-group-ContentBlock-#{@block.id}", wait: LIVE
+    assert_selector "#notes-list a[data-note-row]", text: "On the page itself", count: 1
+    assert_selector "#notes-open-count", text: "1"
+  end
+
+  test "a closed drawer still gets its counts; a burst of signals is one fetch" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+    assert_selector "#notes-open-count", text: "1"
+    watch_notes_fetches
+
+    as(users(:two)) { 5.times { |index| Notes::Start.call(@block, body: "Burst #{index}") } }
+
+    assert_selector "#notes-open-count", text: "6", wait: LIVE
+    assert_selector "#notes-marker-ContentBlock-#{@block.id} [data-notes-count]", text: "6"
+    assert_operator page.evaluate_script("window.__notesFetches"), :<=, 2
+  end
+
+  # A closed drawer is told the counts only: fetching a thread would read it
+  # for someone who is not looking. What it holds is fetched when it opens.
+  test "a drawer closed while its record changed shows the change when it is opened again" do
+    open_list
+    find("#notes-open").click
+    assert_no_selector "#notes-drawer"
+
+    other = as(users(:two)) { Notes::Start.call(@page, body: "While you were away") }.record
+    assert_selector "#notes-open-count", text: "2", wait: LIVE
+
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list a#note-row-#{other.id}", text: "While you were away", wait: LIVE
+  end
+
+  test "the media panel's notes are live too: a reply arrives in the thread open there" do
+    asset = create_media_asset
+    thread = as(users(:two)) { Notes::Start.call(asset, body: "Too dark") }.record
+    visit "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}"
+    await_notes_live
+    assert_selector "#media-notes #note-thread-#{thread.id}", text: "Too dark"
+    find("#note-thread-#{thread.id}-reply textarea[name=body]").send_keys("I think")
+
+    as(users(:two)) { assert Notes::Reply.call(thread, body: "Lighter now").ok? }
+
+    assert_selector "#media-notes [data-note-new-divider] + [data-note-message]", text: "Lighter now", wait: LIVE
+    assert_equal "I think", find("#note-thread-#{thread.id}-reply textarea[name=body]").value
+  end
+
+  # --- the socket -------------------------------------------------------------------
+
+  test "after the socket was down, each part is fetched once: what was missed is there" do
+    open_list
+    hold_consumer
+    page.execute_script("window.__consumer.connection.close()")
+    await_js("document.body.dataset.notesLive !== 'connected'")
+
+    missed = as(users(:two)) { Notes::Start.call(@page, body: "While offline, @[#{users(:one).id}]") }.record
+    page.execute_script("window.__consumer.connection.open()")
+
+    assert_selector "#notes-list a#note-row-#{missed.id}", text: "While offline", wait: LIVE
+    assert_selector "#sidebar-badge-dashboard", text: "1", wait: LIVE
+    await_js("document.body.dataset.notesLive === 'connected'")
+  end
+
+  # A session that ended has its socket closed by the server. The consumer
+  # tries once more and is refused for good: no loop, and nothing in the
+  # console (which would fail this test in its teardown).
+  test "a session that ended closes the socket, and the refused reconnect is quiet and final" do
+    open_list
+    hold_consumer
+
+    Session.where(user: users(:one)).destroy_all
+
+    await_js("document.body.dataset.notesLive !== 'connected'", wait: LIVE)
+    await_js("!window.__consumer.connection.isActive()", wait: LIVE)
+    page.execute_script("window.__consumer.connection.open()")
+    await_js("!window.__consumer.connection.monitor.isRunning()", wait: LIVE)
+    await_js("!window.__consumer.connection.isActive()", wait: LIVE)
+    assert_equal "connecting", page.evaluate_script("document.body.dataset.notesLive")
+    # The page is as it was: nothing was replaced and nothing navigated.
+    assert_selector "#notes-drawer #notes-list"
+  end
+end

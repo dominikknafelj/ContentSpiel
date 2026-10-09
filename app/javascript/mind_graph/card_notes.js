@@ -16,6 +16,17 @@
 // count may have: this writes `node.open_notes`, which the canvas draws as
 // the node's badge (`renderer.js`), from the endpoint's exact `open`.
 //
+// LIVE (notes spec §6). The section is a `record` of `admin--notes-live`, the
+// controller on <body> that holds the socket: it subscribes to this post's
+// signals for as long as the section is in the page and, when a thread of the
+// post changed, says so with `admin--notes-live:changed` on the section, which
+// reads the list again. The target is written with `setAttribute`: the
+// identifier's double dash can't be spelled through `dataset`, whose
+// `adminNotesLiveTarget` is `data-admin-notes-live-target`, a target of
+// nothing. A note started here says which tab it came from (`X-Notes-Tab`,
+// the id that controller wrote on <body>), so this tab is not told about its
+// own note: it has read the list again already.
+//
 // Nothing here outlives the card: the section is a child of the card's
 // container, which `card.js` empties on `hide()` and the controller's
 // `reset()` empties on a page Turbo restored. An answer that arrives after
@@ -51,6 +62,9 @@ function element(tag, className, content) {
 export function cardNotes(node, { text, url, postUrl, onChange }) {
   const section = element("section", "flex flex-col gap-2")
   section.dataset.mindGraphCardNotes = ""
+  section.setAttribute("data-admin--notes-live-target", "record")
+  section.dataset.notesType = "post"
+  section.dataset.notesId = node.id
   const heading = element("h3", LABEL)
   const list = element("ul", "m-0 flex list-none flex-col gap-2 p-0")
   const status = element("p", "m-0 text-[12px] text-danger-ink")
@@ -154,7 +168,10 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
       body.set("view", "mind_graph")
       const response = await fetch(url, {
         method: "POST", body,
-        headers: { Accept: "application/json", "X-CSRF-Token": document.querySelector("meta[name='csrf-token']")?.content || "" }
+        headers: {
+          Accept: "application/json", "X-CSRF-Token": document.querySelector("meta[name='csrf-token']")?.content || "",
+          ...(document.body.dataset.notesTab ? { "X-Notes-Tab": document.body.dataset.notesTab } : {})
+        }
       })
       const answer = await response.json().catch(() => ({}))
       // Saved is a 201 with the thread's id and nothing else: a request that
@@ -173,6 +190,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
     }
   })
 
+  section.addEventListener("admin--notes-live:changed", load)
   title(node.open_notes ?? 0)
   section.append(heading, list, status, form)
   if ((node.open_notes ?? 0) > 0) load()

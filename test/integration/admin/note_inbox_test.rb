@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
+  include ActionCable::TestHelper
+
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     @page = create_page(title: "Pricing")
@@ -217,5 +219,66 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     get "/cs-studio"
 
     assert_equal few, capture_sql { get "/cs-studio" }.grep(/"note_/).size
+  end
+
+  test "one delivery as data, for the toast and the desktop notification: mine only" do
+    delivery = Notes::Delivery.find_by!(user: users(:reader))
+
+    get "/cs-studio/notes/deliveries/#{delivery.id}"
+
+    assert_equal({ "id" => delivery.id, "reason" => "mention", "sentence" => "Dana mentioned you", "title" => "Pricing",
+      "excerpt" => "Ready, @reader@example.com?", "url" => "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}", "thread_id" => @thread.id }, response.parsed_body)
+
+    sign_in_as(users(:two))
+    get "/cs-studio/notes/deliveries/#{delivery.id}"
+    assert_response :not_found
+  end
+
+  # The scoped fetch behind the toast (the person's signal says nothing): a
+  # delivery on a record the person can no longer read, one in the trash and
+  # an id that names nothing are the same 404, and none of them says which.
+  test "a delivery on a record the person may not read any more is not found, like one that is not there" do
+    delivery = Notes::Delivery.find_by!(user: users(:reader))
+
+    get "/cs-studio/notes/deliveries/0"
+    assert_response :not_found
+
+    @page.update!(trashed_at: Time.current)
+    get "/cs-studio/notes/deliveries/#{delivery.id}"
+    assert_response :not_found
+    assert_no_match(/Pricing|Ready|Dana/, response.body)
+  end
+
+  # The sentence is text for `textContent`: a name is written as it is, never
+  # as markup and never as entities.
+  test "a delivery's sentence names a person as text, and says so when nobody can be named" do
+    users(:two).update!(name: "Dana & <b>Co</b>")
+    delivery = Notes::Delivery.find_by!(user: users(:reader))
+
+    get "/cs-studio/notes/deliveries/#{delivery.id}"
+    assert_equal "Dana & <b>Co</b> mentioned you", response.parsed_body["sentence"]
+
+    as(users(:reader)) { Notes::Reply.call(@thread, body: "Yes") }
+    as(users(:two)) { Notes::Resolve.call(@thread) }
+    as(users(:two)) { Notes::Reopen.call(@thread) }
+    reopened = Notes::Delivery.find_by!(user: users(:reader), reason: "reopened")
+
+    get "/cs-studio/notes/deliveries/#{reopened.id}"
+    assert_equal "A note was reopened", response.parsed_body["sentence"]
+  end
+
+  # "Mark all read" names the tab that pressed it (`X-Notes-Tab`), as a
+  # record's notes requests do: that tab's page is drawn again by the
+  # redirect, and its other tabs are told.
+  test "Mark all read's signal names the tab whose request it was" do
+    stream = Notes::Signals.person_stream(users(:reader).id)
+
+    assert_broadcast_on(stream, { kind: "inbox", origin: "tab-0f8fad5b-d9cb-469f" }) do
+      post "/cs-studio/notes/read", headers: { "X-Notes-Tab" => "tab-0f8fad5b-d9cb-469f" }
+    end
+    as(users(:two)) { Notes::Start.call(@page, body: "Again, @[#{users(:reader).id}]") }
+    assert_broadcast_on(stream, { kind: "inbox" }) do
+      post "/cs-studio/notes/read", headers: { "X-Notes-Tab" => "Not an id" }
+    end
   end
 end

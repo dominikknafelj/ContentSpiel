@@ -188,6 +188,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/drawer_component.rb
     app/components/admin/notes_screen/drawer_component.html.erb
     app/javascript/controllers/admin/notes_controller.js
+    app/javascript/controllers/admin/notes_live_controller.js
     app/components/admin/notes_screen/inbox_row_component.rb
     app/components/admin/notes_screen/inbox_row_component.html.erb
     app/components/admin/notes_screen/open_thread_row_component.rb

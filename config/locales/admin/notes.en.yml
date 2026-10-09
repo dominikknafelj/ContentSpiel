@@ -69,6 +69,24 @@ en:
           count:
             one: "%{count} person. Use the arrow keys and Enter."
             other: "%{count} people. Use the arrow keys and Enter."
+        # The toast a note addressed to the viewer raises (`admin--notes-live`):
+        # "Dana mentioned you on Pricing", with "Open". `placeholder` is what
+        # the layout's template holds until the script writes the sentence.
+        toast:
+          placeholder: "A note for you"
+          open: "Open"
+          # Quoted: a bare `on` is YAML's word for true.
+          "on": "%{sentence} on %{title}"
+        # What a live refresh writes into an open thread: the divider above
+        # the first message that arrived, the button that leads down to what
+        # arrived below the screen, and the line above a reply whose thread
+        # was deleted meanwhile.
+        live:
+          new_divider: "New"
+          new_messages:
+            one: "%{count} new message ↓"
+            other: "%{count} new messages ↓"
+          gone: "This thread was deleted"
     # The inbox (notes spec §5): the full list at `<admin>/notes`
     # (`index`, the view's own lazy-lookup scope) and the dashboard's two
     # cards. `card.new` stands beside the card's title, in the small

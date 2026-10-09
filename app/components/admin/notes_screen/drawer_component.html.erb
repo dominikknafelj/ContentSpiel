@@ -7,10 +7,15 @@
     line on its left and no shadow, and it lies under the header's layer
     (`lg:z-[5]`), so a menu the header opens is drawn over it. Escape is
     heard here and nowhere wider: it closes the drawer only while the focus
-    is inside it. %>
+    is inside it. It is a `record` of `admin--notes-live` (notes spec §6):
+    that controller subscribes to this record's signals and, when one comes,
+    fetches the frame's view again -- or, while the drawer is closed, only
+    the counts, from `data-notes-counts-url`. %>
 <%= tag.aside id: "notes-drawer", hidden: true, tabindex: -1, aria: { label: t(".title") },
       class: "admin-notes-drawer fixed inset-x-0 bottom-0 top-(--admin-top-offset) z-20 flex flex-col bg-surface focus:outline-none lg:left-auto lg:z-[5] lg:w-(--admin-notes-width) lg:border-l lg:border-line",
-      data: { "admin--notes-target": "drawer", src: src, key: key, open_on_load: open?, thread: thread, action: "keydown.esc->admin--notes#close" } do %>
+      data: { "admin--notes-target": "drawer", "admin--notes-live-target": "record", notes_type: helpers.note_args(container).first, notes_id: container.id,
+              notes_counts_url: helpers.admin_record_note_counts_path(*helpers.note_args(container)),
+              src: src, key: key, open_on_load: open?, thread: thread, action: "keydown.esc->admin--notes#close" } do %>
   <header class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-4 py-3 lg:py-3.5">
     <%# The sheet's way back, below 1024px only (handoff "Full-screen sheet"). %>
     <%= tag.button type: "button", class: "mr-1 inline-flex cursor-pointer items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[13px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent lg:hidden",

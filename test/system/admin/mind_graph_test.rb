@@ -1690,6 +1690,47 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal 1, Notes::Delivery.unread.where(user: users(:one)).count
   end
 
+  # Live delivery (notes spec §6): the card's notes are a part that draws
+  # itself, so `admin--notes-live` only tells it that the post's notes changed.
+  test "the card's notes follow a note started elsewhere, and the tab's own note is not fetched twice" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card-notes][data-admin--notes-live-target=record][data-notes-type=post][data-notes-id='#{a.id}'] textarea"
+    assert_no_selector "[data-mind-graph-card-notes] li[data-note-row]"
+    await_notes_live
+
+    as(users(:two)) { assert Notes::Start.call(a, body: "Started elsewhere").ok? }
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "Started elsewhere", wait: 8
+    assert_selector "[data-mind-graph-card-notes] h3", text: /open notes · 1/i
+
+    # The card's own note names this tab, so its signal is not answered with
+    # a second read of the list: one GET, the card's own after the save.
+    page.execute_script(<<~JS)
+      window.__noteReads = 0
+      const original = window.fetch
+      window.fetch = (...args) => {
+        if (String(args[0].url || args[0]).includes("/notes/post/") && !args[1]?.method) window.__noteReads += 1
+        return original(...args)
+      }
+    JS
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("From the graph")
+      press "Add note"
+    end
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "it was not fetched again" means anything
+    assert_equal 1, page.evaluate_script("window.__noteReads")
+
+    # The card closed: its subscription is let go, and the page stays live.
+    escape_on_canvas
+    assert_no_selector "[data-mind-graph-card-notes]"
+    await_js("document.body.dataset.notesLive === 'connected'")
+  end
+
   test "three notes in the card, then a link to the rest; a post without notes has only the field" do
     a = create_post(title: "Alpha")
     b = create_post(title: "Beta")
