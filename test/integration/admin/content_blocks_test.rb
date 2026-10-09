@@ -1077,4 +1077,28 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_includes response.body, ContentBlocks::Reorder::STALE
   end
+
+  # Task 4's review: `section_id[]=1` and its kind reached `to_i` as an array
+  # or a hash -- a 500. Whatever is not one value is read as none.
+  test "a forged reorder whose section, column, ids or origin is not one value is answered, never an error" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    order = [ section.id, block.id ]
+
+    [
+      { ids: order, section_id: [ section.id ] },
+      { ids: order, section_id: { a: 1 } },
+      { ids: order, column: [ 1 ] },
+      { ids: order, column: { a: 1 } },
+      { ids: order, moved_from: { block.id => { section_id: [ section.id ], column: { a: 1 } } } },
+      { ids: { a: block.id } },
+      { ids: [ { a: block.id } ] }
+    ].each do |forged|
+      patch "#{blocks_path}/reorder", params: forged, as: :turbo_stream
+
+      assert_includes [ 200, 422 ], response.status, "#{forged.inspect} answered #{response.status}"
+    end
+    assert_equal order, @page.content_blocks.top_level.reorder(:position).ids
+    assert_nil block.reload.section_id
+  end
 end

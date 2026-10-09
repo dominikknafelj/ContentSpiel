@@ -214,9 +214,15 @@ module Admin
     # plan, Q5): the toast's Undo is a reorder of the page's own list back
     # to `before`, which can't put a block back into the column it left and
     # would be refused as soon as the list had gained or lost one.
+    #
+    # Every parameter is read through `one_value` or `moved_from_param`: a
+    # forged `section_id[]=1` is an array where an id belongs, and the
+    # service casts what it is handed with `to_i`.
     def reorder
       before = top_level_blocks.ids
-      result = ContentBlocks::Reorder.call(@page, params[:ids], section: params[:section_id], column: params[:column], moved_from: moved_from_param)
+      section_id = one_value(params[:section_id])
+      origins = moved_from_param
+      result = ContentBlocks::Reorder.call(@page, ordered_ids_param, section: section_id, column: one_value(params[:column]), moved_from: origins)
       status_id = "content-blocks-status"
 
       state = if result.ok? then Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current)
@@ -227,7 +233,7 @@ module Admin
       streams = [ turbo_stream.replace(status_id, state) ]
       if result.ok?
         streams.concat(page_base_streams)
-        streams.concat(reorder_undo_streams(before)) unless params[:section_id].present? || moved_from_param.any?
+        streams.concat(reorder_undo_streams(before)) unless section_id.present? || origins.any?
       else
         streams << picker_error_stream(result.errors)
       end
@@ -500,12 +506,26 @@ module Admin
     # caller reads it after a service has written.
     def top_level_blocks = @page.content_blocks.top_level.reorder(:position, :id)
 
-    # `moved_from` as a plain hash, or none: a request may leave it out, and
-    # a forged one may send anything where the hash belongs.
+    # `moved_from` as a plain hash of hashes, or none: a request may leave it
+    # out, and a forged one may send anything where the hash belongs, where
+    # an entry's does, or where one of its two ids does (`one_value`). An
+    # entry that is no hash names no place, which is what the service reads
+    # as "the top level".
     def moved_from_param
       moved = params[:moved_from]
-      moved.respond_to?(:to_unsafe_h) ? moved.to_unsafe_h : {}
+      return {} unless moved.respond_to?(:to_unsafe_h)
+
+      moved.to_unsafe_h.transform_values { |from| from.is_a?(Hash) ? from.transform_values { |value| one_value(value) } : {} }
     end
+
+    # The new order as the service takes it: a list of ids. Anything else
+    # where the list belongs is no order at all, and an entry that is not one
+    # value names no block -- which the service then refuses.
+    def ordered_ids_param = (params[:ids].is_a?(Array) ? params[:ids] : []).map { |id| one_value(id) }
+
+    # A parameter that is to be one id or number: an array or a hash in its
+    # place (`section_id[]=1`, `column[a]=1`) is read as not sent.
+    def one_value(value) = value.is_a?(String) || value.is_a?(Numeric) ? value : nil
 
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
