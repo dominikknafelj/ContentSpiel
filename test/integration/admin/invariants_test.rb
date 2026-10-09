@@ -25,10 +25,13 @@ require "test_helper"
 #     edit -- was routing specific to the deleted admin's own generic
 #     resource machinery, not a real invariant: CS Studio's `resource
 #     :settings` has no index to redirect from at all.
-#   - "the mind graph data" -- PostGraph's own node/edge query
-#     (test/queries/post_graph_test.rb) and the CS Studio screen
-#     (test/integration/admin/mind_graph_test.rb: colours, editor urls,
-#     edges, the data-island XSS guard and the empty state).
+#   - "the mind graph data" -- PostGraph's own node/edge queries
+#     (test/queries/post_graph/), the data endpoint
+#     (test/integration/admin/mind_graph_data_test.rb: colour indexes, editor
+#     urls, edges) and the CS Studio screen
+#     (test/integration/admin/mind_graph_test.rb: the frame and the empty
+#     state; the page holds no graph data any more, so there is no data
+#     island to break out of).
 #   - "page reorder semantics" -- already covered directly by
 #     test/services/pages/move_test.rb (Pages::Move) and at the integration
 #     level by test/integration/admin/tree_test.rb.

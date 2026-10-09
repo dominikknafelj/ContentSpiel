@@ -461,10 +461,28 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ [ "page", @kept_page.id ], [ "post", @kept_post.id ] ].sort, response.parsed_body.map { |r| [ r["type"], r["id"] ] }.sort
 
     PostRelation.create!(post: @kept_post, related_post: @gone_post)
+    # The page holds no graph data (it is a frame); a trashed post is no focus
+    # for it either. The global graph leaves out a post with no connection, and
+    # a relation to a trashed post is none -- so the kept post is seen through
+    # its own local view, without the trashed one it is related to.
+    @gone_post.update_column(:content_type, "resume_entry")
     get "/cs-studio/mind_graph"
-    nodes = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)["nodes"]
-    assert_includes nodes.map { |n| n["id"] }, @kept_post.id
-    assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
+    assert_response :success
+    assert_not_includes response.body, "Gone post"
+    assert_select "[data-legend-type='#{@kept_post.content_type}']"
+    assert_select "[data-legend-type='resume_entry']", count: 0, message: "the legend names a type only a trashed post has"
+    get "/cs-studio/mind_graph", params: { post: @gone_post.id }
+    assert_response :not_found
+
+    get "/cs-studio/mind_graph/data"
+    assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, @gone_post.id
+    assert_empty response.parsed_body["edges"]
+    get "/cs-studio/mind_graph/data", params: { post: @gone_post.id }
+    assert_response :not_found
+    get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
+    assert_equal [ @kept_post.id ], response.parsed_body["nodes"].map { |n| n["id"] }
+    get "/cs-studio/mind_graph/search", params: { q: "gone" }
+    assert_empty response.parsed_body
   end
 
   # The mind graph's tag nodes (round 3, Task 17): a tag counts only the KEPT
@@ -476,14 +494,14 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     other = create_post(title: "Second kept")
     [ @kept_post, other, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
 
-    get "/cs-studio/mind_graph"
-    data = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)
-    assert_equal [ { "id" => "tag-#{tag.id}", "name" => "graph-shared", "count" => 2 } ], data["tags"]
+    get "/cs-studio/mind_graph/data"
+    data = response.parsed_body
+    assert_equal [ { "id" => "tag-#{tag.id}", "name" => "graph-shared", "count" => 2, "degree" => 2 } ], data["tags"]
     assert_equal [ @kept_post.id, other.id ].sort, data["edges"].select { |e| e["kind"] == "tag" }.map { |e| e["source"] }.sort
 
     other.update_column(:trashed_at, Time.current)
-    get "/cs-studio/mind_graph"
-    data = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)
+    get "/cs-studio/mind_graph/data"
+    data = response.parsed_body
     assert_empty data["tags"], "one kept post is not a connection"
     assert_empty data["edges"]
   end

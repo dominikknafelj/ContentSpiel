@@ -254,7 +254,13 @@ Rails.application.routes.draw do
     # `:id` to route on. "Run again" on the status screen is a plain reload
     # of `show` -- `Setup::SystemCheck` runs on every request.
     resource :system_status, only: :show, controller: :system_status
-    resource :mind_graph, only: :show, controller: :mind_graph
+    # `data` and `search` are the mind graph screen's own JSON reads (mind
+    # graph canvas spec §3.1): the graph, global or around `post=` / `tag=`,
+    # and the search field's rows.
+    resource :mind_graph, only: :show, controller: :mind_graph do
+      get :data, defaults: { format: :json }
+      get :search, defaults: { format: :json }
+    end
 
     # The audit log (access-control design spec §5 "Audit log module",
     # Task 9): a paginated, filterable list plus one event's own page.

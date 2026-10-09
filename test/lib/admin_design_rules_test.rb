@@ -9,11 +9,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # (`components/media`: the picker and the picture tag), the public site's own
   # components (`components/public`: the preview bar, whose two colours are
   # theme tokens too), and every script -- the Stimulus controllers and the
-  # modules beside them (`media/`, `autosave/`, `search/`, `rich_text/`), which
-  # build markup and set classes as well.
+  # modules beside them (`media/`, `autosave/`, `search/`, `rich_text/`,
+  # `mind_graph/`), which build markup and set classes as well. The mind
+  # graph's draw onto a canvas, where a colour is a string handed to the
+  # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
     views/admin views/layouts views/setup components/admin components/media components/public
-    javascript/controllers javascript/media javascript/autosave javascript/search javascript/rich_text
+    javascript/controllers javascript/media javascript/autosave javascript/search javascript/rich_text javascript/mind_graph
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 

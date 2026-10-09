@@ -1,0 +1,105 @@
+# The Mind graph (docs/reference/i18n.md): `admin.mind_graph.show` is the
+# view's own lazy-lookup scope, `script` what `mind_graph/app.js` and its
+# modules show (handed over through the element's `data-messages`).
+#
+# `show.canvas_label` names the canvas until the data has arrived; `script.
+# summary` is the whole name it has afterwards (the same words, then what is
+# drawn), so the script never joins two strings with punctuation of its own;
+# `script.list.select_post` and `select_tag` are a row's whole accessible name
+# for the same reason: what it is, how connected, and what pressing it does.
+# `script.list.posts` and `tags` are a group's heading with how many it holds.
+#
+# `show.zoom_out`, `zoom_in` and `fit` are the zoom buttons' whole names (their
+# `aria-label` and tooltip); what is drawn on them is a glyph, or `fit_short`.
+#
+# `script.capped` is the global view's sentence (it keeps the best-connected
+# posts), `script.capped_local` a local view's (it keeps the nearest to the
+# focus). In `script.isolated`, `%{figure}` is the count as the sentence's
+# language groups it ("1,214"), handed over by the script; `count` only
+# chooses the form.
+en:
+  admin:
+    mind_graph:
+      show:
+        title: "Mind graph"
+        intro: "How your posts relate to each other. Scroll or pinch to zoom, drag to move."
+        no_posts: "No posts yet."
+        filter:
+          legend: "Show connections"
+          all: "All"
+          related: "Related"
+          tag: "Tags"
+        canvas_label: "Post relationship graph"
+        zoom: "Zoom"
+        zoom_in: "Zoom in"
+        zoom_out: "Zoom out"
+        fit: "Fit all"
+        fit_short: "Fit"
+        card_label: "Selected in the graph"
+        list_label: "Posts and tags in this graph"
+        focus:
+          around_post: "Around “%{title}”"
+          around_tag: "Around the tag “%{title}”"
+          depth: "Depth"
+          depth_n: "Depth %{depth}"
+          whole: "Whole graph"
+        search:
+          label: "Find a post or tag"
+          placeholder: "Find a post or tag…"
+      script:
+        loading: "Loading the graph…"
+        load_failed: "The graph could not be loaded."
+        retry: "Retry"
+        worker_failed: "The graph can't be drawn in this browser."
+        no_connections: "Link posts with Related posts, or give them shared tags, to see connections."
+        capped: "Showing the %{shown} best-connected of %{total} posts."
+        capped_local: "Showing the %{shown} nearest of %{total} posts around this one."
+        isolated:
+          one: "%{figure} other post has no connections yet and isn't shown."
+          other: "%{figure} other posts have no connections yet and aren't shown."
+        isolated_only:
+          one: "%{figure} post has no connections yet."
+          other: "%{figure} posts have no connections yet."
+        release_pinned:
+          one: "Release %{count} pinned"
+          other: "Release %{count} pinned"
+        summary: "Post relationship graph: %{posts} posts and tags, %{edges} connections."
+        card:
+          related:
+            one: "%{count} related"
+            other: "%{count} related"
+          tags:
+            one: "%{count} tag"
+            other: "%{count} tags"
+          tag_posts:
+            one: "%{count} post"
+            other: "%{count} posts"
+          open_post: "Open post"
+          focus: "Focus"
+          pin: "Pin"
+          unpin: "Unpin"
+          show_tagged: "Show posts with this tag"
+          close: "Close"
+          tag: "Tag"
+          status:
+            draft: "Draft"
+            scheduled: "Scheduled"
+            live: "Live"
+        list:
+          posts: "Posts · %{count}"
+          tags: "Tags · %{count}"
+          empty: "Nothing is drawn yet."
+          select_post:
+            one: "%{title}: post, %{count} connection. Shows it in the graph."
+            other: "%{title}: post, %{count} connections. Shows it in the graph."
+          select_tag:
+            one: "%{title}: tag, %{count} connection. Shows it in the graph."
+            other: "%{title}: tag, %{count} connections. Shows it in the graph."
+        search:
+          count:
+            one: "%{count} result"
+            other: "%{count} results"
+          none: "No post or tag matches."
+          failed: "Search failed — check your connection."
+          post: "Post"
+          tag: "Tag"

@@ -34,22 +34,20 @@ Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), c
 | CS Studio design pass, three rounds (PRs #35–#37, #45): tokens and theme, shared components, the shell and ⌘K; the editors, side-by-side translation, the dashboard and posts list; Settings, Media, Groups, Users, Tags, Trash, the audit log, System status, the preview bar, the Mind graph | `2026-10-03-cs-studio-design-pass-design.md` (§12 lists where round 3 departs from it) |
 | Five staff-review bugs (S1–S5) | PR #39 and design pass round 3 |
 | Technical cleanup: system tests that fail on JavaScript errors, click natively and wait without fixed sleeps; a behavioural service contract and a dependency-direction guard; the admin i18n key scheme; `queue.js` and `CLAUDE.md` split; one grant per permission, dormant names judged as stored, stale checks on the group and user forms, the owner flag through one endpoint, API tokens found by an indexed digest, language changes under a row lock; URLs synced only when they can have changed; a content version that moves only on published changes | `2026-10-05-technical-cleanup-design.md` (§10 lists the rulings made while building) |
+| Mind graph on a canvas: one 2D canvas laid out by d3-force in a Web Worker, zoom and pan, hubs sized and labelled first with labels that never overlap, a local view around a post or tag to depth 1–2, a cap of 2,000 posts with a message, a search field that reaches everything else, a selection card beside its node, a list beside the canvas whose rows select (the keyboard path), a layout shown at frame pace, nodes that stay where they are dropped, a retired type told apart by shape; d3-force loaded only by that screen | `2026-10-07-mind-graph-canvas-design.md` (§7 holds the measured numbers, §11 the departures made while building and the round after the owner's trial of 2026-10-08) |
 
 ## Next, in order
 
 Agreed 2026-10-04. Each is its own sub-project with a spec and one PR.
 
-1. **Mind graph on a canvas** (Should). Render the graph on a 2D canvas instead of SVG: D3's force simulation stays, and no new dependency unless WebGL proves necessary. Zoom and pan, with labels that fade in by zoom level, hubs first. Then a local graph (a post's or tag's neighbourhood to depth 1–2, filtered on the server) and a cap with a message on the global view; `PostGraph` selects only the columns it needs.
-   - Constraints: colours come from the theme tokens, read from CSS custom properties (no literals in JS); status and type cues stay non-colour-only; the keyboard and screen-reader path is kept through a parallel list of links, since canvas nodes can't take focus; "everything fits inside the box" becomes "the initial view fits everything".
-   - Closes: no cap on posts, overlapping labels, every node one size, and a retired type's ring differing from a 7–12 type's ring by colour alone. Lazy-loading d3-force (S13) belongs here too.
-2. **Block and type catalogue** (Should). A demo site can only show layouts the block types allow. Today: 3 block types (rich text, image, post list), 3 content types (blog, resume entry, now update), 2 page types (standard, landing); the registries are generic, the shipped set is thin and still a personal site's.
+1. **Block and type catalogue** (Should). A demo site can only show layouts the block types allow. Today: 3 block types (rich text, image, post list), 3 content types (blog, resume entry, now update), 2 page types (standard, landing); the registries are generic, the shipped set is thin and still a personal site's.
    - Block candidates: hero or banner, columns or grid, gallery, call to action, quote or testimonial, video or embed, accordion or FAQ, teaser cards linking to pages, and a sitemap block (a human-readable list of the published tree in the visitor's language).
    - Content types: event, person or team member, project or case study; decide whether resume entry and now update stay defaults or move to an optional "personal site" starter set.
    - Page types: contact, legal, redirect or link page, and a sitemap page (a standard page carrying the sitemap block).
    - Not here: the contact form (see "Forms"), editor-defined types (see "Custom content types"). Needs designs for each block's editor card and public rendering.
-3. **Demo content in the setup wizard, plus a large debug and performance data set** (Should). The wizard's starter-content step gains a "Demo site" choice; a second, much larger set with varied layouts and images serves debugging, performance checks and the design issues an almost empty site hides. Built through the save services, not a seed script. Open: who may pick the large set.
-4. **Invites** (Should). A one-time set-password link without mail (`Users::Invite`).
-5. **Admin UI in German** (Should, #49, M8). The public site's own strings in German and Spanish first (about 15), then the admin. The key scheme exists (`docs/reference/i18n.md`), and the shared components, the admin layout and the Tags screen are converted and guarded (`test/lib/admin_i18n_test.rb`); every other screen is still inline English, so this sub-project converts them, adds the German file and decides how CS Studio picks its own UI language. Known English-only spots that build sentences in Ruby: `Audit::Sentence`, and `Post.human_attribute_name` / `ContentBlock.human_attribute_name`.
+2. **Demo content in the setup wizard, plus a large debug and performance data set** (Should). The wizard's starter-content step gains a "Demo site" choice; a second, much larger set with varied layouts and images serves debugging, performance checks and the design issues an almost empty site hides. Built through the save services, not a seed script. Open: who may pick the large set.
+3. **Invites** (Should). A one-time set-password link without mail (`Users::Invite`).
+4. **Admin UI in German** (Should, #49, M8). The public site's own strings in German and Spanish first (about 15), then the admin. The key scheme exists (`docs/reference/i18n.md`), and the shared components, the admin layout and the Tags screen are converted and guarded (`test/lib/admin_i18n_test.rb`); every other screen is still inline English, so this sub-project converts them, adds the German file and decides how CS Studio picks its own UI language. Known English-only spots that build sentences in Ruby: `Audit::Sentence`, and `Post.human_attribute_name` / `ContentBlock.human_attribute_name`.
 
 ## Before the first deploy
 
@@ -183,6 +181,8 @@ All Could (trash spec §10).
 | Dashboard customisation, widgets, statistics | Could | |
 | A resizable or collapsible page-tree column | Could | |
 | A "sample" marker on starter content | Could | |
+| A post's neighbourhood in the post editor (an embedded mind graph panel) | Could | Mind graph spec §2, §10 |
+| WebGL rendering for sites beyond the mind graph's cap (2,000 posts) | Could | Mind graph spec §2, §10 |
 
 ## Technical health
 
@@ -195,7 +195,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | Public read path: no `posts` scan on a 404, batched URL and internal-link lookups, a cap on unlimited listings | Should | S11, S14, S15 |
 | Admin frame requests render a minimal layout; the tree loads only visible, kept pages | Should | S10 |
 | MCP `list_posts` paginated, without rendering bodies | Should | S12 |
-| Lazy-load Tiptap instead of evaluating it on every admin page | Should | S13 |
+| Lazy-load Tiptap instead of evaluating it on every admin page (done for d3-force, which only the Mind graph's layout worker loads now; Tiptap's is still open) | Should | S13 |
 | One GIN index on the slug jsonb (slugs and titles are queried inside jsonb with no index) | Should | D2 |
 | The audit log pages by `offset` over `last_occurred_at`, which moves when an event coalesces, so a row can repeat or be skipped between pages: keyset paging on `(last_occurred_at, id)` | Should | Round 3 |
 | The dashboard feed's event query grows with the readable set (hashed subplans, a `work_mem` cliff on a very large site); dashboard drafts without the per-row audit join | Could | S17, round 2 |
@@ -232,6 +232,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | A Tiptap schema drift test; tests for the Turbo internals the write queue relies on (`turbo-rails` is pinned to 2.0.23) | Should | S23, S25 |
 | Two-connection race tests for the settings row lock (`Settings::Save`, `Locales::Enable` / `Disable` / `MakeDefault` / `Configure`): today the tests prove where the lock is taken and what is read after it, not two writers meeting | Could | Technical cleanup §10 |
 | The system suite flakes at 12 parallel workers on a laptop (run it with `PARALLEL_WORKERS=6`): a leaner browser fixture, or CI-sized runners | Could | Round 2 |
+| The system-test job takes about 17 minutes in CI (16m41s for 477 tests on PR #52, against 4m20s for the unit job), and the mind graph's tests now each wait out a real settle of about five seconds: find where the time goes, then split the job across runners, raise its workers, or shorten the waits | Should | PR #52 |
 | Mouse drag in the page tree and block list (SortableJS's fallback) was never hand-tested in Firefox | Could | Round 1 |
 
 ## Known gaps (interim states)
@@ -305,6 +306,10 @@ Left by the technical cleanup (spec §10). The caching sub-project ("Performance
 - The group editor with scripts off shows an Edit scope button that does nothing on a ticked row; a stored branch root in the trash reads "A page you can't open (kept)" even to an owner. Ticking an ancestor above a page ticked in the same session drops the child where a stored one is kept.
 - The token form decides whether a refusal belongs under Name or Group from the message's first word.
 - The group delete dialog says tokens are "revoked" while `Groups::Destroy` deletes their rows.
+- Mind graph: a label can run over a neighbouring node or past the canvas's right edge; the overlap rule compares labels with labels only.
+- Mind graph: a node can be pinned from the keyboard (its card's Pin) but not moved: dragging is pointer-only.
+- Mind graph: with reduced motion a large graph shows an empty canvas between "ready" and its one layout message (about two and a half seconds at the cap), and a change of the motion setting applies from the next load.
+- Mind graph: the search results close and reopen on each keystroke, and have no arrow-key navigation.
 
 ### Accepted as they are
 
