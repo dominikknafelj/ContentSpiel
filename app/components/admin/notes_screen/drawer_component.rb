@@ -55,6 +55,13 @@ module Admin
 
       def key = ::Notes.key(container)
 
+      # The address of the editor this drawer belongs to, without its query:
+      # `admin--notes` writes `notes=open` into the page's address only while
+      # the address is this one (`syncAddress`). The record's own screen, by
+      # the route its kind has (`Audit::Sentence.route_for`), resolved from
+      # the notes' list of routes like every other.
+      def path = helpers.note_route_path(::Audit::Sentence.route_for(container))
+
       def open? = @open ? true : false
 
       def total = counts.fetch("total").to_i

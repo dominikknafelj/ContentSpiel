@@ -453,6 +453,113 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the thread never took the focus") { page.evaluate_script("document.activeElement.id") == "note-thread-#{thread.id}" }
   end
 
+  # The handoff's decision 39: `notes=open` in the address follows the drawer,
+  # with `thread=<id>` while a thread is open, by `history.replaceState`: the
+  # address says what is on screen, a reload keeps it, and Back still leaves
+  # the page.
+  def address = page.evaluate_script("window.location.pathname + window.location.search")
+
+  def turbo_state = page.evaluate_script("JSON.stringify(window.history.state?.turbo || null)")
+
+  test "the address follows the drawer: notes=open while it is open, the thread while one is, and neither once it is closed" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    open_editor
+    path = "/cs-studio/pages/#{@page.id}"
+    assert_equal path, address
+    entries = page.evaluate_script("window.history.length")
+    state = turbo_state
+    assert_match(/restorationIdentifier/, state)
+
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list"
+    assert_eventually(message: "opening did not add notes=open") { address == "#{path}?notes=open" }
+
+    find("#note-row-#{thread.id}").click
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    assert_eventually(message: "the open thread is not in the address") { address == "#{path}?notes=open&thread=#{thread.id}" }
+
+    find("#notes-drawer a[data-note-back]").click
+    assert_selector "#notes-drawer #notes-list"
+    assert_eventually(message: "the thread stayed in the address after All notes") { address == "#{path}?notes=open" }
+
+    find("#note-row-#{thread.id}").click
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    find("#notes-drawer button[data-note-close]").click
+    assert_no_selector "#notes-drawer"
+    assert_eventually(message: "closing did not take notes and thread out of the address") { address == path }
+
+    # Replaced, never pushed, and Turbo's own state is what it was.
+    assert_equal entries, page.evaluate_script("window.history.length")
+    assert_equal state, turbo_state
+    assert_equal path, page.evaluate_script("window.Turbo.session.history.location.pathname + window.Turbo.session.history.location.search")
+  end
+
+  test "a reload keeps the drawer and the thread that were on screen, and other parameters of the address stay" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    open_editor("?locale=de")
+    find("#notes-open").click
+    find("#note-row-#{thread.id}").click
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    assert_eventually { address == "/cs-studio/pages/#{@page.id}?locale=de&notes=open&thread=#{thread.id}" }
+
+    visit page.current_url # a reload
+    await_admin_controllers
+
+    assert_selector "#notes-drawer #note-thread-#{thread.id}", text: "Look here"
+    assert_equal "/cs-studio/pages/#{@page.id}?locale=de&notes=open&thread=#{thread.id}", address
+  end
+
+  test "Back after opening and closing the drawer leaves the page" do
+    visit "/cs-studio/tags"
+    await_admin_controllers
+    open_editor
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list"
+    assert_eventually { address == "/cs-studio/pages/#{@page.id}?notes=open" }
+    find("#notes-drawer button[aria-label='Close']").click
+    assert_no_selector "#notes-drawer"
+    assert_eventually { address == "/cs-studio/pages/#{@page.id}" }
+
+    page.go_back
+
+    assert_eventually(message: "Back did not leave the page") { address == "/cs-studio/tags" }
+    assert_selector "h1", text: "Tags"
+  end
+
+  # A drawer that opens by itself (remembered from the last editor) says so
+  # in the address too -- of ITS page: an editor reached by a link in the
+  # page tree is drawn before the address is its own, and the page before it
+  # must not be given `notes=open`.
+  test "a remembered drawer puts notes=open into the address of the editor it opened on, not of the page before it" do
+    other = create_page(title: "Other")
+    open_editor
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{@page.id}']"
+    assert_eventually { address == "/cs-studio/pages/#{@page.id}?notes=open" }
+
+    # By script: the tree is folded away while the notes column is open.
+    click_frame_link { find(".admin-shell__tree a", text: "Other", visible: :all).execute_script("this.click()") }
+
+    assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{other.id}']"
+    assert_eventually(message: "the next editor's address does not say its notes are open") { address == "/cs-studio/pages/#{other.id}?notes=open" }
+
+    page.go_back
+    assert_eventually(message: "Back did not return to the first editor") { address == "/cs-studio/pages/#{@page.id}?notes=open" }
+    assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{@page.id}']"
+  end
+
+  # A thread that is gone answers the list: the address follows.
+  test "a thread in the address that is gone leaves the address with the list" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    gone = thread.id
+    thread.destroy!
+
+    open_editor("?notes=open&thread=#{gone}")
+
+    assert_selector "#notes-drawer #notes-list [role=status]", text: /This note is gone/
+    assert_eventually { address == "/cs-studio/pages/#{@page.id}?notes=open" }
+  end
+
   # Spec §4.1: the focus goes back to the trigger on close. A drawer that no
   # press opened (a link with `?notes=open`) has the header's button for one.
   test "a drawer opened by ?notes=open gives the focus to the header's button when it is closed, by Close and by Escape" do

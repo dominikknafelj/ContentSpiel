@@ -63,6 +63,22 @@ import { messages } from "i18n/messages"
 // passage travels to the frame as `note_quote`, the one name a quote has in a
 // URL (it is filtered from the log under that name).
 //
+// THE ADDRESS FOLLOWS THE DRAWER (the handoff's decision 39; `syncAddress`).
+// While the drawer is open the page's address carries `notes=open`, and
+// `thread=<id>` while a thread is its view; closed, neither. So the address
+// says what is on screen, a reload keeps it (the server opens the drawer for
+// those two parameters), and a copied link opens what its sender saw. It is
+// REPLACED, never pushed: Back still leaves the page. The entry is Turbo's,
+// whose state (`history.state.turbo`: its restoration identifier and index)
+// and whose own record of where the document is must both survive, so the
+// replacing is done by Turbo's history with the identifier it has; a bare
+// `replaceState` would leave Turbo believing in the old address. It is
+// written only while the address IS this drawer's editor (`data-path`): an
+// editor reached by a link into `#content` is drawn, and its remembered
+// drawer opened, a moment before Turbo makes the address its own, and the
+// page before it must not be handed `notes=open`. `turbo:load` is when that
+// has happened, and is heard for it.
+//
 // Nothing here writes a record or touches an editor form; note forms are
 // ordinary Turbo forms inside the frame.
 const REMEMBER = "cs-notes-open"
@@ -260,6 +276,7 @@ export default class extends Controller {
     this.fromList = false
     const view = this.frameTarget.querySelector("[data-notes-view]")
     this.markActive()
+    this.syncAddress()
     if (!view || !this.isOpen) return
 
     const lost = inside && !this.drawerTarget.contains(document.activeElement)
@@ -373,6 +390,30 @@ export default class extends Controller {
     this.drawerTarget.hidden = !open
     document.documentElement.toggleAttribute("data-notes-open", open)
     this.syncOpeners()
+    this.syncAddress()
+  }
+
+  // The address as the drawer is now (see "THE ADDRESS FOLLOWS THE DRAWER"):
+  // called whenever that changes -- opened, closed, a view loaded -- and on
+  // `turbo:load`, when the address has become this editor's. The thread is
+  // the one asked for while its view is still on its way, else the one in
+  // the frame. Everything else in the address stays as it is.
+  syncAddress() {
+    if (!this.hasDrawerTarget) return
+    const url = new URL(window.location.href)
+    if (url.pathname !== this.drawerTarget.dataset.path) return
+
+    const open = this.isOpen
+    const thread = !open ? null : this.pending ? this.pending.thread : this.frameTarget.querySelector("[data-notes-view='thread']:not(:has([data-note-gone]))")?.dataset.noteThread
+    if (open) url.searchParams.set("notes", "open")
+    else url.searchParams.delete("notes")
+    if (thread) url.searchParams.set("thread", thread)
+    else url.searchParams.delete("thread")
+    if (url.href === window.location.href) return
+
+    const history = window.Turbo?.session?.history
+    if (history?.restorationIdentifier) history.replace(url, history.restorationIdentifier)
+    else window.history.replaceState(window.history.state, "", url.href)
   }
 
   // Where the column starts: under the editor's sticky header, whose height

@@ -168,7 +168,8 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
         find(tree_button).click
         assert_selector "#tree-column[data-open]"
         click_frame_link { within("#tree-column") { click_link "Other" } }
-        assert_current_path "/cs-studio/pages/#{other.id}"
+        # The address says the notes are open there (the handoff's decision 39).
+        assert_current_path "/cs-studio/pages/#{other.id}?notes=open"
         assert_no_selector "#tree-column"
         assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{other.id}']"
         assert_selector "#{tree_button}[aria-expanded=false]"
