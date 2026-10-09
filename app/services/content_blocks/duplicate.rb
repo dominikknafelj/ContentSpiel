@@ -119,10 +119,9 @@ module ContentBlocks
       ContentBlocks::Reorder.call(@source.owner, siblings, section: @source.section_id, column: @source.section_column, actor: @actor)
     end
 
-    # Every locale's translated columns (`Save::TRANSLATED`
-    # -- fix round 1, same one source `TRANSLATED_COLUMNS` in
-    # `Admin::ContentBlocksController` derives
-    # from), copied literally (no fallback) from `source` onto `copy` --
+    # Every locale's translated columns (`Save::TRANSLATED`, the one list
+    # `TRANSLATED_COLUMNS` in `Admin::ContentBlocksController` derives from
+    # too), copied literally (no fallback) from `source` onto `copy` --
     # `Mobility.with_locale` is what both the reader and the writer need for
     # a jsonb column (Locales.default note in `ContentBlocks::Save` explains
     # why the writer side can't take a `locale:` keyword directly the way a

@@ -1116,7 +1116,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
   RELOAD_LATER = "Something on this page changed elsewhere. Reload once your unsaved text is safe.".freeze
 
-  # Fix round 1. A refusal's list replaces every form on the screen, and a
+  # A refusal's list replaces every form on the screen, and a
   # form paused by a 409 holds the only copy of what was typed -- which its
   # bar has promised stays. A 409 and a refused move have one cause, a second
   # editor on the page, so the two meet. Then the list is NOT drawn: the block
@@ -1173,7 +1173,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_equal "Typed while the move was out", @right.reload.caption
   end
 
-  # Fix round 1. A block whose move between containers is on the wire is
+  # A block whose move between containers is on the wire is
   # about to be replaced by its answer. Grabbed again before that, the drag
   # held an element the answer took out of the document, and the card that
   # came stayed wherever the pointer had it. So the block and its form are
@@ -1886,7 +1886,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_focus_on menu_button(tile(@left)), "the menu of the tile that was not moved"
   end
 
-  # ---- Fix round 1 of the menu moves ----------------------------------------
+  # ---- Menu moves: an unavailable tile, what is announced, where the focus stays
 
   def announced = page.evaluate_script("document.querySelector('[data-admin--blocks-target=\"announcer\"]').textContent")
 

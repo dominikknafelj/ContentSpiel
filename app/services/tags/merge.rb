@@ -143,8 +143,12 @@ module Tags
     # then the pages (the `touch_all` at the end), so a merge and a save of
     # one of these listing blocks could each hold what the other waited for,
     # until Postgres ended one with `ActiveRecord::Deadlocked`. Id order, so
-    # two merges, or a merge and a branch purge (`Trash::Purge`), queue up
-    # the same way round.
+    # two merges, or a merge and a branch purge (`Trash::Purge`), take these
+    # rows the same way round. A known gap is left on the purge's side: a
+    # page's destroy renumbers its siblings (closure_tree's
+    # `_ct_reorder_siblings`), page rows outside the purge's id-ordered
+    # lock, so a merge holding such a sibling and that purge can still
+    # deadlock.
     #
     # Which pages: the owners of `blocks`, the read made without any lock.
     # That read can be behind, but not in a way that leaves a block locked

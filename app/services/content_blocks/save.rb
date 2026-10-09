@@ -62,7 +62,7 @@ module ContentBlocks
         # blocks can change until this one commits.
         #
         # And there is one order of locks for a write to a page's blocks:
-        # the page's row, then block rows (fix rounds 1 to 3). A
+        # the page's row, then block rows. A
         # fold, a lift, a section's delete and the renumbering that follows
         # one go page-first and then write other blocks' rows -- the blocks
         # in the section, and for a lift and a renumbering the top-level
@@ -70,9 +70,10 @@ module ContentBlocks
         # then the page's at the `owner.touch` below. A tab typing in block
         # X while another removed a section and kept its blocks would each
         # hold what the other waits for, and Postgres ends one of them with
-        # `ActiveRecord::Deadlocked`, a 500. "A top-level block is written
-        # by no structural write" was the mistake of fix round 1: a lift
-        # and a renumbering write exactly those. So no save is exempt.
+        # `ActiveRecord::Deadlocked`, a 500. An earlier version exempted
+        # top-level blocks, on the grounds that no structural write touches
+        # one; that was wrong, because a lift and a renumbering write
+        # exactly those. So no save is exempt.
         #
         # It costs one short query and no new waiting: this transaction
         # always took this row, at the touch; it only takes it earlier, so
@@ -157,7 +158,7 @@ module ContentBlocks
     private
 
     # A section is judged as its row stands under the lock, not as the
-    # caller's object was loaded before it (fix round 1). A second tab's copy
+    # caller's object was loaded before it. A second tab's copy
     # may say "two" where the row has since been widened to "four": assigning
     # `layout: "two"` to that copy changes nothing on it, so no UPDATE would
     # be issued and no field change recorded, yet the fold below would read

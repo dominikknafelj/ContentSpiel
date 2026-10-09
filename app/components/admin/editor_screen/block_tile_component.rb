@@ -43,7 +43,7 @@ module Admin
     # is not copied. Spec §6 calls Delete its only action, and of what is done
     # TO the block it is; but the tile keeps its grip, so the pointer moves it
     # along its lane, to another column and out of the section, and spec §1
-    # gives the keyboard whatever the pointer has (review, fix round 1).
+    # gives the keyboard whatever the pointer has.
     #
     # In a section whose own type is gone (spec §6) the tile is drawn the
     # same and `admin--blocks` disables what cannot be done there -- Move up,

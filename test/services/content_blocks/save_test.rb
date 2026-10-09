@@ -415,7 +415,7 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     end
   end
 
-  # The lock order (fix rounds 1 and 2). A fold, a lift and a section's
+  # The lock order. A fold, a lift and a section's
   # delete take the page's row and then write block rows -- the blocks in
   # the section, and (a lift, the renumbering after a delete) the top-level
   # blocks around it. An ordinary save used to write its own row and then

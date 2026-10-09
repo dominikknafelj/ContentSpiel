@@ -1253,7 +1253,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, ContentBlocks::Reorder::STALE
   end
 
-  # --- A move's answer (sections plan, Task 7; spec §4.4, D8) ------------------
+  # --- A move's answer (sections spec §4.4, decision D8) -----------------------
 
   test "a move into a column answers with the tile and its panel in place of the card, and no Undo" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
@@ -1359,8 +1359,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Undo"
   end
 
-  # Task 4's review: `section_id[]=1` and its kind reached `to_i` as an array
-  # or a hash -- a 500. Whatever is not one value is read as none.
+  # `section_id[]=1` and its kind used to reach `to_i` as an array or a hash
+  # -- a 500. Whatever is not one value is read as none.
   test "a forged reorder whose section, column, ids or origin is not one value is answered, never an error" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     block = @page.content_blocks.create!(block_type: "rich_text", position: 1)

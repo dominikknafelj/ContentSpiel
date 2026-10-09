@@ -69,7 +69,7 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
     assert_operator lock, :<, read
   end
 
-  # The same order as every other write of a block (fix rounds 1 and 2):
+  # The same order as every other write of a block:
   # the page's row, then the block's. A lift and the renumbering after a
   # section's delete write top-level blocks under that lock, so a top-level
   # block's delete takes it first too; in a section it also keeps the

@@ -575,8 +575,7 @@ module Admin
     #
     # The layout menu, when the stored layout changed: which choice is the
     # current one, and the diagram on its button, follow what was saved. Not
-    # otherwise (fix round 1 of the section's controls): replaced by a save
-    # of the background, the menu's button lost the focus someone had just
+    # otherwise: replaced by a save of the background, the menu's button lost the focus someone had just
     # Shift+Tabbed onto it -- to <body>, since nothing was picked for
     # `admin--section` to carry the focus over from -- and a menu just opened
     # by pointer was swapped for a closed one. The menu only -- the hidden
@@ -766,10 +765,12 @@ module Admin
     end
 
     # Appends `block.id` right after `after_id` in the page's current block
-    # order, then persists that through `ContentBlocks::Reorder` -- shared
-    # by `create`'s "add between two cards" and `duplicate`'s "insert right
-    # after the source". A blank `after_id` (the end-of-list picker, or a
-    # `create` with none given) leaves the block exactly where
+    # order, then persists that through `ContentBlocks::Reorder` -- for
+    # `create`'s "add between two cards", its only caller: a duplicate
+    # places its copy itself, inside its own transaction (`ContentBlocks
+    # ::Duplicate#place_after_source`), so that a placement that fails
+    # leaves no copy behind. A blank `after_id` (the end-of-list picker, or
+    # a `create` with none given) leaves the block exactly where
     # `ContentBlocks::Save#assign_position` already appended it, so there's
     # nothing here to do.
     def reposition_after(block, after_id)

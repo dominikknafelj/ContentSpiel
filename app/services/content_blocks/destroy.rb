@@ -30,9 +30,8 @@ module ContentBlocks
   # block holds is read from the rows, so a section whose type is gone
   # (sections spec §6) is deleted, or removed with its blocks kept, as any.
   #
-  # So does every other delete (fix rounds 1 and 2), for the order of
-  # locks: every write to a page's blocks takes the page's row and then
-  # block rows (`ContentBlocks::Save#call` has the deadlock this avoids --
+  # So does every other delete, for the order of locks: every write to a
+  # page's blocks takes the page's row and then block rows (`ContentBlocks::Save#call` has the deadlock this avoids --
   # a lift and a renumbering write top-level blocks under that lock, so a
   # top-level block's delete is no exception). The column a block leaves is
   # renumbered under the same lock a fold into that column holds.

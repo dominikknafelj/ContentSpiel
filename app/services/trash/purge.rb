@@ -117,8 +117,13 @@ module Trash
       # hold what the other waited for, until Postgres ended one with
       # `ActiveRecord::Deadlocked`. Id order, whatever order the pages are
       # then destroyed in (deepest first, below), so two purges, or a purge
-      # and a tag merge (`Tags::Merge#repoint_blocks`), queue up the same
-      # way round. A page already gone is not found, and skipped as before.
+      # and a tag merge (`Tags::Merge#repoint_blocks`), take THESE rows the
+      # same way round. A known gap is left: a page's destroy also renumbers
+      # its siblings (closure_tree's `_ct_reorder_siblings`), which updates
+      # page rows that are not in this branch and so not in this id-ordered
+      # lock -- two purges of sibling pages, or a purge and a merge that
+      # holds one of those siblings, can still deadlock there. A page
+      # already gone is not found, and skipped as before.
       Page.where(id: pages.map(&:id)).order(:id).lock.pluck(:id)
 
       pages.each do |page|

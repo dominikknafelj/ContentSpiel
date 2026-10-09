@@ -6,8 +6,9 @@ module Admin
     #
     # THE LANE ELEMENT'S DIRECT CHILDREN ARE EXACTLY THE TILES, as the block
     # list's are exactly the cards: a lane's order is its children's order,
-    # which is what a move reads and a drag sorts (later tasks of the sections
-    # plan; `data-section-id` and `data-column` say which container it is).
+    # which is what a move reads as it is sent and what a drag sorts
+    # (`admin--blocks#move`, one Sortable per lane; `data-section-id` and
+    # `data-column` say which container the lane is).
     # So the column's label is the lane's sibling inside a wrapper, never its
     # child, and nothing else is ever put into a lane. The "+" that ends each
     # lane (spec §4.2: `Admin::BlockPickerComponent` with the section and the

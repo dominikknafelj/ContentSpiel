@@ -712,7 +712,7 @@ export default class extends Controller {
   // saved touched the focus once, in `relocate`, and has nothing to give
   // back: a person who has since clicked the blank page has the focus on
   // <body> on purpose, and pulling it to the card's handle would scroll the
-  // page under them (review, fix round 1). A move that did not stand also
+  // page under them. A move that did not stand also
   // says so, over the announcement `relocate` made of it.
   async sendMove(move, isCurrent) {
     let again = false
