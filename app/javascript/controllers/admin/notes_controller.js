@@ -65,9 +65,15 @@ export default class extends Controller {
 
   // --- targets coming and going ----------------------------------------------
 
+  // "Open" from memory is for the drawer BESIDE an editor. Below 1024px the
+  // notes are a sheet over the whole editor: reopened by itself it would
+  // cover the page a person has just picked (from the tree drawer, which
+  // closed the sheet to be seen at all). There only an explicit ask opens it
+  // -- a press, or a link with `?notes=open`. The choice stays remembered
+  // for a wider window.
   drawerTargetConnected(drawer) {
     if (drawer.dataset.openOnLoad === "true") this.show({ thread: drawer.dataset.thread || null })
-    else if (this.remembered) this.show({ focus: false })
+    else if (this.remembered && this.beside) this.show({ focus: false })
   }
 
   // The editor was replaced (another record in `#content`, another screen):
@@ -128,8 +134,18 @@ export default class extends Controller {
     this.drawerTarget.hidden = true
     this.syncOpeners()
     this.forget()
-    if (this.returnTo?.isConnected) this.returnTo.focus()
+    this.trigger?.focus()
     this.returnTo = null
+  }
+
+  // Where the focus goes on close (spec §4.1: back to the trigger): what
+  // opened the drawer, or the header's button when nothing a person pressed
+  // did (a link with `?notes=open`, the drawer remembered from the last
+  // editor) or when what they pressed is gone (a marker on a card a stream
+  // has drawn again). Never left to fall to <body>.
+  get trigger() {
+    if (this.returnTo?.isConnected) return this.returnTo
+    return this.hasOpenerTarget ? this.openerTarget : null
   }
 
   // A shell drawer opened (`admin--drawer:opened`): this one makes room, and
@@ -214,6 +230,12 @@ export default class extends Controller {
     return this.hasDrawerTarget && !this.drawerTarget.hidden
   }
 
+  // Whether the drawer is a drawer beside the editor (from 1024px, Tailwind's
+  // `lg`, where its classes make it one) and not the full-screen sheet.
+  get beside() {
+    return window.matchMedia("(min-width: 1024px)").matches
+  }
+
   get containerKey() {
     return this.hasDrawerTarget ? this.drawerTarget.dataset.key : null
   }
@@ -238,9 +260,15 @@ export default class extends Controller {
     this.remember()
     if (!wasOpen) this.dispatch("opened")
 
+    // The frame already holds what was asked for: nothing to fetch. It was
+    // asked for and holds no view: that load failed (the network, an error
+    // page) or was emptied, and the same address is fetched again, or the
+    // drawer would stay on "Loading notes…" for good. Otherwise: go there.
     const frame = this.frameTarget
     const next = url.pathname + url.search
-    if (this.address(frame.getAttribute("src")) === next && frame.querySelector("[data-notes-view]")) this.loaded()
+    const there = this.address(frame.getAttribute("src")) === next
+    if (there && frame.querySelector("[data-notes-view]")) this.loaded()
+    else if (there) frame.reload()
     else frame.src = next
   }
 

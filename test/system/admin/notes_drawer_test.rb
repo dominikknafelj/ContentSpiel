@@ -136,6 +136,61 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the thread never took the focus") { page.evaluate_script("document.activeElement.id") == "note-thread-#{thread.id}" }
   end
 
+  # Spec §4.1: the focus goes back to the trigger on close. A drawer that no
+  # press opened (a link with `?notes=open`) has the header's button for one.
+  test "a drawer opened by ?notes=open gives the focus to the header's button when it is closed, by Close and by Escape" do
+    open_editor("?notes=open")
+    assert_selector "#notes-drawer #notes-list"
+    assert_eventually(message: "the focus never moved into the drawer") { focus_in_drawer? }
+
+    find("#notes-drawer button[aria-label='Close']").click
+    assert_no_selector "#notes-drawer"
+    assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
+
+    open_editor("?notes=open")
+    assert_selector "#notes-drawer #notes-list"
+    assert_eventually(message: "the focus never moved into the drawer") { focus_in_drawer? }
+
+    page.driver.browser.keyboard.type(:escape)
+    assert_no_selector "#notes-drawer"
+    assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
+  end
+
+  # Below 1024px the notes are a sheet over the whole editor: opened from
+  # memory it would hide the page a person has just picked in the tree.
+  test "below 1024px a remembered open does not put the sheet over the editor, and ?notes=open still does" do
+    original = page.current_window.size
+    page.current_window.resize_to(900, 800)
+    open_editor
+    page.execute_script("window.localStorage.setItem('cs-notes-open', '1')")
+
+    open_editor
+    assert_selector "#notes-open[aria-pressed=false]"
+    assert_no_selector "#notes-drawer"
+
+    open_editor("?notes=open")
+    assert_selector "#notes-drawer #notes-list"
+    assert_selector "#notes-open[aria-pressed=true]", visible: :all
+  ensure
+    page.current_window.resize_to(*original)
+  end
+
+  # A first load that failed (the network, a server error) leaves the frame
+  # with its `src` and without a view. Stood in for here by emptying the
+  # frame while the drawer is shut: its `src` is unchanged, as after a failure.
+  test "a frame that did not load is fetched again when the drawer is opened" do
+    open_editor
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list"
+    find("#notes-drawer button[aria-label='Close']").click
+    assert_no_selector "#notes-drawer"
+    page.execute_script("document.querySelector('turbo-frame#notes').replaceChildren()")
+
+    find("#notes-open").click
+
+    assert_selector "#notes-drawer #notes-list"
+  end
+
   test "below 1280px, opening the sidebar drawer closes the notes drawer, and the other way round" do
     original = page.current_window.size
     page.current_window.resize_to(1100, 800)

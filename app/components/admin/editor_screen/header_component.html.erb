@@ -26,7 +26,7 @@
           id `notes-open` is this button's alone. %>
       <% if notes? %>
         <%= tag.button type: "button", id: "notes-open",
-              class: "inline-flex cursor-pointer items-center gap-[7px] rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:border-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
+              class: "inline-flex cursor-pointer items-center gap-[7px] rounded-cs border border-line-strong bg-surface px-[11px] py-1.5 text-[13px] font-medium text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
               aria: { controls: "notes-drawer", expanded: "false", pressed: "false", label: t(".notes_label", count: open_notes) },
               data: { "admin--notes-target": "opener", action: "admin--notes#toggle" } do %>
           <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>

@@ -25,6 +25,10 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
 
     assert_select "header.admin-editor-header button#notes-open[aria-controls=notes-drawer] #notes-open-count", text: "2"
     assert_operator response.body.index('id="notes-open"'), :<, response.body.index(">Preview<")
+    # The handoff's button ("Notes header button"): 13px/500 with a 16px icon,
+    # and the count in 11px mono.
+    assert_select "button#notes-open[class~='text-[13px]'][class~='font-medium'][class~='px-[11px]'][class~='py-1.5'][class~='gap-[7px]'] svg[class~='size-4']"
+    assert_select "#notes-open-count[class~='font-cs-mono'][class~='text-[11px]'][class~='text-dim']"
     assert_select "aside#notes-drawer[hidden][data-admin--notes-target=drawer][data-key='Page-#{@page.id}'][data-src='/cs-studio/notes/page/#{@page.id}']" do
       assert_select "turbo-frame#notes[data-admin--notes-target=frame]"
       assert_select "button", text: "Back to Pricing"
