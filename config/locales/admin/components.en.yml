@@ -143,6 +143,35 @@ en:
         added: "Added %{label}."
         removed: "Removed %{label}."
 
+      # A block's form drawn as the open panel of a section (sections spec
+      # §4.3). The rest of the block card is not converted yet.
+      block_card:
+        panel_title: "%{type} · column %{column}"
+        close: "Close"
+
+      editor_screen:
+        # One line of a block's content on its tile in a section (sections
+        # spec §4.2), and what marks a tile that needs attention.
+        tile_summary:
+          unavailable: "Unavailable type — %{type}"
+          no_image: "No image chosen"
+          empty_text: "Empty text"
+          any_type: "All posts"
+          tag: "tag %{name}"
+          needs_fixing: "Needs fixing"
+          attention: "Needs attention"
+        section_card:
+          name: "Section"
+          move: "Move section"
+          columns:
+            one: "%{count} column"
+            other: "%{count} columns"
+          blocks:
+            one: "%{count} block"
+            other: "%{count} blocks"
+        section_lanes:
+          column: "Column %{number}"
+
       # The Mind graph's legend. The content types' own names come from the
       # registry (`Admin::ContentTypeDotComponent`); these are the shapes.
       mind_graph_legend:

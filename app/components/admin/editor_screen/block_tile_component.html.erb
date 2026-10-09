@@ -1,0 +1,8 @@
+<div id="<%= dom_id %>" class="admin-block-tile" role="listitem" data-block-id="<%= block.id %>"
+     data-admin--blocks-target="tile" data-admin--section-target="tile">
+  <button type="button" class="admin-block-tile__face flex w-full min-w-0 cursor-pointer flex-col gap-0.5 rounded-cs px-3 py-2 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent"
+          aria-expanded="<%= open? %>" aria-controls="<%= panel_id %>" data-action="admin--section#toggle">
+    <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
+    <%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %>
+  </button>
+</div>

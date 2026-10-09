@@ -96,6 +96,7 @@ module Admin
         Admin::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
       end
       streams << refused if refused
+      streams << tile_summary_stream(result) if block.section_id
       streams.concat(page_base_streams) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
@@ -247,10 +248,32 @@ module Admin
     # The whole block list, re-rendered in the server's order. The first card
     # has Move up disabled and the last Move down (`first:`/`last:`), as on a
     # page load.
+    #
+    # One outline for the whole list: a section's card draws the blocks in it
+    # from the same array (`card_for`).
     def blocks_list_stream
-      blocks = top_level_blocks.to_a
-      cards = blocks.each_with_index.map { |block, index| render_to_string(block_card_component(block, first: index.zero?, last: index == blocks.size - 1)) }
+      outline = fresh_outline
+      blocks = outline.top_level
+      cards = blocks.each_with_index.map { |block, index| render_to_string(card_for(block, first: index.zero?, last: index == blocks.size - 1, outline: outline)) }
       turbo_stream.update("content-blocks-list", html: helpers.safe_join(cards))
+    end
+
+    # A block in a section is a tile until it is opened, and the one line on
+    # its tile is drawn from what the block holds (sections spec §4.2): every
+    # answer to its autosave redraws that line, so a tile never shows the
+    # caption or the image of before the save -- its form may well be closed
+    # by the time the answer is here, and then the tile is all there is to
+    # see. A save refused as invalid says so on the tile, for the same reason:
+    # the error slots are in a form nobody may be looking at. Not a denied
+    # save: that is no fault of the block's, and the error toast says it.
+    #
+    # Only the summary is replaced, never the tile: the tile's button may hold
+    # the focus and says which form is open (`aria-expanded`). A refused stale
+    # save (409) and a deleted block (410) return before this is reached; the
+    # first has changed nothing and the second has no tile.
+    def tile_summary_stream(result)
+      turbo_stream.replace(Admin::EditorScreen::TileSummaryComponent.dom_id(result.record),
+        Admin::EditorScreen::TileSummaryComponent.new(block: result.record, locale: admin_locale, invalid: !result.ok? && !result.denied?))
     end
 
     # The page's own list (sections spec §3.1): the blocks outside any
@@ -266,6 +289,23 @@ module Admin
     def block_card_component(block, first: false, last: false)
       Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last)
     end
+
+    # The card of a top-level block, as the page view draws it: a section's
+    # card -- lanes, tiles and every form of the blocks in it -- for a
+    # container, the block's own card otherwise (`SectionCardComponent
+    # .draws?` is the one rule for both). `outline:` is for a caller that
+    # draws several cards; without it the page's blocks are read once more,
+    # after whatever the action wrote.
+    def card_for(block, first:, last:, outline: nil)
+      return block_card_component(block, first: first, last: last) unless Admin::EditorScreen::SectionCardComponent.draws?(block, locale: admin_locale)
+
+      Admin::EditorScreen::SectionCardComponent.new(page: @page, section: block, outline: outline || fresh_outline,
+        locale: admin_locale, url_options: admin_url_options, first: first, last: last)
+    end
+
+    # The page's blocks as they are now: `reset` drops what the association
+    # loaded before the action's service wrote.
+    def fresh_outline = BlockOutline.new(@page.content_blocks.reset)
 
     # Splits `params[:block]` by the exact rule spec §5.1 lays out: schema
     # fields with `translated?` go to `translations[locale][:settings]`,
@@ -389,7 +429,7 @@ module Admin
     def insertion_stream(block, after_id)
       ordered = top_level_blocks.to_a
       after_block = after_id.present? ? ordered.find { |candidate| candidate.id == after_id.to_i } : nil
-      card = block_card_component(block, first: ordered.first&.id == block.id, last: ordered.last&.id == block.id)
+      card = card_for(block, first: ordered.first&.id == block.id, last: ordered.last&.id == block.id)
 
       [ after_block ? turbo_stream.after(ActionView::RecordIdentifier.dom_id(after_block), card) : turbo_stream.append("content-blocks-list", card) ]
     end

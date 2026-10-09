@@ -1,0 +1,14 @@
+<div id="<%= lanes_id %>" class="admin-section-lanes" data-columns="<%= lanes.size %>" style="--lanes: <%= lanes.size %>">
+  <% lanes.each do |column, blocks| %>
+    <div class="admin-section-lane flex min-w-0 flex-col gap-1">
+      <p class="admin-section-lane__label font-cs-mono text-label text-meta" aria-hidden="true"><%= column_label(column) %></p>
+      <%# Nothing but tiles in here: see the component. %>
+      <div id="<%= lane_id(column) %>" role="list" aria-label="<%= column_label(column) %>"
+           data-admin--blocks-target="lane" data-section-id="<%= section.id %>" data-column="<%= column %>">
+        <% blocks.each do |block| %>
+          <%= render tile(block) %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

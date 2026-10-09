@@ -42,14 +42,47 @@ module Admin
   # hands it to every card; left nil, the card asks itself. A view-only
   # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete) and its
   # form is disabled without `admin--autosave`.
+  #
+  # `placement:` is where the card is drawn (sections spec §4.3, D4):
+  # - `:list`, the default, is everything above: a card of the page's block
+  #   list;
+  # - `:panel` is the same form for a block that sits in a section's column,
+  #   drawn under the section's lanes and shown by pressing the block's tile
+  #   (`Admin::EditorScreen::SectionCardComponent`, `admin--section`). It is
+  #   this component and not a second form component on purpose: the form,
+  #   its ids, its `base_updated_at`, its status line and its error slots are
+  #   what `Admin::ContentBlocksController#update` answers into, and a block
+  #   moved between the list and a column must be answered the same way. What
+  #   differs is the frame around the form. The wrapper has its own id
+  #   (`panel_id`, because `dom_id(block)` is the TILE's in a section) and is
+  #   rendered `hidden`: every panel of a section is in the page from the
+  #   start and `admin--section` only shows one, so a form is never fetched
+  #   or removed and keeps its place in the write queue (see that script). It
+  #   is no `card` of `admin--blocks` -- the section is the card -- and has no
+  #   handle and no "⋯" menu: a block in a column is moved by its tile. Its
+  #   header is a heading that says which column the form belongs to, and
+  #   Close;
+  # - `:group` is a plain card with neither handle nor menu, for a block
+  #   listed under a section's heading in the translation view (spec §4.5).
   class BlockCardComponent < AdminComponent
+    PLACEMENTS = %i[list panel group].freeze
+
     # `"block-<id>"` is public so `Admin::ContentBlocksController` can
     # recompute the exact same ids from a plain controller method (the
     # save status and error slots its autosave stream targets) without a
     # second, hand-kept copy of this string drifting out of sync with it.
     def self.error_prefix(block) = "block-#{block.id}"
 
-    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil)
+    # The panel's ids are public for the same reason: the block's tile names
+    # the panel it opens (`aria-controls`), and a later stream targets it.
+    def self.panel_id(block) = "#{error_prefix(block)}-panel"
+
+    def self.panel_title_id(block) = "#{error_prefix(block)}-panel-title"
+
+    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list)
+      raise ArgumentError, "unknown block card placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
+
+      @placement = placement
       @editable = editable
       @page = page
       @block = block
@@ -60,6 +93,29 @@ module Admin
     end
 
     def dom_id = ActionView::RecordIdentifier.dom_id(block)
+
+    def panel? = @placement == :panel
+
+    def list? = @placement == :list
+
+    def wrapper_id = panel? ? self.class.panel_id(block) : dom_id
+
+    # What `admin--blocks` and `admin--section` find the wrapper by. Only a
+    # card of the list is a `card` (dragged, moved, counted for Move up and
+    # Move down); only a panel is hidden, and it is its section's to show.
+    def wrapper_attributes
+      return { hidden: true, **panel_name, data: { block_id: block.id, "admin--section-target": "panel" } } if panel?
+
+      { data: { block_id: block.id, **(list? ? { "admin--blocks-target": "card" } : {}) } }
+    end
+
+    # The panel is the region its tile's `aria-controls` points at, named by
+    # its own heading -- which an unavailable block's panel doesn't have.
+    def panel_name = unavailable? ? {} : { role: "region", aria: { labelledby: self.class.panel_title_id(block) } }
+
+    # "Image · column 2" (spec §4.3): the open form is below the lanes, not
+    # in its column, so its heading says which column it belongs to.
+    def panel_title = t(".panel_title", type: label, column: block.section_column)
 
     def definition = block.definition
 

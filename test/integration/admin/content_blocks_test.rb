@@ -37,6 +37,72 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal 3, block.reload.settings_object.limit
   end
 
+  test "saving a block in a section streams its tile's summary, and a block outside one does not" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "post_list", section: section, section_column: 1, position: 0)
+    outside = @page.content_blocks.create!(block_type: "post_list", position: 1)
+
+    patch "#{blocks_path}/#{inside.id}", params: { block: { settings: { limit: "0" } }, base_updated_at: inside.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, "block-#{inside.id}-tile-summary"
+    assert_includes response.body, "Needs fixing"
+
+    patch "#{blocks_path}/#{outside.id}", params: { block: { settings: { limit: "3" } }, base_updated_at: outside.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_not_includes response.body, "tile-summary"
+  end
+
+  test "a saved block in a section streams the summary of what was saved, and a refused stale save streams none" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "post_list", section: section, section_column: 1, position: 0)
+    base = inside.updated_at.iso8601(6)
+
+    patch "#{blocks_path}/#{inside.id}", params: { block: { settings: { tag: "rails" } }, base_updated_at: base }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='block-#{inside.id}-tile-summary']" do
+      assert_select "template", text: /All posts · tag rails/
+    end
+    assert_not_includes response.body, "Needs fixing"
+
+    travel 1.minute do
+      patch "#{blocks_path}/#{inside.id}", params: { block: { settings: { tag: "ruby" } }, base_updated_at: base }, as: :turbo_stream
+    end
+    assert_response :conflict
+    assert_not_includes response.body, "tile-summary"
+  end
+
+  test "the page editor draws a section as a card of lanes with every block's form under them, and only on the default language's tab" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    inside = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    get "/cs-studio/pages/#{@page.id}"
+    assert_response :success
+    assert_select "#content-blocks-list > .admin-block-card", count: 2
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card[data-controller~='admin--section']"
+    assert_select "#section-#{section.id}-lane-2 > ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-tile"
+    assert_select "#section-#{section.id}-panels > #block-#{inside.id}-panel[hidden] form[action$='/content_blocks/#{inside.id}']"
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--blocks-target='card']"
+
+    get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+    assert_response :success
+    assert_select ".admin-section-card", count: 0
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}[data-admin--blocks-target='card']"
+  end
+
+  test "an Undo of a reorder re-renders a section as its card, tiles and forms included" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    other = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, other.id ], undo: 1 }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=update][target='content-blocks-list'] template" do
+      assert_select ".admin-section-card ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-tile"
+      assert_select ".admin-section-card #block-#{inside.id}-panel[hidden]"
+    end
+  end
+
   # One "Add block" row at the end of the list (design pass round 2): the
   # between-cards pickers are gone, so an append only streams the new card in
   # before that row -- nothing about the previously-last card changes (its

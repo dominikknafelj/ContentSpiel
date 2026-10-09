@@ -1,0 +1,34 @@
+<div id="<%= dom_id %>" data-block-id="<%= section.id %>" data-container data-admin--blocks-target="card"
+     data-controller="admin--section" data-action="keydown.esc->admin--section#escape"
+     class="admin-block-card admin-section-card rounded-cs border border-line-strong bg-sunken">
+  <div class="flex items-center gap-2 p-3">
+    <% if editable? %>
+      <%# The block card's own handle, class and actions: `admin--blocks` drags and
+          moves a section's card as it does any card of the list. %>
+      <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              aria-label="<%= t(".move") %>" aria-describedby="block-drag-help"
+              data-action="keydown->admin--blocks#key focusout->admin--blocks#blur">⠿</button>
+    <% end %>
+
+    <%# The name collapses the card, as a block card's does. Collapsed, the header is the
+        whole card: "Section · 3 columns · 5 blocks" (sections spec §4.1). %>
+    <button type="button" class="shrink-0 truncate text-left text-sm font-semibold text-ink"
+            aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--blocks#toggle">
+      <%= t(".name") %>
+    </button>
+    <span class="shrink-0 text-sm text-meta" aria-hidden="true">·</span>
+    <span id="<%= summary_id %>" class="min-w-0 flex-1 truncate text-sm text-dim"><%= t(".columns", count: section.column_count) %> · <%= t(".blocks", count: blocks.size) %></span>
+  </div>
+
+  <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 px-3 pb-3">
+    <%= render lanes %>
+
+    <%# Every block's form, hidden, one shown at a time (see the component). No gap
+        between hidden panels: `hidden` takes them out of the flex layout. %>
+    <div id="<%= panels_id %>" class="flex flex-col">
+      <% blocks.each do |block| %>
+        <%= render panel(block) %>
+      <% end %>
+    </div>
+  </div>
+</div>

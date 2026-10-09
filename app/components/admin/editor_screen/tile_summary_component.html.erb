@@ -1,0 +1,11 @@
+<%# `min-h-[1lh]`: a tile with no line keeps the height of one, so the tiles of a lane line up. %>
+<span id="<%= dom_id %>" class="admin-block-tile__summary flex min-h-[1lh] min-w-0 items-center gap-1.5 text-sm text-dim">
+  <% if attention? %>
+    <%# Never colour alone: the mark is a glyph with a name, and the line beside it says what is wrong. %>
+    <span class="shrink-0 font-semibold text-warn-ink" role="img" aria-label="<%= t(".attention") %>">!</span>
+  <% end %>
+  <% if thumbnail_url %>
+    <%= tag.img src: thumbnail_url, alt: "", class: "size-6 shrink-0 rounded-cs border border-line object-cover" %>
+  <% end %>
+  <span class="truncate"><%= line %></span>
+</span>

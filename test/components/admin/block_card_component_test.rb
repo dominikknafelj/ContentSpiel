@@ -173,4 +173,78 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
 
     assert_not_equal Admin::BlockCardComponent.error_prefix(first), Admin::BlockCardComponent.error_prefix(second)
   end
+
+  test "as a panel it is the block's own form with a heading naming its column, hidden, and no card chrome" do
+    page = create_page(title: "Panel")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
+
+    assert_selector "#block-#{block.id}-panel[hidden][data-admin--section-target='panel'][data-block-id='#{block.id}']", visible: :all
+    assert_selector "#block-#{block.id}-panel-title", text: "Image · column 2", visible: :all
+    assert_selector "form[action$='/content_blocks/#{block.id}'][data-controller~='admin--autosave']", visible: :all
+    assert_selector "#block-#{block.id}-save-status", visible: :all
+    assert_no_selector ".admin-block-card__handle", visible: :all
+    assert_no_selector "[data-admin--blocks-target='card']", visible: :all
+    assert_selector "button[data-action='admin--section#close']", visible: :all
+  end
+
+  test "as a list card it is exactly what it was" do
+    page = create_page(title: "List")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: page)
+
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}[data-admin--blocks-target='card']"
+    assert_no_selector "[data-admin--section-target]"
+  end
+
+  # The panel has the block's `dom_id` nowhere: in a section that id is the
+  # tile's, and two elements with it would make a stream's target ambiguous.
+  test "a panel has no menu, no collapse button and not the block's dom id, and is a region named by its heading" do
+    page = create_page(title: "Panel chrome")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
+
+    assert_no_selector "##{ActionView::RecordIdentifier.dom_id(block)}", visible: :all
+    assert_no_selector "button[aria-label='Block actions']", visible: :all
+    assert_no_selector "[data-action$='admin--blocks#toggle']", visible: :all
+    assert_selector "#block-#{block.id}-panel[role='region'][aria-labelledby='block-#{block.id}-panel-title']", visible: :all
+  end
+
+  test "an unavailable block's panel says so and can still be closed" do
+    page = create_page(title: "Unavailable panel")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    block.update_column(:block_type, "gone/thing")
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block.reload, locale: "en", placement: :panel)
+
+    assert_selector "#block-#{block.id}-panel", text: "Unavailable type — gone/thing", visible: :all
+    assert_selector "button[data-action='admin--section#close']", visible: :all
+    assert_no_selector "form[data-controller~='admin--autosave']", visible: :all
+  end
+
+  test "as a group card it has the type's name and neither handle, menu nor targets" do
+    page = create_page(title: "Group")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: page, placement: :group)
+
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}", text: "Rich text"
+    assert_selector "form[data-controller~='admin--autosave']"
+    assert_no_selector ".admin-block-card__handle"
+    assert_no_selector "button[aria-label='Block actions']"
+    assert_no_selector "[data-admin--blocks-target], [data-admin--section-target]"
+  end
+
+  test "an unknown placement is refused" do
+    page = create_page(title: "Placement")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    assert_raises(ArgumentError) { Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :tile) }
+  end
 end
