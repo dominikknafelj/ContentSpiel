@@ -198,3 +198,12 @@ Four follow-ups, the same day:
 10. **Sections take no notes of their own.** No marker on a section card, no "Add note" in its menu: a section has no content of its own to discuss, its notes belong on the blocks inside. "Remove section, keep blocks" stays instant.
 11. **The thread view's header.** While a thread is open the drawer's own header is hidden; row 1 is "← All notes 4", the Notify link and Close. "New note" comes back with the list.
 12. **Mind graph card.** The document order follows the screen: title, the open notes, "Start a note…", then Open post, Focus and Pin. The keyboard rule changes with it: Enter on the selected node opens the post.
+
+Six more, after live delivery was built:
+
+13. **Account screen.** Name and the two note switches are **one form with one save footer**; the password keeps its own form and footer. (Name and notifications are preferences that save the same way; a password change is a separate, secure step.)
+14. **The permission line** ("Allow in this browser") shows **only while the desktop switch is on**.
+15. **Turning the switch on.** The info line is enough: accent-toned, with "Allow in this browser". The warn tone is for the blocked state only ("Blocked in this browser. Change it in the site settings of your browser.").
+16. **The "Allow in this browser" button** is the shared small secondary button (14px/600), not the 12px/500 given above.
+17. **Small screens.** Over a thread the sheet's header is hidden too, and there is one row: "← All notes 4", the Notify link, and "Back to <title>" as a text button on the right.
+18. **Several notes at once.** The first two notes of a burst (within about 10 s) get their own toasts. From the third, they are replaced by one toast, "You have 3 new notes", whose Open goes to the inbox; its count updates as more arrive and its 8 s timer restarts. The sound plays once per burst.
