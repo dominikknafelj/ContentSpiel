@@ -16,7 +16,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
 
     assert_equal({ id: a.id, title: "Alpha", type: "resume_entry", colour_index: ContentTypes.fetch("resume_entry").colour_index,
                    status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1, related_count: 1, tag_count: 0,
-                   open_notes: 0, unread_notes: false }, node)
+                   open_notes: 0 }, node)
   end
 
   # The selection card says "N related · N tags": the two halves of `degree`,
@@ -206,31 +206,19 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     assert_equal few, capture_sql { graph }.size
   end
 
-  # What turns a node's badge accent (notes spec §4.5): the viewer has an
-  # unread delivery on one of the post's OPEN threads. It is read in the
-  # statement that counts them, so a viewer costs no statement more than none.
-  test "a node says whether its open notes hold something unread for the viewer, in the statement that counts them" do
+  # The badge is neutral (handoff, "Mind graph node badge"): what is unread
+  # for the viewer is said on the card's rows, never on the node. So the
+  # graph's data says nothing about the viewer's deliveries, and reads none.
+  test "a node says nothing about what is unread for the viewer, and no delivery is read for the graph" do
     a = create_post(title: "A")
-    b = create_post(title: "B")
-    c = create_post(title: "C")
-    relate(a, b)
-    relate(b, c)
-    as(users(:two)) do
-      Notes::Start.call(a, body: "For @[#{users(:one).id}]")
-      Notes::Start.call(a, body: "For nobody")
-      Notes::Start.call(b, body: "For nobody")
-      Notes::Resolve.call(Notes::Start.call(c, body: "Was for @[#{users(:one).id}]").record)
-    end
-
-    nodes = graph(actor: users(:one))[:nodes].index_by { |node| node[:id] }
-    assert_equal [ [ 2, true ], [ 1, false ], [ 0, false ] ], [ a, b, c ].map { |post| nodes[post.id].values_at(:open_notes, :unread_notes) }
-    assert_equal [ false ], graph(actor: users(:two))[:nodes].map { |node| node[:unread_notes] }.uniq, "the author is told nothing about their own notes"
-    assert_equal [ false ], graph[:nodes].map { |node| node[:unread_notes] }.uniq, "no viewer, nothing unread"
-
+    relate(a, create_post(title: "B"))
+    as(users(:two)) { Notes::Start.call(a, body: "For @[#{users(:one).id}]") }
     viewer = users(:one)
-    assert_equal capture_sql { graph }.size, capture_sql { graph(actor: viewer) }.size
-    statements = capture_sql { graph(actor: viewer) }
-    assert_equal 1, statements.count { |sql| sql.include?("note_threads") }, statements.grep(/note_/).join("\n")
+
+    statements = capture_sql { assert(graph(actor: viewer)[:nodes].none? { |node| node.key?(:unread_notes) }) }
+
+    assert_equal 1, statements.count { |sql| sql.include?("note_threads") }
+    assert_empty statements.grep(/note_deliveries/)
   end
 
   # Five statements before notes (the readable ids, the relations, the tag

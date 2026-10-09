@@ -796,9 +796,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # In order (the design review of 2026-10-08): the type's dot, the type and
   # the status chip with Close at the end of the row; the title; the counts;
   # then the actions, which are CS Studio's buttons -- the primary one first --
-  # and not underlined links; then a post's notes (notes spec §4.4), before
-  # Close.
-  test "the card reads top to bottom: kind and status, the title, the two counts, then its actions as buttons, then its notes" do
+  # and not underlined links. A post's notes come after the actions in the
+  # document, so Tab meets "Open post" first, and are DRAWN above them, under
+  # the title and its counts (handoff, "Node card thread list").
+  test "the card reads top to bottom: kind and status, the title, the two counts, its notes, then its actions as buttons" do
     a = create_post(title: "Alpha", tags: %w[one two])
     b = create_post(title: "Beta", tags: %w[one two])
     PostRelation.create!(post: a, related_post: b)
@@ -820,6 +821,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_equal [ "Open post", "Focus", "Pin" ], all(":scope > div:nth-child(4) > *").map(&:text)
       assert_equal %w[A A BUTTON], all(":scope > div:nth-child(4) > *").map(&:tag_name).map(&:upcase)
     end
+    # On screen: the counts, the notes, the actions.
+    notes = element_box("[data-mind-graph-card] > section")
+    assert_operator element_box("[data-mind-graph-card] > p")["bottom"], :<=, notes["top"], "the notes are not under the counts"
+    assert_operator notes["bottom"], :<=, element_box("[data-mind-graph-card] > div:nth-child(4)")["top"], "the actions are not under the notes"
     close = element_box("[data-mind-graph-card-close]")
     box = element_box("[data-mind-graph-card]")
     assert_operator box["right"] - close["right"], :<, 12, "Close is not in the card's right corner"
@@ -1249,11 +1254,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_node(a.id)
     assert_selector "[data-mind-graph-card]", visible: :visible
 
-    # Away from the card, which stands on the node's right and, with a post's
-    # notes in it, reaches 126 px below the node's centre: the driver's mouse
-    # does not keep the canvas's pointer capture, so a move that ends over
-    # the card would never reach the canvas and no drag would begin.
-    drag_node(a.id, by: [ -60, 90 ], release: false)
+    # Towards the card and over where it stands, in small steps as a hand
+    # moves: the first few pixels make the press a drag, which takes the card
+    # out of the way before the pointer gets there.
+    drag_node(a.id, by: [ 60, 90 ], release: false, steps: 12)
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal a.id.to_s, graph["data-selected"], "the drag cleared the selection"
     page.driver.browser.mouse.up
@@ -1663,7 +1667,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row][data-unread]", text: "Check the dates"
     # The heading is in the small upper-case label style: matched whatever the case, as the card's counts are.
-    assert_selector "[data-mind-graph-card-notes] h3", text: /1 open note/i
+    assert_selector "[data-mind-graph-card-notes] h3", text: /open notes · 1/i
+    # Unread is said in words too, for whoever does not see the ink and the dot.
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row][data-unread] .sr-only", text: "new", visible: :all
     # The row leads into the post's editor with the drawer open at that thread.
     thread = Notes::Thread.order(:id).last
     assert_selector "[data-mind-graph-card-notes] li[data-note-row] a[href$='/posts/#{a.id}?notes=open&thread=#{thread.id}']"
@@ -1673,7 +1679,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     end
 
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
-    assert_selector "[data-mind-graph-card-notes] h3", text: /2 open notes/i
+    assert_selector "[data-mind-graph-card-notes] h3", text: /open notes · 2/i
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]:not([data-unread])", count: 1
+    assert_selector "[data-mind-graph-card-notes] .sr-only", count: 1, visible: :all # the viewer's own note is not "new"
     assert_equal "", find("[data-mind-graph-card-notes] textarea").value
     assert_equal [ "mind_graph", a ], Notes::Thread.order(:id).last.then { |started| [ started.origin_view, started.subject ] }
     # Listing a post's notes in the card read none of them (decision P10).
@@ -1756,6 +1764,31 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
     assert_selector "[data-legend='notes']", text: "Open notes"
+  end
+
+  # A second click on the node the card is already about leaves the card as
+  # it is: the note being typed in it is not thrown away, and its notes are
+  # not fetched again.
+  test "clicking the selected node again keeps the card and what is typed in it" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 1
+    find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
+    page.execute_script("document.querySelector('[data-mind-graph-card-notes]').dataset.same = 'yes'; window.notesFetches = 0; window.realFetch = window.fetch; window.fetch = (...args) => { if (String(args[0]).includes('/notes/')) window.notesFetches += 1; return window.realFetch(...args) }")
+
+    click_node(a.id)
+    await_frames
+
+    assert_equal a.id.to_s, graph["data-selected"]
+    assert_selector "[data-mind-graph-card-notes][data-same='yes']"
+    assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
+    assert_equal 0, page.evaluate_script("window.notesFetches"), "the card's notes were fetched again"
+  ensure
+    page.execute_script("if (window.realFetch) { window.fetch = window.realFetch; delete window.realFetch }") # the window is shared with what follows
   end
 
   # A note started from the card is on the canvas at once: the node's badge
@@ -2066,7 +2099,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # drag: on a slow runner that was more than the two pixels allowed below,
   # and "the node is where it was dropped" timed out. A person presses where
   # the node is; a test can only press where it was.
-  def drag_node(id, by:, release: true)
+  def drag_node(id, by:, release: true, steps: 1)
     assert_selector "#{GRAPH}[data-settled]", wait: 15
     from = screen_position(id)
     assert from, "node #{id} is not on screen"
@@ -2074,8 +2107,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse = page.driver.browser.mouse
     mouse.move(x: from["x"], y: from["y"])
     mouse.down
-    mouse.move(x: from["x"] + (by[0] / 2), y: from["y"] + (by[1] / 2))
-    mouse.move(x: to["x"], y: to["y"])
+    mouse.move(x: from["x"] + (by[0] / 2), y: from["y"] + (by[1] / 2), steps: steps)
+    mouse.move(x: to["x"], y: to["y"], steps: steps)
     await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{id.to_json}); return Math.abs(p.x - #{to["x"]}) < 2 && Math.abs(p.y - #{to["y"]}) < 2 })()")
     mouse.up if release
     to

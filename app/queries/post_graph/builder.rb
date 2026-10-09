@@ -19,13 +19,10 @@
 #   post's own tags are its neighbours). `keep_tag` is the one exception: a
 #   local view's focused tag is always a node.
 #
-# A post also carries its notes (notes spec §4.4, §4.5): `open_notes`, the
-# number of its open threads, which the page draws as a badge on the node, and
-# `unread_notes`, whether one of them holds a delivery `viewer` has not read,
-# which turns that badge accent. `viewer` is the `User` looking, or nil (a
-# token, the console): then nothing is unread. It has no default, like the
-# callers' `actor:` and `url_for:`, so no graph is drawn for nobody by
-# forgetting it.
+# A post also carries `open_notes` (notes spec §4.4): the number of its open
+# threads, which the page draws as a neutral badge on the node. Nothing about
+# the viewer is in it: what is unread for them is said on the rows of the
+# node's card, which come from the notes' own endpoint.
 #
 # Three queries: the posts (only the columns a node is made from), the tags'
 # names, and the posts' notes.
@@ -33,10 +30,9 @@ module PostGraph
   class Builder
     COLUMNS = %i[id title content_type published_at].freeze
 
-    def initialize(locale:, url_for:, viewer:)
+    def initialize(locale:, url_for:)
       @locale = locale
       @url_for = url_for
-      @viewer = viewer
     end
 
     def call(post_ids:, relations:, tag_links:, tag_counts:, min_tag_edges:, keep_tag: nil)
@@ -66,12 +62,11 @@ module PostGraph
     private
 
     def nodes(post_ids, related_count, tag_count)
-      # The posts' open threads and whether they hold something unread, in one
-      # grouped query whatever the number of nodes. The ids were narrowed by
-      # the read scope by whoever built them (which leaves the trash out), so
-      # no count is for a post the viewer can't read: `Notes::Counts` itself
-      # hides nothing.
-      notes = Notes::Counts.open_and_unread("Post", post_ids.to_a, @viewer)
+      # The posts' open threads, in one grouped query whatever the number of
+      # nodes. The ids were narrowed by the read scope by whoever built them
+      # (which leaves the trash out), so no count is for a post the viewer
+      # can't read: `Notes::Counts` itself hides nothing.
+      notes = Notes::Counts.by_container("Post", post_ids.to_a)
       Post.where(id: post_ids).select(*COLUMNS).order(:id).map do |post|
         {
           id: post.id,
@@ -83,8 +78,7 @@ module PostGraph
           degree: related_count[post.id] + tag_count[post.id],
           related_count: related_count[post.id],
           tag_count: tag_count[post.id],
-          open_notes: notes.dig(post.id, 0) || 0,
-          unread_notes: notes.dig(post.id, 1) || false
+          open_notes: notes.fetch(post.id, 0)
         }
       end
     end

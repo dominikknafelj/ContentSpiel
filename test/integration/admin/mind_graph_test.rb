@@ -79,9 +79,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "%{title}: post, %{count} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
     assert_equal "Posts · %{count}", messages["mind_graph.script.list.posts"]
     assert_equal "Showing the %{shown} nearest of %{total} posts around this one.", messages["mind_graph.script.capped_local"]
-    assert_equal({ "one" => "%{count} open note", "other" => "%{count} open notes" }, messages["mind_graph.script.card.notes.title"])
+    assert_equal "Open notes · %{count}", messages["mind_graph.script.card.notes.title"]
     assert_equal %w[capped capped_local card.close card.focus card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more card.notes.replies
-                    card.notes.title card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
+                    card.notes.title card.notes.unread card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only list.empty list.posts list.select_post list.select_tag list.tags load_failed loading no_connections
                     release_pinned retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort

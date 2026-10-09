@@ -45,7 +45,7 @@ module PostGraph
       tag_counts = PostTag.where(tag_id: @tags.keys, post_id: @readable).group(:tag_id).count
 
       kept = cut(post_ids, relations, tag_links)
-      graph = Builder.new(locale: @locale, url_for: @url_for, viewer: (@actor if @actor.is_a?(User)))
+      graph = Builder.new(locale: @locale, url_for: @url_for)
                      .call(post_ids: kept, relations: relations, tag_links: tag_links, tag_counts: tag_counts,
                            min_tag_edges: 1, keep_tag: (@focus.id if @focus.kind == "tag"))
       graph.merge(total: post_ids.size, shown: kept.size,

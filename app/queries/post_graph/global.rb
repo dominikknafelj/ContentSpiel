@@ -41,7 +41,7 @@ module PostGraph
       tag_links.each { |tag_id, post_id| weight[post_id] += 1 if tag_counts[tag_id] >= MIN_TAGGED_POSTS }
 
       kept = weight.keys.sort_by { |id| [ -weight[id], -stamps[id].to_f, id ] }.first(@cap)
-      graph = Builder.new(locale: @locale, url_for: @url_for, viewer: (@actor if @actor.is_a?(User)))
+      graph = Builder.new(locale: @locale, url_for: @url_for)
                      .call(post_ids: kept, relations: relations, tag_links: tag_links, tag_counts: tag_counts, min_tag_edges: MIN_TAGGED_POSTS)
       graph.merge(total: weight.size, shown: kept.size, isolated: stamps.size - weight.size)
     end

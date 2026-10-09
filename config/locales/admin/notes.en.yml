@@ -69,9 +69,7 @@ en:
       script:
         card:
           notes:
-            title:
-              one: "%{count} open note"
-              other: "%{count} open notes"
+            title: "Open notes · %{count}"
             label: "Write a note on this post"
             add: "Add note"
             replies:
@@ -81,6 +79,9 @@ en:
               one: "+%{count} more"
               other: "+%{count} more"
             deleted_user: "a deleted user"
+            # Read out after a row that holds something the viewer has not
+            # read; on screen the row says it with ink and the accent dot.
+            unread: "new"
             failed: "The notes couldn't be loaded or saved. Try again."
     components:
       # The legend's swatch for a node's notes badge.

@@ -11,9 +11,14 @@
 // tag's "2 posts"); then the actions, which LOOK like CS Studio's buttons and are what
 // they do: "Open post", "Focus" and a tag's "Show posts with this tag" lead
 // somewhere, so they are links; Pin / Unpin changes the graph, so it is a
-// button. A post's card then has its open notes and a field to start one
-// (`card_notes.js`; notes spec §4.4): the fifth part, before Close. A tag has
-// no notes.
+// button. A post's card also has its notes (`card_notes.js`; notes spec §4.4;
+// handoff, "Node card thread list"): "Open notes · N", the rows and the field
+// that starts a note. ON SCREEN they stand under the title and its counts,
+// and the actions follow them; IN THE DOCUMENT the actions come first, so the
+// Tab key still meets "Open post" before a note's links and field -- the
+// rule the Close button's place already follows. The card is a column, and
+// the actions' row is ordered after the rest (`order-1`), which is all that
+// differs. A tag has no notes.
 //
 // Built with `textContent` and `href` only: a title or a tag's name is the
 // editor's text, whatever it contains. A URL comes from a template the server
@@ -109,7 +114,8 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
   }
 
   function actions(...links) {
-    const row = element("div", "mt-1 flex flex-wrap gap-1.5")
+    // `order-1`: drawn after a post's notes, which follow it in the document.
+    const row = element("div", "order-1 mt-1 flex flex-wrap gap-1.5")
     pin = element("button", buttonClasses.secondary)
     pin.type = "button"
     pin.dataset.mindGraphCardPin = ""

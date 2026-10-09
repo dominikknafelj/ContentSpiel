@@ -325,7 +325,9 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     get @base, params: { compose: "ContentBlock-#{@block.id}", note_quote: "€49 a month" }, headers: frame
     assert_equal "#{@base}?compose=ContentBlock-#{@block.id}&note_quote=[FILTERED]", request.filtered_path
     assert_equal "[FILTERED]", request.filtered_parameters["note_quote"]
-    assert_not_includes request.filtered_path, "49"
+    # The quote's own words, and its euro sign as a URL carries it: a bare
+    # "49" would also be found in a record's id.
+    [ "month", "%E2%82%AC", "€" ].each { |part| assert_not_includes request.filtered_path, part }
     assert_select "#notes-new input[type=hidden][name=quote][value='€49 a month']"
     assert_select "#notes-new blockquote", text: "€49 a month"
 

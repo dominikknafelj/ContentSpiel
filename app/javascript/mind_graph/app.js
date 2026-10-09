@@ -382,6 +382,10 @@ export function mount(element) {
 
   function select(index) {
     openedFromRow = null
+    // The node the card already shows: a second click on it, or a filter
+    // change that keeps it, must not build the card again -- that would
+    // throw away a note half typed in it and fetch its notes once more.
+    const shown = index >= 0 && index === state.selected && cardElement.childElementCount > 0
     state.selected = index
     state.neighbours = new Set()
     if (index >= 0) {
@@ -395,7 +399,7 @@ export function mount(element) {
     element.dataset.neighbours = Array.from(state.neighbours, (neighbour) => state.nodes[neighbour].id).join(",")
     if (index >= 0) {
       // Without a layout there is nothing to pin (the worker failed).
-      card.show(state.nodes[index], { pinned: state.pinned.has(index), pinnable: Boolean(layout) })
+      if (!shown) card.show(state.nodes[index], { pinned: state.pinned.has(index), pinnable: Boolean(layout) })
       measureCard()
     } else {
       card.hide()

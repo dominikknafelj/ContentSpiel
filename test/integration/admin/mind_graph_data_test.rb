@@ -33,8 +33,8 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
   end
 
   # Notes spec §4.4: every post node says how many open notes its post has,
-  # and whether one of them holds something the viewer has not read (§4.5).
-  test "every node carries its post's open notes and whether they hold something unread for the viewer" do
+  # and nothing about the viewer (the badge is neutral).
+  test "every node carries its post's open notes" do
     a = create_post(title: "A")
     b = create_post(title: "B")
     PostRelation.create!(post: a, related_post: b)
@@ -42,10 +42,10 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
 
     get "/cs-studio/mind_graph/data"
-    assert_equal [ [ a.id, 1, true ], [ b.id, 0, false ] ], data["nodes"].map { |n| n.values_at("id", "open_notes", "unread_notes") }
+    assert_equal [ [ a.id, 1, false ], [ b.id, 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
 
     get "/cs-studio/mind_graph/data", params: { post: b.id }
-    assert_equal [ [ a.id, 1, true ], [ b.id, 0, false ] ], data["nodes"].map { |n| n.values_at("id", "open_notes", "unread_notes") }
+    assert_equal [ [ a.id, 1, false ], [ b.id, 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
   end
 
   test "post= and depth= answer that post's neighbourhood" do

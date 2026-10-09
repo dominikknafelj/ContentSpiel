@@ -22,10 +22,12 @@
 // that fills a section nobody sees.
 //
 // `cardNotes(node, { text, url, postUrl, onChange })` answers the section
-// (`section[data-mind-graph-card-notes]`); a row is `li[data-note-row]`, with
-// `data-unread` and the accent dot while it holds something the viewer has
-// not read (spec §4.5: the one meaning accent has in notes), and the link to
-// the rest is `a[data-note-more]`.
+// (`section[data-mind-graph-card-notes]`), which the card draws under the
+// title and above its actions (`card.js` says how); a row is `li[data-note-row]`, with
+// `data-unread` while it holds something the viewer has not read -- ink for
+// dim, the accent dot (spec §4.5: the one meaning accent has in notes) and
+// the word "new" for a screen reader, so it is never colour alone -- and the
+// link to the rest is `a[data-note-more]`.
 const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
 // Three rows, then "+N more" (handoff, "Node card thread list").
 const ROWS = 3
@@ -47,7 +49,7 @@ function element(tag, className, content) {
 }
 
 export function cardNotes(node, { text, url, postUrl, onChange }) {
-  const section = element("section", "mt-1 flex flex-col gap-2 border-t border-line pt-2")
+  const section = element("section", "flex flex-col gap-2")
   section.dataset.mindGraphCardNotes = ""
   const heading = element("h3", LABEL)
   const list = element("ul", "m-0 flex list-none flex-col gap-2 p-0")
@@ -103,6 +105,8 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
 
     if (thread.unread) {
       item.dataset.unread = ""
+      // In words, for whoever does not see the ink and the dot.
+      lines.append(element("span", "sr-only", text.t("mind_graph.script.card.notes.unread")))
       const dot = element("span", "mt-1.5 size-[7px] rounded-full bg-accent")
       dot.setAttribute("aria-hidden", "true")
       item.append(dot)

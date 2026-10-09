@@ -6,9 +6,8 @@
 // `watchTheme` answers a function that stops watching. The theme changes when
 // `<html data-theme>` does (`theme_controller.js`) or, with no explicit
 // choice, when the system's scheme does.
-// `line` and `accentTint` are the notes badge's: its border, and its fill
-// while its post's notes hold something unread for the viewer.
-const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", surface: "--cs-surface", sunken: "--cs-sunken", accent: "--cs-accent", line: "--cs-line-strong", accentTint: "--cs-accent-tint" }
+// `line` is the border of the notes badge.
+const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", surface: "--cs-surface", sunken: "--cs-sunken", accent: "--cs-accent", line: "--cs-line-strong" }
 const CATEGORIES = 6
 
 export function readTheme(element) {
