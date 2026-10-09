@@ -285,6 +285,65 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert ContentBlocks::Save.call(stale, attributes: { settings: { "layout" => "two", "background" => "tinted" } }, actor: nil).ok?
 
     assert_equal [ 2, 0 ], arrived.reload.then { |b| [ b.section_column, b.position ] }
+    assert_equal %w[two tinted], section.reload.settings.values_at("layout", "background")
+  end
+
+  # The same stale copy, sending nothing but the layout it already believes
+  # in. Judged against that copy the settings are unchanged, no UPDATE would
+  # be issued and the row would keep "four" while its blocks were folded to
+  # two columns. The section is re-read under the lock, so the save is the
+  # narrowing it looks like: the row says "two", the event says so too.
+  test "a stale copy that sends only the layout it already holds narrows the stored section and folds, as one event" do
+    page = create_page(title: "Stale layout")
+    section = section_on(page, layout: "two")
+    stale = ContentBlock.find(section.id)
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "four" } }, actor: nil).ok?
+    third = add_to(section, 3).record
+    fourth = add_to(section, 4).record
+    # Past the audit log's coalescing window, so the narrowing is an event
+    # of its own to read here and not an extension of the widening's row.
+    travel Audit::COALESCE_WINDOW + 1.minute
+
+    assert_difference -> { Audit::Event.where(action: "block.updated").count }, 1 do
+      assert ContentBlocks::Save.call(stale, attributes: { settings: { "layout" => "two" } }, actor: nil).ok?
+    end
+
+    assert_equal "two", section.reload.settings["layout"]
+    assert_equal [ [ third.id, 2, 0 ], [ fourth.id, 2, 1 ] ], ContentBlock.where(section_id: section.id).reorder(:position).pluck(:id, :section_column, :position)
+    event = Audit::Event.where(action: "block.updated").last
+    assert_equal [ third.id, fourth.id ], event.metadata["folded_block_ids"]
+    assert_equal %w[four two], event.field_changes["settings"].map { |settings| settings["layout"] }
+  end
+
+  # And a save that does not name the layout at all moves nothing, whatever
+  # the copy it was made from believes the layout to be.
+  test "a stale copy's save that leaves the layout alone folds nothing and keeps the stored layout" do
+    page = create_page(title: "Stale background")
+    section = section_on(page, layout: "two")
+    stale = ContentBlock.find(section.id)
+    idle = ContentBlock.find(section.id)
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "four" } }, actor: nil).ok?
+    fourth = add_to(section, 4).record
+
+    assert ContentBlocks::Save.call(stale, attributes: { settings: { "background" => "strong" } }, actor: nil).ok?
+    assert_no_difference -> { Audit::Event.count } do
+      assert ContentBlocks::Save.call(idle, actor: nil).ok?
+    end
+
+    assert_equal %w[four strong], section.reload.settings.values_at("layout", "background")
+    assert_equal [ 4, 0 ], fourth.reload.then { |b| [ b.section_column, b.position ] }
+  end
+
+  test "a section deleted by another tab is a failure for the save that still holds it, not an exception" do
+    page = create_page(title: "Gone section")
+    section = section_on(page)
+    stale = ContentBlock.find(section.id)
+    assert ContentBlocks::Destroy.call(section, actor: nil).ok?
+
+    result = ContentBlocks::Save.call(stale, attributes: { settings: { "layout" => "two" } }, actor: nil)
+
+    assert_not result.ok?
+    assert_equal [ "This block no longer exists" ], result.errors
   end
 
   test "a structural save locks the page's row before it writes, and a save outside a section takes no such lock" do
@@ -302,5 +361,28 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
       assert_operator locks.call(statements), :<, first_write.call(statements)
     end
     assert_nil locks.call(outside)
+  end
+
+  # The lock order (fix round 1). A fold, a lift and a section's delete take
+  # the page's row and then write the rows of the blocks in the section; an
+  # ordinary save of one of those blocks used to write its own row and then
+  # take the page's (the owner's touch). Two tabs doing one each could wait
+  # on each other until Postgres aborted one. So the page's row comes first
+  # for any block in a section; a top-level block's save is as it was.
+  test "an ordinary save of a block in a section locks the page's row before its own, and a top-level block's takes no such lock" do
+    page = create_page(title: "Lock order")
+    section = section_on(page)
+    inside = add_to(section, 3).record
+    outside = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, actor: nil).record
+    typing = { "en" => { body: rich_doc("Typed") } }
+
+    in_section = capture_sql { assert ContentBlocks::Save.call(inside, translations: typing, actor: nil).ok? }
+    top_level = capture_sql { assert ContentBlocks::Save.call(outside, translations: typing, actor: nil).ok? }
+
+    lock = in_section.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+    write = in_section.index { |sql| sql.start_with?('UPDATE "content_blocks"') }
+    assert_operator lock, :<, write
+    assert_empty top_level.grep(/FROM "(pages|content_blocks)".*FOR UPDATE/m)
+    assert_equal 1, top_level.count { |sql| sql.start_with?('UPDATE "content_blocks"') }
   end
 end

@@ -24,8 +24,12 @@ module ContentBlocks
   # that one changes container only through `ContentBlocks::Reorder`. A
   # section saved with a layout of fewer columns takes the blocks of the
   # removed columns along into its last one (`#fold_removed_columns`), and
-  # says which in the event's `folded_block_ids`. Both of those, and any save
-  # of a section, take the page's row lock first (`Structure#lock_owner`).
+  # says which in the event's `folded_block_ids`. Both of those, any save
+  # of a section and any save of a block that sits in one take the page's
+  # row lock first (`#locks_owner_first?`), and a section is then re-read
+  # from its row before anything is assigned (`#reread_container`). A save
+  # of a top-level block that is no section does neither: it is the same
+  # statements as before sections existed.
   class Save < ApplicationService
     include OwnerPermissions
     include Media::Choosing
@@ -53,7 +57,10 @@ module ContentBlocks
         # Before anything is read or assigned: the new block's column is
         # checked, and the section's stranded blocks are looked up, against
         # rows no other structural write can change until this one commits.
-        lock_owner(@block.owner) if structural?
+        if locks_owner_first?
+          lock_owner(@block.owner)
+          reread_container
+        end
         assign
         @block.save || raise(ActiveRecord::Rollback)
         folded = fold_removed_columns
@@ -100,12 +107,50 @@ module ContentBlocks
 
     private
 
-    # A write that changes where blocks are, or could race one that does: a
-    # new block going into a section, and any save of a section (its layout
-    # may lose columns).
-    def structural?
-      @block.container? || @attributes[:section_id].present? ||
+    # Two reasons, one lock. A write that changes where blocks are, or could
+    # race one that does, must see what the other committed: a new block
+    # going into a section, and any save of a section (its layout may lose
+    # columns). And the ORDER of locks (fix round 1): a fold, a lift and a
+    # section's delete take the page's row and then write the rows of the
+    # blocks in the section, while an ordinary save writes the block's own
+    # row and takes the page's last (the owner's touch below). One tab typing
+    # in a block in column 3 while another folds or deletes its section
+    # would each hold what the other waits for, and Postgres ends one of
+    # them with `ActiveRecord::Deadlocked`, a 500. So every save of a block
+    # that sits in a section takes the page's row first too, although it
+    # moves nothing. A top-level block that is no section is written by no
+    # structural write, so its save keeps its old order and takes no lock.
+    def locks_owner_first?
+      @block.container? || @block.section_id.present? || @attributes[:section_id].present? ||
         (@attributes[:block_type].present? && BlockTypes.find(@attributes[:block_type])&.capability?(:container)) || false
+    end
+
+    # A section is judged as its row stands under the lock, not as the
+    # caller's object was loaded before it (fix round 1). A second tab's copy
+    # may say "two" where the row has since been widened to "four": assigning
+    # `layout: "two"` to that copy changes nothing on it, so no UPDATE would
+    # be issued and no field change recorded, yet the fold below would read
+    # the copy's two columns and move the blocks -- a row that says four
+    # columns with its blocks folded into two. Re-read, the same save is the
+    # narrowing it looks like, and one that names no layout leaves it alone.
+    #
+    # The stale-save guard is not weakened: it runs in the controller, before
+    # this service is called, against the record as that request loaded it
+    # (`AutosaveResponses#refuse_stale_autosave`), and has refused or let the
+    # save through by now. Nothing the caller assigned is lost either: a
+    # service's block carries no unsaved change of its own, everything
+    # arrives in `attributes` and `translations`.
+    #
+    # Only a persisted container: no other block's settings decide where
+    # other blocks are. A section another tab deleted meanwhile is a failure
+    # with a message, where the UPDATE of a missing row would have "saved".
+    def reread_container
+      return unless @block.persisted? && @block.container?
+
+      @block.reload
+    rescue ActiveRecord::RecordNotFound
+      @block.errors.add(:base, "This block no longer exists")
+      raise ActiveRecord::Rollback
     end
 
     def assign

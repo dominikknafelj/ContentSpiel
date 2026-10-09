@@ -70,6 +70,17 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
     assert_nil capture_sql { assert ContentBlocks::Destroy.call(@before, actor: nil).ok? }.index { |sql| sql.include?("FOR UPDATE") }
   end
 
+  # The same order as every other write that touches a block in a section
+  # (fix round 1): the page's row, then the block's. It also keeps the
+  # renumbering of the column from racing a fold into it.
+  test "a delete of a block in a section locks the page's row before it deletes the block" do
+    statements = capture_sql { assert ContentBlocks::Destroy.call(@left_a, actor: nil).ok? }
+    lock = statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+    delete = statements.index { |sql| sql.start_with?('DELETE FROM "content_blocks"') }
+
+    assert_operator lock, :<, delete
+  end
+
   test "a section's delete is refused whole for an actor without the page's edit right" do
     @page.update!(published_at: nil)
     nobody = User.create!(email_address: "nobody-destroy@example.com", password: "a long enough password")
