@@ -117,7 +117,9 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(@inside, body: "Wrong picture") }
     open_editor
 
-    assert_selector "#delete-section-#{@section.id} [data-admin--notes-target=warning]", visible: :all, text: "This block has 1 open note. It will be deleted with it."
+    # The section's own sentence (the handoff's decision 7), not the block's.
+    assert_selector "#delete-section-#{@section.id} [data-admin--notes-target=warning]", visible: :all, text: "This section and its blocks have 1 open note. It will be deleted too."
+    assert_selector "#delete-block-#{@inside.id} [data-admin--notes-target=warning]", visible: :all, text: "This block has 1 open note. It will be deleted with it."
     assert_selector "#delete-block-#{@text.id} [data-admin--notes-target=warning]", visible: :all, text: ""
     # An empty warning takes no room in the dialog: the box that holds it alone
     # is not laid out, while the section's, which also holds a sentence, is.
@@ -125,6 +127,32 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_equal "none", holder_display.call("delete-block-#{@text.id}")
     assert_equal "block", holder_display.call("delete-section-#{@section.id}")
     assert_equal "block", holder_display.call("delete-block-#{@inside.id}")
+  end
+
+  # The handoff's decision 7. The number is the section's own open notes and
+  # its blocks' together.
+  test "a section's delete warning adds its own open notes to its blocks', in the plural, and is gone when none is left" do
+    second = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 2, position: 0)
+    as(users(:two)) do
+      Notes::Start.call(@section, body: "Is this band needed?")
+      Notes::Start.call(@inside, body: "Wrong picture")
+      Notes::Start.call(second, body: "Too long")
+    end
+    open_editor
+    warning = "#delete-section-#{@section.id} [data-admin--notes-target=warning]"
+
+    assert_selector warning, visible: :all, text: "This section and its blocks have 3 open notes. They will be deleted too."
+
+    within(card(@section)) do
+      find("button[aria-label='Section actions']").click
+      press "Delete section and its blocks…"
+    end
+    assert_selector "dialog[open] [data-admin--notes-target=warning][data-notes-warning=section]", text: "This section and its blocks have 3 open notes. They will be deleted too."
+    within("dialog[open]") { press "Delete section" }
+
+    assert_no_selector card(@section)
+    assert_no_selector "#notes-open-count"
+    assert_equal 0, Notes::Thread.count
   end
 
   # Duplicate streams the copy's card in after its source and redraws nothing

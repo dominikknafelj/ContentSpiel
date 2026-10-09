@@ -468,8 +468,11 @@ export default class extends Controller {
       const own = within ? this.blockKey(within) : null
       if (own) keys.add(own)
       const count = [ ...keys ].reduce((sum, key) => sum + (subjects[key] || 0), 0)
+      // A section deleted with its blocks has a sentence of its own, that
+      // names both (`data-notes-warning="section"`).
+      const key = warning.dataset.notesWarning === "section" ? "notes.script.delete_section_warning" : "notes.script.delete_warning"
       warning.hidden = count === 0
-      warning.textContent = count === 0 ? "" : text.t("notes.script.delete_warning", { count })
+      warning.textContent = count === 0 ? "" : text.t(key, { count })
     })
   }
 

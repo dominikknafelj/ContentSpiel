@@ -41,7 +41,7 @@ en:
       # which lives on <body>, so they are <body>'s
       # (`Admin::MessagesHelper::SCRIPT_MESSAGES`): the header button's name,
       # a marker's name in each of its three states, and the sentence a
-      # block's delete dialog adds.
+      # block's delete dialog adds, with a section's own.
       script:
         total:
           one: "Notes, %{count} open"
@@ -55,6 +55,11 @@ en:
         delete_warning:
           one: "This block has %{count} open note. It will be deleted with it."
           other: "This block has %{count} open notes. They will be deleted with it."
+        # In the dialog of "Delete section and its blocks…": the section's
+        # own open notes and its blocks', in one number.
+        delete_section_warning:
+          one: "This section and its blocks have %{count} open note. It will be deleted too."
+          other: "This section and its blocks have %{count} open notes. They will be deleted too."
         mentions:
           none: "Nobody by that name can see this."
           count:

@@ -35,7 +35,7 @@ module Admin
       components.save_bar.changes components.save_bar.unsaved components.save_bar.no_changes components.save_bar.blocked
       components.toast.order_failed components.toast.dropped
       layout.leave_dialog.body layout.leave_dialog.body_with_count
-      notes.script.marker.add notes.script.marker.open notes.script.marker.selection notes.script.total notes.script.delete_warning
+      notes.script.marker.add notes.script.marker.open notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning
     ].freeze
 
     def admin_script_messages = messages_data(*SCRIPT_MESSAGES)

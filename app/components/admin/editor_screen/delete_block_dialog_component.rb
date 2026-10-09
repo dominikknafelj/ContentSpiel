@@ -54,8 +54,15 @@ module Admin
       # asks for it by name, so no other dialog's box can be hidden by it.
       NOTES_WARNING_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-ink".freeze
 
-      def self.notes_warning_attributes(within, spacing: nil, alone: false)
-        { hidden: true, class: [ NOTES_WARNING_CLASS, spacing ], data: { "admin--notes-target": "warning", notes_within: within, **(alone ? { notes_alone: "" } : {}) } }
+      #
+      # `kind:` picks the sentence: a block's ("This block has 2 open notes.
+      # They will be deleted with it."), or `:section` for a section deleted
+      # with its blocks ("This section and its blocks have 3 open notes. They
+      # will be deleted too."), whose number is the section's own open notes
+      # and its blocks' together.
+      def self.notes_warning_attributes(within, spacing: nil, alone: false, kind: :block)
+        { hidden: true, class: [ NOTES_WARNING_CLASS, spacing ],
+          data: { "admin--notes-target": "warning", notes_within: within, notes_warning: kind, **(alone ? { notes_alone: "" } : {}) } }
       end
 
       def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)
