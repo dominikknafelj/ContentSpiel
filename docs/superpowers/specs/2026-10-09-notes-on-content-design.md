@@ -1,8 +1,8 @@
 # Notes on content
 
-The first of four steps of "Collaboration on content" (roadmap, decided 2026-10-08): (1) notes — this spec; (2) presence and live delivery of notes; (3) live refresh of blocks changed by someone else, and edit reservations; (4) co-editing of rich text, only if 1–3 prove insufficient. Each step has its own spec, plan and PR. This is the binding spec for one implementation plan.
+The first of four steps of "Collaboration on content" (roadmap, decided 2026-10-08): (1) notes, with live delivery — this spec; (2) presence; (3) live refresh of blocks changed by someone else, and edit reservations; (4) co-editing of rich text, only if 1–3 prove insufficient. Each step has its own spec, plan and PR. This is the binding spec for one implementation plan.
 
-**Status: design, agreed with the user on 2026-10-09.** Mockups: the Claude Design canvas "Notes on content" (three boards: the page editor with the drawer, the dashboard, the other surfaces).
+**Status: design, agreed with the user on 2026-10-09; amended the same day (live delivery, the mention sound, desktop notifications and following a thread moved into this step: D16–D20, §6).** Mockups: the Claude Design canvas "Notes on content" (three boards: the page editor with the drawer, the dashboard, the other surfaces).
 
 ## 1. Purpose
 
@@ -16,14 +16,16 @@ This sub-project adds **notes**: threads of short messages attached to a page, a
 - Opening a page shows at a glance that it has open notes and where.
 - Nobody sees a note on content they may not see.
 
-**Not in this step:** anything pushed to an open screen. A note written by someone else appears when the screen is next loaded. Step 2 adds the push.
+- A note addressed to you reaches an open CS Studio tab at once, with a sound for a mention.
+
+**Not in this step:** presence ("Dana is editing this page"). That is step 2.
 
 ## 2. Decisions
 
 | # | Decision | Reason |
 |---|---|---|
 | D1 | One kind of note: a thread that can be replied to, resolved, reopened and pinned. | A conversation and a standing annotation differ only in whether they are pinned; two kinds would double every screen. |
-| D2 | Mentions (`@name`) address a note to a person; each person has an inbox in CS Studio. No mail. | Mail delivery is not configured (pre-launch list). Step 2 pushes to the inbox this step creates. |
+| D2 | Mentions (`@name`) address a note to a person; each person has an inbox in CS Studio. No mail. | Mail delivery is not configured (pre-launch list). |
 | D3 | Notes follow the content. Whoever may read a record in CS Studio may read its notes, start a thread, reply, react and resolve. You edit and delete your own note. Whoever may edit the record may delete others' notes on it and pin. No new permission. | Nothing to configure; a note outside your scope is "not found" like its record. A separate permission can be added later. |
 | D4 | A note is on a record: a page, a post, a block or a library image. A note on rich text may carry the selected passage as a **quote, a copy**: shown with the thread, not highlighted in the editor, not tracked when the text changes. | An anchored highlight must survive every edit, autosave and AI translation; that is the machinery of step 4. |
 | D5 | Tags take no notes; a note has exactly one subject. | A note on several records raises "what if you may see only one of them" for every list and count. |
@@ -37,6 +39,11 @@ This sub-project adds **notes**: threads of short messages attached to a page, a
 | D13 | A resolved thread is kept, listed collapsed under "Resolved", and not counted. | The answer is often worth finding again. |
 | D14 | A note's text and file names are never copied into the audit log. | The log is append-only: a deleted note's text would otherwise stay readable forever. |
 | D15 | A note's files are served only through a CS Studio action that checks the reader's right to the thread, never by an Active Storage URL. | Active Storage's read URLs are public to anyone who holds one and do not expire (`config/initializers/active_storage_access.rb`); a note's file may be confidential. |
+| D16 | Notes are pushed to open CS Studio tabs over Action Cable (Solid Cable, already installed). **A push carries no note text**: it is a signal, and the browser re-fetches the part through the same scoped request it uses on load. | A push can then never show a note to someone who may not read it, whatever changed since they subscribed. No new infrastructure. |
+| D17 | People follow threads. Writing in a thread or being mentioned in it follows it; a "Notify me" button follows and unfollows by hand; an explicit unfollow is remembered and only a new mention undoes it. Followers are told of replies, resolves and reopens. | Asked for by the user. It also gives a participant a way out, which a fixed "everyone who wrote" rule does not. |
+| D18 | A mention plays a short chime, generated in the browser. Mentions only; one tab plays it. A per-person setting, on by default, switches it off. | Asked for by the user. No audio file to ship or license; a setting per person follows them across devices. |
+| D19 | A mention can also raise a desktop notification with the author, the record's title and the note's first line. A per-person setting, **off by default**; turning it on asks the browser for permission. | Asked for by the user. Off by default because it puts note text outside CS Studio (a lock screen), and because a browser only grants the permission on a person's own click. |
+| D20 | Turbo's morphing page refresh stays off; only the notes parts are refreshed. | The write queue depends on it (`docs/reference/save-rule-and-write-queue.md`). |
 
 ## 3. Data and rules
 
@@ -67,6 +74,12 @@ Models live under `Notes::` (`app/models/notes/`, entry file `app/models/notes.r
 **`note_reactions`** (`Notes::Reaction`)
 - `message_id` (FK, cascade), `user_id` (FK, cascade), `emoji` (string), timestamps. Unique on `(message_id, user_id, emoji)`.
 
+**`note_follows`** (`Notes::Follow`)
+- `thread_id` (FK, cascade), `user_id` (FK, cascade), `following` (boolean), timestamps. Unique on `(thread_id, user_id)`.
+- A row with `following: false` is an explicit unfollow (D17). No row means "never involved".
+
+**`users`** gains `notes_sound` (boolean, default true) and `notes_desktop` (boolean, default false), saved from the account screen through a service like the name is (D18, D19).
+
 User references follow the existing pattern: an author who is deleted leaves the note, shown as "a deleted user" by `Admin::UserNameComponent`.
 
 ### 3.2 Mentions
@@ -77,12 +90,14 @@ User references follow the existing pattern: an author who is deleted leaves the
 
 ### 3.3 Who is told
 
-A delivery row is written, in the transaction of the message, for:
-- each mentioned user (`mention`);
-- on a reply, everyone who has written in the thread or was mentioned in it before (`reply`);
-- on a resolve, the same people (`resolved`), with the thread's first message as `message_id`.
+**Following (D17).** In the transaction of a message, its author and each mentioned user follow the thread: a missing `note_follows` row is created with `following: true`; an author's existing `false` row is left alone (writing again does not undo an explicit unfollow); a mentioned user's `false` row is set back to `true` (a mention is addressed to them). `Notes::Follow` is the button: it sets the actor's own row either way.
 
-Never for the author of the action. At most one row per person per message; `mention` wins over `reply`.
+**Deliveries.** A delivery row is written, in the transaction of the action, for:
+- each mentioned user (`mention`);
+- on a reply, each follower (`reply`);
+- on a resolve or a reopen, each follower (`resolved`, `reopened`), with the thread's first message as `message_id`.
+
+Never for the author of the action. At most one row per person per message; `mention` wins over `reply`. The `reason` column takes `mention`, `reply`, `resolved`, `reopened`.
 
 A delivery is read when its owner opens the thread (the drawer marks the thread's deliveries read when it shows them), presses "Mark all read", or follows the inbox row.
 
@@ -117,6 +132,7 @@ Each is an `ApplicationService` with `authorize!(` and `record_event(`, listed i
 | `Notes::Pin` / `Notes::Unpin` | Changes the pin. A pinned thread stays open and is listed first. |
 | `Notes::React` | Adds or removes the actor's reaction (a toggle). |
 | `Notes::MarkRead` | Marks the actor's own deliveries read: one thread's, or all. |
+| `Notes::Follow` | Follows or unfollows a thread for the actor (D17). Needs the read right. |
 | `Notes::Remove` | Deletes every thread of a subject with its files. Not called by a person: called by `Trash::Purge` (page with its blocks, post, image) and `ContentBlocks::Destroy` (the block and, for a section deleted with its blocks, each of them), inside their transactions. |
 
 Rules:
@@ -124,7 +140,7 @@ Rules:
 - **Existence under a lock.** `Notes::Start` re-reads its subject inside its transaction: for a block it takes the page's row lock first (the lock order of `ContentBlocks::Structure#lock_owner`) and then looks the block up; for a page, post or image it locks that row. A subject deleted in the meantime is an ordinary failure ("This block was deleted"), so `Notes::Remove` can't miss a thread written beside it.
 - **Lifting and folding.** A block that changes container inside its page (into, out of or across a section) keeps its threads: the thread's container is the page. Nothing to update.
 - **Duplicate** copies no notes.
-- **Audit.** New actions `note.started`, `note.replied`, `note.edited`, `note.deleted`, `note.resolved`, `note.reopened`, `note.pinned`, `note.unpinned`, `notes.removed`. The event's subject is the **content record** (page, post, block, image), so the events appear in that record's Activity and are scoped like it. `snapshot: nil`; metadata holds the thread id and the message id only (D14). `Notes::React` and `Notes::MarkRead` are not audited (`# audit: none (…)`): a reaction and a read mark are not changes to content. `Audit::Sentence` gains the wording ("Dana started a note on Pricing"); `Dashboard::Activity::ACTIONS` gains `note.started` and `note.resolved` only, so replies don't flood the feed.
+- **Audit.** New actions `note.started`, `note.replied`, `note.edited`, `note.deleted`, `note.resolved`, `note.reopened`, `note.pinned`, `note.unpinned`, `notes.removed`. The event's subject is the **content record** (page, post, block, image), so the events appear in that record's Activity and are scoped like it. `snapshot: nil`; metadata holds the thread id and the message id only (D14). `Notes::React`, `Notes::MarkRead` and `Notes::Follow` are not audited (`# audit: none (…)`): a reaction, a read mark and a follow are not changes to content. `Audit::Sentence` gains the wording ("Dana started a note on Pricing"); `Dashboard::Activity::ACTIONS` gains `note.started` and `note.resolved` only, so replies don't flood the feed.
 - **"Changed elsewhere" and "Mine".** `Audit::ChangeSince` and `Dashboard::Feed` read a record's newest audit event to say who changed it. Note events are excluded from both (as `access.denied` is from the feed): a note is not a change to the record.
 
 ### 3.6 Files
@@ -156,7 +172,7 @@ Top to bottom (board 1):
 3. **Open** threads, grouped: the record's own first, then one group per block that has threads, in the page's display order (`BlockOutline`). A group's heading names the block the way its card does and, inside a section, its column.
 4. **Resolved** (count), collapsed; loaded when opened.
 
-A thread shows its quote, its messages (author, time, "edited", "written on German" when the origin language differs from the current tab), files, reactions, a reply field, and Resolve. A thread with more than three messages shows the first and the last two with "Show 4 more".
+A thread shows its quote, its messages (author, time, "edited", "written on German" when the origin language differs from the current tab), files, reactions, a reply field, Resolve, and **Notify me** / **Stop notifying me** (D17). A thread with more than three messages shows the first and the last two with "Show 4 more".
 
 The composer is a textarea with three controls: attach files, emoji, and the mention picker that opens on `@`. Enter adds a line; ⌘/Ctrl+Enter sends.
 
@@ -192,11 +208,52 @@ Every string is a key under `config/locales/admin/notes.en.yml`; the new compone
 
 `Dashboard::NotesForYou` and `Dashboard::OpenThreads` (`app/queries/dashboard/`) build on `AccessControl.scope` for pages and posts and on `holds?("media.upload")` for images, as `Dashboard::TranslationNeeds` does, and return rows of data; the components word them. Both are constant in the number of queries and both belong in `test/integration/trash_visibility_test.rb`.
 
-## 6. Errors and edge cases
+## 6. Live delivery
+
+### 6.1 What is pushed
+
+Two kinds of signal, both sent after the transaction commits, neither with any note text, title or name in it (D16):
+
+| Stream | Who subscribes | Sent when | Payload | The browser then |
+|---|---|---|---|---|
+| **Person** | Every CS Studio page of a signed-in user, for that user | A delivery row is written for them | `{ kind: "delivery", delivery_id, reason }` | Re-fetches the sidebar badge and, if on the dashboard, the inbox card; fetches that one delivery through the scoped inbox endpoint and shows a toast ("Dana mentioned you", linked); for `mention`, plays the chime (D18) and raises the desktop notification (D19) if the person's settings say so. |
+| **Record** | A page that shows a record's notes: an editor, the media panel, the mind graph card | A thread of that container is started, replied to, edited, deleted, resolved, reopened, pinned, reacted to, or removed | `{ kind: "threads", thread_id }` | Re-fetches the drawer's thread list and the count markers. Its own author's tab ignores the signal for the action it just made. |
+
+Lists (posts list, page tree, media grid) are not live: their counts are fresh on load.
+
+### 6.2 Subscribing
+
+- `ApplicationCable::Connection` identifies the user from the CS Studio session, as the controllers do; no session, no connection.
+- `Notes::PersonChannel` streams for `current_user` only; it takes no parameter.
+- `Notes::RecordChannel` takes the container's type and id, looks it up **through the read scope** (§3.4) and rejects the subscription when it is not found. A signed stream name is not enough on its own: the check runs on the server at subscribe time.
+- Rights that change while subscribed need no handling: the signal says nothing, and the re-fetch is scoped.
+- The cable script is loaded by CS Studio only, never by a public page (`test/integration/public_javascript_test.rb`).
+
+### 6.3 Refreshing without losing work
+
+- The re-fetch replaces the thread list and the markers. It never replaces a composer: a field with text in it, its attached files and its open mention picker stay as they are. A thread that changed under an open reply field shows the new messages above the field.
+- A thread deleted while its reply field holds text keeps the field, with "This thread was deleted" above it.
+- Signals that arrive in a burst are coalesced: one re-fetch per 500 ms per part.
+- When the socket drops, CS Studio keeps working as without push; on reconnect each subscribed part re-fetches once.
+- No page-level refresh, no morphing (D20). A note's signal never touches an editor form or the write queue.
+
+### 6.4 The chime, the toast and the desktop notification
+
+- **Toast**: the existing toast component, with the sentence and a link to the record with the drawer open at the thread. Not shown when that thread is already open in the same tab; the delivery is then marked read at once.
+- **Chime** (D18): two short tones made with the Web Audio API; no file. Only for `mention`. With several tabs open, the tabs agree through a `BroadcastChannel` which one plays (the visible one, else the first to claim it). A browser that has not yet had a click in the tab stays silent; nothing is queued for later.
+- **Desktop notification** (D19): only when the tab is hidden or unfocused. Title "Dana mentioned you"; body: the record's title and the first 140 characters of the note, read through the scoped inbox endpoint. Clicking it focuses the tab and opens the thread. One per delivery across tabs, by the same agreement as the chime.
+- **Settings**: the account screen gains "Notes" with two switches, "Play a sound when I'm mentioned" (on) and "Show a desktop notification when I'm mentioned" (off). Turning the second on asks the browser for permission in that click; if the browser refuses, the switch goes back and says why. The setting is per person, the permission per browser: on another browser the account screen shows "Allow in this browser".
+
+### 6.5 Deployment
+
+Solid Cable is configured for production (`config/cable.yml`, the `cable` database) and unused until now. The pre-launch checklist gains: the cable database exists and is migrated; the proxy passes WebSocket upgrades on `/cable`. In development and in tests the async adapter runs in the server's own process.
+
+## 7. Errors and edge cases
 
 - **The subject is deleted while the drawer is open.** A reply fails with "This block was deleted" and the drawer reloads.
 - **Two people resolve at once.** The second is a no-op that succeeds; no second event.
 - **A message deleted while someone replies.** The reply still lands; the thread reads on without the deleted message.
+- **A follower loses access later.** Their follow and delivery rows stay and show nowhere; a `Notes::RecordChannel` subscription made earlier keeps receiving signals that tell them nothing.
 - **A mentioned user loses access later.** The delivery stays hidden (§3.3); the mention still renders the name.
 - **A user is deleted.** Their deliveries and reactions go (cascade); their messages stay as "a deleted user".
 - **A file fails validation.** The message is not saved; the composer keeps its text and names the file and the reason.
@@ -205,7 +262,7 @@ Every string is a key under `config/locales/admin/notes.en.yml`; the new compone
 - **The drawer and the shell's drawers** (sidebar, page tree, below 1280 px and 1024 px): opening one closes the other.
 - **⌘K and dialogs** work while the drawer is open; it is not a modal.
 
-## 7. Tests
+## 8. Tests
 
 - Models: validations, the container rule, mention parsing, delivery rules (who is told, never the author, one row per person).
 - Services: the contract tests; per service the refusal (a stranger, a reader trying to moderate, another person's message), the audit event with no text in it, and `Notes::Start` against a subject deleted beside it (statement order, `capture_sql`).
@@ -214,25 +271,31 @@ Every string is a key under `config/locales/admin/notes.en.yml`; the new compone
 - `test/integration/trash_visibility_test.rb`: the inbox, "Open threads", the counts in the posts list, the tree, the media grid and the graph.
 - Files: type sniffing, the size and count limits, an SVG and an HTML file refused, the download headers, no Active Storage URL in any rendered note.
 - Constant queries: the page editor with notes, the posts list, the tree, the media grid and the graph each cost the same number of statements at any number of threads.
+- Live delivery: both channels reject a stranger and a signed-out connection; a signal's payload holds ids only (asserted on every broadcast); a signal is sent after commit and not on a rolled-back action; following rules (auto-follow, explicit unfollow kept, a mention re-follows).
+- System, two sessions: one mentions the other and the other's badge, inbox and toast update without a reload; a reply appears in the other's open drawer while their half-typed reply is kept; the chime and the desktop notification are asserted through a stubbed `AudioContext` and `Notification` (called once across two tabs, not called with the setting off).
 - System: start a note on a block, mention someone, sign in as them, find it in the inbox, reply, resolve, reopen, pin; quote a selection; attach an image and a PDF; react; delete a block with open threads (the warning); keyboard only through the drawer; the drawer beside an autosave in progress (a note sent while a save is outstanding neither waits forever nor moves the base).
 
-## 8. Risk
+## 9. Risk
 
-- **Size.** This is the largest sub-project since the editor: four tables, eleven services, a new drawer, and markers on six surfaces. It ships as one PR all the same (the user's decision, 2026-10-09: the app is not in production). The plan orders the work so that reactions and files (D9, D10, §3.6) come last and nothing before them depends on them.
+- **Size.** This is the largest sub-project since the editor: five tables, twelve services, two channels, a new drawer, and markers on six surfaces. It ships as one PR all the same (the user's decision, 2026-10-09: the app is not in production). The plan orders the work so that reactions and files (D9, D10, §3.6) come last and nothing before them depends on them; live delivery (§6) comes after the drawer and the inbox work without it.
+- **Push is the first use of Action Cable in the app.** The risk is a signal that says too much, or a refresh that eats typed text. D16 and §6.3 are the answers, each with its test.
 - **The drawer is a new pattern** beside the shell's left drawers and the media panel. It gets its own component and controller, and the reference doc says when to use which.
 - **Counts on every list** are where a slow query hides. Each surface reads its counts in one grouped query, pinned by a test.
 - **File serving** is the first authenticated read of an upload in the app. It must not become a general way to read blobs: it takes a message's attachment id, never a blob key.
 
-## 9. Documentation
+## 10. Documentation
 
 - New `docs/reference/notes.md`, indexed in `CLAUDE.md`.
-- `CLAUDE.md` rules: a note never writes its subject; a note's text never reaches the audit log; a note's file is never linked by an Active Storage URL; whoever deletes a page, post, image or block calls `Notes::Remove`; `Admin::Notes` is never defined.
-- `docs/roadmap.md`: step 1 shipped; GIF search and the items of §10 entered.
+- `CLAUDE.md` rules: a note never writes its subject; a note's text never reaches the audit log; a note's file is never linked by an Active Storage URL; whoever deletes a page, post, image or block calls `Notes::Remove`; a pushed signal carries ids only and every part it refreshes is fetched through the read scope; the content models never reference `Notes::` (guarded by a test); `Admin::Notes` is never defined.
+- `docs/roadmap.md`: step 1 shipped; GIF search and the items of §11 entered; step 2 of collaboration is presence alone.
 
-## 10. Out of scope
+## 11. Out of scope
 
-- Live delivery and presence (step 2).
-- Mail and per-person notification settings.
+- Presence (step 2).
+- Following a whole page or post, so that every new thread on it notifies.
+- Notifications when no CS Studio tab is open (a service worker and web push).
+- A sound or a desktop notification for anything but a mention.
+- Mail.
 - An anchored highlight in the text (D4).
 - Notes on tags, users or settings; a note on several records (D5).
 - GIF search (D11).
