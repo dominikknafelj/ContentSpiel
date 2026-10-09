@@ -274,6 +274,18 @@ Rails.application.routes.draw do
     # one POST, `StarterContents::Add`, idempotent.
     resources :starter_contents, only: :create
 
+    # A person's own inbox (notes spec §5): the full list, "Mark all read",
+    # and the three parts a page shows of it, each with its own GET so a tab
+    # can fetch that part again by itself (`turbo-frame#notes-for-you`,
+    # `turbo-frame#notes-open-threads`, the sidebar's `#sidebar-badge-dashboard`).
+    # None of these words can be taken for a record's notes below: that scope
+    # needs `page`, `post` or `media` and an id.
+    get "notes", to: "note_inbox#index", as: :notes
+    post "notes/read", to: "note_inbox#read", as: :read_notes
+    get "notes/card", to: "note_inbox#card", as: :notes_card
+    get "notes/open_threads", to: "note_inbox#open_threads", as: :open_note_threads
+    get "notes/unread", to: "note_inbox#unread", as: :unread_notes, defaults: { format: :json }
+
     # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):
     # quick create, "Your drafts", "Going live next", "Needs translation"
     # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at

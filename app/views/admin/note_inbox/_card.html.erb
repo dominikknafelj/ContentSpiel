@@ -1,0 +1,26 @@
+<%# "Notes for you" (notes spec §5): a frame of its own (`display: contents`,
+    so the card is still the dashboard grid's item) that `GET notes/card`
+    answers again on its own. Locals: `rows` (`Dashboard::NotesForYou#rows`)
+    and `unread`, the viewer's unread count.
+
+    The header says how many are new, in accent -- the one meaning accent has
+    here: unread and addressed to the viewer -- and offers "Mark all read";
+    both only while something is unread. That button is a whole-page visit
+    (`_top`): the sidebar's count, outside this frame, changes with it. %>
+<%= tag.turbo_frame id: "notes-for-you", class: "contents" do %>
+  <%= render Admin::DashboardScreen::CardComponent.new(title: t("admin.note_inbox.card.title"), id: "dashboard-notes-for-you",
+        empty: t("admin.note_inbox.card.empty"), link: [ admin_notes_path(**admin_url_options), t("admin.note_inbox.card.all") ]) do |card| %>
+    <% if unread.positive? %>
+      <% card.with_badge do %>
+        <%= tag.span t("admin.note_inbox.card.new", count: unread), class: "font-cs-mono text-label uppercase tracking-mono text-accent", data: { notes_new: true } %>
+      <% end %>
+      <% card.with_action do %>
+        <%= button_to t("admin.note_inbox.card.mark_all_read"), admin_read_notes_path(back: "dashboard", **admin_url_options),
+              class: "cursor-pointer text-[13px] leading-5 text-ink hover:underline", form: { class: "flex", data: { turbo_frame: "_top" } } %>
+      <% end %>
+    <% end %>
+    <% rows.each do |row| %>
+      <% card.with_row { render Admin::NotesScreen::InboxRowComponent.new(row: row) } %>
+    <% end %>
+  <% end %>
+<% end %>

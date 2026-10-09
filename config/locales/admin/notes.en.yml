@@ -60,6 +60,31 @@ en:
           count:
             one: "%{count} person. Use the arrow keys and Enter."
             other: "%{count} people. Use the arrow keys and Enter."
+    # The inbox (notes spec §5): the full list at `<admin>/notes`
+    # (`index`, the view's own lazy-lookup scope) and the dashboard's two
+    # cards. `card.new` stands beside the card's title, in the small
+    # upper-case label style.
+    note_inbox:
+      index:
+        page_title: "Notes for you · CS Studio"
+        title: "Notes for you"
+        mark_all_read: "Mark all read"
+        empty: "No notes for you."
+      card:
+        title: "Notes for you"
+        empty: "No notes for you."
+        all: "All notes for you"
+        mark_all_read: "Mark all read"
+        new:
+          one: "%{count} new"
+          other: "%{count} new"
+      open_threads:
+        title: "Open threads"
+        empty: "No open threads."
+        # The name of the number beside the title, for a screen reader.
+        total:
+          one: "%{count} open thread in all"
+          other: "%{count} open threads in all"
     # The mind graph's selection card (`mind_graph/card_notes.js`): a post's
     # open notes and the field that starts one. Served by the Mind graph's own
     # `messages_data` call, beside the card's other strings in
@@ -222,3 +247,39 @@ en:
           send_hint: "Ctrl+Enter to send"
           # The field's placeholder, from its label: "Reply…", "Write a note…".
           placeholder: "%{label}…"
+        # One line of the inbox. Each reason is a whole sentence in each of
+        # its three shapes: with a name (`%{name}` arrives as markup, the
+        # name in a heavier weight), for a person who has since been deleted,
+        # and with nobody to name (a reopen records no one).
+        inbox_row:
+          unread: "Unread"
+          untitled: "(untitled)"
+          mention:
+            somebody_html: "%{name} mentioned you"
+            deleted: "A deleted user mentioned you"
+            nobody: "You were mentioned"
+          reply:
+            somebody_html: "%{name} replied"
+            deleted: "A deleted user replied"
+            nobody: "Someone replied"
+          resolved:
+            somebody_html: "%{name} resolved a note"
+            deleted: "A deleted user resolved a note"
+            nobody: "A note was resolved"
+          reopened:
+            somebody_html: "%{name} reopened a note"
+            deleted: "A deleted user reopened a note"
+            nobody: "A note was reopened"
+          where:
+            page: "Page · %{title}"
+            post: "Post · %{title}"
+            media: "Image · %{title}"
+            block: "%{place} · %{block}"
+        open_thread_row:
+          untitled: "(untitled)"
+          kind:
+            page: "Page"
+            media: "Image"
+          open:
+            one: "%{count} open note"
+            other: "%{count} open notes"

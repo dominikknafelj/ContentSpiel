@@ -838,6 +838,70 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  # The inbox (notes spec §5): "Notes for you", its full list, "Open threads"
+  # and the sidebar's unread count all narrow through `Notes.readable_threads`.
+  # Trashed AFTER the note was written, as in life.
+  test "the inbox, Open threads and the sidebar's count show notes on kept records and never on trashed ones" do
+    kept = [ @kept_page, @kept_post, @kept_asset ].map { |subject| create_note_for_reader(subject) }
+    gone = [ create_page(title: "Later gone"), create_post(title: "Later gone post"), create_media_asset ].map { |subject| [ subject, create_note_for_reader(subject) ] }
+    gone.each { |subject, _thread| subject.update!(trashed_at: Time.current) }
+    sign_in_as users(:two)
+
+    get admin_root_path
+    assert_select "turbo-frame#notes-for-you [data-delivery]", count: 3
+    assert_select "turbo-frame#notes-open-threads li", count: 3
+    assert_select "turbo-frame#notes-open-threads [data-notes-total]", text: "3"
+    assert_select "#sidebar-badge-dashboard", text: "3"
+    assert_no_match "Later gone", response.body
+    get admin_notes_path
+    assert_select "[data-delivery]", count: 3
+    assert_no_match "Later gone", response.body
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 3 }, response.parsed_body)
+
+    rows = Dashboard::OpenThreads.new(actor: users(:two), channel: :admin).rows
+    assert_equal kept.map(&:container).map(&:id).sort, rows.map { |row| row.record.id }.sort
+    assert_equal kept.map(&:id).sort, Dashboard::NotesForYou.new(actor: users(:two), channel: :admin).rows(limit: 50).map(&:thread_id).sort
+    assert_equal 6, Notes::Delivery.unread.where(user: users(:two)).count # the trashed records keep theirs
+  end
+
+  # Through the services, not a column: what `Trash::Move` hides,
+  # `Trash::Restore` brings back, unread as it was left.
+  test "a trashed record's notes leave the inbox, the full list and the unread count, and are back when it is restored" do
+    records = [ create_page(title: "Comes back"), create_post(title: "Comes back post"), create_media_asset ]
+    threads = records.map { |subject| create_note_for_reader(subject) }
+    inbox = -> { Dashboard::NotesForYou.new(actor: users(:two), channel: :admin) }
+    sign_in_as users(:two)
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 3 }, response.parsed_body)
+
+    as(users(:one)) { records.each { |record| assert Trash::Move.call(record).ok? } }
+
+    get admin_root_path
+    assert_select "turbo-frame#notes-for-you [data-delivery]", count: 0
+    assert_select "turbo-frame#notes-open-threads li", count: 0
+    assert_select "#sidebar-badge-dashboard[hidden]"
+    assert_no_match "Comes back", response.body
+    get admin_notes_path
+    assert_select "[data-delivery]", count: 0
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 0 }, response.parsed_body)
+    assert_equal [ [], 0, 0 ], inbox.call.then { |query| [ query.rows, query.total, query.unread_count ] }
+    assert_equal 3, Notes::Delivery.unread.where(user: users(:two)).count
+
+    as(users(:one)) { records.each { |record| assert Trash::Restore.call(record.reload).ok? } }
+
+    get admin_root_path
+    assert_select "turbo-frame#notes-for-you [data-delivery][data-unread]", count: 3
+    assert_select "turbo-frame#notes-open-threads li", count: 3
+    assert_select "#sidebar-badge-dashboard:not([hidden])", text: "3"
+    get admin_notes_path
+    assert_select "[data-delivery][data-unread]", count: 3
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 3 }, response.parsed_body)
+    assert_equal threads.map(&:id).sort, inbox.call.rows.map(&:thread_id).sort
+  end
+
   private
 
   def call_tool(raw_token, name, arguments = {})
@@ -854,4 +918,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   end
 
   def text_of(result) = result["content"].map { |item| item["text"] }.join("\n")
+
+  def create_note_for_reader(subject)
+    as(users(:one)) { Notes::Start.call(subject, body: "For @[#{users(:two).id}]") }.record
+  end
 end

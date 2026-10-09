@@ -12,7 +12,16 @@ module Notes
   # record in the trash, or purged, is the ordinary failure "This note is
   # gone" with nothing written. "Mark all read" names no record, so it takes
   # no lock: it is one UPDATE of the actor's own rows, and a row `Trash::Purge`
-  # deletes beside it is simply not there to mark.
+  # deletes beside it is simply not there to mark. It marks EVERY unread row
+  # of the actor's, the ones the inbox is hiding at that moment included (a
+  # record in the trash, a right since lost): accepted, because a row that
+  # comes back into view read is a smaller surprise than a button that says
+  # "all" and leaves a count behind.
+  #
+  # `updated_at` is NOT written: it is when the row last had something new to
+  # tell (`Notes::Deliveries` reuses a row for a resolve), which the inbox
+  # sorts and dates by (`Delivery.inbox_order`). Reading a row is not news,
+  # and must not move it above what was read before it.
   class MarkRead < ApplicationService
     include Authorization
 
@@ -37,8 +46,7 @@ module Notes
       marked = Delivery.transaction(requires_new: true) do
         next false if @names_record && !lock_container(@container)
 
-        now = Time.current
-        unread_rows.update_all(read_at: now, updated_at: now) # version: none (note_deliveries is a person's inbox; no public page reads it)
+        unread_rows.update_all(read_at: Time.current) # version: none (note_deliveries is a person's inbox; no public page reads it)
         true
       end
 

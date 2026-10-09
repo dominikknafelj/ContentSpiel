@@ -1,0 +1,16 @@
+<div class="min-w-0 flex-1">
+  <%= link_to row.title || t(".untitled"), path, class: "block truncate text-sm font-medium text-ink hover:underline", data: { turbo_frame: "_top" } %>
+  <p class="flex flex-wrap items-center gap-x-2 text-sm text-meta">
+    <% if post? %>
+      <%= render Admin::ContentTypeDotComponent.new(content_type: row.record.content_type) %>
+    <% else %>
+      <span><%= t(".kind.#{row.kind}") %></span>
+    <% end %>
+    <%= render Admin::TimeAgoComponent.new(time: row.at) %>
+  </p>
+</div>
+<%# `role="img"` and a label, like the page tree's: a bare "2" says nothing. %>
+<%= tag.span data: { has_notes: true }, role: "img", title: t(".open", count: row.count), aria: { label: t(".open", count: row.count) },
+      class: "admin-notes-marker admin-notes-marker--readonly" do %>
+  <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %><%= row.count %>
+<% end %>

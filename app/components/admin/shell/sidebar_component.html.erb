@@ -27,7 +27,10 @@
               <%= link_to module_path(entry), class: link_classes(entry), aria: { current: (current?(entry) ? "page" : nil) },
                     data: { turbo_prefetch: (false if entry[:path] == :admin_system_status_path) } do %>
                 <%= helpers.render "admin/shared/icon", name: entry[:icon] %><span><%= entry[:label] %></span>
-                <% if (badge = badge_for(entry)) %><span data-badge class="ml-auto font-cs-mono text-label text-meta"><%= badge %></span><% end %>
+                <% if badge?(entry) %>
+                  <%= tag.span (badge_count(entry) if badge_count(entry).positive?), id: BADGE_IDS.fetch(entry[:path]), hidden: !badge_count(entry).positive?,
+                        class: badge_class(entry), data: { badge: (true if badge_count(entry).positive?) } %>
+                <% end %>
               <% end %>
             </li>
           <% end %>

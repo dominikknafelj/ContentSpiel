@@ -3,10 +3,10 @@ require "test_helper"
 class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
   def modules(*labels) = Admin::BaseController::MODULES.select { |entry| labels.include?(entry[:label]) }
 
-  def render_sidebar(labels:, user: users(:one), trash_count: 0)
+  def render_sidebar(labels:, user: users(:one), badges: {})
     with_request_url "/cs-studio" do
       render_inline(Admin::Shell::SidebarComponent.new(modules: modules(*labels), user: user,
-        current_path: "/cs-studio/posts", url_options: {}, trash_count: trash_count))
+        current_path: "/cs-studio/posts", url_options: {}, badges: badges))
     end
   end
 
@@ -38,9 +38,33 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
   end
 
   test "the trash badge shows a count and hides at zero" do
-    render_sidebar(labels: %w[Trash], trash_count: 3)
+    render_sidebar(labels: %w[Trash], badges: { admin_trash_path: 3 })
     assert_selector "a", text: /Trash\s*3/
-    render_sidebar(labels: %w[Trash], trash_count: 0)
+    assert_selector "a #sidebar-badge-trash[data-badge]", text: "3"
+    # Plain mono text: the sidebar's one filled badge is the Dashboard's.
+    assert_no_selector "#sidebar-badge-trash[class*=accent]"
+    render_sidebar(labels: %w[Trash], badges: { admin_trash_path: 0 })
+    assert_no_selector "[data-badge]"
+    assert_no_selector "#sidebar-badge-trash"
+  end
+
+  # Notes spec §5: the viewer's unread notes, on the Dashboard entry. The
+  # element is always there (a live signal fills it), hidden and empty at
+  # zero; accent, the one filled badge, because it means "unread and
+  # addressed to you".
+  test "the Dashboard badge shows the unread count as a filled accent pill, and is in the page hidden and empty at zero" do
+    render_sidebar(labels: %w[Dashboard Trash], badges: { admin_root_path: 3 })
+    assert_selector "a[href='/cs-studio'] #sidebar-badge-dashboard[data-badge].bg-accent.text-on-accent.rounded-full", text: "3"
+    assert_no_selector "#sidebar-badge-trash"
+
+    render_sidebar(labels: %w[Dashboard Trash], badges: {})
+    assert_selector "#sidebar-badge-dashboard", visible: :all, count: 1
+    assert_equal "", page.find("#sidebar-badge-dashboard", visible: :all).text(:all)
+    assert_selector "#sidebar-badge-dashboard[hidden]:not([data-badge])", visible: :all
+  end
+
+  test "an entry that has no badge gets none, whatever is handed in" do
+    render_sidebar(labels: %w[Posts], badges: { admin_posts_path: 4 })
     assert_no_selector "[data-badge]"
   end
 

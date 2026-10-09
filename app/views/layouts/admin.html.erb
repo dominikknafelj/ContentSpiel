@@ -55,10 +55,13 @@
           modules are shown only when `can?`) -- a module they lack is
           simply absent, not greyed out; opening its URL anyway gets the
           403 page. `admin_url_options` is threaded through by the component
-          (see its comment). %>
+          (see its comment). `badges` are the counts beside two entries, keyed
+          by the entry's path helper: the viewer's unread notes on Dashboard
+          (one COUNT, `notes_badge_count`) and what they could act on in
+          Trash. %>
       <div id="sidebar" class="admin-shell__sidebar" data-admin--drawer-target="panel" data-drawer="sidebar" tabindex="-1">
         <%= render Admin::Shell::SidebarComponent.new(modules: admin_modules, user: Current.user, current_path: request.path,
-              url_options: admin_url_options, trash_count: trash_badge_count) %>
+              url_options: admin_url_options, badges: { admin_root_path: notes_badge_count, admin_trash_path: trash_badge_count }) %>
       </div>
 
       <% if content_for?(:tree) %>

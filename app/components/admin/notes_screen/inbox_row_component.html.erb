@@ -1,0 +1,19 @@
+<%# Dot, avatar, three lines, time (handoff: grid 7px 24px 1fr auto). No
+    `turbo_prefetch: false` as on a thread's row: this link is the EDITOR,
+    whose GET reads nothing; the thread is fetched, and marked read, only by
+    the drawer once the page is open. %>
+<%= tag.div class: "relative grid min-w-0 flex-1 grid-cols-[7px_24px_1fr_auto] items-start gap-2.5", data: { delivery: row.id, unread: (true if row.unread) } do %>
+  <span class="mt-[9px] size-[7px] rounded-full <%= "bg-accent" if row.unread %>" aria-hidden="true"></span>
+  <% if somebody? %>
+    <%= render Admin::NotesScreen::AvatarComponent.new(user: row.by, user_id: row.by_id, viewer: nil, size: :row) %>
+  <% else %>
+    <span class="flex size-6 items-center justify-center rounded-full border border-line-strong bg-sunken text-meta" aria-hidden="true"><%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %></span>
+  <% end %>
+  <div class="min-w-0">
+    <%= link_to path, class: "block truncate text-[13px] hover:underline after:absolute after:inset-0 #{row.unread ? "text-ink" : "text-dim"}", data: { turbo_frame: "_top" } do %><%= sentence %><% end %>
+    <% if row.unread %><span class="sr-only"><%= t(".unread") %></span><% end %>
+    <p class="truncate text-[13px] text-dim"><%= row.excerpt %></p>
+    <p class="truncate text-xs text-meta"><%= where %></p>
+  </div>
+  <span class="mt-0.5 font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: row.at) %></span>
+<% end %>

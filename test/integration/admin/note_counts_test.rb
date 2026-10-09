@@ -254,7 +254,10 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     paths.each { |path| get path }
     # The page editor also reads its own record's counts for the drawer (two
     # statements, `Notes::Counts.for_container`); the tree beside it adds two.
-    assert_equal [ 2, 4, 2 ], paths.map { |path| note_statements(path).size }
+    # And one on every CS Studio page: the sidebar's unread count
+    # (`Admin::BaseController#notes_badge_count`, pinned by itself in
+    # `test/integration/admin/note_inbox_test.rb`).
+    assert_equal [ 3, 5, 3 ], paths.map { |path| note_statements(path).size }
 
     as(users(:two)) do
       5.times do |n|
@@ -265,7 +268,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     end
     paths.each { |path| get path }
 
-    assert_equal [ 2, 4, 2 ], paths.map { |path| note_statements(path).size }
+    assert_equal [ 3, 5, 3 ], paths.map { |path| note_statements(path).size }
   end
 
   test "a count is accent for the person its thread is addressed to, and neutral for everyone else" do

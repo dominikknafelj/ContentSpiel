@@ -187,6 +187,14 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/drawer_component.rb
     app/components/admin/notes_screen/drawer_component.html.erb
     app/javascript/controllers/admin/notes_controller.js
+    app/components/admin/notes_screen/inbox_row_component.rb
+    app/components/admin/notes_screen/inbox_row_component.html.erb
+    app/components/admin/notes_screen/open_thread_row_component.rb
+    app/components/admin/notes_screen/open_thread_row_component.html.erb
+    app/views/admin/note_inbox/index.html.erb
+    app/views/admin/note_inbox/_card.html.erb
+    app/views/admin/note_inbox/_open_threads.html.erb
+    app/controllers/admin/note_inbox_controller.rb
   ].freeze
 
   PLACEHOLDER = "".freeze
