@@ -614,4 +614,88 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_current_path "/cs-studio/posts"
     assert_equal 1, page.evaluate_script("window.__announced")
   end
+
+  # Holds every request of this page whose address contains `part` until
+  # `release_requests`, and counts them (`window.__heldCalls`): a request
+  # kept in flight while the test does something else.
+  def hold_requests(part)
+    page.execute_script(<<~JS, part)
+      const part = arguments[0]
+      window.__original = window.fetch
+      window.__heldCalls = 0
+      window.__gate = new Promise((resolve) => { window.__release = resolve })
+      window.fetch = (...args) => {
+        if (!String(args[0].url || args[0]).includes(part)) return window.__original(...args)
+        window.__heldCalls += 1
+        return window.__gate.then(() => window.__original(...args))
+      }
+    JS
+  end
+
+  def release_requests = page.execute_script("if (window.__release) window.__release(); if (window.__original) window.fetch = window.__original")
+
+  # Hands the person's subscription a delivery's signal, as the cable would.
+  def signal_delivery(*deliveries)
+    page.execute_script(<<~JS, deliveries.map(&:id))
+      const person = window.__consumer.subscriptions.subscriptions.find((each) => each.identifier.includes("PersonChannel"))
+      arguments[0].forEach((id) => person.received({ kind: "delivery", delivery_id: id, reason: "mention" }))
+    JS
+  end
+
+  def count_announcements = page.execute_script("window.__announced = []; document.addEventListener('admin--notes-live:delivery', (event) => { window.__announced.push(event.detail.id) })")
+
+  # The run that answers a signal is already out -- the sidebar's count is
+  # being fetched -- when a visit replaces the controller that started it.
+  # What it had not announced is the next page's, at once: nothing waits for
+  # another signal.
+  test "a visit while the inbox is being fetched: the delivery is announced once, on the next page, with no further signal" do
+    as(users(:two)) { Notes::Start.call(@page, body: "Before you go, @[#{users(:one).id}]") }
+    delivery = Notes::Delivery.find_by!(user: users(:one))
+    visit "/cs-studio/tags"
+    await_notes_live
+    hold_consumer
+    count_announcements
+    hold_requests("/notes/unread")
+
+    signal_delivery(delivery)
+    await_js("window.__heldCalls >= 1", wait: LIVE)
+    turbo_visit "/cs-studio/posts"
+    await_notes_live
+    release_requests
+
+    assert_selector "#toasts .admin-toast", text: "Dana mentioned you on Pricing", count: 1, wait: LIVE
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "once" means no second run is on its way
+    assert_equal [ delivery.id ], page.evaluate_script("window.__announced")
+    assert_selector "#toasts .admin-toast", count: 1
+    assert_current_path "/cs-studio/posts"
+  ensure
+    release_requests
+  end
+
+  # Two deliveries, the first being read when the visit comes: the one in
+  # flight is not announced by the page that left, the one behind it is not
+  # stranded, and each is announced once.
+  test "a visit while the first of two deliveries is being read: both are announced once on the next page" do
+    as(users(:two)) { [ "One, @[#{users(:one).id}]", "Two, @[#{users(:one).id}]" ].each { |body| Notes::Start.call(@page, body: body) } }
+    deliveries = Notes::Delivery.where(user: users(:one)).order(:id).to_a
+    assert_equal 2, deliveries.size
+    visit "/cs-studio/tags"
+    await_notes_live
+    hold_consumer
+    count_announcements
+    hold_requests("/notes/deliveries/")
+
+    signal_delivery(*deliveries)
+    await_js("window.__heldCalls >= 1", wait: LIVE)
+    turbo_visit "/cs-studio/posts"
+    await_notes_live
+    release_requests
+
+    assert_selector "#toasts .admin-toast", text: "Dana mentioned you on Pricing", count: 2, wait: LIVE
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "once each" means no second run is on its way
+    assert_equal deliveries.map(&:id), page.evaluate_script("window.__announced").sort
+    assert_selector "#toasts .admin-toast", count: 2
+  ensure
+    release_requests
+  end
 end

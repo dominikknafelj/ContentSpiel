@@ -50,7 +50,9 @@
       delivery 0, a placeholder the route accepts, whose last path segment
       the script replaces with the id it was told (no text is searched for,
       so no `ADMIN_PATH` can collide with it); `tag` writes this tab's id on
-      its notes writes, and `shown`, `fresh` and `visible` tell it that a
+      its notes writes; `person` is whose page this is, so that what one
+      page was told and had not said yet goes to the next page of the same
+      person only; and `shown`, `fresh` and `visible` tell it that a
       drawer was opened, that the notes frame was loaded by Turbo itself and
       that the document can be seen again.
 
@@ -74,7 +76,7 @@
   <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes admin--notes-live admin--notes-alert" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
         data-admin--notes-live-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes-live-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
         data-admin--notes-live-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
-        data-admin--notes-live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>"
+        data-admin--notes-live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes-live-person-value="<%= Current.user&.id %>"
         data-admin--notes-alert-sound-value="<%= Current.user&.notes_sound ? true : false %>" data-admin--notes-alert-desktop-value="<%= Current.user&.notes_desktop ? true : false %>"
         data-admin--notes-alert-person-value="<%= Current.user&.id %>"
         data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:before-fetch-request@document->admin--notes-live#tag admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible admin--notes-live:delivery@document->admin--notes-alert#delivery"

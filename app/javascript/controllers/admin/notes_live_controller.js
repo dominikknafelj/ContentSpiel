@@ -146,7 +146,16 @@ function listen(params, listener) {
 // is fetched, and a Turbo visit inside that window replaces <body> and the
 // controller with it. The next page's controller takes these over
 // (`connect`), so the toast is raised there.
-const pending = { deliveries: new Set(), due: false }
+//
+// `person` is whose they are: the signed-in person's id as the page that was
+// told gave it. A session that ended and was replaced by another sign-in in
+// the same document must not inherit the ids of the person before (`connect`
+// empties this for a different person). `live` is the controller of the
+// <body> that is in the document now, the only one that may announce
+// anything: a run of `inbox` that outlives its page hands what it has left
+// to it (`handBack`).
+const pending = { deliveries: new Set(), due: false, person: null }
+let live = null
 
 // The last segment of the address a control's form posts to: "follow", "pin".
 const change = (control) => control.closest("form")?.getAttribute("action")?.split("?")[0].split("/").pop()
@@ -166,7 +175,7 @@ const nearBottom = (scroller) => scroller.scrollHeight - scroller.scrollTop - sc
 
 export default class extends Controller {
   static targets = [ "record" ]
-  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String }
+  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String }
 
   // Before the first target connects, which is before `connect`.
   initialize() {
@@ -187,8 +196,16 @@ export default class extends Controller {
     // A socket the server closed for good (the session ended; someone has
     // signed in again since) is opened again by the first page that asks.
     cable.getConsumer().then((consumer) => consumer.ensureActiveConnection())
-    // What the page before this one was told and had no time to act on.
-    if (pending.due) this.soon("person", () => this.inbox())
+    // What the page before this one was told and had not acted on -- its
+    // timer not yet run, or its run still out when the visit came (that run
+    // announces nothing more, `inbox`). Nothing of it for another person.
+    if (pending.person !== this.personValue) {
+      pending.deliveries.clear()
+      pending.due = false
+      pending.person = this.personValue
+    }
+    live = this
+    if (pending.due || pending.deliveries.size > 0) this.soon("person", () => this.inbox())
     this.sync()
   }
 
@@ -197,6 +214,7 @@ export default class extends Controller {
     this.person = null
     this.records.forEach((record) => record.stop())
     this.records.clear()
+    if (live === this) live = null
     // The timers go; what the person's stream said stays (`pending`).
     this.timers.forEach((timer) => clearTimeout(timer))
     this.timers.clear()
@@ -630,29 +648,55 @@ export default class extends Controller {
     this.soon("person", () => this.inbox())
   }
 
-  // Each delivery is taken off `pending` only as it is announced: a visit
-  // that replaces this controller in the middle leaves the rest, and the
-  // count, to the next page's.
+  // ONLY THE CONTROLLER OF THE PAGE IN THE DOCUMENT ANNOUNCES. A run can
+  // outlive its page: a Turbo visit replaces <body> while the count or a
+  // delivery is being fetched. After every `await` the run asks whether it
+  // is still `live`; if not it announces nothing -- its `record` targets are
+  // the old page's, so it would judge "is the person looking at this
+  // thread" by a page that is gone -- puts back the delivery it was reading
+  // and hands everything to the page that is there (`handBack`). An id is
+  // taken off `pending` before it is read, so two runs never read the same
+  // one, and it is put back only by the run that took it: no delivery is
+  // announced twice, and none is stranded waiting for another signal.
   async inbox() {
     pending.due = false
     await this.refreshInbox()
+    if (live !== this) return this.handBack()
+
     for (const id of [ ...pending.deliveries ]) {
-      if (!this.person) return void (pending.due = true)
-      pending.deliveries.delete(id)
-      await this.announce(id)
+      // Taken by another run since this one began.
+      if (!pending.deliveries.delete(id)) continue
+      const row = await this.read(id)
+      if (live !== this) return this.handBack(id)
+      if (row) this.announce(row)
     }
+  }
+
+  // This run's page is gone. What it had not announced is the next page's:
+  // the delivery it was reading goes back, the count and the cards are due
+  // again (the answer went to the old page's elements), and the controller
+  // that is live runs -- now, not at the next signal. Without one yet, its
+  // `connect` will. Nothing is handed to another person's page.
+  handBack(id = null) {
+    if (pending.person !== this.personValue) return
+    if (id != null) pending.deliveries.add(id)
+    pending.due = true
+    live?.soon("person", () => live?.inbox())
   }
 
   // One delivery, read through the scoped endpoint before anything is said.
   // Not found or refused (the record left the viewer's scope, or went to the
-  // trash): nothing.
-  async announce(id) {
+  // trash): null, and nothing is said.
+  read(id) {
     // The address of delivery 0, with this one's id as its last segment.
     const url = new URL(this.deliveryUrlValue, window.location.origin)
     url.pathname = url.pathname.replace(/\/0$/, `/${encodeURIComponent(id)}`)
-    const row = await this.json(url.pathname + url.search)
-    if (!row) return
+    return this.json(url.pathname + url.search)
+  }
 
+  // In one task, with no `await`: the controller that was live when the
+  // delivery had been read is the one that judges and says it.
+  announce(row) {
     const shown = this.watching(row.thread_id)
     const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown }
     document.dispatchEvent(new CustomEvent("admin--notes-live:delivery", { detail }))
