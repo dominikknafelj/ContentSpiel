@@ -2009,7 +2009,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   # cards around it are still moved on a translation tab, and the order a move
   # sends is the list's children -- which must name the section or it is
   # refused. The group itself has nothing to move it by.
-  test "on a translation tab a card is moved past a section's group, and the group has no handle and no menu" do
+  test "on a translation tab a card is moved past a section's group, and the group has no handle and no menu but its cards' Add note" do
     with_locales(%w[en de], default: "en") do
       below = @page.content_blocks.create!(block_type: "image", position: 1)
       visit "/cs-studio/pages/#{@page.id}?locale=de"
@@ -2018,7 +2018,12 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
       assert_selector group
       assert_no_selector "#{group} .admin-block-card__handle", visible: :all
-      assert_no_selector "#{group} button[aria-label='Block actions'], #{group} button[aria-label='Section actions']", visible: :all
+      assert_no_selector "#{group} button[aria-label='Section actions']", visible: :all
+      # Each card in the group has the "⋯" with "Add note" as its only item
+      # (the notes handoff's decision 6), and nothing that moves or deletes.
+      assert_equal [ "Add note" ] * all("#{group} > .admin-block-card").size,
+        all("#{group} button[aria-label='Block actions'] + [role=menu] :is(button, a)", visible: :all).map { |item| item.text(:all).strip }
+      assert_no_selector "#{group} [data-move], #{group} dialog", visible: :all
       # No lane on this tab, so nowhere to move a card into.
       assert_selector "#{card(below)} button[data-move='into'][disabled]", visible: :all
 
