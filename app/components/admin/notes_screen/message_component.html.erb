@@ -22,7 +22,7 @@
           mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors)) %>
     <p><%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, **frame_link } %></p>
   <% else %>
-    <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users) %>
+    <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users, viewer_id: viewer&.id) %>
   <% end %>
   <% if bare_failure %>
     <ul role="alert" class="text-[12px] text-danger-ink"><% bare_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
