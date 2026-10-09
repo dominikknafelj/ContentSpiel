@@ -89,9 +89,16 @@ module ContentBlocks
         # A fold is an event even when the save changed no field of the
         # section itself (decision D7: no action of its own, the section's
         # `block.updated` names the blocks that moved).
+        #
+        # And a fold is never coalesced into the section's open
+        # `block.updated` row: an extension of a row leaves its `metadata` as
+        # first written (`Audit.record`), so the ids would be lost exactly
+        # when someone adjusts a section's look and then its layout. Only a
+        # save that moved a block stands alone; every other one coalesces as
+        # before, into the fold's row too, whose ids it does not touch.
         if created || changes.any? || folded.any?
           record_event(created ? "block.created" : "block.updated", subject: @block, field_changes: changes,
-            metadata: (folded.any? ? { "folded_block_ids" => folded } : {}))
+            metadata: (folded.any? ? { "folded_block_ids" => folded } : {}), coalesce: folded.empty?)
         end
         true
       end

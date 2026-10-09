@@ -131,6 +131,28 @@ class Audit::RecordTest < ActiveSupport::TestCase
     assert_equal 2, Audit::Event.where(action: "post.updated").count
   end
 
+  # The one way a coalescible action is made to stand alone: what the event
+  # has to say is in its `metadata`, which a coalesced extension never
+  # writes (`ContentBlocks::Save`'s fold and its `folded_block_ids`).
+  test "coalesce: false writes a row of its own for an action that otherwise coalesces, with its metadata" do
+    post = create_post(title: "Stands alone")
+    first = Audit.record("post.updated", subject: post, field_changes: { "en title" => [ "A", "B" ] })
+    alone = Audit.record("post.updated", subject: post, field_changes: { "en title" => [ "B", "C" ] }, metadata: { "moved" => [ 1, 2 ] }, coalesce: false)
+
+    assert_not_equal first.id, alone.id
+    assert_equal [ "A", "B" ], first.reload.field_changes["en title"]
+    assert_equal [ 1, [ "B", "C" ], { "moved" => [ 1, 2 ] } ], [ alone.occurrences, alone.field_changes["en title"], alone.metadata ]
+  end
+
+  test "an event that follows a stand-alone one extends it and leaves its metadata as written" do
+    post = create_post(title: "Extended")
+    alone = Audit.record("post.updated", subject: post, field_changes: { "en title" => [ "A", "B" ] }, metadata: { "moved" => [ 1 ] }, coalesce: false)
+    later = Audit.record("post.updated", subject: post, field_changes: { "en title" => [ "B", "C" ] }, metadata: { "other" => true })
+
+    assert_equal alone.id, later.id
+    assert_equal [ 2, [ "A", "C" ], { "moved" => [ 1 ] } ], alone.reload.then { |event| [ event.occurrences, event.field_changes["en title"], event.metadata ] }
+  end
+
   test "post.published never coalesces" do
     post = create_post(title: "Publish twice", published: false)
     Audit.record("post.published", subject: post)

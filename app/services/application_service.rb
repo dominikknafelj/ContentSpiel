@@ -105,9 +105,12 @@ class ApplicationService
   # `snapshot: nil` leaves the snapshot out: for an event about a record
   # that didn't change (`ai.translated`, which must carry no text at all),
   # a full copy of the subject would only put its content in the log.
-  def record_event(action, subject: nil, field_changes: {}, metadata: {}, snapshot: Audit::Snapshot.for(subject))
+  #
+  # `coalesce: false` is `Audit.record`'s: for an `*.updated` event that
+  # carries `metadata`, which an event coalesced into an open row loses.
+  def record_event(action, subject: nil, field_changes: {}, metadata: {}, snapshot: Audit::Snapshot.for(subject), coalesce: true)
     as_actor do
-      Audit.record(action, subject:, field_changes:, snapshot:, metadata:)
+      Audit.record(action, subject:, field_changes:, snapshot:, metadata:, coalesce:)
     end
   end
 

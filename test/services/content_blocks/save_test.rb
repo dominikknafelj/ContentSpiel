@@ -300,9 +300,6 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "four" } }, actor: nil).ok?
     third = add_to(section, 3).record
     fourth = add_to(section, 4).record
-    # Past the audit log's coalescing window, so the narrowing is an event
-    # of its own to read here and not an extension of the widening's row.
-    travel Audit::COALESCE_WINDOW + 1.minute
 
     assert_difference -> { Audit::Event.where(action: "block.updated").count }, 1 do
       assert ContentBlocks::Save.call(stale, attributes: { settings: { "layout" => "two" } }, actor: nil).ok?
@@ -313,6 +310,61 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     event = Audit::Event.where(action: "block.updated").last
     assert_equal [ third.id, fourth.id ], event.metadata["folded_block_ids"]
     assert_equal %w[four two], event.field_changes["settings"].map { |settings| settings["layout"] }
+  end
+
+  # `block.updated` coalesces: a burst of saves of one section is one row,
+  # and a row's `metadata` is written once, when the row is (the log is
+  # append-only outside the coalescing columns). A fold folded into an
+  # earlier row would lose the ids of the blocks it moved, in the commonest
+  # order of all -- a section's look is adjusted, then its layout. So a save
+  # that folded is always a row of its own.
+  test "a fold just after another save of the section is its own event, naming the blocks it moved" do
+    page = create_page(title: "Look, then layout")
+    section = section_on(page, layout: "three")
+    third = add_to(section, 3).record
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "background" => "tinted" } }, actor: nil).ok?
+
+    assert_difference -> { Audit::Event.where(action: "block.updated", subject: section).count }, 1 do
+      assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two" } }, actor: nil).ok?
+    end
+
+    look, fold = Audit::Event.where(action: "block.updated", subject: section).order(:id).to_a
+    assert_equal({}, look.metadata)
+    assert_equal %w[none tinted], look.field_changes["settings"].map { |settings| settings["background"] }
+    assert_equal [ third.id ], fold.metadata["folded_block_ids"]
+    assert_equal %w[three two], fold.field_changes["settings"].map { |settings| settings["layout"] }
+  end
+
+  # The other order. A later ordinary save does coalesce into the fold's
+  # row, as into any open `block.updated` of the section: that extends its
+  # field changes, snapshot and count and leaves `metadata` as written.
+  test "a save of the section just after a fold extends the fold's event and leaves its folded ids alone" do
+    page = create_page(title: "Layout, then look")
+    section = section_on(page, layout: "three")
+    third = add_to(section, 3).record
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two" } }, actor: nil).ok?
+
+    assert_no_difference -> { Audit::Event.where(action: "block.updated", subject: section).count } do
+      assert ContentBlocks::Save.call(section, attributes: { settings: { "background" => "tinted" } }, actor: nil).ok?
+    end
+
+    event = Audit::Event.where(action: "block.updated", subject: section).sole
+    assert_equal [ third.id ], event.metadata["folded_block_ids"]
+    assert_equal 2, event.occurrences
+    assert_equal [ %w[three none], %w[two tinted] ], event.field_changes["settings"].map { |settings| settings.values_at("layout", "background") }
+  end
+
+  test "two folds in a row are two events, each naming its own blocks" do
+    page = create_page(title: "Narrow twice")
+    section = section_on(page, layout: "three")
+    second = add_to(section, 2).record
+    third = add_to(section, 3).record
+
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two" } }, actor: nil).ok?
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one" } }, actor: nil).ok?
+
+    assert_equal [ [ third.id ], [ second.id, third.id ] ],
+      Audit::Event.where(action: "block.updated", subject: section).order(:id).map { |event| event.metadata["folded_block_ids"] }
   end
 
   # And a save that does not name the layout at all moves nothing, whatever
