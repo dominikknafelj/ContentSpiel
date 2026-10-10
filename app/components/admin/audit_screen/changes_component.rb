@@ -12,7 +12,7 @@ module Admin
     # since turned off is labelled by its code. Each field is one row:
     #
     #   * text (a string, or nothing) as a WORD DIFF (`Translations::SourceDiff`,
-    #     drawn by `Admin::WordDiffComponent`, the translation reference card's
+    #     drawn by `Admin::Ui::WordDiffComponent`, the translation reference card's
     #     del/ins look): BEFORE shows the text with what left struck through,
     #     AFTER the text with what came in underlined. An empty side reads
     #     "Empty". Text too long for a word diff (`SourceDiff`'s own bounds, and
@@ -58,9 +58,9 @@ module Admin
       # that left or came in is drawn in the diff's own del/ins style.
       def before_html(row)
         case row.kind
-        when :diff then render(Admin::WordDiffComponent.new(segments: row.before))
+        when :diff then render(Admin::Ui::WordDiffComponent.new(segments: row.before))
         when :added then empty
-        when :removed then render(Admin::WordDiffComponent.new(segments: [ [ :delete, row.before ] ]))
+        when :removed then render(Admin::Ui::WordDiffComponent.new(segments: [ [ :delete, row.before ] ]))
         when :too_long then safe_join([ row.before, tag.p(TOO_LONG, class: "mt-1 text-meta") ])
         else row.before.nil? ? empty : row.before
         end
@@ -68,9 +68,9 @@ module Admin
 
       def after_html(row)
         case row.kind
-        when :diff then render(Admin::WordDiffComponent.new(segments: row.after))
+        when :diff then render(Admin::Ui::WordDiffComponent.new(segments: row.after))
         when :removed then empty
-        when :added then render(Admin::WordDiffComponent.new(segments: [ [ :insert, row.after ] ]))
+        when :added then render(Admin::Ui::WordDiffComponent.new(segments: [ [ :insert, row.after ] ]))
         else row.after.nil? ? empty : row.after
         end
       end

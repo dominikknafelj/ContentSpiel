@@ -12,7 +12,7 @@
 # is deliberately NO colour here: a node carries its content type's
 # `colour_index` (nil for a type that isn't registered any more) and the page
 # draws it from the `--cs-cat-<n>` tokens, so a type looks the same in the
-# graph as in `Admin::ContentTypeDotComponent`. `status` is
+# graph as in `Admin::Ui::ContentTypeDotComponent`. `status` is
 # `Publishable#status`.
 #
 # Every query takes `actor:` with no default, so nothing draws the whole graph

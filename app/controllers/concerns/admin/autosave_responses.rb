@@ -17,7 +17,7 @@ module Admin
     extend ActiveSupport::Concern
 
     # `fields:` maps each UI field name (used to compute its error-slot id,
-    # via `Admin::FieldComponent.error_id(error_prefix, field)`) to the
+    # via `Admin::Ui::FieldComponent.error_id(error_prefix, field)`) to the
     # actual `ActiveModel::Errors` attribute name(s) to read for it -- a
     # bare `:subtitle` is also its own error key, but a translated field
     # validated per-locale (`LocalizedSlug`'s `slug_de`/`slug_en`) has no
@@ -44,8 +44,8 @@ module Admin
 
       fields.each do |field, attributes|
         messages = Array(attributes).flat_map { |attribute| record.errors.full_messages_for(attribute) }
-        streams << turbo_stream.replace(Admin::FieldComponent.error_id(error_prefix, field),
-          partial: "admin/shared/field_errors", locals: { id: Admin::FieldComponent.error_id(error_prefix, field), messages: messages })
+        streams << turbo_stream.replace(Admin::Ui::FieldComponent.error_id(error_prefix, field),
+          partial: "admin/shared/field_errors", locals: { id: Admin::Ui::FieldComponent.error_id(error_prefix, field), messages: messages })
       end
 
       # Only bumped on an actual save: a failed attempt never touches the
@@ -79,12 +79,12 @@ module Admin
     end
 
     # One toast appended to the layout's `#toasts` region
-    # (`Admin::ToastRegionComponent`) from a Turbo Stream answer -- for a
+    # (`Admin::Ui::ToastRegionComponent`) from a Turbo Stream answer -- for a
     # response that has no redirect and so no flash to carry the message.
     # `action` is `{ label:, url:, method: }` and `id` the optional DOM id,
-    # both as for `Admin::ToastComponent`.
+    # both as for `Admin::Ui::ToastComponent`.
     def toast_stream(message, kind: :success, action: nil, id: nil)
-      turbo_stream.append("toasts", Admin::ToastComponent.new(message: message, kind: kind, action: action, id: id))
+      turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: message, kind: kind, action: action, id: id))
     end
 
     # Optimistic locking for the three record editors (the page settings
@@ -138,7 +138,7 @@ module Admin
     def stale_streams(record, status_id:, error_prefix:, reload_url:, since:)
       live = live_record?(record)
       [
-        turbo_stream.replace(status_id, Admin::SaveStatusComponent.new(id: status_id, state: :stale, live: live)),
+        turbo_stream.replace(status_id, Admin::Ui::SaveStatusComponent.new(id: status_id, state: :stale, live: live)),
         turbo_stream.update("editor-notice", Admin::EditorScreen::ChangedElsewhereComponent.new(record: record, reload_url: reload_url, since: since)),
         turbo_stream.remove("toast-#{error_prefix}")
       ]
@@ -173,12 +173,12 @@ module Admin
     # off whatever element is there when it writes its own "saving" line.
     def save_status_component(record:, result:, status_id:, base_updated_at:)
       live = live_record?(record)
-      return Admin::SaveStatusComponent.new(id: status_id, state: :forbidden, live: live) if result.denied?
-      return Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size, live: live) unless result.ok?
+      return Admin::Ui::SaveStatusComponent.new(id: status_id, state: :forbidden, live: live) if result.denied?
+      return Admin::Ui::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size, live: live) unless result.ok?
 
-      return Admin::SaveStatusComponent.new(id: status_id, state: :saved_over, live: live) if legacy_stale_after_save?(record, base_updated_at)
+      return Admin::Ui::SaveStatusComponent.new(id: status_id, state: :saved_over, live: live) if legacy_stale_after_save?(record, base_updated_at)
 
-      Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: record.updated_at, live: live)
+      Admin::Ui::SaveStatusComponent.new(id: status_id, state: :saved, at: record.updated_at, live: live)
     end
 
     # The after-the-fact check for the callers that still warn rather than

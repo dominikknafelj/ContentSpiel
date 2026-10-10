@@ -17,14 +17,14 @@
       <div data-pending-skeleton class="h-3 w-2/3 motion-safe:animate-pulse rounded-cs bg-line"></div>
     </div>
     <div class="mt-2">
-      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
     </div>
   </div>
   <div data-pending-timeout hidden>
     <p data-pending-timeout-message class="text-warn-ink"></p>
     <div class="mt-2 flex flex-wrap gap-2">
-      <%= render Admin::ButtonComponent.new(label: "Try again", variant: :primary, size: :small, data: { action: "admin--translate#retry" }) %>
-      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Try again", variant: :primary, size: :small, data: { action: "admin--translate#retry" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
     </div>
   </div>
 <% end %>

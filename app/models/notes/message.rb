@@ -6,7 +6,7 @@ module Notes
   # question (`Notes::Authorization#mention_errors`), not the record's.
   #
   # The author is nullified when the user is deleted; the message stays and
-  # reads "a deleted user" (`Admin::UserNameComponent`).
+  # reads "a deleted user" (`Admin::Ui::UserNameComponent`).
   class Message < ApplicationRecord
     self.table_name = "note_messages"
 

@@ -17,7 +17,7 @@ module Admin
     # judgement, one post at a time, reported back as "refused".
     #
     # Moving to the trash is destructive, so it asks first
-    # (`Admin::ConfirmDialogComponent`, destructive), naming how many; the
+    # (`Admin::Ui::ConfirmDialogComponent`, destructive), naming how many; the
     # confirm form lives in the dialog, a sibling of the Publish form, never
     # inside it.
     class BulkBarComponent < Admin::AdminComponent

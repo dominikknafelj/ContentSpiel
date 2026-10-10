@@ -1,5 +1,5 @@
 module Admin
-  # `data:` attributes that make any element open the `Admin::DialogComponent`
+  # `data:` attributes that make any element open the `Admin::Ui::DialogComponent`
   # with this id: `button_to ..., data: dialog_trigger("delete-tag-3")`.
   # The one `admin--dialog` controller sits on `<body>` (layouts/admin), so
   # the trigger needs no controller of its own and works inside a

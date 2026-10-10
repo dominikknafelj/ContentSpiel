@@ -1,7 +1,7 @@
 module Admin
   module SaveBarHelper
   # The `data:` a form carries to be driven by `admin--save-bar`
-  # (`Admin::SaveBarComponent`): the controller plus the actions it listens
+  # (`Admin::Ui::SaveBarComponent`): the controller plus the actions it listens
   # for. One definition, so the explicit-save screens can't drift.
   #
   # `dirty:` -- the server re-rendered this form with errors (a 422). The

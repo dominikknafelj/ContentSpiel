@@ -97,7 +97,7 @@ module Admin
 
       def frame_form = { data: { turbo_frame: "notes" } }
 
-      def action_class(variant = :ghost) = "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES.fetch(variant)}"
+      def action_class(variant = :ghost) = "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(variant)}"
 
       def key = "thread-#{thread.id}"
 
@@ -146,7 +146,7 @@ module Admin
         t(".written_on", language: ::Locales.name(origin)) if origin.present? && origin != locale
       end
 
-      # Drawn like the translation chip (`Admin::TranslationChipComponent`),
+      # Drawn like the translation chip (`Admin::Ui::TranslationChipComponent`),
       # which itself always says a translation state and so can't be reused.
       def origin_chip
         tag.span(written_on, data: { note_badge: "origin" },

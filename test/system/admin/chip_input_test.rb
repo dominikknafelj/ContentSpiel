@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The chip input (`Admin::ChipInputComponent`, `admin--chip-input`) on the post
+# The chip input (`Admin::Ui::ChipInputComponent`, `admin--chip-input`) on the post
 # editor: tags with autocomplete and "Create tag", related posts with the
 # type dot and status, keyboard-only use, and the rule that searching alone
 # never saves.

@@ -51,7 +51,7 @@
           </div>
           <span role="separator" aria-orientation="vertical" class="mx-0.5 w-px shrink-0 bg-line bg-clip-content py-1"></span>
         <% end %>
-        <%= render Admin::MenuComponent.new(label: "Insert ▾", align: :right,
+        <%= render Admin::Ui::MenuComponent.new(label: "Insert ▾", align: :right,
               button_class: "inline-flex cursor-pointer whitespace-nowrap items-center gap-1 rounded-cs px-2 py-1 font-cs-mono text-sm text-ink hover:bg-surface") do |menu| %>
           <% insert_menu.each do |action, label, text, toggle| %>
             <% menu.with_item do %>

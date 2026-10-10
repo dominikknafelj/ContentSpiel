@@ -6,17 +6,17 @@
     <% if owner? && last_owner %><p class="text-sm text-dim" data-owner-zone-reason><%= reason %></p><% end %>
     <p class="text-sm text-meta" data-admin--pending-lock-target="hint" hidden></p>
   </div>
-  <%= render Admin::ButtonComponent.new(label: trigger_label, variant: :secondary, size: :small, disabled: (owner? && last_owner) || nil,
+  <%= render Admin::Ui::ButtonComponent.new(label: trigger_label, variant: :secondary, size: :small, disabled: (owner? && last_owner) || nil,
         data: dialog_trigger(dialog_id).merge("admin--pending-lock-target": "control")) %>
 </section>
 
 <%# After the user's form, never inside it (forms don't nest). Not destructive: the confirm is the primary button. %>
 <% unless owner? && last_owner %>
-  <%= render Admin::ConfirmDialogComponent.new(id: dialog_id, title: dialog_title, body: dialog_body) do |dialog| %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(id: dialog_id, title: dialog_title, body: dialog_body) do |dialog| %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: url, method: :patch, data: { turbo_frame: "_top" } do %>
         <%= hidden_field_tag "owner", requested_value, id: nil %>
-        <%= render Admin::ButtonComponent.new(label: confirm_label, variant: :primary, type: "submit") %>
+        <%= render Admin::Ui::ButtonComponent.new(label: confirm_label, variant: :primary, type: "submit") %>
       <% end %>
     <% end %>
   <% end %>

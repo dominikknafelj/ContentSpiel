@@ -4,11 +4,11 @@
         (`accessible_label` puts the short one in front where the full one doesn't contain it). %>
     <% if locked? %>
       <%# Greyed, ticked, disabled: it is not submitted, so the hidden inputs below are what carries the grant. %>
-      <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: true, disabled: true, id: checkbox_id,
+      <%= render Admin::Ui::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: true, disabled: true, id: checkbox_id,
             aria: { label: accessible_label, describedby: "#{checkbox_id}-locked" }, class: "opacity-60") %>
       <% carried_inputs.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
     <% else %>
-      <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: ticked?, id: checkbox_id, aria: { label: accessible_label },
+      <%= render Admin::Ui::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: ticked?, id: checkbox_id, aria: { label: accessible_label },
             data: { action: "change->admin--permission-matrix#toggle" }) %>
     <% end %>
     <label for="<%= checkbox_id %>" class="flex min-w-0 <%= locked? ? "cursor-default" : "cursor-pointer" %> flex-col">

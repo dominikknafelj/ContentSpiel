@@ -8,8 +8,8 @@
 <div role="alert" class="rounded-cs border border-warn bg-warn-tint px-4 py-3 text-sm text-ink">
   <% if change %>
     <%= lead %>
-    <% if change.own %>in another tab or window<% else %>by <%= render Admin::UserNameComponent.new(user: change.event.user, user_id: change.event.user_id) %><% end %>
-    <%= render Admin::TimeAgoComponent.new(time: change.event.last_occurred_at) %>.
+    <% if change.own %>in another tab or window<% else %>by <%= render Admin::Ui::UserNameComponent.new(user: change.event.user, user_id: change.event.user_id) %><% end %>
+    <%= render Admin::Ui::TimeAgoComponent.new(time: change.event.last_occurred_at) %>.
     <%= Admin::StaleForm::STALE_ADVICE %>
   <% else %>
     <%= message %>

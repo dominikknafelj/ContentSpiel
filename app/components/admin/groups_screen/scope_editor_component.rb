@@ -59,7 +59,7 @@ module Admin
 
       def dot_class(name)
         definition = ContentTypes.find(name)
-        ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
+        Ui::ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
       end
 
       # --- Branch tree ------------------------------------------------------
@@ -97,7 +97,7 @@ module Admin
             control = if node.readable
               box_id = field_id("page", page_id)
               tag.label(for: box_id, class: "flex min-w-0 items-center gap-2.5 text-ink") do
-                render(Admin::CheckboxComponent.new(name: field_name("page_ids") + "[]", value: page_id, id: box_id,
+                render(Admin::Ui::CheckboxComponent.new(name: field_name("page_ids") + "[]", value: page_id, id: box_id,
                   checked: %i[chosen implied].include?(state.state), disabled: state.state == :implied,
                   data: { admin__branch_picker_target: "box", action: "admin--branch-picker#change", chip_label: node.title, partial: (state.state == :partial || nil) })) + node.title
               end

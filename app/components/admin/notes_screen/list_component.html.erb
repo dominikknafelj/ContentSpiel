@@ -21,7 +21,7 @@
   <% end %>
 
   <% if empty? && !composing? %>
-    <%= render Admin::EmptyStateComponent.new(title: t(".empty_title"), description: t(".empty.#{type}")) do |empty_state| %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty_title"), description: t(".empty.#{type}")) do |empty_state| %>
       <% empty_state.with_action do %>
         <%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes", turbo_prefetch: false } %>
       <% end %>

@@ -15,7 +15,7 @@
     <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
       <h2 id="<%= part_id("title") %>" class="text-h2 text-ink">Choose an image</h2>
       <div class="flex items-center gap-3">
-        <%= render Admin::ButtonComponent.new(label: "Upload", variant: :secondary, type: "button", data: { action: "admin--media-picker#browse" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Upload", variant: :secondary, type: "button", data: { action: "admin--media-picker#browse" }) %>
         <%= tag.button "×", type: "button", "aria-label": "Close", class: "rounded-cs px-2 text-2xl leading-none text-meta hover:text-ink focus:outline-2 focus:outline-accent",
               data: { action: "admin--media-picker#dismiss" } %>
       </div>
@@ -41,8 +41,8 @@
       <%# What is chosen, said in words and announced as it changes. %>
       <p class="text-sm text-meta" role="status" aria-live="polite" data-admin--media-select-target="status">No image selected</p>
       <div class="flex items-center gap-2">
-        <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "button", data: { action: "admin--media-picker#dismiss" }) %>
-        <%= render Admin::ButtonComponent.new(label: "Use image", variant: :primary, type: "button", disabled: true,
+        <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "button", data: { action: "admin--media-picker#dismiss" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Use image", variant: :primary, type: "button", disabled: true,
               data: { "admin--media-select-target": "use", action: "admin--media-select#confirm" }) %>
       </div>
     </div>

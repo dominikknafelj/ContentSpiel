@@ -15,7 +15,7 @@
   <td class="py-3 pr-4 text-meta"><%= type_label %></td>
   <td class="py-3 pr-4">
     <span class="text-ink"><%= who %></span>
-    <span class="text-meta"> · <%= render Admin::TimeAgoComponent.new(time: item.trashed_at) %></span>
+    <span class="text-meta"> · <%= render Admin::Ui::TimeAgoComponent.new(time: item.trashed_at) %></span>
   </td>
   <td class="py-3 pr-4"><%= render Admin::TrashScreen::RetentionTagComponent.new(trashed_at: item.trashed_at, retention_days:) %></td>
   <td class="py-3">
@@ -27,21 +27,21 @@
             <%= label_tag parent_select_id, "Restore under", class: "text-sm text-meta" %>
             <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: "#{setup_select_class} !w-auto max-w-56",
                   disabled: no_parent?, aria: { describedby: (no_parent_id if no_parent?) } %>
-            <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: no_parent?,
+            <%= render Admin::Ui::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: no_parent?,
                   aria: { describedby: (no_parent_id if no_parent?) }) %>
           <% end %>
         <% else %>
           <%= form_with url: restore_path, method: :post, data: { turbo_frame: "_top", promotion_stand_in: true } do %>
             <%= hidden_field_tag :tab, tab, id: nil, data: { hold_ignore: true } %>
-            <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit") %>
+            <%= render Admin::Ui::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit") %>
           <% end %>
         <% end %>
 
         <% if in_use? %>
-          <%= render Admin::ButtonComponent.new(label: "Delete now…", variant: :danger_text, type: "button", disabled: true,
+          <%= render Admin::Ui::ButtonComponent.new(label: "Delete now…", variant: :danger_text, type: "button", disabled: true,
                 title: in_use_reason, aria: { describedby: reason_id }) %>
         <% else %>
-          <%= render Admin::ButtonComponent.new(label: "Delete now…", variant: :danger_text, type: "button",
+          <%= render Admin::Ui::ButtonComponent.new(label: "Delete now…", variant: :danger_text, type: "button",
                 data: dialog_trigger(purge_dialog_id)) %>
         <% end %>
       </div>
@@ -51,11 +51,11 @@
       <% if in_use? %>
         <p id="<%= reason_id %>" class="text-sm text-meta"><%= in_use_reason %></p>
       <% else %>
-        <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: purge_dialog_id, title: purge_dialog_title, body: purge_dialog_body) do |dialog| %>
+        <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: purge_dialog_id, title: purge_dialog_title, body: purge_dialog_body) do |dialog| %>
           <% dialog.with_confirm_action do %>
             <%= form_with url: purge_path, method: :delete, data: { turbo_frame: "_top", promotion_stand_in: true } do %>
               <%= hidden_field_tag :tab, tab, id: nil, data: { hold_ignore: true } %>
-              <%= render Admin::ButtonComponent.new(label: "Delete permanently", variant: :danger, type: "submit") %>
+              <%= render Admin::Ui::ButtonComponent.new(label: "Delete permanently", variant: :danger, type: "submit") %>
             <% end %>
           <% end %>
         <% end %>

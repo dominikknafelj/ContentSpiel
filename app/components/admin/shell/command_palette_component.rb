@@ -7,7 +7,7 @@ module Admin
     # or the sidebar and top-bar buttons), reloads `#jump-results` as the
     # viewer types, and moves the selection with the arrow keys.
     #
-    # It isn't an `Admin::DialogComponent`: that one is a titled dialog with
+    # It isn't an `Admin::Ui::DialogComponent`: that one is a titled dialog with
     # a close button and a padded body, and the palette is a bare search
     # field over a results list. It does reuse the `.admin-dialog` CSS (the
     # backdrop and max-width) and so the body-level backdrop-click and Esc

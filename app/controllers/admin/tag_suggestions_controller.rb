@@ -1,6 +1,6 @@
 module Admin
   # The post editor's tag chip input asks this what to offer while an editor
-  # types (`Admin::ChipInputComponent`, design pass round 2): up to `LIMIT`
+  # types (`Admin::Ui::ChipInputComponent`, design pass round 2): up to `LIMIT`
   # tag names, those that start with the typed text first, then those that
   # merely contain it, each with how many posts use it.
   #

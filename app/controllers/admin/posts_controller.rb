@@ -439,7 +439,7 @@ module Admin
     # already knows the raw string is comma-separated at all -- `assign_tags`
     # only ever sees a plain Array by the time it runs.
     #
-    # The chip input (`Admin::ChipInputComponent`) submits `post[tag_names][]`
+    # The chip input (`Admin::Ui::ChipInputComponent`) submits `post[tag_names][]`
     # instead -- one element per tag, plus an empty sentinel so an emptied list
     # still arrives.
     #
@@ -514,11 +514,11 @@ module Admin
     # slots `group_error_streams` below handles instead, since the row count
     # isn't known ahead of time the way this fixed field list is).
     #
-    # Every `Admin::FieldComponent` this controller's own view renders for a
+    # Every `Admin::Ui::FieldComponent` this controller's own view renders for a
     # typed field is given `id_prefix: "post"` explicitly (`Admin::
     # PostFormComponent::ID_PREFIX`) rather than the default derived from
     # `form_name` ("post[fields]" -> "post_fields") -- so its errors_id
-    # agrees with `Admin::FieldComponent.error_id("post", field.name)` here,
+    # agrees with `Admin::Ui::FieldComponent.error_id("post", field.name)` here,
     # the same bare-"post" prefix every column field's own id already uses.
     def post_error_fields
       fields = {
@@ -529,7 +529,7 @@ module Admin
         # No validation reports against `:tag_names` today (`Posts::Save
         # #assign_tags` finds-or-builds a `Tag` per name, and a blank/
         # duplicate name is already filtered out before it ever reaches
-        # that point) -- wired up anyway so `Admin::ChipInputComponent`'s own
+        # that point) -- wired up anyway so `Admin::Ui::ChipInputComponent`'s own
         # error slot (fix round 1 review) is always cleared/replaced like
         # every other field's, and a later validation on this attribute
         # (e.g. rejecting a tag name that's too long) has somewhere to land
@@ -563,7 +563,7 @@ module Admin
     # components' own default `id_prefix` (no override passed at the render
     # site, unlike `Admin::BlockCardComponent`'s -- see `Admin::
     # PostFormComponent`'s own comment for why there's nothing to
-    # disambiguate against here) already derives: `Admin::FieldComponent.
+    # disambiguate against here) already derives: `Admin::Ui::FieldComponent.
     # dom_id_prefix("post[fields][#{field.name}]" plus, for a `groups` row,
     # "[#{index}]")`. Keeping the two in sync is why both this method and
     # `Admin::PostFormComponent`'s own field loop are the only two places
@@ -575,11 +575,11 @@ module Admin
 
         rows.each_with_index.flat_map do |_row, index|
           row_form_name = field.type == :groups ? "post[fields][#{field.name}][#{index}]" : "post[fields][#{field.name}]"
-          id_prefix = Admin::FieldComponent.dom_id_prefix(row_form_name)
+          id_prefix = Admin::Ui::FieldComponent.dom_id_prefix(row_form_name)
 
           group_definition.fields.map do |subfield|
             attribute = field.type == :groups ? "fields.#{field.name}.#{index}.#{subfield.name}" : "fields.#{field.name}.#{subfield.name}"
-            id = Admin::FieldComponent.error_id(id_prefix, subfield.name)
+            id = Admin::Ui::FieldComponent.error_id(id_prefix, subfield.name)
             messages = record.errors.full_messages_for(attribute)
             turbo_stream.replace(id, partial: "admin/shared/field_errors", locals: { id: id, messages: messages })
           end

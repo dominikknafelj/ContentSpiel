@@ -1,6 +1,6 @@
 <div class="rounded-cs border border-line bg-surface">
 <% if items.empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: empty_title, description: empty_description) %>
+  <%= render Admin::Ui::EmptyStateComponent.new(title: empty_title, description: empty_description) %>
 <% else %>
   <table class="admin-trash-table admin-card-table w-full border-collapse text-sm">
     <thead>

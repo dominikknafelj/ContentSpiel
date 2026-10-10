@@ -19,7 +19,7 @@ module Admin
   # own list; relations read as undirected everywhere else
   # (`Post#all_related_posts`).
   #
-  # The field itself is `Admin::ChipInputComponent` (design pass round 2):
+  # The field itself is `Admin::Ui::ChipInputComponent` (design pass round 2):
   # each related post a chip with its content-type dot, its title and
   # "· Draft" / "· Scheduled" when it isn't live. This component keeps what
   # is specific to relations -- which posts those are, the hidden count and
@@ -52,7 +52,7 @@ module Admin
 
     def search_id = "#{ID_PREFIX}-related_post_ids"
 
-    def errors_id = Admin::FieldComponent.error_id(ID_PREFIX, "related_post_ids")
+    def errors_id = Admin::Ui::FieldComponent.error_id(ID_PREFIX, "related_post_ids")
 
     # `locale:` so the rows' titles are in the language being edited.
     def search_url = helpers.admin_link_targets_path(type: "post", locale: locale)
@@ -70,7 +70,7 @@ module Admin
 
     def dot_class(record)
       definition = ::ContentTypes.find(record.content_type)
-      definition && Admin::ContentTypeDotComponent.new(content_type: record.content_type).mark_class(definition.colour_index)
+      definition && Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type).mark_class(definition.colour_index)
     end
 
     delegate :pluralize, to: :helpers

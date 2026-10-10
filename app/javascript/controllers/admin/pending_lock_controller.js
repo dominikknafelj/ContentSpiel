@@ -94,9 +94,9 @@ export default class extends Controller {
     hint.hidden = !this.locked || this.besideHolder(hint)
   }
 
-  // `admin.components.save_bar.blocked`, the sentence the footer's own
+  // `admin.components.ui.save_bar.blocked`, the sentence the footer's own
   // blocked line shows (read from the page's messages).
-  get hintText() { return messages(this.element).t("components.save_bar.blocked") }
+  get hintText() { return messages(this.element).t("components.ui.save_bar.blocked") }
 
   // See "ONE EXEMPTION".
   exempt(control) { return control.hasAttribute("data-pending-lock-exempt") || control.closest("[data-save-bar-holds]") !== null }

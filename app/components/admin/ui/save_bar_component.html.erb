@@ -1,0 +1,22 @@
+<%# The form's footer: always there, so a form never looks as if it had no
+    way to save. It sits in the form's own column, under the fields, and
+    sticks to the bottom of the window while a long form (a group's
+    permissions) scrolls. `admin--save-bar#refresh` writes the count -- a
+    polite live region, so a screen reader hears the number change -- and
+    disables Save while an existing record has nothing to save. Without
+    JavaScript nothing disables it, so it is a plain working submit button.
+
+    Cancel is a link into the content frame, which the leave guard asks about
+    like any other (round 3) -- except this one: `data-save-bar-cancel` marks
+    it as the way to discard, so it leaves without "Leave without saving?". %>
+<div data-admin--save-bar-target="bar" class="<%= bar_class %>">
+  <%= render Admin::Ui::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--save-bar-target": "save")) %>
+  <%= link_to t(".cancel"), cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_secondary_link_class %>
+  <span data-admin--save-bar-target="count" aria-live="polite" class="text-[13px] text-dim"></span>
+  <%# Shown while another form on the screen has to be saved first
+      (`save_bar_form_data(after:)`); the controller writes the sentence. %>
+  <span data-admin--save-bar-target="blocked" role="status" class="text-[13px] text-dim" hidden></span>
+  <%# Anything the screen wants at the far end of the bar (the account
+      screen's "Forgot your current password?"). %>
+  <% if content.present? %><div class="ml-auto"><%= content %></div><% end %>
+</div>

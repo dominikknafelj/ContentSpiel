@@ -17,7 +17,7 @@
       <span class="flex-1 truncate text-sm font-semibold text-danger-ink"><%= unavailable_label %></span>
       <% if editable? %>
         <%# The only action an unavailable card has (it has no body to move, copy or edit). %>
-        <%= render Admin::ButtonComponent.new(label: "Delete block…", variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Delete block…", variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
       <% end %>
     <% elsif panel? %>
       <%# The open form of a block in a section (sections spec §4.3): a heading, not a
@@ -31,7 +31,7 @@
       <%= render note_marker %>
       <span class="flex-1"></span>
       <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
-      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
         <% menu.with_item { add_note_item } %>
       <% end %>
     <% else %>
@@ -49,7 +49,7 @@
       <%# Move up / Move down keep calling `admin--blocks#moveUp|moveDown`; their `data-move` is how
           `refreshMoveState` finds them to enable or disable them after a reorder, add or delete. %>
       <% if editable? %>
-        <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+        <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
           <%# Always first, and always there: the marker of a block without notes shows only
               on hover or focus, and neither touch nor a test depends on that (notes spec §4.3). %>
           <% menu.with_item { add_note_item } %>
@@ -82,7 +82,7 @@
       <% else %>
         <%# A viewer who can only read the page: the same "⋯", with "Add note" as its
             only item (the handoff's decision 6). %>
-        <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+        <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
           <% menu.with_item { add_note_item } %>
         <% end %>
       <% end %>
@@ -91,7 +91,7 @@
     <%# Every panel can be closed, an unavailable block's too: `admin--section#close`,
         like Escape and a second press on the tile. %>
     <% if panel? %>
-      <%= render Admin::ButtonComponent.new(label: t(".close"), variant: :ghost, size: :small, data: { action: "admin--section#close" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".close"), variant: :ghost, size: :small, data: { action: "admin--section#close" }) %>
     <% end %>
   </div>
 
@@ -101,7 +101,7 @@
 
   <% unless unavailable? %>
     <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 p-3">
-      <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
+      <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
 
       <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4", data: form_data do %>
       <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
@@ -111,17 +111,17 @@
           <%# A post list's three settings in one row (handoff B22): Type, Tag, Limit (72px). %>
           <% type_field, tag_field, limit_field = settings_row_fields %>
           <div class="admin-block-settings-row grid grid-cols-1 items-start gap-x-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_72px]">
-            <%= render Admin::FieldComponent.new(
+            <%= render Admin::Ui::FieldComponent.new(
                   field: type_field, form_name: "block[settings]",
                   value: value_for(type_field), original: original_for(type_field), locale: locale,
                   errors: field_errors(type_field), id_prefix: error_prefix, **translation(type_field.name)
                 ) %>
-            <%= render Admin::ChipInputComponent.new(
+            <%= render Admin::Ui::ChipInputComponent.new(
                   name: "block[settings][#{tag_field.name}]", id: field_id(tag_field.name), label: tag_field.name.humanize,
                   search_url: tag_search_url, chips: tag_chips(tag_field), single: true, create: false, noun: "tag",
                   placeholder: "Any", errors: field_errors(tag_field)
                 ) %>
-            <%= render Admin::FieldComponent.new(
+            <%= render Admin::Ui::FieldComponent.new(
                   field: limit_field, form_name: "block[settings]",
                   value: value_for(limit_field), original: original_for(limit_field), locale: locale,
                   errors: field_errors(limit_field), id_prefix: error_prefix, **translation(limit_field.name)
@@ -131,7 +131,7 @@
         <% end %>
 
         <% other_schema_fields.each do |field| %>
-          <%= render Admin::FieldComponent.new(
+          <%= render Admin::Ui::FieldComponent.new(
                 field: field, form_name: "block[settings]",
                 value: value_for(field), original: original_for(field), locale: locale,
                 errors: field_errors(field), id_prefix: error_prefix, **translation(field.name)

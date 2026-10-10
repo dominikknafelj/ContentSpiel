@@ -30,7 +30,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     within("nav[aria-label='Languages']") { press "Deutsch" }
     # Waits for the language switch's own full top-level Turbo visit
-    # (`data-turbo-frame="_top"`, `Admin::LanguageTabsComponent`'s own
+    # (`data-turbo-frame="_top"`, `Admin::Ui::LanguageTabsComponent`'s own
     # comment) to actually land before typing -- alt/caption have no
     # read-only "original" hint the way a translated column with one would
     # (`Admin::LanguagesSystemTest`'s own comment on why *that* test polls

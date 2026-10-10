@@ -29,7 +29,7 @@
         <% end %>
       </div>
     </fieldset>
-    <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+    <noscript><%= render Admin::Ui::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
   <% end %>
 <% end %>
 
@@ -46,7 +46,7 @@
   <%= render Admin::TranslationScreen::MatrixComponent.new(items: @items, locales: @target_locales) %>
   <% if @pagination.total_pages > 1 %>
     <div class="mt-4 rounded-cs border border-line bg-surface">
-      <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+      <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
     </div>
   <% end %>
 <% end %>

@@ -47,10 +47,10 @@
 
       <% if user.new_record? %>
         <div class="max-w-[420px]">
-          <%= render Admin::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "Password", meter: true) %>
+          <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "Password", meter: true) %>
         </div>
         <div class="max-w-[420px]">
-          <%= render Admin::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm password") %>
+          <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm password") %>
         </div>
       <% elsif !read_only %>
         <%# No `data-password-submit` on this form's button: a blank password means "keep the current one"
@@ -62,10 +62,10 @@
           <summary class="inline-block cursor-pointer text-sm text-accent hover:text-accent-hover">Set a new password…</summary>
           <div class="mt-3 flex max-w-[420px] flex-col gap-4">
             <div>
-              <%= render Admin::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "New password", meter: true, required: false) %>
+              <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "New password", meter: true, required: false) %>
               <p class="mt-1 text-sm text-meta">Leave this closed to keep the current password.</p>
             </div>
-            <%= render Admin::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm new password", required: false) %>
+            <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm new password", required: false) %>
           </div>
         </details>
       <% end %>
@@ -79,7 +79,7 @@
 
   <% unless read_only %>
     <%# The Save button carries `data-password-submit` on a NEW user only: the meter holds it back until the password is long enough. %>
-    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options),
+    <%= render Admin::Ui::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options),
           save_label: (user.new_record? ? "Create user" : "Save user"), save_data: (user.new_record? ? { password_submit: true } : {})) %>
   <% end %>
 <% end %>

@@ -8,7 +8,7 @@
     <p class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
       <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: message.author_id, viewer: viewer, size: :message) %>
       <strong class="text-[13px] font-semibold text-ink"><%= render Admin::NotesScreen::PersonNameComponent.new(user: author, user_id: message.author_id) %></strong>
-      <span class="font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: message.created_at) %></span>
+      <span class="font-cs-mono text-[11px] text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: message.created_at) %></span>
       <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>
       <%# "Unsaved edit" (the handoff's decisions 27 and 29): shown by the
           script while this tab holds a draft of an edit of this message that
@@ -21,7 +21,7 @@
     <%# The way to the emoji set of a message nobody reacted to (decision 26). %>
     <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, view: view, state: reactions_state, place: :meta) %>
     <% if deletable? || reactable? %>
-      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <% if reactable? %>
           <% menu.with_item do %><%= tag.button t(".react"), type: "button", class: "cursor-pointer text-sm text-ink", data: { note_react: message.id, action: "admin--note-reactions#open" } %><% end %>
         <% end %>
@@ -61,7 +61,7 @@
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink" data-note-delete-question>
       <span><%= t(".delete_question") %></span>
       <%= button_to t(".delete_confirm"), message_path, method: :delete,
-            class: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES.fetch(:danger_text)}", form: { data: { turbo_frame: "notes" } } %>
+            class: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(:danger_text)}", form: { data: { turbo_frame: "notes" } } %>
       <%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, **frame_link } %>
     </div>
   <% end %>

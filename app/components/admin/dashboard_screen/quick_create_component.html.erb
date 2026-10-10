@@ -14,7 +14,7 @@
       <%= select_tag :content_type, options_for_select(choices, content_type), id: "dashboard_draft_content_type", class: setup_select_class,
             data: { "admin--quick-create-target": "type" } %>
     </div>
-    <%= render Admin::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit") %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit") %>
     <% if new_page? %>
       <%# The real "New page" trigger a Page submit clicks: a link, so it also works without JS. %>
       <%= link_to "New page", helpers.new_admin_page_path(**url_options), hidden: true, tabindex: -1, aria: { hidden: true },

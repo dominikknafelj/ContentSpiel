@@ -1,18 +1,18 @@
 module Admin
   module Fields
-    # Shared shape for every per-type field input `Admin::FieldComponent`
-    # dispatches to (spec §4.3). All five of `FieldComponent`'s own
+    # Shared shape for every per-type field input `Admin::Ui::FieldComponent`
+    # dispatches to (spec §4.3). All five of `Ui::FieldComponent`'s own
     # constructor keywords are forwarded here unchanged, even though a
     # scalar type (string, integer, url, ...) only ever reads
     # `field`/`form_name`/`value` -- `group` and `groups` are the two that
-    # actually recurse back into `FieldComponent` per subfield and need
+    # actually recurse back into `Ui::FieldComponent` per subfield and need
     # `original`, `locale` and `errors` too. Keeping one signature for every
-    # subclass is what lets `FieldComponent#input_component` construct
+    # subclass is what lets `Ui::FieldComponent#input_component` construct
     # whichever one it dispatches to without a type-by-type special case.
     class Base < Admin::AdminComponent
-      # `id_prefix:` mirrors `FieldComponent`'s own (see its comment) --
+      # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
-      # `FieldComponent#errors_id` a Turbo Stream targets, whichever one a
+      # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a
       # caller supplied.
       def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil)
         @field = field
@@ -21,7 +21,7 @@ module Admin
         @original = original
         @locale = locale
         @errors = errors
-        @id_prefix = id_prefix || Admin::FieldComponent.dom_id_prefix(form_name)
+        @id_prefix = id_prefix || Admin::Ui::FieldComponent.dom_id_prefix(form_name)
       end
 
       private

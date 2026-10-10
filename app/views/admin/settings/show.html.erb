@@ -2,7 +2,7 @@
     nav of anchors at the left (`Admin::SettingsScreen::NavComponent`) and one
     card per section in a column up to 1100px wide altogether. ONE form
     (`#settings-form`) wraps the whole column and carries the ONE save footer
-    (`Admin::SaveBarComponent`, at its bottom): the Site and Publishing cards,
+    (`Admin::Ui::SaveBarComponent`, at its bottom): the Site and Publishing cards,
     the Languages card's order and fallbacks and the AI card's provider and
     model are its fields. What can't be a field of it -- the AI key (its own
     save, instantly, never rendered back), Test connection, and the Languages
@@ -40,7 +40,7 @@
     <%# Full messages, so "AI provider isn't an available provider" keeps the name
     the model gives its attribute instead of the humanized key ("Ai provider"). %>
     <% summary = @errors.respond_to?(:group_by_attribute) ? @errors.group_by_attribute.transform_values { |errors| errors.map(&:full_message) } : (@errors || []) %>
-    <%= render Admin::ErrorSummaryComponent.new(errors: summary, field_ids: error_ids.merge("logo" => "settings-logo")) %>
+    <%= render Admin::Ui::ErrorSummaryComponent.new(errors: summary, field_ids: error_ids.merge("logo" => "settings-logo")) %>
 
     <% if manage_settings || manage_languages %>
       <%= form_with url: admin_settings_path, method: :patch, id: "settings-form", multipart: true, class: "flex flex-col gap-5",
@@ -60,7 +60,7 @@
                 provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
         <% end %>
 
-        <%= render Admin::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
+        <%= render Admin::Ui::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
       <% end %>
 
       <%# Forms of their own, outside the one above (see the comment at the top). %>

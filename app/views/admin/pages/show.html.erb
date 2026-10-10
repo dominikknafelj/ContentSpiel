@@ -61,7 +61,7 @@
                                       "components.editor_screen.block_moves.out", "components.editor_screen.block_moves.back") %>">
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-h2 text-ink">Blocks</h2>
-    <%= render Admin::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>
+    <%= render Admin::Ui::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>
   </div>
 
   <%# Whether the blocks can be changed at all (access-control design spec

@@ -45,8 +45,8 @@
       (URL-encoded), so no path is written in JavaScript; `data-type-labels`
       is each shown type's human name. `data-button-classes` and
       `data-dot-classes` hand the script the classes of
-      `Admin::ButtonComponent` (the card's actions) and of
-      `Admin::ContentTypeDotComponent` (a type's dot in the card and the list,
+      `Admin::Ui::ButtonComponent` (the card's actions) and of
+      `Admin::Ui::ContentTypeDotComponent` (a type's dot in the card and the list,
       slots 1-12 in order), so neither is copied into JavaScript.
       `data-post-notes-url` is a fourth template: a post's open notes as JSON
       for its card, and where the card posts a new one (notes spec §4.4). The
@@ -75,8 +75,8 @@
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
        data-post-notes-url="<%= admin_record_note_threads_data_path("post", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
        data-type-labels="<%= @type_labels.to_json %>"
-       data-button-classes="<%= { primary: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
-       data-dot-classes="<%= (Admin::ContentTypeDotComponent::FILLED + Admin::ContentTypeDotComponent::RINGS).to_json %>"
+       data-button-classes="<%= { primary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
+       data-dot-classes="<%= (Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS).to_json %>"
        data-state="loading"
        class="grid min-h-0 flex-1 overflow-hidden rounded-cs border border-line bg-surface min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
     <%# The search field: how a post or tag the graph doesn't draw is reached.
@@ -144,7 +144,7 @@
           loading, a failure and the cap's sentences are announced. %>
       <div class="relative min-h-0 flex-1">
         <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
-          <%= render Admin::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph#releasePinned" }) %>
+          <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph#releasePinned" }) %>
           <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-line-strong bg-surface text-sm text-ink">
             <% zoom_button = "cursor-pointer px-2.5 py-0.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
             <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph#zoomOut" } %>

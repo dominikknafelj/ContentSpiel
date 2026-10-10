@@ -12,7 +12,7 @@ module Admin
     # it as the slug input changes. `data-slug-preview-value` marks the
     # exact span a later task's autosave/slug controller can target to make
     # it actually live (mirroring `data-translate-slot`'s "reserved for
-    # later" pattern in `Admin::FieldComponent`) without this component
+    # later" pattern in `Admin::Ui::FieldComponent`) without this component
     # needing to know about that controller yet.
     class SlugColumnComponent < Base
       def initialize(value:, base_url:, name: "slug", original: nil, errors: [], locale: nil, id: nil, html_name: nil, help: nil, **html)

@@ -12,5 +12,5 @@
   <h1 class="text-h1 text-ink">No access</h1>
   <p role="alert" class="text-ink"><%= message %></p>
   <p class="text-sm text-meta">If you need this, ask an owner or an admin to add you to a group that has it.</p>
-  <%= link_to "Back to the dashboard", admin_root_path(**admin_url_options), class: "#{Admin::ButtonComponent::BASE_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}" %>
+  <%= link_to "Back to the dashboard", admin_root_path(**admin_url_options), class: "#{Admin::Ui::ButtonComponent::BASE_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" %>
 </section>

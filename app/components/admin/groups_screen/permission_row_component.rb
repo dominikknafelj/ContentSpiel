@@ -142,7 +142,7 @@ module Admin
 
       def dot_class(name)
         definition = ContentTypes.find(name)
-        ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
+        Ui::ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
       end
 
       def chip_class(chip)

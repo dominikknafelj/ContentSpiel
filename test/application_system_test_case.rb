@@ -49,7 +49,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # through each element it had found -- to filter it, then again to print
   # "Also found ..." -- at 0.5 s apiece: with an editor's seven
   # `[role=status]` elements, 4.4 s without looking at the page once. A
-  # success toast stays 4 s (`Admin::ToastComponent::TIMEOUTS`): it was
+  # success toast stays 4 s (`Admin::Ui::ToastComponent::TIMEOUTS`): it was
   # rendered, shown and dismissed on time while the driver was blind, and the
   # assertion then failed on a page that no longer had it. That was the
   # "Undo from the flash" failure of about one run in ten (and "Emptied the
@@ -142,7 +142,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # related-posts picker is a case in point: a native click there once lost
   # the pick, because the autosave its mousedown started grew the empty
   # save-status line and moved the button out from under the mouseup
-  # (`Admin::SaveStatusComponent` now reserves that line).
+  # (`Admin::Ui::SaveStatusComponent` now reserves that line).
   def press(label)
     find(:link_or_button, label).click
   end

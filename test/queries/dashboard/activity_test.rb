@@ -120,7 +120,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     as(gone) { create_post(title: "By a ghost", published: false) }
     gone.destroy!
 
-    # Facts, not a label: the component names them (`Admin::UserNameComponent`).
+    # Facts, not a label: the component names them (`Admin::Ui::UserNameComponent`).
     actors = activity.rows.to_h { |row| [ row.record.title, row.sentence.actor ] }
     assert_nil actors["By the system"].user
     assert_nil actors["By the system"].user_id

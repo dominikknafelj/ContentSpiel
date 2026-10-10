@@ -57,7 +57,7 @@ module Admin
       EMOJI_PANEL_CLASS = "absolute z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu".freeze
       EMOJI_BUTTON_CLASS = "cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken".freeze
       # `disabled:` is the shared button's own disabled look
-      # (`Admin::ButtonComponent::COMMON_CLASS`): the paperclip and the
+      # (`Admin::Ui::ButtonComponent::COMMON_CLASS`): the paperclip and the
       # at-sign are disabled while a note is being sent (decision 41).
       TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-dim".freeze
 

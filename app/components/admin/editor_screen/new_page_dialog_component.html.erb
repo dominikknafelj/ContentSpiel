@@ -1,4 +1,4 @@
-<%= render Admin::DialogComponent.new(id: ID, title: "New page", width: :form, hang: true) do |dialog| %>
+<%= render Admin::Ui::DialogComponent.new(id: ID, title: "New page", width: :form, hang: true) do |dialog| %>
   <div data-controller="admin--new-record" data-admin--new-record-kind-value="page" data-admin--new-record-url-value="<%= form_url %>"
        data-action="admin--dialog:opening@document->admin--new-record#opened input->admin--new-record#update change->admin--new-record#update turbo:submit-start->admin--new-record#submitting turbo:submit-end->admin--new-record#submitted turbo:frame-missing->admin--new-record#failed turbo:before-fetch-response->admin--new-record#checkResponse turbo:fetch-request-error->admin--new-record#failed">
     <p data-admin--new-record-target="loading" class="py-6 text-center text-dim">Loading…</p>
@@ -7,7 +7,7 @@
         only un-hidden is not announced. %>
     <div data-admin--new-record-target="failure" data-message="The form couldn’t be loaded." class="py-6 text-center" hidden>
       <p role="alert" class="text-danger-ink"></p>
-      <div class="mt-3"><%= render Admin::ButtonComponent.new(label: "Try again", variant: :secondary, type: "button", data: { action: "admin--new-record#retry" }) %></div>
+      <div class="mt-3"><%= render Admin::Ui::ButtonComponent.new(label: "Try again", variant: :secondary, type: "button", data: { action: "admin--new-record#retry" }) %></div>
     </div>
     <%# A SUBMIT that never reached the server (network error): the typed form stays, Create is enabled again. %>
     <p data-admin--new-record-target="submitFailure" data-message="Couldn’t save. Check your connection and try again." role="alert" class="mb-3 text-danger-ink empty:hidden"></p>
@@ -15,9 +15,9 @@
   </div>
   <% dialog.with_footer do %>
     <%= tag.form method: "dialog" do %>
-      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
     <% end %>
     <%# Disabled until the form has loaded (`admin--new-record`). %>
-    <%= render Admin::ButtonComponent.new(label: "Create page", variant: :primary, type: "submit", form: Admin::EditorScreen::NewPageFormComponent::FORM_ID, disabled: true) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Create page", variant: :primary, type: "submit", form: Admin::EditorScreen::NewPageFormComponent::FORM_ID, disabled: true) %>
   <% end %>
 <% end %>

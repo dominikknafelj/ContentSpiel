@@ -48,7 +48,7 @@ module Admin
       streams = [ turbo_stream.replace(card_id, card) ]
       switcher_record = record.is_a?(ContentBlock) ? record.owner : record
       unless Translations::Status.outdated_locales(switcher_record).include?(params[:locale].to_s)
-        streams << turbo_stream.remove(Admin::LanguageTabsComponent.outdated_marker_id(params[:locale]))
+        streams << turbo_stream.remove(Admin::Ui::LanguageTabsComponent.outdated_marker_id(params[:locale]))
       end
       streams
     end

@@ -26,7 +26,7 @@ module Admin
         actor = sentence.actor
         return if actor.none
 
-        name = Admin::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label
+        name = Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label
         actor.via_label.present? ? "#{name} via #{actor.via_label}" : name
       end
 

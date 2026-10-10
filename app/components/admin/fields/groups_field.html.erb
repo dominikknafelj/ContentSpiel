@@ -22,10 +22,10 @@
         <button type="button" class="admin-groups-field__handle cursor-grab px-1 text-meta" aria-label="Drag to reorder"><span aria-hidden="true">⠿</span></button>
         <div class="flex-1">
           <% subfields.each do |subfield| %>
-            <%= render Admin::FieldComponent.new(field: subfield, form_name: row_form_name(index), value: subfield_value(row_value, subfield), original: subfield_original(index, subfield), locale: locale) %>
+            <%= render Admin::Ui::FieldComponent.new(field: subfield, form_name: row_form_name(index), value: subfield_value(row_value, subfield), original: subfield_original(index, subfield), locale: locale) %>
           <% end %>
         </div>
-        <%= render Admin::ButtonComponent.new(label: "×", variant: :ghost, type: "button", "aria-label": remove_label, data: { action: "click->admin--groups#remove" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "×", variant: :ghost, type: "button", "aria-label": remove_label, data: { action: "click->admin--groups#remove" }) %>
       </div>
     <% end %>
   </div>
@@ -35,14 +35,14 @@
       <button type="button" class="admin-groups-field__handle cursor-grab px-1 text-meta" aria-label="Drag to reorder"><span aria-hidden="true">⠿</span></button>
       <div class="flex-1">
         <% subfields.each do |subfield| %>
-          <%= render Admin::FieldComponent.new(field: subfield, form_name: row_form_name("__INDEX__"), value: nil, locale: locale) %>
+          <%= render Admin::Ui::FieldComponent.new(field: subfield, form_name: row_form_name("__INDEX__"), value: nil, locale: locale) %>
         <% end %>
       </div>
-      <%= render Admin::ButtonComponent.new(label: "×", variant: :ghost, type: "button", "aria-label": remove_label, data: { action: "click->admin--groups#remove" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "×", variant: :ghost, type: "button", "aria-label": remove_label, data: { action: "click->admin--groups#remove" }) %>
     </div>
   </template>
 
   <div class="mt-2">
-    <%= render Admin::ButtonComponent.new(label: "+ #{add_label}", variant: :secondary, type: "button", data: { action: "click->admin--groups#add" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "+ #{add_label}", variant: :secondary, type: "button", data: { action: "click->admin--groups#add" }) %>
   </div>
 </div>

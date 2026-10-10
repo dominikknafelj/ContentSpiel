@@ -4,7 +4,7 @@ module Admin
     # `Page#subtitle/meta_title/meta_description`, `Post#excerpt`,
     # `ContentBlock#caption`/`alt` -- as opposed to a rich-text `body` column
     # (`RichTextColumnComponent`) or the schema-declared, `ContentModel`-
-    # backed fields `Admin::FieldComponent` renders. `multiline:` picks a
+    # backed fields `Admin::Ui::FieldComponent` renders. `multiline:` picks a
     # `<textarea>` over a single-line `<input>` for the longer ones (an
     # excerpt, a meta description) without needing a whole separate
     # component per column.

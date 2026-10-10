@@ -7,7 +7,7 @@
   <p class="mb-1 text-xs text-meta"><%= link_to "Users", admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
   <h1 class="mb-4 text-h1 text-ink">New user</h1>
 
-  <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
   <%= render "admin/users/form", user: @user, url: admin_users_path(**admin_url_options), method: :post, state: :editable %>
 </div>

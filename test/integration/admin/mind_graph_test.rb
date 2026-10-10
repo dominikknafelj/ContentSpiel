@@ -121,9 +121,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     element = css_select("[data-controller='admin--mind-graph']").first
     buttons = JSON.parse(element["data-button-classes"])
-    assert_equal "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:primary]}", buttons["primary"]
-    assert_equal "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}", buttons["secondary"]
-    assert_equal Admin::ContentTypeDotComponent::FILLED + Admin::ContentTypeDotComponent::RINGS, JSON.parse(element["data-dot-classes"])
+    assert_equal "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", buttons["primary"]
+    assert_equal "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}", buttons["secondary"]
+    assert_equal Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS, JSON.parse(element["data-dot-classes"])
   end
 
   test "the data url carries the focus, the depth and the editing language" do

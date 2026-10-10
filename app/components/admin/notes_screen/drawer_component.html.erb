@@ -27,7 +27,7 @@
         itself, and the line with it. %>
     <p class="font-cs-mono text-[11px] uppercase text-meta has-[[hidden]]:hidden"><%= open_count %></p>
     <div class="ml-auto flex items-center gap-1">
-      <%= render Admin::ButtonComponent.new(label: t(".new"), variant: :secondary, size: :small, type: "button", data: { action: "admin--notes#compose" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".new"), variant: :secondary, size: :small, type: "button", data: { action: "admin--notes#compose" }) %>
       <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { action: "admin--notes#close" },
             class: "inline-flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent max-lg:hidden" do %>
         <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>

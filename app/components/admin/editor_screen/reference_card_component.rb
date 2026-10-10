@@ -5,7 +5,7 @@ module Admin
     # the language's own name as an uppercase mono label, then the original --
     # a `<p>` for a plain value, the rendered (and scrubbed) HTML for a rich
     # one. It replaces the old sunken "original" panel `Admin::Columns::*` and
-    # `Admin::FieldComponent` each rendered by hand.
+    # `Admin::Ui::FieldComponent` each rendered by hand.
     #
     # The root carries `data-original-for` (the field) and
     # `data-translation-state` (`:current` / `:outdated` / `:unknown` /
@@ -101,7 +101,7 @@ module Admin
       # what a confirmation streams in place of the outdated one. The original
       # is the record's own primary-language value (a rich body is a
       # `RichText::Document`, so it renders as rich); a schema group's raw Hash
-      # is handed over as it is, exactly as `Admin::FieldComponent` does, so the
+      # is handed over as it is, exactly as `Admin::Ui::FieldComponent` does, so the
       # card never vanishes on confirm.
       def self.current_for(record, field, locale:)
         original = record.translation_value(field, ::Locales.default)
@@ -194,7 +194,7 @@ module Admin
         paragraphs
       end
 
-      def diff_html(segments) = render(Admin::WordDiffComponent.new(segments:))
+      def diff_html(segments) = render(Admin::Ui::WordDiffComponent.new(segments:))
 
       def confirmable? = confirm.present?
 

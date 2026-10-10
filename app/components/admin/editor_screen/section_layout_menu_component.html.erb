@@ -1,5 +1,5 @@
 <div id="<%= dom_id %>" data-admin--section-target="layoutMenu">
-  <%= render Admin::MenuComponent.new(label: button_label, aria_label: t(".name"), align: :left, close_on_select: true) do |menu| %>
+  <%= render Admin::Ui::MenuComponent.new(label: button_label, aria_label: t(".name"), align: :left, close_on_select: true) do |menu| %>
     <% layouts.each_key do |name| %>
       <% menu.with_item do %>
         <%# `aria-current` marks the layout the section has; the stylesheet draws it from that. %>

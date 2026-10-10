@@ -9,7 +9,7 @@ module Admin
   # Every field's `id:` here is dash-joined (`page-title`, never
   # `page[title]`) so it doubles as this form's own Turbo Stream error-slot
   # id, via the exact formula `Admin::AutosaveResponses` computes
-  # replacement targets with (`Admin::FieldComponent.error_id("page",
+  # replacement targets with (`Admin::Ui::FieldComponent.error_id("page",
   # field)`) -- see `Admin::Columns::Base`'s own comment for why the id and
   # the submitted form field name (`html_name:`, bracket notation, so
   # `Admin::PagesController#update` sees a nested `params[:page]` hash) have
@@ -63,7 +63,7 @@ module Admin
     # (`page_type`'s `<select>`) still needs an error slot id that agrees
     # with `Admin::AutosaveResponses`, so it goes through the exact same
     # formula every other field's id already matches.
-    def errors_id(field) = Admin::FieldComponent.error_id(ID_PREFIX, field)
+    def errors_id(field) = Admin::Ui::FieldComponent.error_id(ID_PREFIX, field)
 
     # A page's own value in whichever locale is being edited -- Mobility's
     # per-locale accessor (`page.title(locale: "de")`), not the plain reader:

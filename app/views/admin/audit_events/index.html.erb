@@ -12,13 +12,13 @@
 <% if @entries.empty? %>
   <div class="rounded-cs border border-line bg-surface">
     <% if @filter.active? %>
-      <%= render Admin::EmptyStateComponent.new(title: "No matches", description: "No events match these filters.") do |empty_state| %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches", description: "No events match these filters.") do |empty_state| %>
         <% empty_state.with_action do %>
           <%= link_to "Clear filters", admin_audit_events_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
         <% end %>
       <% end %>
     <% else %>
-      <%= render Admin::EmptyStateComponent.new(title: "No events", description: "Nothing has been recorded yet.") %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: "No events", description: "Nothing has been recorded yet.") %>
     <% end %>
   </div>
 <% else %>

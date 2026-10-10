@@ -82,7 +82,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     # `assert_match` would build this string into a Regexp via
     # `Regexp.escape`, and the response body has its apostrophe HTML-entity
-    # escaped (`&#39;`, the same auto-escaping `Admin::SaveStatusComponent`'s
+    # escaped (`&#39;`, the same auto-escaping `Admin::Ui::SaveStatusComponent`'s
     # own `<%= text %>` -- unmodified, Task 2 -- gets from ERB) -- so this
     # matches either spelling rather than only the literal `'` the brief's
     # own snippet has.

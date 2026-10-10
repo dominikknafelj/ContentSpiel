@@ -19,7 +19,7 @@
     <% end %>
   </div>
   <p class="mb-4 text-sm text-dim" data-last-sign-in>
-    <% if @last_sign_in %>Last signed in <%= render Admin::TimeAgoComponent.new(time: @last_sign_in) %>.<% else %>Never signed in.<% end %>
+    <% if @last_sign_in %>Last signed in <%= render Admin::Ui::TimeAgoComponent.new(time: @last_sign_in) %>.<% else %>Never signed in.<% end %>
   </p>
 
   <% if @stale_form %>
@@ -28,7 +28,7 @@
     </div>
   <% end %>
 
-  <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
   <% case state %>
   <% when :owner_protected %>

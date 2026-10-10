@@ -21,7 +21,7 @@ module Admin
     # - the restore form's parent choices (`#parent_choices`), only when a
     #   row actually needs a parent.
     class ListComponent < Admin::AdminComponent
-      # The page-number footer (`Admin::PaginationComponent`), inside the card.
+      # The page-number footer (`Admin::Ui::PaginationComponent`), inside the card.
       renders_one :footer
 
       YOU = "You".freeze
@@ -140,8 +140,8 @@ module Admin
         label =
           if item.trashed_by then label_for(item.trashed_by)
           elsif event&.user_id then label_for(event.user)
-          elsif event&.via_label then Admin::UserNameComponent::DELETED_USER
-          else return Admin::UserNameComponent::NOBODY
+          elsif event&.via_label then Admin::Ui::UserNameComponent::DELETED_USER
+          else return Admin::Ui::UserNameComponent::NOBODY
           end
         return label unless event&.via_label
 
@@ -151,11 +151,11 @@ module Admin
       end
 
       # A user who was there: "You", their name, or -- gone since -- "a deleted
-      # user" (`Admin::UserNameComponent`, the one place a user is named).
+      # user" (`Admin::Ui::UserNameComponent`, the one place a user is named).
       def label_for(user)
         return YOU if user && Current.actor.is_a?(User) && Current.actor.id == user.id
 
-        user ? Admin::UserNameComponent.new(user:).label : Admin::UserNameComponent::DELETED_USER
+        user ? Admin::Ui::UserNameComponent.new(user:).label : Admin::Ui::UserNameComponent::DELETED_USER
       end
 
       # The `*.trashed` event of THIS trashing, or nil. `recorded_trashings`

@@ -16,14 +16,14 @@
         <div class="h-1 w-0 rounded-full bg-accent transition-[width] motion-reduce:transition-none" data-translate-progress-bar></div>
       </div>
     </div>
-    <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancel" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancel" }) %>
   <% end %>
 
   <%# Ready: what came back, and the two ways to settle it. %>
   <%= tag.div hidden: true, class: "flex items-center gap-2", data: { "admin--translate-target": "ready" } do %>
     <p class="text-sm text-dim" data-translate-ready-text>0 suggestions ready</p>
-    <%= render Admin::ButtonComponent.new(label: "Use all", variant: :primary, size: :small, data: { action: "admin--translate#useAll" }) %>
-    <%= render Admin::ButtonComponent.new(label: "Discard all", variant: :secondary, size: :small, data: { action: "admin--translate#discardAll" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Use all", variant: :primary, size: :small, data: { action: "admin--translate#useAll" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Discard all", variant: :secondary, size: :small, data: { action: "admin--translate#discardAll" }) %>
   <% end %>
 
   <%# Screen readers only: the visible states (running line, ready line) already show this text. %>

@@ -7,7 +7,7 @@ module Admin
     #
     # Every language's pair is in the page (`site_setting[translations][<code>]
     # [title|tagline]`, ids `settings-<code>-title`), one panel per language;
-    # the language tabs in the header (`LanguageTabsComponent`, `mode:
+    # the language tabs in the header (`Ui::LanguageTabsComponent`, `mode:
     # :buttons`) only switch which panel is visible (`admin--settings-tabs`,
     # `hidden` and `aria-selected`) and never navigate, so switching tabs is
     # not a change and cannot trigger the leave guard. `locale:` is the tab

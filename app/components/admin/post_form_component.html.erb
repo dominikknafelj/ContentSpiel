@@ -45,7 +45,7 @@
   <%# The content type's own typed fields (spec §5.2): a `group` field
       renders as a nested fieldset, `groups` as an add/remove/reorder list
       (`Admin::Fields::GroupField`/`GroupsField`) -- every one of them, plus
-      every scalar field, dispatched through the one `Admin::FieldComponent`
+      every scalar field, dispatched through the one `Admin::Ui::FieldComponent`
       `Admin::BlockCardComponent`'s own schema fields already go through.
       `id_prefix: ID_PREFIX` (the bare "post") is passed explicitly rather
       than left to default from `form_name` ("post[fields]" ->
@@ -57,7 +57,7 @@
     <section class="admin-fields-group flex flex-col gap-1 rounded-cs border border-line p-3" data-editor-fields-group aria-labelledby="<%= field_id("fields-group-title") %>">
       <h2 id="<%= field_id("fields-group-title") %>" class="font-cs-mono text-label uppercase tracking-mono text-meta" data-fields-group-title><%= fields_group_title %></h2>
     <% schema_fields.each do |field| %>
-      <%= render Admin::FieldComponent.new(
+      <%= render Admin::Ui::FieldComponent.new(
             field: field, form_name: "post[fields]",
             value: field_value(field), original: field_original(field), locale: locale,
             errors: field_errors_for(field), id_prefix: ID_PREFIX, **translation(field.name)
@@ -79,7 +79,7 @@
       ) %>
 
   <%# Tags are shared by every language (they are not translated), and a new name is created on save. %>
-  <%= render Admin::ChipInputComponent.new(
+  <%= render Admin::Ui::ChipInputComponent.new(
         name: "#{field_html_name("tag_names")}[]", id: field_id("tag_names"), label: "Tags", chips: tag_chips,
         search_url: helpers.admin_tag_suggestions_path, create: true, lowercase: true, max_length: Tag::MAX_NAME_LENGTH, noun: "tag", placeholder: "Add a tag…",
         errors: field_errors("tag_names"), help: "Press Enter or a comma to add. New tags are created when you save."

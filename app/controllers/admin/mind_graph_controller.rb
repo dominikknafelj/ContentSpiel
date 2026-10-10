@@ -28,7 +28,7 @@ module Admin
     # focus, which is not found when it is outside their scope. `@type_labels`
     # is the human name of each of those types that is still registered, for
     # the selection card (a retired type has none; the card shows its stored
-    # name, as `Admin::ContentTypeDotComponent` does).
+    # name, as `Admin::Ui::ContentTypeDotComponent` does).
     def show
       @focus = PostGraph::Focus.find(actor: Current.actor, post: params[:post], tag: params[:tag], locale: admin_locale)
       @depth = params[:depth].to_s == "2" ? 2 : 1

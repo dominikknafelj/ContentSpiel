@@ -1,5 +1,5 @@
 <%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top" } do %>
-  <%= render Admin::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
 
   <div class="mb-4">
     <label for="<%= TITLE_ID %>" class="<%= setup_label_class %>">Title</label>

@@ -11,10 +11,10 @@
 
   <div class="flex flex-wrap gap-2">
     <% if can_choose? %>
-      <%= render Admin::ButtonComponent.new(label: choose_label, variant: :secondary, type: "button", "aria-haspopup": "dialog",
+      <%= render Admin::Ui::ButtonComponent.new(label: choose_label, variant: :secondary, type: "button", "aria-haspopup": "dialog",
             data: { "admin--media-field-target": "choose", action: "admin--media-field#choose" }) %>
     <% end %>
-    <%= render Admin::ButtonComponent.new(label: "Remove image", variant: :secondary, type: "button", hidden: !chosen?,
+    <%= render Admin::Ui::ButtonComponent.new(label: "Remove image", variant: :secondary, type: "button", hidden: !chosen?,
           data: { "admin--media-field-target": "remove", action: "admin--media-field#remove" }) %>
   </div>
 

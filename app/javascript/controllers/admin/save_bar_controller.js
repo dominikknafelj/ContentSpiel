@@ -350,7 +350,7 @@ function measureBars() {
 // open and filled in while the main Save re-renders the screen): the element
 // holding it carries `data-save-bar-holds="<sentence>"` while it does, and
 // asks for a new look with `admin--save-bar:query`.
-// The sentence itself is `admin.components.save_bar.blocked`, read from the
+// The sentence itself is `admin.components.ui.save_bar.blocked`, read from the
 // page's messages (`i18n/messages.js`); `admin--pending-lock` shows the same.
 
 export default class extends Controller {
@@ -406,8 +406,8 @@ export default class extends Controller {
     }
     const text = messages(this.element)
     this.countTarget.textContent = count > 0
-      ? text.t("components.save_bar.changes", { count })
-      : (this.unsaved ? text.t("components.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.save_bar.no_changes")))
+      ? text.t("components.ui.save_bar.changes", { count })
+      : (this.unsaved ? text.t("components.ui.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.ui.save_bar.no_changes")))
     announce()
   }
 
@@ -415,7 +415,7 @@ export default class extends Controller {
   // blocks this form's Save.
   get blockedBy() {
     const ids = this.afterValue.split(/\s+/).filter(Boolean)
-    if ([...instances].some((instance) => instance !== this && ids.includes(instance.element.id) && instance.unsaved)) return messages(this.element).t("components.save_bar.blocked")
+    if ([...instances].some((instance) => instance !== this && ids.includes(instance.element.id) && instance.unsaved)) return messages(this.element).t("components.ui.save_bar.blocked")
     // Something typed beside the form that is no field of it and that its
     // Save would throw away: whoever holds it says so, in its own words.
     return document.querySelector("[data-save-bar-holds]")?.getAttribute("data-save-bar-holds") || ""

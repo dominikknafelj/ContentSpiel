@@ -38,4 +38,19 @@ class SourceLayoutTest < ActiveSupport::TestCase
     assert_equal "admin--notes", self.class.owner("admin--notes-target", ids)
     assert_nil self.class.owner("admin--nothing", ids)
   end
+
+  test "every relative translation key an admin component reads exists" do
+    missing = Dir[ROOT.join("app/components/admin/**/*.{rb,erb}")].flat_map do |path|
+      relative = Pathname(path).relative_path_from(ROOT.join("app/components/admin")).to_s
+      next [] if relative == "admin_component.rb" # the base class only shows `t(".cancel")` in its doc comment; it reads no key itself
+      scope = relative.sub(/_component(\.html)?\.(rb|erb)\z/, "").sub(/\.(rb|html\.erb)\z/, "").tr("/", ".")
+      File.read(path).scan(/\bt\(\s*["']\.([a-z0-9_.]+)["']/).flatten.uniq.reject { |key| I18n.exists?("admin.components.#{scope}.#{key}", :en) }.map { |key| "#{relative}: .#{key}" }
+    end
+    assert_empty missing, "keys read but not defined:\n#{missing.join("\n")}"
+  end
+
+  test "a shared building block lives in admin/ui" do
+    assert Dir[ROOT.join("app/components/admin/ui/*_component.rb")].size >= 25
+    assert_predicate ROOT.join("app/components/admin/ui/button_component.rb"), :exist?
+  end
 end

@@ -6,7 +6,7 @@
     <p class="<%= setup_label_class %>">MCP URL</p>
     <div class="mt-1 flex flex-wrap items-center gap-2">
       <code id="mcp-url" class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken px-3 py-2 font-cs-mono text-ink"><%= mcp_url %></code>
-      <%= render Admin::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the MCP URL" }, data: copy_data("mcp-url")) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the MCP URL" }, data: copy_data("mcp-url")) %>
     </div>
   </div>
 
@@ -15,7 +15,7 @@
     <div class="mt-1 flex flex-wrap items-start gap-2">
       <pre id="<%= secret? ? "api-token-config" : "mcp-client-config" %>" class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono text-sm"
         <%= tag.attributes(data: config_data) %>><%= config %></pre>
-      <%= render Admin::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the client configuration" },
+      <%= render Admin::Ui::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the client configuration" },
             data: copy_data(secret? ? "api-token-config" : "mcp-client-config")) %>
     </div>
   </div>

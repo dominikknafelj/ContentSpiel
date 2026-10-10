@@ -1,7 +1,7 @@
 module Admin
   # The strings a script shows, handed over by the server (docs/reference/
   # i18n.md, "A string a script shows"). `data-messages="<%= messages_data(
-  # "components.save_status.saving", "components.save_bar.changes") %>"` on the
+  # "components.ui.save_status.saving", "components.ui.save_bar.changes") %>"` on the
   # element a controller lives on (or on <body>, for what every screen's
   # scripts share), and the controller reads it through
   # `messages(element).t(key, { count, name })` from `i18n/messages.js`
@@ -31,10 +31,10 @@ module Admin
     # controllers are on <body> itself, so <body> is the only place their
     # messages can be.
     SCRIPT_MESSAGES = %w[
-      components.save_status.saving components.save_status.saving_live components.save_status.retrying
-      components.save_status.offline components.save_status.signed_out components.save_status.retry
-      components.save_bar.changes components.save_bar.unsaved components.save_bar.no_changes components.save_bar.blocked
-      components.toast.order_failed components.toast.dropped
+      components.ui.save_status.saving components.ui.save_status.saving_live components.ui.save_status.retrying
+      components.ui.save_status.offline components.ui.save_status.signed_out components.ui.save_status.retry
+      components.ui.save_bar.changes components.ui.save_bar.unsaved components.ui.save_bar.no_changes components.ui.save_bar.blocked
+      components.ui.toast.order_failed components.ui.toast.dropped
       layout.leave_dialog.body layout.leave_dialog.body_with_count
       notes.script.marker.add notes.script.marker.open notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning
       notes.script.toast.on notes.script.toast.many notes.script.live.new_divider notes.script.live.new_messages notes.script.live.gone

@@ -22,12 +22,12 @@
 
     <%# "Forgot your password?" rides the Password label row, right-aligned
         (the field's `label_aside` slot). %>
-    <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "Password", autocomplete: "current-password") do |field| %>
+    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "Password", autocomplete: "current-password") do |field| %>
       <% field.with_label_aside do %>
         <%= link_to "Forgot your password?", new_admin_password_path, class: "text-xs text-accent hover:text-accent-hover" %>
       <% end %>
     <% end %>
 
-    <%= render Admin::ButtonComponent.new(label: "Sign in", type: "submit", class: "w-full") %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Sign in", type: "submit", class: "w-full") %>
   <% end %>
 </div>

@@ -10,7 +10,7 @@
           <span class="flex min-w-0 flex-col gap-px">
             <span class="flex flex-wrap items-center gap-2">
               <%= link_to helpers.edit_admin_user_path(user, **url_options), data: { turbo_frame: "content" },
-                    class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" do %><%= render Admin::UserNameComponent.new(user: user) %><% end %>
+                    class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" do %><%= render Admin::Ui::UserNameComponent.new(user: user) %><% end %>
               <% if you?(user) %><span class="text-sm text-meta">(you)</span><% end %>
               <% if user.owner? %><span class="rounded-cs border border-line-strong px-1.5 font-cs-mono text-label uppercase tracking-mono text-meta">Owner</span><% end %>
             </span>
@@ -27,7 +27,7 @@
         </span>
         <span class="font-cs-mono text-xs text-meta" data-column="last-sign-in">
           <%# The column heading is not a table header (the list is a `ul`), so each row says what its time is. %>
-          <span class="sr-only">Last sign-in: </span><% if last_sign_ins[user.id] %><%= render Admin::TimeAgoComponent.new(time: last_sign_ins[user.id]) %><% else %>Never<% end %>
+          <span class="sr-only">Last sign-in: </span><% if last_sign_ins[user.id] %><%= render Admin::Ui::TimeAgoComponent.new(time: last_sign_ins[user.id]) %><% else %>Never<% end %>
         </span>
         <span class="text-meta" aria-hidden="true">›</span>
       </li>

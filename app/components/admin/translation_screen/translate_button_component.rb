@@ -3,7 +3,7 @@ module Admin
     # The **Translate** button under a translated field's own input, on the
     # field's side of the translation pair (translation helpers spec §6.4),
     # rendered into its `data-translate-slot` by the three field renderers
-    # (`Admin::FieldComponent`, `Admin::Columns::PlainColumnComponent`/
+    # (`Admin::Ui::FieldComponent`, `Admin::Columns::PlainColumnComponent`/
     # `RichTextColumnComponent`). The empty box a suggestion streams into
     # (`SuggestionComponent.dom_id(input_id)`, `box_id`) is NOT part of this
     # component: the renderers put it right beside the button, under the
@@ -55,7 +55,7 @@ module Admin
       # a translation.
       #
       # **Translate** itself only renders on an empty field; the renderers
-      # (`Admin::Columns::Base#translate_button`, `Admin::FieldComponent`) decide
+      # (`Admin::Columns::Base#translate_button`, `Admin::Ui::FieldComponent`) decide
       # that, and put the suggestion box under the input for either mode.
       def initialize(confirm:, input_id:, kind: :plain, characters: 0, mode: :translate)
         raise ArgumentError, "unknown translate mode #{mode.inspect}" unless MODES.include?(mode.to_sym)

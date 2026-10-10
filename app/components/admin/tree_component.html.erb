@@ -17,7 +17,7 @@
       <%= link_to "+ New page", new_page_path, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: "rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken" %>
     <% end %>
     <% if offer_starter_pages? %>
-      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "More page actions") do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More page actions") do |menu| %>
         <% menu.with_item do %>
           <%# Posts to `_top`: the new pages land in the tree, outside the `content`
               frame, so the redirect back has to replace the whole shell. %>
@@ -40,6 +40,6 @@
       <%= render Admin::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, note_counts: note_counts, note_unread: note_unread, selected: selected, locale: locale, url_options: url_options, root: true) %>
     </ul>
   <% else %>
-    <%= render Admin::EmptyStateComponent.new(title: "No pages yet") %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: "No pages yet") %>
   <% end %>
 </turbo-frame>

@@ -1,5 +1,5 @@
 <%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top" } do %>
-  <%= render Admin::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
 
   <fieldset id="<%= TYPE_ID %>" class="mb-4">
     <legend class="<%= setup_label_class %>">Type</legend>
@@ -8,7 +8,7 @@
         <label class="inline-flex cursor-pointer items-center rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:bg-sunken has-checked:border-accent has-checked:bg-accent-tint has-checked:font-semibold has-focus-visible:outline-2 has-focus-visible:outline-accent">
           <%= radio_button_tag "post[content_type]", choice.name, selected?(choice), id: "#{TYPE_ID}-#{choice.name.parameterize}", class: "sr-only",
                 data: { path: choice.path, admin__new_record_target: "type" } %>
-          <%= render Admin::ContentTypeDotComponent.new(content_type: choice.name) %>
+          <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: choice.name) %>
         </label>
       <% end %>
     </div>

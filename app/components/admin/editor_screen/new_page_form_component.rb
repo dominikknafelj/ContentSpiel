@@ -43,7 +43,7 @@ module Admin
       end
 
       # `errors` is an `ActiveModel::Errors`, a hash or an array of sentences
-      # (`Admin::ErrorSummaryComponent` takes all three).
+      # (`Admin::Ui::ErrorSummaryComponent` takes all three).
       def initialize(url_options: {}, locale: ::Locales.default, parent_id: nil, title: nil, page_type: nil, errors: nil)
         @url_options = url_options
         @locale = locale.to_s

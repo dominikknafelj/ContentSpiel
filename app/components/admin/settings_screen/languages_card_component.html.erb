@@ -40,7 +40,7 @@
           <% if default?(code) %>
             <span class="rounded-cs border border-line-strong px-1.5 py-0.5 font-cs-mono text-label uppercase text-dim" data-default-tag>Default</span>
           <% else %>
-            <%= render Admin::ButtonComponent.new(label: "Make default", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
+            <%= render Admin::Ui::ButtonComponent.new(label: "Make default", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
                   data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--pending-lock-target": "control")) %>
           <% end %>
         </div>
@@ -57,10 +57,10 @@
             tag and select out of line with the rows below. %>
         <% if default?(code) %>
           <span class="invisible" aria-hidden="true" data-turn-off-spacer>
-            <%= render Admin::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, disabled: true, tabindex: -1) %>
+            <%= render Admin::Ui::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, disabled: true, tabindex: -1) %>
           </span>
         <% else %>
-          <%= render Admin::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, aria: { label: "Turn off #{name(code)}" },
+          <%= render Admin::Ui::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, aria: { label: "Turn off #{name(code)}" },
                 data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--pending-lock-target": "control")) %>
         <% end %>
       </li>
@@ -74,7 +74,7 @@
       <label for="language-add-code" class="text-sm text-ink">Add a language</label>
       <%= select_tag "code", options_for_select(addable_options), id: "language-add-code", form: ADD_FORM,
             class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--pending-lock-target": "control" } %>
-      <%= render Admin::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit", form: ADD_FORM,
+      <%= render Admin::Ui::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit", form: ADD_FORM,
             data: { "admin--pending-lock-target": "control" }) %>
     </div>
   <% else %>

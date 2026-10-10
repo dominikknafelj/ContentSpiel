@@ -22,7 +22,7 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
       # off `test/speaker`'s own default (unlabeled) `humanize`d name --
       # purely client-side (`admin--groups#add`), no request of its own.
       press "+ Add Test/speaker"
-      # Row 0's `name` input id, by `Admin::FieldComponent`'s own formula
+      # Row 0's `name` input id, by `Admin::Ui::FieldComponent`'s own formula
       # (`dom_id_prefix("post[fields][speakers][0]")`) -- see that
       # component's class comment, and `admin--groups#renumber`'s own for
       # why this id moves with a row across a later reorder/remove.

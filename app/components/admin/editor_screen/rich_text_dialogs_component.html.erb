@@ -4,11 +4,11 @@
      data-admin--rich-text-dialog-search-url-value="<%= search_url %>"
      data-action="rich-text-dialog:open@window->admin--rich-text-dialog#open rich-text-dialog:withdraw@window->admin--rich-text-dialog#withdraw">
 
-  <%= render Admin::DialogComponent.new(id: IMAGE, title: "Image", width: :form) do |dialog| %>
+  <%= render Admin::Ui::DialogComponent.new(id: IMAGE, title: "Image", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
-      <%= render Admin::ButtonComponent.new(label: "Remove image", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text-dialog#remove", "admin--rich-text-dialog-target": "imageRemove" }) %>
-      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
-      <%= render Admin::ButtonComponent.new(label: "Insert image", type: "submit", form: "rich-text-image-form", data: { "admin--rich-text-dialog-target": "imageSubmit" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Remove image", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text-dialog#remove", "admin--rich-text-dialog-target": "imageRemove" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Insert image", type: "submit", form: "rich-text-image-form", data: { "admin--rich-text-dialog-target": "imageSubmit" }) %>
     <% end %>
     <form id="rich-text-image-form" class="flex flex-col gap-4" novalidate data-action="submit->admin--rich-text-dialog#submit" data-kind="image">
       <img alt="" class="max-h-40 self-start rounded-cs border border-line" hidden data-admin--rich-text-dialog-target="imagePreview">
@@ -25,10 +25,10 @@
     </form>
   <% end %>
 
-  <%= render Admin::DialogComponent.new(id: YOUTUBE, title: "YouTube video", width: :form) do |dialog| %>
+  <%= render Admin::Ui::DialogComponent.new(id: YOUTUBE, title: "YouTube video", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
-      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
-      <%= render Admin::ButtonComponent.new(label: "Insert video", type: "submit", form: "rich-text-youtube-form") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Insert video", type: "submit", form: "rich-text-youtube-form") %>
     <% end %>
     <form id="rich-text-youtube-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text-dialog#submit" data-kind="youtube">
       <label class="<%= setup_label_class %>" for="rich-text-youtube-url">YouTube URL or video ID</label>
@@ -40,10 +40,10 @@
     </form>
   <% end %>
 
-  <%= render Admin::DialogComponent.new(id: PAGE, title: "Page link", width: :form) do |dialog| %>
+  <%= render Admin::Ui::DialogComponent.new(id: PAGE, title: "Page link", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
-      <%= render Admin::ButtonComponent.new(label: "Remove link", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text-dialog#remove", "admin--rich-text-dialog-target": "pageRemove" }) %>
-      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Remove link", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text-dialog#remove", "admin--rich-text-dialog-target": "pageRemove" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
     <% end %>
     <form id="rich-text-page-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text-dialog#submit" data-kind="page">
       <label class="<%= setup_label_class %>" for="rich-text-page-search">Search pages and posts</label>

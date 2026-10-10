@@ -1,7 +1,7 @@
 module Admin
   module GroupsScreen
     # The group editor's Members field (round 3 Task 11, handoff §4.7 and decision
-    # D16): a chip multi-select -- `Admin::ChipInputComponent` over
+    # D16): a chip multi-select -- `Admin::Ui::ChipInputComponent` over
     # `GET /<admin>/users/suggest` -- instead of a checkbox per user, so a site with
     # many users doesn't render all of them.
     #

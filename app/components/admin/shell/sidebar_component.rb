@@ -11,7 +11,7 @@ module Admin
     # without it, following a modules link while editing a non-default
     # language silently dropped back to `Locales.default` -- these are the
     # one navigation in the shell that doesn't already run through a
-    # component (`Admin::TreeNodeComponent#path`, `Admin::LanguageTabsComponent`,
+    # component (`Admin::TreeNodeComponent#path`, `Admin::Ui::LanguageTabsComponent`,
     # ...) that threads it through for its own links.
     class SidebarComponent < Admin::AdminComponent
       def initialize(modules:, user:, current_path:, url_options:, badges: {})

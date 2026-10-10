@@ -5,6 +5,6 @@
   <%= link_to time_text, event_path, aria: { label: "#{time_text}, details of this change", describedby: "#{dom_id}-sentence" }, class: "w-28 shrink-0 font-cs-mono text-xs text-meta after:absolute after:inset-0 hover:underline focus-visible:outline-2 focus-visible:outline-accent" %>
   <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sunken text-xs font-semibold text-ink" aria-hidden="true"><%= initial %></span>
   <p id="<%= dom_id %>-sentence" class="min-w-0 flex-1 basis-60 text-sm text-dim"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
-  <%= render Admin::ChannelChipComponent.new(channel: event.channel) %>
+  <%= render Admin::Ui::ChannelChipComponent.new(channel: event.channel) %>
   <span class="font-cs-mono text-[11px] <%= key_class %>"><%= event.action %></span>
 </li>

@@ -17,7 +17,7 @@ module Admin
   #
   # THE SAME PICKER AT THE END OF A LANE (sections spec §4.2), with
   # `section:` and `column:`. A lane is a column wide, so there it is not a
-  # row of buttons but a "+" that opens an `Admin::MenuComponent` of them;
+  # row of buttons but a "+" that opens an `Admin::Ui::MenuComponent` of them;
   # each item is the same plain `button_to`, which also posts `section_id`
   # and `column` -- the controller's own instruction for where the block
   # goes, beside `block[...]`, as `after_id` is. Two things differ:
@@ -33,7 +33,7 @@ module Admin
   # them in the write queue like every add (`holdTurboRequest`).
 
   class BlockPickerComponent < AdminComponent
-    BUTTON_CLASS = [ Admin::ButtonComponent::SMALL_CLASS, Admin::ButtonComponent::VARIANT_CLASSES[:secondary] ].join(" ").freeze
+    BUTTON_CLASS = [ Admin::Ui::ButtonComponent::SMALL_CLASS, Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary] ].join(" ").freeze
     # A menu item's look: the block card's own constant, not a copy of it, so
     # a lane's "+" items and a card's "⋯" items cannot drift apart.
     MENU_ITEM_CLASS = Admin::BlockCardComponent::MENU_ITEM_CLASS

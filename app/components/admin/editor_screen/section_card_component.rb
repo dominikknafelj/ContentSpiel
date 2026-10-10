@@ -197,7 +197,7 @@ module Admin
 
       def field_id(name) = "#{error_prefix}-#{name}"
 
-      def error_id(name) = Admin::FieldComponent.error_id(error_prefix, name)
+      def error_id(name) = Admin::Ui::FieldComponent.error_id(error_prefix, name)
 
       # One menu object for the card: it is drawn in the form, and the layout
       # it shows as current is the value of the form's hidden input.

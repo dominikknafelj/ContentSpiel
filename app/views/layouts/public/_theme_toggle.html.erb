@@ -1,7 +1,7 @@
 <%# The public site keeps the two-state Dark/Light toggle: it is styled by the
     public theme's own stylesheet (themes/default/theme.css), which neither
     scans app/components/admin nor defines the --cs-* tokens the three-way
-    Admin::ThemeSwitchComponent needs. That switch is product UI. Served by
+    Admin::Ui::ThemeSwitchComponent needs. That switch is product UI. Served by
     theme_controller.js#toggle. %>
 <button type="button" data-controller="theme" data-action="theme#toggle"
   class="rounded-cs border border-line-strong px-3 py-1 font-cs-mono text-label uppercase tracking-mono text-dim hover:bg-sunken">

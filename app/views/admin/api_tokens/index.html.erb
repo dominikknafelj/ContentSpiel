@@ -5,7 +5,7 @@
     keep the reveal for Back -- so it arrives as its own document whose head
     opts out of Turbo's cache (see admin/api_tokens/create). A refused create
     re-renders this very page at 422 (no token exists, so nothing secret).
-    Revoke is gated behind `Admin::ConfirmDialogComponent`, like every other
+    Revoke is gated behind `Admin::Ui::ConfirmDialogComponent`, like every other
     destructive action in CS Studio. %>
 <% content_for :title, "AI assistant" %>
 <%= render "admin/api_tokens/screen", raw_token: nil %>

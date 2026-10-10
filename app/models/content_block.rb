@@ -135,7 +135,7 @@ class ContentBlock < ApplicationRecord
   end
 
   # How a typed setting's error names its field: `settings.limit` -> "Limit"
-  # (the label its input carries, `Admin::FieldComponent#label_text`), so the
+  # (the label its input carries, `Admin::Ui::FieldComponent#label_text`), so the
   # message reads "Limit must be greater than or equal to 1" in the card's
   # error slot, the flash and MCP alike. Rails would otherwise print the
   # dotted path as "Settings limit ...". Everything else -- the block's own

@@ -28,10 +28,10 @@
             <% data = row[:dialog] ? { turbo_frame: "_top", action: "admin--command-palette#close admin--dialog#open", "admin--dialog-id-param": row[:dialog] } : { turbo_frame: "_top" } %>
             <%= link_to jump_row_path(row[:route]), data: data, class: "flex items-center gap-3 px-4 py-2 text-sm text-ink hover:bg-sunken" do %>
               <span class="min-w-0 flex-1 truncate"><%= row[:title] %></span>
-              <% if row[:hint] %><%= render Admin::ContentTypeDotComponent.new(content_type: row[:hint]) %><% end %>
+              <% if row[:hint] %><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: row[:hint]) %><% end %>
               <%# Right-hand end: a non-Live status, then -- on the selected row
                   only (`group-aria-selected`) -- the "↵" that says Enter opens it. %>
-              <% if row[:status] %><%= render Admin::StatusChipComponent.new(status: row[:status], hide_live: true) %><% end %>
+              <% if row[:status] %><%= render Admin::Ui::StatusChipComponent.new(status: row[:status], hide_live: true) %><% end %>
               <span aria-hidden="true" class="admin-palette__enter hidden font-cs-mono text-[10px] text-meta group-aria-selected:inline">↵</span>
             <% end %>
           </li>

@@ -8,7 +8,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 pt-3.5">
     <h2 id="site" class="pb-2 text-h2 text-ink">Site</h2>
     <% if codes.size > 1 %>
-      <%= render Admin::LanguageTabsComponent.new(current: locale, missing: switcher_locales[:missing], outdated: switcher_locales[:outdated],
+      <%= render Admin::Ui::LanguageTabsComponent.new(current: locale, missing: switcher_locales[:missing], outdated: switcher_locales[:outdated],
             mode: :buttons, button_data: method(:tabs_data), panel_id: method(:panel_id)) %>
     <% end %>
   </div>
@@ -48,11 +48,11 @@
           <span class="grid size-11 shrink-0 place-items-center bg-sunken font-cs-mono text-[9px] text-meta">NONE</span>
         <% end %>
         <div class="min-w-0 flex-1">
-          <%= render Admin::FileDropComponent.new(name: "site_setting[logo]", id: "settings-logo", accept: "image/*", label: "Logo file",
+          <%= render Admin::Ui::FileDropComponent.new(name: "site_setting[logo]", id: "settings-logo", accept: "image/*", label: "Logo file",
                 hint: "PNG, JPEG, GIF or WebP. Without a logo the site title is shown.") %>
           <% if logo.attached? %>
             <label class="mt-2 inline-flex items-center gap-2 text-sm text-meta">
-              <%= render Admin::CheckboxComponent.new(name: "site_setting[remove_logo]", value: "1", id: "settings-remove_logo", checked: values.remove_logo?) %>
+              <%= render Admin::Ui::CheckboxComponent.new(name: "site_setting[remove_logo]", value: "1", id: "settings-remove_logo", checked: values.remove_logo?) %>
               Remove logo
             </label>
           <% end %>

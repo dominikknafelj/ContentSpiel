@@ -20,7 +20,7 @@
     anywhere on the screen shows the overlay below and a drop hands its files to
     `admin--media-upload`) and `admin--media-upload` itself (the queue: a progress
     tile per file at the start of the grid, one at a time, nothing reloads). The
-    FileDropComponent inside is the visible zone and the labelled file input; it
+    Ui::FileDropComponent inside is the visible zone and the labelled file input; it
     stops its own drops from reaching the document-level handler twice
     (file_drop_controller.js). The header's button opens the same input. %>
 <div class="mb-4 flex flex-col gap-4"
@@ -29,10 +29,10 @@
      data-action="admin--media-drop:dropped->admin--media-upload#dropped">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-h1 text-ink">Media</h1>
-    <%= render Admin::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media-upload#browse" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media-upload#browse" }) %>
   </div>
   <div>
-    <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
+    <%= render Admin::Ui::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
           hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
           data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
     <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
@@ -62,7 +62,7 @@
       <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, selected_id: @selected&.id, link_params: @link_params) %>
       <% if @pagination.total_pages > 1 %>
         <div class="mt-4 rounded-cs border border-line bg-surface">
-          <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+          <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
         </div>
       <% end %>
     <% end %>

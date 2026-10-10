@@ -27,7 +27,7 @@
     <div>
       <div class="flex flex-wrap items-center gap-3">
         <%# Its own form (a sibling after the main one). Not a pending-lock control: see the class comment. %>
-        <%= render Admin::ButtonComponent.new(label: "Test connection", variant: :secondary, type: "submit", form: TEST_FORM,
+        <%= render Admin::Ui::ButtonComponent.new(label: "Test connection", variant: :secondary, type: "submit", form: TEST_FORM,
               data: { "admin--ai-settings-target": "test", busy_label: "Testing…" }) %>
         <span class="text-sm text-meta" data-admin--ai-settings-target="testHint" hidden></span>
       </div>

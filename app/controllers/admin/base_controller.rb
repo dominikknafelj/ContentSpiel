@@ -192,7 +192,7 @@ module Admin
       if request.format.json?
         render json: { errors: [ message ] }, status: :forbidden
       elsif status_id
-        render turbo_stream: turbo_stream.replace(status_id, Admin::SaveStatusComponent.new(id: status_id, state: :forbidden)), status: :forbidden
+        render turbo_stream: turbo_stream.replace(status_id, Admin::Ui::SaveStatusComponent.new(id: status_id, state: :forbidden)), status: :forbidden
       else
         render "admin/errors/forbidden", status: :forbidden, formats: [ :html ], content_type: "text/html", locals: { message: message }
       end

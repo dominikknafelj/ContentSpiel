@@ -77,36 +77,36 @@ require "ripper"
 class AdminI18nTest < ActiveSupport::TestCase
   CONVERTED = %w[
     app/views/layouts/admin.html.erb
-    app/components/admin/button_component.rb
-    app/components/admin/button_component.html.erb
-    app/components/admin/dialog_component.rb
-    app/components/admin/dialog_component.html.erb
-    app/components/admin/confirm_dialog_component.rb
-    app/components/admin/confirm_dialog_component.html.erb
-    app/components/admin/toast_component.rb
-    app/components/admin/toast_component.html.erb
-    app/components/admin/toast_region_component.rb
-    app/components/admin/toast_region_component.html.erb
-    app/components/admin/save_bar_component.rb
-    app/components/admin/save_bar_component.html.erb
-    app/components/admin/save_status_component.rb
-    app/components/admin/save_status_component.html.erb
-    app/components/admin/status_chip_component.rb
-    app/components/admin/status_chip_component.html.erb
-    app/components/admin/translation_chip_component.rb
-    app/components/admin/language_tabs_component.rb
-    app/components/admin/language_tabs_component.html.erb
-    app/components/admin/pagination_component.rb
-    app/components/admin/pagination_component.html.erb
-    app/components/admin/time_ago_component.rb
-    app/components/admin/empty_state_component.rb
-    app/components/admin/empty_state_component.html.erb
-    app/components/admin/error_summary_component.rb
-    app/components/admin/error_summary_component.html.erb
-    app/components/admin/chip_input_component.rb
-    app/components/admin/chip_input_component.html.erb
-    app/components/admin/menu_component.rb
-    app/components/admin/menu_component.html.erb
+    app/components/admin/ui/button_component.rb
+    app/components/admin/ui/button_component.html.erb
+    app/components/admin/ui/dialog_component.rb
+    app/components/admin/ui/dialog_component.html.erb
+    app/components/admin/ui/confirm_dialog_component.rb
+    app/components/admin/ui/confirm_dialog_component.html.erb
+    app/components/admin/ui/toast_component.rb
+    app/components/admin/ui/toast_component.html.erb
+    app/components/admin/ui/toast_region_component.rb
+    app/components/admin/ui/toast_region_component.html.erb
+    app/components/admin/ui/save_bar_component.rb
+    app/components/admin/ui/save_bar_component.html.erb
+    app/components/admin/ui/save_status_component.rb
+    app/components/admin/ui/save_status_component.html.erb
+    app/components/admin/ui/status_chip_component.rb
+    app/components/admin/ui/status_chip_component.html.erb
+    app/components/admin/ui/translation_chip_component.rb
+    app/components/admin/ui/language_tabs_component.rb
+    app/components/admin/ui/language_tabs_component.html.erb
+    app/components/admin/ui/pagination_component.rb
+    app/components/admin/ui/pagination_component.html.erb
+    app/components/admin/ui/time_ago_component.rb
+    app/components/admin/ui/empty_state_component.rb
+    app/components/admin/ui/empty_state_component.html.erb
+    app/components/admin/ui/error_summary_component.rb
+    app/components/admin/ui/error_summary_component.html.erb
+    app/components/admin/ui/chip_input_component.rb
+    app/components/admin/ui/chip_input_component.html.erb
+    app/components/admin/ui/menu_component.rb
+    app/components/admin/ui/menu_component.html.erb
     app/components/admin/mind_graph_legend_component.rb
     app/components/admin/mind_graph_legend_component.html.erb
     app/helpers/admin/messages_helper.rb
@@ -416,7 +416,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     sixteen = %w[button dialog confirm_dialog toast toast_region save_bar status_chip translation_chip language_tabs
       pagination time_ago empty_state error_summary chip_input menu save_status]
     sixteen.each do |name|
-      assert CONVERTED.any? { |path| path == "app/components/admin/#{name}_component.rb" }, "#{name}_component.rb is not in CONVERTED"
+      assert CONVERTED.any? { |path| path == "app/components/admin/ui/#{name}_component.rb" }, "#{name}_component.rb is not in CONVERTED"
     end
   end
 
@@ -461,7 +461,7 @@ class AdminI18nTest < ActiveSupport::TestCase
       assert copy?(text), "#{text.inspect} should count as copy"
     end
     [ "flex items-center gap-1.5 rounded-cs", "admin--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
-      "Admin::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
+      "Admin::Ui::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
       "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
     end
@@ -498,14 +498,14 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_equal [ %(1: "Dismiss") ], js_offences(%(el.setAttribute("aria-label", "Dismiss")\n))
     assert_equal [ %(1: "Name") ], js_offences(%(input.placeholder = "Name"\n))
     assert_equal [ %(1: "go") ], js_offences(%(if (confirm("go")) {}\n))
-    assert_empty js_offences(%(// "Couldn't save the new order"\nconst a = "components.save_bar.blocked"\n))
+    assert_empty js_offences(%(// "Couldn't save the new order"\nconst a = "components.ui.save_bar.blocked"\n))
     assert_empty js_offences(%(/* "Save or cancel" */ x.replace(/'Save or "cancel/g, "")\n))
     assert_empty js_offences(%(const total = a / b; const k = "admin--save-bar"\n))
     assert_empty js_offences(%(x.querySelector("[data-leave-count]").dataset.foo = "NOT"\n))
-    assert_empty js_offences(%(toast.querySelector("span").textContent = messages(el).t("components.toast.dropped")\n))
-    assert_empty js_offences(%(button.textContent = this.text("components.save_status.retry")\n))
+    assert_empty js_offences(%(toast.querySelector("span").textContent = messages(el).t("components.ui.toast.dropped")\n))
+    assert_empty js_offences(%(button.textContent = this.text("components.ui.save_status.retry")\n))
     assert_empty js_offences("note.textContent = ` ${this.text(\"a.b\")}`\n")
-    assert_empty js_offences(%(el.setAttribute("aria-label", this.text("components.chip_input.remove", { label }))\n))
+    assert_empty js_offences(%(el.setAttribute("aria-label", this.text("components.ui.chip_input.remove", { label }))\n))
     assert_empty js_offences(%(headers["Content-Type"] = "x"; method: "PATCH"; zone = "UTC"\n))
     assert_empty js_offences(%(headers["X-Page-Base-Updated-At"] = base; el.textContent = "\\u00b7\\u2192"\n))
     assert_empty js_offences(%(status.textContent = "" // i18n-ok: emptying the line, not saying anything\n))

@@ -24,7 +24,7 @@ module SetupHelper
   end
 
   # "Skip" on an optional step: no border, no fill, so Continue stays the one
-  # emphasised action (same look as Admin::ButtonComponent's :ghost).
+  # emphasised action (same look as Admin::Ui::ButtonComponent's :ghost).
   def setup_ghost_link_class
     "inline-flex cursor-pointer items-center justify-center rounded-cs px-4 py-2 font-semibold text-dim hover:bg-sunken hover:text-ink"
   end

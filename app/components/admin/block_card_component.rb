@@ -2,14 +2,14 @@ module Admin
   # One block's card in the page editor's block list (cs-studio spec §5.1):
   # its type label, drag handle, collapse toggle and "⋯" menu (Duplicate,
   # Move up/down, Delete), plus its own autosaving form -- the schema fields
-  # from `block.definition.fields` (`Admin::FieldComponent`) and the columns
+  # from `block.definition.fields` (`Admin::Ui::FieldComponent`) and the columns
   # it opts into (`block.definition.uses_columns`, one `Admin::Columns::*`
   # each). Mirrors `Admin::PageSettingsFormComponent`'s shape (one `<form
   # data-controller="admin--autosave">`, a hidden `base_updated_at`, a
   # `save-status` line) but there can be many of these on one page at once,
   # unlike the page settings form -- every id here is therefore built off
   # `error_prefix` (`"block-<id>"`, unique per row) rather than a bare,
-  # hand-kept string like `"page"`, and every `Admin::FieldComponent` this
+  # hand-kept string like `"page"`, and every `Admin::Ui::FieldComponent` this
   # renders is handed that same prefix via `id_prefix:` so two blocks of the
   # *same* type on one page never render two inputs (or two Turbo Stream
   # error-replace targets) sharing one id -- see that component's own
@@ -24,7 +24,7 @@ module Admin
   # block…" its only action).
   #
   # The header (design pass round 2): drag handle, the type name -- a button
-  # that collapses the body (`aria-expanded`) -- and a "⋯" `Admin::MenuComponent`
+  # that collapses the body (`aria-expanded`) -- and a "⋯" `Admin::Ui::MenuComponent`
   # (Move up, Move down, "Move into section…", Duplicate, a divider, "Delete
   # block…"). `first:` and
   # `last:` only decide whether Move up / Move down start disabled; the page
@@ -34,7 +34,7 @@ module Admin
   # other, so the neighbour's state can only be corrected there).
   #
   # A post-list block's Type, Tag and Limit share one row (`#settings_row?`),
-  # Tag being a one-value `Admin::ChipInputComponent` over the tag
+  # Tag being a one-value `Admin::Ui::ChipInputComponent` over the tag
   # suggestions (no creating a tag from a filter).
   #
   # `editable:` is whether the user may change this page's blocks
@@ -285,13 +285,13 @@ module Admin
     # The default-language value for a translated schema field, shown
     # read-only once the editing locale isn't the default one (spec §6.2) --
     # same `nil`-means-"nothing to compare against" contract
-    # `Admin::FieldComponent#show_original?` already reads off this.
+    # `Admin::Ui::FieldComponent#show_original?` already reads off this.
     #
     # `field.translated?` gates this first: an *untranslated* schema field
     # (e.g. a post_list block's own `limit`) has exactly one value across
     # every locale, so its default-locale value is never "the original to
     # translate from" -- returning it here regardless of `translated?` (the
-    # bug this guard fixes) would make `FieldComponent#show_original?` show
+    # bug this guard fixes) would make `Ui::FieldComponent#show_original?` show
     # a read-only original/translate-slot pair for a field that should
     # instead be listed read-only under "Shared fields" on a translation tab
     # (`#shared_fields`).

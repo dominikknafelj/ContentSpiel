@@ -27,7 +27,7 @@
             class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
 
       <%# The chip carries `data-status` itself and renders nothing for Live. %>
-      <%= render Admin::StatusChipComponent.new(status: status, at: page.published_at, hide_live: true) %>
+      <%= render Admin::Ui::StatusChipComponent.new(status: status, at: page.published_at, hide_live: true) %>
 
       <%# Outdated and missing translated fields (handoff §10 B24), summed over
           the target languages: plain text in a warn / meta ink, nothing at

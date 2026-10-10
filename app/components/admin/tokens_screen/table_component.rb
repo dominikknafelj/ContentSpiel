@@ -27,7 +27,7 @@ module Admin
 
       def dialog_id(token) = "revoke-api-token-#{token.id}"
 
-      def user_label(token) = Admin::UserNameComponent.new(user: token.user, user_id: token.user_id).label
+      def user_label(token) = Admin::Ui::UserNameComponent.new(user: token.user, user_id: token.user_id).label
 
       def revoke_body(token)
         "The assistant acting as #{user_label(token)} through this token loses access at once. " \

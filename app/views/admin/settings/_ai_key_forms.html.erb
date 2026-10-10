@@ -16,12 +16,12 @@
   <% end %>
 
   <% if site_setting.ai_api_key_set? %>
-    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: Admin::SettingsScreen::AiKeyComponent::REMOVE_DIALOG, title: "Remove the API key?",
+    <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: Admin::SettingsScreen::AiKeyComponent::REMOVE_DIALOG, title: "Remove the API key?",
           body: "AI translation stops working until a new key is saved.") do |dialog| %>
       <% dialog.with_confirm_action do %>
         <%= form_with url: admin_settings_ai_key_path, method: :delete do %>
           <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
-          <%= render Admin::ButtonComponent.new(label: "Remove key", variant: :danger, type: "submit") %>
+          <%= render Admin::Ui::ButtonComponent.new(label: "Remove key", variant: :danger, type: "submit") %>
         <% end %>
       <% end %>
     <% end %>

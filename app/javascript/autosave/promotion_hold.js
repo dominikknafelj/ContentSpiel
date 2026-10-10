@@ -194,7 +194,7 @@ function droppedToast() {
   const region = document.getElementById("toasts")
   if (!toast || !region) return
   toast.id = "toast-promotion-dropped"
-  toast.querySelector("span").textContent = messages(document.body).t("components.toast.dropped")
+  toast.querySelector("span").textContent = messages(document.body).t("components.ui.toast.dropped")
   document.getElementById(toast.id)?.remove()
   region.append(toast)
 }

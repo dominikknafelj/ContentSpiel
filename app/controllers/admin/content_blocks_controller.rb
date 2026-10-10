@@ -145,7 +145,7 @@ module Admin
 
     # Permanent (spec §7's "No trash" interim state) -- the card simply
     # disappears from the list, no confirmation round trip beyond the
-    # `ConfirmDialogComponent` the card's own "⋯" menu already gated this
+    # `Ui::ConfirmDialogComponent` the card's own "⋯" menu already gated this
     # request behind client-side. A refusal (no `pages.edit` -- a view-only
     # editor never shows the menu, so a stale tab or a forged request) or
     # any other failure leaves the card in place and says why in the
@@ -251,9 +251,9 @@ module Admin
       result = ContentBlocks::Reorder.call(@page, ordered_ids_param, section: section_id, column: one_value(params[:column]), moved_from: origins)
       status_id = "content-blocks-status"
 
-      state = if result.ok? then Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current)
-      elsif result.denied? then Admin::SaveStatusComponent.new(id: status_id, state: :forbidden)
-      else Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size)
+      state = if result.ok? then Admin::Ui::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current)
+      elsif result.denied? then Admin::Ui::SaveStatusComponent.new(id: status_id, state: :forbidden)
+      else Admin::Ui::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size)
       end
 
       streams = [ turbo_stream.replace(status_id, state) ]

@@ -8,10 +8,10 @@
       <%= chip_text %>
     </span>
     <% if key_set? %>
-      <%= render Admin::ButtonComponent.new(label: "Replace", variant: :secondary, size: :small, data: LOCK.merge(action: "admin--ai-settings#edit")) %>
-      <%= render Admin::ButtonComponent.new(label: "Remove…", variant: :danger_text, size: :small, data: dialog_trigger(REMOVE_DIALOG).merge(LOCK)) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Replace", variant: :secondary, size: :small, data: LOCK.merge(action: "admin--ai-settings#edit")) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Remove…", variant: :danger_text, size: :small, data: dialog_trigger(REMOVE_DIALOG).merge(LOCK)) %>
     <% else %>
-      <%= render Admin::ButtonComponent.new(label: "Add key", variant: :secondary, size: :small, data: LOCK.merge(action: "admin--ai-settings#edit")) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Add key", variant: :secondary, size: :small, data: LOCK.merge(action: "admin--ai-settings#edit")) %>
     <% end %>
   </div>
 
@@ -22,8 +22,8 @@
           aria: { describedby: ("settings-ai-key-errors" if error.present?), invalid: (true if error.present?) },
           class: "#{setup_input_class} !mt-0 max-w-md",
           data: LOCK.merge("admin--ai-settings-target": "input", action: "keydown.esc->admin--ai-settings#cancel input->admin--ai-settings#holdKey") %>
-    <%= render Admin::ButtonComponent.new(label: "Save key", variant: :primary, type: "submit", form: KEY_FORM, data: LOCK) %>
-    <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--ai-settings#cancel" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Save key", variant: :primary, type: "submit", form: KEY_FORM, data: LOCK) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--ai-settings#cancel" }) %>
   </div>
 
   <div id="settings-ai-key-errors" class="mt-1 text-sm text-danger-ink" role="alert">

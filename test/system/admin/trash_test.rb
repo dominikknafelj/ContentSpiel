@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
 # The trash in a real browser (trash spec §7, §9): every confirm is
-# `Admin::ConfirmDialogComponent`'s native `<dialog>` (never a browser
+# `Admin::Ui::ConfirmDialogComponent`'s native `<dialog>` (never a browser
 # `confirm()`), Restore is a one-click POST, and a "Move to trash" flash
 # carries an Undo button that restores in one click.
 class Admin::TrashSystemTest < ApplicationSystemTestCase

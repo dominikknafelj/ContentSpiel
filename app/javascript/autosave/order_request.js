@@ -29,11 +29,11 @@ import { messages } from "i18n/messages"
 
 // The texts of the toast are the page's messages (`i18n/messages.js`).
 // `signedOut` is the autosave status line's own key
-// (`components.save_status.signed_out`, `Admin::SaveStatusComponent`'s
+// (`components.ui.save_status.signed_out`, `Admin::SaveStatusComponent`'s
 // `:signed_out`): the same thing happened, and the same thing fixes it.
 const ORDER_MESSAGES = {
-  failed: "components.toast.order_failed",
-  signedOut: "components.save_status.signed_out"
+  failed: "components.ui.toast.order_failed",
+  signedOut: "components.ui.save_status.signed_out"
 }
 
 // Sends the PATCH and answers with one of:

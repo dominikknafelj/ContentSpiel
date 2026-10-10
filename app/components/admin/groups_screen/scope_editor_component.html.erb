@@ -9,7 +9,7 @@
         <% registered_types.each do |name| %>
           <% box_id = field_id("type", name.parameterize) %>
           <label for="<%= box_id %>" class="flex items-center gap-2 rounded-cs border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink">
-            <%= render Admin::CheckboxComponent.new(name: field_name("content_types") + "[]", value: name, checked: chosen_types.include?(name), id: box_id,
+            <%= render Admin::Ui::CheckboxComponent.new(name: field_name("content_types") + "[]", value: name, checked: chosen_types.include?(name), id: box_id,
                   data: { chip_label: content_type_label(name), chip_dot: dot_class(name) }) %>
             <% if dot_class(name) %><span aria-hidden="true" class="h-[7px] w-[7px] shrink-0 rounded-full <%= dot_class(name) %>"></span><% end %>
             <%= content_type_label(name) %>

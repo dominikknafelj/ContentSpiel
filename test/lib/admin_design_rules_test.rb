@@ -96,7 +96,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # failure, never for "missing" or "outdated" (final review C, M13).
   test "translation chips, language tabs, tree markers, the matrix and the summary and dashboard cards never use the danger colour" do
     %w[
-      app/components/admin/translation_chip_component.rb app/components/admin/language_tabs_component.html.erb
+      app/components/admin/ui/translation_chip_component.rb app/components/admin/ui/language_tabs_component.html.erb
       app/components/admin/tree_node_component.html.erb app/components/admin/tree_node_component.rb
       app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
       app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb

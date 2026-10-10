@@ -18,7 +18,7 @@
   <%= render form %>
 
   <div class="mt-4 flex gap-2">
-    <%= render Admin::ButtonComponent.new(label: "Create page", variant: :primary, type: "submit", form: form.form_id) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Create page", variant: :primary, type: "submit", form: form.form_id) %>
     <%= link_to "Cancel", admin_pages_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
   </div>
 </div>

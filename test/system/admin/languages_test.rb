@@ -17,7 +17,7 @@ class Admin::LanguagesSystemTest < ApplicationSystemTestCase
 
     # `Locales.enabled` for the default fixture (`db/schema.rb`'s own
     # `site_settings.locales` default) is en/de/es -- "Deutsch" (native:
-    # true, `Admin::LanguageTabsComponent`) is German's own link text.
+    # true, `Admin::Ui::LanguageTabsComponent`) is German's own link text.
     # A normal Turbo link, but scripted anyway (`press`) for the same
     # reason `test/system/setup_wizard_test.rb` gives its own clicks.
     within("nav[aria-label='Languages']") { press "Deutsch" }

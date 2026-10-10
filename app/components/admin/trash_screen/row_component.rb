@@ -11,7 +11,7 @@ module Admin
     # whose parent is trashed): then it is a small inline form, "Restore
     # under" a `<select name="parent_id">` of `parent_choices` and a Restore
     # button, since `Trash::Restore` would only refuse the one-click version.
-    # "Delete now…" always confirms in its own `Admin::ConfirmDialogComponent`
+    # "Delete now…" always confirms in its own `Admin::Ui::ConfirmDialogComponent`
     # (one per row, 50 at most per page -- a small `<dialog>` each, rather than
     # a shared one that a script would have to fill); an image something in
     # the trash still uses gets a disabled button instead -- the refusal

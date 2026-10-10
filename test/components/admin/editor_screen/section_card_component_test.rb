@@ -143,7 +143,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#{form} input[type=hidden][name='base_updated_at']#block-#{@section.id}-base-updated-at[value='#{@section.reload.updated_at.iso8601(6)}']", visible: :all
     assert_selector "#{form} input#block-#{@section.id}-layout[name='block[settings][layout]']", visible: :all
     %w[layout background width].each do |name|
-      assert_selector "#{form} ##{Admin::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all
+      assert_selector "#{form} ##{Admin::Ui::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all
     end
     assert_selector "#{form} select#block-#{@section.id}-background[aria-label='Background']"
     assert_selector "#{form} select#block-#{@section.id}-width[aria-label='Width']"

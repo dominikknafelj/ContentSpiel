@@ -1,9 +1,9 @@
 <span class="flex size-7 shrink-0 items-center justify-center text-xs font-semibold <%= avatar_class %>" aria-hidden="true"><%= initial %></span>
 <p class="min-w-0 flex-1 text-sm text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
 <% if via_token? %>
-  <%= render Admin::ChannelChipComponent.new(channel: channel) %>
+  <%= render Admin::Ui::ChannelChipComponent.new(channel: channel) %>
 <% end %>
 <% if status? %>
-  <%= render Admin::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
+  <%= render Admin::Ui::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
 <% end %>
-<span class="shrink-0 text-sm text-meta"><%= render Admin::TimeAgoComponent.new(time: shown_at, title: span_title) %></span>
+<span class="shrink-0 text-sm text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: shown_at, title: span_title) %></span>

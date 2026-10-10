@@ -9,7 +9,7 @@
       <div class="mt-2 flex flex-wrap items-start gap-2">
         <pre id="api-token-value" data-admin--token-reveal-target="secret"
           class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= raw_token %></pre>
-        <%= render Admin::ButtonComponent.new(label: "Copy token", variant: :secondary,
+        <%= render Admin::Ui::ButtonComponent.new(label: "Copy token", variant: :secondary,
               data: { action: "admin--token-reveal#copy", "admin--token-reveal-source-param": "api-token-value" }) %>
       </div>
       <p data-admin--token-reveal-target="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
@@ -46,7 +46,7 @@
     </div>
 
     <div>
-      <%= render Admin::ButtonComponent.new(label: "Create token", variant: :primary, type: "submit") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Create token", variant: :primary, type: "submit") %>
     </div>
   <% end %>
 </section>

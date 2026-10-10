@@ -1,4 +1,4 @@
-<%= render Admin::DialogComponent.new(id: dialog_id, title: "Schedule publishing", width: :form_narrow, open_on_load: error.present?) do |dialog| %>
+<%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: "Schedule publishing", width: :form_narrow, open_on_load: error.present?) do |dialog| %>
   <%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" }, html: { novalidate: true } do %>
     <label for="<%= input_id %>" class="<%= setup_label_class %>">Date and time</label>
     <%= tag.input type: "datetime-local", id: input_id, name: "published_at", value: input_value, min: min_value,
@@ -17,12 +17,12 @@
           time. "Schedule" is the schedule form's only submit. %>
       <%= form_with url: url, method: :post, class: "mr-auto", data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } do %>
         <%= hidden_field_tag :remove, "1", id: nil %>
-        <%= render Admin::ButtonComponent.new(label: "Remove schedule", variant: :ghost, type: "submit") %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Remove schedule", variant: :ghost, type: "submit") %>
       <% end %>
     <% end %>
     <%= tag.form method: "dialog" do %>
-      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
     <% end %>
-    <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :primary, type: "submit", form: form_id) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Schedule", variant: :primary, type: "submit", form: form_id) %>
   <% end %>
 <% end %>

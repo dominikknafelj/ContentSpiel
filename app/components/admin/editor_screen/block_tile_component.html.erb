@@ -19,7 +19,7 @@
     <%# Every move a drag makes, by name (see the component). Its `data-move` buttons are
         enabled and disabled by `admin--blocks#refreshMoveState`. %>
     <div class="flex shrink-0 items-center pr-1">
-      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <%# Always first: see the block card's menu. %>
         <% menu.with_item { add_note_item } %>
         <% menu.with_item do %>
@@ -53,7 +53,7 @@
     <%# A viewer who can only read the page: the "⋯" with "Add note" as its only item
         (the handoff's decision 6), and nothing else of an editor's tile. %>
     <div class="flex shrink-0 items-center pr-1">
-      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <% menu.with_item { add_note_item } %>
       <% end %>
     </div>

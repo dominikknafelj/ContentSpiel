@@ -10,9 +10,9 @@
       <% if editable? %>
         <%= form_with url: destroy_path, method: :delete, data: settled_screen_data do %>
           <%= hidden_field_tag :keep_blocks, 1, id: nil %>
-          <%= render Admin::ButtonComponent.new(label: t(".remove_keep"), variant: :secondary, size: :small, type: "submit") %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".remove_keep"), variant: :secondary, size: :small, type: "submit") %>
         <% end %>
-        <%= render Admin::ButtonComponent.new(label: t(".delete"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".delete"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
       <% end %>
     </div>
     <p class="px-3 pb-3 text-xs text-meta"><%= t(".unavailable_hint") %></p>
@@ -54,7 +54,7 @@
               id: field_id("background"), class: select_class, "aria-label": t(".background") %>
         <%= select_tag "block[settings][width]", options_for_select(width_options, setting("width")),
               id: field_id("width"), class: select_class, "aria-label": t(".width") %>
-        <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
+        <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
         <%# One slot per setting, as every field of a block has: `update` replaces all three
             with each answer. Together they take a line of their own, and no room at all
             while none holds a message (`.admin-section-errors`). %>
@@ -67,7 +67,7 @@
     <% end %>
 
     <% if editable? %>
-      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <% menu.with_item do %>
           <%= tag.button t(".move_up"), type: "button", disabled: first?, class: menu_item_class,
                 data: { move: "up", action: "click->admin--blocks#moveUp" } %>
@@ -108,7 +108,7 @@
   <%# "Delete section and its blocks…": after the body, outside the settings form. Its
       count is kept current by every add and delete inside the section. %>
   <% if editable? %>
-    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".delete_title"), body: t(".delete_body")) do |dialog| %>
+    <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".delete_title"), body: t(".delete_body")) do |dialog| %>
       <% dialog.with_details do %>
         <%= render self.class.delete_count(section: section, count: blocks.size) %>
         <%# The open notes on the section's blocks, deleted with them (notes spec D12), in
@@ -120,7 +120,7 @@
       <% end %>
       <% dialog.with_confirm_action do %>
         <%= form_with url: destroy_path, method: :delete do %>
-          <%= render Admin::ButtonComponent.new(label: t(".delete_confirm"), variant: :danger, type: "submit") %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".delete_confirm"), variant: :danger, type: "submit") %>
         <% end %>
       <% end %>
     <% end %>
