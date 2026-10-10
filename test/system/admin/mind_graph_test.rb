@@ -1855,11 +1855,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     field = find("[data-mind-graph-card-notes] textarea")
     assert field.readonly?, "the card's field can be typed in while its note is on the wire"
     assert_equal "On its way", field.value
+    # Still out after 300ms: it says so (the notes handoff's decision 41).
+    assert_selector "[data-mind-graph-card-notes] button[type=submit][aria-busy=true][disabled]", text: "Sending…"
+    assert page.evaluate_script("document.querySelector('[data-mind-graph-card-notes] textarea').classList.contains('text-dim')")
     page.execute_script("window.__release()")
 
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "On its way"
     assert_equal "", find("[data-mind-graph-card-notes] textarea").value
     assert_not find("[data-mind-graph-card-notes] textarea").readonly?
+    assert_selector "[data-mind-graph-card-notes] button[type=submit]:not([aria-busy]):not([disabled])", text: "Add note"
+    assert_not page.evaluate_script("document.querySelector('[data-mind-graph-card-notes] textarea').classList.contains('text-dim')")
   ensure
     page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
   end

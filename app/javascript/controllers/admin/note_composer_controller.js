@@ -100,12 +100,22 @@ const APPLE = /mac|iphone|ipad|ipod/i
 const ROWS = 6
 // A lookup waits for a pause in the typing, not for every letter.
 const LOOKUP_DELAY_MS = 150
+// How long a send must be out before the form says so (decision 41): a send
+// that is answered sooner shows nothing, so the state never flashes.
+const SENDING_AFTER_MS = 300
 
 export default class extends Controller {
-  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "files", "chosen", "fileError", "row", "lost" ]
+  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "files", "chosen", "fileError", "row", "lost", "tool" ]
   static values = { key: String, mentionsUrl: String, user: String, edit: Boolean }
 
   connect() {
+    // A form that is not sending carries nothing of a send. It can: Turbo's
+    // snapshot of a record's notes page, taken while a note was on its way,
+    // holds the field read-only and "Sending…", and Back would hand that to
+    // a controller that knows of no send. (A form that IS sending and was
+    // only moved keeps its state: `out` is this controller's, and it is the
+    // same controller.)
+    if (!this.out) this.settled()
     this.names = this.parse(this.namesTarget.value)
     // What the SERVER drew the form with: for an edit, the saved text a draft
     // is measured against. The field's `defaultValue`, never its `value`:
@@ -145,6 +155,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    clearTimeout(this.sendingTimer)
     clearTimeout(this.lookupTimer)
     this.aborter?.abort()
   }
@@ -236,17 +247,57 @@ export default class extends Controller {
   // emoji, the at-sign and the paperclip do nothing meanwhile. (Read-only,
   // not disabled: a disabled field is left out of the form's data when Turbo
   // builds the request, and loses the focus.)
+  //
+  // WHAT IT LOOKS LIKE (the handoff's decision 41), once the send has been
+  // out for `SENDING_AFTER_MS`: the field's text dim, the submit reading
+  // "Sending…" with `aria-busy` (it is disabled already, with the button's
+  // own disabled look), and the paperclip, emoji and at-sign disabled. No
+  // spinner. All of it is taken back in one place (`settled`), on every way
+  // a send ends -- `turbo:submit-end` follows an answer of any status, a
+  // network error and an aborted or stopped submission alike -- and when a
+  // form connects that is not sending.
   sending() {
+    if (this.out) return
     this.out = true
     this.fieldTarget.readOnly = true
+    this.refresh()
+    clearTimeout(this.sendingTimer)
+    this.sendingTimer = setTimeout(() => { if (this.out) this.saySending() }, SENDING_AFTER_MS)
+  }
+
+  saySending() {
+    this.fieldTarget.classList.replace("text-ink", "text-dim")
+    this.toolTargets.forEach((tool) => { tool.disabled = true })
+    this.emojiTarget.open = false
+    this.emojiTarget.inert = true
+    if (!this.hasSubmitTarget) return
+    // The button's own words are kept on it, for whoever puts them back.
+    this.submitTarget.dataset.label ??= this.submitTarget.textContent
+    this.submitTarget.textContent = messages(this.element).t("notes.script.sending")
+    this.submitTarget.setAttribute("aria-busy", "true")
+  }
+
+  // Nothing is being sent: the field, the submit and the three controls as
+  // they are at rest. Read from the elements, not from what this controller
+  // remembers, so it also undoes a state it did not set (`connect`).
+  settled() {
+    clearTimeout(this.sendingTimer)
+    this.out = false
+    this.fieldTarget.readOnly = false
+    this.fieldTarget.classList.replace("text-dim", "text-ink")
+    this.toolTargets.forEach((tool) => { tool.disabled = false })
+    this.emojiTarget.inert = false
+    if (this.hasSubmitTarget) {
+      if (this.submitTarget.dataset.label != null) this.submitTarget.textContent = this.submitTarget.dataset.label
+      delete this.submitTarget.dataset.label
+      this.submitTarget.removeAttribute("aria-busy")
+    }
     this.refresh()
   }
 
   // `turbo:submit-end` on the form: a note that went through leaves no draft.
   sent(event) {
-    this.out = false
-    this.fieldTarget.readOnly = false
-    this.refresh()
+    this.settled()
     if (event.detail.success) this.forget()
   }
 

@@ -158,8 +158,9 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
 
     assert reply_field.readonly?, "the field can be typed in while its note is on the wire"
     reply_field.send_keys(" and one more")
-    find("#note-thread-#{@thread.id}-reply [data-admin--note-composer-target=emoji] summary").click
-    find("#note-thread-#{@thread.id}-reply button[data-emoji='👍']", visible: :all).click
+    # An emoji picked by script (the control itself is disabled meanwhile,
+    # decision 41) goes nowhere either.
+    page.execute_script("document.querySelector(\"#note-thread-#{@thread.id}-reply button[data-emoji='👍']\").click()")
     assert_equal "First thought", reply_field.value
     release
 
@@ -194,6 +195,132 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Held back"
     assert_equal "", reply_field.value
     assert_not reply_field.readonly?
+  end
+
+  # The handoff's decision 41: what a note being sent looks like, once it has
+  # been out for 300ms -- the text dim, Send reading "Sending…" and busy, the
+  # paperclip, emoji and @ controls disabled -- and that all of it is put
+  # back when the send ends.
+  def watch_sending
+    page.execute_script(<<~JS)
+      window.__sending = { shown: null, pressed: null, ended: null }
+      const reply = document.querySelector("#note-thread-#{@thread.id}-reply")
+      const form = reply.querySelector("form[data-note-composer]")
+      form.addEventListener("submit", () => { window.__sending.pressed ??= performance.now() }, { capture: true })
+      form.addEventListener("turbo:submit-end", () => { window.__sending.ended ??= performance.now() })
+      new MutationObserver(() => {
+        if (document.querySelector("#note-thread-#{@thread.id}-reply button[aria-busy='true']")) window.__sending.shown ??= performance.now()
+      }).observe(reply, { subtree: true, attributes: true, childList: true, characterData: true })
+    JS
+  end
+
+  def sending_look
+    page.evaluate_script(<<~JS)
+      (() => {
+        const reply = document.querySelector("#note-thread-#{@thread.id}-reply")
+        const submit = reply.querySelector("[data-admin--note-composer-target~='submit']")
+        const field = reply.querySelector("textarea[name=body]")
+        return {
+          label: submit.textContent.trim(), busy: submit.getAttribute("aria-busy"), disabled: submit.disabled, dim: field.classList.contains("text-dim"),
+          attach: reply.querySelector("button[data-note-attach]").disabled, mention: reply.querySelector("button[aria-label='Mention someone']").disabled,
+          emoji: reply.querySelector("[data-admin--note-composer-target~='emoji']").inert, readonly: field.readOnly
+        }
+      })()
+    JS
+  end
+
+  AT_REST = { "label" => "Reply", "busy" => nil, "dim" => false, "attach" => false, "mention" => false, "emoji" => false, "readonly" => false }.freeze
+
+  test "a reply that is still out after 300ms says Sending: dim text, a busy Send, the three controls disabled; the answer puts it all back" do
+    open_in_drawer
+    reply_field.send_keys("Slow to arrive")
+    watch_sending
+    hold_request("/messages")
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+
+    assert_selector "#note-thread-#{@thread.id}-reply button[aria-busy=true][disabled]", text: "Sending…"
+    assert_equal({ "label" => "Sending…", "busy" => "true", "disabled" => true, "dim" => true, "attach" => true, "mention" => true, "emoji" => true, "readonly" => true }, sending_look)
+    assert_equal page.evaluate_script("getComputedStyle(document.querySelector('[data-note-actions] form button')).color"),
+      page.evaluate_script("getComputedStyle(document.querySelector('#note-thread-#{@thread.id}-reply textarea[name=body]')).color"), "the field's text is not the dim colour (the Notify link's)"
+    # Not before the 300ms: a send that is answered sooner never shows it.
+    assert_operator page.evaluate_script("window.__sending.shown - window.__sending.pressed"), :>=, 290
+    release
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Slow to arrive"
+    assert_equal AT_REST.merge("disabled" => true), sending_look # an empty field: Send is disabled as at rest
+    assert_equal "", reply_field.value
+  end
+
+  # The request fails outright (the network): the same form stays, and is the
+  # person's to send again -- nothing of the sending state may stay on it.
+  test "a send that fails on the network gives the field, Send and the three controls back as they were" do
+    open_in_drawer
+    reply_field.send_keys("Never arrives")
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.fetch = (...args) => {
+        const method = String(args[1]?.method || args[0].method || "GET").toUpperCase()
+        if (method === "GET" || window.__held) return original(...args)
+        window.__held = true
+        return new Promise((_resolve, reject) => { window.__fail = () => reject(new TypeError("Failed to fetch")) })
+      }
+    JS
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+    assert_selector "#note-thread-#{@thread.id}-reply button[aria-busy=true][disabled]", text: "Sending…"
+    page.execute_script("window.__fail()")
+
+    # Turbo reports a failed submission on the console and lets the rejection
+    # go: both are this test's own doing.
+    expect_js_error(/Failed to fetch/, times: 2)
+    assert_no_selector "#note-thread-#{@thread.id}-reply button[aria-busy]"
+    assert_equal AT_REST.merge("disabled" => false), sending_look
+    assert_equal "Never arrives", reply_field.value
+    reply_field.send_keys(", yet")
+    assert_equal "Never arrives, yet", reply_field.value
+  end
+
+  test "a reply that is answered quickly never shows the sending state" do
+    open_in_drawer
+    reply_field.send_keys("Quick")
+    watch_sending
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Quick"
+    await_js("window.__sending.ended !== null")
+    took, shown = page.evaluate_script("[ window.__sending.ended - window.__sending.pressed, window.__sending.shown ]")
+    # The server answers a reply in well under 300ms; on a machine so loaded
+    # that it did not, the state is right to have shown, and not before then.
+    if took < 300
+      assert_nil shown, "the sending state flashed for a send answered in #{took.round}ms"
+    else
+      assert_operator shown - page.evaluate_script("window.__sending.pressed"), :>=, 290
+    end
+    assert_equal AT_REST.merge("disabled" => true), sending_look
+  end
+
+  # A record's notes page is the one notes screen Turbo keeps a snapshot of.
+  # A snapshot taken while a note was on its way holds the field read-only
+  # and the sending state; Back must not hand that to the person.
+  test "Back to a notes page left while a reply was being sent finds a field that can be typed in, and Send at rest" do
+    visit "/cs-studio/notes/page/#{@page.id}/threads/#{@thread.id}"
+    await_admin_controllers
+    assert_selector "#note-thread-#{@thread.id}"
+    reply_field.send_keys("Left behind")
+    hold_request("/messages")
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+    assert_selector "#note-thread-#{@thread.id}-reply button[aria-busy=true][disabled]", text: "Sending…"
+
+    click_link "Tags"
+    assert_selector "h1", text: "Tags"
+    page.go_back
+
+    assert_selector "#note-thread-#{@thread.id}-reply textarea[name=body]"
+    assert_eventually(message: "the restored field is still as it was while sending") { sending_look == AT_REST.merge("disabled" => false) }
+    reply_field.send_keys("!")
+    assert_equal "Left behind!", reply_field.value
   end
 
   # A refused note is drawn again with its text, to be put right: editable.

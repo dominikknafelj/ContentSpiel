@@ -56,7 +56,10 @@ module Admin
       # picker, drawn from here. Which edge it hangs from is its user's.
       EMOJI_PANEL_CLASS = "absolute z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu".freeze
       EMOJI_BUTTON_CLASS = "cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken".freeze
-      TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
+      # `disabled:` is the shared button's own disabled look
+      # (`Admin::ButtonComponent::COMMON_CLASS`): the paperclip and the
+      # at-sign are disabled while a note is being sent (decision 41).
+      TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-dim".freeze
 
       # `edit` makes it an EDIT form: its field is drawn with the saved text,
       # and a draft is what differs from that (`admin--note-composer`, "an
@@ -113,7 +116,7 @@ module Admin
       # On a line of its own, ending the line: `test/lib/script_messages_test.rb`
       # reads the literal keys of a `messages_data(...)` call only when the
       # closing bracket is followed by a line end, a comma or another bracket.
-      def script_messages = messages_data("notes.script.mentions.none", "notes.script.mentions.count", "notes.script.files.too_many", "notes.script.files.too_big", "notes.script.files.remove", "notes.script.files.again", "notes.script.send_apple")
+      def script_messages = messages_data("notes.script.mentions.none", "notes.script.mentions.count", "notes.script.files.too_many", "notes.script.files.too_big", "notes.script.files.remove", "notes.script.files.again", "notes.script.send_apple", "notes.script.sending")
     end
   end
 end

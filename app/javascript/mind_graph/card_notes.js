@@ -200,6 +200,14 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
     event.preventDefault()
     submit.disabled = true
     field.readOnly = true
+    // Said only when the send is still out after 300ms, as in a composer
+    // (the notes handoff's decision 41): the text dim, the button
+    // "Sending…" and busy. The card's field has no other controls.
+    const saying = setTimeout(() => {
+      field.classList.replace("text-ink", "text-dim")
+      submit.textContent = text.t("mind_graph.script.card.notes.sending")
+      submit.setAttribute("aria-busy", "true")
+    }, 300)
     try {
       const body = new FormData(form)
       body.set("view", "mind_graph")
@@ -224,6 +232,10 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
     } catch {
       fail(text.t("mind_graph.script.card.notes.failed"))
     } finally {
+      clearTimeout(saying)
+      field.classList.replace("text-dim", "text-ink")
+      submit.textContent = text.t("mind_graph.script.card.notes.add")
+      submit.removeAttribute("aria-busy")
       submit.disabled = false
       field.readOnly = false
     }

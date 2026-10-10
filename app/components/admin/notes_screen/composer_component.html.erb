@@ -51,9 +51,10 @@
           <%= file_field_tag "files[]", id: "#{field_id}-files", multiple: true, class: "sr-only", tabindex: -1, aria: { hidden: true },
                 data: { "admin--note-composer-target": "files", action: "change->admin--note-composer#filesChosen", max_count: ::Notes::Files::MAX_COUNT, max_bytes: ::Notes::Files::MAX_BYTES, max_size: max_size } %>
           <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".attach") %>" title="<%= t(".attach_title", count: ::Notes::Files::MAX_COUNT, size: max_size) %>"
-                  data-note-attach data-action="admin--note-composer#browse"><%= helpers.render "admin/shared/icon", name: :paperclip, size: "size-4" %></button>
+                  data-note-attach data-admin--note-composer-target="tool" data-action="admin--note-composer#browse"><%= helpers.render "admin/shared/icon", name: :paperclip, size: "size-4" %></button>
         <% end %>
-        <details class="group relative" data-admin--note-composer-target="emoji">
+        <%# `inert` while a note is being sent: a <details> has no `disabled`. %>
+        <details class="group relative inert:opacity-50" data-admin--note-composer-target="emoji">
           <summary class="<%= TOOL_CLASS %> list-none group-open:bg-sunken group-open:text-ink [&::-webkit-details-marker]:hidden" aria-label="<%= t(".emoji") %>" title="<%= t(".emoji") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: "size-4" %></summary>
           <div class="<%= EMOJI_PANEL_CLASS %> left-0 <%= POPOVER_SIDE %>">
             <% ::Notes::EMOJI.each do |emoji| %>
@@ -62,7 +63,7 @@
           </div>
         </details>
         <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".mention") %>" title="<%= t(".mention") %>"
-                data-action="admin--note-composer#mention"><%= helpers.render "admin/shared/icon", name: :at_sign, size: "size-4" %></button>
+                data-admin--note-composer-target="tool" data-action="admin--note-composer#mention"><%= helpers.render "admin/shared/icon", name: :at_sign, size: "size-4" %></button>
       </div>
       <div class="flex items-center gap-2">
         <%= secondary %>

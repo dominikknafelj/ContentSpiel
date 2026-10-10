@@ -104,6 +104,9 @@ en:
           # comes back: the script kept the names beside the text.
           again: "Choose the files again: %{names}"
         send_apple: "Send (⌘↵)"
+        # What the submit reads while its note is being sent, once that has
+        # taken longer than a moment (the handoff's decision 41).
+        sending: "Sending…"
         # The toast a note addressed to the viewer raises (`admin--notes-live`):
         # "Dana mentioned you on Pricing", with "Open". `placeholder` is what
         # the layout's template holds until the script writes the sentence.
@@ -198,6 +201,8 @@ en:
             title: "Open notes · %{count}"
             label: "Write a note on this post"
             add: "Add note"
+            # The button while the note is being sent (decision 41).
+            sending: "Sending…"
             replies:
               one: "%{count} reply"
               other: "%{count} replies"
