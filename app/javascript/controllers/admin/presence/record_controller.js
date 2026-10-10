@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { listen, TAB } from "live/connection"
-import { settle } from "notes/live_state"
+import { settle } from "live/state"
 
 // This tab's presence on ONE record, and the people shown for it (presence
 // spec §5.2; `Admin::PresenceScreen::PeopleComponent` renders the element:
@@ -18,7 +18,7 @@ import { settle } from "notes/live_state"
 // 3. REDRAWS THE PEOPLE when the server says they changed, and on a slow
 //    timer besides (below).
 // 4. Says on its element whether its subscription has been answered
-//    (`data-live-part`, `notes/live_state`), which the system tests wait for.
+//    (`data-live-part`, `live/state`), which the system tests wait for.
 //
 // IT TOUCHES NOTHING OF THE EDITOR. Its element stands outside every form.
 // It never visits, never changes the address, sends nothing through the
@@ -63,13 +63,28 @@ import { settle } from "notes/live_state"
 // fires with every frame of a moving mouse, is looked at once a second at
 // most. Typing in the rich-text editor costs one assignment per key.
 //
-// ARRIVING AND LEAVING (handoff 14): a circle that is new fades in over
-// 150ms and one that is gone fades out before the others snap to their
-// places (`.admin-presence` in content-spiel.tailwind.css; none of it with
-// reduced motion). Here to away is redrawn at once. The first drawing after
-// connecting fades nobody in: those people did not arrive, the viewer did.
-// A redraw replaces what the frame holds, so what a person was doing in it
-// is put back: the focus on a circle or on "+N", and the open list.
+// WHEN THE RECORD IS GONE FOR THIS VIEWER -- the subscription is refused,
+// or the frame's answer is a 404 or a 403: the record went to the trash, or
+// a right was taken away while the page was open -- the part stops for
+// good: nobody is shown, the timers end and it stops listening, which is
+// leaving (the others stop seeing someone who can no longer read the
+// record). A Turbo visit to the screen starts a new one. A session that
+// ended (the answer is a redirect to the sign-in page) and a server error
+// are not that: nobody is shown, and it goes on asking.
+//
+// ARRIVING (handoff 14 and 25): a circle that is new fades in over 150ms
+// (`.admin-presence` in content-spiel.tailwind.css; not with reduced
+// motion). Someone who left is simply not in the next drawing, and here to
+// away is redrawn at once. The first drawing after connecting fades nobody
+// in: those people did not arrive, the viewer did.
+//
+// A DRAWING REPLACES what the frame holds, so it is made only when the
+// answer differs from the one shown: the read once a minute that finds
+// nothing new touches nothing, and a screen reader is not told the group
+// again. When it does differ, what a person was doing in the frame is put
+// back: an open list is open again, and the focus, which can only have been
+// on the group's button or in its list, is there again (on the button when
+// the list is gone; nowhere when nobody is left).
 //
 // A TAB THAT IS GOING SAYS SO. Leaving by a Turbo visit disconnects this
 // controller, which stops listening. Leaving by a full load (an address
@@ -89,11 +104,14 @@ import { settle } from "notes/live_state"
 // snapshot is taken before that event anyway. So, as the toasts do
 // (`admin--ui--toast`), what comes OUT of the cache has its people taken
 // out before it reaches the page: a preview and a restoration (Back,
-// Forward). The server's own rendering, in a fresh page, is left alone, and
+// Forward), for as long as that visit lasts. The server's own rendering, in a fresh page, is left alone, and
 // either way the people are read again on connecting. The listeners are
 // document-level and installed once, when this module first loads.
 let restoring = false
 document.addEventListener("turbo:visit", (event) => { restoring = event.detail.action === "restore" })
+// The visit is over: a render that comes without a visit of its own (a form
+// answered in place) is no restoration.
+document.addEventListener("turbo:load", () => { restoring = false })
 document.addEventListener("turbo:before-render", (event) => {
   if (!restoring && !document.documentElement.hasAttribute("data-turbo-preview")) return
   event.detail.newBody.querySelectorAll("[data-controller~='admin--presence--record']").forEach((part) => {
@@ -103,7 +121,6 @@ document.addEventListener("turbo:before-render", (event) => {
   })
 })
 
-const FADE = 150
 const COALESCE = 500
 const MOVE_EVERY = 1000
 const INPUTS = [ "keydown", "pointerdown", "scroll" ]
@@ -119,7 +136,9 @@ export default class extends Controller {
     this.lastInput = this.lastMove = Date.now()
     this.state = document.hidden ? "away" : "here"
     this.drawn = false
+    this.shown = null
     this.element.removeAttribute("data-presence-drawn")
+    this.element.removeAttribute("data-presence-gone")
 
     this.input = () => this.active(Date.now())
     this.move = () => {
@@ -129,6 +148,7 @@ export default class extends Controller {
       this.active(now)
     }
     this.visibility = () => this.seen()
+    this.left = () => this.closeList()
     this.going = () => this.stop.suspend()
     this.back = () => this.stop.resume()
     // Captured: a scroll does not bubble, and most of an editor's scrolling
@@ -140,10 +160,11 @@ export default class extends Controller {
     window.addEventListener("pageshow", this.back)
 
     const listener = Object.assign((signal) => this.heard(signal), {
-      connected: () => this.arrived(), disconnected: () => this.answered(), rejected: () => this.answered()
+      connected: () => this.arrived(), disconnected: () => this.answered(), rejected: () => this.gone()
     })
     this.stop = listen(this.params, listener)
     this.running = true
+    if (this.stop.rejected) return this.gone()
     this.stop.up ? this.arrived() : this.answered()
     this.watchIdle()
     this.keepAlive()
@@ -151,22 +172,41 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.quit()
+    // The element has left the document: the page's answer no longer waits
+    // for it.
+    settle(document.body)
+  }
+
+  // Everything this part set going is ended: its listeners, its timers, a
+  // request that is out, and the subscription (which is leaving).
+  quit() {
+    if (!this.running) return
     this.running = false
     INPUTS.forEach((name) => document.removeEventListener(name, this.input, { capture: true }))
     document.removeEventListener("pointermove", this.move, { capture: true })
     document.removeEventListener("visibilitychange", this.visibility)
     window.removeEventListener("pagehide", this.going)
     window.removeEventListener("pageshow", this.back)
+    this.frameTarget.removeEventListener("mouseleave", this.left)
     clearTimeout(this.idleTimer)
     clearInterval(this.beatTimer)
     clearInterval(this.refreshTimer)
     clearTimeout(this.soonTimer)
-    clearTimeout(this.fadeTimer)
-    this.soonTimer = this.fadeTimer = this.next = null
+    this.soonTimer = null
     this.request?.abort()
-    this.stop?.()
-    // The element has left the document: the page's answer no longer waits
-    // for it.
+    this.stop()
+  }
+
+  // The record is gone for this viewer (see WHEN THE RECORD IS GONE): nobody
+  // is shown and the part stops. It has nothing left to wait for, so the
+  // page's answer does not wait for it either.
+  gone() {
+    this.quit()
+    this.shown = null
+    this.frameTarget.replaceChildren()
+    this.element.setAttribute("data-live-part", "answered")
+    this.element.setAttribute("data-presence-gone", "true")
     settle(document.body)
   }
 
@@ -263,49 +303,41 @@ export default class extends Controller {
   }
 
   // The frame, asked of the server again. Never in a hidden document. A
-  // newer request ends an older one; a refusal (the record went to the
-  // trash, a right was taken away, the session ended and the answer is the
-  // sign-in page) shows nobody; a network error leaves what is shown.
+  // newer request ends an older one. A 404 or a 403 ends the part (`gone`);
+  // any other refusal (the session ended and the answer is the sign-in page,
+  // a server error) shows nobody; a network error leaves what is shown; and
+  // an answer that is the one already shown is not drawn again.
   async fetchPeople() {
-    if (document.hidden) return
+    if (document.hidden || !this.running) return
     this.request?.abort()
     const request = this.request = new AbortController()
-    let fresh = null
+    let answer = null
+    let refused = false
     try {
       const response = await fetch(this.urlValue, { headers: { Accept: "text/html", "Turbo-Frame": this.frameTarget.id }, signal: request.signal })
-      if (response.ok && !response.redirected) {
-        fresh = new DOMParser().parseFromString(await response.text(), "text/html").getElementById(this.frameTarget.id)
-      }
+      refused = response.status === 404 || response.status === 403
+      if (response.ok && !response.redirected) answer = await response.text()
     } catch (error) {
       return
     }
     if (request.signal.aborted || !this.running) return
-    this.draw(fresh ? [ ...fresh.childNodes ] : [])
+    if (refused) return this.gone()
+    if (answer !== null && answer === this.shown) return
+
+    const fresh = answer === null ? null : new DOMParser().parseFromString(answer, "text/html").getElementById(this.frameTarget.id)
+    this.shown = fresh ? answer : null
+    this.put(fresh ? [ ...fresh.childNodes ] : [])
   }
 
-  // Puts the answer in the frame. Whoever is in the frame and not in the
-  // answer fades out first, and the answer waits for that; an answer that
-  // comes while one waits takes its place.
-  draw(nodes) {
-    this.next = nodes
-    if (this.fadeTimer) return
-    const staying = people(nodes)
-    const leaving = this.drawn && motion() ? this.circles.filter((each) => !staying.has(each.dataset.presenceUser)) : []
-    if (leaving.length === 0) return this.put()
-    leaving.forEach((each) => each.setAttribute("data-presence-leaving", ""))
-    this.fadeTimer = setTimeout(() => {
-      this.fadeTimer = null
-      this.put()
-    }, FADE)
-  }
-
-  put() {
+  // Puts an answer in the frame, and puts back what the person was doing
+  // there (see A DRAWING REPLACES).
+  put(nodes) {
     const frame = this.frameTarget
-    const nodes = this.next
-    this.next = null
     const before = people([ frame ])
-    const focused = frame.contains(document.activeElement) ? key(document.activeElement) : null
-    const open = Boolean(frame.querySelector("[data-admin--ui--menu-target='panel']:not([hidden])"))
+    const panel = "[data-admin--ui--menu-target='panel']"
+    const focused = frame.contains(document.activeElement)
+    const reading = focused && Boolean(document.activeElement.closest(panel))
+    const open = Boolean(frame.querySelector(`${panel}:not([hidden])`))
 
     frame.replaceChildren(...nodes.map((node) => document.importNode(node, true)))
 
@@ -314,11 +346,29 @@ export default class extends Controller {
     // Said on the element, for whoever has to know that the people shown
     // are this connection's own reading (a test, before it counts fades).
     this.element.setAttribute("data-presence-drawn", "true")
-    if (open) {
-      frame.querySelector("[data-admin--ui--menu-target='panel']")?.removeAttribute("hidden")
-      frame.querySelector("[data-admin--ui--menu-target='button']")?.setAttribute("aria-expanded", "true")
+    const button = frame.querySelector("[data-admin--ui--menu-target='button']")
+    const list = frame.querySelector(panel)
+    // The list, open again: for someone reading it, or for the pointer that
+    // is still on the group. The new list has never seen the pointer come,
+    // so it would not see it go either (the browser tells an element that
+    // the pointer left only if it told it that it came): the frame, which
+    // stays, is asked instead, once.
+    frame.removeEventListener("mouseleave", this.left)
+    if (open && list && (reading || frame.matches(":hover"))) {
+      list.removeAttribute("hidden")
+      button.setAttribute("aria-expanded", "true")
+      if (!reading) frame.addEventListener("mouseleave", this.left, { once: true })
     }
-    if (focused) [ ...frame.querySelectorAll("[data-presence-user], button") ].find((each) => key(each) === focused)?.focus()
+    if (focused) (reading && open && list ? list : button)?.focus()
+  }
+
+  // The pointer left a list that a drawing had opened again: closed, unless
+  // someone is reading it by now.
+  closeList() {
+    const frame = this.frameTarget
+    if (frame.contains(document.activeElement)) return
+    frame.querySelector("[data-admin--ui--menu-target='panel']")?.setAttribute("hidden", "")
+    frame.querySelector("[data-admin--ui--menu-target='button']")?.setAttribute("aria-expanded", "false")
   }
 
   get circles() { return [ ...this.frameTarget.querySelectorAll("[data-presence-user]") ] }
@@ -333,16 +383,4 @@ function people(nodes) {
     node.querySelectorAll("[data-presence-listed]").forEach((each) => ids.add(each.dataset.presenceListed))
   }
   return ids
-}
-
-// What a focused element of the frame is, so that its twin in the next
-// drawing can take the focus: a person's circle, or the "+N" button.
-function key(element) {
-  const circle = element.closest?.("[data-presence-user]")
-  if (circle) return `user-${circle.dataset.presenceUser}`
-  return element.closest?.("button") ? "more" : null
-}
-
-function motion() {
-  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches
 }

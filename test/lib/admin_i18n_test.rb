@@ -107,6 +107,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/chip_input_component.html.erb
     app/components/admin/ui/avatar_component.rb
     app/components/admin/ui/tooltip_component.rb
+    app/javascript/controllers/admin/ui/tooltip_controller.js
+    app/javascript/live/state.js
     app/components/admin/presence_screen/people_component.rb
     app/components/admin/presence_screen/people_component.html.erb
     app/javascript/controllers/admin/presence/record_controller.js

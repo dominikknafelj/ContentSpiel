@@ -17,21 +17,25 @@ module Admin
     # viewer in a note (filled ink); `:away` is someone whose tab is hidden or
     # idle (presence handoff 4: no fill, the plain line, meta letters -- never
     # a lower opacity, which would take the letters below contrast).
-    # `ring`: a 2px ring in the paper colour, for circles that overlap.
+    # `ring`: a 2px ring in the colour of what the circles stand on, for
+    # circles that overlap: `:paper` (an editor's header) or `:surface` (the
+    # media panel).
     class AvatarComponent < Admin::AdminComponent
       SIZES = { md: "size-6 text-[9px]", sm: "size-5 text-[8px]" }.freeze
       TONES = { other: "border border-line-strong bg-sunken text-ink", own: "bg-ink text-paper", away: "border border-line bg-paper text-meta" }.freeze
 
-      def initialize(initials:, size:, tone: :other, ring: false)
+      RINGS = { paper: "ring-2 ring-paper", surface: "ring-2 ring-surface" }.freeze
+
+      def initialize(initials:, size:, tone: :other, ring: nil)
         @initials = initials
         @size = SIZES.fetch(size)
         @tone = TONES.fetch(tone)
-        @ring = ring
+        @ring = ring && RINGS.fetch(ring)
       end
 
       def call
         tag.span(@initials, aria: { hidden: true },
-          class: class_names("flex shrink-0 items-center justify-center rounded-full font-cs-mono font-medium uppercase leading-none", @size, @tone, "ring-2 ring-paper": @ring))
+          class: class_names("flex shrink-0 items-center justify-center rounded-full font-cs-mono font-medium uppercase leading-none", @size, @tone, @ring))
       end
     end
   end

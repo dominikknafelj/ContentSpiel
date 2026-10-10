@@ -634,7 +634,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
 
   # `data-notes-live` is what `await_notes_live` waits on, and two controllers
   # hold the subscriptions: the person's is `admin--notes--inbox`'s, a record's
-  # is `admin--notes--live`'s (`notes/live_state` puts their words together).
+  # is `admin--notes--live`'s (`live/state` puts their words together).
   # A half that is taken for the whole would not fail a test, it would make
   # one lose a signal now and then. Each subscription's own callbacks are
   # called here, as Action Cable calls them, one side at a time.
@@ -659,7 +659,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     # only one controller has spoken, the page is not live on its word.
     said = page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
-      import("notes/live_state").then(({ report }) => {
+      import("live/state").then(({ report }) => {
         const one = document.createElement("body")
         const other = document.createElement("body")
         report(one, "records", true)

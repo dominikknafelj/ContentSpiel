@@ -27,20 +27,20 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
     assert_no_selector "[role=menu][data-action]", visible: :all
   end
 
-  # A panel that lists things rather than offering actions (presence's "+N"):
-  # it is no ARIA menu, and it opens on hover and focus as well as a click.
-  test "a list panel: list roles, and it opens on hover, focus and click and closes when both have left" do
-    render_inline(Admin::Ui::MenuComponent.new(label: "+2", list: true)) do |menu|
+  # A panel that lists things rather than offering actions (everyone behind
+  # presence's group): it is no ARIA menu; pressing the button moves the focus
+  # into the list, which is named.
+  test "a list panel: list roles and a name, it takes the focus itself, and it closes when the pointer and the focus have left" do
+    render_inline(Admin::Ui::MenuComponent.new(label: "+2", list: true, list_label: "Everyone with this open")) do |menu|
       menu.with_item { "Ann" }
       menu.with_item { "Bob" }
     end
 
-    assert_selector "[data-controller='admin--ui--menu'] button[aria-haspopup=true][aria-expanded=false][data-action='admin--ui--menu#show']", text: "+2"
-    assert_selector "[role=list][hidden] > [role=listitem]", count: 2, visible: :all
+    assert_selector "[data-controller='admin--ui--menu'] button[aria-haspopup=true][aria-expanded=false][data-action='admin--ui--menu#enter']", text: "+2"
+    assert_selector "[role=list][hidden][tabindex='-1'][aria-label='Everyone with this open'] > [role=listitem]", count: 2, visible: :all
     assert_no_selector "[role=menu], [role=none]", visible: :all
-    actions = page.find("[data-controller='admin--ui--menu']")["data-action"].split
-    %w[click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown mouseenter->admin--ui--menu#show
-       mouseleave->admin--ui--menu#leave focusin->admin--ui--menu#show focusout->admin--ui--menu#leave].each { |action| assert_includes actions, action }
+    assert_equal %w[click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave],
+      page.find("[data-controller='admin--ui--menu']")["data-action"].split
   end
 
   test "an ordinary menu has none of the hover and focus actions" do
@@ -49,5 +49,6 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
     assert_equal "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown", page.find("[data-controller='admin--ui--menu']")["data-action"]
     assert_selector "button[data-action='admin--ui--menu#toggle']"
     assert_selector "[role=menu] > [role=none]", visible: :all
+    assert_no_selector "[role=menu][tabindex], [role=menu][aria-label]", visible: :all
   end
 end

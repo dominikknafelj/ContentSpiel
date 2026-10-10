@@ -30,16 +30,24 @@ module Admin
     # controller have found the record through the read scope. Two statements
     # at most.
     #
-    # ONE CIRCLE (`Admin::Ui::AvatarComponent`, the paper ring, 6px over the
-    # one before) is an image named "Dana Weiss · here" or "Dana Weiss · away
-    # 12 min" ("away over an hour" from sixty minutes; whole minutes, rounded
-    # down, so "away 0 min" is said), with the same words in the shared
-    # tooltip, and it takes the focus so a keyboard reaches them. A person is
-    # named by `PersonName.of`, as in notes. Nothing is announced: no live
-    # region.
+    # THE GROUP IS ONE BUTTON (handoff 23), the one Tab stop: the circles and
+    # "+N" are inside it and none of them takes the focus. Its name says
+    # everything a sighted person reads off the circles -- "Also open by 3
+    # people: Dana Weiss, here; Jonas Lind, away 12 min", and "…; 2 more
+    # people" for those behind "+N" -- and pressing it, anywhere, opens the
+    # list of EVERYONE in the same order (`Admin::Ui::MenuComponent`,
+    # `list: true`: the list takes the focus, Escape gives it back). With one
+    # person it is still the Tab stop and opens a list of one. It IS the menu
+    # component's button, so nothing interactive is nested in it: "+N" is a
+    # span, which also shows the list on hover without moving the focus.
+    # Nothing is announced: no live region.
     #
-    # "+N" (`Admin::Ui::MenuComponent`, `list: true`) lists EVERYONE, the
-    # shown ones too, in the same order.
+    # ONE CIRCLE (`Admin::Ui::AvatarComponent`, a ring in the colour of what
+    # it stands on, 6px over the one before) still shows its own tooltip ON
+    # HOVER (`Admin::Ui::TooltipComponent`): "Dana Weiss · here", "Dana Weiss
+    # · away just now" under a minute, "· away 12 min" (whole minutes, rounded
+    # down), "· away over an hour" from sixty. A person is named by
+    # `PersonName.of`, as in notes.
     #
     # BELOW 1024px the header shows one circle and "+N" (handoff 15), by
     # classes and not by a second render: the second and third circle are
@@ -51,22 +59,22 @@ module Admin
     # editors pass `counts:`, `locale:` and `url_options:` for other features).
     class PeopleComponent < Admin::AdminComponent
       # `shown`: how many circles before "+N"; `narrow`: how many below
-      # 1024px (nil: the same); `avatar`: `Admin::Ui::AvatarComponent`'s size;
-      # `more`: the "+N" circle, the avatar's size; `wrapper`: the element's
-      # place in its row -- the header's action row has a gap of 8px and the
-      # people stand 12px before the saved status (handoff 2); in the panel's
-      # file-name row they never give way (handoff 13), and are centred on
-      # the name's first line (28px).
-      # `hang`: the edge a circle's tooltip and the "+N" list hang from. The
-      # header's people stand at the START of the action row, which is at the
-      # window's left edge once the row has wrapped under the breadcrumb, so
-      # they hang from the left and open to the right, over the row; the
-      # panel's stand at the window's right edge and hang from the right.
-      Size = Data.define(:shown, :narrow, :avatar, :more, :wrapper, :hang)
+      # 1024px (nil: the same at every width, the panel is a column of one
+      # width); `avatar`: `Admin::Ui::AvatarComponent`'s size; `more`: the
+      # "+N" circle's size; `ground`: what the circles stand on, the colour of
+      # their ring and of the "+N" circle, which has no fill (handoff 20, 24);
+      # `wrapper`: the element's place in its row -- the header's action row
+      # has a gap of 8px and the people stand 12px before the saved status
+      # (handoff 2); in the panel's file-name row they never give way
+      # (handoff 13), and `mt-1` centres their 20px on the name's first line
+      # of 28px in a row that is aligned to its top (handoff 24); `hang`: the
+      # edge the list hangs from (handoff 19).
+      Size = Data.define(:shown, :narrow, :avatar, :more, :ground, :wrapper, :hang)
       SIZES = {
-        header: Size.new(shown: 3, narrow: 1, avatar: :md, more: "size-6", wrapper: "mr-1", hang: :left),
-        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, more: "size-5", wrapper: "ml-auto mt-1 flex-none", hang: :right)
+        header: Size.new(shown: 3, narrow: 1, avatar: :md, more: "size-6", ground: :paper, wrapper: "mr-1", hang: :left),
+        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, more: "size-5", ground: :surface, wrapper: "ml-auto mt-1 flex-none", hang: :right)
       }.freeze
+      GROUNDS = { paper: "bg-paper", surface: "bg-surface" }.freeze
 
       # "away over an hour" from here on.
       LONG_AWAY = 60.minutes
@@ -97,7 +105,7 @@ module Admin
 
       # `admin-presence`: the fade of someone arriving and leaving
       # (content-spiel.tailwind.css).
-      def wrapper_class = "admin-presence hidden items-center has-[[role=group]]:flex #{@size.wrapper}"
+      def wrapper_class = "admin-presence hidden items-center has-[button]:flex #{@size.wrapper}"
 
       def people
         @people ||= begin
@@ -108,18 +116,34 @@ module Admin
 
       def circles = people.first(@size.shown)
 
-      def group_label = t(".group", count: people.size)
+      # The button's name: how many, then who is shown and how they are, then
+      # how many more.
+      def group_label
+        said = circles.map { |person| t(".person", name: person.name, status: person.status) }
+        said << t(".more_people", count: more_wide) if more_wide.positive?
+        t(".group_label", summary: t(".group", count: people.size), people: said.join(t(".separator")))
+      end
+
+      def list_label = t(".everyone")
 
       def avatar_size = @size.avatar
 
+      def ground = @size.ground
+
       def hang = @size.hang
 
-      # The circle's own classes: over the one before by 6px; hidden below
-      # 1024px when the narrow header has no room for it.
-      def circle_class(index)
-        class_names(Admin::Ui::TooltipComponent::HOST, "flex-none rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-          "-ml-1.5": index.positive?, "max-lg:hidden": narrow? && index >= @size.narrow)
+      # The one Tab stop, with its focus ring around the group.
+      def group_class
+        "flex cursor-pointer items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       end
+
+      # A circle's own classes: the tooltip's host, over the one before by
+      # 6px; hidden below 1024px when the narrow header has no room for it.
+      def circle_class(index)
+        class_names(Admin::Ui::TooltipComponent::HOST, "flex-none rounded-full", "-ml-1.5": index.positive?, "max-lg:hidden": narrow? && index >= @size.narrow)
+      end
+
+      def circle_data(person) = { presence_user: person.user.id, presence_state: person.state, **Admin::Ui::TooltipComponent.host_data }
 
       def tone(person) = person.state == "away" ? :away : :other
 
@@ -132,20 +156,19 @@ module Admin
 
       def more? = more_wide.positive? || more_narrow.positive?
 
-      # Shown below 1024px only, when the wide row has room for everyone.
-      def more_class = class_names("ml-1 flex flex-none", "lg:hidden": !more_wide.positive?)
+      # "+N": a circle of the avatar's size with no fill, 4px after the last
+      # person and not overlapped, the count in 10px mono. Shown below 1024px
+      # only when the wide row has room for everyone.
+      def more_class
+        class_names("ml-1 flex flex-none items-center justify-center rounded-full border border-line-strong font-cs-mono text-[10px] leading-none text-dim",
+          @size.more, GROUNDS.fetch(ground), "lg:hidden": !more_wide.positive?)
+      end
 
       # "+1", or both counts with one shown at each width.
       def more_label
         wide = more_wide.positive? ? tag.span(t(".more", count: more_wide), class: ("max-lg:hidden" if narrow?), data: { presence_more: "wide" }) : nil
         narrow = narrow? ? tag.span(t(".more", count: more_narrow), class: "lg:hidden", data: { presence_more: "narrow" }) : nil
         safe_join([ wide, narrow ].compact)
-      end
-
-      # The same circle as a person's, not overlapped, the count in 10px mono.
-      def more_button_class
-        "flex #{@size.more} cursor-pointer items-center justify-center rounded-full border border-line-strong bg-sunken font-cs-mono text-[10px] leading-none text-dim " \
-          "hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       end
 
       private
@@ -156,12 +179,15 @@ module Admin
         Shown.new(user: person.user, state: person.state, name:, initials: ::PersonName.initials(name), label: t(".label", name:, status:), status:)
       end
 
-      # "here", "away 12 min" (whole minutes, rounded down), "away over an hour".
+      # "here", "away just now" under a minute, "away 12 min" (whole minutes,
+      # rounded down), "away over an hour".
       def status_of(person, now)
         return t(".here") unless person.state == "away"
 
         away = now - person.since
-        away >= LONG_AWAY ? t(".away_long") : t(".away", count: [ (away / 60).floor, 0 ].max)
+        return t(".away_now") if away < 1.minute
+
+        away >= LONG_AWAY ? t(".away_long") : t(".away", count: (away / 60).floor)
       end
     end
   end

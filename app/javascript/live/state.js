@@ -4,6 +4,10 @@
 // signal sent from then on is received; "connecting" says that one is not.
 // The system tests wait on it before they cause a signal (`await_notes_live`).
 //
+// It is in `live/`, beside the connection, because more than one topic says
+// its word here: notes' two controllers and presence's part. The attribute
+// keeps the name it had when only notes spoke.
+//
 // Two controllers on <body> hold the subscriptions, and each knows only its
 // own: `admin--notes--inbox` the person's ("person"), `admin--notes--live`
 // the records' ("records"). Each says here how its own stand, whenever that

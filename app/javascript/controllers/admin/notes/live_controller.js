@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 import { TAB, listen } from "live/connection"
 import { json } from "notes/json"
-import { report } from "notes/live_state"
+import { report } from "live/state"
 import { hold, mergeGone, mergeList, mergeThread, scrollerOf } from "notes/merge"
 
 // Live delivery of notes, the RECORD'S side (notes spec §6): a record's
@@ -90,7 +90,7 @@ import { hold, mergeGone, mergeList, mergeThread, scrollerOf } from "notes/merge
 // this page has been answered (confirmed, or rejected for a record the
 // viewer may not read): a signal sent from then on is received. This
 // controller says how the records' subscriptions stand, `admin--notes--inbox`
-// how the person's does, and `notes/live_state` puts the two together.
+// how the person's does, and `live/state` puts the two together.
 //
 // NO PAGE REFRESH, NO MORPHING (decision D20): nothing here touches an editor
 // form, the write queue or anything outside the notes parts.
@@ -264,7 +264,7 @@ export default class extends Controller {
   // --- the socket -------------------------------------------------------------------
 
   // Whether every record subscription of this page has been answered: this
-  // controller's half of `data-notes-live` (`notes/live_state`; the person's
+  // controller's half of `data-notes-live` (`live/state`; the person's
   // subscription is `admin--notes--inbox`'s half).
   sync() {
     report(this.element, "records", [ ...this.records.values() ].every((record) => record.stop.settled))

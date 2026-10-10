@@ -227,7 +227,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     row = page.find("#media-panel > div:first-child")
     assert_equal [ "h2", "div", "a" ], row.all(:xpath, "./*", visible: :all).map(&:tag_name)
     row.assert_selector "div.hidden.flex-none.ml-auto[data-controller='admin--presence--record'] turbo-frame#presence-media-#{asset.id}", visible: :all
-    row.assert_no_selector "[role=group]", visible: :all
+    row.assert_no_selector "button", visible: :all
   end
 
   test "with nothing registered at its slots the panel is the panel without the notes section" do

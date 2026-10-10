@@ -118,8 +118,15 @@ export function listen(params, listener) {
   // no close for as long as the page is kept, and `stop` lets go a task
   // later, which a page that is being frozen may never run. The listeners
   // are told `disconnected`, as when the socket drops; after `resume` they
-  // are told `connected` again. Both are the SUBSCRIPTION's, as `perform`
-  // is, and both are harmless twice.
+  // are told `connected` again. Both are harmless twice.
+  //
+  // BOTH ARE THE SUBSCRIPTION'S, asked by one listener, as `perform` is:
+  // suspending cuts off EVERY listener of these params. That is right when
+  // all of them go together (every presence part of a page hears the same
+  // `pagehide`), and two things follow that nothing does today: a listener
+  // of another kind sharing the params would be silenced and would not come
+  // back by itself; and a listener that JOINS a suspended subscription is
+  // told nothing and waits for someone's `resume`.
   const suspend = () => {
     if (entry.suspended || entry.closed || entry.rejected || !entry.made || !entry.listeners.has(listener)) return
     entry.suspended = true

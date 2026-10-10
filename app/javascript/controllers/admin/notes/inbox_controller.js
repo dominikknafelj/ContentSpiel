@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 import { TAB, listen, open } from "live/connection"
 import { json } from "notes/json"
-import { report } from "notes/live_state"
+import { report } from "live/state"
 import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 
 // The person's side of live notes (notes spec §6): the sidebar's count, the
@@ -56,7 +56,7 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 // -- signals sent meanwhile were never received. What a session's end does
 // to the socket: `live/connection`. This controller says on <body> whether
 // the person's subscription is up, its half of `data-notes-live`
-// (`notes/live_state`).
+// (`live/state`).
 //
 // THE TAB'S NOTE DRAFTS are this person's or nobody's: they go when the
 // person signs out (`signingOut`) and when a page is loaded for someone else
@@ -153,7 +153,7 @@ export default class extends Controller {
   // --- the socket -------------------------------------------------------------------
 
   // Whether the person's subscription is up: this controller's half of
-  // `data-notes-live` (`notes/live_state`; the records' subscriptions are
+  // `data-notes-live` (`live/state`; the records' subscriptions are
   // `admin--notes--live`'s half).
   sync() {
     report(this.element, "person", Boolean(this.subscription?.up))

@@ -58,7 +58,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
 
     get admin_record_presence_path("page", @page.id)
     assert_equal "no-store", response.headers["Cache-Control"]
-    assert_select "turbo-frame#presence-page-#{@page.id} [role=group][aria-label='Also open by 2 people'] > [data-presence-user] > span.size-6", count: 2
+    assert_select "turbo-frame#presence-page-#{@page.id} button[aria-label^='Also open by 2 people: '] > [data-presence-user] > span.size-6", count: 2
     # The frame's place on a page is the slot's; the answer is the frame.
     assert_select "[data-controller='admin--presence--record']", count: 0
 

@@ -4,7 +4,7 @@ require "application_system_test_case"
 # to 8 and 13 to 17): the others on a record, in an editor's header and in
 # the media library's image panel, live. Two people are two Capybara
 # sessions. `await_notes_live` waits for presence's subscription too
-# (`notes/live_state`), so an arrival caused after it is heard.
+# (`live/state`), so an arrival caused after it is heard.
 class Admin::PresenceSystemTest < ApplicationSystemTestCase
   LIVE = 8
 
@@ -34,7 +34,25 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     end
   end
 
-  def circle(user, state = nil) = ".admin-editor-header [role=group] > [data-presence-user='#{user.id}']#{"[data-presence-state=#{state}]" if state}"
+  # The group: one button, the header's one Tab stop for presence.
+  def group = ".admin-editor-header .admin-presence button"
+
+  def list = ".admin-editor-header .admin-presence [role=list]"
+
+  def circle(user, state = nil) = "#{group} > [data-presence-user='#{user.id}']#{"[data-presence-state=#{state}]" if state}"
+
+  def tip(user) = "#{circle(user)} [data-tooltip]"
+
+  # The part's own reading has been drawn: what is shown is no longer the
+  # server's first rendering, and the next drawing is a change.
+  def await_drawn(within: ".admin-editor-header")
+    await_js("document.querySelector(#{"#{within} [data-controller~='admin--presence--record']".to_json})?.dataset.presenceDrawn === 'true'", wait: LIVE)
+  end
+
+  def turbo_visit(path)
+    page.execute_script("window.__visited = false; document.addEventListener('turbo:load', () => { window.__visited = true }, { once: true }); Turbo.visit(#{path.to_json})")
+    await_js("window.__visited === true", wait: LIVE)
+  end
 
   def marks(user) = Presence::Mark.where(user_id: user.id, record_type: "Page", record_id: @page.id)
 
@@ -63,15 +81,16 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
   test "someone who opens the page I am on appears in my header, and I in theirs, and neither sees themselves" do
     open_page
     assert_selector ".admin-editor-header turbo-frame#presence-page-#{@page.id}", visible: :all
-    assert_no_selector ".admin-editor-header [role=group]"
+    assert_no_selector group
 
     join(:dana, @dana) do
-      assert_selector circle(@me, "here") + "[aria-label='Olga Braun · here']", wait: LIVE
+      assert_selector circle(@me, "here"), wait: LIVE
+      assert_selector "#{group}[aria-label='Also open by 1 person: Olga Braun, here']"
       assert_no_selector "[data-presence-user='#{@dana.id}']"
     end
 
-    assert_selector circle(@dana, "here") + "[aria-label='Dana Weiss · here']", wait: LIVE
-    assert_selector ".admin-editor-header [role=group][aria-label='Also open by 1 person']"
+    assert_selector circle(@dana, "here"), wait: LIVE
+    assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, here']"
     assert_no_selector "[data-presence-user='#{@me.id}']"
     # The circle: 24px, the initials, first in the action row and 12px before
     # the status that follows (handoff 1 and 2).
@@ -80,17 +99,49 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
       (() => {
         const people = document.querySelector(".admin-editor-header [data-controller~='admin--presence--record']")
         const circle = people.querySelector("[data-presence-user] > span").getBoundingClientRect()
-        return { first: people.parentElement.firstElementChild === people, width: circle.width, height: circle.height,
+        return { first: people.parentElement.firstElementChild === people, width: circle.width, height: circle.height, row: people.getBoundingClientRect().height,
                  gap: people.nextElementSibling.getBoundingClientRect().left - people.getBoundingClientRect().right }
       })()
     JS
-    assert_equal({ "first" => true, "width" => 24, "height" => 24, "gap" => 12 }, box)
+    assert_equal({ "first" => true, "width" => 24, "height" => 24, "row" => 24, "gap" => 12 }, box)
+    assert_no_selector ".admin-editor-header .admin-presence [title]", visible: :all
+  end
 
-    # The shared tooltip says the same on focus (7): never a `title`.
-    assert_no_selector circle(@dana) + " [data-tooltip]"
-    page.execute_script("document.querySelector(#{circle(@dana).to_json}).focus()")
-    assert_selector circle(@dana) + " [data-tooltip]", text: "Dana Weiss · here", exact_text: true
-    assert_no_selector ".admin-editor-header [role=group] [title]", visible: :all
+  # Handoff 23: the whole group is ONE Tab stop, a button that says who is
+  # there and opens the list of everyone; the list takes the focus and
+  # Escape gives it back.
+  test "the group is one Tab stop: its name says who is there, Enter opens the list and moves the focus into it, and Escape gives the focus back" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana), wait: LIVE
+    await_drawn
+
+    stops = page.evaluate_script("[ ...document.querySelectorAll('.admin-editor-header .admin-presence :is(a, button, input, [tabindex])') ].filter((each) => each.tabIndex >= 0).length")
+    assert_equal 1, stops
+    page.execute_script("document.querySelector(#{group.to_json}).focus()")
+    find(group).send_keys(:enter)
+    assert_selector "#{list}[aria-label='Everyone with this open'] [role=listitem]", count: 1
+    assert_selector "#{group}[aria-expanded=true]"
+    assert_eventually(message: "the list did not take the focus") { page.evaluate_script("document.activeElement === document.querySelector(#{list.to_json})") }
+    assert_equal [ [ "Dana Weiss", "here" ] ], all("#{list} [data-presence-listed]").map { |row| [ row.find("[data-presence-name]").text, row.find("[data-presence-status]").text ] }
+
+    find(list).send_keys(:escape)
+    assert_no_selector list
+    assert_selector "#{group}[aria-expanded=false]"
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{group.to_json})")
+
+    # A press anywhere on the group opens it too, a circle included; a second
+    # press closes it; and it closes when the focus leaves it.
+    find(circle(@dana)).click
+    assert_selector "#{list} [role=listitem]", count: 1
+    find(circle(@dana)).click
+    assert_no_selector list
+    find(group).click
+    assert_selector list
+    page.execute_script("document.activeElement.blur()")
+    page.driver.browser.mouse.move(x: 5, y: 5)
+    find(".admin-editor-header h1").click
+    assert_no_selector list
   end
 
   test "they turn away when their tab is hidden, and here again when it is shown" do
@@ -100,12 +151,14 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
     using_session(:dana) { hide_document }
     # At once, and the unfilled circle (4): no fade marks a change of state.
-    assert_selector circle(@dana, "away") + "[aria-label='Dana Weiss · away 0 min']", wait: LIVE
+    assert_selector circle(@dana, "away"), wait: LIVE
+    assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, away just now']"
+    assert_selector tip(@dana), text: "Dana Weiss · away just now", exact_text: true, visible: :all
     assert_selector circle(@dana) + " > span.bg-paper.border-line.text-meta"
-    assert_no_selector "[data-presence-arriving], [data-presence-leaving]"
 
     using_session(:dana) { show_document }
-    assert_selector circle(@dana, "here") + "[aria-label='Dana Weiss · here']", wait: LIVE
+    assert_selector circle(@dana, "here"), wait: LIVE
+    assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, here']"
     assert_selector circle(@dana) + " > span.bg-sunken.border-line-strong.text-ink"
   end
 
@@ -136,7 +189,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     end
 
     assert_no_selector circle(@dana), wait: LIVE
-    assert_no_selector ".admin-editor-header [role=group]"
+    assert_no_selector group
     assert_eventually(message: "the row of a tab that left stayed") { marks(@dana).none? }
   end
 
@@ -147,7 +200,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the second tab wrote no row of its own") { marks(@dana).count == 2 }
 
     assert_selector circle(@dana), count: 1, wait: LIVE
-    assert_selector ".admin-editor-header [role=group][aria-label='Also open by 1 person']"
+    assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, here']"
     %i[dana dana_again].each do |name|
       using_session(name) do
         assert_selector circle(@me), count: 1
@@ -185,9 +238,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     set_timing("refresh", 200)
 
     join(:dana, @dana)
-    # The arrival's signal is coalesced for half a second; three of the
-    # shortened slow timers have run by the time this is over as well.
-    await_js("true", wait: 1)
+    sleep 1 # sleep: the arrival's signal is held for half a second and the shortened slow timer runs every 200 ms; "fetched nothing" needs both to have had their turn
     assert_eventually(message: "the hidden tab never reported away") { marks(@me).where(state: "away").exists? }
     assert_no_selector circle(@dana)
 
@@ -199,11 +250,13 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     open_page
     join(:reader, @reader) { assert_selector circle(@me, "here"), wait: LIVE }
 
-    assert_selector circle(@reader, "here") + "[aria-label='reader · here']", wait: LIVE
+    assert_selector circle(@reader, "here"), wait: LIVE
+    assert_selector "#{group}[aria-label='Also open by 1 person: reader, here']"
     assert_selector circle(@reader) + " > span.bg-sunken", text: "R", exact_text: true
   end
 
-  test "someone arriving fades in beside those who were there, and someone leaving fades out before the rest move up" do
+  # Handoff 14 and 25: arriving fades in; leaving does not fade.
+  test "someone arriving fades in beside those who were there, and someone leaving is simply gone" do
     open_page
     join(:dana, @dana)
     assert_selector circle(@dana) + "[data-presence-arriving]", wait: LIVE
@@ -213,13 +266,13 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     # Whoever is there when the page is opened did not arrive: the viewer did.
     open_page
     assert_selector circle(@dana), wait: LIVE
-    await_js("document.querySelector(#{".admin-editor-header [data-controller~='admin--presence--record']".to_json}).dataset.presenceDrawn === 'true'", wait: LIVE)
+    await_drawn
     assert_no_selector "[data-presence-arriving]"
     page.execute_script(<<~JS)
-      window.__leaving = []
+      window.__faded = []
       new MutationObserver((changes) => changes.forEach((change) => {
-        if (change.attributeName === "data-presence-leaving") window.__leaving.push(change.target.dataset.presenceUser)
-      })).observe(document.querySelector(".admin-editor-header turbo-frame"), { attributes: true, subtree: true })
+        if (change.type === "attributes") window.__faded.push(`${change.attributeName}:${change.target.dataset.presenceUser}`)
+      })).observe(document.querySelector(".admin-editor-header turbo-frame"), { attributes: true, subtree: true, attributeFilter: [ "data-presence-leaving", "style", "class" ] })
     JS
 
     join(:reader, @reader)
@@ -228,9 +281,35 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
     using_session(:dana) { visit admin_tags_path }
     assert_no_selector circle(@dana), wait: LIVE
-    assert_equal [ @dana.id.to_s ], page.evaluate_script("window.__leaving")
+    assert_equal [], page.evaluate_script("window.__faded"), "someone leaving was marked or restyled before going"
     assert_selector circle(@reader), count: 1
-    assert_no_selector "[data-presence-arriving], [data-presence-leaving]"
+    assert_no_selector "[data-presence-arriving]"
+  end
+
+  # The read once a minute that finds nothing new must touch nothing: every
+  # drawing replaces the group, and a screen reader would be told it again.
+  test "an answer that is the one shown is not drawn again, and the focus stays on the very button it was on" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana), wait: LIVE
+    await_drawn
+    page.execute_script("window.__button = document.querySelector(#{group.to_json}); window.__button.focus()")
+
+    set_timing("refresh", 150)
+    # Several of the shortened reads have been answered by the time a second
+    # has passed.
+    await_js("performance.getEntriesByType('resource').filter((each) => each.name.includes('/presence/page/')).length >= 4", wait: LIVE)
+    assert_equal [ true, true ], page.evaluate_script("[ window.__button.isConnected, document.activeElement === window.__button ]")
+
+    # A change is drawn, and the focus is on the new group's button.
+    using_session(:dana) { hide_document }
+    assert_selector circle(@dana, "away"), wait: LIVE
+    assert_equal [ false, true ], page.evaluate_script("[ window.__button.isConnected, document.activeElement === document.querySelector(#{group.to_json}) ]")
+
+    # The one person leaves: nothing is left to hold the focus.
+    using_session(:dana) { visit admin_tags_path }
+    assert_no_selector group, wait: LIVE
+    assert_equal true, page.evaluate_script("document.activeElement === document.body")
   end
 
   test "the media panel shows who has the image open, between the name and the close, and nobody once they close it" do
@@ -239,23 +318,27 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/media?selected=#{asset.id}"
     await_notes_live
     assert_selector "#media-panel turbo-frame#presence-media-#{asset.id}", visible: :all
-    assert_no_selector "#media-panel [role=group]"
+    assert_no_selector "#media-panel .admin-presence button"
     alone = page.evaluate_script("document.querySelector('#media-panel a[aria-label=\"Close panel\"]').getBoundingClientRect().left - document.querySelector('#media-panel-title').getBoundingClientRect().right")
     assert_equal 12, alone, "with nobody else the close is not 12px after the name"
 
     join(:dana, @dana, path: "/cs-studio/media?selected=#{asset.id}") { assert_selector "#media-panel [data-presence-user='#{@me.id}']", wait: LIVE }
 
-    assert_selector "#media-panel [role=group][aria-label='Also open by 1 person'] > [data-presence-user='#{@dana.id}'][aria-label='Dana Weiss · here']", wait: LIVE
+    assert_selector "#media-panel .admin-presence button[aria-label='Also open by 1 person: Dana Weiss, here'] > [data-presence-user='#{@dana.id}']", wait: LIVE
     row = page.evaluate_script(<<~JS)
       (() => {
         const box = (selector) => document.querySelector(`#media-panel ${selector}`).getBoundingClientRect()
         const [ name, people, circle, close ] = [ box("#media-panel-title"), box("[data-controller~='admin--presence--record']"), box("[data-presence-user] > span"), box("a[aria-label='Close panel']") ]
         const title = document.querySelector("#media-panel-title")
+        const ring = getComputedStyle(document.querySelector("#media-panel [data-presence-user] > span")).boxShadow
+        const surface = getComputedStyle(document.querySelector("#media-panel").parentElement.closest(".bg-surface")).backgroundColor
         return { circle: circle.width, afterName: people.left - name.right, beforeClose: close.left - people.right, cut: title.scrollWidth > title.clientWidth,
-                 oneLine: name.height < 40, closeLast: close.right > people.right, whole: title.firstElementChild.title }
+                 oneLine: name.height, centred: (circle.top + circle.height / 2) - (name.top + name.height / 2), closeLast: close.right > people.right,
+                 whole: title.firstElementChild.title, ringOnSurface: ring.includes(surface) }
       })()
     JS
-    assert_equal({ "circle" => 20, "afterName" => 8, "beforeClose" => 12, "cut" => true, "oneLine" => true, "closeLast" => true, "whole" => asset.title }, row)
+    # 20px circles, centred on the name's one line of 28px (handoff 24).
+    assert_equal({ "circle" => 20, "afterName" => 8, "beforeClose" => 12, "cut" => true, "oneLine" => 28, "centred" => 0, "closeLast" => true, "whole" => asset.title, "ringOnSurface" => true }, row)
 
     # Closing the panel takes its element out of the page: that is leaving.
     using_session(:dana) do
@@ -274,58 +357,190 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     join(:reader, @reader)
     assert_selector circle(@reader), wait: LIVE
     # Wide: both, and no "+N".
-    assert_selector ".admin-editor-header [role=group] > [data-presence-user]", count: 2
-    assert_no_selector ".admin-editor-header [role=group] button"
+    assert_selector "#{group} > [data-presence-user]", count: 2
+    assert_no_selector "#{group} [data-presence-more]"
 
     page.current_window.resize_to(900, 900)
-    assert_selector ".admin-editor-header [role=group] > [data-presence-user]", count: 1
+    assert_selector "#{group} > [data-presence-user]", count: 1
     assert_selector circle(@dana)
-    assert_selector ".admin-editor-header [role=group] button", text: "+1", exact_text: true
+    assert_selector "#{group} [data-presence-more=narrow]", text: "+1", exact_text: true
     more = page.evaluate_script(<<~JS)
       (() => {
-        const [ circle, button ] = [ "[data-presence-user] > span", "button" ].map((selector) => document.querySelector(`.admin-editor-header [role=group] ${selector}`).getBoundingClientRect())
-        return { width: button.width, height: button.height, overlapped: button.left < circle.right }
+        const group = document.querySelector(#{group.to_json})
+        const [ circle, count ] = [ group.querySelector("[data-presence-user] > span"), group.querySelector("[data-presence-more]").parentElement ]
+        const [ a, b ] = [ circle.getBoundingClientRect(), count.getBoundingClientRect() ]
+        const paper = getComputedStyle(document.querySelector(".admin-editor-header")).backgroundColor
+        return { width: b.width, height: b.height, after: b.left - a.right, unfilled: getComputedStyle(count).backgroundColor === paper }
       })()
     JS
-    assert_equal({ "width" => 24, "height" => 24, "overlapped" => false }, more)
+    # A circle of the same size with no fill, 4px after the last person (20).
+    assert_equal({ "width" => 24, "height" => 24, "after" => 4, "unfilled" => true }, more)
 
-    # "+N" opens the list of everyone, in the same order (6); a redraw under
-    # the open list leaves it open; Escape closes it.
-    find(".admin-editor-header [role=group] button").click
-    assert_selector ".admin-editor-header [role=list] [role=listitem]", count: 2
+    # Hovering "+N" shows the list of everyone, in the same order (6), and
+    # leaves the focus where it was; a redraw under the open list leaves it
+    # open; it goes when the pointer does.
+    find("#{group} [data-presence-more=narrow]").hover
+    assert_selector "#{list} [role=listitem]", count: 2
+    assert_equal true, page.evaluate_script("document.activeElement === document.body")
     assert_equal [ [ "Dana Weiss", "here" ], [ "reader", "here" ] ],
-      all(".admin-editor-header [role=list] [data-presence-listed]").map { |row| [ row.find("[data-presence-name]").text, row.find("[data-presence-status]").text ] }
+      all("#{list} [data-presence-listed]").map { |row| [ row.find("[data-presence-name]").text, row.find("[data-presence-status]").text ] }
     using_session(:dana) { hide_document }
-    assert_selector ".admin-editor-header [role=list] [data-presence-listed='#{@dana.id}'] [data-presence-status]", text: "away 0 min", wait: LIVE
-    assert_selector ".admin-editor-header [role=group] button[aria-expanded=true]"
+    assert_selector "#{list} [data-presence-listed='#{@dana.id}'] [data-presence-status]", text: "away just now", wait: LIVE
+    assert_selector "#{group}[aria-expanded=true]"
     # Here before away: the reader is the one circle now.
     assert_selector circle(@reader)
-    find(".admin-editor-header [role=group] button").send_keys(:escape)
-    assert_no_selector ".admin-editor-header [role=list]"
-    assert_selector ".admin-editor-header [role=group] button[aria-expanded=false]"
-    # Focus opens it too, and it closes when neither the focus nor the
-    # pointer is on it any more.
-    page.driver.browser.mouse.move(x: 5, y: 5)
-    page.execute_script("document.activeElement.blur()")
-    assert_no_selector ".admin-editor-header [role=list]"
-    page.execute_script("document.querySelector('.admin-editor-header [role=group] button').focus()")
-    assert_selector ".admin-editor-header [role=list] [role=listitem]", count: 2
-    page.execute_script("document.activeElement.blur()")
-    assert_no_selector ".admin-editor-header [role=list]"
+    find(".admin-editor-header h1").hover
+    assert_no_selector list
+    assert_selector "#{group}[aria-expanded=false]"
 
-    # Below 1024px the notes are a sheet over the editor, its header too (15).
+    # Below 1024px the notes are a sheet over the editor (15): the people are
+    # not shown, and not there for a keyboard or a screen reader either.
     find("#notes-open").click
     assert_selector "#notes-drawer #notes-list"
-    covered = page.evaluate_script(<<~JS)
-      (() => {
-        const box = document.querySelector(".admin-editor-header [data-presence-user] > span").getBoundingClientRect()
-        const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
-        return Boolean(top && top.closest("#notes-drawer"))
-      })()
-    JS
-    assert covered, "a person's circle shows through the notes sheet"
+    assert_no_selector ".admin-editor-header .admin-presence"
+    assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector('.admin-editor-header .admin-presence')).display")
+    # Closed again, they are back.
+    within("#notes-drawer") { find("button", text: /Back to/).click }
+    assert_selector circle(@reader)
   ensure
     page.current_window.resize_to(*original)
+  end
+
+  # --- the tooltip (handoff 18), on the circles that are its first hosts ----
+
+  # When the bubble of `user`'s circle was shown, after the pointer came.
+  def watch_tooltips
+    page.execute_script(<<~JS)
+      window.__tips = {}
+      document.querySelectorAll(".admin-presence [data-presence-user]").forEach((host) => {
+        const id = host.dataset.presenceUser
+        window.__tips[id] = {}
+        host.addEventListener("mouseenter", () => { window.__tips[id].entered = performance.now() })
+        new MutationObserver(() => { if (!host.querySelector("[data-tooltip]").hidden) window.__tips[id].shown = performance.now() })
+          .observe(host.querySelector("[data-tooltip]"), { attributes: true, attributeFilter: [ "hidden" ] })
+      })
+    JS
+  end
+
+  def waited(user) = page.evaluate_script("window.__tips[#{user.id}].shown - window.__tips[#{user.id}].entered")
+
+  test "a circle's tooltip: after 300ms on hover, 6px under the circle and centred, at once from one circle to the next, and gone on Escape or a press" do
+    open_page
+    join(:dana, @dana)
+    join(:reader, @reader)
+    assert_selector "#{group} > [data-presence-user]", count: 2, wait: LIVE
+    await_js("document.querySelector(#{".admin-editor-header [data-controller~='admin--presence--record']".to_json}).querySelectorAll('[data-controller=\"admin--ui--tooltip\"]').length === 2")
+    await_admin_controllers
+    assert_no_selector tip(@dana)
+    watch_tooltips
+
+    find(circle(@dana)).hover
+    assert_selector tip(@dana), text: "Dana Weiss · here", exact_text: true
+    assert_operator waited(@dana), :>=, 290
+    look = page.evaluate_script(<<~JS)
+      (() => {
+        const host = document.querySelector(#{circle(@dana).to_json})
+        const [ a, b ] = [ host.getBoundingClientRect(), host.querySelector("[data-tooltip]").getBoundingClientRect() ]
+        const style = getComputedStyle(host.querySelector("[data-tooltip]"))
+        const header = getComputedStyle(document.querySelector(".admin-editor-header h1"))
+        return { below: Math.round(b.top - a.bottom), centred: Math.abs((b.left + b.width / 2) - (a.left + a.width / 2)) <= 0.5, size: style.fontSize, shadow: style.boxShadow,
+                 inverted: style.backgroundColor === header.color, padding: [ style.paddingTop, style.paddingLeft ], narrow: b.width <= 240 }
+      })()
+    JS
+    assert_equal({ "below" => 6, "centred" => true, "size" => "12px", "shadow" => "none", "inverted" => true, "padding" => %w[4px 8px], "narrow" => true }, look)
+
+    # To the next circle: at once, and one bubble at a time.
+    find(circle(@reader)).hover
+    assert_selector tip(@reader), text: "reader · here", exact_text: true
+    assert_operator waited(@reader), :<, 150
+    assert_no_selector tip(@dana)
+
+    # Escape: gone, and the focus where it was.
+    page.execute_script("document.querySelector(#{group.to_json}).focus()")
+    find(group).send_keys(:escape)
+    assert_no_selector tip(@reader)
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{group.to_json})")
+    assert_no_selector list
+
+    # A press on the circle: no bubble over the list it opens, and none until
+    # the pointer has left and come back.
+    find(".admin-editor-header h1").hover
+    find(circle(@dana)).hover
+    assert_selector tip(@dana)
+    find(circle(@dana)).click
+    assert_selector list
+    assert_no_selector tip(@dana)
+    sleep 0.6 # sleep: the tooltip's own wait is 300 ms; "it does not come back" needs that to have passed twice
+    assert_no_selector tip(@dana)
+    find(list).send_keys(:escape)
+    find(".admin-editor-header h1").hover
+    find(circle(@dana)).hover
+    assert_selector tip(@dana)
+    find(".admin-editor-header h1").hover
+    assert_no_selector tip(@dana)
+  end
+
+  test "a tooltip that would leave the box it is in lines up with its host's edge on that side" do
+    @dana.update!(name: "Dana Weiss-Hohenlohe of the Long Name")
+    asset = create_media_asset
+    visit "/cs-studio/media?selected=#{asset.id}"
+    await_notes_live
+    join(:dana, @dana, path: "/cs-studio/media?selected=#{asset.id}")
+    host = "#media-panel .admin-presence [data-presence-user='#{@dana.id}']"
+    assert_selector host, wait: LIVE
+    await_drawn(within: "#media-panel")
+    await_admin_controllers
+
+    find(host).hover
+    assert_selector "#{host} [data-tooltip][data-align=right]", text: "Dana Weiss-Hohenlohe of the Long Name · here"
+    edges = page.evaluate_script(<<~JS)
+      (() => {
+        const host = document.querySelector(#{host.to_json})
+        const [ a, b ] = [ host.getBoundingClientRect(), host.querySelector("[data-tooltip]").getBoundingClientRect() ]
+        const panel = document.querySelector("#media-panel").parentElement.getBoundingClientRect()
+        return { lined: Math.abs(b.right - a.right) <= 0.5, inside: b.left >= panel.left && b.right <= panel.right, below: Math.round(b.top - a.bottom), wide: b.width <= 240 }
+      })()
+    JS
+    assert_equal({ "lined" => true, "inside" => true, "below" => 6, "wide" => true }, edges)
+  end
+
+  # The circles take no focus, so the keyboard's half of the tooltip is shown
+  # on a host made for the test: a copy of the first circle with a tab index,
+  # put after the group (inside a button nothing is a Tab stop).
+  test "a tooltip's host that takes the focus shows it at once for the keyboard, and Escape hides it with the focus still there" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana), wait: LIVE
+    await_drawn
+    page.execute_script(<<~JS)
+      const host = document.querySelector(#{circle(@dana).to_json}).cloneNode(true)
+      host.id = "focus-host"
+      host.tabIndex = 0
+      host.removeAttribute("data-presence-user")
+      document.querySelector(".admin-editor-header .admin-presence").append(host)
+      window.__shown = null
+      new MutationObserver(() => { if (!host.querySelector("[data-tooltip]").hidden) window.__shown = performance.now() })
+        .observe(host.querySelector("[data-tooltip]"), { attributes: true, attributeFilter: [ "hidden" ] })
+    JS
+    await_admin_controllers
+    assert_no_selector "#focus-host [data-tooltip]"
+
+    # By the keyboard: Tab from the group's button lands on it.
+    page.execute_script("document.querySelector(#{group.to_json}).focus(); window.__at = performance.now()")
+    find(group).send_keys(:tab)
+    assert_selector "#focus-host [data-tooltip]", text: "Dana Weiss · here", exact_text: true
+    assert_equal true, page.evaluate_script("document.activeElement.id === 'focus-host'")
+    assert_operator page.evaluate_script("window.__shown - window.__at"), :<, 250, "the keyboard waited for its tooltip as the pointer does"
+    find("#focus-host").send_keys(:escape)
+    assert_no_selector "#focus-host [data-tooltip]"
+    assert_equal true, page.evaluate_script("document.activeElement.id === 'focus-host'")
+
+    # Away and back: shown again; and it goes with the focus.
+    find("#focus-host").send_keys([ :shift, :tab ])
+    find(group).send_keys(:tab)
+    assert_selector "#focus-host [data-tooltip]"
+    find("#focus-host").send_keys([ :shift, :tab ])
+    assert_no_selector "#focus-host [data-tooltip]"
   end
 
   # Presence is not content: nothing a save reads or sends is touched, no
@@ -431,7 +646,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     # part as the server draws it.
     result = page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
-      import("notes/live_state").then(({ report, settle }) => {
+      import("live/state").then(({ report, settle }) => {
         const body = document.createElement("body")
         body.innerHTML = '<div data-live-part="waiting"></div>'
         const states = []
@@ -459,7 +674,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
       part.id = "refused-part"
       document.querySelector(".admin-editor-header").append(part)
     JS
-    assert_selector "#refused-part[data-live-part=answered]", visible: :all, wait: LIVE
+    assert_selector "#refused-part[data-live-part=answered][data-presence-gone=true]", visible: :all, wait: LIVE
     await_notes_live
     page.execute_script("document.querySelector('#refused-part').remove()")
     await_notes_live
@@ -473,7 +688,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     open_page
     join(:dana, @dana)
     join(:reader, @reader)
-    assert_selector ".admin-editor-header [role=group] > [data-presence-user]", count: 2, wait: LIVE
+    assert_selector "#{group} > [data-presence-user]", count: 2, wait: LIVE
     page.execute_script(<<~JS)
       window.__rendered = []
       document.addEventListener("turbo:render", () => window.__rendered.push(document.querySelectorAll(".admin-editor-header [data-presence-user]").length))
@@ -514,5 +729,114 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
     assert_eventually(message: "a closing tab left a row behind: #{marks(@dana).pluck(:state)}") { marks(@dana).none? }
     assert_no_selector circle(@dana), wait: LIVE
+  end
+
+  # --- going and coming back (the review's I2) ------------------------------
+
+  # A page the browser keeps for its Back button, and brings back: `pagehide`
+  # ends the subscription at once, `pageshow` takes it up again and says how
+  # the tab is.
+  test "a page that is hidden away by the browser leaves at once, and is back when it is shown again" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana, "here"), wait: LIVE
+    token = marks(@dana).sole.token
+
+    using_session(:dana) { page.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))") }
+    assert_no_selector circle(@dana), wait: LIVE
+    assert_eventually(message: "the row of a page that went stayed") { marks(@dana).none? }
+
+    using_session(:dana) do
+      page.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))")
+      await_notes_live
+      assert_selector circle(@me, "here"), wait: LIVE
+    end
+    assert_selector circle(@dana, "here"), wait: LIVE
+    assert_not_equal token, marks(@dana).sole.token
+    assert_equal "here", marks(@dana).sole.state
+  end
+
+  # "Leave site?" answered with Stay: the page asked, nothing was unloaded,
+  # and the person who stays is still there for everyone. It holds because
+  # leaving is heard at `pagehide` and not at `beforeunload`.
+  test "a leave that is asked about and not taken changes nothing: still subscribed, still shown" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana, "here"), wait: LIVE
+    row = marks(@dana).sole.attributes.slice("id", "token", "state")
+
+    using_session(:dana) do
+      # The question itself, asked and answered with Stay: a `beforeunload`
+      # that is cancelled, as the leave guard cancels one over unsaved work
+      # (`autosave_unload_test.rb`: the browser's dialog cannot be driven).
+      page.execute_script(<<~JS)
+        window.__asked = []
+        for (let turn = 0; turn < 3; turn++) {
+          const event = new Event("beforeunload", { cancelable: true })
+          event.preventDefault()
+          window.dispatchEvent(event)
+          window.__asked.push(event.defaultPrevented)
+        }
+      JS
+      assert_equal [ true, true, true ], page.evaluate_script("window.__asked")
+      await_frames
+      assert_equal "connected", page.evaluate_script("document.body.dataset.notesLive")
+      assert_selector circle(@me, "here")
+    end
+
+    await_frames
+    assert_selector circle(@dana, "here")
+    assert_equal row, marks(@dana).sole.attributes.slice("id", "token", "state")
+  end
+
+  # A Turbo visit to the same record's screen replaces the page, and the part
+  # with it; the subscription is kept (let go a task later, asked for again
+  # in between), so the server sees no leave and no arrival.
+  test "a Turbo visit to the same record keeps the tab's row and makes nobody appear to leave" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana, "here"), wait: LIVE
+    await_drawn
+    row = marks(@dana).sole.attributes.slice("id", "token", "arrived_at")
+    page.execute_script(<<~JS)
+      window.__drawings = 0
+      new MutationObserver(() => { window.__drawings += 1 }).observe(document.querySelector(".admin-editor-header turbo-frame"), { childList: true })
+    JS
+
+    using_session(:dana) do
+      turbo_visit "/cs-studio/pages/#{@page.id}?locale=de"
+      await_notes_live
+      assert_selector circle(@me, "here"), wait: LIVE
+      turbo_visit "/cs-studio/pages/#{@page.id}"
+      await_notes_live
+      assert_selector circle(@me, "here"), wait: LIVE
+    end
+
+    sleep 1 # sleep: a signal would be held for half a second before the frame is read; "not drawn again" needs that to have passed
+    assert_equal row, marks(@dana).sole.attributes.slice("id", "token", "arrived_at")
+    assert_equal "here", marks(@dana).sole.state
+    assert_equal 0, page.evaluate_script("window.__drawings"), "the other person's frame was drawn again: someone seemed to leave or arrive"
+    assert_selector circle(@dana, "here")
+  end
+
+  # --- a record that is gone for the viewer (the review's M2) ---------------
+
+  test "when the record goes to the trash the part stops: nobody is shown, nothing is asked any more, and the tab has left" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana, "here"), wait: LIVE
+    using_session(:dana) { assert_selector circle(@me, "here"), wait: LIVE }
+    set_timing("refresh", 150)
+
+    @page.update_columns(trashed_at: Time.current) # version: none (a system test puts its own page in the trash, around the service, to see a 404)
+    assert_selector ".admin-editor-header [data-controller~='admin--presence--record'][data-presence-gone=true][data-live-part=answered]", visible: :all, wait: LIVE
+    assert_no_selector group
+    assert_eventually(message: "the tab that can no longer read the record kept its row") { marks(@me).none? }
+
+    # No more reads: the shortened timer would have asked several times.
+    asked = page.evaluate_script("performance.getEntriesByType('resource').filter((each) => each.name.includes('/presence/page/')).length")
+    sleep 1 # sleep: the shortened timer would have asked six times in a second; "asks no more" needs that time to pass
+    assert_equal asked, page.evaluate_script("performance.getEntriesByType('resource').filter((each) => each.name.includes('/presence/page/')).length")
+    assert_equal "connected", page.evaluate_script("document.body.dataset.notesLive")
   end
 end

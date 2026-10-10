@@ -21,9 +21,14 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
     assert_no_selector ".bg-sunken, .border-line-strong, .text-ink"
   end
 
-  test "a paper ring, for circles that overlap" do
-    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: true))
+  test "a ring in the colour of what the circles stand on, for circles that overlap" do
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: :paper))
     assert_selector "span.ring-2.ring-paper"
+
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, ring: :surface))
+    assert_selector "span.ring-2.ring-surface"
+    assert_no_selector ".ring-paper"
+    assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: :pink) }
   end
 
   test "an unknown size or tone is refused" do

@@ -1,30 +1,29 @@
 <% frame = capture do %>
-  <%= tag.turbo_frame id: frame_id, class: "block", data: { "admin--presence--record-target": "frame" } do %>
+  <%= tag.turbo_frame id: frame_id, class: "flex items-center", data: { "admin--presence--record-target": "frame" } do %>
     <% if people.any? %>
-      <div role="group" aria-label="<%= group_label %>" class="flex items-center">
+      <% group = capture do %>
         <% circles.each_with_index do |person, index| %>
-          <%= tag.span class: circle_class(index), tabindex: 0, role: "img", aria: { label: person.label }, data: { presence_user: person.user.id, presence_state: person.state } do %>
-            <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: avatar_size, tone: tone(person), ring: true) %><%= render Admin::Ui::TooltipComponent.new(text: person.label, align: hang) %>
+          <%= tag.span class: circle_class(index), data: circle_data(person) do %>
+            <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: avatar_size, tone: tone(person), ring: ground) %><%= render Admin::Ui::TooltipComponent.new(text: person.label) %>
           <% end %>
         <% end %>
         <% if more? %>
-          <%= tag.span class: more_class do %>
-            <%= render Admin::Ui::MenuComponent.new(label: more_label, list: true, align: hang, button_class: more_button_class) do |menu| %>
-              <% people.each do |person| %>
-                <% menu.with_item do %>
-                  <%= tag.div class: "flex items-center gap-2 px-2 py-1", data: { presence_listed: person.user.id } do %>
-                    <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: :md, tone: tone(person)) %>
-                    <span class="min-w-0">
-                      <span class="block max-w-56 truncate text-sm text-ink" data-presence-name><%= person.name %></span>
-                      <span class="block text-xs text-meta" data-presence-status><%= person.status %></span>
-                    </span>
-                  <% end %>
-                <% end %>
-              <% end %>
+          <%= tag.span more_label, class: more_class, data: { action: "mouseenter->admin--ui--menu#reveal" } %>
+        <% end %>
+      <% end %>
+      <%= render Admin::Ui::MenuComponent.new(label: group, aria_label: group_label, list: true, list_label: list_label, align: hang, button_class: group_class) do |menu| %>
+        <% people.each do |person| %>
+          <% menu.with_item do %>
+            <%= tag.div class: "flex items-center gap-2 px-2 py-1.5", data: { presence_listed: person.user.id } do %>
+              <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: :md, tone: tone(person)) %>
+              <span class="min-w-0">
+                <span class="block max-w-56 truncate text-sm text-ink" data-presence-name><%= person.name %></span>
+                <span class="block text-xs text-meta" data-presence-status><%= person.status %></span>
+              </span>
             <% end %>
           <% end %>
         <% end %>
-      </div>
+      <% end %>
     <% end %>
   <% end %>
 <% end %>

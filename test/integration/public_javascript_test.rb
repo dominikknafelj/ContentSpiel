@@ -41,7 +41,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     # `live/connection` and `notes/merge` among them: pinned `preload: "admin"`,
     # they are part of what every CS Studio screen runs (the notes' two
     # controllers on <body> import them), not a late import.
-    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema prosemirror-model live/connection notes/merge].each do |name|
+    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema prosemirror-model live/connection live/state notes/merge].each do |name|
       assert preloads.any? { |href| href.include?(name) }, "expected #{name} to be modulepreloaded in CS Studio: #{preloads.inspect}"
     end
     assert_includes entry_point_script, %(import "admin")

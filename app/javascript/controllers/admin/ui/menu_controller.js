@@ -3,8 +3,10 @@ import { Controller } from "@hotwired/stimulus"
 // A popover menu (Admin::Ui::MenuComponent). The button toggles the panel;
 // opening focuses the first item, ArrowDown/ArrowUp move between the panel's
 // links and buttons, Escape closes and hands focus back to the button, and a
-// click anywhere outside closes it. A list panel also opens on hover and
-// focus (`leave`).
+// click anywhere outside closes it. A LIST panel (`list: true`) has nothing
+// to pick: pressing its button moves the focus into the list as a whole
+// (`enter`), something inside the button may show it on hover (`reveal`),
+// and it closes when neither the pointer nor the focus is on it (`leave`).
 export default class extends Controller {
   static targets = [ "button", "panel" ]
 
@@ -42,6 +44,7 @@ export default class extends Controller {
   }
 
   close({ refocus = false } = {}) {
+    this.entered = false
     this.panelTarget.hidden = true
     this.buttonTarget.setAttribute("aria-expanded", "false")
     if (refocus) this.buttonTarget.focus()
@@ -55,8 +58,25 @@ export default class extends Controller {
     if (item && this.panelTarget.contains(item) && !item.disabled) this.close()
   }
 
-  // A list panel (`list: true`), which hover and focus open: the pointer or
-  // the focus has left. It closes when NEITHER is on it any more -- a
+  // A list panel, shown and nothing else: the focus stays where it is.
+  reveal() {
+    this.panelTarget.hidden = false
+    this.buttonTarget.setAttribute("aria-expanded", "true")
+  }
+
+  // A list panel's button, pressed: the list is shown and takes the focus,
+  // so a screen reader reads it through; pressed again while the list has
+  // the focus, it closes and the button has the focus back.
+  // (`entered`: the press itself takes the focus out of the list, so where
+  // the focus is by then says nothing.)
+  enter() {
+    if (this.open && this.entered) return this.close({ refocus: true })
+    this.reveal()
+    this.entered = true
+    this.panelTarget.focus()
+  }
+
+  // A list panel: the pointer or the focus has left. It closes when NEITHER is on it any more -- a
   // keyboard user's list does not go because the mouse moved, nor a mouse
   // user's because the focus went elsewhere.
   leave(event) {

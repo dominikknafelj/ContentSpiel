@@ -1,5 +1,5 @@
-# The strings of `app/components/admin/presence_screen/` (presence handoff 7
-# and 8: the wording is the designer's).
+# The strings of `app/components/admin/presence_screen/` (presence handoff 7,
+# 8, 21 to 23 and 26: the wording is the designer's).
 en:
   admin:
     components:
@@ -8,8 +8,16 @@ en:
           group:
             one: "Also open by 1 person"
             other: "Also open by %{count} people"
+          group_label: "%{summary}: %{people}"
+          person: "%{name}, %{status}"
+          separator: "; "
+          more_people:
+            one: "1 more person"
+            other: "%{count} more people"
+          everyone: "Everyone with this open"
           label: "%{name} · %{status}"
           here: "here"
+          away_now: "away just now"
           away:
             one: "away %{count} min"
             other: "away %{count} min"
