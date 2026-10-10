@@ -20,6 +20,9 @@ module Notes
   # a tab made up, never a sentence -- and checked here as well as where the
   # header is read: this is the last place before it leaves.
   #
+  # THE SENDING is `Live::Signals`' (the one sender, which refuses a payload
+  # that could carry text); this module decides what notes says and to whom.
+  #
   # AFTER COMMIT. Each is called from inside a service's transaction and sent
   # once every transaction open at that moment has committed
   # (`ActiveRecord.after_all_transactions_commit`): a service's own
@@ -40,7 +43,7 @@ module Notes
   # behind it in the same commit -- a deferred `PublicSite.bump_version!`
   # among them, when the signal is `Notes::Remove`'s inside a purge.
   module Signals
-    TAB = /\A[a-z0-9-]{8,40}\z/
+    TAB = Live::Signals::TAB
 
     module_function
 
@@ -67,16 +70,8 @@ module Notes
       later(record_stream(container_type, container_id), { kind: "threads", thread_id: thread_id, origin: origin }.compact)
     end
 
-    def origin = Current.notes_tab.to_s[TAB]
+    def origin = Live::Signals.origin
 
-    def later(stream, payload)
-      ActiveRecord.after_all_transactions_commit do
-        ActionCable.server.broadcast(stream, payload)
-      rescue StandardError => error
-        Rails.logger.warn("Notes signal not sent (#{payload[:kind]}): #{error.class}")
-        Rails.error.report(error, handled: true)
-      end
-      nil
-    end
+    def later(stream, payload) = Live::Signals.later(stream, payload)
   end
 end

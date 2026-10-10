@@ -193,13 +193,20 @@ class Notes::SignalsTest < ActiveSupport::TestCase
   # The guard above looks at the notes services. Nothing else in the app may
   # broadcast at all: whatever is pushed goes through `Notes::Signals`, where
   # the payload is built.
-  test "nothing in the app broadcasts but Notes::Signals" do
+  test "nothing in the app broadcasts but Live::Signals, and only a ...::Signals module calls it" do
     pattern = /\.broadcast\b|broadcast_to|broadcasts?_(to|refresh|append|prepend|replace|update|remove|render|action)|turbo_stream_from/
     found = Dir[Rails.root.join("app/**/*.{rb,erb}")].select do |file|
       File.readlines(file).any? { |line| !line.strip.start_with?("#") && line.match?(pattern) }
     end
 
-    assert_equal [ "app/models/notes/signals.rb" ], found.map { |file| Pathname(file).relative_path_from(Rails.root).to_s }
+    assert_equal [ "app/models/live/signals.rb" ], found.map { |file| Pathname(file).relative_path_from(Rails.root).to_s }
+
+    callers = Dir[Rails.root.join("app/**/*.rb")].select do |file|
+      File.readlines(file).any? { |line| !line.strip.start_with?("#") && line.match?(/Live::Signals\.later\b/) }
+    end
+    callers.each do |file|
+      assert_match(/^\s*module \w+::Signals\b|^\s*module Signals\b/, File.read(file), "#{file} calls Live::Signals.later but is not a Signals module") unless file.end_with?("app/models/live/signals.rb")
+    end
   end
 
   test "a new note signals its record and the person it mentions" do
@@ -485,8 +492,8 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     assert_equal [ "the cable is down" ] * 2, reported
     # The log says that it happened and to which kind, never what the error
     # said (a driver's message can quote what it was sending) nor a payload.
-    lines = log.string.lines.grep(/Notes signal not sent/)
-    assert_equal [ "Notes signal not sent (delivery): IOError", "Notes signal not sent (threads): IOError" ], lines.map(&:strip)
+    lines = log.string.lines.grep(/Live signal not sent/)
+    assert_equal [ "Live signal not sent (delivery): IOError", "Live signal not sent (threads): IOError" ], lines.map(&:strip)
     assert_no_match(/cable is down|thread_id|delivery_id|\d/, lines.join)
     assert after_signals, "a failed signal stopped the callbacks queued behind it"
   ensure
