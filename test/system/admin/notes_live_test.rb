@@ -273,24 +273,42 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_equal 1, page.evaluate_script("window.__threadFetches")
   end
 
+  # The reader stands at 40, neither the top nor the bottom: at 0 a scroller
+  # that was replaced and never put back would pass for one that was kept.
+  # And where they stand is also noted in the very turn of the refresh (an
+  # observer of the view's own parts, which runs as the redraw ends), so
+  # nothing that scrolls the thread a moment later can pass for the refresh.
   test "a reader who is not at the bottom is not moved: a button says what arrived and leads there" do
     as(users(:two)) { 2.times { |index| Notes::Reply.call(@thread, body: ([ "A long line #{index}" ] * 40).join("\n")) } }
     open_thread
-    page.execute_script("document.querySelector('#notes-drawer [data-note-scroll]').scrollTop = 0")
-    assert_equal 0, drawer_scroll
+    page.execute_script("document.querySelector('#notes-drawer [data-note-scroll]').scrollTop = 40")
+    assert_equal 40, drawer_scroll
+    room = page.evaluate_script("(() => { const s = document.querySelector('#notes-drawer [data-note-scroll]'); return s.scrollHeight - s.scrollTop - s.clientHeight })()")
+    assert_operator room, :>, 100, "the thread is too short for this test to say anything"
+    page.execute_script(<<~JS)
+      window.__tops = []
+      new MutationObserver(() => window.__tops.push(document.querySelector('#notes-drawer [data-note-scroll]').scrollTop))
+        .observe(document.querySelector('#notes-drawer [data-notes-view=thread]'), { childList: true })
+    JS
 
-    reply_as_dana("Down here")
+    # Long ones: with more than three messages the older ones are folded
+    # away, and a thread of short replies would then be too short to scroll,
+    # which puts any reader at 0.
+    reply_as_dana(([ "Down here" ] * 40).join("\n"))
 
     assert_selector "#note-thread-#{@thread.id}-reply button[data-note-jump]", text: "1 new message ↓", wait: LIVE
-    assert_equal 0, drawer_scroll
+    assert_equal 40, drawer_scroll
+    assert_equal [ 40 ], page.evaluate_script("window.__tops").uniq, "the reader was moved while the thread was drawn again"
     assert_selector "[data-note-new-divider] + [data-note-message]", text: "Down here", visible: :all
     # 12px above the reply field's dock, which is fixed at the bottom.
     gap = page.evaluate_script("document.querySelector('#note-thread-#{@thread.id}-reply').getBoundingClientRect().top - document.querySelector('[data-note-jump]').getBoundingClientRect().bottom")
     assert_in_delta 12, gap, 0.5
 
-    reply_as_dana("And here")
+    reply_as_dana(([ "And here" ] * 40).join("\n"))
     assert_selector "button[data-note-jump]", text: "2 new messages ↓", count: 1, wait: LIVE
-    assert_equal 0, drawer_scroll
+    assert_equal 40, drawer_scroll
+    assert_equal [ 40 ], page.evaluate_script("window.__tops").uniq
+    assert_operator page.evaluate_script("window.__tops.length"), :>=, 2, "the observer saw no second redraw"
     assert_selector "[data-note-new-divider]", count: 1
 
     find("button[data-note-jump]").click
