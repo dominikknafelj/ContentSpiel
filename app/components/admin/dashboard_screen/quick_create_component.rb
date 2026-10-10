@@ -6,7 +6,7 @@ module Admin
     # "Page" when they may create pages; choosing Page and submitting opens
     # the New page dialog with the typed title carried over (Inside = Home,
     # the dialog's own default) instead of creating anything here
-    # (`admin--quick-create`, which clicks the hidden "New page" trigger, a
+    # (`admin--dashboard--quick-create`, which clicks the hidden "New page" trigger, a
     # real link to the standalone New page screen -- also where a submit
     # lands without JS: `Admin::DashboardController#create_draft` redirects
     # a "page" there). "New page" and "Upload image" are gone from the bar:
