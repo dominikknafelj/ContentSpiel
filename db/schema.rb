@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -325,6 +325,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
     t.index ["updated_at"], name: "index_posts_on_updated_at"
   end
 
+  create_table "presence_marks", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.string "tab", null: false
+    t.string "state", default: "here", null: false
+    t.datetime "seen_at", null: false
+    t.datetime "arrived_at", null: false
+    t.index ["record_type", "record_id", "seen_at"], name: "index_presence_marks_on_record_and_seen_at"
+    t.index ["user_id", "record_type", "record_id", "tab"], name: "index_presence_marks_on_user_record_tab", unique: true
+    t.check_constraint "state::text = ANY (ARRAY['here'::character varying, 'away'::character varying]::text[])", name: "presence_marks_state_known"
+  end
+
   create_table "public_paths", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.boolean "current", default: true, null: false
@@ -437,5 +450,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
   add_foreign_key "post_tags", "tags"
   add_foreign_key "posts", "users", column: "author_id", on_delete: :nullify
   add_foreign_key "posts", "users", column: "trashed_by_id", on_delete: :nullify
+  add_foreign_key "presence_marks", "users", on_delete: :cascade
   add_foreign_key "sessions", "users"
 end

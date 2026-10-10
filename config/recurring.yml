@@ -21,6 +21,10 @@ production:
     class: PublicSite::SyncWentLiveJob
     queue: default
     schedule: every 5 minutes
+  presence_sweep:
+    class: Presence::Sweep
+    queue: default
+    schedule: every minute
 
 development:
   trash_purge_expired:

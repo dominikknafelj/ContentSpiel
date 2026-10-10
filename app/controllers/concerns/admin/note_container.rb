@@ -11,6 +11,7 @@ module Admin
   # (`render_list`) and one thread (`render_thread`), which replaces it.
   module NoteContainer
     extend ActiveSupport::Concern
+    include Admin::RecordOfKind
 
     included do
       before_action :set_container
@@ -22,14 +23,7 @@ module Admin
     private
 
     def set_container
-      kind = RecordKinds.named(params[:container_type]) or raise ActiveRecord::RecordNotFound
-      # Rights that are per record make every nil a 404. A kind whose right
-      # opens every record (the library: `media.upload`) is a 403 for someone
-      # without it, as `Admin::MediaController`'s gate is; that says nothing
-      # of any one record (`RecordKinds::Kind#scoped`).
-      return forbidden! if !kind.scoped && !can?(kind.read)
-
-      @container = kind.find(Current.actor, params[:container_id], channel: Current.channel) or raise ActiveRecord::RecordNotFound
+      @container = record_of_kind(params[:container_type], params[:container_id])
     end
 
     # Which tab this is (`X-Notes-Tab`, set by `admin--notes--live` on its

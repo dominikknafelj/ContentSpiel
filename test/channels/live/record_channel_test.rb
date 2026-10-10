@@ -128,9 +128,10 @@ class Live::RecordChannelTest < ActionCable::Channel::TestCase
 
   test "no channel under app/channels that descends from Live::RecordChannel offers an action it does not mean to" do
     Rails.application.eager_load!
-    meant = { "Notes::RecordChannel" => [] }
+    meant = { "Notes::RecordChannel" => [], "Presence::Channel" => %w[beat report] }
     subclasses = Live::RecordChannel.descendants.reject { |klass| klass.name.nil? || klass.name.start_with?("Live::RecordChannelTest") }
     assert_includes subclasses.map(&:name), "Notes::RecordChannel"
+    assert_includes subclasses.map(&:name), "Presence::Channel"
     subclasses.each do |klass|
       assert_equal meant.fetch(klass.name, []).sort, klass.action_methods.to_a.sort, "#{klass.name} offers a client an action it does not mean to"
     end
