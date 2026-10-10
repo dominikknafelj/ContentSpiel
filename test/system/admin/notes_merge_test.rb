@@ -172,10 +172,12 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
   end
 
   # Where the thread's messages stand is read in the same task as the merge,
-  # before anything else of the page can run. Read a moment later, a reader at
-  # the bottom was found at the bottom even with the merge's own line taken
-  # out (seen when this test was written; what else puts them there was not
-  # looked for), and that must not pass for the merge's doing.
+  # before anything else of the page can run. And every reply is a long one:
+  # with more than three messages the older ones are folded away, and a thread
+  # of short replies is then too short to scroll at all -- any reader is at
+  # the top and at the bottom at once, and both halves of this test would
+  # pass with the merge's own line taken out (the second half did, when this
+  # test was first written with short replies).
   test "a message someone else added appears, and the reader's scroll position holds unless they were at the bottom" do
     as(users(:two)) { 2.times { |index| Notes::Reply.call(@thread, body: ([ "A long line #{index}" ] * 40).join("\n")) } }
     open_thread
@@ -183,13 +185,14 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
       (merge, view, answer, t) => {
         merge.mergeThread(view, answer, { t })
         const scroller = view.querySelector("[data-note-scroll]")
-        return { top: scroller.scrollTop, toBottom: scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight }
+        return { top: scroller.scrollTop, toBottom: scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight, room: scroller.scrollHeight - scroller.clientHeight }
       }
     JS
+    long = ->(words) { ([ words ] * 40).join("\n") }
     page.execute_script("document.querySelector('#notes-drawer [data-note-scroll]').scrollTop = 40")
     assert_equal 40, scroll["top"]
     assert_operator scroll["toBottom"], :>, 100, "the thread is too short for this test to say anything"
-    reply_as_dana("Down here")
+    reply_as_dana(long.call("Down here"))
 
     after = merging(measured)
 
@@ -200,11 +203,12 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
 
     page.execute_script("(() => { const s = document.querySelector('#notes-drawer [data-note-scroll]'); s.scrollTop = s.scrollHeight })()")
     assert_operator scroll["toBottom"], :<, 2
-    reply_as_dana("And here")
+    reply_as_dana(long.call("And here"))
 
     after = merging(measured)
 
     assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "And here"
+    assert_operator after["room"], :>, 100, "the thread no longer scrolls, so this says nothing"
     assert_operator after["toBottom"], :<, 2, "a reader at the bottom did not stay there"
     assert_no_selector "button[data-note-jump]"
   end
@@ -228,9 +232,16 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-list #notes-new", count: 1
   end
 
+  # With a message being worked in: that is the path where a second merge
+  # could do harm (the kept message put into the copy once more, doubled or
+  # sent to the end), and markup alone shows neither which element it is nor
+  # what its field holds.
   test "merging the same answer twice changes nothing the second time" do
     open_thread
+    menu(@first, "Edit")
+    find(field(@first)).send_keys(", changed")
     find(reply_field).send_keys("Half a thou")
+    page.execute_script("window.__message = document.querySelector('#note-message-#{@first.id}'); window.__field = document.querySelector(#{field(@first).to_json})")
     reply_as_dana("Meanwhile")
 
     drawn = merging(<<~JS)
@@ -244,6 +255,90 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
 
     assert_includes drawn["once"], "Meanwhile"
     assert_equal drawn["once"], drawn["twice"]
+    assert_equal "Half a thou", find(reply_field).value
+    assert_equal true, page.evaluate_script("window.__message === document.querySelector('#note-message-#{@first.id}')")
+    assert_equal true, page.evaluate_script("window.__field === document.querySelector(#{field(@first).to_json})")
+    assert_selector "#note-message-#{@first.id}", count: 1, visible: :all
+    assert_selector "[data-note-message]", text: "Meanwhile", count: 1
+    assert_equal "My first, changed", find(field(@first)).value
+    assert_equal "My first", page.evaluate_script("window.__field.defaultValue")
+    assert_selector "[data-note-new-divider]", count: 1, visible: :all
+  end
+
+  # Two refreshes in a row, each with a message from someone else, while an
+  # edit is open with the caret in the middle of its text: everything of the
+  # edit is what it was after each, and "NEW" stands once, where it first stood.
+  test "an open edit is the same element, with its text, baseline, caret and the focus, across two merges that each bring a message" do
+    open_thread
+    menu(@first, "Edit")
+    find(field(@first)).send_keys(", changed")
+    page.execute_script("window.__message = document.querySelector('#note-message-#{@first.id}'); window.__field = document.querySelector(#{field(@first).to_json}); window.__field.setSelectionRange(3, 8, 'backward')")
+    edit = -> do
+      page.evaluate_script(<<~JS)
+        ({ message: window.__message === document.querySelector('#note-message-#{@first.id}'), field: window.__field === document.querySelector(#{field(@first).to_json}),
+           connected: window.__field.isConnected, value: window.__field.value, baseline: window.__field.defaultValue,
+           caret: [ window.__field.selectionStart, window.__field.selectionEnd, window.__field.selectionDirection ], focused: document.activeElement === window.__field,
+           copies: document.querySelectorAll('#note-message-#{@first.id}').length, dividers: document.querySelectorAll('[data-note-new-divider]').length,
+           marked: document.querySelector('[data-note-new-divider]')?.nextElementSibling?.textContent.includes('One more') })
+      JS
+    end
+    kept = { "message" => true, "field" => true, "connected" => true, "value" => "My first, changed", "baseline" => "My first",
+             "caret" => [ 3, 8, "backward" ], "focused" => true, "copies" => 1, "dividers" => 1, "marked" => true }
+
+    reply_as_dana("One more")
+    assert_equal({ "gone" => false, "kept" => 1, "arrived" => 1 }, merge_thread)
+    assert_equal kept, edit.call
+
+    reply_as_dana("And another")
+    assert_equal({ "gone" => false, "kept" => 1, "arrived" => 1 }, merge_thread)
+    assert_selector "[data-note-message]", text: "And another", count: 1
+    # "NEW" is still above the first of the two.
+    assert_equal kept, edit.call
+  end
+
+  # The merge moves the messages being worked in into its copy of the answer
+  # before the copy takes the old part's place. Whatever can fail must have
+  # failed before that: a translator that throws (or one that was not handed
+  # over) leaves the view as it was, the edit in the page with its text.
+  test "a merge that cannot say NEW fails before it has moved anything: the open edit is where it was" do
+    open_thread
+    menu(@first, "Edit")
+    find(field(@first)).send_keys(", changed")
+    page.execute_script("window.__message = document.querySelector('#note-message-#{@first.id}'); window.__field = document.querySelector(#{field(@first).to_json}); window.__messages = document.querySelector('#note-thread-#{@thread.id}-messages')")
+    reply_as_dana("Meanwhile")
+
+    [ "{ t: () => { throw new Error('no such message') } }", "{}", "undefined" ].each do |options|
+      threw = merging("(merge, view, answer) => { try { merge.mergeThread(view, answer, #{options}); return null } catch (error) { return String(error) } }")
+
+      assert threw, "mergeThread(view, answer, #{options}) did not fail"
+      assert_equal true, page.evaluate_script("window.__messages.isConnected && window.__messages === document.querySelector('#note-thread-#{@thread.id}-messages')"), "the messages part was replaced (#{options})"
+      assert_equal true, page.evaluate_script("window.__field.isConnected && window.__message === document.querySelector('#note-message-#{@first.id}')"), "the edit left the page (#{options}): #{threw}"
+      assert_equal "My first, changed", find(field(@first)).value
+      assert_no_selector "[data-note-message]", text: "Meanwhile"
+    end
+
+    # And with a translator, the same answer merges.
+    assert_equal({ "gone" => false, "kept" => 1, "arrived" => 1 }, merge_thread)
+    assert_equal "My first, changed", find(field(@first)).value
+  end
+
+  # The same for a thread that is gone: the forms of the first rows are taken
+  # away only once the line that says why can be written.
+  test "a gone thread that cannot be said so keeps its rows and its typed reply" do
+    open_thread
+    find(reply_field).send_keys("Half a thou")
+    forms = page.evaluate_script("document.querySelectorAll('#notes-drawer [data-note-actions] form').length")
+    assert_operator forms, :>, 0
+
+    threw = merging("(merge, view) => { try { merge.mergeGone(view, { t: () => { throw new Error('no such message') } }); return null } catch (error) { return String(error) } }")
+
+    assert threw, "mergeGone did not fail"
+    assert_equal forms, page.evaluate_script("document.querySelectorAll('#notes-drawer [data-note-actions] form').length")
+    assert_no_selector "[data-note-gone]"
+    assert_equal "Half a thou", find(reply_field).value
+
+    assert_equal true, merging("(merge, view, answer, t) => merge.mergeGone(view, { t })")
+    assert_selector "[data-note-gone]", text: "This thread was deleted"
     assert_equal "Half a thou", find(reply_field).value
   end
 end

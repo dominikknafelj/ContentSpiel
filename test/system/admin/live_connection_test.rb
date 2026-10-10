@@ -116,6 +116,7 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
       }
     JS
     await_js("window.__told.length === 1", wait: 8)
+    live("(live, consumer) => { window.__subscription = consumer.subscriptions.subscriptions.find((each) => each.identifier.includes('RecordChannel')) }")
 
     live("(live) => live.close()")
 
@@ -126,6 +127,12 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
     # which no longer says that every subscription is answered.
     assert_equal %w[connected disconnected], page.evaluate_script("window.__told")
     assert_equal "connecting", page.evaluate_script("document.body.dataset.notesLive")
+    assert_equal false, page.evaluate_script("window.__stop.up")
+    # An answer of the server's that was still on its way when the entry was
+    # closed (here: the subscription's own callbacks, called as Action Cable
+    # calls them) reaches nobody.
+    page.execute_script("window.__subscription.connected(); window.__subscription.received({ kind: 'threads' }); window.__subscription.disconnected()")
+    assert_equal %w[connected disconnected], page.evaluate_script("window.__told")
     assert_equal false, page.evaluate_script("window.__stop.up")
 
     # Someone listens again, with the same params: a new subscription under

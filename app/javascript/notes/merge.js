@@ -47,10 +47,11 @@
 //   is switched off (`mergeGone`).
 //
 // THE ORDER INSIDE A MERGE IS LOAD-BEARING: what has the focus and where
-// the view is scrolled are noted first, the kept elements are put into the
-// answer's copy, the copy takes the old part's place, and only then are the
-// focus and the scroll position given back. An element that is moved drops
-// the focus, and a part that is replaced starts at its top.
+// the view is scrolled are noted first, whatever can fail (the translator)
+// is asked before the first element is moved, the kept elements are put
+// into the answer's copy, the copy takes the old part's place, and only then
+// are the focus and the scroll position given back. An element that is
+// moved drops the focus, and a part that is replaced starts at its top.
 //
 // WHAT IT TOUCHES. `view`, the element on screen, and `answer`, the view
 // element of the server's markup (parsed, not in the document; it is only
@@ -158,6 +159,16 @@ export function mergeThread(view, answer, { own = false, reply: sentReply = fals
   const next = document.importNode(answer.querySelector(":scope > [data-note-part='messages']"), true)
   const find = (id) => [ ...next.querySelectorAll("[data-note-message]") ].find((message) => message.dataset.noteMessage === id)
 
+  // NOTHING BELOW MAY FAIL UNTIL THE COPY HAS TAKEN THE OLD PART'S PLACE: the
+  // messages being worked in are moved into the copy next, and a throw
+  // between that and the swap would leave them, with their typed text, out
+  // of the document for good. So what can fail is done here, with nothing
+  // moved yet: the "NEW" divider is built whether or not this merge turns
+  // out to need it, since building it asks the translator, which throws for
+  // a key it does not have and is not there at all for a caller that forgot
+  // it. (After this tab's own press there is no divider, and none is built.)
+  const line = own ? null : divider(t)
+
   const arrived = [ ...next.querySelectorAll("[data-note-message]") ].filter((message) => !known.has(message.dataset.noteMessage))
   // The set of emoji that is open under a message, to be open again.
   // (Not after this tab's own press: an emoji was picked from it.)
@@ -194,7 +205,7 @@ export function mergeThread(view, answer, { own = false, reply: sentReply = fals
   const mark = own ? null : (first && find(first)) || arrived[0]
   if (mark) {
     mark.closest("details")?.setAttribute("open", "")
-    mark.before(divider(t))
+    mark.before(line)
   }
 
   // A refused Pin or Notify is cleared by the PERSON'S next action (the
@@ -257,17 +268,21 @@ export function mergeGone(view, { t } = {}) {
   const files = reply.querySelector("input[type='file']")?.files.length > 0
   if (!reply.querySelector("textarea")?.value && !files && editing.length === 0) return false
 
+  // The line that says why, written before anything is taken away: asking
+  // the translator can fail, and a view with its rows' forms and its
+  // messages gone but no word about it would be worse than one left alone.
+  const line = document.createElement("p")
+  line.dataset.noteGone = ""
+  line.setAttribute("role", "status")
+  line.className = "rounded-cs border border-line bg-sunken px-3 py-2 text-[13px] text-ink"
+  line.textContent = t("notes.script.live.gone")
+
   const held = hold(view)
   const rows = old.querySelector(":scope > [data-note-rows]")
   rows?.querySelectorAll("[data-note-actions] form").forEach((form) => form.remove())
   // What is left under the rows: the edits that hold text, and nothing else.
   old.querySelector(":scope > [data-note-scroll]")?.replaceChildren(...editing)
 
-  const line = document.createElement("p")
-  line.dataset.noteGone = ""
-  line.setAttribute("role", "status")
-  line.className = "rounded-cs border border-line bg-sunken px-3 py-2 text-[13px] text-ink"
-  line.textContent = t("notes.script.live.gone")
   ;(reply.querySelector("form[data-note-composer]") || reply.lastElementChild).before(line)
   reply.querySelector(":scope > [data-note-jump]")?.remove()
 

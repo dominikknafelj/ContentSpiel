@@ -50,11 +50,16 @@ export function listen(params, listener) {
   if (!entry) {
     entry = { listeners: new Set(), up: false, settled: false, rejected: false }
     const tell = (name, ...args) => [ ...entry.listeners ].forEach((each) => each[name]?.(...args))
+    // An entry that `close` has ended hears nothing more: an answer of the
+    // server's that was on its way (a confirmation, in the wait before the
+    // unsubscribe is sent) must not tell its listeners `connected` after
+    // they were told `disconnected`.
+    const unlessClosed = (act) => (...args) => { if (!entry.closed) act(...args) }
     entry.subscription = cable.subscribeTo(params, {
-      connected: () => { entry.up = entry.settled = true; tell("connected") },
-      disconnected: () => { entry.up = entry.settled = false; tell("disconnected") },
-      rejected: () => { entry.rejected = entry.settled = true; tell("rejected") },
-      received: (signal) => [ ...entry.listeners ].forEach((each) => each(signal))
+      connected: unlessClosed(() => { entry.up = entry.settled = true; tell("connected") }),
+      disconnected: unlessClosed(() => { entry.up = entry.settled = false; tell("disconnected") }),
+      rejected: unlessClosed(() => { entry.rejected = entry.settled = true; tell("rejected") }),
+      received: unlessClosed((signal) => [ ...entry.listeners ].forEach((each) => each(signal)))
     })
     pool.set(key, entry)
   }
@@ -95,7 +100,11 @@ export function open() {
 // held, it ends those too: their listeners are told `disconnected`, as they
 // are when the socket drops -- their subscription is not up any more, and
 // one that was told nothing would go on saying it is -- and a `stop` that
-// comes later finds nothing left to do.
+// comes later finds nothing left to do. They are told ONCE and then hear
+// nothing again, ever: no later `listen` revives their subscription. That
+// is right for a deliberate close (the tab left CS Studio; a test) and is
+// NOT a drop that recovers: to a listener it looks like one whose
+// `connected` never comes, so `close` is no way to reconnect.
 //
 // The socket is closed only if nobody listens by then. Ending the
 // subscriptions waits (for the consumer, for each subscription), and a
