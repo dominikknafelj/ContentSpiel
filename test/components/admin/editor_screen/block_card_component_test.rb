@@ -31,7 +31,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_card(block, page: page)
 
     assert_selector ".admin-block-card__handle[aria-label='Move Rich text']"
-    assert_selector "button[aria-expanded='true'][data-action$='admin--blocks#toggle']", text: "Rich text"
+    assert_selector "button[aria-expanded='true'][data-action$='admin--editor--blocks#toggle']", text: "Rich text"
     assert_selector "button[aria-haspopup='menu'][aria-label='Block actions']", text: "⋯"
     assert_no_selector "summary", visible: :all
   end
@@ -66,7 +66,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
   end
 
   # Sections spec §4.4. Disabled as rendered: whether the page has a section
-  # is the screen's to say (`admin--blocks#refreshMoveState`), since sections
+  # is the screen's to say (`admin--editor--blocks#refreshMoveState`), since sections
   # come and go without this card being drawn again.
   test "Move into section… fills the Move dialog and then opens it, and starts disabled" do
     page = create_page(title: "Into test")
@@ -74,7 +74,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_card(block, page: page)
 
-    assert_selector "[role=menu] button[disabled][data-move='into'][data-action='click->admin--blocks#askWhere admin--ui--dialog#open'][data-admin--ui--dialog-id-param='move-block-dialog']",
+    assert_selector "[role=menu] button[disabled][data-move='into'][data-action='click->admin--editor--blocks#askWhere admin--ui--dialog#open'][data-admin--ui--dialog-id-param='move-block-dialog']",
       text: "Move into section…", visible: :all
   end
 
@@ -105,14 +105,14 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog", visible: :all
   end
 
-  test "the menu's Move buttons keep calling admin--blocks#moveUp and #moveDown" do
+  test "the menu's Move buttons keep calling admin--editor--blocks#moveUp and #moveDown" do
     page = create_page(title: "Actions test")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
 
     render_card(block, page: page)
 
-    assert_selector "button[data-move='up'][data-action~='click->admin--blocks#moveUp']", visible: :all
-    assert_selector "button[data-move='down'][data-action~='click->admin--blocks#moveDown']", visible: :all
+    assert_selector "button[data-move='up'][data-action~='click->admin--editor--blocks#moveUp']", visible: :all
+    assert_selector "button[data-move='down'][data-action~='click->admin--editor--blocks#moveDown']", visible: :all
   end
 
   test "Delete block… opens a destructive confirm that says blocks skip the trash" do
@@ -227,13 +227,13 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
 
-    assert_selector "#block-#{block.id}-panel[hidden][data-admin--section-target='panel'][data-block-id='#{block.id}']", visible: :all
+    assert_selector "#block-#{block.id}-panel[hidden][data-admin--editor--section-target='panel'][data-block-id='#{block.id}']", visible: :all
     assert_selector "#block-#{block.id}-panel-title", text: "Image · column 2", visible: :all
     assert_selector "form[action$='/content_blocks/#{block.id}'][data-controller~='admin--saving--autosave']", visible: :all
     assert_selector "#block-#{block.id}-save-status", visible: :all
     assert_no_selector ".admin-block-card__handle", visible: :all
-    assert_no_selector "[data-admin--blocks-target='card']", visible: :all
-    assert_selector "button[data-action='admin--section#close']", visible: :all
+    assert_no_selector "[data-admin--editor--blocks-target='card']", visible: :all
+    assert_selector "button[data-action='admin--editor--section#close']", visible: :all
   end
 
   test "as a list card it is exactly what it was" do
@@ -242,8 +242,8 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_card(block, page: page)
 
-    assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}[data-admin--blocks-target='card']"
-    assert_no_selector "[data-admin--section-target]"
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}[data-admin--editor--blocks-target='card']"
+    assert_no_selector "[data-admin--editor--section-target]"
   end
 
   # The panel has the block's `dom_id` nowhere: in a section that id is the
@@ -257,7 +257,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     assert_no_selector "##{ActionView::RecordIdentifier.dom_id(block)}", visible: :all
     assert_no_selector "button[aria-label='Block actions']", visible: :all
-    assert_no_selector "[data-action$='admin--blocks#toggle']", visible: :all
+    assert_no_selector "[data-action$='admin--editor--blocks#toggle']", visible: :all
     assert_selector "#block-#{block.id}-panel[role='region'][aria-labelledby='block-#{block.id}-panel-title']", visible: :all
   end
 
@@ -270,7 +270,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block.reload, locale: "en", placement: :panel)
 
     assert_selector "#block-#{block.id}-panel", text: "Unavailable type — gone/thing", visible: :all
-    assert_selector "button[data-action='admin--section#close']", visible: :all
+    assert_selector "button[data-action='admin--editor--section#close']", visible: :all
     assert_no_selector "form[data-controller~='admin--saving--autosave']", visible: :all
   end
 
@@ -286,7 +286,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     # The handoff's decision 6: the one item a group card's menu has.
     assert_selector "button[aria-label='Block actions']", count: 1
     assert_equal [ "Add note" ], page_menu_items
-    assert_no_selector "[data-admin--blocks-target], [data-admin--section-target]"
+    assert_no_selector "[data-admin--editor--blocks-target], [data-admin--editor--section-target]"
   end
 
   test "an unknown placement is refused" do

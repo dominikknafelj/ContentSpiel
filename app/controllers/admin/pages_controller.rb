@@ -94,7 +94,7 @@ module Admin
       end
       return forbidden! unless allowed
 
-      # The New page dialog loading its form (`admin--new-record` sets the
+      # The New page dialog loading its form (`admin--editor--new-record` sets the
       # frame's `src` to this URL): just the frame, no layout. A normal request
       # renders the standalone page.
       render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPageDialogComponent::FRAME_ID

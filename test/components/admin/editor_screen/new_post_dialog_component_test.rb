@@ -19,7 +19,7 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
     # top edge like the media picker (`.admin-dialog[data-dialog-hang]`).
     assert_selector "dialog#new-post-dialog[data-dialog-hang]", visible: :all
     assert_selector "#new-post-dialog-title", text: "New post", visible: :all
-    assert_selector "[data-admin--new-record-kind-value=post][data-admin--new-record-url-value='/cs-studio/posts/new']", visible: :all
+    assert_selector "[data-admin--editor--new-record-kind-value=post][data-admin--editor--new-record-url-value='/cs-studio/posts/new']", visible: :all
     assert_selector "turbo-frame#new-post-form-frame:empty", visible: :all
     assert_selector "dialog footer button[form=new-post-form][disabled]", text: "Create draft", visible: :all
     assert_no_selector "form#new-post-form", visible: :all
@@ -64,7 +64,7 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
 
   test "an unlisted type says so; a listed one carries its page's path" do
     render_form
-    assert_selector "[data-admin--new-record-target=url]", text: "Not listed on any page yet"
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
 
     journal = create_page(title: "Journal")
     ContentBlock.create!(owner: journal, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
@@ -83,7 +83,7 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
     render_form(users(:editor_branch))
     assert_selector "input[value=blog]", visible: :all
     assert_no_selector "input[value=blog][data-path]", visible: :all
-    assert_selector "[data-admin--new-record-target=url]", text: "Not listed on any page yet"
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
 
     journal.update_columns(published_at: 1.day.ago)
     render_form(users(:editor_branch))

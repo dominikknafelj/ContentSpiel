@@ -7,7 +7,7 @@ module Admin
   # field's raw value (its own comment: "a `groups` value must be an Array
   # of Hashes"). Rack's nested-query parser usually hands back a genuine
   # Array for sequential `[0]`, `[1]`, ... keys already, but a row removed
-  # client-side (`admin--groups#remove`, which only re-numbers the rows
+  # client-side (`admin--editor--groups#remove`, which only re-numbers the rows
   # that are left rather than guaranteeing a contiguous 0..n run mid-edit)
   # or a form resubmitted before that renumbering lands can leave gaps --
   # and a genuinely non-sequential key set parses as a Hash instead, not an

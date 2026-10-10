@@ -39,7 +39,7 @@ en:
           duplicate: "Duplicate"
           delete: "Delete block…"
         # The one "Move block" dialog of the page editor. `column` and
-        # `section_column` are the choices `admin--blocks#askWhere` writes
+        # `section_column` are the choices `admin--editor--blocks#askWhere` writes
         # into its select: a tile is offered the other columns of its own
         # section; a card every column of every section, the sections
         # numbered as they stand in the page's list, top to bottom.
@@ -50,7 +50,7 @@ en:
           move: "Move"
           column: "Column %{column}"
           section_column: "Section %{section} · column %{column}"
-        # What `admin--blocks` says in its live region after a move made
+        # What `admin--editor--blocks` says in its live region after a move made
         # from a "⋯" menu: the focus lands on a button every block names the
         # same, so this is what tells a screen reader which block went where.
         # `block` is the block's type as its card or tile shows it; the
@@ -105,12 +105,12 @@ en:
           unavailable_hint: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
           # The toast of a block that was not moved between the list and a
           # column, or between sections, because its form holds an edit that
-          # was not saved (`admin--blocks#move`): the move would redraw the
+          # was not saved (`admin--editor--blocks#move`): the move would redraw the
           # form.
           unsaved_move: "Reload or fix this block before moving it."
           # Under the reason of a refused move whose answer did not redraw
           # the list, because a form on the screen holds text that is not
-          # saved (`admin--blocks#renderKeepingForms`).
+          # saved (`admin--editor--blocks#renderKeepingForms`).
           reload_later: "Something on this page changed elsewhere. Reload once your unsaved text is safe."
         # The layout menu in a section's header: `name` is the button's
         # accessible name, `label` the word on it beside the diagram, and

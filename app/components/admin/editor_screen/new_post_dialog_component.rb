@@ -4,7 +4,7 @@ module Admin
     # layout outside `#content` (forms can't nest). Only the SHELL is rendered
     # there: a loading line and an empty `<turbo-frame id="new-post-form-frame">`,
     # and a disabled Create button. The form itself is loaded when the dialog
-    # opens (`admin--new-record` sets the frame's `src` to `GET /posts/new`,
+    # opens (`admin--editor--new-record` sets the frame's `src` to `GET /posts/new`,
     # with the trigger's preset as query params), because building it costs
     # a listing-page lookup per content type -- not something every
     # CS Studio request should pay -- and a copy rendered with the page would go

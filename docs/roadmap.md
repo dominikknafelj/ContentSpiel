@@ -368,7 +368,7 @@ Left by the sections sub-project (spec §12).
 - A tile in a section's lane has no pick-up-and-arrows keyboard drag; every one of its moves is in its ⋯ menu.
 - A duplicated section is several audit events (a `block.created` per copy and one `block.reordered`), not one.
 - "Remove section, keep blocks" is refused while ANY form on the screen holds unsaved text, not only one inside the section, and the toast does not say which form (`admin/queue_hold_controller.js` asks `settled()` and `drained()` of the whole screen). The fix is to ask only the forms inside the section's card.
-- Text typed into a form of the section after "Remove section, keep blocks" was pressed, while the removal's request is on the wire, is lost with the form: the section's card is not held `inert` during the removal as a moved block and its form are (`admin--blocks`' `hold`).
+- Text typed into a form of the section after "Remove section, keep blocks" was pressed, while the removal's request is on the wire, is lost with the form: the section's card is not held `inert` during the removal as a moved block and its form are (`admin--editor--blocks`' `hold`).
 
 ### Notes
 

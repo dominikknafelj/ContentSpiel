@@ -2,7 +2,7 @@ module Admin
   module EditorScreen
     # A section in the page editor's block list (sections spec §4.1–§4.3): a
     # card like any other block's -- it is dragged, moved and collapsed by
-    # `admin--blocks` exactly as one -- but framed and tinted, and holding the
+    # `admin--editor--blocks` exactly as one -- but framed and tinted, and holding the
     # section's columns as lanes of tiles (`SectionLanesComponent`) in its
     # body, where a block card has its fields. Its own three settings are a
     # form in its header (below).
@@ -10,7 +10,7 @@ module Admin
     # EVERY BLOCK'S FORM IS RENDERED WITH THE PAGE (plan decision D3). Under
     # the lanes sits one `Admin::EditorScreen::BlockCardComponent` per block of the section,
     # drawn as a `placement: :panel`: hidden, and shown one at a time by
-    # `admin--section` when its tile is pressed. A form is never fetched when
+    # `admin--editor--section` when its tile is pressed. A form is never fetched when
     # a tile is opened and never removed when it is closed. That is what makes
     # the pattern safe on top of autosave: each form registers with the write
     # queue once (`admin--saving--autosave`'s `connect`), and its debounce, its queued
@@ -24,7 +24,7 @@ module Admin
     # order a screen reader meets them in; only one is ever visible, so the
     # order is not a layout.
     #
-    # `data-container` is how `admin--blocks` and the stylesheet tell a
+    # `data-container` is how `admin--editor--blocks` and the stylesheet tell a
     # section's card from a block's without asking for a type by name: the
     # code asks `container?` (`self.draws?`), the markup says the answer.
     #
@@ -78,10 +78,10 @@ module Admin
     # would then submit the settings form.)
     #
     # THE "⋯" MENU (spec §4.1), for a viewer who may edit: Move up and Move
-    # down are the block card's own buttons (`data-move`, `admin--blocks
+    # down are the block card's own buttons (`data-move`, `admin--editor--blocks
     # #moveUp|moveDown`), since a section's card is moved as any card is;
     # `first:` and `last:` are the card's place in the list and say which of
-    # the two starts disabled, and `admin--blocks#refreshMoveState` keeps
+    # the two starts disabled, and `admin--editor--blocks#refreshMoveState` keeps
     # them right afterwards. Duplicate copies the section with its blocks.
     # Then the two deletes, which are the two explicit choices a section's
     # removal is: "Remove section, keep blocks" is sent without a question

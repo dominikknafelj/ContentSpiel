@@ -24,20 +24,20 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "button[aria-haspopup='menu'][aria-label='Block actions']", text: "⋯"
     assert_equal [ "Add note", "Move up", "Move down", "Move to column…", "Move out of section", "Duplicate", "", "Delete block…" ], menu_items
     assert_selector "[role=menu][data-action~='click->admin--ui--menu#select']", visible: :all
-    assert_selector "[role=menu] button[data-move='up'][data-action='click->admin--blocks#moveUp']", visible: :all
-    assert_selector "[role=menu] button[data-move='down'][data-action='click->admin--blocks#moveDown']", visible: :all
-    assert_selector "[role=menu] button[data-move='out'][data-action='click->admin--blocks#moveOut']", visible: :all
+    assert_selector "[role=menu] button[data-move='up'][data-action='click->admin--editor--blocks#moveUp']", visible: :all
+    assert_selector "[role=menu] button[data-move='down'][data-action='click->admin--editor--blocks#moveDown']", visible: :all
+    assert_selector "[role=menu] button[data-move='out'][data-action='click->admin--editor--blocks#moveOut']", visible: :all
     assert_selector "[role=menu] form[action$='/content_blocks/#{@block.id}/duplicate'][method='post']", visible: :all
     assert_selector "[role=menu] button.text-danger-ink", text: "Delete block…", visible: :all
   end
 
-  # One click, two actions, in this order: `admin--blocks` fills the dialog's
+  # One click, two actions, in this order: `admin--editor--blocks` fills the dialog's
   # choices from the screen, then `admin--ui--dialog` shows it -- so opening,
   # where the focus goes and where it returns are the dialog controller's own.
   test "Move to column… fills the Move dialog and then opens it" do
     render_tile
 
-    assert_selector "[role=menu] button[data-move='column'][data-action='click->admin--blocks#askWhere admin--ui--dialog#open'][data-admin--ui--dialog-id-param='move-block-dialog']",
+    assert_selector "[role=menu] button[data-move='column'][data-action='click->admin--editor--blocks#askWhere admin--ui--dialog#open'][data-admin--ui--dialog-id-param='move-block-dialog']",
       text: "Move to column…", visible: :all
   end
 

@@ -371,13 +371,13 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    about the room a section has. `--lanes` is the section's column count, set
    on the lanes element by `Admin::EditorScreen::SectionLanesComponent`. A
    lane keeps a minimum height so an empty column still has a place on screen
-   -- and under the pointer: it is what a block is dropped into (`admin--blocks`).
+   -- and under the pointer: it is what a block is dropped into (`admin--editor--blocks`).
    The open tile -- the one whose form is showing under the lanes -- is marked
    by its border, read from the face's own `aria-expanded`, so the look cannot
-   drift from what `admin--section` tells a screen reader. */
+   drift from what `admin--editor--section` tells a screen reader. */
 .admin-section-card { container-type: inline-size; }
 .admin-section-lanes { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
-.admin-section-lane > [data-admin--blocks-target="lane"] { display: flex; flex-direction: column; gap: 0.5rem; min-height: 2.5rem; }
+.admin-section-lane > [data-admin--editor--blocks-target="lane"] { display: flex; flex-direction: column; gap: 0.5rem; min-height: 2.5rem; }
 .admin-section-lane__label { display: block; }
 @container (min-width: 40rem) {
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }

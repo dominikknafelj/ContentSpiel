@@ -50,7 +50,7 @@ module Admin
     #   list;
     # - `:panel` is the same form for a block that sits in a section's column,
     #   drawn under the section's lanes and shown by pressing the block's tile
-    #   (`Admin::EditorScreen::SectionCardComponent`, `admin--section`). It is
+    #   (`Admin::EditorScreen::SectionCardComponent`, `admin--editor--section`). It is
     #   this component and not a second form component on purpose: the form,
     #   its ids, its `base_updated_at`, its status line and its error slots are
     #   what `Admin::ContentBlocksController#update` answers into, and a block
@@ -58,15 +58,15 @@ module Admin
     #   differs is the frame around the form. The wrapper has its own id
     #   (`panel_id`, because `dom_id(block)` is the TILE's in a section) and is
     #   rendered `hidden`: every panel of a section is in the page from the
-    #   start and `admin--section` only shows one, so a form is never fetched
+    #   start and `admin--editor--section` only shows one, so a form is never fetched
     #   or removed and keeps its place in the write queue (see that script). It
-    #   is no `card` of `admin--blocks` -- the section is the card -- and has no
+    #   is no `card` of `admin--editor--blocks` -- the section is the card -- and has no
     #   handle, no "⋯" menu and no delete dialog: a block in a column is moved,
     #   copied and deleted from its tile, which holds the dialog. Its
     #   header is a heading that says which column the form belongs to, and
     #   Close. `open: true` is for the panel of a block just added to a column
     #   (spec §4.3: it opens at once). The panel is still rendered `hidden`,
-    #   with `data-open` beside it: showing a form is `admin--section`'s alone
+    #   with `data-open` beside it: showing a form is `admin--editor--section`'s alone
     #   -- it closes the one that was open first, sending what that one holds
     #   -- so the server only asks, and the script takes the mark off as it
     #   opens. A panel shown by the markup would be a second open form;
@@ -139,13 +139,13 @@ module Admin
 
       def wrapper_id = panel? ? self.class.panel_id(block) : dom_id
 
-      # What `admin--blocks` and `admin--section` find the wrapper by. Only a
+      # What `admin--editor--blocks` and `admin--editor--section` find the wrapper by. Only a
       # card of the list is a `card` (dragged, moved, counted for Move up and
       # Move down); only a panel is hidden, and it is its section's to show.
       def wrapper_attributes
-        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--section-target": "panel", **(@open ? { open: true } : {}) } } if panel?
+        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **(@open ? { open: true } : {}) } } if panel?
 
-        { data: { block_id: block.id, **(list? ? { "admin--blocks-target": "card" } : {}) } }
+        { data: { block_id: block.id, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
       end
 
       # The panel is the region its tile's `aria-controls` points at, named by

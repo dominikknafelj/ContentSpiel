@@ -7,7 +7,7 @@ module Admin
     # THE LANE ELEMENT'S DIRECT CHILDREN ARE EXACTLY THE TILES, as the block
     # list's are exactly the cards: a lane's order is its children's order,
     # which is what a move reads as it is sent and what a drag sorts
-    # (`admin--blocks#move`, one Sortable per lane; `data-section-id` and
+    # (`admin--editor--blocks#move`, one Sortable per lane; `data-section-id` and
     # `data-column` say which container the lane is).
     # So the column's label is the lane's sibling inside a wrapper, never its
     # child, and nothing else is ever put into a lane. The "+" that ends each
@@ -36,11 +36,11 @@ module Admin
     # `data-no-drop` and has no "+": nothing is added to a section that isn't
     # one, by a drop or by the picker -- the server would refuse both
     # (`Reorder::NO_COLUMN`, `ContentBlock#section_rules`) -- and
-    # `admin--blocks` reads the attribute to offer no move that ends in one,
+    # `admin--editor--blocks` reads the attribute to offer no move that ends in one,
     # not even along the lane itself. What is left is what the card's
     # sentence says: move the blocks out, or delete them.
     #
-    # The element is `admin--section`'s `lanes` target: it is replaced as a
+    # The element is `admin--editor--section`'s `lanes` target: it is replaced as a
     # whole when the section's columns change under this screen (`Admin
     # ::ContentBlocksController#section_structure_streams`), and the script
     # then has to say where the focus goes, since the control that was

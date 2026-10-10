@@ -34,11 +34,11 @@ import { drained, settled } from "saving/queue"
 // is no visit: its form is inside the blocks section and its answer is a
 // Turbo Stream that puts a new card where each of the section's blocks had a
 // form. For the text in those forms that is the same as a redirect, so the
-// same rule holds, and it composes with `admin--blocks` like this: the
+// same rule holds, and it composes with `admin--editor--blocks` like this: the
 // `submit` is taken here first and nothing of Turbo's has started; after a
 // clean drain the form is submitted for real, ONCE (`passing`); only then
 // does Turbo build the request, whose `turbo:before-fetch-request` bubbles
-// to `admin--blocks`, which takes its turn in the -- now empty -- queue and
+// to `admin--editor--blocks`, which takes its turn in the -- now empty -- queue and
 // adds the page base (`holdTurboRequest`), exactly as for an unheld delete.
 // After an unclean drain no request is ever built. `holdTurboRequest` alone
 // was not enough: it waits for the queue's slot, so the delete went ahead of

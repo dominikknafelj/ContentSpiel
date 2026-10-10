@@ -18,7 +18,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_selector "li[data-page-id='#{@alpha.id}']"
     assert_selector "ul[data-parent-id='#{@beta.id}']"
 
-    # `admin--tree` drives SortableJS the same way `admin--blocks` does (see
+    # `admin--tree` drives SortableJS the same way `admin--editor--blocks` does (see
     # that test's own comment for why): native HTML5 drag-and-drop, which
     # a driver's synthesized mouse events can't reliably trigger in
     # headless Chrome. Moving Alpha's `<li>` into Beta's own children `<ul>`

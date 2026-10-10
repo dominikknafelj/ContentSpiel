@@ -13,7 +13,7 @@ module Admin
     # its own (no `data-controller`/`data-turbo-stream` needed here), so the
     # controller's Turbo Stream response is applied in place automatically;
     # only the drag/move-up-down side of the block list needs a real Stimulus
-    # controller (`admin--blocks`). The controller still honours an `after_id`
+    # controller (`admin--editor--blocks`). The controller still honours an `after_id`
     # param on `create`, but nothing here sends one.
     #
     # THE SAME PICKER AT THE END OF A LANE (sections spec §4.2), with
@@ -30,7 +30,7 @@ module Admin
     # - the menu closes on the pick (`close_on_select`): its answer puts a
     #   tile into the lane above it and opens the block's form under the lanes,
     #   and a menu left open would lie over both.
-    # Both submissions are inside the Blocks section, so `admin--blocks` holds
+    # Both submissions are inside the Blocks section, so `admin--editor--blocks` holds
     # them in the write queue like every add (`holdTurboRequest`).
 
     class BlockPickerComponent < AdminComponent

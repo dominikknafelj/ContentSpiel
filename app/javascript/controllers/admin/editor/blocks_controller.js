@@ -257,7 +257,7 @@ export default class extends Controller {
   besideSection(event, pointer) {
     const section = event.related
     if (!section.hasAttribute("data-container") || event.dragged.hasAttribute("data-container")) return true
-    const lanes = section.querySelector('[data-admin--section-target="lanes"]')?.getBoundingClientRect()
+    const lanes = section.querySelector('[data-admin--editor--section-target="lanes"]')?.getBoundingClientRect()
     if (!lanes || lanes.height === 0) return true
 
     if (pointer.clientY < lanes.top) return !event.willInsertAfter
@@ -366,7 +366,7 @@ export default class extends Controller {
   focusCopy(mutations) {
     if (!this.awaitingCopy) return
     const copy = mutations.flatMap((mutation) => Array.from(mutation.addedNodes))
-      .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--blocks-target="card"], [data-admin--blocks-target="tile"]'))
+      .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--editor--blocks-target="card"], [data-admin--editor--blocks-target="tile"]'))
     if (!copy) return
 
     this.awaitingCopy = false
@@ -469,7 +469,7 @@ export default class extends Controller {
   // the block's "⋯" when the dialog is closed without a move.
   askWhere(event) {
     const item = this.itemFor(event)
-    const own = item.closest('[data-admin--blocks-target="lane"]')
+    const own = item.closest('[data-admin--editor--blocks-target="lane"]')
     const open = this.openLanes()
     const lanes = own ? open.filter((lane) => lane.dataset.sectionId === own.dataset.sectionId && lane !== own) : open
     const sections = this.cardTargets.filter((card) => open.some((lane) => card.contains(lane))).map((card) => card.dataset.blockId)
@@ -502,16 +502,16 @@ export default class extends Controller {
 
     // Said as the choice read: "column 2" to a tile, which stays in its
     // section, and "column 2 of section 1" to a card.
-    const within = item.matches('[data-admin--blocks-target="tile"]')
+    const within = item.matches('[data-admin--editor--blocks-target="tile"]')
     const section = this.askingSections.indexOf(lane.dataset.sectionId) + 1
-    this.expand(lane.closest('[data-admin--blocks-target="card"]'))
+    this.expand(lane.closest('[data-admin--editor--blocks-target="card"]'))
     this.relocate(item, () => lane.append(item), within ? "column" : "into", { column: lane.dataset.column, section })
   }
 
   // Out of its section: directly after the section's card in the page's list.
   moveOut(event) {
     const item = this.itemFor(event)
-    const section = item.closest('[data-admin--blocks-target="card"]')
+    const section = item.closest('[data-admin--editor--blocks-target="card"]')
     this.relocate(item, () => section.after(item), "out")
   }
 
@@ -1116,7 +1116,7 @@ export default class extends Controller {
   // A block's name as its element shows it: the title button of a card, the
   // first line of a tile's face.
   titleOf(card) {
-    return card.querySelector("[data-action$='admin--blocks#toggle'], .admin-block-tile__face > span")?.textContent.trim() || "block"
+    return card.querySelector("[data-action$='admin--editor--blocks#toggle'], .admin-block-tile__face > span")?.textContent.trim() || "block"
   }
 
   positionOf(card) {
@@ -1129,12 +1129,12 @@ export default class extends Controller {
   }
 
   cardFor(event) {
-    return event.currentTarget.closest('[data-admin--blocks-target="card"]')
+    return event.currentTarget.closest('[data-admin--editor--blocks-target="card"]')
   }
 
   // The block an action was pressed in: the nearest card or tile. A tile is
   // inside its section's card, which is what `cardFor` would answer.
   itemFor(event) {
-    return event.currentTarget.closest('[data-admin--blocks-target="card"], [data-admin--blocks-target="tile"]')
+    return event.currentTarget.closest('[data-admin--editor--blocks-target="card"], [data-admin--editor--blocks-target="tile"]')
   }
 }

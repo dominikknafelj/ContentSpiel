@@ -42,7 +42,7 @@ class Admin::DialogsHangSystemTest < ApplicationSystemTestCase
 
     yield
     assert_selector "#{selector}[open]"
-    assert_selector "#{selector} [data-admin--new-record-target=loading]", visible: :visible
+    assert_selector "#{selector} [data-admin--editor--new-record-target=loading]", visible: :visible
     before = top.call
     assert_operator before, :>, 0
 

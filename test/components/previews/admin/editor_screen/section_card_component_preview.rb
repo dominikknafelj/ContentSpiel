@@ -4,7 +4,7 @@ module Admin
     # a three-column section with a text in its first column, an image
     # without an image in its second (a tile that needs attention) and an
     # empty third lane. The forms are in the markup but hidden: a tile opens
-    # one only where `admin--section` runs. `narrow` puts the same card in a
+    # one only where `admin--editor--section` runs. `narrow` puts the same card in a
     # column too narrow for the lanes to sit side by side, where they stack
     # with their column labels (spec §4.6).
     class SectionCardComponentPreview < ViewComponent::Preview

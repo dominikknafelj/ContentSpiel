@@ -29,7 +29,7 @@ export default class extends Controller {
   }
 }
 
-// Exported for `admin--new-record`, whose URL line must read exactly like this one.
+// Exported for `admin--editor--new-record`, whose URL line must read exactly like this one.
 export function slugify(value) {
   return value
     .toString()

@@ -1,8 +1,8 @@
 require "application_system_test_case"
 
 # The page editor's block list (cs-studio spec §5.1/§9): adding a block
-# through the picker (a plain form submission, `admin--blocks` itself has no
-# hand in it) and drag-reordering existing ones (`admin--blocks#reorder`).
+# through the picker (a plain form submission, `admin--editor--blocks` itself has no
+# hand in it) and drag-reordering existing ones (`admin--editor--blocks#reorder`).
 class Admin::BlocksSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -305,7 +305,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     assert_selector "#content-blocks-list .admin-block-card:first-child[data-block-id='#{first.id}']"
 
-    # `admin--blocks` drives SortableJS with no `forceFallback` option (see
+    # `admin--editor--blocks` drives SortableJS with no `forceFallback` option (see
     # that controller's own source), so a drag here is the browser's native
     # HTML5 drag-and-drop under the hood -- `dragstart`/`dragover`/`drop`
     # events a synthesized mouse sequence (Capybara's `drag_to`) can't
@@ -323,8 +323,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
       const firstCard = list.querySelector('[data-block-id="#{first.id}"]')
       list.insertBefore(secondCard, firstCard)
 
-      const section = document.querySelector('[data-controller~="admin--blocks"]')
-      window.Stimulus.getControllerForElementAndIdentifier(section, "admin--blocks").reorder()
+      const section = document.querySelector('[data-controller~="admin--editor--blocks"]')
+      window.Stimulus.getControllerForElementAndIdentifier(section, "admin--editor--blocks").reorder()
     JS
 
     # `assert_selector(id, text:, wait:)`, not `within(id) { assert_text }`

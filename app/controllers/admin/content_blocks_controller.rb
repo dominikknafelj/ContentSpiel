@@ -232,7 +232,7 @@ module Admin
     #   where it was dragged from, the column is gone -- and how far behind
     #   is not known here, so nothing less than the list puts it right. That
     #   replaces every form on the screen, as an Undo's answer does;
-    #   `admin--blocks#move` has had each send what it held first, and does
+    #   `admin--editor--blocks#move` has had each send what it held first, and does
     #   not draw the list at all while a form holds text that is not saved
     #   (`#renderKeepingForms`) -- which only the browser can know, so the
     #   list is sent regardless.
@@ -312,7 +312,7 @@ module Admin
     #
     # So a block response may move that form's base forward to the page's
     # new `updated_at` -- but only when the base the form holds (sent by
-    # `admin--saving--autosave`/`admin--blocks` as `X-Page-Base-Updated-At`) was
+    # `admin--saving--autosave`/`admin--editor--blocks` as `X-Page-Base-Updated-At`) was
     # still current *before* this write (fix round 2). If the page was saved
     # elsewhere since the form loaded it (another tab, another user), the
     # sent base is older than `@page_updated_at_before_write`, and moving it
@@ -384,13 +384,13 @@ module Admin
     # card, and its form's panel under the lanes. The panel goes with it --
     # and it can be the very thing on screen: an unavailable block's panel
     # has "Delete block…" in it. Left behind it would stay open with no tile
-    # to close it from, its Delete answering 410. `admin--section` needs no
+    # to close it from, its Delete answering 410. `admin--editor--section` needs no
     # telling: the open form is whichever panel is showing, and none is.
     def panel_removal_streams(block)
       block.section_id ? [ turbo_stream.remove(Admin::EditorScreen::BlockCardComponent.panel_id(block)) ] : []
     end
 
-    # A block's two halves inside a section, in the order `admin--section`
+    # A block's two halves inside a section, in the order `admin--editor--section`
     # needs them: the panel (its form) first, then the tile that opens it.
     # Either order would open the form -- whichever target connects second
     # finds the other (`openIfNew`) -- but with the form already there the
@@ -418,7 +418,7 @@ module Admin
     # what follows a Duplicate is as often moving the copy as editing it.
     # Opening it would also close the form that is open in the section, which
     # may be the source's, mid-edit. The focus goes to the copy's menu
-    # (`admin--blocks#focusCopy`), from where it is opened, moved or copied on.
+    # (`admin--editor--blocks#focusCopy`), from where it is opened, moved or copied on.
     def copy_tile_streams(copy, source)
       section = copy.section
       [ turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(section), panel_component(copy)),
@@ -448,7 +448,7 @@ module Admin
     # - A tile that changed lanes inside its section keeps both. Only its
     #   panel's heading is rewritten, which names the column.
     #
-    # THE BROWSER HAS ALREADY MOVED THE ELEMENT (`admin--blocks#move`), so the
+    # THE BROWSER HAS ALREADY MOVED THE ELEMENT (`admin--editor--blocks#move`), so the
     # `replace` of the block's `dom_id` lands where it was dropped, and
     # nothing here says a position.
     #
@@ -512,7 +512,7 @@ module Admin
     # 409 (`test/system/admin/sections_test.rb`, the two "Remove section,
     # keep blocks" tests about unsaved text). Each card is
     # told whether it is the list's first or last, as on a page load; its
-    # neighbours are corrected in the browser (`admin--blocks
+    # neighbours are corrected in the browser (`admin--editor--blocks
     # #refreshMoveState`, on every change of the list's children).
     def removal_streams(block, kept_ids, section)
       id = ActionView::RecordIdentifier.dom_id(block)
@@ -581,7 +581,7 @@ module Admin
     # current one, and the diagram on its button, follow what was saved. Not
     # otherwise: replaced by a save of the background, the menu's button lost the focus someone had just
     # Shift+Tabbed onto it -- to <body>, since nothing was picked for
-    # `admin--section` to carry the focus over from -- and a menu just opened
+    # `admin--editor--section` to carry the focus over from -- and a menu just opened
     # by pointer was swapped for a closed one. The menu only -- the hidden
     # input the pick was written into is the form's own and is left alone,
     # as every field of a saved form is.

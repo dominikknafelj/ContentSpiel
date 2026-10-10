@@ -31,7 +31,7 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     render_group
 
     assert_selector ".admin-section-group", count: 1
-    assert_selector "#{group}[data-block-id='#{@section.id}'][data-container][data-admin--blocks-target='card'] > h3", text: "Section", exact_text: true
+    assert_selector "#{group}[data-block-id='#{@section.id}'][data-container][data-admin--editor--blocks-target='card'] > h3", text: "Section", exact_text: true
     cards = page.all("#{group} > .admin-block-card").map { |card| card["data-block-id"].to_i }
     assert_equal [ @text.id, @late.id, @image.id ], cards
   end
@@ -40,7 +40,7 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     as(users(:one), channel: :admin) { render_group }
 
     assert_no_selector ".admin-block-tile", visible: :all
-    assert_no_selector "[data-admin--section-target]", visible: :all
+    assert_no_selector "[data-admin--editor--section-target]", visible: :all
     assert_no_selector ".admin-block-card__handle", visible: :all
     assert_no_selector "button[aria-label='Section actions']", visible: :all
     # Each block's card has the "⋯" with "Add note" as its only item (the
@@ -48,8 +48,8 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     assert_selector "button[aria-label='Block actions']", count: 3
     assert_equal [ "Add note" ] * 3, page.all(".admin-block-card > div:first-child [role=menu] > div", visible: :all).map { |item| item.text(:all).strip }
     assert_no_selector "[data-move]", visible: :all
-    assert_no_selector "[data-admin--blocks-target='lane']", visible: :all
-    assert_selector "[data-admin--blocks-target='card']", count: 1
+    assert_no_selector "[data-admin--editor--blocks-target='lane']", visible: :all
+    assert_selector "[data-admin--editor--blocks-target='card']", count: 1
     assert_no_selector ".admin-section-group > [hidden]", visible: :all
   end
 

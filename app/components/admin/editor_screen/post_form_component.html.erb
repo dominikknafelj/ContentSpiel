@@ -20,19 +20,19 @@
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
-  <%# Wraps title + slug only, for `admin--slug-preview` -- same pairing
+  <%# Wraps title + slug only, for `admin--editor--slug-preview` -- same pairing
       `Admin::EditorScreen::PageSettingsFormComponent` already uses. %>
-  <div data-controller="admin--slug-preview" data-action="input->admin--slug-preview#update">
+  <div data-controller="admin--editor--slug-preview" data-action="input->admin--editor--slug-preview#update">
     <%= render Admin::Columns::PlainColumnComponent.new(
           name: "title", id: field_id("title"), html_name: field_html_name("title"),
           value: value(:title), original: original(:title), locale: locale, errors: field_errors("title"), **translation(:title),
-          data: { "admin--slug-preview-target": "title" }
+          data: { "admin--editor--slug-preview-target": "title" }
         ) %>
 
     <%= render Admin::Columns::SlugColumnComponent.new(
           name: "slug", id: field_id("slug"), html_name: field_html_name("slug"),
           value: value(:slug), base_url: slug_base_url, original: original(:slug), locale: locale, errors: field_errors("slug"),
-          data: { "admin--slug-preview-target": "slug" }, help: "The last part of the post’s address. Changing it leaves a redirect from the old address."
+          data: { "admin--editor--slug-preview-target": "slug" }, help: "The last part of the post’s address. Changing it leaves a redirect from the old address."
         ) %>
   </div>
 

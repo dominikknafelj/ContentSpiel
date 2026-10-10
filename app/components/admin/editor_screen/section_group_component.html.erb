@@ -2,7 +2,7 @@
     handle or menu: see the component. Its direct children are the heading and one card
     per block. %>
 <%= tag.div id: dom_id, class: "admin-section-group flex flex-col gap-3 rounded-cs border border-line-strong bg-sunken p-3",
-      data: { block_id: section.id, container: "", "admin--blocks-target": "card" } do %>
+      data: { block_id: section.id, container: "", "admin--editor--blocks-target": "card" } do %>
   <h3 class="font-cs-mono text-label uppercase tracking-mono <%= unavailable? ? "text-danger-ink" : "text-meta" %>"><%= heading %></h3>
   <% blocks.each do |block| %>
     <%= render card(block) %>

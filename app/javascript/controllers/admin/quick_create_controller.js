@@ -5,7 +5,7 @@ import { Controller } from "@hotwired/stimulus"
 // New page dialog instead, with the typed title carried over: the form holds
 // a hidden real "New page" link wired to `admin--ui--dialog#open`, and this
 // controller hands it the title as the `data-new-page-title-param` the dialog's
-// form (`admin--new-record`) presets from, then clicks it -- so the dialog is
+// form (`admin--editor--new-record`) presets from, then clicks it -- so the dialog is
 // opened by its one ordinary path and nothing here knows how a dialog works.
 // Without JS (or without that link) the form submits and the server sends a
 // "page" to the standalone New page screen.

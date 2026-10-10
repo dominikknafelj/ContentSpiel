@@ -2,7 +2,7 @@ module Admin
   module EditorScreen
     # A block inside a section, as it stands in its column (sections spec
     # §4.2): its type and one line of its content, on a button that opens the
-    # block's form under the lanes (`admin--section#toggle`).
+    # block's form under the lanes (`admin--editor--section#toggle`).
     #
     # THE TILE HAS THE BLOCK'S `dom_id`, as a card of the block list has: it
     # is the element that stands for the block where the block is, the one a
@@ -12,7 +12,7 @@ module Admin
     #
     # The face is a real button, so a tile is opened by Enter and Space and
     # is in the Tab order; `aria-expanded` says whether its form is the open
-    # one and is kept by `admin--section`. `open:` is for a tile rendered
+    # one and is kept by `admin--editor--section`. `open:` is for a tile rendered
     # while its form is to be shown at once (a block just added): the script
     # opens the panel, and the tile must not say "collapsed" in between.
     #
@@ -27,15 +27,15 @@ module Admin
     #
     # THE "⋯" MENU IS THE TILE'S KEYBOARD PATH (sections spec §4.4, plan D9),
     # for a viewer who can edit: Move up and Move down along the lane (the
-    # card's own buttons, `data-move` and `admin--blocks#moveUp|moveDown`),
+    # card's own buttons, `data-move` and `admin--editor--blocks#moveUp|moveDown`),
     # "Move to column…" (the page's one Move dialog, `MoveDialogComponent`),
-    # "Move out of section" (`admin--blocks#moveOut`: to the page's list,
+    # "Move out of section" (`admin--editor--blocks#moveOut`: to the page's list,
     # directly after the section), Duplicate, and "Delete block…". Every move
     # item is rendered enabled: which of them has nowhere to go -- the first
     # tile's Move up, the last one's Move down, "Move to column…" in a section
     # of one column -- depends on the tile's neighbours and its section's
     # layout, which change without the tile being drawn again, so
-    # `admin--blocks#refreshMoveState` says it, as the tile connects and after
+    # `admin--editor--blocks#refreshMoveState` says it, as the tile connects and after
     # every change of a lane.
     #
     # A tile of a type that is no longer registered keeps the four moves and
@@ -46,9 +46,9 @@ module Admin
     # gives the keyboard whatever the pointer has.
     #
     # In a section whose own type is gone (spec §6) the tile is drawn the
-    # same and `admin--blocks` disables what cannot be done there -- Move up,
+    # same and `admin--editor--blocks` disables what cannot be done there -- Move up,
     # Move down and "Move to column…", since that section has no column the
-    # server would take a block into (`admin--blocks#closed`). "Move out of
+    # server would take a block into (`admin--editor--blocks#closed`). "Move out of
     # section" and "Delete block…" are what is left, and no Duplicate
     # (`duplicate?`).
     #

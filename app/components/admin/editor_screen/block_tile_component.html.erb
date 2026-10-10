@@ -1,12 +1,12 @@
 <div id="<%= dom_id %>" class="admin-block-tile flex items-stretch" role="listitem" data-block-id="<%= block.id %>"
-     data-admin--blocks-target="tile" data-admin--section-target="tile">
-  <%# What the pointer drags the tile by (SortableJS `handle:` in `admin--blocks`). Not a
+     data-admin--editor--blocks-target="tile" data-admin--editor--section-target="tile">
+  <%# What the pointer drags the tile by (SortableJS `handle:` in `admin--editor--blocks`). Not a
       control: see the component. %>
   <% if editable? %>
     <span class="admin-block-tile__grip flex shrink-0 cursor-grab select-none items-center rounded-l-cs px-1 text-meta hover:text-ink" aria-hidden="true">⠿</span>
   <% end %>
   <button type="button" class="admin-block-tile__face flex w-full min-w-0 cursor-pointer flex-col gap-0.5 rounded-cs px-3 py-2 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent"
-          aria-expanded="<%= open? %>" aria-controls="<%= panel_id %>" data-action="admin--section#toggle">
+          aria-expanded="<%= open? %>" aria-controls="<%= panel_id %>" data-action="admin--editor--section#toggle">
     <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
     <%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %>
   </button>
@@ -17,22 +17,22 @@
   <div class="flex shrink-0 items-center px-1"><%= render note_marker %></div>
   <% if editable? %>
     <%# Every move a drag makes, by name (see the component). Its `data-move` buttons are
-        enabled and disabled by `admin--blocks#refreshMoveState`. %>
+        enabled and disabled by `admin--editor--blocks#refreshMoveState`. %>
     <div class="flex shrink-0 items-center pr-1">
       <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <%# Always first: see the block card's menu. %>
         <% menu.with_item { add_note_item } %>
         <% menu.with_item do %>
-          <%= tag.button t(".move_up"), type: "button", class: menu_item_class, data: { move: "up", action: "click->admin--blocks#moveUp" } %>
+          <%= tag.button t(".move_up"), type: "button", class: menu_item_class, data: { move: "up", action: "click->admin--editor--blocks#moveUp" } %>
         <% end %>
         <% menu.with_item do %>
-          <%= tag.button t(".move_down"), type: "button", class: menu_item_class, data: { move: "down", action: "click->admin--blocks#moveDown" } %>
+          <%= tag.button t(".move_down"), type: "button", class: menu_item_class, data: { move: "down", action: "click->admin--editor--blocks#moveDown" } %>
         <% end %>
         <% menu.with_item do %>
           <%= tag.button t(".move_to_column"), type: "button", class: menu_item_class, data: move_to_column %>
         <% end %>
         <% menu.with_item do %>
-          <%= tag.button t(".move_out"), type: "button", class: menu_item_class, data: { move: "out", action: "click->admin--blocks#moveOut" } %>
+          <%= tag.button t(".move_out"), type: "button", class: menu_item_class, data: { move: "out", action: "click->admin--editor--blocks#moveOut" } %>
         <% end %>
         <%# Not always: see `duplicate?`. %>
         <% if duplicate? %>

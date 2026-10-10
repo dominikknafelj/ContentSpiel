@@ -25,9 +25,9 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     # top edge like the media picker (`.admin-dialog[data-dialog-hang]`).
     assert_selector "dialog#new-page-dialog[data-dialog-hang]", visible: :all
     assert_selector "#new-page-dialog-title", text: "New page", visible: :all
-    assert_selector "[data-controller=admin--new-record][data-admin--new-record-kind-value=page][data-admin--new-record-url-value='/cs-studio/pages/new']", visible: :all
-    assert_selector "[data-admin--new-record-target=loading]", text: "Loading…", visible: :all
-    assert_selector "[data-admin--new-record-target=failure][hidden] button", text: "Try again", visible: :all
+    assert_selector "[data-controller=admin--editor--new-record][data-admin--editor--new-record-kind-value=page][data-admin--editor--new-record-url-value='/cs-studio/pages/new']", visible: :all
+    assert_selector "[data-admin--editor--new-record-target=loading]", text: "Loading…", visible: :all
+    assert_selector "[data-admin--editor--new-record-target=failure][hidden] button", text: "Try again", visible: :all
     assert_selector "turbo-frame#new-page-form-frame:empty", visible: :all
     assert_selector "dialog footer button[form=new-page-form][disabled]", text: "Create page", visible: :all
     assert_selector "dialog footer button", text: "Cancel", visible: :all
@@ -54,7 +54,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_selector "select#new-page-inside[name='page[parent_id]']"
     assert_selector "select#new-page-type[name='page[page_type]'] option[value=standard]", text: "Standard"
     assert_selector "select#new-page-type option[value=landing]", text: "Landing"
-    assert_selector "[data-admin--new-record-target=url]", text: "URL: /"
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "URL: /"
   end
 
   test "Inside lists every page the owner may create under, indented by depth, in tree order" do
@@ -80,8 +80,8 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
   test "the preset parent is selected, and the note names it" do
     render_form(parent_id: @about.id)
     assert_selector "#new-page-inside option[selected][value='#{@about.id}']"
-    assert_selector "[data-admin--new-record-target=note]", text: "Created as a draft at the end of About. Drag it in the tree to move it."
-    assert_selector "[data-admin--new-record-target=url]", text: "URL: /about/"
+    assert_selector "[data-admin--editor--new-record-target=note]", text: "Created as a draft at the end of About. Drag it in the tree to move it."
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "URL: /about/"
   end
 
   test "a branch editor is offered the branch root itself, indented from it, and nothing outside" do
@@ -102,7 +102,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     [ ContentBlock, PublicPath, PageHierarchy, Page ].each(&:delete_all)
     render_form
     assert_no_selector "#new-page-inside"
-    assert_selector "[data-admin--new-record-target=note]", text: "Created as the home page."
+    assert_selector "[data-admin--editor--new-record-target=note]", text: "Created as the home page."
     assert_selector "input#new-page-title"
   end
 

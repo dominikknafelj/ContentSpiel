@@ -4,7 +4,7 @@ module Admin
     # fields (e.g. `test/event#speakers`). Rows are named
     # `form_name[field][index][subfield]`; a hidden `<template>` holds one
     # blank row with the literal placeholder `__INDEX__` in place of an
-    # index, which `app/javascript/controllers/admin/groups_controller.js`
+    # index, which `app/javascript/controllers/admin/editor/groups_controller.js`
     # clones and renumbers on "Add" -- see that file for the add/remove/
     # reorder mechanics this only has to render the markup for.
     #

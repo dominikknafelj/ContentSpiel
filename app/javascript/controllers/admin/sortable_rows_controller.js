@@ -3,7 +3,7 @@ import Sortable from "sortablejs"
 
 // Rows that can be reordered, where the new order is only PENDING (design pass
 // round 3, Task 6): the Languages card in Settings. Unlike the block list
-// (`admin--blocks`, whose every move is a request through the write queue --
+// (`admin--editor--blocks`, whose every move is a request through the write queue --
 // that controller is not touched), nothing is sent here. A drag or a keyboard
 // drop only rewrites the DOM order and the one tracked field that carries it,
 // then dispatches a bubbling `input` + `change` on that field so the screen's
@@ -71,7 +71,7 @@ export default class extends Controller {
   }
 
   // The dragged clone is a picture of the row, appended to <body> outside the
-  // form: stripped of ids and Stimulus wiring (as `admin--blocks` does) so
+  // form: stripped of ids and Stimulus wiring (as `admin--editor--blocks` does) so
   // nothing exists twice or connects in it.
   makeCloneInert() {
     const clone = Sortable.ghost

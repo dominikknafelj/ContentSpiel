@@ -22,7 +22,7 @@ import { Controller } from "@hotwired/stimulus"
 //
 // WHICH FORM IS OPEN IS READ FROM THE PAGE, NOT REMEMBERED HERE (`openId`):
 // the open panel is the one that is not `hidden`. A section's card is moved
-// in the DOM by a drag or the keyboard path of `admin--blocks`, and Stimulus
+// in the DOM by a drag or the keyboard path of `admin--editor--blocks`, and Stimulus
 // then disconnects every target and connects it again -- so anything this
 // controller kept beside the DOM would have to be rebuilt or would be wrong:
 // a remembered id cleared when "its panel left" forgot a form that was still
@@ -105,7 +105,7 @@ export default class extends Controller {
     const layout = event.params.layout
     const form = event.currentTarget.closest("form")
     const input = form?.querySelector("input[name='block[settings][layout]']")
-    const menu = event.currentTarget.closest("[data-admin--section-target='layoutMenu']")
+    const menu = event.currentTarget.closest("[data-admin--editor--section-target='layoutMenu']")
     menu?.querySelector("[aria-haspopup=menu]")?.focus()
     const current = event.currentTarget.getAttribute("aria-current") === "true"
     if (!input || (current && input.value === layout)) return
@@ -186,7 +186,7 @@ export default class extends Controller {
   // the same key press must not also take the form away. Their listeners sit
   // on descendants of the card, so they have run by the time this one does,
   // and each marks the press as handled (`admin--ui--menu#keydown`, the rich-text
-  // popover and `admin--blocks#key` for a picked-up card call
+  // popover and `admin--editor--blocks#key` for a picked-up card call
   // `preventDefault`; `admin--ui--chip-input` and the link search also stop it
   // from getting here at all). The checks after `defaultPrevented` are for a
   // widget that closes on Escape without saying so: the press is left alone

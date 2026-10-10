@@ -9,7 +9,7 @@ import { messages } from "i18n/messages"
 // sentence -- `Admin::TagsHelper` chooses them from the locale file, so the copy is tested in Ruby).
 // `admin--ui--dialog#open` announces the opening (`admin--ui--dialog:opening`, on
 // `document`, before the dialog is shown) with the trigger; this controller
-// reads the trigger and fills the dialog, the way `admin--new-record` does for
+// reads the trigger and fills the dialog, the way `admin--editor--new-record` does for
 // the New page dialog.
 //
 // Merge: sets the title and the sentence, points the form at

@@ -27,7 +27,7 @@ import { orderErrorToast, sendOrder } from "saving/order_request"
 // and a stale base is refused (409, final). The move used to go straight out
 // and tell that form nothing: the editor's next keystroke was "Changed
 // elsewhere" against their own move, the form dead until Reload. So a move is
-// treated exactly like a block write (`admin--blocks`, `saving/queue.js`):
+// treated exactly like a block write (`admin--editor--blocks`, `saving/queue.js`):
 // - it takes its turn in the page's write queue (`enqueue`), so it is never
 //   on the wire together with an autosave of the same page, and reads the
 //   base when it is SENT, after the previous answer's was written back;
@@ -40,7 +40,7 @@ import { orderErrorToast, sendOrder } from "saving/order_request"
 //   (`Admin::TreeController#page_base_streams`).
 // The toast's Undo is the same PATCH, sent by Turbo from `#toasts`: it is
 // caught by its URL and held in the same queue with the same header
-// (`holdUndo`, as `admin--blocks#addPageBaseToUndo` does for a reorder).
+// (`holdUndo`, as `admin--editor--blocks#addPageBaseToUndo` does for a reorder).
 //
 // No generation is handed to `enqueue`: the tree column sits outside
 // `#content` and outlives a frame navigation, so "the page showing as the

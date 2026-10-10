@@ -1,11 +1,11 @@
 <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".title")) do |dialog| %>
   <label class="<%= setup_label_class %> mb-1" for="<%= destination_id %>"><%= t(".destination") %></label>
   <%# Empty on purpose: see the component. %>
-  <select id="<%= destination_id %>" class="<%= setup_select_class %>" data-admin--blocks-target="destination"></select>
+  <select id="<%= destination_id %>" class="<%= setup_select_class %>" data-admin--editor--blocks-target="destination"></select>
   <% dialog.with_footer do %>
     <%= tag.form method: "dialog" do %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
     <% end %>
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".move"), variant: :primary, data: { action: "admin--blocks#moveTo" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".move"), variant: :primary, data: { action: "admin--editor--blocks#moveTo" }) %>
   <% end %>
 <% end %>

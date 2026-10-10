@@ -9,17 +9,17 @@ module Admin
     # disabled, with no autosave (`editable:` is handed down).
     #
     # NOTHING OF THE DEFAULT TAB'S SECTION CARD IS HERE: no lanes, no tiles,
-    # no hidden panels, no settings, no `admin--section`. A translator works
+    # no hidden panels, no settings, no `admin--editor--section`. A translator works
     # down the page's text; which column a text stands in is layout, and
     # layout is the same in every language. So the forms are all open, one
     # under the other, in the order the public page is read.
     #
     # THE GROUP STANDS IN THE BLOCK LIST AS THE SECTION'S CARD DOES: a direct
     # child of the list with the section's `dom_id` and `data-block-id`, and a
-    # `card` target of `admin--blocks`. The cards around it are still moved
+    # `card` target of `admin--editor--blocks`. The cards around it are still moved
     # from their handles and menus on a translation tab, and the order such a
     # move sends is read from the list's children that carry a
-    # `data-block-id` (`admin--blocks#itemsOf`) -- which has to name the
+    # `data-block-id` (`admin--editor--blocks#itemsOf`) -- which has to name the
     # section, or the reorder is refused as not listing the page's blocks.
     # It has no handle and no menu of its own, so the section itself is not
     # moved, copied or deleted from this tab: the default-language tab is

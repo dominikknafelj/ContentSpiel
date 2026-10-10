@@ -15,19 +15,19 @@ class Admin::Fields::GroupsFieldTest < ViewComponent::TestCase
     end
   end
 
-  test "renders a <template> for new rows, and add/remove controls wired to admin--groups" do
+  test "renders a <template> for new rows, and add/remove controls wired to admin--editor--groups" do
     with_test_types do
       field = Field.new(name: "speakers", type: :groups, options: { of: "test/speaker" })
       render_inline Admin::Fields::GroupsField.new(field:, form_name: "post[fields]", value: [], locale: "en")
 
-      assert_selector "[data-controller='admin--groups']"
-      assert_selector "template[data-admin--groups-target='template']", visible: false
+      assert_selector "[data-controller='admin--editor--groups']"
+      assert_selector "template[data-admin--editor--groups-target='template']", visible: false
       # Capybara deliberately empties a <template>'s content when building its
       # queryable DOM (Capybara.HTML, matching real browser semantics where a
       # template's content isn't part of the document) -- so the placeholder
       # row inside it can only be checked against the raw rendered string.
       assert_includes rendered_content, "post[fields][speakers][__INDEX__][name]"
-      assert_selector "[data-action='click->admin--groups#add']"
+      assert_selector "[data-action='click->admin--editor--groups#add']"
     end
   end
 
@@ -48,7 +48,7 @@ class Admin::Fields::GroupsFieldTest < ViewComponent::TestCase
       field = Field.new(name: "speakers", type: :groups, options: { of: "test/speaker" })
       render_inline Admin::Fields::GroupsField.new(field:, form_name: "post[fields]", value: nil, locale: "en")
 
-      assert_selector "[data-admin--groups-target='row']", count: 0
+      assert_selector "[data-admin--editor--groups-target='row']", count: 0
     end
   end
 
@@ -60,9 +60,9 @@ class Admin::Fields::GroupsFieldTest < ViewComponent::TestCase
       render_inline Admin::Fields::GroupsField.new(field:, form_name: "post[fields]", value: [ { "name" => "Ada" } ], locale: "en")
 
       singular = FieldGroups.fetch("test/speaker").label.to_s.singularize
-      assert_selector "[data-admin--groups-target='row'].border .admin-groups-field__handle"
-      assert_selector "[data-admin--groups-target='row'] button[aria-label='Remove #{singular}'][data-action='click->admin--groups#remove']", text: "×"
-      assert_selector "button[data-action='click->admin--groups#add']", text: "+ Add #{singular}"
+      assert_selector "[data-admin--editor--groups-target='row'].border .admin-groups-field__handle"
+      assert_selector "[data-admin--editor--groups-target='row'] button[aria-label='Remove #{singular}'][data-action='click->admin--editor--groups#remove']", text: "×"
+      assert_selector "button[data-action='click->admin--editor--groups#add']", text: "+ Add #{singular}"
     end
   end
 end

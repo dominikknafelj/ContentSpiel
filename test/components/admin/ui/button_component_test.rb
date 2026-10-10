@@ -18,9 +18,9 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
   end
 
   test "passes through arbitrary html attributes, e.g. type submit and data attributes" do
-    render_inline Admin::Ui::ButtonComponent.new(label: "Add row", type: "submit", data: { action: "click->admin--groups#add" })
+    render_inline Admin::Ui::ButtonComponent.new(label: "Add row", type: "submit", data: { action: "click->admin--editor--groups#add" })
 
-    assert_selector "button[type='submit'][data-action='click->admin--groups#add']", text: "Add row"
+    assert_selector "button[type='submit'][data-action='click->admin--editor--groups#add']", text: "Add row"
   end
 
   test "rejects an unknown variant" do

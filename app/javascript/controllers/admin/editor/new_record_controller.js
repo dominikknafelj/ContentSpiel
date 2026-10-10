@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { slugify } from "controllers/admin/slug_preview_controller"
+import { slugify } from "controllers/admin/editor/slug_preview_controller"
 
 // The New page / New post dialogs (`NewPageDialogComponent`,
 // `NewPostDialogComponent`; one instance per dialog, on a wrapper inside its
@@ -25,7 +25,7 @@ import { slugify } from "controllers/admin/slug_preview_controller"
 //    element itself changed, so updating the URL line's text can't loop.
 // 3. Keeps the URL line live as Title, Inside or the type change: the chosen
 //    parent's (or type's listing page's) path plus the slug of the typed title,
-//    slugified by the same function as `admin--slug-preview`. A type no page
+//    slugified by the same function as `admin--editor--slug-preview`. A type no page
 //    lists says "Not listed on any page yet".
 // 4. Guards the Create button, which sits in the dialog's footer outside the
 //    form (tied to it with `form=`, so found by that attribute): disabled

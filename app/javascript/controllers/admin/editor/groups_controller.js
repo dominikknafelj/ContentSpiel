@@ -50,7 +50,7 @@ export default class extends Controller {
   remove(event) {
     event.preventDefault()
 
-    event.target.closest('[data-admin--groups-target="row"]')?.remove()
+    event.target.closest('[data-admin--editor--groups-target="row"]')?.remove()
     this.renumber()
   }
 

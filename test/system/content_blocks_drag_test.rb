@@ -26,9 +26,9 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
 
     handle = "#{card(@second)} .admin-block-card__handle"
     find(handle).send_keys(:space)
-    assert_selector "[data-admin--blocks-target=announcer]", text: /Picked up .* Position 2 of 3/, visible: :all
+    assert_selector "[data-admin--editor--blocks-target=announcer]", text: /Picked up .* Position 2 of 3/, visible: :all
     find(handle).send_keys(:up)
-    assert_selector "[data-admin--blocks-target=announcer]", text: /Position 1 of 3/, visible: :all
+    assert_selector "[data-admin--editor--blocks-target=announcer]", text: /Position 1 of 3/, visible: :all
     find(handle).send_keys(:space)
 
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /order changed/i, wait: 10
@@ -52,7 +52,7 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
   # The mouse path, driven by hand for the reason test/system/tree_test.rb
   # gives. The clone that follows the pointer is a deep copy of the card and
   # must be a picture only: no controller, target or id of its own
-  # (`admin--blocks#makeCloneInert`).
+  # (`admin--editor--blocks#makeCloneInert`).
   test "dragging a card by its handle with the mouse reorders, and the clone is inert" do
     sign_in_via_form(users(:one))
     visit admin_page_path(@page)
@@ -73,7 +73,7 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
 
     assert_selector "body > .admin-drag-fallback"
     assert_no_selector "body > .admin-drag-fallback[id], body > .admin-drag-fallback [id]", visible: :all
-    assert_no_selector "body > .admin-drag-fallback [data-controller], body > .admin-drag-fallback[data-admin--blocks-target]", visible: :all
+    assert_no_selector "body > .admin-drag-fallback [data-controller], body > .admin-drag-fallback[data-admin--editor--blocks-target]", visible: :all
     assert_selector "#content-blocks-list > [data-block-id]", count: 3
     await_drag_slot "#content-blocks-list > .admin-drag-ghost", at: :first
     mouse.up
@@ -90,7 +90,7 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     find("#{card(@first)} .admin-block-card__handle").send_keys(:space, :down, :escape)
-    assert_selector "[data-admin--blocks-target=announcer]", text: /Cancelled/, visible: :all
+    assert_selector "[data-admin--editor--blocks-target=announcer]", text: /Cancelled/, visible: :all
     assert_equal [ @first.id, @second.id, @third.id ], order_on_screen
     assert_no_selector "#toasts .admin-toast"
     assert_equal [ @first, @second, @third ], @page.content_blocks.reload.to_a

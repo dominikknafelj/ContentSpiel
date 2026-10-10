@@ -1,4 +1,4 @@
-// The request behind a drag: a block move (`admin--blocks#move`) and a
+// The request behind a drag: a block move (`admin--editor--blocks#move`) and a
 // page tree move (`admin--tree#save`). Both are hand-built `fetch`es -- a drop
 // is no form submission, so Turbo Drive sends nothing -- that ask for a Turbo
 // Stream and render it themselves. This module is the part the two share:
@@ -74,7 +74,7 @@ export function orderErrorToast(outcome, id) {
 }
 
 // The same toast with a caller's own sentence, for a drop that was never
-// sent at all (`admin--blocks#move`, a block whose form holds an edit that
+// sent at all (`admin--editor--blocks#move`, a block whose form holds an edit that
 // was not saved): one copy of the cloning.
 export function errorToast(text, id) {
   const template = document.getElementById("toast-error-template")
