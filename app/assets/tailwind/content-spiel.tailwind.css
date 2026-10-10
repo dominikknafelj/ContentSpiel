@@ -503,7 +503,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    scroll under a thread. By where the frame stands, like the rules around
    this one: in the media panel and on a record's notes page the same thread
    is in the flow of what scrolls there, and none of this applies.
-   `admin--notes--live#scroller` reads `overflow-y` to tell the two apart. */
+   `notes/merge`'s `scrollerOf` reads `overflow-y` to tell the two apart. */
 .admin-notes-drawer [data-notes-scroller]:has([data-notes-view="thread"]) { overflow: hidden; }
 .admin-notes-drawer turbo-frame#notes:has(> [data-notes-view="thread"]),
 .admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }

@@ -40,23 +40,27 @@
       never open together -- but for the page tree folded beside the notes
       column, which is opened from it (`admin--notes--drawer#shellOpened`).
 
-      `admin--notes--live` is the one thing in CS Studio that opens a socket
-      (notes spec §6): on <body>, so every screen has the person's stream --
-      the sidebar's count, the toast -- and so the parts that show one
-      record's notes (its `record` targets: an editor's drawer, the media
-      panel's notes, the mind graph's card) are found wherever they are
-      drawn. Its values are the addresses of the parts it fetches again when
-      a signal says something changed -- the delivery's is the address of
-      delivery 0, a placeholder the route accepts, whose last path segment
+      `admin--notes--live` and `admin--notes--inbox` are the two things in
+      CS Studio that open a socket (notes spec §6; both through
+      `live/connection`), on <body>. `admin--notes--inbox` is the person's
+      side, so every screen has the person's stream -- the sidebar's count,
+      the toast. Its values are the addresses of the parts it fetches again
+      when a signal says something changed -- the delivery's is the address
+      of delivery 0, a placeholder the route accepts, whose last path segment
       the script replaces with the id it was told (no text is searched for,
-      so no `ADMIN_PATH` can collide with it); `tag` writes this tab's id on
-      its notes writes; `person` is whose page this is, so that what one
-      page was told and had not said yet goes to the next page of the same
-      person only; and `shown`, `fresh` and `visible` tell it that a
-      drawer was opened, that the notes frame was loaded by Turbo itself and
-      that the document can be seen again.
+      so no `ADMIN_PATH` can collide with it); `person` is whose page this
+      is, so that what one page was told and had not said yet goes to the
+      next page of the same person only. `admin--notes--live` is the record's
+      side, on <body> so that the parts that show one record's notes (its
+      `record` targets: an editor's drawer, the media panel's notes, the mind
+      graph's card) are found wherever they are drawn: `tag` writes this
+      tab's id on its notes writes; `shown`, `fresh` and `visible` tell it
+      that a drawer was opened, that the notes frame was loaded by Turbo
+      itself and that the document can be seen again; and `watched` answers
+      the inbox's question whether the person is looking at a thread
+      (`admin--notes--inbox:watching`).
 
-      `admin--notes--alert` hears what that controller announces (one delivery,
+      `admin--notes--alert` hears what the inbox controller announces (one delivery,
       already read through the scoped endpoint) and, for a mention, lets one
       tab of this person chime and, with no tab of theirs in view, one raise
       a desktop notification (notes spec §6.4). Its values are the person's
@@ -75,13 +79,13 @@
       the pending-lock hint -- `Admin::MessagesHelper`,
       `app/javascript/i18n/messages.js`); a script that finds no nearer
       `data-messages` reads these. %>
-  <body data-controller="admin--ui--dialog admin--shell--drawer admin--shell--command-palette admin--shell--fragment-links admin--shell--file-drop-guard admin--notes--drawer admin--notes--live admin--notes--alert" data-admin--shell--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
-        data-admin--notes--live-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes--live-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
-        data-admin--notes--live-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
-        data-admin--notes--live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes--live-person-value="<%= Current.user&.id %>"
+  <body data-controller="admin--ui--dialog admin--shell--drawer admin--shell--command-palette admin--shell--fragment-links admin--shell--file-drop-guard admin--notes--drawer admin--notes--live admin--notes--inbox admin--notes--alert" data-admin--shell--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
+        data-admin--notes--inbox-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes--inbox-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
+        data-admin--notes--inbox-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
+        data-admin--notes--inbox-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes--inbox-person-value="<%= Current.user&.id %>"
         data-admin--notes--alert-sound-value="<%= Current.user&.notes_sound ? true : false %>" data-admin--notes--alert-desktop-value="<%= Current.user&.notes_desktop ? true : false %>"
         data-admin--notes--alert-person-value="<%= Current.user&.id %>"
-        data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--shell--drawer#closeAll turbo:before-visit@document->admin--shell--drawer#visiting turbo:frame-load@document->admin--shell--drawer#frameLoaded selectionchange@document->admin--notes--drawer#selected mousedown->admin--notes--drawer#release:capture admin--notes--drawer:opened->admin--shell--drawer#standAside admin--shell--drawer:opened->admin--notes--drawer#shellOpened turbo:load@document->admin--notes--drawer#syncAddress turbo:before-fetch-request@document->admin--notes--live#tag turbo:before-fetch-request@document->admin--notes--live#asked turbo:before-frame-render@document->admin--notes--live#answered admin--notes--drawer:opened->admin--notes--live#shown turbo:frame-load@document->admin--notes--live#fresh visibilitychange@document->admin--notes--live#visible admin--notes--live:delivery@document->admin--notes--alert#delivery"
+        data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--shell--drawer#closeAll turbo:before-visit@document->admin--shell--drawer#visiting turbo:frame-load@document->admin--shell--drawer#frameLoaded selectionchange@document->admin--notes--drawer#selected mousedown->admin--notes--drawer#release:capture admin--notes--drawer:opened->admin--shell--drawer#standAside admin--shell--drawer:opened->admin--notes--drawer#shellOpened turbo:load@document->admin--notes--drawer#syncAddress turbo:before-fetch-request@document->admin--notes--live#tag turbo:before-fetch-request@document->admin--notes--live#asked turbo:before-frame-render@document->admin--notes--live#answered admin--notes--drawer:opened->admin--notes--live#shown turbo:frame-load@document->admin--notes--live#fresh visibilitychange@document->admin--notes--live#visible admin--notes--inbox:watching@document->admin--notes--live#watched admin--notes--inbox:delivery@document->admin--notes--alert#delivery"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render "admin/shared/notes_alert_settings" %>
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
@@ -136,7 +140,7 @@
 
     <%# The toast a note addressed to the viewer raises (notes spec §6.4; handoff
         "Toast"): the existing inverted toast with the action "Open", 8 seconds
-        like Undo. `admin--notes--live` clones it and writes in the sentence,
+        like Undo. `admin--notes--inbox` clones it and writes in the sentence,
         the accent dot and where "Open" leads; inert here, like the template
         above. "Open" is a GET, the one toast action that is: it opens a
         record's notes and writes nothing. As drawn here it leads to the inbox,

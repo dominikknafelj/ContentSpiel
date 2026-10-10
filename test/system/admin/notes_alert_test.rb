@@ -170,7 +170,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   # A tab hears the signal in its own time. One whose copy has not come yet
   # is made here by keeping the delivery's announcement from the alert
   # controller altogether: what the tab IS must count on another tab's word.
-  def deafen = page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => event.stopImmediatePropagation(), true)")
+  def deafen = page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => event.stopImmediatePropagation(), true)")
 
   test "a tab in view counts before its own copy of the signal has come: it chimes, and nothing goes to the desktop" do
     users(:one).update!(notes_desktop: true)
@@ -283,7 +283,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   # The window of a burst, for the page in front of the test: both scripts
   # read it from this one value (the alert takes it from the delivery's
   # event), at the moment a delivery is announced.
-  def burst_window(milliseconds) = page.execute_script("document.body.setAttribute('data-admin--notes--live-burst-ms-value', '#{milliseconds}')")
+  def burst_window(milliseconds) = page.execute_script("document.body.setAttribute('data-admin--notes--inbox-burst-ms-value', '#{milliseconds}')")
 
   test "two notes at once are two named toasts and one chime; from the third one toast counts them, and the next burst starts over" do
     users(:one).update!(notes_desktop: true)
@@ -333,7 +333,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   # ends (NaN compares false with everything): the ten seconds stand in.
   test "a burst's window that is not a positive number is ten seconds" do
     stubbed_dashboard
-    page.execute_script("window.__windows = []; document.addEventListener('admin--notes--live:delivery', (event) => window.__windows.push(event.detail.burstMs))")
+    page.execute_script("window.__windows = []; document.addEventListener('admin--notes--inbox:delivery', (event) => window.__windows.push(event.detail.burstMs))")
 
     [ "soon", "0", "-5", "Infinity", "2500" ].each do |value|
       burst_window(value)

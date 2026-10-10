@@ -35,7 +35,7 @@
 // `cs-note-draft:<user id>:graph-Post-<id>` in `sessionStorage`; put back
 // when that post's card is built again; removed when the note is saved or
 // the field emptied, and with every other draft when the person signs out
-// (`forgetDrafts`). The person is the one `admin--notes--live` was given on
+// (`forgetDrafts`). The person is the one `admin--notes--inbox` was given on
 // <body>. While a note is on its way the field is read-only, so nothing is
 // typed that the emptied field would throw away. A draft is a convenience:
 // storage that is absent or full is the same as having none.
@@ -98,7 +98,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   submit.type = "submit"
   form.append(field, submit)
 
-  const key = draftKey(document.body.getAttribute("data-admin--notes--live-person-value") || "", `graph-Post-${node.id}`)
+  const key = draftKey(document.body.getAttribute("data-admin--notes--inbox-person-value") || "", `graph-Post-${node.id}`)
   const draft = {
     read() {
       try {

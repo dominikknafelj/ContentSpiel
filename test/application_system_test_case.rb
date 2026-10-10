@@ -337,8 +337,10 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   # Waits until the page's notes are live (notes spec §6): `admin--notes--live`
-  # is connected, the socket is up and EVERY subscription of the page -- the
-  # person's and one per record shown -- has been answered by the server. A
+  # and `admin--notes--inbox` are connected, the socket is up and EVERY
+  # subscription of the page -- the person's (the inbox controller's) and one
+  # per record shown (the live controller's) -- has been answered by the
+  # server; `notes/live_state` puts the two controllers' words together. A
   # signal the test causes after this is received; one caused a moment
   # earlier, while a subscription was still on its way, would be lost with
   # nothing to wait for. The cable needs no setting up for it: the suite's

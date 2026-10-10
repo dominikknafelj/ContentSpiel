@@ -188,7 +188,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     reply_field.send_keys("Half a thou")
     keep_reply_field
 
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__delivery = event.detail })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__delivery = event.detail })")
 
     # Addressed to the viewer, so that there IS a delivery the lines at the
     # end are about: without the mention this person, who never wrote in the
@@ -226,7 +226,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   test "a window that shows the thread without having the focus is refreshed like any other, with no toast" do
     open_thread
     page.execute_script("document.hasFocus = () => false")
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__shown = event.detail.shown })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__shown = event.detail.shown })")
 
     reply_as_dana("Are you there, @[#{users(:one).id}]?")
 
@@ -244,7 +244,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     open_thread
     hide_document
     watch_notes_fetches
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__shown = event.detail.shown })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__shown = event.detail.shown })")
 
     reply_as_dana("While you were away, @[#{users(:one).id}]")
 
@@ -610,6 +610,47 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     await_js("document.body.dataset.notesLive === 'connected'")
   end
 
+  # `data-notes-live` is what `await_notes_live` waits on, and two controllers
+  # hold the subscriptions: the person's is `admin--notes--inbox`'s, a record's
+  # is `admin--notes--live`'s (`notes/live_state` puts their words together).
+  # A half that is taken for the whole would not fail a test, it would make
+  # one lose a signal now and then. Each subscription's own callbacks are
+  # called here, as Action Cable calls them, one side at a time.
+  test "the page says it is live only while the person's subscription and the record's are both answered, whichever of the two is not" do
+    open_list
+    hold_consumer
+    state = -> { page.evaluate_script("[ document.body.dataset.notesLive, document.body.getAttribute('data-notes-live-person'), document.body.getAttribute('data-notes-live-records') ]") }
+    tell = ->(channel, callback) { page.execute_script("window.__consumer.subscriptions.subscriptions.find((each) => each.identifier.includes(#{channel.to_json})).#{callback}()") }
+    assert_equal %w[connected answered answered], state.call
+
+    tell.call("PersonChannel", "disconnected")
+    assert_equal %w[connecting waiting answered], state.call
+    tell.call("PersonChannel", "connected")
+    assert_equal %w[connected answered answered], state.call
+
+    tell.call("RecordChannel", "disconnected")
+    assert_equal %w[connecting answered waiting], state.call
+    tell.call("RecordChannel", "connected")
+    assert_equal %w[connected answered answered], state.call
+
+    # And a half that has said nothing yet is not answered: on a <body> where
+    # only one controller has spoken, the page is not live on its word.
+    said = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("notes/live_state").then(({ report }) => {
+        const one = document.createElement("body")
+        const other = document.createElement("body")
+        report(one, "records", true)
+        report(other, "person", true)
+        const halves = [ one.dataset.notesLive, other.dataset.notesLive ]
+        report(one, "person", true)
+        report(other, "records", true)
+        done([ ...halves, one.dataset.notesLive, other.dataset.notesLive ])
+      })
+    JS
+    assert_equal %w[connecting connecting connected connected], said
+  end
+
   # A session that ended has its socket closed by the server. The consumer
   # tries once more and is refused for good: no loop, and nothing in the
   # console (which would fail this test in its teardown).
@@ -698,7 +739,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/tags"
     await_notes_live
     hold_consumer
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__announced = (window.__announced || 0) + 1 })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__announced = (window.__announced || 0) + 1 })")
 
     page.execute_script(<<~JS)
       window.__visited = false
@@ -741,7 +782,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     JS
   end
 
-  def count_announcements = page.execute_script("window.__announced = []; document.addEventListener('admin--notes--live:delivery', (event) => { window.__announced.push(event.detail.id) })")
+  def count_announcements = page.execute_script("window.__announced = []; document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__announced.push(event.detail.id) })")
 
   # The run that answers a signal is already out -- the sidebar's count is
   # being fetched -- when a visit replaces the controller that started it.

@@ -107,7 +107,7 @@ en:
         # What the submit reads while its note is being sent, once that has
         # taken longer than a moment (the handoff's decision 41).
         sending: "Sending…"
-        # The toast a note addressed to the viewer raises (`admin--notes--live`):
+        # The toast a note addressed to the viewer raises (`admin--notes--inbox`):
         # "Dana mentioned you on Pricing", with "Open". `placeholder` is what
         # the layout's template holds until the script writes the sentence.
         toast:

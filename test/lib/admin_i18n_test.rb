@@ -198,6 +198,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/drawer_component.html.erb
     app/javascript/controllers/admin/notes/drawer_controller.js
     app/javascript/controllers/admin/notes/live_controller.js
+    app/javascript/controllers/admin/notes/inbox_controller.js
     app/javascript/notes/merge.js
     app/javascript/controllers/admin/notes/alert_controller.js
     app/javascript/controllers/admin/notes/permission_controller.js

@@ -82,7 +82,7 @@ export const draftKey = (user, key) => `${PREFIX}${user}:${key}`
 // session: the person in the key keeps the next one's forms from showing the
 // last one's text, but the text, and the names of the files chosen with it,
 // would stay readable in the tab until it is closed -- and a note's text is
-// kept out of every log for a reason. So `admin--notes--live` calls this when
+// kept out of every log for a reason. So `admin--notes--inbox` calls this when
 // the person signs out (all), and when a page loads for someone (all but
 // theirs: a session can end without the button). A draft is a convenience;
 // a failure here is the same as having none.

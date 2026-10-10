@@ -27,7 +27,7 @@ module Admin
     # sentences, the pending-lock hint, the toasts a failed drop raises --
     # written once on <body> (`layouts/admin`), where a script that finds no
     # nearer `data-messages` reads them. Keys are relative to `admin`.
-    # `notes.script.*` are `admin--notes--drawer`' and `admin--notes--live`'s: those
+    # `notes.script.*` are `admin--notes--drawer`', `admin--notes--live`'s and `admin--notes--inbox`'s: those
     # controllers are on <body> itself, so <body> is the only place their
     # messages can be.
     SCRIPT_MESSAGES = %w[

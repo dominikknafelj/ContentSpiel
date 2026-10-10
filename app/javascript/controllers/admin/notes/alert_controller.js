@@ -2,8 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 // A mention's chime and desktop notification (notes spec §6.4, D18, D19).
-// Lives on <body>. `admin--notes--live` announces every delivery it has READ
-// through the scoped endpoint (`admin--notes--live:delivery` on `document`; a
+// Lives on <body>. `admin--notes--inbox` announces every delivery it has READ
+// through the scoped endpoint (`admin--notes--inbox:delivery` on `document`; a
 // delivery the person may no longer read is never announced, so nothing here
 // can speak of one); this acts on a `mention` only, and only as the person's
 // two settings say (`sound`, `desktop`: the account screen's switches, as
@@ -46,7 +46,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 //
 // ONCE PER BURST (the handoff's decision 18). Several notes at once make one
 // sound: within a burst -- deliveries within `burstMs` (10 s) of the one
-// before, `admin--notes--live`'s clock, handed over as `detail.burstMs` --
+// before, `admin--notes--inbox`'s clock, handed over as `detail.burstMs` --
 // only the first mention that would chime does, and only the first that
 // would notify the desktop does. DONE says whether its tab chimed and
 // notified, so every tab knows the burst has had its sound whichever of
@@ -256,7 +256,7 @@ export default class extends Controller {
     if (tell) this.say({ type: "settings", sound, desktop })
   }
 
-  // `admin--notes--live:delivery` on the document.
+  // `admin--notes--inbox:delivery` on the document.
   delivery(event) {
     const delivery = event.detail
     arrival(delivery.burstMs)

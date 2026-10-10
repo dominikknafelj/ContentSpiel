@@ -6,7 +6,7 @@ require "application_system_test_case"
 # test can call it directly (as `mind_graph_modules_test.rb` does for the mind
 # graph's modules).
 #
-# The page is the Tags screen: `admin--notes--live` is on its <body> and listens
+# The page is the Tags screen: `admin--notes--inbox` is on its <body> and listens
 # to the person's stream through this same module, and the screen shows no
 # record, so the person's subscription is the only one the page itself holds.
 # The cable needs no setting up: the suite's `test` adapter delivers to the

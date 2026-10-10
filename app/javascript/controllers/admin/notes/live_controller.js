@@ -1,45 +1,31 @@
 import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
-import { TAB, listen, open } from "live/connection"
+import { TAB, listen } from "live/connection"
+import { json } from "notes/json"
+import { report } from "notes/live_state"
 import { hold, mergeGone, mergeList, mergeThread, scrollerOf } from "notes/merge"
-import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 
-// Live delivery of notes (notes spec §6). Lives on <body>. A signal over the
-// cable says only THAT something changed (`Notes::Signals`: a kind and ids);
-// this controller then fetches the part again through the same scoped GET the
-// page used on load, so what a tab can show is always what its viewer may
-// read. The connection is `live/connection`'s (the consumer, the shared
-// subscriptions, the tab's id and the socket's closing when a Turbo visit
-// leaves CS Studio): this controller listens through it (`listen`).
+// Live delivery of notes, the RECORD'S side (notes spec §6): a record's
+// threads and its list kept current while someone reads or types in them,
+// and the answers to the tab's own buttons merged the same way. Lives on
+// <body>, so the parts that show one record's notes (its `record` targets)
+// are found wherever they are drawn. A signal over the cable says only THAT
+// something changed (`Notes::Signals`: a kind and ids); this controller then
+// fetches the part again through the same scoped GET the page used on load,
+// so what a tab can show is always what its viewer may read. The connection
+// is `live/connection`'s (the consumer, the shared subscriptions, the tab's
+// id and the socket's closing when a Turbo visit leaves CS Studio): this
+// controller listens through it (`listen`).
 //
-// TWO SUBSCRIPTIONS.
-// - `Notes::PersonChannel`, once per tab. `delivery`: a delivery was written
-//   for the viewer. The sidebar's count and, on the dashboard, the two cards
-//   are fetched again; then that one delivery is FETCHED as data -- the
-//   signal may have reached someone who has since lost the right to read the
-//   record, and a refusal ends it there, with nothing said -- announced on
-//   `document` (`admin--notes--live:delivery`) and raised as a toast. No toast
-//   when the person is LOOKING AT that thread (`watching`, the one predicate:
-//   it is the view of a notes frame of this tab, and the document is not
-//   hidden -- the window's focus is not asked for, so two windows side by
-//   side both stay live): the thread's own refresh shows the message and,
-//   being the thread's GET, reads the delivery. `inbox`: deliveries of theirs
-//   were read or removed elsewhere; only the count and the cards are fetched,
-//   and nothing is said.
-//   SEVERAL AT ONCE (the handoff's decision 18). A BURST is deliveries
-//   announced within `burstMs` (10 s) of the one before; it ends that long
-//   after the last. The first two that are said in a burst get their own
-//   toasts; from the third, those named toasts are taken away and ONE toast
-//   stands for the burst, "You have 3 new notes", whose "Open" leads to the
-//   inbox; with each further one it is put up again with the new count, so
-//   its 8 seconds start over. Every delivery is still announced by itself
-//   (`admin--notes--live:delivery`), with `detail.burstMs`, the length of the
-//   window, so that `admin--notes--alert` counts its once-per-burst chime by
-//   the same clock. The burst is kept beside the controller (`burst`), like
-//   `pending`: it outlives a Turbo visit.
-// - `Notes::RecordChannel`, one per `record` target (an editor's drawer, the
-//   media panel's notes, the mind graph's card): a thread of that record
-//   changed, or went with a deleted block.
+// The PERSON'S side -- the person's stream, the sidebar's count, the
+// dashboard's cards, the toasts and their bursts -- is `admin--notes--inbox`,
+// beside this controller on <body>. It asks this one whether the person is
+// looking at a thread (`watched`, `watching`), and that is all the two say to
+// each other.
+//
+// THE SUBSCRIPTIONS. `Notes::RecordChannel`, one per `record` target (an
+// editor's drawer, the media panel's notes, the mind graph's card): a thread
+// of that record changed, or went with a deleted block.
 //
 // REFRESHING WITHOUT LOSING WORK (§6.3). What is READ is replaced; what is
 // TYPED is never touched.
@@ -102,44 +88,15 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 // received. What a session's end does to the socket: `live/connection`.
 // `data-notes-live="connected"` on <body> says that every subscription of
 // this page has been answered (confirmed, or rejected for a record the
-// viewer may not read): a signal sent from then on is received.
+// viewer may not read): a signal sent from then on is received. This
+// controller says how the records' subscriptions stand, `admin--notes--inbox`
+// how the person's does, and `notes/live_state` puts the two together.
 //
 // NO PAGE REFRESH, NO MORPHING (decision D20): nothing here touches an editor
 // form, the write queue or anything outside the notes parts.
 const COALESCE_MS = 500
-// What the person's stream has said and nobody has acted on yet: the
-// deliveries to announce, and whether the count and the cards are due. Beside
-// the controller, not on it (as `pool` is in `live/connection`): a signal
-// waits half a second before anything is fetched, and a Turbo visit inside
-// that window replaces <body> and the controller with it. The next page's
-// controller takes these over (`connect`), so the toast is raised there.
-//
-// `person` is whose they are: the signed-in person's id as the page that was
-// told gave it. A session that ended and was replaced by another sign-in in
-// the same document must not inherit the ids of the person before (`connect`
-// empties this for a different person). `live` is the controller of the
-// <body> that is in the document now, the only one that may announce
-// anything: a run of `inbox` that outlives its page hands what it has left
-// to it (`handBack`).
-const pending = { deliveries: new Set(), due: false, person: null }
-let live = null
-
-// The burst of deliveries being announced (see "SEVERAL AT ONCE"): when the
-// last one was announced, how many of it were said in a toast, the named
-// toasts that are its first two, and the one toast that replaced them. The
-// elements may be gone (dismissed, timed out, left behind by a visit);
-// removing one that is gone does nothing.
-const NAMED_TOASTS = 2
-const BURST_MS = 10000
-const burst = { last: 0, said: 0, named: [], summary: null }
-
-function endBurst() {
-  Object.assign(burst, { last: 0, said: 0, named: [], summary: null })
-}
-
 export default class extends Controller {
   static targets = [ "record" ]
-  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String, burstMs: { type: Number, default: BURST_MS } }
 
   // Before the first target connects, which is before `connect`.
   initialize() {
@@ -148,42 +105,16 @@ export default class extends Controller {
     this.records = new Map()
     this.timers = new Map()
     this.stale = new WeakSet()
-    this.dropped = false
   }
 
   connect() {
     this.element.dataset.notesTab = TAB
-    this.person = listen({ channel: "Notes::PersonChannel" }, Object.assign((signal) => this.addressed(signal), {
-      connected: () => this.online(),
-      disconnected: () => this.offline(),
-      rejected: () => this.sync()
-    }))
-    // A socket the server closed for good (the session ended; someone has
-    // signed in again since) is opened again by the first page that asks.
-    open()
-    // What the page before this one was told and had not acted on -- its
-    // timer not yet run, or its run still out when the visit came (that run
-    // announces nothing more, `inbox`). Nothing of it for another person.
-    if (pending.person !== this.personValue) {
-      pending.deliveries.clear()
-      pending.due = false
-      pending.person = this.personValue
-      endBurst()
-    }
-    // The tab's note drafts are this person's or nobody's (`forgetDrafts`).
-    forgetDrafts(this.personValue)
-    live = this
-    if (pending.due || pending.deliveries.size > 0) this.soon("person", () => this.inbox())
     this.sync()
   }
 
   disconnect() {
-    this.person?.()
-    this.person = null
     this.records.forEach((record) => record.stop())
     this.records.clear()
-    if (live === this) live = null
-    // The timers go; what the person's stream said stays (`pending`).
     this.timers.forEach((timer) => clearTimeout(timer))
     this.timers.clear()
   }
@@ -216,20 +147,6 @@ export default class extends Controller {
     clearTimeout(this.timers.get(element))
     this.timers.delete(element)
     this.sync()
-  }
-
-  // `submit` on the sidebar's Sign out form: the tab's note drafts go with the
-  // session. When the document actually goes (`pagehide`), not at the press:
-  // with unsaved content the browser asks "Leave site?" first, and a person
-  // who stays must find their half-typed note where it was. If they stay,
-  // the next key or pointer press takes the intent back, so a later reload,
-  // which is meant to keep drafts, removes nothing.
-  signingOut() {
-    const clear = () => forgetDrafts()
-    const stay = () => window.removeEventListener("pagehide", clear)
-    window.addEventListener("pagehide", clear, { once: true })
-    document.addEventListener("pointerdown", stay, { once: true, capture: true })
-    document.addEventListener("keydown", stay, { once: true, capture: true })
   }
 
   // `turbo:before-fetch-request` on the document: this tab's notes WRITES say
@@ -346,24 +263,11 @@ export default class extends Controller {
 
   // --- the socket -------------------------------------------------------------------
 
-  // Whether every subscription of this page has been answered.
+  // Whether every record subscription of this page has been answered: this
+  // controller's half of `data-notes-live` (`notes/live_state`; the person's
+  // subscription is `admin--notes--inbox`'s half).
   sync() {
-    const settled = Boolean(this.person?.up) && [ ...this.records.values() ].every((record) => record.stop.settled)
-    this.element.dataset.notesLive = settled ? "connected" : "connecting"
-  }
-
-  // The person's stream is up. After a drop, what the person's signals lead
-  // to is fetched once; each record's own subscription does the same for
-  // its part (`recordTargetConnected`).
-  online() {
-    if (this.dropped) this.soon("person", () => this.inbox())
-    this.dropped = false
-    this.sync()
-  }
-
-  offline() {
-    this.dropped = true
-    this.sync()
+    report(this.element, "records", [ ...this.records.values() ].every((record) => record.stop.settled))
   }
 
   // One run per key per COALESCE_MS, at the end of the burst's first window.
@@ -496,7 +400,7 @@ export default class extends Controller {
   async refreshCounts(element) {
     const url = element.dataset.notesCountsUrl
     if (!url) return
-    const counts = await this.json(url)
+    const counts = await json(url)
     if (counts && element.isConnected) this.notes?.refreshCounts(counts)
   }
 
@@ -505,192 +409,28 @@ export default class extends Controller {
     return this.application.getControllerForElementAndIdentifier(this.element, "admin--notes--drawer")
   }
 
-  // --- the person's inbox -----------------------------------------------------------
+  // --- is the person looking at a thread ------------------------------------------------
 
-  // A signal on the person's stream. Every delivery named in a burst is
-  // announced; the count and the cards are fetched once for all of them.
-  addressed(signal) {
-    if (signal?.kind === "delivery") {
-      if (Number.isInteger(signal.delivery_id)) pending.deliveries.add(signal.delivery_id)
-    } else if (signal?.kind !== "inbox" || signal.origin === TAB) {
-      return
-    }
-    pending.due = true
-    this.soon("person", () => this.inbox())
-  }
-
-  // ONLY THE CONTROLLER OF THE PAGE IN THE DOCUMENT ANNOUNCES. A run can
-  // outlive its page: a Turbo visit replaces <body> while the count or a
-  // delivery is being fetched. After every `await` the run asks whether it
-  // is still `live`; if not it announces nothing -- its `record` targets are
-  // the old page's, so it would judge "is the person looking at this
-  // thread" by a page that is gone -- puts back the delivery it was reading
-  // and hands everything to the page that is there (`handBack`). An id is
-  // taken off `pending` before it is read, so two runs never read the same
-  // one, and it is put back only by the run that took it: no delivery is
-  // announced twice, and none is stranded waiting for another signal.
-  async inbox() {
-    pending.due = false
-    await this.refreshInbox()
-    if (live !== this) return this.handBack()
-
-    for (const id of [ ...pending.deliveries ]) {
-      // Taken by another run since this one began.
-      if (!pending.deliveries.delete(id)) continue
-      const row = await this.read(id)
-      if (live !== this) return this.handBack(id)
-      if (row) this.announce(row)
-    }
-  }
-
-  // This run's page is gone. What it had not announced is the next page's:
-  // the delivery it was reading goes back, the count and the cards are due
-  // again (the answer went to the old page's elements), and the controller
-  // that is live runs -- now, not at the next signal. Without one yet, its
-  // `connect` will. Nothing is handed to another person's page.
-  handBack(id = null) {
-    if (pending.person !== this.personValue) return
-    if (id != null) pending.deliveries.add(id)
-    pending.due = true
-    live?.soon("person", () => live?.inbox())
-  }
-
-  // One delivery, read through the scoped endpoint before anything is said.
-  // Not found or refused (the record left the viewer's scope, or went to the
-  // trash): null, and nothing is said.
-  read(id) {
-    // The address of delivery 0, with this one's id as its last segment.
-    const url = new URL(this.deliveryUrlValue, window.location.origin)
-    url.pathname = url.pathname.replace(/\/0$/, `/${encodeURIComponent(id)}`)
-    return this.json(url.pathname + url.search)
-  }
-
-  // In one task, with no `await`: the controller that was live when the
-  // delivery had been read is the one that judges and says it.
-  announce(row) {
-    const now = Date.now()
-    if (now - burst.last > this.burstWindow) endBurst()
-    burst.last = now
-
-    const shown = this.watching(row.thread_id)
-    const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown, burstMs: this.burstWindow }
-    document.dispatchEvent(new CustomEvent("admin--notes--live:delivery", { detail }))
-    if (shown) return
-
-    // The first two of a burst by name; from the third, one toast for all.
-    burst.said += 1
-    if (burst.said <= NAMED_TOASTS) {
-      const toast = this.toast(row)
-      if (toast) burst.named.push(toast)
-    } else {
-      this.summarise()
-    }
-  }
-
-  // The length of a burst's window: `burstMs`, or the 10 seconds for
-  // anything that is not a positive finite number -- a NaN here would make a
-  // burst that never ends.
-  get burstWindow() {
-    const ms = this.burstMsValue
-    return Number.isFinite(ms) && ms > 0 ? ms : BURST_MS
-  }
-
-  // "You have 3 new notes": in the place of the burst's named toasts, and of
-  // itself when the count grows -- a new element, so its 8 seconds start
-  // again (`admin--ui--toast` counts from when it connects). "Open" is the
-  // template's own, which leads to the inbox.
-  summarise() {
-    burst.named.forEach((toast) => toast.remove())
-    burst.named = []
-    burst.summary?.remove()
-
-    const toast = this.blankToast()
-    if (!toast) return
-    toast.dataset.noteToast = "many"
-    toast.querySelector("span:not([aria-hidden])").textContent = messages(this.element).t("notes.script.toast.many", { count: burst.said })
-    document.getElementById("toasts").append(toast)
-    burst.summary = toast
+  // `admin--notes--inbox:watching` on the document: `admin--notes--inbox`,
+  // which raises the toasts, asks whether the person is looking at a thread.
+  // The answer is written into the event's own `detail`, and `dispatchEvent`
+  // is synchronous, so the asker reads it on its next line. Neither
+  // controller holds the other: no outlet, no import.
+  watched(event) {
+    event.detail.watching = this.watching(event.detail.threadId)
   }
 
   // Whether the person is looking at that thread, THE ONE PREDICATE: it is
   // the view of a notes frame that is open here, in a document that is not
-  // hidden. It is `detail.shown` of the delivery's event, what keeps the
-  // toast away, and -- its second half, in `fetchPart` -- what lets a thread
-  // be fetched at all. The window's focus is not part of it.
+  // hidden. It is `detail.shown` of the delivery's event
+  // (`admin--notes--inbox:delivery`), what keeps the toast away, and -- its
+  // second half, in `fetchPart` -- what lets a thread be fetched at all. The
+  // window's focus is not part of it.
   watching(threadId) {
     if (document.hidden) return false
     return this.recordTargets.some((element) => {
       const view = element.hidden ? null : element.querySelector("turbo-frame#notes > [data-notes-view='thread']")
       return Boolean(view) && view.dataset.noteThread === String(threadId) && !view.querySelector("[data-note-gone]")
     })
-  }
-
-  async refreshInbox() {
-    const count = await this.json(this.unreadUrlValue)
-    const badge = document.getElementById("sidebar-badge-dashboard")
-    if (count && badge) {
-      const unread = Number(count.unread) || 0
-      badge.textContent = unread > 0 ? String(unread) : ""
-      badge.hidden = unread === 0
-      badge.toggleAttribute("data-badge", unread > 0)
-    }
-    this.reload(document.getElementById("notes-for-you"), this.cardUrlValue)
-    this.reload(document.getElementById("notes-open-threads"), this.openThreadsUrlValue)
-  }
-
-  // The dashboard's two cards are frames drawn with the page, with no `src`
-  // of their own: the first signal gives them one, later ones reload it.
-  reload(frame, url) {
-    if (!frame || !url) return
-    if (frame.getAttribute("src") === url) frame.reload()
-    else frame.src = url
-  }
-
-  // JSON from one of CS Studio's own endpoints, or null: a refusal, a
-  // redirect to the sign-in page (which answers 200 with a page) and
-  // anything else that is not JSON are all "nothing to show".
-  async json(url) {
-    const response = await fetch(url, { headers: { Accept: "application/json" } })
-    if (!response.ok || response.redirected || !(response.headers.get("Content-Type") || "").includes("json")) return null
-    return response.json()
-  }
-
-  // The layout's `#toast-note-template` with an accent dot before its
-  // sentence (accent means "for you"), not yet in the page; nothing where
-  // there is no template or no region to put it in.
-  blankToast() {
-    const toast = document.getElementById("toast-note-template")?.content.firstElementChild?.cloneNode(true)
-    if (!toast || !document.getElementById("toasts")) return null
-
-    const dot = document.createElement("span")
-    dot.className = "size-1.5 shrink-0 rounded-full bg-accent"
-    dot.setAttribute("aria-hidden", "true")
-    toast.prepend(dot)
-    return toast
-  }
-
-  // One delivery's toast: "Dana mentioned you on Pricing" and "Open". The
-  // action is a GET form, whose query a browser rebuilds from its fields:
-  // the URL's parameters go in as hidden fields. Answers the element.
-  toast(row) {
-    const toast = this.blankToast()
-    const region = document.getElementById("toasts")
-    if (!toast) return null
-
-    toast.dataset.noteToast = "one"
-    toast.querySelector("span:not([aria-hidden])").textContent = messages(this.element).t("notes.script.toast.on", { sentence: row.sentence, title: row.title })
-
-    const form = toast.querySelector("form")
-    const target = new URL(row.url, window.location.origin)
-    form.action = target.pathname
-    target.searchParams.forEach((value, name) => {
-      const field = document.createElement("input")
-      field.type = "hidden"
-      field.name = name
-      field.value = value
-      form.append(field)
-    })
-    region.append(toast)
-    return toast
   }
 }
