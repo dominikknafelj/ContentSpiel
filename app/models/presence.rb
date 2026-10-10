@@ -18,7 +18,8 @@
 #
 # PRESENCE IS NOT CONTENT. It is the one write that is not an
 # `ApplicationService` (`CLAUDE.md`): a channel writes and deletes its own
-# rows, nobody asks for it by name, and it is gone in a minute. It is never
+# rows, nobody asks for it by name, and it is gone within 150 seconds of the
+# tab's last word (STALE_AFTER). It is never
 # audited, never touches the record it is on and never moves the public
 # content version. It does not know notes, nor notes it.
 module Presence

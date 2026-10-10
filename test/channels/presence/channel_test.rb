@@ -156,6 +156,34 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
     assert_equal 0, Presence::Mark.count
   end
 
+  # A reload, or a socket that came back before the server noticed the old
+  # one was gone: for a while the same person, record and tab have TWO live
+  # subscriptions. The older one's keep-alive finds the row (it is the
+  # newer's now) and must leave its token alone, or the newer one's leave
+  # would delete nothing and the person would stay until the row went stale.
+  test "an older live subscription's beat leaves the newer one's token on the row" do
+    user = users(:reader)
+    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    subscribe type: "page", id: @page.id, tab: TAB
+    first = subscription
+    old_token = Presence::Mark.sole.token
+    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    subscribe type: "page", id: @page.id, tab: TAB
+    second = subscription
+    new_token = Presence::Mark.sole.token
+    assert_not_equal old_token, new_token
+
+    first.perform_action("action" => "beat", "state" => "here")
+    assert_equal new_token, Presence::Mark.sole.token
+    first.perform_action("action" => "report", "state" => "away")
+    assert_equal [ new_token, "away" ], Presence::Mark.sole.values_at(:token, :state)
+
+    first.unsubscribe_from_channel
+    assert_equal 1, Presence::Mark.count
+    second.unsubscribe_from_channel
+    assert_equal 0, Presence::Mark.count
+  end
+
   test "a beat finds no row, puts it back with the subscription's token and the state it carries, and tells the others" do
     connect_as users(:reader)
     subscribe type: "page", id: @page.id, tab: TAB

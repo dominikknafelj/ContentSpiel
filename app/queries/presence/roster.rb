@@ -1,7 +1,8 @@
 module Presence
   # Who is on a record, and which of these records have someone here, for one
   # viewer. It reads only FRESH rows (`Mark.fresh`), so a person who left
-  # without saying so is gone from every answer after a minute whatever the
+  # without saying so is gone from every answer after 150 seconds
+  # (`Presence::STALE_AFTER`) whatever the
   # sweep has deleted, and it never includes the viewer: your own other tab
   # is you, not company. It is told nothing about rights: the caller has
   # already found the record(s) through the read scope.

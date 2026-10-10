@@ -108,6 +108,32 @@ class Presence::MarkTest < ActiveSupport::TestCase
     assert_equal [ "tab-bbbbbbbb" ], Presence::Mark.pluck(:tab)
   end
 
+  # A subscription that was refused, or one whose arrival failed, has no
+  # token: its leave must not match a row (`token IS NULL` matches none, the
+  # column is not null; and it must never read as "any token").
+  test "leave without a token deletes nothing" do
+    arrive
+    assert_not Presence::Mark.leave(user: @user, record: @page, tab: @tab, token: nil)
+    assert_equal 1, Presence::Mark.count
+  end
+
+  # A reconnect arrives again: "away since" starts over, because the server
+  # cannot know what the tab was doing while it was gone (the tab reports its
+  # state right after, `Presence::Channel`).
+  test "arriving again resets state_at, whatever the state was" do
+    travel_to(Time.zone.local(2026, 10, 10, 12, 0, 0)) { arrive && report("away") }
+    travel_to Time.zone.local(2026, 10, 10, 12, 7, 0) do
+      arrive
+      assert_equal [ "here", Time.current ], Presence::Mark.sole.values_at(:state, :state_at)
+      arrive(state: "away")
+      assert_equal "away", Presence::Mark.sole.state
+    end
+    travel_to Time.zone.local(2026, 10, 10, 12, 9, 0) do
+      arrive(state: "away")
+      assert_equal Time.current, Presence::Mark.sole.state_at, "a re-arrival in the same state kept the old state_at"
+    end
+  end
+
   test "fresh is the last STALE_AFTER" do
     assert_equal 150.seconds, Presence::STALE_AFTER
     arrive
