@@ -33,7 +33,11 @@ module Admin
         record.persisted? && !RecordKinds.of(record).nil? && ::Notes.readable?(viewer, record)
       end
 
-      def open_notes = (@counts || ::Notes::Counts.for_container(record, user: viewer)).fetch("total").to_i
+      def open_notes = (@counts || ::Notes::Counts.for_container(record, user: user)).fetch("total").to_i
+
+      # The person the count is unread FOR, as the editor views ask it (`Current.user`):
+      # the viewer is the actor, which on another channel could be an API token.
+      def user = viewer.is_a?(ApiToken) ? viewer.user : viewer
 
       # The shared secondary style of the header (Preview's), as a flex row
       # for the icon, the word and the count: the one class swapped is the

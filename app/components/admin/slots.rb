@@ -23,8 +23,11 @@ module Admin
   #   its own question;
   # - `context` is whatever the host handed to the slot (`locale:`,
   #   `url_options:`, and for a screen that has already read something the
-  #   feature would read again, that). A component takes the context it uses
-  #   and ignores the rest (`**`).
+  #   feature would read again, that). EVERY slot component must accept `**`
+  #   for the context it does not use: a screen may hand through more than
+  #   one feature needs (the editors pass `counts:`);
+  # - `options` are the registration's own (`register(name, component,
+  #   size: :panel)`), merged after the context, so they win on a clash.
   # `render?` decides whether it draws; one that says no leaves no markup.
   #
   # A list slot's `loader` is called ONCE per render of the list with all its
@@ -40,7 +43,12 @@ module Admin
   # Each worker of a parallel test run is its own process; a test that changes
   # a slot does it through `with`, which puts the registry back in an `ensure`.
   module Slots
-    Entry = Data.define(:component, :loader)
+    # `options` are fixed at registration (`register(name, component, size: :panel)`)
+    # and part of the entry's value, so the same component and loader registered
+    # twice with different options are two entries.
+    Entry = Data.define(:component, :loader, :options) do
+      def initialize(component:, loader: nil, options: {}) = super
+    end
 
     NAMES = %w[
       editor.header.people editor.header.actions
@@ -52,8 +60,8 @@ module Admin
 
     class << self
       # Raises for a name no screen draws. Entries keep registration order.
-      def register(name, component, loader: nil)
-        entries_for!(name) << Entry.new(component:, loader:)
+      def register(name, component, loader: nil, **options)
+        entries_for!(name) << Entry.new(component:, loader:, options:)
       end
 
       def entries(name) = entries_for!(name).dup
@@ -91,7 +99,7 @@ module Admin
         @registry.fetch(name.to_s) { raise ArgumentError, "no slot is named #{name.inspect}; the names are #{NAMES.join(", ")}" }
       end
 
-      def entry_of(entry) = entry.is_a?(Entry) ? entry : Entry.new(component: entry, loader: nil)
+      def entry_of(entry) = entry.is_a?(Entry) ? entry : Entry.new(component: entry, loader: nil, options: {})
     end
   end
 end

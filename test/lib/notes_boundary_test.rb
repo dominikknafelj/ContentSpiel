@@ -16,6 +16,11 @@ require "test_helper"
 # slots (`Admin::Slots`, `config/initializers/admin_slots.rb`) and do not say
 # the word, comments included. The places that still name notes directly are
 # listed with the trigger that would make each a slot.
+#
+# What the screen guard covers is COMPONENTS. The views that assemble a screen
+# (`app/views/admin/pages/show.html.erb`, `posts/show.html.erb`) may name the
+# features on it, and do: they hand the drawer's counts through the header's
+# `slot_context:`. The shared components may not.
 class NotesBoundaryTest < ActiveSupport::TestCase
   CONTENT_SOURCES = %w[
     app/models/page.rb app/models/page/**/*.rb app/models/post.rb app/models/post/**/*.rb app/models/content_block.rb
@@ -97,7 +102,10 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/posts_screen/table_component.rb
   ].freeze
 
-  NOTES_WORD = /\bnotes\b/i
+  # "notes" at the start of a word or after an underscore, digit, colon or hyphen: `Admin::NotesScreen::X`,
+  # `open_notes`, `@open_notes`, `notes_path`, `notes_type`, `admin--notes--drawer`, a comment's "Notes". Not
+  # inside a word ("footnotes", "denotes").
+  NOTES_WORD = /(?<![a-z])notes/i
 
   # Notes-only places that stay direct: files outside `notes_screen` that name
   # notes on purpose, each with the trigger that would make it a slot. A slot
@@ -141,11 +149,10 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     assert_empty NAMED_EXCEPTIONS.keys.flatten & SLOT_HOSTS
   end
 
-  test "the slot pattern finds the word in code and in a comment, and not a word that only contains it" do
-    assert_match NOTES_WORD, "# the Notes button"
-    assert_match NOTES_WORD, "open_threads(notes)"
-    assert_no_match NOTES_WORD, "footnotes = 1"
-    assert_no_match NOTES_WORD, "denotes"
+  test "the slot pattern finds notes in every spelling, and not a word that only contains it" do
+    [ "# the Notes button", "open_notes(x)", "Admin::NotesScreen::HeaderButtonComponent", "open_notes: 3", "@open_notes", "notes_path",
+      "data: { notes_type: 1 }", "admin--notes--drawer", "data-notes-id" ].each { |text| assert_match NOTES_WORD, text, text }
+    [ "footnotes = 1", "denotes", "ReleaseNotes.latest" ].each { |text| assert_no_match NOTES_WORD, text, text }
   end
 
   test "the pattern finds a reference and nothing that only looks like one" do

@@ -10,6 +10,9 @@ module Admin
     # once for all its rows); a single-record slot leaves it nil and each
     # component asks for what it needs.
     #
+    # An entry's registration options are merged after the host's context, so
+    # they win on a clash.
+    #
     # There is no template on purpose: the markup is the entries' alone, and a
     # template's own whitespace would be between them.
     class SlotComponent < Admin::AdminComponent
@@ -25,7 +28,7 @@ module Admin
 
       def call
         safe_join(entries.map do |entry|
-          render(entry.component.new(record: @record, viewer: @viewer, data: data_for(entry), **@context))
+          render(entry.component.new(record: @record, viewer: @viewer, data: data_for(entry), **@context, **entry.options))
         end)
       end
 

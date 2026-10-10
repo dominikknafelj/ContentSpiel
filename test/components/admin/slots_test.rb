@@ -26,7 +26,7 @@ class Admin::SlotsTest < ViewComponent::TestCase
     def render? = false
   end
 
-  def entry(component, loader: nil) = Admin::Slots::Entry.new(component:, loader:)
+  def entry(component, loader: nil, **options) = Admin::Slots::Entry.new(component:, loader:, options:)
 
   test "the names a screen may put a slot at" do
     assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title], Admin::Slots::NAMES
@@ -83,6 +83,35 @@ class Admin::SlotsTest < ViewComponent::TestCase
 
     texts = Capybara.string(rendered_content).all("i[data-probe]").map(&:text)
     assert_equal [ "FirstComponent:#{other.id}:#{users(:one).id}:\"mark #{other.id}\":{}", "SecondComponent:#{other.id}:#{users(:one).id}:nil:{}" ], texts
+  end
+
+  test "a registration carries options, which win over the host's context on a clash" do
+    page = create_page(title: "About")
+
+    Admin::Slots.with("media.panel.header" => []) do
+      Admin::Slots.register("media.panel.header", FirstComponent, size: :panel, locale: "fixed")
+      assert_equal({ size: :panel, locale: "fixed" }, Admin::Slots.entries("media.panel.header").first.options)
+      render_inline Admin::Ui::SlotComponent.new(name: "media.panel.header", record: page, viewer: nil, locale: "de")
+    end
+
+    assert_equal "FirstComponent:#{page.id}::nil:{locale: \"fixed\", size: :panel}", Capybara.string(rendered_content).find("i[data-probe]").text
+  end
+
+  test "the same component and loader registered twice with different options are two entries, each loaded once" do
+    page = create_page(title: "About")
+    calls = 0
+    loader = ->(records, viewer:) { calls += 1; records.to_h { |record| [ record.id, "data" ] } }
+
+    Admin::Slots.with("tree.row.markers" => []) do
+      Admin::Slots.register("tree.row.markers", FirstComponent, loader: loader, size: :header)
+      Admin::Slots.register("tree.row.markers", FirstComponent, loader: loader, size: :panel)
+
+      loaded = Admin::Slots.load("tree.row.markers", [ page ], viewer: nil)
+
+      assert_equal 2, loaded.size
+      assert_equal 2, calls
+      assert_equal [ { size: :header }, { size: :panel } ], loaded.keys.map(&:options)
+    end
   end
 
   test "load calls each loader once with every record and the viewer, and skips entries without one" do
