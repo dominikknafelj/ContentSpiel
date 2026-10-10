@@ -232,4 +232,54 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
       page.evaluate_script("({ up: window.__stop.up, settled: window.__stop.settled, rejected: window.__stop.rejected, sent: window.__stop.perform('beat') })"))
     assert_equal 0, Presence::Mark.count
   end
+
+  # A document that is going away tells the server at once: the browser may
+  # keep a page it left by a full load, socket and all, and `stop` lets go a
+  # task later. On presence's channel, where the server's row says whether
+  # the subscription is there.
+  test "suspend ends the subscription on the server in the same task and keeps the listener, and resume takes it up again" do
+    record = create_page(title: "Pricing")
+    params = { channel: "Presence::Channel", type: "page", id: record.id.to_s }
+    marks = Presence::Mark.where(user: users(:one), record_type: "Page", record_id: record.id)
+    await_notes_live
+    live(<<~JS, params)
+      (live, consumer, params) => {
+        window.__told = []
+        window.__stop = live.listen({ ...params, tab: live.TAB }, Object.assign(() => {}, { connected: () => window.__told.push("connected"), disconnected: () => window.__told.push("disconnected") }))
+      }
+    JS
+    await_js("window.__told.length === 1", wait: 8)
+    token = marks.sole.token
+
+    # In one task: gone from the consumer, the listener told, nothing sent after.
+    after = page.evaluate_script(<<~JS)
+      (() => {
+        window.__stop.suspend()
+        window.__stop.suspend()
+        return { told: window.__told, up: window.__stop.up, settled: window.__stop.settled, sent: window.__stop.perform("beat") }
+      })()
+    JS
+    assert_equal({ "told" => %w[connected disconnected], "up" => false, "settled" => false, "sent" => false }, after)
+    assert_equal 0, subscriptions("Presence::Channel")
+    assert_eventually(message: "the server kept the row of a suspended subscription") { marks.none? }
+    assert_equal 1, subscriptions("PersonChannel"), "suspending one subscription took another with it"
+
+    page.execute_script("window.__stop.resume(); window.__stop.resume()")
+    await_js("window.__told.length === 3", wait: 8)
+    assert_equal %w[connected disconnected connected], page.evaluate_script("window.__told")
+    assert_equal 1, subscriptions("Presence::Channel")
+    assert_not_equal token, marks.sole.token
+    assert_equal true, page.evaluate_script("window.__stop.perform('beat')")
+
+    # Suspended and then let go for good: nothing is unsubscribed twice (the
+    # server would answer a second one with an error), and nothing comes back.
+    page.execute_script("window.__stop.suspend(); window.__stop()")
+    assert_eventually(message: "the server kept the row") { marks.none? }
+    await_frames
+    page.execute_script("window.__stop.resume()")
+    await_frames
+    assert_equal 0, subscriptions("Presence::Channel")
+    assert_equal 1, subscriptions("PersonChannel")
+    assert live("(live) => live.connected()")
+  end
 end

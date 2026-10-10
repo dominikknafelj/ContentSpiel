@@ -61,6 +61,8 @@ const pool = new Map()
 // shares the one subscription, and the channel cannot tell them apart -- so
 // whatever is sent must mean the same sent twice (presence's `report` and
 // `beat` do).
+//
+// And `suspend()` and `resume()`: see where they are defined, below.
 export function listen(params, listener) {
   const key = JSON.stringify(params)
   let entry = pool.get(key)
@@ -72,15 +74,20 @@ export function listen(params, listener) {
     // unsubscribe is sent) must not tell its listeners `connected` after
     // they were told `disconnected`.
     const unlessClosed = (act) => (...args) => { if (!entry.closed) act(...args) }
-    entry.subscription = cable.subscribeTo(params, {
-      connected: unlessClosed(() => { entry.up = entry.settled = true; tell("connected") }),
-      disconnected: unlessClosed(() => { entry.up = entry.settled = false; tell("disconnected") }),
-      rejected: unlessClosed(() => { entry.rejected = entry.settled = true; tell("rejected") }),
-      received: unlessClosed((signal) => [ ...entry.listeners ].forEach((each) => each(signal)))
-    })
-    // The subscription itself, once the consumer has made it (before the
-    // server can have confirmed it), for `perform`.
-    entry.subscription.then((subscription) => { entry.made = subscription })
+    entry.tell = tell
+    // Asks the server, now and again after a `suspend`. The subscription
+    // itself, once the consumer has made it (before the server can have
+    // confirmed it), is kept for `perform` and `suspend`.
+    entry.subscribe = () => {
+      const made = entry.subscription = cable.subscribeTo(params, {
+        connected: unlessClosed(() => { entry.up = entry.settled = true; tell("connected") }),
+        disconnected: unlessClosed(() => { entry.up = entry.settled = false; tell("disconnected") }),
+        rejected: unlessClosed(() => { entry.rejected = entry.settled = true; tell("rejected") }),
+        received: unlessClosed((signal) => [ ...entry.listeners ].forEach((each) => each(signal)))
+      })
+      made.then((subscription) => { if (entry.subscription === made) entry.made = subscription })
+    }
+    entry.subscribe()
     pool.set(key, entry)
   }
   clearTimeout(entry.release)
@@ -94,8 +101,9 @@ export function listen(params, listener) {
       // Ended by `close` meanwhile: the key may be another entry's by now.
       if (entry.listeners.size > 0 || entry.closed) return
       pool.delete(key)
-      // A rejected one is forgotten on both sides already.
-      if (!entry.rejected) subscription.unsubscribe()
+      // A rejected one is forgotten on both sides already, and so is a
+      // suspended one.
+      if (!entry.rejected && !entry.suspended) subscription.unsubscribe()
       if (pool.size === 0) close()
     }, 0)
   }
@@ -103,8 +111,31 @@ export function listen(params, listener) {
     if (!entry.up || entry.closed || !entry.made || !entry.listeners.has(listener)) return false
     return entry.made.perform(action, data) !== false
   }
+  // Ends the subscription ON THE SERVER AT ONCE, in this task, and keeps the
+  // listeners: `resume` asks for it again. For a document that is going
+  // away (`pagehide`): a page left by a full load may be kept by the browser
+  // for the Back button with its socket still open, so the server is told of
+  // no close for as long as the page is kept, and `stop` lets go a task
+  // later, which a page that is being frozen may never run. The listeners
+  // are told `disconnected`, as when the socket drops; after `resume` they
+  // are told `connected` again. Both are the SUBSCRIPTION's, as `perform`
+  // is, and both are harmless twice.
+  const suspend = () => {
+    if (entry.suspended || entry.closed || entry.rejected || !entry.made || !entry.listeners.has(listener)) return
+    entry.suspended = true
+    entry.up = entry.settled = false
+    entry.made.unsubscribe()
+    entry.made = null
+    entry.tell("disconnected")
+  }
+  const resume = () => {
+    if (!entry.suspended || entry.closed || !entry.listeners.has(listener)) return
+    entry.suspended = false
+    entry.subscribe()
+  }
   return Object.defineProperties(stop, {
-    up: { get: () => entry.up }, settled: { get: () => entry.settled }, rejected: { get: () => entry.rejected }, perform: { value: perform }
+    up: { get: () => entry.up }, settled: { get: () => entry.settled }, rejected: { get: () => entry.rejected },
+    perform: { value: perform }, suspend: { value: suspend }, resume: { value: resume }
   })
 }
 
@@ -148,7 +179,7 @@ export async function close() {
   })
   for (const entry of entries) {
     const subscription = await entry.subscription
-    if (!entry.rejected) subscription.unsubscribe()
+    if (!entry.rejected && !entry.suspended) subscription.unsubscribe()
   }
   const consumer = await cable.getConsumer()
   if (pool.size > 0) return
