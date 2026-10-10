@@ -9,7 +9,7 @@ pairs = ARGV.to_h { |arg| arg.split("=", 2) }
 abort "usage: constants.rb Old::Name=New::Name ..." if pairs.empty?
 
 ROOT = Pathname(__dir__).join("../..").expand_path
-FILES = Dir[ROOT.join("{app,test,docs,config,lib}/**/*.{rb,erb,yml,md,rake}")] + [ ROOT.join("CLAUDE.md").to_s ]
+FILES = Dir[ROOT.join("{app,test,docs,config,lib}/**/*.{rb,erb,yml,md,rake,js,css}")] + [ ROOT.join("CLAUDE.md").to_s ]
 # Specs and plans are historical records and quote old names on purpose; built CSS is
 # git-ignored; the guard test holds sample strings that must stay as written.
 EXCLUDED = %w[docs/superpowers docs/product docs/architecture app/assets/builds test/lib/source_layout_test.rb test/lib/layout_tools_test.rb].map { |path| ROOT.join(path).to_s }

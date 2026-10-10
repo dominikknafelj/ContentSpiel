@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // The Site card's language tabs (round 3, Task 5; decision D6, handoff B32).
 // Every enabled language's title and tagline are in the page at once, one
 // `[data-language-panel]` per language; the tabs only choose which panel is
-// shown. A tab is a `<button type="button">` (`LanguageTabsComponent`, `mode:
+// shown. A tab is a `<button type="button">` (`Ui::LanguageTabsComponent`, `mode:
 // :buttons`): nothing navigates, so Turbo never sees a visit and the save
 // footer's leave guard never hears of it, and nothing here touches a form
 // control's value -- a hidden panel's inputs are still the form's, still

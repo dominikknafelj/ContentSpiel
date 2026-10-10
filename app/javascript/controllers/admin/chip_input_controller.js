@@ -3,7 +3,7 @@ import { createSuggestions } from "search/suggestions"
 import { messages } from "i18n/messages"
 
 // A multi-value input that shows each value as a removable chip, with
-// autocomplete (`Admin::ChipInputComponent`; its class comment has the form
+// autocomplete (`Admin::Ui::ChipInputComponent`; its class comment has the form
 // contract). The post editor's tags and related posts both use it, and a
 // post-list block's tag filter in its `single` form (one chip at most: a new
 // choice replaces the old one).
@@ -102,7 +102,7 @@ export default class extends Controller {
   }
 
   // A message by key (`data-messages` on this component's root,
-  // `Admin::ChipInputComponent#messages`; keys are relative to `admin`).
+  // `Admin::Ui::ChipInputComponent#messages`; keys are relative to `admin`).
   text(key, vars) { return messages(this.element).t(key, vars) }
 
   get query() {

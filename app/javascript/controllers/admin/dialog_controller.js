@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Opens a <dialog> by id (Admin::DialogComponent). One instance on <body>
+// Opens a <dialog> by id (Admin::Ui::DialogComponent). One instance on <body>
 // serves every trigger on the page -- including ones Turbo streams in
 // later -- so no view carries an inline `onclick="…showModal()"` (which a
 // strict CSP would refuse anyway). Focus: the browser focuses the
@@ -9,7 +9,7 @@ import { Controller } from "@hotwired/stimulus"
 // form field when there is one.
 //
 // Focus on the way back: the browser returns it to whatever had it before
-// `showModal()`. When that was an item of a menu (`Admin::MenuComponent` --
+// `showModal()`. When that was an item of a menu (`Admin::Ui::MenuComponent` --
 // the block card's "Delete block…", the editor header's Schedule… /
 // Unpublish / Move to trash, a list row's Move to trash), the menu has
 // closed on the pick and the item is hidden, so focus fell to <body>: a

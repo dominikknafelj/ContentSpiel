@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// A popover menu (Admin::MenuComponent). The button toggles the panel;
+// A popover menu (Admin::Ui::MenuComponent). The button toggles the panel;
 // opening focuses the first item, ArrowDown/ArrowUp move between the panel's
 // links and buttons, Escape closes and hands focus back to the button, and a
 // click anywhere outside closes it.

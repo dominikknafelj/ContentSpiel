@@ -29,7 +29,7 @@ import { messages } from "i18n/messages"
 
 // The texts of the toast are the page's messages (`i18n/messages.js`).
 // `signedOut` is the autosave status line's own key
-// (`components.ui.save_status.signed_out`, `Admin::SaveStatusComponent`'s
+// (`components.ui.save_status.signed_out`, `Admin::Ui::SaveStatusComponent`'s
 // `:signed_out`): the same thing happened, and the same thing fixes it.
 const ORDER_MESSAGES = {
   failed: "components.ui.toast.order_failed",
@@ -62,7 +62,7 @@ export async function sendOrder(url, { headers, body }) {
 
 // An error toast made in the browser, for a request that got no answer the
 // server could have put one into. The markup is the server's own: the layout
-// holds one `Admin::ToastComponent` (kind `error`, so `role=alert` and no
+// holds one `Admin::Ui::ToastComponent` (kind `error`, so `role=alert` and no
 // auto-hide) in `<template id="toast-error-template">`, and this clones it,
 // writes the message as text and appends it to `#toasts`, where
 // `admin--toast` takes over like for any other toast.

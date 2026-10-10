@@ -114,7 +114,7 @@ export default class extends Controller {
     }
   }
 
-  // One error toast (`Admin::ToastComponent`'s markup; its own controller
+  // One error toast (`Admin::Ui::ToastComponent`'s markup; its own controller
   // dismisses it and keeps it to a handful). Errors never auto-hide.
   showToast(message) {
     const region = document.getElementById("toasts")

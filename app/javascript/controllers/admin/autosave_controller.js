@@ -96,7 +96,7 @@ export default class extends Controller {
     pageBaseId: String
   }
 
-  // Client-only states `Admin::SaveStatusComponent` never has occasion to
+  // Client-only states `Admin::Ui::SaveStatusComponent` never has occasion to
   // render server-side -- there is no request to answer with them, since
   // they describe the request *not landing* at all. Each reads exactly like
   // the component's own matching state because it IS the same key
@@ -108,7 +108,7 @@ export default class extends Controller {
   //
   // `saving_live` is the same line for a live record, whose edits go
   // straight to the site: the status element says so with `data-live`
-  // (`Admin::SaveStatusComponent`'s `live:`). `offline` ends in a Retry
+  // (`Admin::Ui::SaveStatusComponent`'s `live:`). `offline` ends in a Retry
   // button (`setStatus` builds it), which is why its text stops at "· ".
   text(key) { return messages(this.element).t(key) }
 
@@ -344,7 +344,7 @@ export default class extends Controller {
     // a *followed*, final 200 response for the sign-in page itself -- this
     // controller's own PATCH endpoints never redirect otherwise -- and it
     // gets its own client-only status (`signedOut`, matching `Admin::
-    // SaveStatusComponent`'s own `:signed_out`) rather than the retry path
+    // Ui::SaveStatusComponent`'s own `:signed_out`) rather than the retry path
     // below: retrying a PATCH against an expired session can never
     // succeed on its own, only signing back in does.
     if (response.redirected) return "signedOut"
@@ -499,7 +499,7 @@ export default class extends Controller {
     return answeredStatus && contentType.includes("text/vnd.turbo-stream.html")
   }
 
-  // `retry: true` appends the Retry button of `Admin::SaveStatusComponent`'s
+  // `retry: true` appends the Retry button of `Admin::Ui::SaveStatusComponent`'s
   // offline state. The status line sits in the record header, outside this
   // controller's form, so a `data-action` on the button would never reach
   // it: the listener is bound here instead.

@@ -26,8 +26,8 @@
 // editor's text, whatever it contains. A URL comes from a template the server
 // built with its route helpers (`__ID__`, `__NAME__`), never from a path
 // written here; a post's own editor URL arrives with its node. The buttons'
-// classes are `Admin::ButtonComponent`'s and a type's dot is
-// `Admin::ContentTypeDotComponent`'s, both handed over by the view
+// classes are `Admin::Ui::ButtonComponent`'s and a type's dot is
+// `Admin::Ui::ContentTypeDotComponent`'s, both handed over by the view
 // (`buttonClasses`, `dotClasses`), so neither is copied here.
 //
 // `createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses,
@@ -42,7 +42,7 @@
 // and `onChange` what the notes call when they arrived or one was added: the
 // card's height changed, and the node's count may have.
 //
-// The status chip is `Admin::StatusChipComponent`'s, class for class: a dot in
+// The status chip is `Admin::Ui::StatusChipComponent`'s, class for class: a dot in
 // the status's token colour AND the word, so the colour is never the only cue.
 import { cardNotes } from "mind_graph/card_notes"
 
@@ -54,7 +54,7 @@ export const fill = (template, placeholder, value) => template.replace(placehold
 
 // A type's dot by its colour slot (`dotClasses` are slots 1-12 in order); a
 // type that is no longer registered has no slot and gets the neutral ring, as
-// `Admin::ContentTypeDotComponent` gives it. `node_list.js` marks its rows
+// `Admin::Ui::ContentTypeDotComponent` gives it. `node_list.js` marks its rows
 // with the same two.
 export const dotClass = (dotClasses, node) =>
   `h-[7px] w-[7px] shrink-0 rounded-full ${node.colour_index == null ? "border border-meta" : dotClasses[(node.colour_index - 1) % dotClasses.length]}`

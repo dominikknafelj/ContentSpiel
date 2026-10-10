@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Behaviour for `Admin::FileDropComponent`: highlight the zone while a file is
+// Behaviour for `Admin::Ui::FileDropComponent`: highlight the zone while a file is
 // dragged over it, hand a dropped file to the hidden input (and fire its
 // `change`, which is what whoever owns the upload listens to), and echo the
 // chosen name(s) into the polite live region.

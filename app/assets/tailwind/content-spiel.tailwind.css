@@ -52,7 +52,7 @@
 }
 
 /* The active theme choice needs no JS: shared/_theme_head sets
-   <html data-theme-choice> before first paint, and Admin::ThemeSwitchComponent's
+   <html data-theme-choice> before first paint, and Admin::Ui::ThemeSwitchComponent's
    buttons carry their own choice as data-theme-choice-param. */
 [data-theme-choice="light"] .admin-theme-switch__choice[data-theme-choice-param="light"],
 [data-theme-choice="dark"] .admin-theme-switch__choice[data-theme-choice-param="dark"],
@@ -176,8 +176,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 }
 @media (prefers-reduced-motion: reduce) { :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
 
-/* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
-   and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */
+/* Admin::Ui::DialogComponent: a native <dialog> needs real CSS for its backdrop
+   and max sizes (widths mirror Admin::Ui::DialogComponent::WIDTHS). */
 .admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }
 .admin-dialog[open] { display: flex; flex-direction: column; }
 .admin-dialog::backdrop { background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
@@ -200,7 +200,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    downwards. `test/system/admin/media_picker_test.rb` pins it. */
 .admin-media-picker { margin-top: 7.5vh; }
 /* The same fixed top edge for the New page and New post dialogs
-   (`Admin::DialogComponent`'s `hang:`), round 3 Task 9: they open as a shell
+   (`Admin::Ui::DialogComponent`'s `hang:`), round 3 Task 9: they open as a shell
    with a loading line and the form loads into it, so a centred one grew in both
    directions and moved its own header (and the Create button at the foot) under
    the pointer. 7.5vh as above, where the top of a full-height dialog sits when
@@ -239,7 +239,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
 
-/* Styled native checkbox (Admin::CheckboxComponent, round 1 departure). The
+/* Styled native checkbox (Admin::Ui::CheckboxComponent, round 1 departure). The
    browser draws the tick; `accent-color` gives it the token fill in both
    themes, and the radius and focus ring come from tokens too. */
 .cs-checkbox { accent-color: var(--cs-accent); border-radius: var(--cs-radius); width: 1rem; height: 1rem; flex: none; cursor: pointer; }
@@ -289,8 +289,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    Wrappers that render a slot (always as their own direct child):
    `.admin-column` (Columns::*, the settings fields, tag and related-post
    inputs, the AI key form, a tag row's form) and `.admin-field` (the schema
-   fields of Admin::FieldComponent). Wrappers NEST: a group field's sub-fields
-   and a repeater's rows are FieldComponents inside a FieldComponent, so one
+   fields of Admin::Ui::FieldComponent). Wrappers NEST: a group field's sub-fields
+   and a repeater's rows are FieldComponents inside a Ui::FieldComponent, so one
    sub-field's error must colour only that sub-field's own controls, never its
    siblings' (a descendant `:has` would, since the outer wrapper contains every
    inner slot). So the colour travels as an inherited custom property that
@@ -598,7 +598,7 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
    ring WITH A STROKE THROUGH IT, so it differs from a ring of slots 7-12 by
    shape; a pinned node carries a small ink dot with a surface ring at its
    top-right (here on a faint stand-in for the node). (A type's own dot is
-   `Admin::ContentTypeDotComponent`.) Change one side and the other with it. */
+   `Admin::Ui::ContentTypeDotComponent`.) Change one side and the other with it. */
 .mg-tag rect { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 1.5; }
 .mg-edge { fill: none; }
 .mg-edge-related { stroke: var(--cs-ink); stroke-opacity: 0.35; stroke-width: 1.5; }

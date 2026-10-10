@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// One toast (Admin::ToastComponent). Hides itself after `timeout` ms (0 =
+// One toast (Admin::Ui::ToastComponent). Hides itself after `timeout` ms (0 =
 // stays until dismissed); hovering or focusing pauses the clock so an Undo
 // can't vanish under the pointer. At most three are shown: a fourth pushes
 // the oldest out.

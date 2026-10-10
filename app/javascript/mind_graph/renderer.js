@@ -3,7 +3,7 @@
 // camera moves a node's centre, and a node is the same size at every zoom.
 //
 // A node's mark carries two cues that never share a shape, exactly as
-// `Admin::ContentTypeDotComponent` and the legend draw them:
+// `Admin::Ui::ContentTypeDotComponent` and the legend draw them:
 // - the TYPE is the fill: colour slots 1-6 are filled with the hue, 7-12 are a
 //   ring of the same six hues (13+ cycle);
 // - the STATUS is the outline: a live post's is solid, a draft's or a

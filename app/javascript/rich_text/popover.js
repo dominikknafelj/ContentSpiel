@@ -3,7 +3,7 @@
 // `window.prompt`/`confirm`/`alert` anywhere, just a panel under the
 // toolbar built from CS Studio's own product token classes. The class
 // strings here mirror `SetupHelper#setup_input_class`/`#setup_label_class`
-// and `Admin::ButtonComponent`'s variants, so a popover reads like every
+// and `Admin::Ui::ButtonComponent`'s variants, so a popover reads like every
 // other CS Studio form; `app/assets/tailwind/application.css` `@source`s
 // this directory so Tailwind actually generates them.
 //

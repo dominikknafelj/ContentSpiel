@@ -66,7 +66,7 @@ export default class extends Controller {
   // schema-declared identifiers, not numeric).
   //
   // `id`/`for` need the same fix (cs-studio Task 7, carried in from Task 2's
-  // review): `Admin::FieldComponent`'s default `dom_id_prefix(form_name)`
+  // review): `Admin::Ui::FieldComponent`'s default `dom_id_prefix(form_name)`
   // bakes a row's index into every subfield's own input `id`, `<label
   // for>` and error-slot `id` too -- just without brackets (e.g.
   // "post_fields_speakers_0-name", not "...[0]-name") -- so a stale id left
