@@ -387,6 +387,103 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     Notes::Resolve.define_singleton_method(:call, original) if original
   end
 
+  # The handoff's decision 40: a refused Pin or Notify is said under the two
+  # rows its button is in, in the warn alert, with a control to close it; the
+  # next thing the person does in the thread clears it; and when what it
+  # says is that the note is gone, the drawer goes back to the list.
+  def refuse(service, sentence)
+    original = service.method(:call)
+    refusal = ApplicationService::Result.failure(nil, [ sentence ])
+    service.define_singleton_method(:call) { |*, **| refusal }
+    yield
+  ensure
+    service.define_singleton_method(:call, original)
+  end
+
+  REFUSAL = "#notes-drawer [data-note-refusal]".freeze
+
+  test "a refused Pin is said in the warn alert under the two rows, 8px from the drawer's edges; its close control takes it away" do
+    open_in_drawer
+    refuse(Notes::Pin, "Reopen this note before pinning it.") do
+      find("[data-note-actions] button[aria-label='Pin']").click
+      assert_selector "#{REFUSAL}[role=alert]", text: "Reopen this note before pinning it."
+    end
+
+    look = page.evaluate_script(<<~JS)
+      (() => {
+        const alert = document.querySelector(#{REFUSAL.to_json}).getBoundingClientRect()
+        const style = getComputedStyle(document.querySelector(#{REFUSAL.to_json}))
+        const drawer = document.querySelector("#notes-drawer").getBoundingClientRect()
+        const rows = document.querySelector("#notes-drawer [data-note-rows]").getBoundingClientRect()
+        const scroll = document.querySelector("#notes-drawer [data-note-scroll]").getBoundingClientRect()
+        return { left: alert.left - drawer.left, right: drawer.right - alert.right, underRows: alert.top >= rows.bottom, aboveMessages: alert.bottom <= scroll.top, size: style.fontSize }
+      })()
+    JS
+    # The drawer has a 1px line on its left.
+    assert_in_delta 8, look["left"], 1.5
+    assert_in_delta 8, look["right"], 1.5
+    assert_equal [ true, true, "13px" ], look.values_at("underRows", "aboveMessages", "size")
+    assert_no_selector "[data-note-badge=pinned]"
+
+    find("#{REFUSAL} button[aria-label='Dismiss']").click
+
+    assert_no_selector REFUSAL
+    assert_equal true, page.evaluate_script("document.activeElement.closest('#notes-drawer') !== null"), "the focus left the drawer with the alert"
+  end
+
+  test "a refusal stays while someone else's reply arrives, and the person's next action in the thread clears it" do
+    open_in_drawer
+    refuse(Notes::Pin, "Reopen this note before pinning it.") do
+      find("[data-note-actions] button[aria-label='Pin']").click
+      assert_selector REFUSAL, text: "Reopen this note before pinning it."
+    end
+    await_notes_live
+
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "Meanwhile").ok? }
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Meanwhile", wait: 8
+    assert_selector REFUSAL, text: "Reopen this note before pinning it."
+
+    within("[data-note-actions]") { press "Stop notifying me" }
+    assert_selector "[data-note-actions] button", text: "Notify me"
+    assert_no_selector REFUSAL
+  end
+
+  test "a Pin refused because the note is gone takes the drawer back to the list after four seconds" do
+    open_in_drawer
+    refuse(Notes::Pin, "This note is gone: it was deleted, or what it was on was.") do
+      find("[data-note-actions] button[aria-label='Pin']").click
+      assert_selector REFUSAL, text: "This note is gone: it was deleted, or what it was on was."
+    end
+    shown = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    assert_selector "#notes-drawer [data-notes-view=thread]"
+
+    assert_selector "#notes-drawer #notes-list", wait: 10
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - shown, :>=, 3
+    assert_no_selector REFUSAL
+  end
+
+  # The way back is the person's if they take it first: the timer goes with
+  # the alert, and does not fire into whatever they opened next.
+  test "the timer of a gone refusal is cleared when the person leaves the thread before it runs" do
+    open_in_drawer
+    page.execute_script(<<~JS)
+      window.__timers = { set: [], cleared: [] }
+      const set = window.setTimeout, clear = window.clearTimeout
+      window.setTimeout = (run, ms, ...rest) => { const id = set(run, ms, ...rest); if (ms > 3000 && ms <= 4000) window.__timers.set.push(id); return id }
+      window.clearTimeout = (id) => { window.__timers.cleared.push(id); return clear(id) }
+    JS
+    refuse(Notes::Pin, "This note is gone: it was deleted, or what it was on was.") do
+      find("[data-note-actions] button[aria-label='Pin']").click
+      assert_selector REFUSAL
+    end
+    assert_eventually(message: "no four-second timer was set") { page.evaluate_script("window.__timers.set.length") == 1 }
+
+    find("#notes-drawer a[data-note-back]").click
+
+    assert_selector "#notes-drawer #notes-list"
+    assert_equal true, page.evaluate_script("window.__timers.cleared.includes(window.__timers.set[0])"), "the timer outlived the thread it was for"
+  end
+
   test "a reaction on another message leaves an open edit and a half-typed reply as they are" do
     open_in_drawer
     start_editing

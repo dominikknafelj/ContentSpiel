@@ -402,7 +402,19 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     # Pin is in the rows at the top, and its refusal is said there.
     answering(Notes::Pin, -> { gone }) { post "#{@base}/threads/#{other.id}/pin", headers: frame }
     assert_response :unprocessable_entity
-    assert_select "#note-thread-#{other.id}-messages > ul[role=alert]", text: /This note is gone/
+    # In the shared warn alert, between the rows and what scrolls, with a
+    # control to close it (the handoff's decision 40). "This note is gone"
+    # is marked: the drawer leaves for the list after it.
+    assert_select "#note-thread-#{other.id}-messages > [data-note-rows] + [data-note-refusal] + [data-note-scroll]"
+    assert_select "#note-thread-#{other.id}-messages > [data-note-refusal][role=alert][class~='bg-warn-tint'][class~='text-warn-ink'][class~='border-warn']" do
+      assert_select "li", text: /This note is gone/
+      assert_select "button[type=button][aria-label=Dismiss]"
+    end
+    assert_select "[data-note-refusal][data-admin--note-refusal-gone-value=true][data-admin--note-refusal-back-value='#{@base}']"
+
+    refused = ApplicationService::Result.failure(nil, [ "Reopen this note before pinning it." ])
+    answering(Notes::Pin, -> { refused }) { post "#{@base}/threads/#{other.id}/pin", headers: frame }
+    assert_select "[data-note-refusal][data-admin--note-refusal-gone-value=false] li", text: "Reopen this note before pinning it."
     assert_select "#note-thread-#{other.id}-reply form[data-note-composer] ul[role=alert]", count: 0
 
     first = other.first_message

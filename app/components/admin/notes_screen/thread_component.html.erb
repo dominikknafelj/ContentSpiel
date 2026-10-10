@@ -72,11 +72,24 @@
         <p class="text-[13px] text-dim"><%= summary %></p>
       </div>
     </div>
-    <%# A refusal of Pin or Notify, under the two rows their buttons are in
-        (and, like them, not scrolled away). A refused reply, Resolve or
-        Reopen is said in the composer. %>
+    <%# A refusal of Pin or Notify (the handoff's decision 40): under the two
+        rows their buttons are in and, like them, not scrolled away; in the
+        warn alert (the classes of every warn alert in CS Studio: the delete
+        dialog's notes warning, the blocked permission line) at 13px, 8px in
+        from the drawer's edges, so it does not read as part of the thread;
+        with a control to close it. The person's next action in the thread
+        redraws this part and so clears it. When it says the note is gone,
+        `admin--note-refusal` takes the frame back to the list after four
+        seconds. A refused reply, Resolve or Reopen is said in the composer. %>
     <% if button_failure %>
-      <ul role="alert" class="shrink-0 border-b border-line px-4 py-2 text-[12px] text-danger-ink"><% button_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
+      <%= tag.div role: "alert", class: "mx-2 my-2 flex shrink-0 items-start gap-2 #{REFUSAL_CLASS}",
+            data: { note_refusal: true, controller: "admin--note-refusal", "admin--note-refusal-gone-value": gone_refusal?, "admin--note-refusal-back-value": back_path } do %>
+        <ul class="min-w-0 flex-1"><% button_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
+        <%= tag.button type: "button", title: t(".dismiss"), aria: { label: t(".dismiss") }, data: { action: "admin--note-refusal#close" },
+              class: "-my-0.5 -mr-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-cs hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent" do %>
+          <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+        <% end %>
+      <% end %>
     <% end %>
     <%# The rows' own line is the first message's too: a message that comes
         first draws none above itself. %>

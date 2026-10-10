@@ -319,6 +319,8 @@ en:
           back: "All notes"
           # Row 1's Close, the drawer's own while a thread is open.
           close: "Close"
+          # The × of a refused Pin or Notify's alert, under the two rows.
+          dismiss: "Dismiss"
           # Row 1's way back to the editor in the sheet (below 1024px), where
           # the sheet's own header is hidden while a thread is open. These
           # words for a page and a post alike, without the title (the

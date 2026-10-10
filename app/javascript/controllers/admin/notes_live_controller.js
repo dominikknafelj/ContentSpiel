@@ -659,6 +659,13 @@ export default class extends Controller {
       mark.before(this.divider())
     }
 
+    // A refused Pin or Notify is cleared by the PERSON'S next action (the
+    // handoff's decision 40), not by somebody else's change: a refresh that
+    // is not this tab's own answer carries the alert over, as the element it
+    // is (its four seconds, when the note is gone, go on counting).
+    const refusal = own ? null : old.querySelector(":scope > [data-note-refusal]")
+    if (refusal) next.querySelector(":scope > [data-note-rows]")?.after(refusal)
+
     old.replaceWith(next)
     view.dataset.state = answer.dataset.state
     this.takeCounts(view, answer)
