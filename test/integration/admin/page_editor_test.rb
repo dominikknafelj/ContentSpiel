@@ -13,7 +13,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "h1", "About"
     assert_select "[data-status='live']"
     assert_includes response.body, "This page is live. Changes appear on the site as soon as they’re saved."
-    assert_select "form[data-controller~='admin--autosave'] input[name='page[title]'][value='About']"
+    assert_select "form[data-controller~='admin--saving--autosave'] input[name='page[title]'][value='About']"
   end
 
   # Ledger m1: a restored snapshot of an editor holds stale bases and unsent
@@ -373,11 +373,11 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "input[name='page[hero_alt]'][placeholder='A dog on a beach']"
     # No upload field of its own any more; the one file input is the
     # picker's header Upload, rendered once by the layout.
-    assert_select "form[data-controller~='admin--autosave'] input[type=file]", count: 0
+    assert_select "form[data-controller~='admin--saving--autosave'] input[type=file]", count: 0
     assert_select "dialog#media-picker[data-controller~='admin--media-picker']", count: 1
   end
 
-  # `new FormData(form)` (`admin--autosave`) resends *every* field on
+  # `new FormData(form)` (`admin--saving--autosave`) resends *every* field on
   # *every* save -- the hero's hidden input included, carrying the stored
   # id, which is a no-op (no `media.upload` check, no change).
   test "autosaving another field resends the stored hero id and keeps the hero" do
@@ -536,6 +536,6 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "fieldset[disabled] button[data-action='admin--ui--override-field#reset']"
     assert_select "fieldset[disabled] [data-controller='admin--ui--char-count'] input[name='page[meta_title]']"
     assert_select "fieldset[disabled] [data-controller='admin--ui--char-count'] textarea[name='page[meta_description]']"
-    assert_select "form[data-controller~='admin--autosave']", count: 0
+    assert_select "form[data-controller~='admin--saving--autosave']", count: 0
   end
 end

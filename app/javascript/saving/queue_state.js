@@ -1,6 +1,6 @@
 // What the write queue's modules share: the page generations, the queue's
 // chain and its counters, the registered autosave forms, and the promotion
-// window. `autosave/queue.js` has the overview and the module map.
+// window. `saving/queue.js` has the overview and the module map.
 //
 // This module imports nothing and registers no listener. It is the first of
 // the queue's modules to be evaluated, whichever of them is imported first,

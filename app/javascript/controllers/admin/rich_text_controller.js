@@ -11,7 +11,7 @@ import { createTargetSearch } from "rich_text/target_search"
 // The contract with the rest of CS Studio is the hidden `input` target:
 // on every document change this writes `JSON.stringify(editor.getJSON())`
 // into it and dispatches a bubbling `input` event, which the enclosing
-// form's own `admin--autosave` already listens for -- the editor never
+// form's own `admin--saving--autosave` already listens for -- the editor never
 // saves anything itself. The schema (`rich_text/schema.js`) is
 // `RichText::Schema`'s, type for type, so whatever lands in that input is
 // something `RichText::Document#validate` accepts.
@@ -170,7 +170,7 @@ export default class extends Controller {
 
   // Focus moving between the editor, its toolbar and its popovers is still
   // "inside the field": stop that `focusout` here so the form's
-  // `focusout->admin--autosave#saveNow` only fires when focus actually
+  // `focusout->admin--saving--autosave#saveNow` only fires when focus actually
   // leaves this column (the debounced `input` save still runs meanwhile).
   containFocus(event) {
     if (event.relatedTarget && this.element.contains(event.relatedTarget)) event.stopPropagation()

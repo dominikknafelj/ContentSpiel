@@ -9,7 +9,7 @@ module Admin
     #
     # `admin--media-field` writes the picked id (or "" on Remove) into that
     # input and dispatches a bubbling `input`, so the enclosing form's own
-    # `admin--autosave` sends it with everything else -- the same contract
+    # `admin--saving--autosave` sends it with everything else -- the same contract
     # the rich-text column's hidden input has. "" is a deliberate clear
     # (`Media::Choosing`: clearing needs only the edit right); resending the
     # stored id is a no-op; a different id needs `media.upload` and an

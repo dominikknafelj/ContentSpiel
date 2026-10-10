@@ -177,7 +177,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # (Create user): that render is promoted the same way.
   #
   # The write queue itself holds a non-GET form pressed in that window (the
-  # "promotion hold", `autosave/promotion_hold.js`), so a write is no longer lost
+  # "promotion hold", `saving/promotion_hold.js`), so a write is no longer lost
   # there; `test/system/admin/promotion_hold_test.rb` presses without this
   # wait on purpose, and must keep doing so.
   def click_frame_link(locator = nil, **options)
@@ -246,14 +246,14 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     assert met, "timed out waiting for: #{condition}"
   end
 
-  # Waits until the write queue (`autosave/queue.js`) says the screen is
+  # Waits until the write queue (`saving/queue.js`) says the screen is
   # `settled()`: nothing queued, debounced, in flight or waiting to retry, and
   # no autosave form paused by a 409 or failed. It is the end of the window of
   # a test that claims "no save was sent": a save the page was ever going to
   # send has been sent AND answered by the time this returns, so a counter or a
   # record read after it can't pass merely because it was read too early.
   #
-  # `import("autosave/queue")` resolves to the module instance the page itself
+  # `import("saving/queue")` resolves to the module instance the page itself
   # uses (the importmap pins one URL for the specifier), so this reads the live
   # queue's state and not a second copy's. A screen with no registered autosave
   # form is trivially settled -- nothing there can be waiting to send -- so a
@@ -264,7 +264,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     settled = using_wait_time(wait + 1) do # see `await_js`: Ferrum's own script timeout would otherwise cut this at 2 s
       page.evaluate_async_script(<<~JS, wait * 1000)
         const [timeout, done] = [arguments[0], arguments[arguments.length - 1]]
-        import("autosave/queue").then((queue) => {
+        import("saving/queue").then((queue) => {
           const deadline = Date.now() + timeout
           const poll = () => {
             if (queue.settled()) return done(true)
@@ -350,7 +350,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # by the `admin` entry point (app/javascript/admin.js) through one dynamic
   # `import()` each, so they connect a moment *after* the page has loaded,
   # even though they're modulepreloaded. A test that types right after
-  # `visit` can race them -- before `admin--autosave` is connected its
+  # `visit` can race them -- before `admin--saving--autosave` is connected its
   # `input` events go nowhere. So this waits until every `admin--*`
   # controller named on the page is connected.
   #

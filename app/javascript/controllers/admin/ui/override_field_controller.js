@@ -7,7 +7,7 @@ import { Controller } from "@hotwired/stimulus"
 // back to.
 //
 // Reset empties the input and dispatches a bubbling `input` on it, which the
-// form's `admin--autosave` queues like a keystroke -- so the cleared value is
+// form's `admin--saving--autosave` queues like a keystroke -- so the cleared value is
 // what gets saved, and the placeholder (the library text) is what shows.
 // Nothing here talks to the server.
 //

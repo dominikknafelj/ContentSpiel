@@ -9,7 +9,7 @@ import { Controller } from "@hotwired/stimulus"
 // returns to); the pick arrives as `media-picker:picked` on that button and
 // bubbles up to here. Either way -- a pick or Remove -- the hidden input's
 // new value goes out with a bubbling `input` event, which the enclosing
-// form's `admin--autosave` already listens for: this controller never
+// form's `admin--saving--autosave` already listens for: this controller never
 // saves anything itself.
 export default class extends Controller {
   static targets = [ "input", "thumbnail", "title", "choose", "remove" ]

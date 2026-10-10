@@ -14,7 +14,7 @@ module Admin
   # is a full reload of Settings, which renders a fresh `base_updated_at` for
   # the main form, so no base needs moving; and it would throw away anything
   # typed there, which is why the card's controls are disabled while that form
-  # has unsaved changes (`admin--pending-lock`, decision D10). A request made
+  # has unsaved changes (`admin--saving--pending-lock`, decision D10). A request made
   # anyway (a script, a second tab) still just reloads the screen.
   #
   # `languages.manage`, checked again by each service.

@@ -11,8 +11,8 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
     zone(users(:two))
 
     assert_text "Owners can do everything, whatever their groups, and are the only ones who can change who is an owner."
-    assert_selector ".admin-owner-zone[data-controller='admin--pending-lock']"
-    assert_selector "button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='owner-user-#{users(:two).id}'][data-admin--pending-lock-target=control]", text: "Make owner…"
+    assert_selector ".admin-owner-zone[data-controller='admin--saving--pending-lock']"
+    assert_selector "button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='owner-user-#{users(:two).id}'][data-admin--saving--pending-lock-target=control]", text: "Make owner…"
     assert_selector "dialog#owner-user-#{users(:two).id}", visible: :all do
       assert_selector "dialog", text: "Make two@example.com an owner?", visible: :all
       assert_selector "dialog", text: "Owners have every permission, including managing other owners and removing your owner rights.", visible: :all
@@ -27,7 +27,7 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
     other = User.create!(email_address: "owner2@example.com", password: "password12345", owner: true)
     zone(other)
 
-    assert_selector "button[data-admin--pending-lock-target=control]:not([disabled])", text: "Remove owner rights…"
+    assert_selector "button[data-admin--saving--pending-lock-target=control]:not([disabled])", text: "Remove owner rights…"
     assert_selector "dialog#owner-user-#{other.id}", visible: :all do
       assert_selector "dialog", text: "Remove owner rights from owner2@example.com?", visible: :all
       assert_selector "dialog", text: "They keep their groups and the permissions those give.", visible: :all
@@ -46,7 +46,7 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
 
   test "the hint a pending change shows is there, hidden" do
     zone(users(:two))
-    assert_selector "[data-admin--pending-lock-target=hint][hidden]", visible: :all
+    assert_selector "[data-admin--saving--pending-lock-target=hint][hidden]", visible: :all
   end
 end
 

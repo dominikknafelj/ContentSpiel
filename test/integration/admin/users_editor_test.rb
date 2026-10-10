@@ -246,7 +246,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "details.admin-set-password[open]"
     assert_not_includes response.body, "typed-password-1"
-    assert_select "#user-form[data-admin--save-bar-dirty-value=true]"
+    assert_select "#user-form[data-admin--saving--save-bar-dirty-value=true]"
   end
 
   test "a refused save keeps the typed name and email, and the heading is still the stored name" do
@@ -356,10 +356,10 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
   test "the owner and delete buttons wait for unsaved changes, outside the form" do
     get "/cs-studio/users/#{users(:reader).id}/edit"
 
-    assert_select ".admin-owner-zone[data-controller='admin--pending-lock'] button[data-admin--pending-lock-target=control]", text: "Make owner…"
-    assert_select ".admin-delete-zone[data-controller='admin--pending-lock'] button[data-admin--pending-lock-target=control]", text: "Delete user…"
+    assert_select ".admin-owner-zone[data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Make owner…"
+    assert_select ".admin-delete-zone[data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Delete user…"
     assert_select "#user-form .admin-owner-zone, #user-form .admin-delete-zone, #user-form dialog", count: 0
-    assert_select ".admin-delete-zone [data-admin--pending-lock-target=hint][hidden]"
+    assert_select ".admin-delete-zone [data-admin--saving--pending-lock-target=hint][hidden]"
   end
 
   # --- The delete zone -------------------------------------------------------------

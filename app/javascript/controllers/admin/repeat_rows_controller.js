@@ -8,7 +8,7 @@ import { Controller } from "@hotwired/stimulus"
 // one): the server reads the rows in numeric order, whatever has gaps.
 //
 // Adding or removing dispatches a bubbling `change` from the list, which is
-// what the form's save footer (`admin--save-bar`) listens to, so it counts a
+// what the form's save footer (`admin--saving--save-bar`) listens to, so it counts a
 // row added or removed. The new row's first field takes the focus; after a
 // removal focus goes to the next row's field (or "+ Add link" when none is
 // left), never to the page.

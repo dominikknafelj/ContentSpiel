@@ -7,7 +7,7 @@ module Admin
     #   document's JSON -- the one contract between the editor and the
     #   server. The controller writes `JSON.stringify(editor.getJSON())`
     #   into it on every change and dispatches `input`, so the enclosing
-    #   form's own `admin--autosave` sends it like any other field; the
+    #   form's own `admin--saving--autosave` sends it like any other field; the
     #   controllers hand it to their services untouched as
     #   `translations[locale][:body]`, and `HasRichTextBody` parses and
     #   validates it (`RichText::Document#validate`). It is also where the

@@ -6,7 +6,7 @@ import { Controller } from "@hotwired/stimulus"
 // forms as a hidden panel under its lanes (`Admin::EditorScreen::BlockCardComponent`,
 // `placement: :panel`), and this controller only shows one and hides the
 // rest. That is the whole point of the design: a form that is never removed
-// stays registered with the write queue (`autosave/queue.js`), keeps its
+// stays registered with the write queue (`saving/queue.js`), keeps its
 // debounce timer, its queued or in-flight save and its save state -- paused
 // by a 409, failed -- exactly as a card's does, so opening, closing and
 // switching need no request and can lose nothing. Do not turn this into
@@ -14,7 +14,7 @@ import { Controller } from "@hotwired/stimulus"
 // is what the queue's drain exists to guard against.
 //
 // CLOSING SENDS. A form being hidden is told to send what it holds now
-// (`admin--autosave#saveNow`): an edit inside its debounce is otherwise only
+// (`admin--saving--autosave#saveNow`): an edit inside its debounce is otherwise only
 // sent by its timer, a second later, with nothing on screen to say so. An
 // unchanged form sends nothing and a paused one refuses, as always. Hiding
 // itself stops nothing: a save queued or on the wire is answered into the
@@ -28,7 +28,7 @@ import { Controller } from "@hotwired/stimulus"
 // a remembered id cleared when "its panel left" forgot a form that was still
 // showing, and the next tile pressed opened a second one beside it. The
 // panel's own `hidden` moves with the panel, as a form's save state moves
-// with the form (`saveStates` in `admin--autosave`). For the same reason a
+// with the form (`saveStates` in `admin--saving--autosave`). For the same reason a
 // panel that really does leave (its block deleted or moved out) needs no
 // bookkeeping: with it gone, nothing is open.
 //
@@ -112,7 +112,7 @@ export default class extends Controller {
 
     input.value = layout
     this.pickedIn = menu
-    this.application.getControllerForElementAndIdentifier(form, "admin--autosave")?.saveNow()
+    this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
   }
 
   // Whether the menu a pick was made in has been replaced by its answer.
@@ -205,8 +205,8 @@ export default class extends Controller {
   }
 
   sendNow(panel) {
-    for (const form of panel.querySelectorAll("form[data-controller~='admin--autosave']")) {
-      this.application.getControllerForElementAndIdentifier(form, "admin--autosave")?.saveNow()
+    for (const form of panel.querySelectorAll("form[data-controller~='admin--saving--autosave']")) {
+      this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
     }
   }
 

@@ -2,7 +2,7 @@ require "application_system_test_case"
 
 # A drop that was not saved must not look saved, and whatever answers a drop
 # is rendered only when it is the Turbo Stream the endpoint sends
-# (`autosave/order_request.js`): a block reorder (`admin--blocks`) and a page
+# (`saving/order_request.js`): a block reorder (`admin--blocks`) and a page
 # tree move (`admin--tree`) both put the dragged thing back where it was and
 # raise an error toast when the request fails, is answered by something else,
 # or is redirected to sign-in -- whose page used to be appended to the

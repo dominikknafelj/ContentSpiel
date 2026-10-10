@@ -59,7 +59,7 @@ export default class extends Controller {
     if (this.hintTarget.textContent !== hint) this.hintTarget.textContent = hint
     const submit = this.element.closest("form")?.querySelector("[data-password-submit]")
     // `data-save-bar-blocked`: the form's footer holds this Save back until
-    // another form on the screen is saved (`admin--save-bar`, "ONE FORM AFTER
+    // another form on the screen is saved (`admin--saving--save-bar`, "ONE FORM AFTER
     // ANOTHER"); it asks for a new measure when that is over.
     if (submit) submit.disabled = length < this.minimumValue || submit.hasAttribute("data-save-bar-blocked")
   }

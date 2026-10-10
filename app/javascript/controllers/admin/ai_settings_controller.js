@@ -11,22 +11,22 @@ import { Controller } from "@hotwired/stimulus"
 //    place, on two independent rules:
 //      - Provider or Model differ from their `data-saved-value` -> disabled,
 //        "Save provider and model first. Tests the saved settings."
-//      - the main form has unsaved changes (any `admin--save-bar` on the page,
-//        heard as `admin--save-bar:state`, decision D10) -> disabled,
+//      - the main form has unsaved changes (any `admin--saving--save-bar` on the page,
+//        heard as `admin--saving--save-bar:state`, decision D10) -> disabled,
 //        "Save or cancel your changes first."
 //    Both can apply at once (a changed field is itself a pending change);
 //    then only the more specific hint shows. The button is deliberately not an
-//    `admin--pending-lock` control: that controller would re-enable it on its
+//    `admin--saving--pending-lock` control: that controller would re-enable it on its
 //    own schedule and undo the first rule.
 //
 // 3. A key typed and not saved holds the main Save back (ledger C-M8). The
 //    entry is a field of the key's own form; the main Save re-renders the
 //    screen and dropped it without a word. While the entry is open and not
 //    empty it carries `data-save-bar-holds` with the sentence the footer
-//    shows, and the footer's Save is disabled (`admin--save-bar`, "ONE FORM
+//    shows, and the footer's Save is disabled (`admin--saving--save-bar`, "ONE FORM
 //    AFTER ANOTHER"). Chosen over counting it in the leave guard: the key is
 //    not a change of the Settings form, and its own Save or Cancel are right
-//    there. And they stay usable (`admin--pending-lock`, "ONE EXEMPTION"), or
+//    there. And they stay usable (`admin--saving--pending-lock`, "ONE EXEMPTION"), or
 //    a changed form and a typed key would lock each other: the INPUT for as
 //    long as the entry is open (`data-pending-lock-exempt`; emptied to type
 //    another key it must not be disabled under the caret), Save key while
@@ -38,7 +38,7 @@ import { Controller } from "@hotwired/stimulus"
 //    goes to the chip's button (Replace / Add key), or stays in the input
 //    when the answer re-opened the entry with an error.
 //
-// Like `admin--pending-lock`, it asks the save bar for its state once on
+// Like `admin--saving--pending-lock`, it asks the save bar for its state once on
 // connect (each controller arrives by its own dynamic import, and a form
 // re-rendered after a refusal is unsaved from the start).
 const SPECIFIC_HINT = "Save provider and model first. Tests the saved settings."
@@ -54,7 +54,7 @@ export default class extends Controller {
       this.pending = Boolean(event.detail?.unsaved)
       this.refresh()
     }
-    document.addEventListener("admin--save-bar:state", this.onState)
+    document.addEventListener("admin--saving--save-bar:state", this.onState)
     // The test's own submission. `admin--ui--busy` (on the test form) disables the
     // button for the flight and, when the answer lands, puts it back ENABLED
     // from a snapshot -- which would undo this gate (a Model edited during the
@@ -89,7 +89,7 @@ export default class extends Controller {
   }
 
   disconnect() {
-    document.removeEventListener("admin--save-bar:state", this.onState)
+    document.removeEventListener("admin--saving--save-bar:state", this.onState)
     document.removeEventListener("turbo:submit-start", this.onSubmitStart)
     document.removeEventListener("turbo:submit-end", this.onSubmitEnd)
     this.started = false
@@ -106,7 +106,7 @@ export default class extends Controller {
     else this.inputTarget.focus()
   }
 
-  // See 3. Also asks the footer (and every `admin--pending-lock`) to look
+  // See 3. Also asks the footer (and every `admin--saving--pending-lock`) to look
   // again.
   holdKey() {
     if (this.hasEntryTarget && this.hasInputTarget) {
@@ -120,7 +120,7 @@ export default class extends Controller {
       // depends on there being something to save.
       this.inputTarget.toggleAttribute("data-pending-lock-exempt", open)
     }
-    document.dispatchEvent(new CustomEvent("admin--save-bar:query"))
+    document.dispatchEvent(new CustomEvent("admin--saving--save-bar:query"))
   }
 
   edit() {

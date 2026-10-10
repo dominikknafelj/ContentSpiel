@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Closing the tab, or reloading it, on an autosave screen (`autosave/queue_core.js`,
+# Closing the tab, or reloading it, on an autosave screen (`saving/queue_core.js`,
 # "THE UNLOAD GUARD"): the browser asks first exactly when leaving would lose
 # something -- an edit not yet sent or not yet answered, or text a refused save
 # left only in the page -- and never on a screen that has nothing to lose.
@@ -65,7 +65,7 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
     page.execute_script(<<~JS)
-      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector("form[data-controller~='admin--autosave']"), "admin--autosave")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector("form[data-controller~='admin--saving--autosave']"), "admin--saving--autosave")
       controller.constructor.retryDelays = [ 10, 10, 10 ]
       const originalFetch = window.fetch
       window.fetch = (url, options = {}) => ((options.method || "GET").toUpperCase() === "GET" ? originalFetch(url, options) : Promise.reject(new TypeError("Failed to fetch")))
@@ -84,7 +84,7 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     # long this is still the editor, which rightly asks.
     within(".admin-shell__sidebar") { click_link "Trash" }
     assert_current_path %r{/cs-studio/trash}
-    assert_no_selector "form[data-controller~='admin--autosave']"
+    assert_no_selector "form[data-controller~='admin--saving--autosave']"
     assert_not asks_before_unload?, "a screen with no autosave form asked before unloading"
   end
 

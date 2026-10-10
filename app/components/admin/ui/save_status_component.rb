@@ -14,7 +14,7 @@ module Admin
     # the first save doesn't push everything below it down a line. It used
     # to collapse to nothing, and a first save started by a click's own
     # mousedown (the `focusout` that blurring a field sends straight to
-    # `admin--autosave#saveNow`) moved the page between that mousedown and
+    # `admin--saving--autosave#saveNow`) moved the page between that mousedown and
     # its mouseup: the mouseup landed beside the button, the browser fired
     # no `click`, and the related-posts picker silently dropped the pick.
     class SaveStatusComponent < AdminComponent

@@ -11,7 +11,7 @@ class Admin::UsersScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     zone(users(:two))
 
     assert_selector "h2", text: "Delete user"
-    assert_selector "button.text-danger-ink[data-admin--ui--dialog-id-param='delete-user-#{users(:two).id}'][data-admin--pending-lock-target=control]", text: "Delete user…"
+    assert_selector "button.text-danger-ink[data-admin--ui--dialog-id-param='delete-user-#{users(:two).id}'][data-admin--saving--pending-lock-target=control]", text: "Delete user…"
     assert_selector "dialog#delete-user-#{users(:two).id}", visible: :all do
       assert_selector "dialog", text: "Delete two@example.com?", visible: :all
       assert_selector "dialog", text: "They can't sign in any more and their AI tokens stop working. Their pages, posts and media stay; posts they wrote are left without an author.", visible: :all

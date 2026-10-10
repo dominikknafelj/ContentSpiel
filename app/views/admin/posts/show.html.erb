@@ -10,7 +10,7 @@
 
     And no link is prefetched from an editor (follow-up N1): Turbo fetches a
     link on hover and reuses that answer for the click. From an editor the
-    click first waits for the save queue (`autosave/queue.js`), so a
+    click first waits for the save queue (`saving/queue.js`), so a
     prefetched answer for the same record -- its other language tab, its own
     row in the tree -- shows it as it was BEFORE those saves, with the old
     base: the saved text missing and the next edit refused. %>

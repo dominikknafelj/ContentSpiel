@@ -312,7 +312,7 @@ module Admin
     #
     # So a block response may move that form's base forward to the page's
     # new `updated_at` -- but only when the base the form holds (sent by
-    # `admin--autosave`/`admin--blocks` as `X-Page-Base-Updated-At`) was
+    # `admin--saving--autosave`/`admin--blocks` as `X-Page-Base-Updated-At`) was
     # still current *before* this write (fix round 2). If the page was saved
     # elsewhere since the form loaded it (another tab, another user), the
     # sent base is older than `@page_updated_at_before_write`, and moving it
@@ -505,7 +505,7 @@ module Admin
     # connects. The forms they replace -- the section's panels -- go with the
     # section's card, and none of them holds anything the database does not
     # have: the request was not sent until the screen's write queue was empty
-    # and every form clean (`admin--queue-hold` on the "Remove section, keep
+    # and every form clean (`admin--saving--queue-hold` on the "Remove section, keep
     # blocks" form, `SectionCardComponent#settled_screen_data`). Waiting its
     # turn in the queue would not be enough -- the delete would go ahead of
     # the follow-up of a save still on the wire, and over a form paused by a

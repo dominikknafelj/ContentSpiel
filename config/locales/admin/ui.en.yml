@@ -24,8 +24,8 @@ en:
           dismiss: "Dismiss"
           # What the layout's `<template id="toast-error-template">` is cloned
           # with when a save got no answer at all, and the two sentences a
-          # script puts into a clone of it (`autosave/order_request.js`,
-          # `autosave/promotion_hold.js`).
+          # script puts into a clone of it (`saving/order_request.js`,
+          # `saving/promotion_hold.js`).
           save_failed: "Couldn't save."
           order_failed: "Couldn't save the new order. Check your connection and try again."
           dropped: "That didn't go through — the screen changed. Try again."
@@ -33,14 +33,14 @@ en:
         save_bar:
           save: "Save"
           cancel: "Cancel"
-          # The footer's count line, written by `admin--save-bar`.
+          # The footer's count line, written by `admin--saving--save-bar`.
           changes:
             one: "%{count} unsaved change"
             other: "%{count} unsaved changes"
           unsaved: "Unsaved changes"
           no_changes: "No unsaved changes"
           # Shown while another form on the screen has to be saved first; also
-          # `admin--pending-lock`'s hint on an instant action.
+          # `admin--saving--pending-lock`'s hint on an instant action.
           blocked: "Save or cancel your changes first."
 
         save_status:

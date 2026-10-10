@@ -11,7 +11,7 @@ module Admin
     # (nothing is designed below 768px). The editor beside it stays usable.
     # Rendered once per screen, inside `#content` (a frame navigation to
     # another record replaces it) and OUTSIDE EVERY FORM: the frame brings
-    # forms of its own, forms can't nest, and inside an `admin--autosave` form
+    # forms of its own, forms can't nest, and inside an `admin--saving--autosave` form
     # a note's field would be the record's. `hidden` until `admin--notes`
     # opens it.
     #

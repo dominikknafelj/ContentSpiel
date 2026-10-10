@@ -20,7 +20,7 @@
 //
 // So for that window such a submission is not started at all. A CAPTURING
 // `submit` listener on `window` -- ahead of Turbo's own (`FormSubmitObserver`,
-// on `document`), of `admin--queue-hold` and of every Stimulus action --
+// on `document`), of `admin--saving--queue-hold` and of every Stimulus action --
 // cancels it and keeps (form, submitter); when the promoted visit has
 // COMPLETED (`turbo:load`) the form is submitted again with `requestSubmit`,
 // and everybody sees that one submit as if it were the first. Never released
@@ -47,7 +47,7 @@
 // WHILE IT IS HELD:
 // - a double press holds one entry (a `Map` keyed by the form);
 // - the submitter shows the press was taken: disabled, the width it had, a
-//   spinner before its label (`markBusy`, the same look `admin--queue-hold`
+//   spinner before its label (`markBusy`, the same look `admin--saving--queue-hold`
 //   and `admin--ui--busy` give), and the form is `aria-busy`. Put back when the
 //   entry is dropped or released;
 // - a press made in a DIALOG is taken back by closing the dialog (Cancel,
@@ -91,7 +91,7 @@
 // (`turbo:frame-missing`: Turbo then draws "Content missing" and starts no
 // visit). A second link clicked meanwhile restarts the limit and keeps what is
 // held.
-// It composes with the two other holds. `admin--queue-hold` never saw the
+// It composes with the two other holds. `admin--saving--queue-hold` never saw the
 // held submit (propagation stopped here), so the resubmit is its first; and
 // its own `requestSubmit` after a drain, if caught here, is released with its
 // `passing` flag still set. The request the resubmit makes is held by "TURBO
@@ -105,13 +105,13 @@
 // THE MODULES. This file is the hold itself: the `submit` listener that takes
 // a press, and what becomes of the presses when the window closes. The
 // window's record (`promotion`), its two limits and `frameFormRefused` are in
-// `autosave/queue_state.js`, and the window is opened from
-// `autosave/frame_hold.js`'s listeners, which are evaluated before this file
-// and cannot import it (see the order in `autosave/queue.js`): this file
+// `saving/queue_state.js`, and the window is opened from
+// `saving/frame_hold.js`'s listeners, which are evaluated before this file
+// and cannot import it (see the order in `saving/queue.js`): this file
 // hands its release in with `onPromotionEnd`.
 import { messages } from "i18n/messages"
-import { frameFor } from "autosave/frame_hold"
-import { onPromotionEnd, promotionEnds, promotionHeld, promotionOpen } from "autosave/queue_state"
+import { frameFor } from "saving/frame_hold"
+import { onPromotionEnd, promotionEnds, promotionHeld, promotionOpen } from "saving/queue_state"
 
 const formMethod = (form, submitter) => (submitter?.getAttribute("formmethod") || form.getAttribute("method") || "get").toLowerCase()
 const navigatorLevel = (form, submitter) => frameFor(form, submitter) === null
@@ -136,7 +136,7 @@ function standInFor(form, entry) {
   return matches.length === 1 ? matches[0] : null
 }
 
-// The busy look `admin--queue-hold#markBusy` gives its button. Returns the undo.
+// The busy look `admin--saving--queue-hold#markBusy` gives its button. Returns the undo.
 function markBusy(form, button) {
   form.setAttribute("aria-busy", "true")
   if (!button) return () => form.removeAttribute("aria-busy")

@@ -39,7 +39,7 @@ import { Controller } from "@hotwired/stimulus"
 // attribute as it handles the click, synchronously), and gets what it had
 // back straight after.
 //
-// `admin--save-bar` stands back from these links for the same reason (its
+// `admin--saving--save-bar` stands back from these links for the same reason (its
 // `onFrameLink`); the two listeners may run in either order.
 export default class extends Controller {
   connect() {

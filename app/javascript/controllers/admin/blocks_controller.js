@@ -1,8 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
-import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "autosave/queue"
-import { errorToast, orderErrorToast, sendOrder, streamsApplied } from "autosave/order_request"
+import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "saving/queue"
+import { errorToast, orderErrorToast, sendOrder, streamsApplied } from "saving/order_request"
 import { messages } from "i18n/messages"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
@@ -75,7 +75,7 @@ export default class extends Controller {
   // still current (`Admin::ContentBlocksController#page_base_streams`).
   // Turbo's own submissions inside this section (add, duplicate, delete)
   // get it here; `move` below adds it itself; a card's autosave through
-  // `admin--autosave`'s `pageBaseId` value.
+  // `admin--saving--autosave`'s `pageBaseId` value.
   static pageBaseId = "page-base-updated-at"
 
   // What the lanes need is made here, not in `connect`: Stimulus tells a
@@ -94,10 +94,10 @@ export default class extends Controller {
 
   connect() {
     // The page this list was rendered on: a reorder belongs to it whenever it
-    // is queued (`autosave/queue_state.js`, "PAGE GENERATIONS").
+    // is queued (`saving/queue_state.js`, "PAGE GENERATIONS").
     this.generation = currentGeneration()
     // A write (never a GET) waits its turn in the page-level queue
-    // (`autosave/queue.js`) and reads the page base when it is actually sent;
+    // (`saving/queue.js`) and reads the page base when it is actually sent;
     // the queue slot is kept until the answer's bases are in the hidden
     // fields, so the next request sees them. Add, duplicate and delete are
     // plain Turbo form submissions, and answer with streams that move the
@@ -555,7 +555,7 @@ export default class extends Controller {
   // -- `from` the container it left, and `before` every container's order as
   // it was before the element was moved (`snapshot`).
   //
-  // Queued with every other write on the screen (`autosave/queue.js`): the
+  // Queued with every other write on the screen (`saving/queue.js`): the
   // order is read when the request is sent (a Move up/down made while an
   // autosave was in flight still sends the final order), and the page base
   // it carries is the freshest one. The answer's page base is written into
@@ -572,7 +572,7 @@ export default class extends Controller {
   // the endpoint's answer does not redraw the list -- so when the request
   // fails, the order on screen would be one the server never took, looking
   // exactly like one it did. What came back is judged by `sendOrder`
-  // (`autosave/order_request.js`, which also says what this used to do with
+  // (`saving/order_request.js`, which also says what this used to do with
   // an expired session's sign-in page):
   // - a Turbo Stream is rendered, whatever its status. A refusal (403, 422:
   //   the status line and the reason) is the endpoint's own answer -- and
@@ -612,7 +612,7 @@ export default class extends Controller {
   //   nowhere else, and the 409 bar has promised it stays. Everything goes
   //   back (`putBack`) and a toast says to reload or fix the block first;
   // - one whose edit is still on its way stands back ONCE. That is an edit
-  //   typed while the form's own save was on the wire: `admin--autosave`
+  //   typed while the form's own save was on the wire: `admin--saving--autosave`
   //   sends it as that save's follow-up, queued only when the save is
   //   answered -- behind this move. Sent in its turn, the move's answer would
   //   draw the form without those words, and on a base the follow-up then
@@ -895,13 +895,13 @@ export default class extends Controller {
   }
 
   // Whether any autosave form of the block list holds text the server does
-  // not: a form that did not end clean (`admin--autosave#clean`: paused,
+  // not: a form that did not end clean (`admin--saving--autosave#clean`: paused,
   // refused, invalid, offline), or one with an edit still to be sent or
   // answered. The questions the write queue asks of a form (`settled()` in
-  // `autosave/queue_core.js`), put to the forms a redrawn list would replace.
+  // `saving/queue_core.js`), put to the forms a redrawn list would replace.
   formsHoldText() {
-    return Array.from(this.element.querySelectorAll("form[data-controller~='admin--autosave']"))
-      .map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--autosave"))
+    return Array.from(this.element.querySelectorAll("form[data-controller~='admin--saving--autosave']"))
+      .map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave"))
       .some((form) => form && (!form.clean() || form.outstanding() || !form.unchanged()))
   }
 
@@ -958,8 +958,8 @@ export default class extends Controller {
   // inside its debounce is queued ahead of the move being made (see `move`).
   // An unchanged form sends nothing and a paused one refuses, as always.
   sendHeldEdits() {
-    for (const form of this.element.querySelectorAll("form[data-controller~='admin--autosave']")) {
-      this.application.getControllerForElementAndIdentifier(form, "admin--autosave")?.saveNow()
+    for (const form of this.element.querySelectorAll("form[data-controller~='admin--saving--autosave']")) {
+      this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
     }
   }
 
@@ -969,13 +969,13 @@ export default class extends Controller {
   // form: an unavailable type.
   formOf(item) {
     const holder = document.getElementById(`block-${item.dataset.blockId}-panel`) || item
-    const form = holder.querySelector("form[data-controller~='admin--autosave']")
-    return form ? this.application.getControllerForElementAndIdentifier(form, "admin--autosave") : undefined
+    const form = holder.querySelector("form[data-controller~='admin--saving--autosave']")
+    return form ? this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave") : undefined
   }
 
   // Whether what a block's form holds is on the server: "saved"; "unsent",
   // an edit debounced, queued, on the wire or typed since; or "refused", a
-  // form whose last save did not land (`admin--autosave#clean`). A block
+  // form whose last save did not land (`admin--saving--autosave#clean`). A block
   // with no form has nothing to lose.
   formState(item) {
     const form = this.formOf(item)

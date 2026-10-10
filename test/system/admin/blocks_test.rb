@@ -160,7 +160,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
   end
 
   # Ledger m2 (final fix wave 1): moving a card in the DOM (a drag, Move
-  # up/down) disconnects and reconnects its form's `admin--autosave`. The
+  # up/down) disconnects and reconnects its form's `admin--saving--autosave`. The
   # reconnect used to take whatever the form held for "what the server
   # holds", and the disconnect had cleared the debounce timer: an edit made
   # by code inside its debounce (a translation's Use, with focus elsewhere)
@@ -358,7 +358,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_no_selector "#changed-elsewhere"
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
-  # Fix round 3: a card's queued follow-up save (`admin--autosave`'s
+  # Fix round 3: a card's queued follow-up save (`admin--saving--autosave`'s
   # `pending` retrigger) runs before Turbo applies the previous response's
   # streams (next animation frame), so it used to send the page form's
   # *old* base -- the server then rightly refused to move it, the write

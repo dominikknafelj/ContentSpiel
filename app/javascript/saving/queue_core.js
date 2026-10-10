@@ -1,10 +1,10 @@
 // The write queue itself: one write at a time (`acquire`, `enqueue`,
 // `holdTurboRequest`), each answer's bases written back before the next
 // request is sent (`syncBases`), and `drained()`, the promise everything that
-// replaces an editor waits on. `autosave/queue.js` says WHY and has "THE
+// replaces an editor waits on. `saving/queue.js` says WHY and has "THE
 // RULE" and the module map; the state this file works on -- the chain, the
 // counters, the registered forms, the page generations -- is in
-// `autosave/queue_state.js`.
+// `saving/queue_state.js`.
 //
 // This module registers no listener as it is evaluated. The ones it adds
 // later come and go with what they serve: `beforeunload` with the first and
@@ -19,7 +19,7 @@
 import {
   addForm, chain, chainOnto, currentGeneration, formCount, isCurrentGeneration, queuedWrites, registeredForms,
   removeForm, writeLeft, writeQueued
-} from "autosave/queue_state"
+} from "saving/queue_state"
 
 const HOLD_LIMIT_MS = 30000
 export const DRAIN_LIMIT_MS = 10000
@@ -32,7 +32,7 @@ const STREAM_RENDER_LIMIT_MS = 1000
 // The first form to register also puts up THE UNLOAD GUARD below, and the
 // last to leave takes it down: a screen with no autosave form has nothing of
 // this module's to lose (and the explicit-save screens have their own,
-// `admin--save-bar`).
+// `admin--saving--save-bar`).
 export function registerForm(form) {
   if (formCount() === 0) window.addEventListener("beforeunload", guardUnload)
   addForm(form)
@@ -91,7 +91,7 @@ function within(promise, ms) {
 // behind then still runs, in order, and finds `isCurrent()` false once the
 // page is gone. `token` is this call's own: a form uses it to send a
 // retry that is waiting out its backoff at most ONCE per drain (see
-// `admin--autosave#flush`).
+// `admin--saving--autosave#flush`).
 //
 // It NEVER REJECTS (follow-up N3). Everything that waits on it holds something
 // of Turbo's -- a visit, a frame's request or render, a form submission -- and

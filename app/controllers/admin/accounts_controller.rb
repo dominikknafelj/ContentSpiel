@@ -76,7 +76,7 @@ module Admin
     # happened. The stream replaces the one thing a new name changes outside
     # the field itself, the sidebar's account block, and says "Settings saved";
     # the footer takes what it sent as its new baseline
-    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect.
+    # (`admin--saving--save-bar#submitEnded`). Without Turbo it is the redirect.
     #
     # The stream carries a second thing a save changes outside the form: the
     # two notes settings as the scripts hold them (`admin--notes-alert`, on

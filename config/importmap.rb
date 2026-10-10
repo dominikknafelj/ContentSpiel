@@ -27,7 +27,7 @@ pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", pre
 # `controllers/admin/rich_text_controller.js` as `rich_text/...`.
 pin_all_from "app/javascript/rich_text", under: "rich_text", preload: "admin"
 # The one-at-a-time write queue every autosaving form and block action shares.
-pin_all_from "app/javascript/autosave", under: "autosave", preload: "admin"
+pin_all_from "app/javascript/saving", under: "saving", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"

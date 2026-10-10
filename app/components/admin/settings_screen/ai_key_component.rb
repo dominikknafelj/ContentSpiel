@@ -16,7 +16,7 @@ module Admin
     # the key's own form (`settings-ai-key-form`, a sibling after the main
     # form) through `form=`, so the footer never counts them and Save never
     # sends them; Replace, Remove… and Cancel are unnamed buttons. Replace /
-    # Add key, Remove…, the input and Save key are `admin--pending-lock`
+    # Add key, Remove…, the input and Save key are `admin--saving--pending-lock`
     # controls (decision D10): they wait while the main form has unsaved changes.
     #
     # The root's id is what a Turbo Stream `replace` of a key save targets.
@@ -25,7 +25,7 @@ module Admin
       ID = "settings-ai-key".freeze
       KEY_FORM = "settings-ai-key-form".freeze
       REMOVE_DIALOG = "settings-ai-remove-key-dialog".freeze
-      LOCK = { "admin--pending-lock-target": "control" }.freeze
+      LOCK = { "admin--saving--pending-lock-target": "control" }.freeze
 
       def initialize(site_setting:, error: nil)
         @site_setting = site_setting

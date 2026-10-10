@@ -13,7 +13,7 @@ module Admin
     # `admin--section` when its tile is pressed. A form is never fetched when
     # a tile is opened and never removed when it is closed. That is what makes
     # the pattern safe on top of autosave: each form registers with the write
-    # queue once (`admin--autosave`'s `connect`), and its debounce, its queued
+    # queue once (`admin--saving--autosave`'s `connect`), and its debounce, its queued
     # or in-flight save and its save state (paused by a 409, failed) are the
     # same whether it is showing or not. A design that fetched the form on
     # demand would have to answer what happens to a save whose form has left
@@ -68,7 +68,7 @@ module Admin
     # is refused as stale (409) and reported exactly as a block's is. Layout
     # is a menu over a hidden input (`SectionLayoutMenuComponent`); the other
     # two are plain selects. A viewer who can't edit sees the three as they
-    # are, disabled, in a form with no `admin--autosave` -- as a view-only
+    # are, disabled, in a form with no `admin--saving--autosave` -- as a view-only
     # block card shows its fields.
     #
     # The form holds no other form: the "⋯" menu's Duplicate and Remove are
@@ -95,7 +95,7 @@ module Admin
     # block in the section's place (`Admin::ContentBlocksController
     # #removal_streams`), and the panels' forms go with the section's card.
     # A row is never lost by it; what a form holds and has not saved would
-    # be. So its form carries `admin--queue-hold`, as the editor
+    # be. So its form carries `admin--saving--queue-hold`, as the editor
     # header's actions do: the press first waits until the write queue is
     # EMPTY (`drained()` -- an edit inside its debounce is sent, and so is one
     # typed while the block's save was on the wire, whose follow-up the
@@ -225,7 +225,7 @@ module Admin
 
       # On the form of "Remove section, keep blocks", in the menu and on the
       # card of a section whose type is gone: see the class comment.
-      def settled_screen_data = { controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" }
+      def settled_screen_data = { controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" }
 
       def menu_item_class = Admin::EditorScreen::BlockCardComponent::MENU_ITEM_CLASS
 

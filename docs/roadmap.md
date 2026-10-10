@@ -277,7 +277,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | Item | Priority | Ref |
 |---|---|---|
 | After a block or a section is deleted, or a section is removed with its blocks kept, the focus falls to `<body>`, the top of the page for a keyboard user (`Admin::ContentBlocksController#removal_streams`, `admin/blocks_controller.js`): move it to the neighbouring block, or to the first of the kept blocks' cards | Could | Sections |
-| From a section's ⋯ menu, "Remove section, keep blocks" shows no waiting state while the write queue drains (up to 10 s on a slow connection, `DRAIN_LIMIT_MS`): the menu closes on the press, so the busy look `admin--queue-hold` gives the button is in a closed menu, and the focus is left at the top of the page meanwhile | Could | Sections |
+| From a section's ⋯ menu, "Remove section, keep blocks" shows no waiting state while the write queue drains (up to 10 s on a slow connection, `DRAIN_LIMIT_MS`): the menu closes on the press, so the busy look `admin--saving--queue-hold` gives the button is in a closed menu, and the focus is left at the top of the page meanwhile | Could | Sections |
 | A queue drain that passes its 10 s limit is reported as unclean, so the toast says "Your last change wasn't saved" when the save is only slow (`admin/queue_hold_controller.js`, `drained()`'s `timedOut`; also met by the editor header's actions): say that it is still saving and offer to try again | Could | Sections |
 | Notes, small: the header's Notes button carries both `aria-pressed` and `aria-expanded`; the mention field sets `aria-activedescendant` on a textarea with no `role="combobox"` and no `aria-expanded`; the composer's emoji buttons have no name (the reaction set's have); the sidebar's unread badge is a bare number in the link's name ("Dashboard 3"); the account page goes from `h1` to `h3`; a deleted author's avatar reads "AD"; a block's notes marker has no `aria-controls`; an open "⋯" menu closes when its thread is refreshed; the focus is given back by index inside an open emoji set | Could | Notes, final review |
 | A section's Layout button does not say which layout is current, and the six diagrams in its menu have no visible name (`Admin::EditorScreen::SectionLayoutMenuComponent`) | Could | Sections |
@@ -295,7 +295,7 @@ Knowingly shipped incomplete, and fine while tracked here. Grouped by what close
 
 ### The write queue and Turbo
 
-Small follow-up fixes to `app/javascript/autosave/queue.js` and its neighbours; none loses saved data.
+Small follow-up fixes to `app/javascript/saving/queue.js` and its neighbours; none loses saved data.
 
 - A `_top` link clicked while a `#content` frame navigation is loading loses to the visit that navigation is promoted to. Forms are held (the promotion hold); links are not.
 - A held press whose screen was replaced is dropped unsent with an error toast, unless it is a Trash row's restore or purge form. Affected: the editor header's actions, the bulk bar, tags Merge, the user and group zones, "Still correct". Opting a form in (`data-promotion-stand-in`) is the follow-up, form by form.

@@ -1,13 +1,13 @@
 <%# The card's ids sit on its heading, as the other cards' do (`#languages` is the
-    nav's and ⌘K's anchor). The whole section is the `admin--pending-lock`
+    nav's and ⌘K's anchor). The whole section is the `admin--saving--pending-lock`
     scope: every `control` below is an instant action. %>
 <section id="settings-languages-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="languages"
-         data-controller="admin--pending-lock admin--sortable-rows">
+         data-controller="admin--saving--pending-lock admin--sortable-rows">
   <div class="border-b border-line px-4 py-3.5">
     <h2 id="languages" class="text-h2 text-ink">Languages</h2>
     <p class="mt-1 text-sm text-dim">The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default.</p>
     <p id="language-drag-help" class="sr-only">Press Space on a handle to pick a language up, the arrow keys to move it, Space to drop it and Escape to put it back.</p>
-    <p class="mt-1 text-sm text-meta" data-admin--pending-lock-target="hint" hidden></p>
+    <p class="mt-1 text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
   </div>
 
   <%# The order as ONE tracked value: see `admin--sortable-rows`. %>
@@ -41,7 +41,7 @@
             <span class="rounded-cs border border-line-strong px-1.5 py-0.5 font-cs-mono text-label uppercase text-dim" data-default-tag>Default</span>
           <% else %>
             <%= render Admin::Ui::ButtonComponent.new(label: "Make default", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
-                  data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--pending-lock-target": "control")) %>
+                  data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
           <% end %>
         </div>
 
@@ -61,7 +61,7 @@
           </span>
         <% else %>
           <%= render Admin::Ui::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, aria: { label: "Turn off #{name(code)}" },
-                data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--pending-lock-target": "control")) %>
+                data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
         <% end %>
       </li>
     <% end %>
@@ -73,9 +73,9 @@
     <div class="flex flex-wrap items-center gap-3 p-4">
       <label for="language-add-code" class="text-sm text-ink">Add a language</label>
       <%= select_tag "code", options_for_select(addable_options), id: "language-add-code", form: ADD_FORM,
-            class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--pending-lock-target": "control" } %>
+            class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--saving--pending-lock-target": "control" } %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit", form: ADD_FORM,
-            data: { "admin--pending-lock-target": "control" }) %>
+            data: { "admin--saving--pending-lock-target": "control" }) %>
     </div>
   <% else %>
     <p class="p-4 text-sm text-meta">Every available language is already on.</p>

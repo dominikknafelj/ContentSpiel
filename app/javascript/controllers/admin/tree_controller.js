@@ -1,8 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
-import { enqueue, holdTurboRequest, syncBases } from "autosave/queue"
-import { orderErrorToast, sendOrder } from "autosave/order_request"
+import { enqueue, holdTurboRequest, syncBases } from "saving/queue"
+import { orderErrorToast, sendOrder } from "saving/order_request"
 
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
 // children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
@@ -27,7 +27,7 @@ import { orderErrorToast, sendOrder } from "autosave/order_request"
 // and a stale base is refused (409, final). The move used to go straight out
 // and tell that form nothing: the editor's next keystroke was "Changed
 // elsewhere" against their own move, the form dead until Reload. So a move is
-// treated exactly like a block write (`admin--blocks`, `autosave/queue.js`):
+// treated exactly like a block write (`admin--blocks`, `saving/queue.js`):
 // - it takes its turn in the page's write queue (`enqueue`), so it is never
 //   on the wire together with an autosave of the same page, and reads the
 //   base when it is SENT, after the previous answer's was written back;
@@ -138,7 +138,7 @@ export default class extends Controller {
   // 30 s timeout at most; its own request has the same limit, so it cannot
   // hold the queue either.
   //
-  // What came back is judged by `sendOrder` (`autosave/order_request.js`,
+  // What came back is judged by `sendOrder` (`saving/order_request.js`,
   // which also says what this used to do with an expired session's sign-in
   // page):
   // - a Turbo Stream is the endpoint's answer, at any status, and is

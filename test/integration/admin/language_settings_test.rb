@@ -78,12 +78,12 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
   test "Default, Turn off and Add carry the pending-lock controls and its hint" do
     get "/cs-studio/settings"
 
-    assert_select "#settings-languages-card[data-controller~='admin--pending-lock']"
-    assert_select "#settings-languages-card [data-admin--pending-lock-target=hint]"
-    assert_select "#settings-languages-card button[data-admin--pending-lock-target=control]", text: "Make default", count: 2
-    assert_select "#settings-languages-card button[data-admin--pending-lock-target=control]", text: "Turn off…", count: 2
-    assert_select "#settings-languages-card #language-add-code[data-admin--pending-lock-target=control]"
-    assert_select "#settings-languages-card button[type=submit][form='language-add-form'][data-admin--pending-lock-target=control]", text: "Add language"
+    assert_select "#settings-languages-card[data-controller~='admin--saving--pending-lock']"
+    assert_select "#settings-languages-card [data-admin--saving--pending-lock-target=hint]"
+    assert_select "#settings-languages-card button[data-admin--saving--pending-lock-target=control]", text: "Make default", count: 2
+    assert_select "#settings-languages-card button[data-admin--saving--pending-lock-target=control]", text: "Turn off…", count: 2
+    assert_select "#settings-languages-card #language-add-code[data-admin--saving--pending-lock-target=control]"
+    assert_select "#settings-languages-card button[type=submit][form='language-add-form'][data-admin--saving--pending-lock-target=control]", text: "Add language"
   end
 
   test "the Turn off dialog is neutral, and the default dialog names the move and the item count" do
@@ -271,7 +271,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_select ".admin-error-summary[role=alert]", text: /isn't enabled|isn’t enabled/
-    assert_select "form#settings-form[data-admin--save-bar-dirty-value='true']"
+    assert_select "form#settings-form[data-admin--saving--save-bar-dirty-value='true']"
     # The order as typed, not the stored one.
     assert_select "#settings-language-order[value='de,en']"
     assert_equal %w[en de], @site.reload.locale_codes

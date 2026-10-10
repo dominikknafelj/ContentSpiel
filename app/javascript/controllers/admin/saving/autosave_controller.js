@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
-import { currentGeneration, enqueue, isCurrentGeneration, registerForm, syncBases, unregisterForm } from "autosave/queue"
+import { currentGeneration, enqueue, isCurrentGeneration, registerForm, syncBases, unregisterForm } from "saving/queue"
 
 // Each autosave form's SAVE STATE, by form ELEMENT:
 // - `saved`: what the server holds of it -- the signature (`#signature`) the
@@ -27,7 +27,7 @@ const saveStates = new WeakMap()
 
 // Autosaves a page/post editor form (cs-studio spec §6.1): the page settings
 // form, a block card, and the post form all share this one controller.
-// `data-controller="admin--autosave"` sits directly on the `<form>` itself
+// `data-controller="admin--saving--autosave"` sits directly on the `<form>` itself
 // (never a wrapping element): every id this controller reads or writes (the
 // status line, the hidden `base_updated_at` field) is resolved from the
 // *response*, not from a Stimulus `target` declared here, which is exactly
@@ -59,7 +59,7 @@ const saveStates = new WeakMap()
 // into the same single follow-up.
 //
 // Across forms: that rule is per form. Every request this controller sends
-// also goes through the page-level queue (`autosave/queue.js`), shared with
+// also goes through the page-level queue (`saving/queue.js`), shared with
 // every other autosaving form on the screen and with block add/duplicate/
 // delete/reorder: one request is on the wire at a time, and each reads its
 // body and bases when it is SENT, after the previous answer's bases were
@@ -126,7 +126,7 @@ export default class extends Controller {
     // `saved`, `sent`, `paused` (set by a 409: this form's saves are over
     // until the page is reloaded) and `failed` (the last answer was not a
     // success -- refused, invalid, offline, signed out: `clean()` reports it
-    // to `drained()`, see `autosave/queue.js`) live with the element, see
+    // to `drained()`, see `saving/queue.js`) live with the element, see
     // `saveStates`.
     const reconnected = saveStates.has(this.element)
     if (!reconnected) saveStates.set(this.element, { saved: this.signature(new FormData(this.element)), sent: null, paused: false, failed: false })
@@ -168,7 +168,7 @@ export default class extends Controller {
     this.timer = setTimeout(() => this.trigger(), this.debounceValue)
   }
 
-  // Called by `drained()` (`autosave/queue.js`) before a header action or a
+  // Called by `drained()` (`saving/queue.js`) before a header action or a
   // visit: an edit still inside its debounce is sent now, and so is one
   // typed while a save was in flight (`saveNow` -> `pending`, which sends it
   // as soon as that save is answered). Pressing a button normally blurs the
@@ -235,7 +235,7 @@ export default class extends Controller {
   }
 
   // One save attempt. The request itself is SENT from inside the page-level
-  // queue (`autosave/queue.js` -- read its comment for why every write on a
+  // queue (`saving/queue.js` -- read its comment for why every write on a
   // screen goes one at a time): the "saving" line shows from the moment the
   // attempt is queued, and the body, headers and bases are read when the
   // request is actually sent, not now. `send()` answers with what happened;

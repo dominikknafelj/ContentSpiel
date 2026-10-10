@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // A "Copy" button: the record header's next to the public URL (cs-studio
 // spec §5.1) and the System status rows' next to a console command.
 // `navigator.clipboard` needs no server round trip, so this stays its own
-// tiny controller rather than folding into `admin--autosave` (which these
+// tiny controller rather than folding into `admin--saving--autosave` (which these
 // buttons have nothing to do with) or `admin--tree`.
 //
 // What is copied is `textValue` when set, else `urlValue` -- both read once

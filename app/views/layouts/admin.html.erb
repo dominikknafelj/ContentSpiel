@@ -129,7 +129,7 @@
 
     <%# The error toast a drop clones when its request got no answer the
         server could have put a toast into -- offline, signed out, an error
-        page (`autosave/order_request.js`, which writes the message in). The
+        page (`saving/order_request.js`, which writes the message in). The
         component's own markup, so such a toast is the same toast; inert and
         outside `#toasts` while it is a `<template>`. %>
     <template id="toast-error-template"><%= render Admin::Ui::ToastComponent.new(message: t("admin.components.ui.toast.save_failed"), kind: :error) %></template>
@@ -153,7 +153,7 @@
     <template id="translation-pending-template"><%= render Admin::TranslationScreen::PendingComponent.new %></template>
 
     <%# The one Leave dialog (design pass spec §4; round 3 decision D24):
-        `admin--save-bar` opens it when a Turbo visit, a link into the content
+        `admin--saving--save-bar` opens it when a Turbo visit, a link into the content
         frame or Back / Forward would drop unsaved changes. Here, outside
         `#content` and every form, like every dialog.
         "Keep editing" is the primary button and holds the initial focus, so

@@ -13,7 +13,7 @@ import { messages } from "i18n/messages"
 // field, keyboard handling, and a polite live region that announces each
 // addition and removal. What it deliberately does not own: saving. A chip
 // change dispatches a bubbling `change` from the sentinel -- a real control
-// in the form -- so the form's own `admin--autosave` sees it like any other
+// in the form -- so the form's own `admin--saving--autosave` sees it like any other
 // edit and sends the whole list. The text field's own `input`/`change`
 // events are swallowed at the component's root (`swallow`), so typing a
 // search never queues a save; and since a save is only sent when the form's

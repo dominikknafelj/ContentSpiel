@@ -59,7 +59,7 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@image)} .admin-translation-pair", text: "A harbour at dawn"
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@image)} .admin-translation-pair #block-#{@image.id}-alt"
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@text)} .admin-translation-pair", text: "Hello from a column"
-    assert_selector "#{group} form[data-controller~='admin--autosave']", count: 3
+    assert_selector "#{group} form[data-controller~='admin--saving--autosave']", count: 3
   end
 
   # A block card of the list carries its "Delete this block?" dialog; in the
@@ -75,7 +75,7 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
 
     assert_selector "#{group} > .admin-block-card", count: 3
     assert_selector "#{group} fieldset[disabled]", count: 3
-    assert_no_selector "form[data-controller~='admin--autosave']", visible: :all
+    assert_no_selector "form[data-controller~='admin--saving--autosave']", visible: :all
     assert_no_selector "dialog", visible: :all
   end
 

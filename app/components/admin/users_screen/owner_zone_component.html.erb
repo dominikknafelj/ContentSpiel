@@ -1,13 +1,13 @@
 <section class="admin-owner-zone mt-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3.5 rounded-cs border border-dashed border-line-strong px-3.5 py-3"
-         aria-labelledby="owner-zone-title" data-controller="admin--pending-lock">
+         aria-labelledby="owner-zone-title" data-controller="admin--saving--pending-lock">
   <div class="flex min-w-0 flex-col gap-0.5">
     <h2 id="owner-zone-title" class="text-base font-medium text-ink">Owner</h2>
     <p class="text-sm text-dim">Owners can do everything, whatever their groups, and are the only ones who can change who is an owner.</p>
     <% if owner? && last_owner %><p class="text-sm text-dim" data-owner-zone-reason><%= reason %></p><% end %>
-    <p class="text-sm text-meta" data-admin--pending-lock-target="hint" hidden></p>
+    <p class="text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
   </div>
   <%= render Admin::Ui::ButtonComponent.new(label: trigger_label, variant: :secondary, size: :small, disabled: (owner? && last_owner) || nil,
-        data: dialog_trigger(dialog_id).merge("admin--pending-lock-target": "control")) %>
+        data: dialog_trigger(dialog_id).merge("admin--saving--pending-lock-target": "control")) %>
 </section>
 
 <%# After the user's form, never inside it (forms don't nest). Not destructive: the confirm is the primary button. %>

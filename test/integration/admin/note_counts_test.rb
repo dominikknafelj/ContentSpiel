@@ -77,10 +77,10 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     # The panel is the image's autosaving form, and a form cannot nest: the
     # frame brings forms of its own, and inside an autosave form a note's
     # field would be the image's.
-    assert_select "#media-panel form[data-controller~='admin--autosave']"
+    assert_select "#media-panel form[data-controller~='admin--saving--autosave']"
     assert_select "#media-panel form #media-notes", count: 0
     assert_select "form turbo-frame#notes", count: 0
-    assert_select "[data-controller~='admin--autosave'] turbo-frame#notes", count: 0
+    assert_select "[data-controller~='admin--saving--autosave'] turbo-frame#notes", count: 0
 
     get "/cs-studio/media", params: { picker: 1 }
     assert_select "[data-notes-chip]", count: 0
@@ -107,7 +107,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { selected: @asset.id }
 
     assert_response :success
-    assert_select "#media-panel form[data-controller~='admin--autosave']", count: 0
+    assert_select "#media-panel form[data-controller~='admin--saving--autosave']", count: 0
     assert_select "#media-panel #media-notes turbo-frame#notes"
   end
 

@@ -1,6 +1,6 @@
 module Admin
   module SaveBarHelper
-  # The `data:` a form carries to be driven by `admin--save-bar`
+  # The `data:` a form carries to be driven by `admin--saving--save-bar`
   # (`Admin::Ui::SaveBarComponent`): the controller plus the actions it listens
   # for. One definition, so the explicit-save screens can't drift.
   #
@@ -36,11 +36,11 @@ module Admin
     end
 
     {
-      controller: "admin--save-bar",
-      "admin--save-bar-dirty-value": dirty,
-      "admin--save-bar-always-value": always,
-      "admin--save-bar-after-value": after,
-      action: "input->admin--save-bar#refresh change->admin--save-bar#refresh submit->admin--save-bar#guardSubmit turbo:submit-start->admin--save-bar#markSubmitting turbo:submit-end->admin--save-bar#submitEnded"
+      controller: "admin--saving--save-bar",
+      "admin--saving--save-bar-dirty-value": dirty,
+      "admin--saving--save-bar-always-value": always,
+      "admin--saving--save-bar-after-value": after,
+      action: "input->admin--saving--save-bar#refresh change->admin--saving--save-bar#refresh submit->admin--saving--save-bar#guardSubmit turbo:submit-start->admin--saving--save-bar#markSubmitting turbo:submit-end->admin--saving--save-bar#submitEnded"
     }.compact
   end
   end

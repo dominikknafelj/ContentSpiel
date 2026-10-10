@@ -8,7 +8,7 @@ module Admin
     # language tabs, an autosaving title/alt/caption form (`Media::Save`,
     # alt/caption per locale), "Used on" and Move to trash with its help text.
     # The form is the detail page's own, moved: it saves through the write
-    # queue (`admin--autosave`) and its answer (`Admin::MediaController#update`)
+    # queue (`admin--saving--autosave`) and its answer (`Admin::MediaController#update`)
     # also moves the tile and the segment counts, so nothing reloads under the
     # typing editor. The panel is narrower than 880px, so the translation pair
     # stacks on its own (`container-type` on the form).
@@ -17,7 +17,7 @@ module Admin
     # the editors' drawer shows, in place -- this screen has no drawer, so a
     # thread opens where the list was. It stands OUTSIDE the autosave form:
     # the frame brings forms of its own, a form cannot nest, and inside an
-    # `admin--autosave` form a note's field would be the image's. Anyone who
+    # `admin--saving--autosave` form a note's field would be the image's. Anyone who
     # may open the panel may read and write notes there (`media.upload`,
     # `Admin::NoteContainer`), whether or not the image is theirs to edit.
     #
@@ -116,9 +116,9 @@ module Admin
         return {} unless editable?
 
         {
-          controller: "admin--autosave",
-          action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-          "admin--autosave-status-id-value": status_id
+          controller: "admin--saving--autosave",
+          action: "input->admin--saving--autosave#queue change->admin--saving--autosave#queue focusout->admin--saving--autosave#saveNow",
+          "admin--saving--autosave-status-id-value": status_id
         }
       end
 

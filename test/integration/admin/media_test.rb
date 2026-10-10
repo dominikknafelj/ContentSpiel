@@ -587,7 +587,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { selected: asset.id, q: "sel", filter: "unused", page: 1 }
     assert_response :success
-    assert_select "div #media-panel form[data-controller='admin--autosave'][action^='/cs-studio/media/#{asset.id}?']"
+    assert_select "div #media-panel form[data-controller='admin--saving--autosave'][action^='/cs-studio/media/#{asset.id}?']"
     assert_select "#media-panel form input[name='media_asset[alt]']"
     assert_select "#media-panel #media-save-status"
     assert_select "#media-asset-#{asset.id} a[aria-current='true']"

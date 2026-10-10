@@ -410,7 +410,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_select ".admin-stale-grant", text: "Limited to a content type that no longer exists (retired_type). Saving removes it; until then only someone who could grant that type can manage this group."
     assert_select "[data-permission='posts.read'] input[type=checkbox][name$='[enabled]'][checked]", count: 0
     # Save is live from the start, without a counted change (so leaving doesn't ask).
-    assert_select "form#group-form[data-admin--save-bar-always-value=true][data-admin--save-bar-dirty-value=false]"
+    assert_select "form#group-form[data-admin--saving--save-bar-always-value=true][data-admin--saving--save-bar-dirty-value=false]"
 
     assert_difference -> { Audit::Event.where(action: "group.updated", subject_id: group.id).count }, 1 do
       patch "/cs-studio/groups/#{group.id}", params: params_as_rendered
@@ -420,7 +420,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     follow_redirect!
     assert_select ".admin-stale-grant", count: 0
-    assert_select "form#group-form[data-admin--save-bar-always-value=false]"
+    assert_select "form#group-form[data-admin--saving--save-bar-always-value=false]"
 
     sign_in_as(manager)
     get "/cs-studio/groups/#{group.id}/edit"
@@ -440,7 +440,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     get "/cs-studio/groups/#{group.id}/edit"
 
     assert_select ".admin-stale-grant", text: /matched nothing\. It stays off unless you tick it again\./
-    assert_select "form#group-form[data-admin--save-bar-always-value=false]"
+    assert_select "form#group-form[data-admin--saving--save-bar-always-value=false]"
   end
 
   # Final fix wave (Task 11): the two groups differ ONLY in how many unscoped

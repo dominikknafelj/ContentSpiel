@@ -50,7 +50,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
 
     render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en")
 
-    assert_selector "form[data-controller='admin--autosave'] input[name='media_asset[title]']"
+    assert_selector "form[data-controller='admin--saving--autosave'] input[name='media_asset[title]']"
     assert_selector ".admin-media-alt-warn input[name='media_asset[alt]'][placeholder='Add alt text']"
     assert_text "Kept in Trash for 30 days."
     assert_selector "button", text: "Move to trash…"

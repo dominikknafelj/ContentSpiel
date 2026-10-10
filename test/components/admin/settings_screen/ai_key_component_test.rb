@@ -51,10 +51,10 @@ class Admin::SettingsScreen::AiKeyComponentTest < ViewComponent::TestCase
   test "its controls are pending-lock controls" do
     render_key(site: site_with_key(nil))
 
-    %w[Replace Remove…].each { |label| assert_selector "button[data-admin--pending-lock-target=control]", text: label }
-    assert_selector "input[data-admin--pending-lock-target=control]", visible: :all
-    assert_selector "button[data-admin--pending-lock-target=control]", text: "Save key", visible: :all
-    assert_selector "[data-admin--pending-lock-target=hint]", visible: :all
+    %w[Replace Remove…].each { |label| assert_selector "button[data-admin--saving--pending-lock-target=control]", text: label }
+    assert_selector "input[data-admin--saving--pending-lock-target=control]", visible: :all
+    assert_selector "button[data-admin--saving--pending-lock-target=control]", text: "Save key", visible: :all
+    assert_selector "[data-admin--saving--pending-lock-target=hint]", visible: :all
   end
 
   test "an error shows in the slot with the input open" do

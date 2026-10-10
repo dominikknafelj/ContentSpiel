@@ -1,12 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
-import { drained, settled } from "autosave/queue"
+import { drained, settled } from "saving/queue"
 
 // On a form in an editor's header whose submission REPLACES THE PAGE (Publish,
 // Unpublish, Schedule, Remove schedule, Move to trash: each redirects), and on
 // the one block action whose answer REPLACES FORMS OF BLOCKS THAT STAY: a
 // section's "Remove section, keep blocks" (below).
 // Nothing that replaces the page starts until the page's write queue is empty
-// (`autosave/queue.js`, "THE RULE"): the submit is intercepted, the button
+// (`saving/queue.js`, "THE RULE"): the submit is intercepted, the button
 // shows it is waiting, `drained()` sends every edit still held by any form --
 // debounced, queued, in flight, or typed while a save was in flight -- and
 // only then is the form submitted for real. The action therefore runs on the
@@ -26,7 +26,7 @@ import { drained, settled } from "autosave/queue"
 // The visit the action's redirect ends in is not held by the queue's own
 // `turbo:before-visit` handler, should an edit have landed in the meantime:
 // that holds for every Turbo form submission and is the queue's business
-// (`autosave/frame_hold.js`, "TURBO FORM SUBMISSIONS"), which also holds the
+// (`saving/frame_hold.js`, "TURBO FORM SUBMISSIONS"), which also holds the
 // request itself once more if something became outstanding between this
 // controller's drain and the request going out.
 //

@@ -12,7 +12,7 @@ module Admin
     # mean "this PATCH says nothing about it" (`Admin::EditorScreen::RelatedPostsComponent`'s
     # own class comment has the contract). `admin--ui--chip-input` adds and removes
     # those inputs and dispatches a bubbling `change` from the sentinel, which
-    # the form's autosave (`admin--autosave`) already listens for; typing in the
+    # the form's autosave (`admin--saving--autosave`) already listens for; typing in the
     # search box is swallowed at this component's root, so it never queues a
     # save by itself. The text input has no `name`, so it is never submitted.
     #
@@ -49,7 +49,7 @@ module Admin
     # `track: true` is for a field inside an explicit-save form (the group
     # editor's members): the form's footer counts what the form would submit and
     # skips a hidden input unless it carries `data-save-bar-track`
-    # (`admin--save-bar#snapshot`), so the sentinel and every chip's input are
+    # (`admin--saving--save-bar#snapshot`), so the sentinel and every chip's input are
     # marked -- adding a chip is then "1 unsaved change", removing it likewise,
     # and the sentinel's bubbling `change` makes the footer look. Typing in the
     # search box still counts as nothing: its text input has no name and its

@@ -32,7 +32,7 @@ require "ripper"
 #   fixing", "m ago"), or two words ending in a sentence mark. A Tailwind class,
 #   a `data` key, an id, a symbol and a `strftime` pattern are lower-case tokens
 #   with hyphens, dots or percent signs ("flex items-center gap-1.5",
-#   "admin--save-bar-target", "%-d %b"), which none of that matches. Exempt by
+#   "admin--saving--save-bar-target", "%-d %b"), which none of that matches. Exempt by
 #   rule, not by marker: `Admin::Foo` (a `::`), an HTTP header (an `X-` one, or a name in
 #   `STANDARD_HEADERS`: "Content-Type"; "Read-Only" is a label), a single word in capitals
 #   with no ellipsis ("PATCH", "UTC"), and a literal with SQL in it ("LOWER(",
@@ -111,16 +111,16 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/mind_graph_screen/legend_component.html.erb
     app/helpers/admin/messages_helper.rb
     app/javascript/i18n/messages.js
-    app/javascript/controllers/admin/save_bar_controller.js
-    app/javascript/controllers/admin/pending_lock_controller.js
+    app/javascript/controllers/admin/saving/save_bar_controller.js
+    app/javascript/controllers/admin/saving/pending_lock_controller.js
     app/javascript/controllers/admin/ui/chip_input_controller.js
-    app/javascript/controllers/admin/autosave_controller.js
-    app/javascript/autosave/order_request.js
-    app/javascript/autosave/queue.js
-    app/javascript/autosave/queue_state.js
-    app/javascript/autosave/queue_core.js
-    app/javascript/autosave/frame_hold.js
-    app/javascript/autosave/promotion_hold.js
+    app/javascript/controllers/admin/saving/autosave_controller.js
+    app/javascript/saving/order_request.js
+    app/javascript/saving/queue.js
+    app/javascript/saving/queue_state.js
+    app/javascript/saving/queue_core.js
+    app/javascript/saving/frame_hold.js
+    app/javascript/saving/promotion_hold.js
     app/views/admin/tags/index.html.erb
     app/controllers/admin/tags_controller.rb
     app/controllers/admin/tag_suggestions_controller.rb
@@ -460,7 +460,7 @@ class AdminI18nTest < ActiveSupport::TestCase
       "Read-Only", "Sign-In", "Up-To-Date" ].each do |text|
       assert copy?(text), "#{text.inspect} should count as copy"
     end
-    [ "flex items-center gap-1.5 rounded-cs", "admin--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
+    [ "flex items-center gap-1.5 rounded-cs", "admin--saving--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
       "Admin::Ui::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
       "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
@@ -500,7 +500,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_equal [ %(1: "go") ], js_offences(%(if (confirm("go")) {}\n))
     assert_empty js_offences(%(// "Couldn't save the new order"\nconst a = "components.ui.save_bar.blocked"\n))
     assert_empty js_offences(%(/* "Save or cancel" */ x.replace(/'Save or "cancel/g, "")\n))
-    assert_empty js_offences(%(const total = a / b; const k = "admin--save-bar"\n))
+    assert_empty js_offences(%(const total = a / b; const k = "admin--saving--save-bar"\n))
     assert_empty js_offences(%(x.querySelector("[data-leave-count]").dataset.foo = "NOT"\n))
     assert_empty js_offences(%(toast.querySelector("span").textContent = messages(el).t("components.ui.toast.dropped")\n))
     assert_empty js_offences(%(button.textContent = this.text("components.ui.save_status.retry")\n))

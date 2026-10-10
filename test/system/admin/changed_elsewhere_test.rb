@@ -61,7 +61,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
   end
 
   # The editor's own forms must never make each other stale (autosave queue,
-  # `autosave/queue.js`): fill the page settings form and two block forms
+  # `saving/queue.js`): fill the page settings form and two block forms
   # inside one debounce window so all three save on the same tick, then edit
   # the page settings again. Deterministic, no AI. A `fetch` wrapper counts
   # the writes in flight at once: it must never exceed one.
@@ -189,7 +189,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
   end
 
   # Nothing that replaces the page starts until the queue is empty
-  # (`autosave/queue.js`, "THE RULE"). The wrapper below slows every PATCH so a
+  # (`saving/queue.js`, "THE RULE"). The wrapper below slows every PATCH so a
   # save is reliably still in flight when the next thing happens.
   SLOW_PATCHES = <<~JS
     const originalFetch = window.fetch
@@ -493,7 +493,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const form = document.getElementById("page-subtitle").closest("form")
-      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--autosave").flush = () => { throw new Error("flush failed") }
+      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--saving--autosave").flush = () => { throw new Error("flush failed") }
       const field = document.getElementById("page-subtitle")
       field.value = "Sent by its own timer"
       field.dispatchEvent(new Event("input", { bubbles: true }))
@@ -512,7 +512,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const form = document.getElementById("page-subtitle").closest("form")
-      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--autosave").constructor.retryDelays = [ 2000, 100, 100 ]
+      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--saving--autosave").constructor.retryDelays = [ 2000, 100, 100 ]
       const originalFetch = window.fetch
       window.fetch = (url, options = {}) =>
         (options.method || "GET").toUpperCase() === "PATCH" ? Promise.reject(new TypeError("offline")) : originalFetch(url, options)

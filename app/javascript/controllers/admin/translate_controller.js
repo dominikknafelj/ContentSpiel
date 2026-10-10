@@ -40,7 +40,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 // are three different instances.
 //
 // Nothing here saves anything either. Use fills the field's input and
-// lets that form's own `admin--autosave` save it, as an ordinary edit
+// lets that form's own `admin--saving--autosave` save it, as an ordinary edit
 // (Review Focus 4): a plain field gets its value set and a bubbling
 // `input` event (what typing does -- the autosave queue only sends a form
 // whose submitted data changed, so this event is what makes Use save); a

@@ -457,7 +457,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       assert_select "#content-blocks-list > *", count: 2
       assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group[data-admin--blocks-target='card'] > h3", text: "Section"
       assert_equal [ left.id, right.id ], css_select(".admin-section-group > .admin-block-card").map { |card| card["data-block-id"].to_i }
-      assert_select "##{ActionView::RecordIdentifier.dom_id(right)} form[action$='/content_blocks/#{right.id}?locale=de'][data-controller~='admin--autosave'] .admin-translation-pair", text: /Right original/
+      assert_select "##{ActionView::RecordIdentifier.dom_id(right)} form[action$='/content_blocks/#{right.id}?locale=de'][data-controller~='admin--saving--autosave'] .admin-translation-pair", text: /Right original/
       assert_select ".admin-block-tile, [data-admin--blocks-target='lane'], [data-admin--section-target]", count: 0
       assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--blocks-target='card'] .admin-block-card__handle"
     end
@@ -504,7 +504,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card.border-danger", text: /Unavailable type — gone\/section/
     assert_select "#section-#{section.id}-lane-1[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(first)}.admin-block-tile"
     assert_select "#section-#{section.id}-lane-3[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(third)}.admin-block-tile"
-    assert_select "#section-#{section.id}-panels > #block-#{first.id}-panel form[data-controller~='admin--autosave']"
+    assert_select "#section-#{section.id}-panels > #block-#{first.id}-panel form[data-controller~='admin--saving--autosave']"
     assert_select "[id^='block-picker-#{section.id}-']", count: 0
   end
 

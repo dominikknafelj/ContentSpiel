@@ -76,7 +76,7 @@
 @media (max-width: 1279px) { :root { --admin-top-offset: 3rem; } }
 /* A save footer sticks to the bottom of the window; toasts rise above it, or
    on a narrow window (where the form's column is the window) they cover Save.
-   By the footer's MEASURED height (`admin--save-bar` writes it: a footer that
+   By the footer's MEASURED height (`admin--saving--save-bar` writes it: a footer that
    wraps onto two or three lines is taller than any fixed offset), 4rem until
    it has been measured. */
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
@@ -555,7 +555,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    it: sunken too, or it keeps a white frame around a sunken inner field. */
 .admin-view-only .admin-chip-field { background: var(--cs-sunken); }
 
-/* A link `admin--pending-lock` has locked (an instant action waiting for the
+/* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
    main form's unsaved changes, round 3 decision D10): it can't be `disabled`
    like a button, so it is dimmed the way a disabled button is. The controller
    swallows its click. */

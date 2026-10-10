@@ -188,7 +188,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     end
     assert_select "dialog#merge-tag-dialog footer button[type=submit][form='merge-tag-form'][disabled]", text: "Merge tags"
     # The picker's controls never sit inside a row's autosave form.
-    assert_select "form[data-controller='admin--autosave'] [data-controller='admin--ui--chip-input']", count: 0
+    assert_select "form[data-controller='admin--saving--autosave'] [data-controller='admin--ui--chip-input']", count: 0
     assert_select "dialog#delete-tag-dialog button.bg-danger", text: "Delete tag"
   end
 

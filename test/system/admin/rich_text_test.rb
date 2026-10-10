@@ -3,7 +3,7 @@ require "application_system_test_case"
 # The Tiptap editor in CS Studio (tiptap spec §4.1/§9): `admin--rich-text`
 # mounts Tiptap on `Admin::Columns::RichTextColumnComponent`, writes
 # `editor.getJSON()` into the column's hidden `…[body]` input and dispatches
-# `input` so the form's own `admin--autosave` sends it. Every test here ends
+# `input` so the form's own `admin--saving--autosave` sends it. Every test here ends
 # by reading the *saved* document back and running it through
 # `RichText::Document#validate` -- the editor's schema has to match
 # `RichText::Schema` exactly (task 7's "schema fidelity" ruling), so anything

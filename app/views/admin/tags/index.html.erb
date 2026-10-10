@@ -33,7 +33,7 @@
           <% readable = @counts_visible ? @readable_counts.fetch(row.id, 0) : nil %>
           <tr id="<%= dom_id(row) %>" class="border-b border-line last:border-b-0 align-middle">
             <td class="py-1.5 pr-4">
-              <%# `data-controller="admin--autosave"` sits directly on this
+              <%# `data-controller="admin--saving--autosave"` sits directly on this
                   row's own form, same as every other autosaving form in CS
                   Studio (`Admin::EditorScreen::PageSettingsFormComponent`'s own comment
                   explains why the save-status cell, a sibling `<td>` rather
@@ -42,9 +42,9 @@
                   focused: "click the name to rename it". %>
               <%= form_with url: admin_tag_path(row), method: :patch, class: "admin-column flex flex-col gap-1",
                     data: {
-                      controller: "admin--autosave",
-                      action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-                      "admin--autosave-status-id-value": "tag-#{row.id}-save-status"
+                      controller: "admin--saving--autosave",
+                      action: "input->admin--saving--autosave#queue change->admin--saving--autosave#queue focusout->admin--saving--autosave#saveNow",
+                      "admin--saving--autosave-status-id-value": "tag-#{row.id}-save-status"
                     } do %>
                 <%= render partial: "admin/shared/base_updated_at_field",
                       locals: { id: "tag-#{row.id}-base-updated-at", value: row.updated_at.iso8601(6) } %>

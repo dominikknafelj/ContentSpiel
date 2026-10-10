@@ -35,7 +35,7 @@ import { messages } from "i18n/messages"
 //    no `turbo:before-visit` for it until the frame has rendered and the form
 //    is gone. It is stopped at `turbo:click`, BEFORE Turbo has started
 //    anything -- not at the frame's `turbo:before-fetch-request`, where the
-//    write queue holds one (`autosave/queue.js`). A request held there can
+//    write queue holds one (`saving/queue.js`). A request held there can
 //    only be resumed, never dropped: by then `FrameController#navigateFrame`
 //    has set the frame's `src` to the new URL and armed the promoted visit,
 //    and the event carries no handle to cancel with (`resume`, `url` and
@@ -133,7 +133,7 @@ const mustAsk = () => !shared.leaving && guarded().length > 0
 // password manager fills a field) made the guard cancel it and ask "Leave
 // without saving?" about the very screen that had just opened -- and re-arm
 // an open dialog's Discard with a visit to the page already showing.
-// As the write queue does for the same visit (`autosave/frame_hold.js`,
+// As the write queue does for the same visit (`saving/frame_hold.js`,
 // `expectVisit`), the frame's URL is noted as `#content` renders and the next
 // `turbo:before-visit` to exactly that URL is let through. The note is spent
 // by the next visit whichever it is, and expires: not every frame render is
@@ -178,7 +178,7 @@ function onFrameLink(event) {
   const link = event.target
   if (event.defaultPrevented || !(link instanceof Element)) return
 
-  // A jump within the page leaves nothing, so nobody asks: `admin--fragment-
+  // A jump within the page leaves nothing, so nobody asks: `admin--shell--fragment-
   // links` (on <body>) makes it by hand, with no fetch and no history entry.
   if (targetWithinThePage(event.detail.url)) return
 
@@ -304,14 +304,14 @@ function clearPendingLeave() {
   shared.pending = null
 }
 
-// PENDING CHANGES, ANNOUNCED. `admin--save-bar:state` on `document`, with
+// PENDING CHANGES, ANNOUNCED. `admin--saving--save-bar:state` on `document`, with
 // `detail: { unsaved, count }` for the whole PAGE (any form unsaved; the
 // changes of all of them), whenever a form connects, changes or goes. It is
 // the one thing this controller tells the rest of the screen, and
-// `admin--pending-lock` is its listener: instant actions beside the form are
+// `admin--saving--pending-lock` is its listener: instant actions beside the form are
 // disabled while changes are pending (decision D10).
 // A listener that connects later than the forms asks for the state again by
-// dispatching `admin--save-bar:query` on `document`, which is answered with
+// dispatching `admin--saving--save-bar:query` on `document`, which is answered with
 // the same event -- controllers are registered by one dynamic import each, so
 // no connect order can be relied on. The question is anybody's to ask; the
 // answer is still the one thing told.
@@ -320,7 +320,7 @@ function announce() {
   // ANOTHER", below).
   instances.forEach((instance) => instance.applyBlock())
   const unsaved = [...instances].filter((instance) => instance.unsaved)
-  document.dispatchEvent(new CustomEvent("admin--save-bar:state", {
+  document.dispatchEvent(new CustomEvent("admin--saving--save-bar:state", {
     detail: { unsaved: unsaved.length > 0, count: unsaved.reduce((sum, instance) => sum + instance.changes, 0) }
   }))
 }
@@ -349,9 +349,9 @@ function measureBars() {
 // drop (ledger C-M8: Settings' API key entry, a field of the key's own form,
 // open and filled in while the main Save re-renders the screen): the element
 // holding it carries `data-save-bar-holds="<sentence>"` while it does, and
-// asks for a new look with `admin--save-bar:query`.
+// asks for a new look with `admin--saving--save-bar:query`.
 // The sentence itself is `admin.components.ui.save_bar.blocked`, read from the
-// page's messages (`i18n/messages.js`); `admin--pending-lock` shows the same.
+// page's messages (`i18n/messages.js`); `admin--saving--pending-lock` shows the same.
 
 export default class extends Controller {
   static targets = ["bar", "count", "save", "blocked"]
@@ -365,7 +365,7 @@ export default class extends Controller {
       document.addEventListener("turbo:click", onFrameLink, true)
       guardPopState()
       window.addEventListener("beforeunload", onUnload)
-      document.addEventListener("admin--save-bar:query", announce)
+      document.addEventListener("admin--saving--save-bar:query", announce)
     }
     instances.add(this)
     shared.leaving = false
@@ -386,7 +386,7 @@ export default class extends Controller {
       document.removeEventListener("turbo:before-visit", onVisit)
       document.removeEventListener("turbo:click", onFrameLink, true)
       window.removeEventListener("beforeunload", onUnload)
-      document.removeEventListener("admin--save-bar:query", announce)
+      document.removeEventListener("admin--saving--save-bar:query", announce)
       clearPendingLeave()
     }
     // After the listeners are gone: the form leaving is a change of state too

@@ -69,7 +69,7 @@ class Admin::Ui::SaveStatusComponentTest < ViewComponent::TestCase
 
   test "the offline state carries a Retry button that saves now" do
     render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :offline)
-    assert_selector "p#s button[data-action='admin--autosave#saveNow']", text: "Retry"
+    assert_selector "p#s button[data-action='admin--saving--autosave#saveNow']", text: "Retry"
   end
 
   test "rejects an unknown state" do

@@ -175,7 +175,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     find(face(@left)).click
     page.execute_script(<<~JS)
       const field = document.getElementById(#{caption(@left).to_json})
-      field.form.setAttribute("data-admin--autosave-debounce-value", "600000")
+      field.form.setAttribute("data-admin--saving--autosave-debounce-value", "600000")
       field.value = "Sent by the close"
       field.dispatchEvent(new Event("input", { bubbles: true }))
     JS
@@ -593,7 +593,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
   # "Remove section, keep blocks" is the one action of a section that replaces
   # the forms of blocks that STAY: its answer draws a card for each in the
-  # section's place. So it runs only on a settled screen (`admin--queue-hold`
+  # section's place. So it runs only on a settled screen (`admin--saving--queue-hold`
   # on its form): a form paused by a 409 holds text that is nowhere else, and
   # the bar over it has promised that it is still there.
   test "Remove section, keep blocks does not run while a form holds text that was refused, and says so" do
@@ -870,7 +870,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     drop_into(@left, "#content-blocks-list")
 
-    assert_selector "#content-blocks-list > .admin-block-card[data-block-id='#{@left.id}'] form[data-controller~='admin--autosave']"
+    assert_selector "#content-blocks-list > .admin-block-card[data-block-id='#{@left.id}'] form[data-controller~='admin--saving--autosave']"
     assert_no_selector panel(@left), visible: :all
     assert_selector "#section-#{@section.id}-summary", text: "2 columns · 1 block"
     assert_nil @left.reload.section_id

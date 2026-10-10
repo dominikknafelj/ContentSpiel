@@ -473,7 +473,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   end
 
   # Reached through the Groups LIST, i.e. a Turbo *frame* navigation: the
-  # form's `admin--save-bar` then connects (and takes its baseline) before the
+  # form's `admin--saving--save-bar` then connects (and takes its baseline) before the
   # nested `admin--branch-picker` has ticked and disabled the boxes a chosen
   # branch implies. The baseline has to describe what would be submitted --
   # a disabled box and an unticked one are both simply absent -- or the
@@ -519,7 +519,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
         const form = document.getElementById("user-form").getBoundingClientRect()
         const save = bar.querySelector("button[type=submit]").getBoundingClientRect()
         const cancel = bar.querySelector("a").getBoundingClientRect()
-        const count = getComputedStyle(bar.querySelector("[data-admin--save-bar-target=count]"))
+        const count = getComputedStyle(bar.querySelector("[data-admin--saving--save-bar-target=count]"))
         return { barLeft: rect.left, barRight: rect.right, formLeft: form.left, formRight: form.right,
                  saveLeft: save.left, cancelLeft: cancel.left,
                  font: count.fontFamily, size: count.fontSize, transform: count.textTransform,

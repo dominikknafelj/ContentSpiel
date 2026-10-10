@@ -147,7 +147,7 @@ module Admin
     # The HTTP status an autosave answers with: 200, 403 for a permission
     # refusal (access-control design spec §3.4 -- a forged or stale-tab
     # PATCH to a record the user may only read), 422 for anything else.
-    # The Turbo Stream body is sent either way; `admin--autosave` renders a
+    # The Turbo Stream body is sent either way; `admin--saving--autosave` renders a
     # stream answer whatever its status.
     def autosave_status(result)
       if result.ok? then :ok

@@ -14,13 +14,13 @@
 //   said nothing, and the card or row stayed where the editor had dropped it
 //   -- an order on screen that was never saved, looking exactly like one that
 //   was.
-// `admin--autosave#send` already tells these apart for a form's save
+// `admin--saving--autosave#send` already tells these apart for a form's save
 // (`response.redirected`, `isTurboStreamAnswer`, its retry and signed-out
 // states); this is the same judgement for a drop, which has no status line to
 // write into and nothing to retry: the dragged thing is put BACK where it was
 // (each controller knows how) and an error toast says why.
 //
-// The queue (`autosave/queue.js`) is not this module's business: each caller
+// The queue (`saving/queue.js`) is not this module's business: each caller
 // still runs `sendOrder` inside its own `enqueue` task, reads its bases at
 // send time and writes the answer's back (`syncBases`) exactly as before.
 // `sendOrder` never throws, so the task always ends and the slot is released.
@@ -93,7 +93,7 @@ export function errorToast(text, id) {
 // `<turbo-stream>` elements at once but performs each one's action after the
 // next repaint (`StreamElement#render`, turbo-rails 2.0.23; a timer instead
 // when the tab is hidden), so this waits for that repaint and the task after
-// it -- the end of `streamRenders().applied` in `autosave/queue_core.js`,
+// it -- the end of `streamRenders().applied` in `saving/queue_core.js`,
 // which has to recognise an answer Turbo renders; here the caller rendered
 // it, a line earlier, and Turbo's frame callback is ahead of this one.
 //

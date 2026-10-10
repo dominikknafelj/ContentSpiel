@@ -12,7 +12,7 @@ require "test_helper"
 # The import map itself is the same on both (it's only a lookup table);
 # what differs is what each page preloads and imports.
 class PublicJavascriptTest < ActionDispatch::IntegrationTest
-  ADMIN_ONLY = %w[controllers/admin/ rich_text/ autosave/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
+  ADMIN_ONLY = %w[controllers/admin/ rich_text/ saving/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
 
   test "a public page loads the application entry point without any admin module" do
     create_page(title: "About")

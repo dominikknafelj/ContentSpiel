@@ -13,7 +13,7 @@
 //   implicitly submitting that form (a full-page PATCH navigation);
 // - `input`/`change` from popover fields stop at the popover. Those fields
 //   have no `name` and never reach the server, so letting them bubble would
-//   only make `admin--autosave` save an unchanged form on every keystroke.
+//   only make `admin--saving--autosave` save an unchanged form on every keystroke.
 
 const INPUT_CLASS = "mt-1 block w-full rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
 const LABEL_CLASS = "block font-cs-mono text-label uppercase tracking-mono text-meta"

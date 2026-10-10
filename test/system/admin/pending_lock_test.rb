@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# `admin--pending-lock` (design pass round 3, Task 1; decision D10): while an
+# `admin--saving--pending-lock` (design pass round 3, Task 1; decision D10): while an
 # explicit-save form on the screen has unsaved changes, the instant actions
 # beside it are disabled and a hint says why -- "Save or cancel your changes
 # first." -- because an instant action re-renders the screen and would throw
@@ -8,7 +8,7 @@ require "application_system_test_case"
 #
 # Its first real hosts arrive with Settings, Groups and Users later in the
 # round, so the wrapper is added to the edit-user screen here (ruling R2):
-# a button, a link and the hint, next to the real `admin--save-bar` form.
+# a button, a link and the hint, next to the real `admin--saving--save-bar` form.
 class Admin::PendingLockTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -19,11 +19,11 @@ class Admin::PendingLockTest < ApplicationSystemTestCase
   def add_lock(position = "beforebegin")
     page.execute_script(<<~JS, position)
       document.getElementById("user-form").insertAdjacentHTML(arguments[0], `
-        <div id="lock" data-controller="admin--pending-lock">
-          <button type="button" id="lock-button" data-admin--pending-lock-target="control">Test connection</button>
-          <button type="button" id="lock-off" disabled data-admin--pending-lock-target="control">Already off</button>
-          <a id="lock-link" href="#{admin_groups_path}" data-turbo-frame="_top" data-admin--pending-lock-target="control">Manage groups</a>
-          <p id="lock-hint" hidden data-admin--pending-lock-target="hint"></p>
+        <div id="lock" data-controller="admin--saving--pending-lock">
+          <button type="button" id="lock-button" data-admin--saving--pending-lock-target="control">Test connection</button>
+          <button type="button" id="lock-off" disabled data-admin--saving--pending-lock-target="control">Already off</button>
+          <a id="lock-link" href="#{admin_groups_path}" data-turbo-frame="_top" data-admin--saving--pending-lock-target="control">Manage groups</a>
+          <p id="lock-hint" hidden data-admin--saving--pending-lock-target="hint"></p>
         </div>`)
     JS
     await_admin_controllers
@@ -86,10 +86,10 @@ class Admin::PendingLockTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       document.querySelector("#user-form .admin-save-bar").insertAdjacentHTML("beforebegin", `
-        <div id="lock" data-controller="admin--pending-lock">
-          <input id="lock-field" name="user[note]" value="kept" data-admin--pending-lock-target="control">
-          <button type="button" id="lock-button" data-admin--pending-lock-target="control">Instant</button>
-          <p id="lock-hint" hidden data-admin--pending-lock-target="hint"></p>
+        <div id="lock" data-controller="admin--saving--pending-lock">
+          <input id="lock-field" name="user[note]" value="kept" data-admin--saving--pending-lock-target="control">
+          <button type="button" id="lock-button" data-admin--saving--pending-lock-target="control">Instant</button>
+          <p id="lock-hint" hidden data-admin--saving--pending-lock-target="hint"></p>
         </div>`)
       const form = document.getElementById("user-form")
       const parent = form.parentNode, next = form.nextSibling

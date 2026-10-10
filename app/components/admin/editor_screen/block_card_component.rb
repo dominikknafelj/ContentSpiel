@@ -6,7 +6,7 @@ module Admin
     # from `block.definition.fields` (`Admin::Ui::FieldComponent`) and the columns
     # it opts into (`block.definition.uses_columns`, one `Admin::Columns::*`
     # each). Mirrors `Admin::EditorScreen::PageSettingsFormComponent`'s shape (one `<form
-    # data-controller="admin--autosave">`, a hidden `base_updated_at`, a
+    # data-controller="admin--saving--autosave">`, a hidden `base_updated_at`, a
     # `save-status` line) but there can be many of these on one page at once,
     # unlike the page settings form -- every id here is therefore built off
     # `error_prefix` (`"block-<id>"`, unique per row) rather than a bare,
@@ -43,7 +43,7 @@ module Admin
     # follow their page's permissions). The page view works it out once and
     # hands it to every card; left nil, the card asks itself. A view-only
     # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete) and its
-    # form is disabled without `admin--autosave`.
+    # form is disabled without `admin--saving--autosave`.
     #
     # `placement:` is where the card is drawn (sections spec §4.3, D4):
     # - `:list`, the default, is everything above: a card of the page's block
@@ -104,10 +104,10 @@ module Admin
 
       def self.autosave_form_data(block)
         {
-          controller: "admin--autosave",
-          action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-          "admin--autosave-status-id-value": status_id(block),
-          "admin--autosave-page-base-id-value": "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+          controller: "admin--saving--autosave",
+          action: "input->admin--saving--autosave#queue change->admin--saving--autosave#queue focusout->admin--saving--autosave#saveNow",
+          "admin--saving--autosave-status-id-value": status_id(block),
+          "admin--saving--autosave-page-base-id-value": "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
         }
       end
 

@@ -20,7 +20,7 @@ module Admin
     # forms can't nest) and is reached from here by the `form=` attribute or a
     # dialog trigger. They answer with a 303 to the screen, which reloads it, so
     # they are disabled while the main form has unsaved changes
-    # (`admin--pending-lock`, decision D10): otherwise the reload would throw
+    # (`admin--saving--pending-lock`, decision D10): otherwise the reload would throw
     # the typed changes away.
     #
     # The default language is NOT a radio group (final wave B, ledger C-M9; the

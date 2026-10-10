@@ -17,7 +17,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_text "Post list"
     assert_selector "input[name='block[settings][limit]'][value='3']"
     assert_selector "##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-limit-errors"
-    assert_selector "form[action$='/content_blocks/#{block.id}'][data-controller~='admin--autosave']"
+    assert_selector "form[action$='/content_blocks/#{block.id}'][data-controller~='admin--saving--autosave']"
   end
 
   def render_card(block, page:, **options)
@@ -101,7 +101,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
 
-    assert_selector "#block-#{block.id}-panel form[data-controller~='admin--autosave']", visible: :all
+    assert_selector "#block-#{block.id}-panel form[data-controller~='admin--saving--autosave']", visible: :all
     assert_no_selector "dialog", visible: :all
   end
 
@@ -158,7 +158,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "button", text: "Delete block…"
     assert_no_selector "[role=menu]", visible: :all
     assert_no_selector ".admin-block-card__handle", visible: :all
-    assert_no_selector "form[data-controller~='admin--autosave']"
+    assert_no_selector "form[data-controller~='admin--saving--autosave']"
     assert_no_selector "[data-block-body], input[name^='block['], textarea, select", visible: :all
     refute_text "Duplicate"
     refute_text "Move up"
@@ -181,7 +181,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     # Its menu holds "Add note" and nothing of an editor's (the handoff's decision 6).
     assert_no_selector ".admin-block-card__handle, [data-move], form[action$='/duplicate'], dialog", visible: :all
     assert_equal [ "Add note" ], page_menu_items
-    assert_no_selector "form[data-controller~='admin--autosave']"
+    assert_no_selector "form[data-controller~='admin--saving--autosave']"
   end
 
   test "an image block's alt and caption are per-use overrides with the library text as placeholder and Reset" do
@@ -229,7 +229,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     assert_selector "#block-#{block.id}-panel[hidden][data-admin--section-target='panel'][data-block-id='#{block.id}']", visible: :all
     assert_selector "#block-#{block.id}-panel-title", text: "Image · column 2", visible: :all
-    assert_selector "form[action$='/content_blocks/#{block.id}'][data-controller~='admin--autosave']", visible: :all
+    assert_selector "form[action$='/content_blocks/#{block.id}'][data-controller~='admin--saving--autosave']", visible: :all
     assert_selector "#block-#{block.id}-save-status", visible: :all
     assert_no_selector ".admin-block-card__handle", visible: :all
     assert_no_selector "[data-admin--blocks-target='card']", visible: :all
@@ -271,7 +271,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     assert_selector "#block-#{block.id}-panel", text: "Unavailable type — gone/thing", visible: :all
     assert_selector "button[data-action='admin--section#close']", visible: :all
-    assert_no_selector "form[data-controller~='admin--autosave']", visible: :all
+    assert_no_selector "form[data-controller~='admin--saving--autosave']", visible: :all
   end
 
   test "as a group card it has the type's name, a menu with Add note alone, and neither handle nor targets" do
@@ -281,7 +281,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_card(block, page: page, placement: :group)
 
     assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}", text: "Rich text"
-    assert_selector "form[data-controller~='admin--autosave']"
+    assert_selector "form[data-controller~='admin--saving--autosave']"
     assert_no_selector ".admin-block-card__handle"
     # The handoff's decision 6: the one item a group card's menu has.
     assert_selector "button[aria-label='Block actions']", count: 1

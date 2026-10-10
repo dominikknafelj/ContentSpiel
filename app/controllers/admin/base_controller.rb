@@ -179,7 +179,7 @@ module Admin
     # HTML in place. `message` is a service's refusal ("You don't have
     # permission to publish posts") when there is one.
     #
-    # An autosave (a Turbo Stream request from `admin--autosave`) refused
+    # An autosave (a Turbo Stream request from `admin--saving--autosave`) refused
     # here -- a tab left open after the user lost the area -- gets the
     # 403 save-status stream a service refusal gets
     # (`AutosaveResponses#autosave_status`), in the status line the

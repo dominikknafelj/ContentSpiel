@@ -18,7 +18,7 @@ module Admin
     #
     # An instant action must not run over an unsaved edit -- it answers by
     # re-rendering the screen, which would throw the typed changes away -- so the
-    # button is an `admin--pending-lock` control: disabled while the user form has
+    # button is an `admin--saving--pending-lock` control: disabled while the user form has
     # unsaved changes, with "Save or cancel your changes first.". The zone and its
     # dialogs sit AFTER the user form, never inside it (forms don't nest).
     class OwnerZoneComponent < AdminComponent

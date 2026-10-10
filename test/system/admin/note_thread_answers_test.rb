@@ -171,7 +171,7 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
   end
 
   # The same before the request has left at all: a non-GET is held by the
-  # write queue while an autosave is out (`autosave/frame_hold.js`), which is
+  # write queue while an autosave is out (`saving/frame_hold.js`), which is
   # before Turbo says `turbo:submit-start`. The hold is played here by a
   # listener that keeps the request back the way the queue does.
   test "the field is read-only from the press, also while the request is still held back before it is sent" do

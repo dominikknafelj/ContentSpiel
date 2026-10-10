@@ -14,7 +14,7 @@ module Admin
     # while the main form has unsaved changes (decision D10), while anything is
     # pending ("Save or cancel your changes first."). The two can both apply --
     # a changed field is itself a pending change -- and then only the specific
-    # one shows. `admin--pending-lock` (same root) locks the key's controls and
+    # one shows. `admin--saving--pending-lock` (same root) locks the key's controls and
     # carries the key row's own hint; Test connection is NOT one of its
     # controls, since its state is the union of both rules and is decided in
     # one place.

@@ -37,7 +37,7 @@ module Admin
       # form itself is live: without it the header says "View only", every
       # field is disabled (one `<fieldset disabled>` around the form's
       # contents, which also makes the rich-text editor read-only) and
-      # `admin--autosave` isn't attached, so typing sends nothing at all
+      # `admin--saving--autosave` isn't attached, so typing sends nothing at all
       # (Review Focus 4).
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(post))
 
@@ -47,9 +47,9 @@ module Admin
         return {} unless editable?
 
         {
-          controller: "admin--autosave",
-          action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-          "admin--autosave-status-id-value": save_status_id
+          controller: "admin--saving--autosave",
+          action: "input->admin--saving--autosave#queue change->admin--saving--autosave#queue focusout->admin--saving--autosave#saveNow",
+          "admin--saving--autosave-status-id-value": save_status_id
         }
       end
 

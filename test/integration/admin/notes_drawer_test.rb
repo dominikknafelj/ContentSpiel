@@ -14,7 +14,7 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
   def assert_drawer_outside_every_form
     assert_select "form aside#notes-drawer", count: 0
     assert_select "form turbo-frame#notes", count: 0
-    assert_select "[data-controller~='admin--autosave'] turbo-frame#notes", count: 0
+    assert_select "[data-controller~='admin--saving--autosave'] turbo-frame#notes", count: 0
     assert_select "turbo-frame#content aside#notes-drawer turbo-frame#notes", count: 1
   end
 

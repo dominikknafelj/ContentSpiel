@@ -3,7 +3,7 @@ module Admin
     # The explicit-save bar for configuration screens (design pass spec §4,
     # handoff §9 B12): sticky at the foot of the form and always visible, with
     # Save, Cancel (which leaves without asking, `data-save-bar-cancel`) and a
-    # live count of changed fields. It is rendered *inside* the form that carries `admin--save-bar`
+    # live count of changed fields. It is rendered *inside* the form that carries `admin--saving--save-bar`
     # (the controller finds its `bar`/`count` targets by being an ancestor), and
     # its Save names the form with `form=` as well, so the button keeps working
     # if a layout change ever moves the bar out of the `<form>` element.

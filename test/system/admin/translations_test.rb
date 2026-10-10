@@ -4,7 +4,7 @@ require "application_system_test_case"
 # helpers spec §4-§6): the editor's Translate / Use / "Translate empty
 # fields" / "Use all" (`admin--translate`), which only a browser can run --
 # the request is a `fetch`, Use fills the input and lets the form's own
-# `admin--autosave` save it, and a rich-text Use goes through the Tiptap
+# `admin--saving--autosave` save it, and a rich-text Use goes through the Tiptap
 # editor (`admin--rich-text#applySuggestion`) -- plus the outdated note,
 # the Translations overview and the translated site tagline.
 #
@@ -180,7 +180,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       # Sent together they would carry the same page base, and the second
       # would leave the page form holding a base nobody else made stale: its
       # next save would be refused ("changed elsewhere") with no one else
-      # involved. The page-level queue (`autosave/queue.js`) prevents that.
+      # involved. The page-level queue (`saving/queue.js`) prevents that.
       fill_in id: "page-subtitle", with: "[de] Typed after Use all"
       assert_eventually { page_record.reload.subtitle(locale: "de", fallback: false) == "[de] Typed after Use all" }
       assert_no_text "CHANGED ELSEWHERE"

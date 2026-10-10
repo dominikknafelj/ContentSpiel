@@ -1,5 +1,5 @@
 // What waits for the write queue to drain before it replaces an editor
-// ("THE RULE" in `autosave/queue.js`, which also has the module map): a Turbo
+// ("THE RULE" in `saving/queue.js`, which also has the module map): a Turbo
 // visit, a frame navigation inside `#content` -- its request, and its render,
 // with the refetch of an answer that is older than a save -- and a Turbo form
 // submission. One section each below, in that order; the frame's GET and the
@@ -7,15 +7,15 @@
 //
 // The same listeners are where the promotion window opens and closes (the
 // frame's GET going out, its render, a refused frame form): what the window
-// is for and what is held in it is `autosave/promotion_hold.js`; its record
-// is in `autosave/queue_state.js`, because this module is evaluated before
+// is for and what is held in it is `saving/promotion_hold.js`; its record
+// is in `saving/queue_state.js`, because this module is evaluated before
 // `promotion_hold.js` and cannot import it (see the order in `queue.js`).
 import { Turbo } from "@hotwired/turbo-rails"
-import { busy, drained, DRAIN_LIMIT_MS } from "autosave/queue_core"
+import { busy, drained, DRAIN_LIMIT_MS } from "saving/queue_core"
 import {
   formCount, frameFormWasRefused, frameRendered, promotionEnds, promotionOpen, promotionStarts, setFrameFormRefused,
   writeCount, PROMOTION_FETCH_LIMIT_MS, PROMOTION_LIMIT_MS
-} from "autosave/queue_state"
+} from "saving/queue_state"
 
 const VISIT_NOTE_LIMIT_MS = 2000
 
@@ -43,7 +43,7 @@ export function frameFor(form, submitter) {
 // A Turbo visit (sidebar link, locale switch, Reload) waits for the queue to
 // drain first, so no edit still on its way is lost to the page replacing
 // itself. Only when something IS outstanding: with nothing queued the visit
-// goes straight on, so screens without autosave (and `admin--save-bar`'s own
+// goes straight on, so screens without autosave (and `admin--saving--save-bar`'s own
 // before-visit guard) are untouched. After the drain the visit goes on
 // whatever the outcome -- the editor chose to leave, and is never trapped on
 // the page (a timeout, a refused or failed save still end in the visit; the
@@ -215,7 +215,7 @@ document.addEventListener("turbo:before-frame-render", (event) => {
 //    `holdTurboRequest` already took (block add/duplicate/delete, the reorder
 //    and tree Undo toasts -- which also need the page base) is
 //    `defaultPrevented` by then and left to it. The editor header's five
-//    actions drain earlier still, at `submit` (`admin--queue-hold`), because
+//    actions drain earlier still, at `submit` (`admin--saving--queue-hold`), because
 //    they also refuse to run after an unclean drain; this half only catches
 //    what lands between their drain and their request.
 //    (The same listener holds a `#content` frame's GET: "FRAME NAVIGATIONS",

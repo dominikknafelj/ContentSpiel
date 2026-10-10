@@ -461,7 +461,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{@own_post.id}"
 
     assert_response :success
-    assert_select "form[data-controller~='admin--autosave']"
+    assert_select "form[data-controller~='admin--saving--autosave']"
     assert_select "button, input[type=submit]", text: /Publish|Move to trash/, count: 0
   end
 
@@ -485,7 +485,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-view-only]", text: "View only"
-    assert_select "[data-controller~='admin--autosave']", count: 0
+    assert_select "[data-controller~='admin--saving--autosave']", count: 0
     assert_select "form fieldset[disabled]"
   end
 
@@ -496,7 +496,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{@own_post.id}"
 
     assert_select "[data-view-only]", text: "View only"
-    assert_select "[data-controller~='admin--autosave']", count: 0
+    assert_select "[data-controller~='admin--saving--autosave']", count: 0
   end
 
   test "a readable but not editable page renders its settings and blocks view only" do
@@ -506,7 +506,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_select "[data-view-only]", text: "View only"
-    assert_select "[data-controller~='admin--autosave']", count: 0
+    assert_select "[data-controller~='admin--saving--autosave']", count: 0
     assert_select ".admin-block-card fieldset[disabled]"
     assert_select ".admin-block-card__handle", count: 0
     assert_select ".admin-block-card__menu", count: 0

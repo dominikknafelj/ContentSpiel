@@ -24,7 +24,7 @@
 // queue time. The server's base mechanism is unchanged.
 //
 // Everything that sends `X-Page-Base-Updated-At` goes through here: every
-// `admin--autosave` form (`enqueue`), block reorder (`enqueue`), Turbo's own
+// `admin--saving--autosave` form (`enqueue`), block reorder (`enqueue`), Turbo's own
 // block form submissions -- add, duplicate, delete, the Undo toast
 // (`holdTurboRequest`) -- and, from outside the editor's forms, the page
 // tree's move (`enqueue`) and its Undo toast (`holdTurboRequest`): moving the
@@ -58,28 +58,28 @@
 // So no edit is dropped on the way out: before this, a queued save was either
 // cancelled by the visit (lost silently) or sent on a base the action had just
 // moved (refused). The header action additionally refuses to run when a form
-// ended unclean (`admin--queue-hold`): its redirect would throw away the very
+// ended unclean (`admin--saving--queue-hold`): its redirect would throw away the very
 // text a 409 bar promised to keep. A plain visit or frame navigation still
 // goes on (the editor chose to leave; do not trap them), after the drain.
 //
 // THE MODULES. This file is the one specifier everybody imports
-// (`autosave/queue`: the four controllers that write, and the system tests'
+// (`saving/queue`: the four controllers that write, and the system tests'
 // `assert_writes_settled`); what it exports is unchanged by the split, and
 // nothing outside this directory imports the files below.
-// - `autosave/queue_state.js`: what the others share, and nothing else -- the
+// - `saving/queue_state.js`: what the others share, and nothing else -- the
 //   page generations ("PAGE GENERATIONS", "WHAT A GENERATION IS"), the
 //   chain and its counters, the registered forms, the promotion window's
 //   record. No imports, no listeners.
-// - `autosave/queue_core.js`: the queue itself -- `acquire`, `enqueue`,
+// - `saving/queue_core.js`: the queue itself -- `acquire`, `enqueue`,
 //   `holdTurboRequest`, `syncBases`, `drained()`, and "THE UNLOAD GUARD".
-// - `autosave/frame_hold.js`: what waits on `drained()` before it replaces an
+// - `saving/frame_hold.js`: what waits on `drained()` before it replaces an
 //   editor -- a visit, a `#content` frame navigation ("FRAME NAVIGATIONS",
 //   with the refetch of a stale answer) and a Turbo form submission ("TURBO
 //   FORM SUBMISSIONS").
-// - `autosave/promotion_hold.js`: "THE PROMOTION HOLD", the navigator-level
+// - `saving/promotion_hold.js`: "THE PROMOTION HOLD", the navigator-level
 //   submissions kept back while a frame navigation is promoted to a visit.
 // Every module imports the others by their import-map specifier
-// (`autosave/...`, never a relative path): the import map gives each ONE URL,
+// (`saving/...`, never a relative path): the import map gives each ONE URL,
 // so each is evaluated once per document and there is one queue.
 //
 // THE ORDER THE LISTENERS ARE REGISTERED IN. Nine listeners are registered as
@@ -111,30 +111,30 @@
 //   are made by the TARGET, not by when a listener was added: (5) is a
 //   capturing listener on `window`, the first stop of every `submit`, so it
 //   runs before Turbo's `FormSubmitObserver` (capturing, on `document`),
-//   before `admin--queue-hold` and before every Stimulus action; (3) is on
+//   before `admin--saving--queue-hold` and before every Stimulus action; (3) is on
 //   `window`, the last stop of a bubbling event, so it runs after every
 //   `turbo:before-fetch-request` listener on an element or on `document`, and
 //   finds a request `holdTurboRequest` took already `defaultPrevented`.
 // - What the order does decide is where each of the nine stands among OTHER
 //   code's listeners for the same event on the same target (Turbo's own on
-//   `document`, `admin--save-bar`'s `turbo:before-visit` guard, a
+//   `document`, `admin--saving--save-bar`'s `turbo:before-visit` guard, a
 //   controller's `turbo:before-render` or `turbo:load`), and those run in the
 //   order they were added. The nine are added in one go -- no other module is
-//   evaluated in between -- at the first import of `autosave/queue`, as they
+//   evaluated in between -- at the first import of `saving/queue`, as they
 //   always were. Keeping their order means that position is the same listener
 //   for listener, so nothing has to be argued event by event.
 // - (9) is here because it belongs to two modules at once (it retires a body,
 //   `queue_state.js`, and drops a visit note, `frame_hold.js`) and comes last.
 import { Turbo } from "@hotwired/turbo-rails"
-import { retire } from "autosave/queue_state"
-import "autosave/queue_core"
-import { expectVisit } from "autosave/frame_hold"
-import "autosave/promotion_hold"
+import { retire } from "saving/queue_state"
+import "saving/queue_core"
+import { expectVisit } from "saving/frame_hold"
+import "saving/promotion_hold"
 
-export { currentGeneration, isCurrentGeneration } from "autosave/queue_state"
+export { currentGeneration, isCurrentGeneration } from "saving/queue_state"
 export {
   registerForm, unregisterForm, settled, busy, drained, acquire, enqueue, syncBases, holdTurboRequest
-} from "autosave/queue_core"
+} from "saving/queue_core"
 
 // See "WHAT A GENERATION IS" (`queue_state.js`): the body Turbo is about to
 // replace is retired now, a moment before the swap.
