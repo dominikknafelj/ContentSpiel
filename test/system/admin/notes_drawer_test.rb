@@ -360,7 +360,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_no_selector "#notes-drawer"
 
     find("#notes-open").click
-    find("#note-row-#{thread.id}").click if page.has_selector?("#notes-drawer #notes-list", wait: 2)
+    find("#notes-drawer #notes-list #note-row-#{thread.id}").click
     assert_selector "#notes-drawer #note-thread-#{thread.id}"
     scroll_messages_to_end(thread)
     find("#notes-drawer a[data-note-back]").click
@@ -537,8 +537,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{@page.id}']"
     assert_eventually { address == "/cs-studio/pages/#{@page.id}?notes=open" }
 
-    # By script: the tree is folded away while the notes column is open.
-    click_frame_link { find(".admin-shell__tree a", text: "Other", visible: :all).execute_script("this.click()") }
+    click_frame_link { find(".admin-shell__tree a", text: "Other", visible: :all).execute_script("this.click()") } # press_by_script: the tree is folded away while the notes column is open
 
     assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{other.id}']"
     assert_eventually(message: "the next editor's address does not say its notes are open") { address == "/cs-studio/pages/#{other.id}?notes=open" }
