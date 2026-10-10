@@ -10,7 +10,7 @@
     (and fires `turbo:before-cache`) on its own schedule, which either kept
     the reveal in the cache or, with `data-turbo-temporary`, removed it from
     the live page right after it rendered.
-    `admin--token-reveal` does the copying (Clipboard API, falling back to
+    `admin--tokens--reveal` does the copying (Clipboard API, falling back to
     selecting the text) and blanks the token on `pagehide` for the
     browser's own back/forward cache. Round 3 draws it as the AI assistant
     page itself (the warn box in step 1, the token in step 2's configuration),

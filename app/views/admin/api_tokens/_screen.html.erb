@@ -2,9 +2,9 @@
     page as a numbered flow: 1 Create a token, 2 Add it to your assistant, then
     the Tokens table. `index` and `create` both render it, so the reveal is the
     same page with the raw token in step 1 and filled into step 2's
-    configuration. `admin--token-reveal` wraps all of it: its Copy buttons, and
+    configuration. `admin--tokens--reveal` wraps all of it: its Copy buttons, and
     the blanking of every `secret` on `pagehide`. %>
-<div data-controller="admin--token-reveal" class="flex max-w-[880px] flex-col gap-4">
+<div data-controller="admin--tokens--reveal" class="flex max-w-[880px] flex-col gap-4">
   <div>
     <h1 class="text-h1 text-ink">Connect an AI assistant</h1>
     <p class="mt-1 text-meta">An assistant connects over MCP with a token and acts as the user who created it, limited to the token's group.</p>

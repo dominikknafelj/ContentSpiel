@@ -34,7 +34,7 @@ class Admin::TokensScreen::CreateStepComponentTest < ViewComponent::TestCase
     render_inline Admin::TokensScreen::CreateStepComponent.new(groups: @groups, form_url: "/x", raw_token: "a" * 64)
 
     assert_text "Copy this token now. It won't be shown again."
-    assert_selector "pre#api-token-value[data-admin--token-reveal-target=secret]", text: "a" * 64
-    assert_selector "button[data-admin--token-reveal-source-param=api-token-value]", text: "Copy token"
+    assert_selector "pre#api-token-value[data-admin--tokens--reveal-target=secret]", text: "a" * 64
+    assert_selector "button[data-admin--tokens--reveal-source-param=api-token-value]", text: "Copy token"
   end
 end

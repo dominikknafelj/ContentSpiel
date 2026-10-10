@@ -39,7 +39,7 @@ module Admin
     # the create form is a plain (non-Turbo) POST, so the reveal is its own
     # document whose head carries `turbo-cache-control: no-cache` -- Turbo
     # never snapshots it, and Back from it refetches the list -- and
-    # `admin--token-reveal` blanks the token on `pagehide`. Reloading the
+    # `admin--tokens--reveal` blanks the token on `pagehide`. Reloading the
     # reveal itself can only re-POST (the browser asks first), which mints
     # a *new* token; it never shows this one again.
     #
