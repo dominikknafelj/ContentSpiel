@@ -177,4 +177,59 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
     assert_equal 0, subscriptions("PersonChannel")
     assert_equal 1, subscriptions("RecordChannel")
   end
+
+  # A channel action goes out only on a subscription the server has
+  # confirmed: Action Cable drops a `perform` on a socket that is not open
+  # without a word, and the server raises for a subscription it has not
+  # confirmed. The channel is presence's (`Presence::Channel#report`), whose
+  # one row says what arrived.
+  test "perform sends a channel action while the subscription is up and says so, and sends nothing before it is answered or after it is let go" do
+    record = create_page(title: "Pricing")
+    params = { channel: "Presence::Channel", type: "page", id: record.id.to_s }
+    await_notes_live
+
+    early = live(<<~JS, params)
+      (live, consumer, params) => {
+        window.__told = []
+        window.__stop = live.listen({ ...params, tab: live.TAB }, Object.assign(() => {}, { connected: () => window.__told.push("connected") }))
+        return { sent: window.__stop.perform("report", { state: "away" }), up: window.__stop.up, rejected: window.__stop.rejected }
+      }
+    JS
+    assert_equal({ "sent" => false, "up" => false, "rejected" => false }, early)
+
+    await_js("window.__told.length === 1", wait: 8)
+    mark = Presence::Mark.find_by!(user: users(:one), record_type: "Page", record_id: record.id)
+    assert_equal "here", mark.state, "the action asked for before the subscription was confirmed was sent after all"
+
+    assert_equal true, page.evaluate_script("window.__stop.perform('report', { state: 'away' })")
+    assert_eventually(message: "the action never reached the channel") { mark.reload.state == "away" }
+    # Without data, as a keep-alive may be sent.
+    assert_equal true, page.evaluate_script("window.__stop.perform('beat')")
+
+    # A dropped socket: nothing is sent, and the answer says so.
+    page.execute_script("window.__dropped = window.__stop")
+    live("(live, consumer) => consumer.subscriptions.subscriptions.find((each) => each.identifier.includes('Presence::Channel')).disconnected()")
+    assert_equal false, page.evaluate_script("window.__stop.perform('report', { state: 'here' })")
+
+    page.execute_script("window.__stop()")
+    assert_eventually(message: "the subscription nobody listens to was kept") { subscriptions("Presence::Channel").zero? }
+    assert_equal false, page.evaluate_script("window.__stop.perform('report', { state: 'here' })")
+    assert_eventually(message: "the row of a subscription that ended was kept") { !Presence::Mark.exists?(mark.id) }
+  end
+
+  test "a refused subscription says rejected, and performs nothing" do
+    await_notes_live
+
+    live(<<~JS)
+      (live) => {
+        window.__told = []
+        window.__stop = live.listen({ channel: "Presence::Channel", type: "page", id: "0", tab: live.TAB }, Object.assign(() => {}, { rejected: () => window.__told.push("rejected") }))
+      }
+    JS
+    await_js("window.__told.length === 1", wait: 8)
+
+    assert_equal({ "up" => false, "settled" => true, "rejected" => true, "sent" => false },
+      page.evaluate_script("({ up: window.__stop.up, settled: window.__stop.settled, rejected: window.__stop.rejected, sent: window.__stop.perform('beat') })"))
+    assert_equal 0, Presence::Mark.count
+  end
 end

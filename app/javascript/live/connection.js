@@ -7,8 +7,10 @@ import { cable } from "@hotwired/turbo-rails"
 // `controllers/admin/notes/inbox_controller.js` listens to the person's
 // stream (`Notes::PersonChannel`, one per tab), and
 // `controllers/admin/notes/live_controller.js` to one stream per record
-// shown (`Notes::RecordChannel`). Presence's controllers, when they exist,
-// are its third user. All of them hear signals that say only THAT something
+// shown (`Notes::RecordChannel`). Presence's
+// `controllers/admin/presence/record_controller.js` is its third user: one
+// stream per record whose people are shown (`Presence::Channel`), on which
+// it also sends (`perform`). All of them hear signals that say only THAT something
 // changed (a kind and ids) and fetch the part again themselves; nothing
 // here knows what a signal means.
 //
@@ -45,8 +47,20 @@ const pool = new Map()
 // when the socket drops and when the server refuses it (a record the viewer
 // may not read). Answers the function that stops listening, which also says
 // how the subscription stands now -- `up`: confirmed and not dropped since;
-// `settled`: answered, confirmed or rejected -- because someone who joins a
-// subscription another listener already holds is told of no change.
+// `settled`: answered, confirmed or rejected; `rejected`: refused by the
+// server -- because someone who joins a subscription another listener
+// already holds is told of no change.
+//
+// It also carries `perform(action, data)`, which sends a channel action and
+// answers whether it was sent. It is sent ONLY WHILE THE SUBSCRIPTION IS UP
+// and this listener still listens: Action Cable drops a `perform` on a
+// socket that is not open without a word, and the server raises for a
+// subscription it has not confirmed, so a caller that must not lose what it
+// says sends it again at the next `connected`. An action belongs to the
+// SUBSCRIPTION, not to the listener -- every listener with these params
+// shares the one subscription, and the channel cannot tell them apart -- so
+// whatever is sent must mean the same sent twice (presence's `report` and
+// `beat` do).
 export function listen(params, listener) {
   const key = JSON.stringify(params)
   let entry = pool.get(key)
@@ -64,6 +78,9 @@ export function listen(params, listener) {
       rejected: unlessClosed(() => { entry.rejected = entry.settled = true; tell("rejected") }),
       received: unlessClosed((signal) => [ ...entry.listeners ].forEach((each) => each(signal)))
     })
+    // The subscription itself, once the consumer has made it (before the
+    // server can have confirmed it), for `perform`.
+    entry.subscription.then((subscription) => { entry.made = subscription })
     pool.set(key, entry)
   }
   clearTimeout(entry.release)
@@ -82,7 +99,13 @@ export function listen(params, listener) {
       if (pool.size === 0) close()
     }, 0)
   }
-  return Object.defineProperties(stop, { up: { get: () => entry.up }, settled: { get: () => entry.settled } })
+  const perform = (action, data = {}) => {
+    if (!entry.up || entry.closed || !entry.made || !entry.listeners.has(listener)) return false
+    return entry.made.perform(action, data) !== false
+  }
+  return Object.defineProperties(stop, {
+    up: { get: () => entry.up }, settled: { get: () => entry.settled }, rejected: { get: () => entry.rejected }, perform: { value: perform }
+  })
 }
 
 // Whether the socket is up, as far as the subscriptions know: one of them
