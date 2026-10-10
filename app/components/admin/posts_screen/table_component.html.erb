@@ -5,7 +5,7 @@
         <% if selectable? %>
           <th scope="col" class="w-10 py-2 pl-3.5 pr-2">
             <%= render Admin::Ui::CheckboxComponent.new(name: "select_all", id: "posts-select-all", aria: { label: "Select all posts on this page" },
-                  data: { "admin--bulk-select-target": "all", action: "change->admin--bulk-select#toggleAll" }) %>
+                  data: { "admin--posts--bulk-select-target": "all", action: "change->admin--posts--bulk-select#toggleAll" }) %>
           </th>
         <% end %>
         <th scope="col" class="py-2 pr-4<%= " pl-3.5" unless selectable? %>">Title</th>
@@ -31,7 +31,7 @@
           <% if selectable? %>
           <td class="py-2.5 pl-3.5 pr-2">
             <%= render Admin::Ui::CheckboxComponent.new(name: "select[]", value: post.id, id: "select-post-#{post.id}", aria: { label: "Select #{title_of(post)}" },
-                  data: { "admin--bulk-select-target": "row", action: "change->admin--bulk-select#sync" }) %>
+                  data: { "admin--posts--bulk-select-target": "row", action: "change->admin--posts--bulk-select#sync" }) %>
           </td>
           <% end %>
           <th scope="row" class="w-2/5 max-w-0 py-2.5 pr-4 text-left font-normal<%= " pl-3.5" unless selectable? %>">
@@ -71,12 +71,12 @@
               <% end %>
               <% if can?("posts.delete", post) %>
                 <%# Selects just this row and opens the bulk trash confirmation
-                    (`admin--bulk-select#only`): one path for trashing, with
+                    (`admin--posts--bulk-select#only`): one path for trashing, with
                     its confirmation, its filters and its Undo. %>
                 <% menu.with_item do %>
                   <%= tag.button "Move to trash", type: "button", class: "text-danger-ink",
-                        data: { action: "admin--bulk-select#only admin--ui--dialog#open", "admin--bulk-select-id-param": post.id,
-                                "admin--bulk-select-dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID,
+                        data: { action: "admin--posts--bulk-select#only admin--ui--dialog#open", "admin--posts--bulk-select-id-param": post.id,
+                                "admin--posts--bulk-select-dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID,
                                 "admin--ui--dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID } %>
                 <% end %>
               <% end %>

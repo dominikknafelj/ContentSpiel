@@ -170,7 +170,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     visit admin_posts_path
     await_admin_controllers
     find("#select-post-#{draft.id}").click
-    within("[data-admin--bulk-select-target=bar]") { press "Move to trash" }
+    within("[data-admin--posts--bulk-select-target=bar]") { press "Move to trash" }
     assert_selector "dialog#bulk-trash-dialog[open]"
     hold_frame_fetches
     count_writes

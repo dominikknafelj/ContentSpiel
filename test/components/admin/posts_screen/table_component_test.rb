@@ -16,8 +16,8 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     render_table([ draft ])
     assert_selector "thead th", text: /Title/
     %w[Type Status Translations Updated].each { |name| assert_selector "thead th", text: /#{name}/ }
-    assert_selector "thead input.cs-checkbox[data-admin--bulk-select-target=all][aria-label='Select all posts on this page']"
-    assert_selector "tbody tr#post_#{draft.id} input.cs-checkbox[data-admin--bulk-select-target=row][value='#{draft.id}'][aria-label='Select A draft']"
+    assert_selector "thead input.cs-checkbox[data-admin--posts--bulk-select-target=all][aria-label='Select all posts on this page']"
+    assert_selector "tbody tr#post_#{draft.id} input.cs-checkbox[data-admin--posts--bulk-select-target=row][value='#{draft.id}'][aria-label='Select A draft']"
     assert_text "FOOTER"
   end
 
@@ -27,7 +27,7 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     Current.actor = users(:reader)
     render_table([ post_record ])
     assert_no_selector "input[type=checkbox]"
-    assert_no_selector "[data-admin--bulk-select-target]"
+    assert_no_selector "[data-admin--posts--bulk-select-target]"
     assert_selector "tbody tr#post_#{post_record.id} th[scope=row] a", text: /Readable/
   end
 
@@ -70,7 +70,7 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_selector "tr#post_#{live.id} [role=menu] a", text: "Open", visible: :all
     assert_selector "tr#post_#{live.id} [role=menu] a[href='/blog/live-one']", text: "View on site", visible: :all
     assert_no_selector "tr#post_#{draft.id} [role=menu] a", text: "View on site", visible: :all
-    assert_selector "tr#post_#{draft.id} [role=menu] button[data-action='admin--bulk-select#only admin--ui--dialog#open'][data-admin--bulk-select-id-param='#{draft.id}'][data-admin--ui--dialog-id-param=bulk-trash-dialog]", text: "Move to trash", visible: :all
+    assert_selector "tr#post_#{draft.id} [role=menu] button[data-action='admin--posts--bulk-select#only admin--ui--dialog#open'][data-admin--posts--bulk-select-id-param='#{draft.id}'][data-admin--ui--dialog-id-param=bulk-trash-dialog]", text: "Move to trash", visible: :all
     assert_no_selector "tr#post_#{draft.id} form", visible: :all
     assert_selector "tr#post_#{draft.id} button[aria-label='Actions for Draft one']"
 

@@ -40,7 +40,7 @@
 <% page_url = ->(page) { admin_posts_path(list_params(*Admin::PostsController::LIST_KEYS).merge("page" => page)) } %>
 <% filtered = @scope != "all" || filters_active?(%i[q type tag translation]) %>
 
-<div data-controller="admin--bulk-select">
+<div data-controller="admin--posts--bulk-select">
   <%= render Admin::PostsScreen::BulkBarComponent.new(list_fields: list_params(*Admin::PostsController::LIST_KEYS)) %>
 
   <% if @pagination.out_of_range? %>

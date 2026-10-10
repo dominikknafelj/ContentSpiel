@@ -181,17 +181,17 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
   test "a viewer who can't publish or delete sees no bulk actions; one who can sees the bar, the trash dialog and the toolbar" do
     create_post(title: "One")
     get "/cs-studio/posts"
-    assert_select "[data-admin--bulk-select-target=bar][hidden]"
-    assert_select "p[role=status][aria-live=polite][data-admin--bulk-select-target=status]"
-    assert_select "[data-admin--bulk-select-target=bar] form[action=?] button", "/cs-studio/posts/bulk", text: "Publish"
+    assert_select "[data-admin--posts--bulk-select-target=bar][hidden]"
+    assert_select "p[role=status][aria-live=polite][data-admin--posts--bulk-select-target=status]"
+    assert_select "[data-admin--posts--bulk-select-target=bar] form[action=?] button", "/cs-studio/posts/bulk", text: "Publish"
     assert_select "dialog#bulk-trash-dialog form[action=?]", "/cs-studio/posts/bulk"
-    assert_select "tbody input.cs-checkbox[type=checkbox][data-admin--bulk-select-target=row]", 1
-    assert_select "thead input.cs-checkbox[data-admin--bulk-select-target=all][aria-label]"
+    assert_select "tbody input.cs-checkbox[type=checkbox][data-admin--posts--bulk-select-target=row]", 1
+    assert_select "thead input.cs-checkbox[data-admin--posts--bulk-select-target=all][aria-label]"
 
     sign_in_as(users(:reader))
     get "/cs-studio/posts"
     assert_response :ok
-    assert_select "[data-admin--bulk-select-target=bar]", count: 0
+    assert_select "[data-admin--posts--bulk-select-target=bar]", count: 0
     assert_select "dialog#bulk-trash-dialog", count: 0
   end
 
