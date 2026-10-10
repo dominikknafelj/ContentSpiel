@@ -3,11 +3,14 @@ import { cable } from "@hotwired/turbo-rails"
 // The cable connection of CS Studio: one socket per document, the
 // subscriptions on it shared by whoever listens, and the tab's id.
 //
-// WHO USES IT. The notes (`controllers/admin/notes/live_controller.js`: the
-// person's stream and one stream per record shown) and, from Task 10 of the
-// presence plan, presence (`controllers/admin/presence/`). Both hear signals
-// that say only THAT something changed (a kind and ids) and fetch the part
-// again themselves; nothing here knows what a signal means.
+// WHO USES IT. The notes' two controllers on <body>:
+// `controllers/admin/notes/inbox_controller.js` listens to the person's
+// stream (`Notes::PersonChannel`, one per tab), and
+// `controllers/admin/notes/live_controller.js` to one stream per record
+// shown (`Notes::RecordChannel`). Presence's controllers, when they exist,
+// are its third user. All of them hear signals that say only THAT something
+// changed (a kind and ids) and fetch the part again themselves; nothing
+// here knows what a signal means.
 //
 // NOTHING ON A PUBLIC PAGE IMPORTS IT. The consumer is the one bundled in
 // turbo-rails; nothing but this file asks for it, so a public page opens no

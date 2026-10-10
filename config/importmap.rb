@@ -32,9 +32,11 @@ pin_all_from "app/javascript/saving", under: "saving", preload: "admin"
 # subscriptions and the tab's id (notes today, presence next). Nothing on a
 # public page imports it, so a public page opens no socket.
 pin_all_from "app/javascript/live", under: "live", preload: "admin"
-# The notes' plain modules: the merge of a notes view with the server's fresh
-# markup ("what is read is replaced, what is typed is never touched"), which
-# `controllers/admin/notes/live_controller.js` imports as `notes/merge`.
+# The notes' plain modules, imported by the notes' controllers: `notes/merge`,
+# the merge of a notes view with the server's fresh markup ("what is read is
+# replaced, what is typed is never touched"); `notes/json`, the one fetch of
+# JSON the live and inbox controllers share; and `notes/live_state`, which
+# makes `data-notes-live` on <body> of what those two say.
 pin_all_from "app/javascript/notes", under: "notes", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.

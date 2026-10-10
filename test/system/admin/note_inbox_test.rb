@@ -35,8 +35,9 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
       press "Dana mentioned you"
     end
 
-    assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=#{thread.id}\z/)
-    assert_selector "#notes-drawer #note-thread-#{thread.id}", text: "Is this ready"
+    # A whole editor visit and then the drawer's frame: more than the default wait on a busy machine.
+    assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=#{thread.id}\z/, wait: 8)
+    assert_selector "#notes-drawer #note-thread-#{thread.id}", text: "Is this ready", wait: 8
     assert_eventually(message: "opening the thread never marked its delivery read") { Notes::Delivery.unread.where(user: @me).none? }
 
     open_dashboard
@@ -116,8 +117,9 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
       find("li > a").click
     end
 
-    assert_current_path(/\/pages\/#{@page.id}\?notes=open\z/)
-    assert_selector "#notes-drawer #notes-list a[data-note-row]", count: 2
+    # As above: a visit, then the drawer's frame.
+    assert_current_path(/\/pages\/#{@page.id}\?notes=open\z/, wait: 8)
+    assert_selector "#notes-drawer #notes-list a[data-note-row]", count: 2, wait: 8
   end
 
   test "All notes for you is the same rows as a page, and its Mark all read stays there" do

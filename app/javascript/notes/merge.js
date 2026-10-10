@@ -167,21 +167,31 @@ export function mergeThread(view, answer, { own = false, reply: sentReply = fals
   // out to need it, since building it asks the translator, which throws for
   // a key it does not have and is not there at all for a caller that forgot
   // it. (After this tab's own press there is no divider, and none is built.)
+  // The reactions of the messages being worked in are taken over before the
+  // first move for the same reason (below).
   const line = own ? null : divider(t)
 
   const arrived = [ ...next.querySelectorAll("[data-note-message]") ].filter((message) => !known.has(message.dataset.noteMessage))
   // The set of emoji that is open under a message, to be open again.
   // (Not after this tab's own press: an emoji was picked from it.)
   const picking = own ? null : old.querySelector("details[data-reaction-add][open]")?.closest("[data-note-message]")?.dataset.noteMessage
+  // A message being worked in gets the answer's reactions: they are what
+  // others did, not what is being typed -- the new ones, disabled under an
+  // edit form (which is not touched). Not while its own set of emoji is
+  // open. For ALL of them here, each still where it is in the page, before
+  // the first is moved: `takeReactions` reads markup it expects to find,
+  // and it too must have failed, if it fails, with nothing moved. (Each
+  // call touches only its message and that message's twin in the copy, so
+  // doing them ahead of the moves changes nothing of the result.)
+  busy.forEach((message) => {
+    const twin = find(message.dataset.noteMessage)
+    if (twin && !message.querySelector("details[data-reaction-add][open]")) takeReactions(message, twin, { disabled: Boolean(message.querySelector("form[data-note-composer]")) })
+  })
   // The very elements, in the place the answer gives their messages -- shown,
   // should that place now be among the folded ones; one whose message was
   // deleted meanwhile keeps its text at the end.
   busy.forEach((message) => {
     const twin = find(message.dataset.noteMessage)
-    // Its reactions are what others did, not what is being typed: the new
-    // ones, disabled under an edit form (which is not touched). Not while
-    // its own set of emoji is open.
-    if (twin && !message.querySelector("details[data-reaction-add][open]")) takeReactions(message, twin, { disabled: Boolean(message.querySelector("form[data-note-composer]")) })
     if (twin) twin.replaceWith(message)
     // At the end of the messages, which is inside what scrolls (decision 35).
     else (next.querySelector(":scope > [data-note-scroll]") || next).append(message)

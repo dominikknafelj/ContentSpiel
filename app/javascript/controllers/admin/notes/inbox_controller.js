@@ -300,9 +300,13 @@ export default class extends Controller {
   // `dispatchEvent` runs its listeners before it returns, so the answer is
   // in `detail` on the next line, in the same task (`announce` has no
   // `await`). Neither controller holds a reference to the other: no outlet,
-  // no import. Should nobody answer (both are on <body>, so in CS Studio
-  // someone always does), the answer stays false, which is the safe side: a
-  // toast too many, never a note taken as seen that nobody saw.
+  // no import. Should nobody answer, the answer stays false, which is the
+  // safe side: a toast too many (and a chime), never a note taken as seen
+  // that nobody saw. That can only be the moment of a full load in which
+  // this controller is connected and `admin--notes--live` is not yet, with
+  // a delivery announced in that gap -- not reachable in practice: `live`
+  // stands before `inbox` in <body>'s `data-controller`, and `announce` runs
+  // only after `soon`'s half second and two fetches. It is not impossible.
   watching(threadId) {
     const detail = { threadId, watching: false }
     document.dispatchEvent(new CustomEvent("admin--notes--inbox:watching", { detail }))

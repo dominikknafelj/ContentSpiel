@@ -322,6 +322,47 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
     assert_equal "My first, changed", find(field(@first)).value
   end
 
+  # A second message being worked in, whose reactions in the answer are not
+  # what the server draws (an "Add a reaction" with no <summary>): taking
+  # them over throws. The reactions of every such message are taken before
+  # the first of them is moved, so the throw finds the first edit, and the
+  # second, in the page. (One edit is open at a time, so the second is made
+  # here by hand, as is the answer's markup.)
+  test "reactions that cannot be taken over fail the merge before anything is moved: an edit open on another message is where it was" do
+    open_thread
+    menu(@first, "Edit")
+    find(field(@first)).send_keys(", changed")
+    page.execute_script(<<~JS)
+      window.__message = document.querySelector('#note-message-#{@first.id}')
+      window.__field = document.querySelector(#{field(@first).to_json})
+      window.__messages = document.querySelector('#note-thread-#{@thread.id}-messages')
+      window.__other = document.querySelector('#note-message-#{@second.id}')
+      const form = document.createElement('form')
+      form.dataset.noteComposer = 'made-by-hand'
+      window.__other.append(form)
+    JS
+    reply_as_dana("Meanwhile")
+
+    threw = merging(<<~JS)
+      (merge, view, answer, t) => {
+        const twin = [ ...answer.querySelectorAll('[data-note-message]') ].find((message) => message.dataset.noteMessage === '#{@second.id}')
+        twin.querySelectorAll(':scope > [data-note-reactions]').forEach((row) => row.remove())
+        const row = document.createElement('div')
+        row.dataset.noteReactions = ''
+        row.append(Object.assign(document.createElement('details'), { }))
+        row.firstElementChild.dataset.reactionAdd = ''
+        twin.append(row)
+        try { merge.mergeThread(view, answer, { t }); return null } catch (error) { return String(error) }
+      }
+    JS
+
+    assert threw, "the merge did not fail on reactions it cannot take over"
+    assert_equal true, page.evaluate_script("window.__messages.isConnected && window.__messages === document.querySelector('#note-thread-#{@thread.id}-messages')"), "the messages part was replaced"
+    assert_equal true, page.evaluate_script("window.__field.isConnected && window.__message === document.querySelector('#note-message-#{@first.id}')"), "the edit left the page: #{threw}"
+    assert_equal true, page.evaluate_script("window.__other.isConnected"), "the second message left the page"
+    assert_equal "My first, changed", find(field(@first)).value
+  end
+
   # The same for a thread that is gone: the forms of the first rows are taken
   # away only once the line that says why can be written.
   test "a gone thread that cannot be said so keeps its rows and its typed reply" do

@@ -143,7 +143,8 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: "Dana mentioned you on Pricing"
     assert_selector "#toasts .admin-toast > span[aria-hidden=true][class~='bg-accent']:first-child"
     within("#toasts .admin-toast") { press "Open" }
-    assert_selector "#notes-drawer [data-notes-view=thread]", text: "Look at this"
+    # A whole editor visit and then the drawer's frame: more than the default wait on a busy machine.
+    assert_selector "#notes-drawer [data-notes-view=thread]", text: "Look at this", wait: LIVE
     assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=\d+\z/)
   end
 
