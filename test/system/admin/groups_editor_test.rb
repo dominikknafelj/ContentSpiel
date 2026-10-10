@@ -2,7 +2,7 @@ require "application_system_test_case"
 
 # The group editor's permission rows (access-control design spec §5, round 3
 # Task 10): each row has its own scope chips and "Edit scope", the page tree is
-# tri-state (`admin--branch-picker`), and the footer counts what the form would
+# tri-state (`admin--groups--branch-picker`), and the footer counts what the form would
 # SUBMIT -- so opening a scope editor, or ticking a page that greys out its
 # subpages, is as many changes as it really is.
 class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase

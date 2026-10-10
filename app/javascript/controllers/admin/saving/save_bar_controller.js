@@ -479,7 +479,7 @@ export default class extends Controller {
   // What the form would SUBMIT, not what its controls look like: a disabled
   // control and an unticked checkbox are both simply absent. That matters
   // because other controllers inside the form adjust controls on connect --
-  // `admin--branch-picker` ticks and disables every box under a chosen
+  // `admin--groups--branch-picker` ticks and disables every box under a chosen
   // branch -- and on a Turbo frame navigation this controller connects (and
   // takes its baseline) *before* they run. Recording a checkbox's `checked`
   // as such made an untouched group form count "1 unsaved change" and ask

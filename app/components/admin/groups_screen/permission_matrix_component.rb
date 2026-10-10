@@ -64,7 +64,7 @@ module Admin
     # disabled fieldset.
     #
     # Showing and hiding the editors and rewriting the chips is
-    # `admin--permission-matrix`; the tri-state tree is `admin--branch-picker`.
+    # `admin--groups--permission-matrix`; the tri-state tree is `admin--groups--branch-picker`.
     class PermissionMatrixComponent < AdminComponent
       def initialize(grants:, stale: nil, form_name: "group[grants]", locale: Locales.default, open_keys: [], tree: nil, view_only: false, stored: [])
         @view_only = view_only

@@ -474,7 +474,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
   # Reached through the Groups LIST, i.e. a Turbo *frame* navigation: the
   # form's `admin--saving--save-bar` then connects (and takes its baseline) before the
-  # nested `admin--branch-picker` has ticked and disabled the boxes a chosen
+  # nested `admin--groups--branch-picker` has ticked and disabled the boxes a chosen
   # branch implies. The baseline has to describe what would be submitted --
   # a disabled box and an unticked one are both simply absent -- or the
   # untouched form counts one change and the sidebar asks "Leave without

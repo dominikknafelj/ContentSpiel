@@ -12,7 +12,7 @@ module Admin
     # as a hidden input (`PermissionRowComponent`), its position undisclosed.
     #
     # `states(selected_ids)` is the tri-state, server-rendered so the form is
-    # correct with scripts off and `admin--branch-picker` only has to keep it
+    # correct with scripts off and `admin--groups--branch-picker` only has to keep it
     # so:
     #
     # - `:chosen`   a stored branch root: a ticked box that is submitted;

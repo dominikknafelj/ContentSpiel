@@ -23,7 +23,7 @@ import { Controller } from "@hotwired/stimulus"
 //
 // Stored roots the viewer has no place for in the tree at all are hidden
 // inputs (`kept`), never touched. A change on a box bubbles to the row's
-// editor, whose `admin--permission-matrix` rewrites the chips from the state
+// editor, whose `admin--groups--permission-matrix` rewrites the chips from the state
 // this has just settled (the box's own action runs first); the form's footer
 // reads the same event.
 export default class extends Controller {
@@ -67,10 +67,10 @@ export default class extends Controller {
       const carried = node.querySelector(":scope > div:first-child > input[type=hidden]")
       if (carried) carried.disabled = !(chosen && implied)
 
-      const mark = node.querySelector(":scope > div:first-child > span > [data-admin--branch-picker-target='mark']")
+      const mark = node.querySelector(":scope > div:first-child > span > [data-admin--groups--branch-picker-target='mark']")
       if (mark) mark.textContent = implied || chosen ? "✓" : partial ? "–" : ""
 
-      const note = node.querySelector(":scope > div:first-child > [data-admin--branch-picker-target='note']")
+      const note = node.querySelector(":scope > div:first-child > [data-admin--groups--branch-picker-target='note']")
       if (note) note.textContent = implied ? "included" : partial ? "contains a chosen page" : chosen ? this.includes(below.length) : ""
     })
   }

@@ -44,7 +44,7 @@ module Admin
     # use them, and the key sits beside the label in mono with itself as title.
     #
     # THE CHIPS are drawn here for the first paint and by
-    # `admin--permission-matrix` after every change: the same rules in both
+    # `admin--groups--permission-matrix` after every change: the same rules in both
     # (`#chips` / `rewriteChips`), which a system test pins side by side.
     #
     # NO SCRIPT: the scope editor is rendered open and "Edit scope" is held back

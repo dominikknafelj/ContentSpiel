@@ -3,7 +3,7 @@ module Admin
     # `Admin::GroupsScreen::ScopeEditorComponent`, the scope controls a
     # permission row opens in place. Rendered open and alone, so the states can
     # be looked at without the row around them (Lookbook's layout has no
-    # `admin--permission-matrix`, so Remove and Done do nothing here):
+    # `admin--groups--permission-matrix`, so Remove and Done do nothing here):
     # - posts: content types and "Own only", with a removed content type as its
     #   warn chip;
     # - pages, three levels deep: the chosen page ticked, everything under it a

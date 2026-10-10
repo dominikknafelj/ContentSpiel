@@ -142,7 +142,7 @@ export default class extends Controller {
   pageItems(editor) {
     const roots = Array.from(editor.querySelectorAll("input[type=checkbox][data-chip-label]:checked:not(:disabled)"))
       .map((box) => ({ label: `Under ${box.dataset.chipLabel}` }))
-    const kept = editor.querySelectorAll("input[type=hidden][data-admin--branch-picker-target='kept']").length
+    const kept = editor.querySelectorAll("input[type=hidden][data-admin--groups--branch-picker-target='kept']").length
     return roots.concat(Array.from({ length: kept }, () => ({ label: "A page you can't open" })))
   }
 
