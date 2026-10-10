@@ -6,7 +6,7 @@
 //   const text = messages(this.element).t("components.ui.save_bar.changes", { count: 3 })
 //
 // reads one. EVERY KEY IS RELATIVE TO `admin`: the key above is
-// `admin.components.ui.save_bar.changes` in `config/locales/admin/components.en.yml`,
+// `admin.components.ui.save_bar.changes` in `config/locales/admin/ui.en.yml`,
 // and a screen's own are `tags.dialogs.delete_failed`, whatever element carries
 // the attribute.
 //

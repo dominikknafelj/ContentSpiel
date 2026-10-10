@@ -1,5 +1,6 @@
 # CS Studio's shared building blocks, the components in `app/components/admin/ui/`
-# (docs/reference/i18n.md). A component's keys are
+# (docs/reference/i18n.md); every other component folder has its own file,
+# `config/locales/admin/<folder>.en.yml`. A component's keys are
 # `admin.components.ui.<its class name without Admin::Ui:: and Component, underscored>`:
 # `Admin::Ui::ConfirmDialogComponent#t(".cancel")` reads
 # `admin.components.ui.confirm_dialog.cancel`. Strings a script shows sit here too,

@@ -1,25 +1,10 @@
-# CS Studio's components (docs/reference/i18n.md); the shared building blocks of
-# `app/components/admin/ui/` keep theirs in `ui.en.yml`. A component's keys are
-# `admin.components.<its class name without Admin:: and Component, underscored,
-# one segment per namespace>`: `Admin::EditorScreen::BlockCardComponent#t(".x")` reads
-# `admin.components.editor_screen.block_card.x`. Strings a script shows sit
-# here too, beside the component whose server-rendered text they repeat, and
-# reach the script through `messages_data` (`app/helpers/admin/messages_helper.rb`)
-# -- one key for the server's render and the script's, so they cannot drift.
-#
+# CS Studio's editor-screen components, `app/components/admin/editor_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.editor_screen.<class name without Admin:: and Component, underscored>`.
 # YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
 # glyph that opens a YAML token (a bullet, `·`) is double-quoted.
 en:
   admin:
     components:
-      # `Admin::TranslationScreen::MatrixComponent` (a cell's link label).
-      translation_screen:
-        matrix:
-          cell_label:
-            complete: "%{title}: %{language}, translated"
-            missing: "%{title}: %{language}, not translated"
-            outdated: "%{title}: %{language}, outdated"
-
       editor_screen:
         # A block's form drawn as the open panel of a section (sections spec
         # §4.3). The rest of the block card is not converted yet. The panel's
@@ -161,15 +146,3 @@ en:
         section_group:
           heading: "Section"
           unavailable: "Unavailable type — %{type}"
-
-      # The Mind graph's legend. The content types' own names come from the
-      # registry (`Admin::Ui::ContentTypeDotComponent`); these are the shapes.
-      mind_graph_screen:
-        legend:
-          label: "Legend"
-          tag: "Tag"
-          hollow: "Draft or scheduled"
-          retired: "Retired type"
-          related: "Related post"
-          tag_edge: "Shares a tag"
-          pinned: "Pinned"

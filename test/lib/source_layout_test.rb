@@ -86,4 +86,36 @@ class SourceLayoutTest < ActiveSupport::TestCase
     loose = Dir[ROOT.join("app/components/admin/*.{rb,erb}")].map { |path| File.basename(path) }
     assert_equal %w[admin_component.rb], loose
   end
+
+  # One locale file per component folder: `config/locales/admin/<folder>.en.yml`
+  # holds exactly `en.admin.components.<folder>`, so a screen's strings are found
+  # from its folder and a scope is in one file.
+  #
+  # `notes.en.yml` is the one exception. Besides notes' own keys it holds notes'
+  # wording on other screens (the block card's and the tile's "Add note", the
+  # tree node's and the legend's markers), merged into those screens' scopes by
+  # Rails; moving them into the screens' files would put notes' strings in core files.
+  LOCALE_EXCEPTIONS = %w[notes].freeze
+
+  test "a locale file of admin components holds one folder's scope" do
+    Dir[ROOT.join("config/locales/admin/*.en.yml")].each do |path|
+      name = File.basename(path, ".en.yml")
+      next if LOCALE_EXCEPTIONS.include?(name)
+      scopes = (YAML.load_file(path).dig("en", "admin", "components") || {}).keys
+      next if scopes.empty?
+      assert_equal [ name ], scopes, "#{File.basename(path)} holds #{scopes.inspect}"
+    end
+  end
+
+  test "a component scope has keys in one locale file, except where an exception names it" do
+    holders = Hash.new { |hash, scope| hash[scope] = [] }
+    Dir[ROOT.join("config/locales/admin/*.en.yml")].each do |path|
+      name = File.basename(path, ".en.yml")
+      next if LOCALE_EXCEPTIONS.include?(name)
+      (YAML.load_file(path).dig("en", "admin", "components") || {}).each_key { |scope| holders[scope] << name }
+    end
+    assert_empty holders.select { |_, files| files.size > 1 }, "a scope's keys are in two files"
+    assert_empty holders.keys - Dir[ROOT.join("app/components/admin/*")].select { |p| File.directory?(p) }.map { |p| File.basename(p) },
+      "a locale file names a scope with no component folder"
+  end
 end

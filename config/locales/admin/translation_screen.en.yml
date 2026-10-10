@@ -1,0 +1,14 @@
+# CS Studio's translation-screen components, `app/components/admin/translation_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.translation_screen.<class name without Admin:: and Component, underscored>`.
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      # `Admin::TranslationScreen::MatrixComponent` (a cell's link label).
+      translation_screen:
+        matrix:
+          cell_label:
+            complete: "%{title}: %{language}, translated"
+            missing: "%{title}: %{language}, not translated"
+            outdated: "%{title}: %{language}, outdated"
