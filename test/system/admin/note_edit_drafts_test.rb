@@ -223,4 +223,27 @@ class Admin::NoteEditDraftsSystemTest < ApplicationSystemTestCase
 
     assert_nil draft(@first)
   end
+
+  # A refused edit is drawn again with the REFUSED text in its field. The
+  # field's own content is then typed text, not the saved one, and a
+  # baseline read from it made the edit look unchanged: one keystroke that
+  # left the field as it was removed the draft. The server hands the saved
+  # text over beside the field.
+  test "an edit that was refused is still measured against the saved text: left, it is kept and said" do
+    open_thread
+    menu(@first, "Edit")
+    find(field(@first)).send_keys(" for @[999999]")
+    within("#note-message-#{@first.id}") { press "Save" }
+    assert_selector "#note-message-#{@first.id} form[data-note-composer] [role=alert]", text: "Someone you mentioned can't see this page."
+    assert_equal "My first for @[999999]", find(field(@first)).value
+
+    find(field(@first)).send_keys("x", :backspace)
+    assert_not_nil draft(@first), "the draft was dropped although the field differs from the saved text"
+
+    menu(@second, "Edit")
+    assert_selector field(@second)
+    assert_selector unsaved(@first), text: "Unsaved edit"
+    menu(@first, "Edit")
+    assert_equal "My first for @[999999]", find(field(@first)).value
+  end
 end

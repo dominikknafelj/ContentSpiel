@@ -65,9 +65,11 @@ module Admin
       # and a draft is what differs from that (`admin--note-composer`, "an
       # edit that was left"). That a restored draft is unsaved is said in the
       # message's meta line, never above the field (decision 29): that space
-      # is for errors.
+      # is for errors. `saved` is the SAVED text of an edit whose field is drawn
+      # with something else -- a refused edit comes back holding what was
+      # typed -- so the script still measures a draft against what is stored.
       def initialize(url:, key:, label:, submit:, mentions_url:, method: :post, body: "", names: {}, errors: [], hidden: {}, rows: 2, edit: false,
-        files: true, files_lost: [])
+        files: true, files_lost: [], saved: nil)
         @url = url
         @key = key
         @label = label
@@ -82,6 +84,7 @@ module Admin
         @edit = edit
         @files = files
         @files_lost = Array(files_lost).map(&:to_s).compact_blank
+        @saved = saved
       end
 
       private
@@ -109,7 +112,7 @@ module Admin
       def form_data
         { controller: "admin--note-composer", turbo_frame: "notes", note_composer: key,
           "admin--note-composer-key-value": key, "admin--note-composer-mentions-url-value": mentions_url,
-          "admin--note-composer-user-value": Current.user&.id, "admin--note-composer-edit-value": edit?,
+          "admin--note-composer-user-value": Current.user&.id, "admin--note-composer-edit-value": edit?, "admin--note-composer-saved-value": @saved,
           action: "submit->admin--note-composer#sending turbo:submit-start->admin--note-composer#sending turbo:submit-end->admin--note-composer#sent", messages: script_messages }
       end
 

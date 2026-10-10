@@ -38,7 +38,7 @@
     <% text, names = editable %>
     <%# `files: false`: an edit changes the text; the files stay as they were written. %>
     <%= render Admin::NotesScreen::ComposerComponent.new(url: message_path, method: :patch, key: key, label: t(".edit_label"), submit: t(".save"),
-          mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors), edit: true, files: false) %>
+          mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors), edit: true, files: false, saved: (saved_text if edit_failure)) %>
     <%# Cancel gives the edit up: its draft goes with it. %>
     <p><%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, action: "admin--note-unsaved#forget", **frame_link } %></p>
   <% else %>

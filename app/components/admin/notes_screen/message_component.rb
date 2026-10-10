@@ -95,6 +95,10 @@ module Admin
         edit_failure ? [ edit_failure[:body], edit_failure[:names] ] : ::Notes::Mentions.display(message.body, listing.users)
       end
 
+      # The stored body as an edit form would show it, for a form that is
+      # drawn with a refused text instead (`ComposerComponent`'s `saved`).
+      def saved_text = ::Notes::Mentions.display(message.body, listing.users).first
+
       def cancel_class = "cursor-pointer rounded-cs text-[12px] text-dim underline underline-offset-[3px] hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
     end
   end

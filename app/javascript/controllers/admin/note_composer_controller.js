@@ -106,7 +106,7 @@ const SENDING_AFTER_MS = 300
 
 export default class extends Controller {
   static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "files", "chosen", "fileError", "row", "lost", "tool" ]
-  static values = { key: String, mentionsUrl: String, user: String, edit: Boolean }
+  static values = { key: String, mentionsUrl: String, user: String, edit: Boolean, saved: String }
 
   connect() {
     // A form that is not sending carries nothing of a send. It can: Turbo's
@@ -125,14 +125,19 @@ export default class extends Controller {
     // from `value` there was the text typed so far -- from then on the edit
     // looked unchanged, its draft was removed by the next keystroke that
     // left the field as it was, and "Unsaved edit" no longer protected it.
-    this.drawn = this.fieldTarget.defaultValue
+    //
+    // One form is drawn with something else in its field: an edit that was
+    // REFUSED comes back holding the refused text. The server then hands the
+    // saved text beside it (`saved`), or that typed text would be the
+    // baseline in the same way.
+    this.drawn = this.hasSavedValue ? this.savedValue : this.fieldTarget.defaultValue
     // The files a form drawn again no longer holds: the server's, after a refusal.
     this.lost = this.hasLostTarget ? this.list(this.lostTarget.dataset.names) : []
     const draft = this.stored()
     // A draft is put back into a field as the server drew it, never over one
     // that already holds typing (the moved element again: what is in the
     // field is newer than anything stored).
-    const untouched = this.fieldTarget.value === this.drawn
+    const untouched = this.fieldTarget.value === this.fieldTarget.defaultValue
     if (draft && untouched && (this.editValue ? draft.body !== this.drawn : !this.drawn)) {
       this.fieldTarget.value = draft.body
       this.names = { ...draft.names, ...this.names }

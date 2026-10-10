@@ -18,7 +18,9 @@ class NotesGuardsTest < ActiveSupport::TestCase
   # code, markup, a script or a comment that could be uncommented -- it fails.
   # (Any OTHER broadcast is refused by `test/models/notes/signals_test.rb`,
   # "nothing in the app broadcasts but Notes::Signals".)
-  MORPHING = /turbo_refreshes_with|turbo_refresh_method_tag|turbo_refresh_scroll_tag|turbo-refresh-method|turbo-refresh-scroll|broadcasts?_refresh/
+  # A refresh sent as a stream is one too: `turbo_stream.refresh`, or the
+  # element it writes.
+  MORPHING = /turbo_refreshes_with|turbo_refresh_method_tag|turbo_refresh_scroll_tag|turbo-refresh-method|turbo-refresh-scroll|broadcasts?_refresh|turbo_stream\.refresh\b(?!_)|turbo_stream_refresh_tag|<turbo-stream[^>]*action=["']refresh/
 
   test "nothing in the app turns on Turbo's page refresh or morphing, or broadcasts one" do
     files = Dir[Rails.root.join("{app,config,lib}/**/*.{rb,erb,js,yml,html}")]
@@ -32,10 +34,12 @@ class NotesGuardsTest < ActiveSupport::TestCase
   test "the morphing scan sees each of the ways to switch it on" do
     [ %(<%= turbo_refreshes_with method: :morph, scroll: :preserve %>), %(<meta name="turbo-refresh-method" content="morph">),
       %(<meta name="turbo-refresh-scroll" content="preserve">), "broadcast_refresh_to(page)", "broadcasts_refreshes", "broadcast_refresh_later",
-      "turbo_refresh_method_tag(:morph)" ].each do |line|
+      "turbo_refresh_method_tag(:morph)", "render turbo_stream: turbo_stream.refresh(request_id: nil)", "turbo_stream_refresh_tag",
+      %(<turbo-stream request-id="x" action="refresh"></turbo-stream>) ].each do |line|
       assert_match MORPHING, line
     end
     assert_no_match MORPHING, %(frame.reload() // refresh the frame, turbo_stream.replace)
+    assert_no_match MORPHING, %(<turbo-stream action="replace" target="x"></turbo-stream> turbo_stream.refresh_counts)
   end
 
   # --- 2. the container's row lock first --------------------------------------
