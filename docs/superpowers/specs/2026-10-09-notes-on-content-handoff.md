@@ -246,3 +246,9 @@ Five last ones, when the build was complete:
 37. **A very small picture.** A GIF and a still image have a minimum tile of 120×90, the picture centred at its natural size on the placeholder ground, so a GIF's label and Play control always fit.
 38. **The account page's address** is `/account`; `/account/password` redirects there, and `#password` is the anchor of the Password card.
 39. **`notes=open` in the address** follows the drawer: opening adds it (with `thread=ID` when a thread is open) and closing removes it, by `history.replaceState`, so the address says what is on screen, a reload keeps the view, and Back still leaves the page.
+
+Three from the final fix round:
+
+40. **A refused Pin or Notify** is said directly under row 2, above the scrolling messages (it belongs to the controls just above it), in the shared warn alert (`bg-warn-tint text-warn-ink rounded-cs`, 13px, 8px inset from the drawer's edges), not as a bare line with a rule, which reads as part of the thread. It has a × to close it and is cleared by the next action. When the sentence is "This note is gone", the drawer goes back to the list after 4 seconds, since nothing is left to act on.
+41. **While a note is being sent** the text in the field is `text-dim` and the Send button reads "Sending…" with `aria-busy="true"`, disabled with the button's ordinary disabled look; the paperclip, emoji and @ controls are disabled with it. No spinner (it would be the only one in the drawer). A send that answers in under 300ms does not show the state, so it does not flash.
+42. **After the password form is saved or refused** the page comes back at `/account#password` with the Password card in view (the result belongs to that card). Focus moves to the message, so a screen reader announces it; with reduced motion the page jumps to the card instead of scrolling smoothly.
