@@ -379,6 +379,7 @@ Left by the notes sub-project (spec §12; `docs/reference/notes.md`).
 - A file is sent from memory: `Admin::NoteFilesController` downloads up to 10 MB per request and ignores `Range`.
 - Legacy Office files (.doc, .xls, .ppt) are refused: they share one signature with files that are none of them.
 - The chime, the permission prompt and the desktop notification are tested against fakes only (`AudioContext` and `Notification` stubbed); no test plays real audio, meets the real prompt or runs in Safari.
+- A notes setting saved on the account screen reaches the person's open tabs of THAT browser at once (the tabs' own channel). A tab in another browser or on another device keeps the old sound and desktop settings until it is loaded in full again, which in CS Studio can be long: moving between screens does not redraw `<body>`, where they stand. A signal on the person's cable stream would close it.
 - Two tabs can each chime once when two mentions arrive in the same instant and different tabs win them; and a visible tab that is busy for longer than the 150 ms the tabs take to agree cannot answer, so a hidden one may chime and notify with CS Studio in view.
 - The posts list, the page tree and the media grid are not live: their note counts are fresh on load. The media picker's tiles show no note counts.
 - A reopen's inbox row names nobody ("A note was reopened"): a thread records who resolved it, not who reopened it.
