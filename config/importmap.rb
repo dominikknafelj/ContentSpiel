@@ -28,6 +28,10 @@ pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", pre
 pin_all_from "app/javascript/rich_text", under: "rich_text", preload: "admin"
 # The one-at-a-time write queue every autosaving form and block action shares.
 pin_all_from "app/javascript/saving", under: "saving", preload: "admin"
+# The cable connection CS Studio's scripts share: one socket, its pooled
+# subscriptions and the tab's id (notes today, presence next). Nothing on a
+# public page imports it, so a public page opens no socket.
+pin_all_from "app/javascript/live", under: "live", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"

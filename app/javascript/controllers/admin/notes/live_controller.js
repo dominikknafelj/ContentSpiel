@@ -1,15 +1,15 @@
 import { Controller } from "@hotwired/stimulus"
-import { cable } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
+import { TAB, listen, open } from "live/connection"
 import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 
 // Live delivery of notes (notes spec §6). Lives on <body>. A signal over the
 // cable says only THAT something changed (`Notes::Signals`: a kind and ids);
 // this controller then fetches the part again through the same scoped GET the
 // page used on load, so what a tab can show is always what its viewer may
-// read. The consumer is the one bundled in turbo-rails; nothing but this file
-// asks for it, so a public page opens no socket, and the socket is closed
-// again when a Turbo visit leaves CS Studio (`listen`).
+// read. The connection is `live/connection`'s (the consumer, the shared
+// subscriptions, the tab's id and the socket's closing when a Turbo visit
+// leaves CS Studio): this controller listens through it (`listen`).
 //
 // TWO SUBSCRIPTIONS.
 // - `Notes::PersonChannel`, once per tab. `delivery`: a delivery was written
@@ -124,9 +124,7 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 //
 // THE SOCKET. When it drops, CS Studio works as without push; when it is
 // back, every part is fetched once -- signals sent meanwhile were never
-// received. A session that ended has its socket closed by the server
-// (`Session#disconnect_cable`); the consumer's one reconnect is refused with
-// `reconnect: false`, and it stops there, silently.
+// received. What a session's end does to the socket: `live/connection`.
 // `data-notes-live="connected"` on <body> says that every subscription of
 // this page has been answered (confirmed, or rejected for a record the
 // viewer may not read): a signal sent from then on is received.
@@ -137,60 +135,12 @@ const COALESCE_MS = 500
 const NEAR_BOTTOM = 48
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, [tabindex]"
 
-// This tab, for as long as its document lives: the shape the server echoes
-// (`Notes::Signals::TAB`, lower-case letters, digits and dashes, 8 to 40).
-const TAB = `tab-${Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("")}`
-
-// The subscriptions of this document, one per channel-and-parameters, shared
-// by whoever listens. A Turbo visit replaces <body>, and with it this
-// controller and its `record` targets: the old ones let go and the new ones
-// ask in the same task. Unsubscribing and subscribing again to the same
-// identifier at once is what Action Cable can't promise the order of (the
-// server works its commands on a pool; a late "unsubscribe" would remove the
-// new subscription, and the confirmation of the old one would have been taken
-// for it), so a subscription nobody listens to is let go a task later, and
-// one asked for again in between is simply kept. When the last one goes, the
-// tab has left CS Studio and the socket is closed.
-const pool = new Map()
-
-function listen(params, listener) {
-  const key = JSON.stringify(params)
-  let entry = pool.get(key)
-  if (!entry) {
-    entry = { listeners: new Set(), up: false, settled: false, rejected: false }
-    const tell = (name, ...args) => [ ...entry.listeners ].forEach((each) => each[name]?.(...args))
-    entry.subscription = cable.subscribeTo(params, {
-      connected: () => { entry.up = entry.settled = true; tell("connected") },
-      disconnected: () => { entry.up = entry.settled = false; tell("disconnected") },
-      rejected: () => { entry.rejected = entry.settled = true; tell("rejected") },
-      received: (signal) => tell("received", signal)
-    })
-    pool.set(key, entry)
-  }
-  clearTimeout(entry.release)
-  entry.listeners.add(listener)
-
-  const stop = () => {
-    entry.listeners.delete(listener)
-    if (entry.listeners.size > 0) return
-    entry.release = setTimeout(async () => {
-      const subscription = await entry.subscription
-      if (entry.listeners.size > 0) return
-      pool.delete(key)
-      // A rejected one is forgotten on both sides already.
-      if (!entry.rejected) subscription.unsubscribe()
-      if (pool.size === 0) (await cable.getConsumer()).disconnect()
-    }, 0)
-  }
-  return { entry, stop }
-}
-
 // What the person's stream has said and nobody has acted on yet: the
 // deliveries to announce, and whether the count and the cards are due. Beside
-// `pool`, not on the controller: a signal waits half a second before anything
-// is fetched, and a Turbo visit inside that window replaces <body> and the
-// controller with it. The next page's controller takes these over
-// (`connect`), so the toast is raised there.
+// the controller, not on it (as `pool` is in `live/connection`): a signal
+// waits half a second before anything is fetched, and a Turbo visit inside
+// that window replaces <body> and the controller with it. The next page's
+// controller takes these over (`connect`), so the toast is raised there.
 //
 // `person` is whose they are: the signed-in person's id as the page that was
 // told gave it. A session that ended and was replaced by another sign-in in
@@ -248,15 +198,14 @@ export default class extends Controller {
 
   connect() {
     this.element.dataset.notesTab = TAB
-    this.person = listen({ channel: "Notes::PersonChannel" }, {
+    this.person = listen({ channel: "Notes::PersonChannel" }, Object.assign((signal) => this.addressed(signal), {
       connected: () => this.online(),
       disconnected: () => this.offline(),
-      rejected: () => this.sync(),
-      received: (signal) => this.addressed(signal)
-    })
+      rejected: () => this.sync()
+    }))
     // A socket the server closed for good (the session ended; someone has
     // signed in again since) is opened again by the first page that asks.
-    cable.getConsumer().then((consumer) => consumer.ensureActiveConnection())
+    open()
     // What the page before this one was told and had not acted on -- its
     // timer not yet run, or its run still out when the visit came (that run
     // announces nothing more, `inbox`). Nothing of it for another person.
@@ -274,7 +223,7 @@ export default class extends Controller {
   }
 
   disconnect() {
-    this.person?.stop()
+    this.person?.()
     this.person = null
     this.records.forEach((record) => record.stop())
     this.records.clear()
@@ -286,7 +235,11 @@ export default class extends Controller {
 
   recordTargetConnected(element) {
     const record = { dropped: false }
-    const { entry, stop } = listen({ channel: "Notes::RecordChannel", type: element.dataset.notesType, id: String(element.dataset.notesId) }, {
+    const heard = (signal) => {
+      if (signal?.kind !== "threads" || signal.origin === TAB) return
+      this.soon(element, () => this.refresh(element, signal.thread_id ?? null))
+    }
+    const stop = listen({ channel: "Notes::RecordChannel", type: element.dataset.notesType, id: String(element.dataset.notesId) }, Object.assign(heard, {
       connected: () => {
         if (record.dropped) this.soon(element, () => this.refresh(element, null))
         record.dropped = false
@@ -296,13 +249,9 @@ export default class extends Controller {
         record.dropped = true
         this.sync()
       },
-      rejected: () => this.sync(),
-      received: (signal) => {
-        if (signal?.kind !== "threads" || signal.origin === TAB) return
-        this.soon(element, () => this.refresh(element, signal.thread_id ?? null))
-      }
-    })
-    this.records.set(element, Object.assign(record, { entry, stop }))
+      rejected: () => this.sync()
+    }))
+    this.records.set(element, Object.assign(record, { stop }))
     this.sync()
   }
 
@@ -444,7 +393,7 @@ export default class extends Controller {
 
   // Whether every subscription of this page has been answered.
   sync() {
-    const settled = Boolean(this.person?.entry.up) && [ ...this.records.values() ].every((record) => record.entry.settled)
+    const settled = Boolean(this.person?.up) && [ ...this.records.values() ].every((record) => record.stop.settled)
     this.element.dataset.notesLive = settled ? "connected" : "connecting"
   }
 
