@@ -319,7 +319,7 @@ Solid Cable is configured for production (`config/cable.yml`, the `cable` databa
 
 ## 12. As built
 
-Where the code differs from this spec, with the reason. The code is the authority; `docs/reference/notes.md` describes it, and the handoff's "Decisions after the build started" (items 1–42) records each design answer taken while building and after the whole branch was reviewed. The body above is left as it was agreed.
+Where the code differs from this spec, with the reason. The code is the authority; `docs/reference/notes.md` describes it, and the handoff's "Decisions after the build started" (items 1–45) records each design answer taken while building and after the whole branch was reviewed. The body above is left as it was agreed.
 
 **Decisions and the drawer (§2, §4)**
 
@@ -334,7 +334,7 @@ Where the code differs from this spec, with the reason. The code is the authorit
 - **§4.4: the mind graph's card** has the notes under the title and the actions after them, on screen and in the document; Enter on the selected node opens the post. The node's badge is always neutral: unread is said on the card's rows. (Decision 12.)
 - **§4.5: accent in a note's text.** "Unread for you" is said by markers only. In the text accent is a link; a mention is a small chip, tinted accent only when it is the viewer who is mentioned. (Decision 5.)
 - **§4.5, §3.6: reactions.** The add control of a message without reactions is in its meta line, shown on hover or focus, and "React" is in the message's "⋯" menu. A resolved thread shows its reactions read-only and takes no new ones. (Decisions 24, 26.)
-- **§6.4, §3.1: the account screen** is "Your account": the name and the two note switches are one form with one Save, in two cards (Profile, Notes), and the password has a card and a form of its own. Its address is `account`; `account/password`, its first address, answers a GET with a 301 to it, and the Password card is `#password`. After the password form is saved or refused the page comes back at `#password`, the card in view and the focus on the message; a small script does it, since a redirect's fragment does not survive a Turbo visit. The permission line shows only while the desktop switch is on. (Decisions 13–16, 19, 20, 25, 34, 38, 42.)
+- **§6.4, §3.1: the account screen** is "Your account": the name and the two note switches are one form with one Save, in two cards (Profile, Notes), and the password has a card and a form of its own. Its address is `account`; `account/password`, its first address, answers a GET with a 301 to it, and the Password card is `#password`. After the password form is saved or refused the page comes back at `#password`, the card in view and the focus on the message, which is an alert at the top of the card (danger for a refusal, success for a save, no toast); a small script does it, since a redirect's fragment does not survive a Turbo visit. The permission line shows only while the desktop switch is on. (Decisions 13–16, 19, 20, 25, 34, 38, 42, 43.)
 
 **Data and rules (§3)**
 
