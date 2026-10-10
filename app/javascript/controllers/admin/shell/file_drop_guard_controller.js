@@ -10,7 +10,7 @@ import { Controller } from "@hotwired/stimulus"
 // "none", and a `drop` there is cancelled. Real targets are left entirely
 // alone -- a file drop zone (`file-drop`), a file input, anything editable (a
 // rich-text editor takes its own drops), and the whole Media screen, whose
-// `admin--media-drop` owns the window. A drag that carries no files (text, a
+// `admin--media--drop` owns the window. A drag that carries no files (text, a
 // link, SortableJS's pointer drags) is never touched.
 export default class extends Controller {
   connect() {
@@ -30,7 +30,7 @@ export default class extends Controller {
   }
 
   accepted(target) {
-    if (document.querySelector("[data-controller~='admin--media-drop']")) return true
+    if (document.querySelector("[data-controller~='admin--media--drop']")) return true
     if (!(target instanceof Element)) return false
     return target.closest("[data-controller~='file-drop'], input[type=file], [contenteditable]:not([contenteditable=false])") !== null
   }

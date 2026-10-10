@@ -15,7 +15,7 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
   test "an empty field has an empty hidden input, Choose, and a hidden Remove" do
     render_column(nil)
 
-    assert_selector "#page-hero-image-section[data-controller='admin--media-field']"
+    assert_selector "#page-hero-image-section[data-controller='admin--media--field']"
     assert_selector "input[type=hidden][name='page[hero_media_asset_id]'][id='page-hero_image'][value='']", visible: :all
     assert_button "Choose image"
     assert_selector "button[hidden]", text: "Remove image", visible: :all
@@ -83,7 +83,7 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
   test "the override fields to keep in step are passed to the controller" do
     render_column(nil, placeholder_ids: { alt: "page-hero_alt" })
 
-    assert_equal({ "alt" => "page-hero_alt" }, JSON.parse(page.find("#page-hero-image-section")["data-admin--media-field-placeholder-ids-value"]))
+    assert_equal({ "alt" => "page-hero_alt" }, JSON.parse(page.find("#page-hero-image-section")["data-admin--media--field-placeholder-ids-value"]))
   end
 
   test "the defaults a blank override falls back to, in the editing locale" do

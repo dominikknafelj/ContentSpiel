@@ -895,7 +895,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@page.id}"
     assert_response :success
 
-    assert_select "##{prefix}-image-section[data-controller='admin--media-field']" do
+    assert_select "##{prefix}-image-section[data-controller='admin--media--field']" do
       assert_select "p", text: "Image"
       assert_select "input[type=hidden][name='block[media_asset_id]'][value='#{block.media_asset_id}']"
       assert_select "button", text: "Change image"
@@ -904,7 +904,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "input[name='block[alt]'][placeholder='A dog']"
     assert_select "input[name='block[caption]'][placeholder='Our dog']"
     assert_equal({ "alt" => "#{prefix}-alt", "caption" => "#{prefix}-caption" },
-      JSON.parse(css_select("##{prefix}-image-section").first["data-admin--media-field-placeholder-ids-value"]))
+      JSON.parse(css_select("##{prefix}-image-section").first["data-admin--media--field-placeholder-ids-value"]))
   end
 
   # Every autosave resends the hidden input's stored id -- a no-op.

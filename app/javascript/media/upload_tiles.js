@@ -1,5 +1,5 @@
-// The upload queue the Media screen (`admin--media-upload`) and the media
-// picker (`admin--media-picker`) share (round 3, Task 9).
+// The upload queue the Media screen (`admin--media--upload`) and the media
+// picker (`admin--media--picker`) share (round 3, Task 9).
 //
 // Files go up ONE AT A TIME, each as a progress tile at the start of the grid:
 // its name, a bar, "Uploading…". The server's answer (`Admin::MediaUploadResponses`)

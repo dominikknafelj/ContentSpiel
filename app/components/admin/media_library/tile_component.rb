@@ -16,7 +16,7 @@ module Admin
     #
     # `pick: true` is the same tile inside `Media::PickerComponent` (round 3,
     # Task 9): a button, not a link, because the picker is select-then-confirm
-    # (D14). A click selects it (`admin--media-select#select`, `aria-pressed`
+    # (D14). A click selects it (`admin--media--select#select`, `aria-pressed`
     # drawing the same accent ring the panel's selected tile has), a double
     # click selects and confirms, Enter on a selected one confirms. Its whole
     # payload for the opener (`media-picker:picked`'s detail) is one JSON action
@@ -45,7 +45,7 @@ module Admin
 
       PICK_CARD = "#{CARD} border-line aria-pressed:border-accent aria-pressed:ring-[3px] aria-pressed:ring-accent-tint".freeze
 
-      PICK_ACTIONS = "click->admin--media-select#select dblclick->admin--media-select#choose keydown->admin--media-select#key".freeze
+      PICK_ACTIONS = "click->admin--media--select#select dblclick->admin--media--select#choose keydown->admin--media--select#key".freeze
 
       def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false)
         @asset = asset
@@ -79,7 +79,7 @@ module Admin
         }.to_json
       end
 
-      def pick_data = { action: PICK_ACTIONS, "asset-id": asset.id, "admin--media-select-asset-param": pick_payload }
+      def pick_data = { action: PICK_ACTIONS, "asset-id": asset.id, "admin--media--select-asset-param": pick_payload }
 
       def unused? = @unused
 

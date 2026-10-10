@@ -32,7 +32,7 @@ import { createTargetSearch } from "rich_text/target_search"
 // handlers check the editor is still the one they started with.
 //
 // Images come from the library (media library Task 8): the Image button
-// opens the one picker (`admin--media-picker`, `Media::PickerComponent`),
+// opens the one picker (`admin--media--picker`, `Media::PickerComponent`),
 // and the picked asset goes on to the image dialog (alt text and caption),
 // whose "Insert image" adds `image{asset_id}` (`#picked`, `#dialogClosed`).
 // The editor has no upload of its own; the picker's header Upload covers it.

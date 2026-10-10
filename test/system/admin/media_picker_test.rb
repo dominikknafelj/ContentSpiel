@@ -149,7 +149,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   # `after_a_save:`, a save is pushed through with another field first, after
   # which the record's own value means something.
   def assert_no_image_chosen(after_a_save: nil)
-    assert_equal "", find("#page-hero-image-section input[data-admin--media-field-target=input]", visible: :all).value
+    assert_equal "", find("#page-hero-image-section input[data-admin--media--field-target=input]", visible: :all).value
     return unless after_a_save
 
     fill_in "Title", with: after_a_save

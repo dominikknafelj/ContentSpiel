@@ -16,7 +16,7 @@ module Admin
     # `label:` is the input's accessible name (aria-label), e.g. "Upload images";
     # without it the visible "Choose file" label names it.
     #
-    # Whoever owns the upload (the media library's `admin--media-upload`) listens
+    # Whoever owns the upload (the media library's `admin--media--upload`) listens
     # to the input's own `change`; this component never uploads anything.
     class FileDropComponent < AdminComponent
       def initialize(name:, id:, accept: Media::Asset::ALLOWED_CONTENT_TYPES.join(","), multiple: false, hint: nil, label: nil, **input_html)

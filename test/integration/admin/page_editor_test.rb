@@ -365,7 +365,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{landing.id}"
     assert_response :success
 
-    assert_select "#page-hero-image-section[data-controller='admin--media-field']" do
+    assert_select "#page-hero-image-section[data-controller='admin--media--field']" do
       assert_select "input[type=hidden][name='page[hero_media_asset_id]'][value='#{asset.id}']"
       assert_select "button", text: "Change image"
       assert_select "button", text: "Remove image"
@@ -374,7 +374,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     # No upload field of its own any more; the one file input is the
     # picker's header Upload, rendered once by the layout.
     assert_select "form[data-controller~='admin--saving--autosave'] input[type=file]", count: 0
-    assert_select "dialog#media-picker[data-controller~='admin--media-picker']", count: 1
+    assert_select "dialog#media-picker[data-controller~='admin--media--picker']", count: 1
   end
 
   # `new FormData(form)` (`admin--saving--autosave`) resends *every* field on

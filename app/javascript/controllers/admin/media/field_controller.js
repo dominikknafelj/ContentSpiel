@@ -4,7 +4,7 @@ import { Controller } from "@hotwired/stimulus"
 // (`Admin::Columns::MediaColumnComponent`, media library Task 8; see that
 // component for the markup and the save contract).
 //
-// Choose/Change opens the one picker (`admin--media-picker`, via
+// Choose/Change opens the one picker (`admin--media--picker`, via
 // `media-picker:open` on `window`, with the button as the opener focus
 // returns to); the pick arrives as `media-picker:picked` on that button and
 // bubbles up to here. Either way -- a pick or Remove -- the hidden input's

@@ -18,7 +18,7 @@ module Media
   # field offers Choose and the editor has no Image button, so nothing
   # would open it anyway.
   #
-  # How a field talks to it (`admin--media-picker`'s own comment): the
+  # How a field talks to it (`admin--media--picker`'s own comment): the
   # opener dispatches `media-picker:open` on `window` with itself as
   # `detail.opener`; the picker answers with `media-picker:picked`
   # (`{ id, url, title, alt, caption }`) dispatched *on that opener*,
@@ -29,7 +29,7 @@ module Media
   # same search, segments with counts, pagination and constant-query tiles the
   # Media module uses -- and navigated inside the frame, so searching never
   # leaves the dialog. Choosing is select-then-use (D14): a click selects a
-  # tile, **Use image** confirms, a double click does both (`admin--media-select`,
+  # tile, **Use image** confirms, a double click does both (`admin--media--select`,
   # on this same element). Uploads (`Admin::MediaAssetsController#create`,
   # `Media::Upload`) show as progress tiles at the start of the grid; the first
   # one to finish is selected, and a refused one keeps its tile with the
@@ -53,15 +53,15 @@ module Media
     # - the select controller's `chosen`, and the picker's own `reset`/`uploaded`
     #   telling it to forget or to select a finished upload.
     ACTIONS = [
-      "media-picker:open@window->admin--media-picker#open",
-      "close->admin--media-picker#closed",
-      "cancel->admin--media-picker#cancel",
-      "keydown->admin--media-picker#keydown",
-      "turbo:frame-load->admin--media-picker#gridLoaded",
-      "turbo:frame-load->admin--media-select#reapply",
-      "admin--media-picker:reset->admin--media-select#reset",
-      "admin--media-picker:uploaded->admin--media-select#selectUploaded",
-      "admin--media-select:chosen->admin--media-picker#chosen"
+      "media-picker:open@window->admin--media--picker#open",
+      "close->admin--media--picker#closed",
+      "cancel->admin--media--picker#cancel",
+      "keydown->admin--media--picker#keydown",
+      "turbo:frame-load->admin--media--picker#gridLoaded",
+      "turbo:frame-load->admin--media--select#reapply",
+      "admin--media--picker:reset->admin--media--select#reset",
+      "admin--media--picker:uploaded->admin--media--select#selectUploaded",
+      "admin--media--select:chosen->admin--media--picker#chosen"
     ].join(" ").freeze
 
     def initialize(url_options: {})

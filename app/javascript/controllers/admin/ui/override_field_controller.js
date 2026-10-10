@@ -12,7 +12,7 @@ import { Controller } from "@hotwired/stimulus"
 // Nothing here talks to the server.
 //
 // `refresh` runs when the input changes and when its placeholder does
-// (`admin--media-field` rewrites it when another image is chosen), so Reset
+// (`admin--media--field` rewrites it when another image is chosen), so Reset
 // and the library line show only while the field holds its own text, and the
 // line always names the current library text.
 export default class extends Controller {

@@ -4,7 +4,7 @@ import { UploadTiles, updateCounts } from "media/upload_tiles"
 // The one media picker (media library design spec §6, Task 8; round 3, Task 9),
 // on `Media::PickerComponent`'s `<dialog>` -- rendered once per CS Studio page by
 // the admin layout. See that component's comment for where it's used and how it
-// is built; `admin--media-select` (the same element) owns choosing a tile.
+// is built; `admin--media--select` (the same element) owns choosing a tile.
 //
 // The contract with a field or editor that wants an image:
 // - open it by dispatching `media-picker:open` on `window` with
@@ -91,7 +91,7 @@ export default class extends Controller {
 
     this.focusSearchOnLoad = false
     const active = document.activeElement
-    if (active === this.element || active === document.body || active?.dataset?.action?.includes("admin--media-picker#browse")) {
+    if (active === this.element || active === document.body || active?.dataset?.action?.includes("admin--media--picker#browse")) {
       this.search?.focus()
     }
   }
@@ -191,7 +191,7 @@ export default class extends Controller {
     updateCounts(json.counts, { picker: true })
     if (!this.selectNextUpload || !tile) return
 
-    const raw = tile.querySelector("[data-admin--media-select-asset-param]")?.getAttribute("data-admin--media-select-asset-param")
+    const raw = tile.querySelector("[data-admin--media--select-asset-param]")?.getAttribute("data-admin--media--select-asset-param")
     if (!raw) return
 
     this.selectNextUpload = false

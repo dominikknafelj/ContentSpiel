@@ -7,7 +7,7 @@ module Admin
     # and **Remove image**, around one hidden input named `html_name` that
     # holds the asset id -- the one thing that's saved.
     #
-    # `admin--media-field` writes the picked id (or "" on Remove) into that
+    # `admin--media--field` writes the picked id (or "" on Remove) into that
     # input and dispatches a bubbling `input`, so the enclosing form's own
     # `admin--saving--autosave` sends it with everything else -- the same contract
     # the rich-text column's hidden input has. "" is a deliberate clear
@@ -69,15 +69,15 @@ module Admin
       def root_data
         {
           field_name: name,
-          controller: "admin--media-field",
-          action: "media-picker:picked->admin--media-field#picked",
-          "admin--media-field-placeholder-ids-value": placeholder_ids.to_json,
-          "admin--media-field-defaults-value": defaults.to_json
+          controller: "admin--media--field",
+          action: "media-picker:picked->admin--media--field#picked",
+          "admin--media--field-placeholder-ids-value": placeholder_ids.to_json,
+          "admin--media--field-defaults-value": defaults.to_json
         }
       end
 
       # The rendered image's own alt/caption defaults, which
-      # `admin--media-field` writes into the override fields' placeholders
+      # `admin--media--field` writes into the override fields' placeholders
       # on connect -- so when this component is re-rendered by a stream
       # after a refused choice (`Admin::PagesController#update`,
       # `Admin::ContentBlocksController#update`), the placeholders the

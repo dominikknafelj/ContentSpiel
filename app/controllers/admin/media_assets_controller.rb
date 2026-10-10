@@ -10,7 +10,7 @@ module Admin
   # this controller keeps its own separate route and its own narrower
   # JSON contract (`Admin::MediaUploadResponses`: `id`, `title`, `url`, the finished
   # pick tile and the counts, or `{errors}`) rather than folding into it --
-  # `admin--media-picker` and `admin--media-upload` are two unrelated callers
+  # `admin--media--picker` and `admin--media--upload` are two unrelated callers
   # that happen to share the same underlying `Media::Upload`, not one
   # feature split across two endpoints.
   class MediaAssetsController < BaseController

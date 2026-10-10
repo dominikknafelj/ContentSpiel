@@ -36,13 +36,13 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: /Move to trash/
   end
 
-  test "the panel is a focusable region and its close link tells admin--media-panel which tile to return to" do
+  test "the panel is a focusable region and its close link tells admin--media--panel which tile to return to" do
     asset = create_media_asset
 
     render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en")
 
-    assert_selector "section#media-panel[tabindex='-1'][data-admin--media-panel-target='panel']"
-    assert_selector "a[aria-label='Close panel'][data-action='click->admin--media-panel#close'][data-admin--media-panel-tile-id-param='#{asset.id}']"
+    assert_selector "section#media-panel[tabindex='-1'][data-admin--media--panel-target='panel']"
+    assert_selector "a[aria-label='Close panel'][data-action='click->admin--media--panel#close'][data-admin--media--panel-tile-id-param='#{asset.id}']"
   end
 
   test "an editable panel carries the autosave form, the retention help and the warn hook while the alt is empty" do

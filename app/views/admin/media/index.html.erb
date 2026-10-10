@@ -16,32 +16,32 @@
     frame that keeps the search, the segment, the page and the language, so Back
     returns to the previous choice. No tree column (a library image has no tree
     position of its own, the same reason Tags/Posts render plain content frames). %>
-<%# Uploading (round 3, Task 9): the wrapper carries `admin--media-drop` (a file drag
+<%# Uploading (round 3, Task 9): the wrapper carries `admin--media--drop` (a file drag
     anywhere on the screen shows the overlay below and a drop hands its files to
-    `admin--media-upload`) and `admin--media-upload` itself (the queue: a progress
+    `admin--media--upload`) and `admin--media--upload` itself (the queue: a progress
     tile per file at the start of the grid, one at a time, nothing reloads). The
     Ui::FileDropComponent inside is the visible zone and the labelled file input; it
     stops its own drops from reaching the document-level handler twice
     (file_drop_controller.js). The header's button opens the same input. %>
 <div class="mb-4 flex flex-col gap-4"
-     data-controller="admin--media-drop admin--media-upload"
-     data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"
-     data-action="admin--media-drop:dropped->admin--media-upload#dropped">
+     data-controller="admin--media--drop admin--media--upload"
+     data-admin--media--upload-url-value="<%= admin_media_path(**admin_url_options) %>"
+     data-action="admin--media--drop:dropped->admin--media--upload#dropped">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-h1 text-ink">Media</h1>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media-upload#browse" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media--upload#browse" }) %>
   </div>
   <div>
     <%= render Admin::Ui::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
           hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
-          data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
+          data: { "admin--media--upload-target": "input", action: "change->admin--media--upload#filesSelected" }) %>
     <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
-    <p class="sr-only" role="status" aria-live="polite" data-admin--media-upload-target="status"></p>
+    <p class="sr-only" role="status" aria-live="polite" data-admin--media--upload-target="status"></p>
   </div>
   <%# Centred by flex over the whole window, translucent (the page stays
       visible behind it, as in the mock), and never in the way of the drop
       itself (`pointer-events-none`: the drag keeps its real target). %>
-  <div hidden data-admin--media-drop-target="overlay" aria-hidden="true"
+  <div hidden data-admin--media--drop-target="overlay" aria-hidden="true"
        class="pointer-events-none fixed inset-0 z-30 flex items-center justify-center border-2 border-dashed border-accent bg-accent-tint/85">
     <p class="rounded-cs bg-surface px-6 py-4 text-h2 text-ink shadow-menu">Drop images to upload</p>
   </div>
@@ -52,9 +52,9 @@
 <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected).merge("page" => page)) } %>
 <%# DOM order is visual order at every width (grid, then panel; the panel stacks
     below the grid under 1024px): no `order-*` swap, so tab order never contradicts
-    what is drawn. `admin--media-panel` moves focus into the panel when a tile was
+    what is drawn. `admin--media--panel` moves focus into the panel when a tile was
     chosen, and back to the tile when the panel is closed. %>
-<div class="grid items-start gap-6 <%= "lg:grid-cols-[minmax(0,1fr)_340px]" if @selected %>" data-controller="admin--media-panel">
+<div class="grid items-start gap-6 <%= "lg:grid-cols-[minmax(0,1fr)_340px]" if @selected %>" data-controller="admin--media--panel">
   <div class="min-w-0">
     <% if @pagination.out_of_range? %>
       <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>

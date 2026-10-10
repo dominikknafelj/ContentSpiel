@@ -58,7 +58,7 @@
           autosaves like any other field, with `hero_alt` as this page's
           own per-use override -- its placeholder is the image's own
           default alt in this language, kept current by
-          `admin--media-field` when the image changes. %>
+          `admin--media--field` when the image changes. %>
       <%= render self.class.hero_image_field(asset: page.hero_media_asset, locale: locale) %>
 
       <%= render Admin::Columns::PlainColumnComponent.new(

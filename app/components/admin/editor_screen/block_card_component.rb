@@ -335,7 +335,7 @@ module Admin
       # image's own defaults (media library design spec §6): blank, the
       # public page falls back to the image's default in this language, which
       # is what they show as their placeholder (kept current after a pick by
-      # `admin--media-field`, through the `placeholder_ids:` that
+      # `admin--media--field`, through the `placeholder_ids:` that
       # `.image_field` below hands the image column).
       def column_placeholder(name)
         case name

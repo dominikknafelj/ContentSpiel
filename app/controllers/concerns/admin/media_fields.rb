@@ -5,7 +5,7 @@ module Admin
   # library Task 8 fix round 1, I2): after a *refused* choice, a stream
   # that re-renders the whole field with the image actually stored.
   #
-  # By the time the PATCH lands, `admin--media-field` has already swapped
+  # By the time the PATCH lands, `admin--media--field` has already swapped
   # the thumbnail, the title, the Change/Choose label and the override
   # fields' placeholders over to the picked image, and put its id in the
   # hidden input. Left like that, the field shows an image that was never

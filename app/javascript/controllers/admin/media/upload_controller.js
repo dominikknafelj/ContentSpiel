@@ -2,8 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 import { UploadTiles, updateCounts } from "media/upload_tiles"
 
 // The Media module's own multi-file upload (media library design spec §6, round 3
-// Task 9): files dropped anywhere on the screen (`admin--media-drop`, which hands
-// them over as `admin--media-drop:dropped`), the header's "Upload images" button
+// Task 9): files dropped anywhere on the screen (`admin--media--drop`, which hands
+// them over as `admin--media--drop:dropped`), the header's "Upload images" button
 // and the plain file input in the drop zone -- all three end in `#upload`, which
 // gives every file a progress tile at the start of the grid and sends them one at
 // a time, one POST per file, to `Admin::MediaController#create`. That is what

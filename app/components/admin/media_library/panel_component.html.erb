@@ -2,11 +2,11 @@
     Media screen's own layout and the tests look for; the title, the save status
     and the base-updated-at field keep stable ids because the autosave answer
     (`Admin::MediaController#update`) addresses them. %>
-<section id="media-panel" class="admin-media-panel flex flex-col gap-4 focus:outline-none" aria-labelledby="media-panel-title" tabindex="-1" data-admin--media-panel-target="panel">
+<section id="media-panel" class="admin-media-panel flex flex-col gap-4 focus:outline-none" aria-labelledby="media-panel-title" tabindex="-1" data-admin--media--panel-target="panel">
   <div class="flex items-start justify-between gap-3">
     <h2 id="media-panel-title" class="min-w-0 break-words text-lg font-semibold text-ink"><%= asset.title %></h2>
     <%= link_to "×", close_path, aria: { label: "Close panel" }, title: "Close", class: "-mt-1 shrink-0 rounded-cs px-2 text-xl leading-none text-meta hover:text-ink",
-          data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media-panel#close", "admin--media-panel-tile-id-param": asset.id } %>
+          data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media--panel#close", "admin--media--panel-tile-id-param": asset.id } %>
   </div>
 
   <span class="block overflow-hidden rounded-cs border border-line bg-sunken">

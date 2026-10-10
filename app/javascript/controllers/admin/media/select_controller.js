@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 // Select-then-use for the media picker (round 3, Task 9, D14), on the same
-// `<dialog>` as `admin--media-picker` (`Media::PickerComponent`).
+// `<dialog>` as `admin--media--picker` (`Media::PickerComponent`).
 //
 // - A click on a tile SELECTS it (one at a time): `aria-pressed` draws the accent
 //   ring and the footer says "1 selected" -- announced, it is a live region --
@@ -10,7 +10,7 @@ import { Controller } from "@hotwired/stimulus"
 //   does Enter on a tile that is already selected. A tile is a real `<button>`, so
 //   Tab reaches every one and Enter or Space selects it with no code of ours; the
 //   keydown below only adds the second Enter.
-// - Confirming dispatches `admin--media-select:chosen` with the asset's payload
+// - Confirming dispatches `admin--media--select:chosen` with the asset's payload
 //   (`{ id, url, title, alt, caption }`); the picker closes and answers its opener.
 //
 // The selection is the payload held HERE, not a mark in the DOM: searching or

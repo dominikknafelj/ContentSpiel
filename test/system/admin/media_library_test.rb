@@ -2,7 +2,7 @@ require "application_system_test_case"
 
 # The Media module's own grid and side panel (media library design spec
 # §6, Task 7; round 3 Task 8): a real multi-file upload through the file
-# input (`admin--media-upload`), then opening one of the uploaded images and
+# input (`admin--media--upload`), then opening one of the uploaded images and
 # setting its German alt text; and the panel's live effect on the tile and the
 # segment counts.
 class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
@@ -14,7 +14,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     # A real, single multi-file selection on the visible file input --
-    # `admin--media-upload#filesSelected` fires one POST per file, one at a time
+    # `admin--media--upload#filesSelected` fires one POST per file, one at a time
     # (global constraints' own upload ruling), and nothing reloads.
     attach_file("media-upload-input", [ file_fixture("tiny.png").to_s, file_fixture("wide.png").to_s ])
 
@@ -112,10 +112,10 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     hold_uploads
 
     dispatch_file_drag("dragenter", "tiny.png")
-    assert_selector "[data-admin--media-drop-target=overlay]", text: "Drop images to upload", visible: :visible
+    assert_selector "[data-admin--media--drop-target=overlay]", text: "Drop images to upload", visible: :visible
     dispatch_file_drop("tiny.png")
 
-    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_no_selector "[data-admin--media--drop-target=overlay]", visible: :visible
     assert_selector "[data-upload-tile]", text: "tiny.png"
     assert_selector "[data-upload-tile]", text: "Uploading…"
     assert_equal 0, Media::Asset.count
@@ -158,17 +158,17 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
       data.setData("text/plain", "just some words")
       document.dispatchEvent(new DragEvent("dragenter", { dataTransfer: data, bubbles: true, cancelable: true }))
     JS
-    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_no_selector "[data-admin--media--drop-target=overlay]", visible: :visible
 
     dispatch_file_drag("dragenter", "tiny.png")
-    assert_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_selector "[data-admin--media--drop-target=overlay]", visible: :visible
     # Entering and leaving a child (the counted enter/leave) does not flicker it...
     dispatch_file_drag("dragenter", "tiny.png")
     dispatch_file_drag("dragleave", "tiny.png", related: true)
-    assert_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_selector "[data-admin--media--drop-target=overlay]", visible: :visible
     # ...and Escape ends the drag.
     page.driver.browser.keyboard.type(:escape)
-    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_no_selector "[data-admin--media--drop-target=overlay]", visible: :visible
     assert_equal 0, Media::Asset.count
   end
 
@@ -183,14 +183,14 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     page.execute_script("document.querySelector('#media-asset-#{asset.id} img').dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true }))")
     dispatch_file_drag("dragenter", "tiny.png")
     dispatch_file_drag("dragover", "tiny.png")
-    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_no_selector "[data-admin--media--drop-target=overlay]", visible: :visible
     dispatch_file_drop("tiny.png")
     await_frames # the drop handler has run: no tile was made, no upload started
     assert_no_selector "li[data-upload-tile]"
     assert_equal 1, Media::Asset.count
 
     dispatch_file_drag("dragenter", "tiny.png")
-    assert_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_selector "[data-admin--media--drop-target=overlay]", visible: :visible
     page.driver.browser.keyboard.type(:escape)
   end
 

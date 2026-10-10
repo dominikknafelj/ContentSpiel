@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // Drop images anywhere on the Media screen (round 3, Task 9, handoff §4.6): while
 // a drag that carries FILES is over the window, a full-screen overlay says "Drop
 // images to upload"; the drop hands the files to whoever uploads
-// (`admin--media-upload`, on the same element, over `admin--media-drop:dropped`).
+// (`admin--media--upload`, on the same element, over `admin--media--drop:dropped`).
 //
 // Only a drag that carries files is any of this controller's business -- never a
 // SortableJS drag (it is pointer-driven, no drag events at all here, and its
