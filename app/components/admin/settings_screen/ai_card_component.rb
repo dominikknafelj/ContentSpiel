@@ -7,7 +7,7 @@ module Admin
     # `#settings-ai-key-forms` (rendered by `show` AFTER the main form --
     # forms can't nest) through `form=`.
     #
-    # `admin--ai-settings` (this card's root) owns Replace/Cancel and gates
+    # `admin--settings--ai` (this card's root) owns Replace/Cancel and gates
     # Test connection: it tests the SAVED settings, so it is disabled while
     # Provider or Model differ from `data-saved-value` ("Save provider and model
     # first. Tests the saved settings.") and, as every instant action is

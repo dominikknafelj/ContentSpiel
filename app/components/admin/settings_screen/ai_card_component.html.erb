@@ -1,5 +1,5 @@
 <section id="settings-ai-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="ai"
-         data-controller="admin--ai-settings admin--saving--pending-lock">
+         data-controller="admin--settings--ai admin--saving--pending-lock">
   <div class="border-b border-line px-4 py-3.5">
     <h2 id="ai" class="text-h2 text-ink">AI translation</h2>
     <p class="mt-1 text-sm text-dim">Editors can ask for a suggested translation of a field. Nothing is saved until they use it.</p>
@@ -10,14 +10,14 @@
         <%= label_tag "settings-ai_provider", "Provider", class: setup_label_class %>
         <%= select_tag "site_setting[ai_provider]", options_for_select(provider_names, values.ai_provider),
               include_blank: "None (AI translation off)", id: "settings-ai_provider", class: setup_select_class,
-              data: { "admin--ai-settings-target": "provider", "saved-value": saved_provider, action: "change->admin--ai-settings#refresh" } %>
+              data: { "admin--settings--ai-target": "provider", "saved-value": saved_provider, action: "change->admin--settings--ai#refresh" } %>
         <%= helpers.render "admin/shared/field_errors", id: "settings-ai_provider-errors", messages: provider_errors %>
       </div>
       <div class="admin-column" data-field-name="ai_model">
         <%= label_tag "settings-ai_model", "Model", class: setup_label_class %>
         <%= text_field_tag "site_setting[ai_model]", values.ai_model, placeholder: ::AI::DEFAULT_MODEL, id: "settings-ai_model",
               autocomplete: "off", spellcheck: false, class: setup_input_class,
-              data: { "admin--ai-settings-target": "model", "saved-value": saved_model, action: "input->admin--ai-settings#refresh" } %>
+              data: { "admin--settings--ai-target": "model", "saved-value": saved_model, action: "input->admin--settings--ai#refresh" } %>
         <%= helpers.render "admin/shared/field_errors", id: "settings-ai_model-errors", messages: model_errors %>
       </div>
     </div>
@@ -28,8 +28,8 @@
       <div class="flex flex-wrap items-center gap-3">
         <%# Its own form (a sibling after the main one). Not a pending-lock control: see the class comment. %>
         <%= render Admin::Ui::ButtonComponent.new(label: "Test connection", variant: :secondary, type: "submit", form: TEST_FORM,
-              data: { "admin--ai-settings-target": "test", busy_label: "Testing…" }) %>
-        <span class="text-sm text-meta" data-admin--ai-settings-target="testHint" hidden></span>
+              data: { "admin--settings--ai-target": "test", busy_label: "Testing…" }) %>
+        <span class="text-sm text-meta" data-admin--settings--ai-target="testHint" hidden></span>
       </div>
       <%= render Admin::SettingsScreen::AiTestResultComponent.new %>
     </div>

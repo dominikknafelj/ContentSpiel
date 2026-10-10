@@ -68,7 +68,7 @@ module Admin
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],
         # `language_order` is the one tracked field that makes a reorder a
-        # single change for the footer (`admin--sortable-rows`); the rows
+        # single change for the footer (`admin--settings--sortable-rows`); the rows
         # themselves are what is read.
         languages: [ :code, :fallback ]
       )
@@ -171,7 +171,7 @@ module Admin
 
     # The tab to show after a refusal: the language of the first error that
     # belongs to a translated field (the title rule is the default language's),
-    # else the tab the editor was on (`locale`, kept current by `admin--settings-tabs`).
+    # else the tab the editor was on (`locale`, kept current by `admin--settings--tabs`).
     def tab_for_errors(errors)
       errors.attribute_names.any? { |name| Settings::Save::TRANSLATED.include?(name) } ? Locales.default : admin_locale
     end

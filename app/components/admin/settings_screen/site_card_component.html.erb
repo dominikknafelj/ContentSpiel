@@ -2,9 +2,9 @@
     ⌘K's anchors), so a jump lands on the title. The card itself is named by
     its heading. %>
 <section id="settings-site-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="site"
-         data-controller="admin--settings-tabs" data-action="click@document->admin--settings-tabs#reveal" data-admin--settings-tabs-current-value="<%= locale %>">
-  <%# Where Save (or a refused one) comes back to; `admin--settings-tabs` keeps it on the visible tab. %>
-  <%= hidden_field_tag :locale, locale, id: "settings-locale", data: { "admin--settings-tabs-target": "locale" } %>
+         data-controller="admin--settings--tabs" data-action="click@document->admin--settings--tabs#reveal" data-admin--settings--tabs-current-value="<%= locale %>">
+  <%# Where Save (or a refused one) comes back to; `admin--settings--tabs` keeps it on the visible tab. %>
+  <%= hidden_field_tag :locale, locale, id: "settings-locale", data: { "admin--settings--tabs-target": "locale" } %>
   <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 pt-3.5">
     <h2 id="site" class="pb-2 text-h2 text-ink">Site</h2>
     <% if codes.size > 1 %>
@@ -19,7 +19,7 @@
     <% codes.each do |code| %>
       <%= tag.div id: panel_id(code), role: ("tabpanel" if codes.size > 1), hidden: !current?(code), class: "flex flex-col gap-4",
             aria: ({ labelledby: "language-tab-#{code}" } if codes.size > 1),
-            data: { language_panel: code, "admin--settings-tabs-target": "panel" } do %>
+            data: { language_panel: code, "admin--settings--tabs-target": "panel" } do %>
         <%# Suggest translations for N empty fields -- this language's. %>
         <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: site_setting, locale: code, editable: true) %>
 
@@ -69,18 +69,18 @@
       <%= helpers.render "admin/shared/field_errors", id: "settings-time_zone-errors", messages: errors_for(:time_zone) %>
     </div>
 
-    <fieldset class="admin-column" id="settings-social-links" data-field-name="social_links" data-controller="admin--repeat-rows"
-              data-admin--repeat-rows-next-value="<%= values.social_rows.size %>">
+    <fieldset class="admin-column" id="settings-social-links" data-field-name="social_links" data-controller="admin--settings--repeat-rows"
+              data-admin--settings--repeat-rows-next-value="<%= values.social_rows.size %>">
       <legend class="<%= setup_label_class %> mb-1">Social links</legend>
-      <div class="flex flex-col gap-2" data-admin--repeat-rows-target="list">
+      <div class="flex flex-col gap-2" data-admin--settings--repeat-rows-target="list">
         <% values.social_rows.each_with_index do |(name, url), index| %>
           <%= render "admin/settings/social_link_row", index: index, name: name, url: url %>
         <% end %>
       </div>
-      <template id="settings-social-link-template" data-admin--repeat-rows-target="template">
+      <template id="settings-social-link-template" data-admin--settings--repeat-rows-target="template">
         <%= render "admin/settings/social_link_row", index: TEMPLATE_INDEX, name: "", url: "" %>
       </template>
-      <button type="button" class="mt-2 cursor-pointer text-sm text-accent hover:text-accent-hover" data-action="admin--repeat-rows#add">+ Add link</button>
+      <button type="button" class="mt-2 cursor-pointer text-sm text-accent hover:text-accent-hover" data-action="admin--settings--repeat-rows#add">+ Add link</button>
       <%= helpers.render "admin/shared/field_errors", id: "settings-social_links-errors", messages: errors_for(:social_links) %>
     </fieldset>
   </div>

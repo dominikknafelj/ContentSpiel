@@ -1,12 +1,12 @@
 <%# locals: index, name, url -- one social link row of the Settings form
     (`Admin::SettingsScreen::SiteCardComponent`): rendered once per stored link
-    and once, with a placeholder index, in the `<template>` `admin--repeat-rows`
+    and once, with a placeholder index, in the `<template>` `admin--settings--repeat-rows`
     clones for "+ Add link". The × button has no name, so it is no field of the
     form. %>
-<div class="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_2rem] items-center gap-2" data-admin--repeat-rows-target="row">
+<div class="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_2rem] items-center gap-2" data-admin--settings--repeat-rows-target="row">
   <%= text_field_tag "site_setting[social_links][#{index}][name]", name, id: "settings-social-#{index}-name", placeholder: "Label, e.g. GitHub",
         autocomplete: "off", aria: { label: "Label" }, class: "#{setup_input_class} !mt-0" %>
   <%= url_field_tag "site_setting[social_links][#{index}][url]", url, id: "settings-social-#{index}-url", placeholder: "https://",
         autocomplete: "off", aria: { label: "URL" }, class: "#{setup_input_class} !mt-0 font-cs-mono text-[13px]" %>
-  <button type="button" class="cursor-pointer text-base text-meta hover:text-ink" aria-label="Remove link" data-action="admin--repeat-rows#remove">×</button>
+  <button type="button" class="cursor-pointer text-base text-meta hover:text-ink" aria-label="Remove link" data-action="admin--settings--repeat-rows#remove">×</button>
 </div>

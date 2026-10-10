@@ -12,7 +12,7 @@ module Admin
     # PENDING -- fields of the one Settings form, saved by its footer: the
     # ORDER (a hidden `site_setting[languages][][code]` per row, in row order,
     # plus the one tracked `site_setting[language_order]` that makes a
-    # reorder a single counted change; see `admin--sortable-rows`) and each
+    # reorder a single counted change; see `admin--settings--sortable-rows`) and each
     # row's FALLBACK (`site_setting[languages][][fallback]`).
     #
     # INSTANT -- Default, Turn off and Add, each a form of its own that sits

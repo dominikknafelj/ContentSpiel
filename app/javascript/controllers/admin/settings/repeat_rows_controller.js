@@ -25,7 +25,7 @@ export default class extends Controller {
   }
 
   remove(event) {
-    const row = event.currentTarget.closest("[data-admin--repeat-rows-target='row']")
+    const row = event.currentTarget.closest("[data-admin--settings--repeat-rows-target='row']")
     if (!row) return
     // The last row is cleared, not removed: one empty row is the "none" state,
     // and without it the form would post no rows at all, which the server
@@ -38,7 +38,7 @@ export default class extends Controller {
     }
     const following = row.nextElementSibling || row.previousElementSibling
     row.remove()
-    ;(following?.querySelector("input") || this.element.querySelector("[data-action~='admin--repeat-rows#add']"))?.focus()
+    ;(following?.querySelector("input") || this.element.querySelector("[data-action~='admin--settings--repeat-rows#add']"))?.focus()
     this.changed()
   }
 

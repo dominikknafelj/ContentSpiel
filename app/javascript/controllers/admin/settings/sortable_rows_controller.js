@@ -10,13 +10,13 @@ import Sortable from "sortablejs"
 // save footer counts it ("1 unsaved change") and the Save that follows sends
 // the rows in their new order. Cancel on the footer reloads the screen.
 //
-//   <section data-controller="admin--sortable-rows">
-//     <input type="hidden" data-admin--sortable-rows-target="order" data-save-bar-track value="en,de">
-//     <p data-admin--sortable-rows-target="announcer" aria-live="assertive" class="sr-only"></p>
-//     <ul data-admin--sortable-rows-target="list">
-//       <li data-admin--sortable-rows-target="row" data-label="Deutsch">
-//         <button type="button" data-admin--sortable-rows-target="handle"
-//                 data-action="keydown->admin--sortable-rows#key focusout->admin--sortable-rows#blur">⠿</button>
+//   <section data-controller="admin--settings--sortable-rows">
+//     <input type="hidden" data-admin--settings--sortable-rows-target="order" data-save-bar-track value="en,de">
+//     <p data-admin--settings--sortable-rows-target="announcer" aria-live="assertive" class="sr-only"></p>
+//     <ul data-admin--settings--sortable-rows-target="list">
+//       <li data-admin--settings--sortable-rows-target="row" data-label="Deutsch">
+//         <button type="button" data-admin--settings--sortable-rows-target="handle"
+//                 data-action="keydown->admin--settings--sortable-rows#key focusout->admin--settings--sortable-rows#blur">⠿</button>
 //
 // WHY ONE ORDER FIELD. The footer counts a change per control POSITION, so
 // moving one row down by one would change two positional keys (the row inputs
@@ -37,7 +37,7 @@ export default class extends Controller {
 
   connect() {
     this.sortable = Sortable.create(this.listTarget, {
-      handle: "[data-admin--sortable-rows-target='handle']",
+      handle: "[data-admin--settings--sortable-rows-target='handle']",
       animation: 150,
       ghostClass: "admin-drag-ghost",
       chosenClass: "admin-drag-chosen",
@@ -167,7 +167,7 @@ export default class extends Controller {
   }
 
   focusHandle(row) {
-    row.querySelector("[data-admin--sortable-rows-target='handle']")?.focus()
+    row.querySelector("[data-admin--settings--sortable-rows-target='handle']")?.focus()
   }
 
   labelOf(row) { return row.dataset.label || "row" }
@@ -181,6 +181,6 @@ export default class extends Controller {
   }
 
   rowFor(event) {
-    return event.currentTarget.closest("[data-admin--sortable-rows-target='row']")
+    return event.currentTarget.closest("[data-admin--settings--sortable-rows-target='row']")
   }
 }

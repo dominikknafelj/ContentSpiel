@@ -2,7 +2,7 @@
     nav's and ⌘K's anchor). The whole section is the `admin--saving--pending-lock`
     scope: every `control` below is an instant action. %>
 <section id="settings-languages-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="languages"
-         data-controller="admin--saving--pending-lock admin--sortable-rows">
+         data-controller="admin--saving--pending-lock admin--settings--sortable-rows">
   <div class="border-b border-line px-4 py-3.5">
     <h2 id="languages" class="text-h2 text-ink">Languages</h2>
     <p class="mt-1 text-sm text-dim">The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default.</p>
@@ -10,20 +10,20 @@
     <p class="mt-1 text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
   </div>
 
-  <%# The order as ONE tracked value: see `admin--sortable-rows`. %>
+  <%# The order as ONE tracked value: see `admin--settings--sortable-rows`. %>
   <%= hidden_field_tag "site_setting[language_order]", order_value, id: "settings-language-order",
-        data: { "save-bar-track": true, "admin--sortable-rows-target": "order" } %>
-  <p class="sr-only" aria-live="assertive" data-admin--sortable-rows-target="announcer"></p>
+        data: { "save-bar-track": true, "admin--settings--sortable-rows-target": "order" } %>
+  <p class="sr-only" aria-live="assertive" data-admin--settings--sortable-rows-target="announcer"></p>
 
-  <ul class="m-0 list-none p-0" data-admin--sortable-rows-target="list">
+  <ul class="m-0 list-none p-0" data-admin--settings--sortable-rows-target="list">
     <% rows.each do |row| %>
       <% code = row[:code] %>
       <li id="language-<%= code %>" class="admin-language-row flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-3"
-          data-admin--sortable-rows-target="row" data-code="<%= code %>" data-label="<%= name(code) %>">
+          data-admin--settings--sortable-rows-target="row" data-code="<%= code %>" data-label="<%= name(code) %>">
         <button type="button" class="shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
                 aria-label="Move <%= name(code) %>" aria-describedby="language-drag-help"
-                data-admin--sortable-rows-target="handle"
-                data-action="keydown->admin--sortable-rows#key focusout->admin--sortable-rows#blur">⠿</button>
+                data-admin--settings--sortable-rows-target="handle"
+                data-action="keydown->admin--settings--sortable-rows#key focusout->admin--settings--sortable-rows#blur">⠿</button>
         <%# Row inputs, in row order: the code first, then the fallback (the
             default's select is disabled and so not posted). %>
         <%= hidden_field_tag "site_setting[languages][][code]", code, id: nil %>

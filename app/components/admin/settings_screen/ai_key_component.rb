@@ -4,7 +4,7 @@ module Admin
     # "● Key saved · added 2 Oct" ("Key saved" alone for a key stored before
     # the date column existed, "No key yet" without one) with Replace and
     # Remove… (Add key when there is none). Replace/Add key swaps the chip for
-    # a password input with Save key and Cancel -- client side, `admin--ai-settings`.
+    # a password input with Save key and Cancel -- client side, `admin--settings--ai`.
     #
     # NO PART OF THE KEY IS EVER RENDERED, and nothing here decrypts it: only
     # `SiteSetting#ai_api_key_set?` (the raw column) and the saved-on date are

@@ -26,7 +26,7 @@
           and rode low (round 1 departure). Now the flex row is just the
           label and its dot, centred on each other. %>
       <%# Buttons mode keys the underline and weight on `aria-selected`, which
-          `admin--settings-tabs` flips, so no script ever edits a class. %>
+          `admin--settings--tabs` flips, so no script ever edits a class. %>
       <li <%= "role=presentation" if buttons? %> class="inline-flex items-center gap-1.5 border-b-2 pb-2 <%= buttons? ? "border-transparent has-[[aria-selected=true]]:border-ink" : (current?(code) ? "border-ink" : "border-transparent") %>">
         <% if buttons? %>
           <%= tag.button native_name(code), type: "button", role: "tab", id: "language-tab-#{code}",

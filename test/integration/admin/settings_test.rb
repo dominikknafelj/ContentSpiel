@@ -244,7 +244,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_response :see_other
     assert_equal({ "GitHub" => "https://github.com/dana", "Blog" => "https://example.org/blog" }, @site.reload.social_links)
     get "/cs-studio/settings"
-    assert_select "#settings-social-links [data-admin--repeat-rows-target=list] input[name$='[name]']", 2
+    assert_select "#settings-social-links [data-admin--settings--repeat-rows-target=list] input[name$='[name]']", 2
     assert_select "#settings-social-links input[value='GitHub']"
     assert_select "#settings-social-links input[value='https://example.org/blog']"
   end
@@ -271,7 +271,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/settings"
 
     assert_select "input[name='site_setting[social_links][0][name]']", 1
-    assert_select "#settings-social-links [data-admin--repeat-rows-target=list] input[name$='[name]']", 1
+    assert_select "#settings-social-links [data-admin--settings--repeat-rows-target=list] input[name$='[name]']", 1
     assert_select "template#settings-social-link-template input[name$='[name]']", 1
     assert_select "button", text: "+ Add link"
   end
