@@ -9,6 +9,10 @@ abort "usage: identifiers.rb OLD=NEW ..." if pairs.empty? || pairs.any? { |old, 
 ROOT = Pathname(__dir__).join("../..").expand_path
 ALL_OLD = Dir[ROOT.join("app/javascript/controllers/admin/*_controller.js")].map { |f| "admin--" + File.basename(f, "_controller.js").tr("_", "-") } | pairs.keys
 FILES = Dir[ROOT.join("{app,test,docs,config/locales}/**/*.{rb,erb,js,css,yml,md}")] + [ ROOT.join("CLAUDE.md").to_s ]
+# Specs and plans are historical records and quote old names on purpose; built CSS is
+# git-ignored; the guard test holds sample strings that must stay as written.
+EXCLUDED = %w[docs/superpowers app/assets/builds test/lib/source_layout_test.rb].map { |path| ROOT.join(path).to_s }
+FILES.reject! { |path| EXCLUDED.any? { |prefix| path == prefix || path.start_with?("#{prefix}/") } }
 # A run of the old one-level form, matched whole (the atomic group forbids a shorter match). A run followed by "--" is already in the new form: leave it.
 TOKEN = /(?<![a-z0-9-])(?>admin--[a-z0-9]+(?:-[a-z0-9]+)*)(?!--)/
 
