@@ -1,6 +1,6 @@
 <%# The Mind graph (mind graph canvas spec §3.2, §5): a frame. The graph's data
     is NOT in the page -- at the cap it is several hundred kilobytes, which
-    would sit in every load and in Turbo's page cache -- so `admin--mind-graph`
+    would sit in every load and in Turbo's page cache -- so `admin--mind-graph--graph`
     fetches it from `data-url`, lays it out in a worker (`data-worker-url`,
     which imports d3-force from `data-d3-url`: an import map does not apply
     inside a worker, so both are plain asset URLs) and draws it on the canvas.
@@ -56,7 +56,7 @@
       keys are written out one by one: `test/lib/script_messages_test.rb`
       reads the literals to check that every key the script asks for is
       served. %>
-  <div data-controller="admin--mind-graph"
+  <div data-controller="admin--mind-graph--graph"
        data-url="<%= data_admin_mind_graph_path(**admin_url_options, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
        data-d3-url="<%= asset_path("d3-force.js") %>"
@@ -125,7 +125,7 @@
           <div class="inline-flex overflow-hidden rounded-cs border border-line-strong bg-surface">
             <% %w[all related tag].each do |value| %>
               <label for="mind-graph-filter-<%= value %>" class="flex cursor-pointer items-center border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken has-[:checked]:bg-accent-tint has-[:checked]:font-semibold has-[:checked]:text-ink has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent">
-                <%= radio_button_tag "mind_graph_filter", value, value == "all", id: "mind-graph-filter-#{value}", class: "sr-only", data: { action: "change->admin--mind-graph#filter" } %>
+                <%= radio_button_tag "mind_graph_filter", value, value == "all", id: "mind-graph-filter-#{value}", class: "sr-only", data: { action: "change->admin--mind-graph--graph#filter" } %>
                 <span><%= t(".filter.#{value}") %></span>
               </label>
             <% end %>
@@ -144,17 +144,17 @@
           loading, a failure and the cap's sentences are announced. %>
       <div class="relative min-h-0 flex-1">
         <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
-          <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph#releasePinned" }) %>
+          <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph--graph#releasePinned" }) %>
           <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-line-strong bg-surface text-sm text-ink">
             <% zoom_button = "cursor-pointer px-2.5 py-0.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
-            <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph#zoomOut" } %>
+            <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph--graph#zoomOut" } %>
             <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 font-cs-mono text-label text-meta"></span>
-            <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph#zoomIn" } %>
-            <%= tag.button t(".fit_short"), type: "button", class: "#{zoom_button} border-l border-line", title: t(".fit"), "aria-label": t(".fit"), data: { action: "admin--mind-graph#fit" } %>
+            <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph--graph#zoomIn" } %>
+            <%= tag.button t(".fit_short"), type: "button", class: "#{zoom_button} border-l border-line", title: t(".fit"), "aria-label": t(".fit"), data: { action: "admin--mind-graph--graph#fit" } %>
           </div>
         </div>
-        <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>" data-label="<%= t(".canvas_label") %>"></canvas>
-        <div data-admin--mind-graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
+        <canvas data-admin--mind-graph--graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>" data-label="<%= t(".canvas_label") %>"></canvas>
+        <div data-admin--mind-graph--graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
         <%# (The canvas's `data-label` is its name as the server wrote it: the
             script puts the counts into `aria-label`, and the controller's
             `reset` puts this back on a page Turbo restored.) %>

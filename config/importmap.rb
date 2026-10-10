@@ -41,7 +41,7 @@ pin_all_from "app/javascript/i18n", under: "i18n", preload: "admin"
 # files go up one at a time as progress tiles at the start of a grid.
 pin_all_from "app/javascript/media", under: "media", preload: "admin"
 
-# The mind graph's modules: imported only by `controllers/admin/mind_graph_controller.js`
+# The mind graph's modules: imported only by `controllers/admin/mind_graph/graph_controller.js`
 # through a dynamic `import()`, so no other CS Studio screen fetches them --
 # `preload: false`. `layout_worker.js` is in this directory too but is never
 # imported: it is started as a module Worker from its asset URL.

@@ -58,8 +58,11 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       preloads = modulepreloads
-      assert preloads.any? { |href| href.include?("controllers/admin/mind_graph_controller") }, "the thin controller is an admin controller like any other"
-      %w[mind_graph/ d3-force].each do |name|
+      assert preloads.any? { |href| href.include?("controllers/admin/mind_graph/graph_controller") }, "the thin controller is an admin controller like any other"
+      # "/assets/mind_graph/", not "mind_graph/": the thin controller's own file lives in
+      # controllers/admin/mind_graph/, and only the module folder app/javascript/mind_graph/
+      # (an asset path of its own, no "admin/" before it) is the one that stays unloaded.
+      %w[/assets/mind_graph/ d3-force].each do |name|
         assert preloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on #{path}: #{preloads.grep(/#{Regexp.escape(name)}/).inspect}"
       end
       assert_not_includes entry_point_script, "mind_graph/"
@@ -68,7 +71,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
     # The Mind graph names the worker and d3-force as plain asset URLs, for the
     # script to start a worker from; no other screen mentions either.
-    assert_select "[data-controller='admin--mind-graph'][data-worker-url*='mind_graph/layout_worker'][data-d3-url*='d3-force']"
+    assert_select "[data-controller='admin--mind-graph--graph'][data-worker-url*='mind_graph/layout_worker'][data-d3-url*='d3-force']"
     get "/cs-studio/tags"
     assert_select "[data-worker-url], [data-d3-url]", count: 0
   end

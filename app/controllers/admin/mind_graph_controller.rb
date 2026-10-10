@@ -1,6 +1,6 @@
 module Admin
   # The mind graph (mind graph canvas spec §3): the page is a FRAME -- heading,
-  # legend, filter, an empty canvas -- and holds no graph data. `admin--mind-graph`
+  # legend, filter, an empty canvas -- and holds no graph data. `admin--mind-graph--graph`
   # fetches the graph from `data` and draws it on the canvas, laid out by
   # d3-force in a worker. Read-only -- relations are edited in the post editor's
   # related-posts picker, not here. Each node's editor URL is built through the

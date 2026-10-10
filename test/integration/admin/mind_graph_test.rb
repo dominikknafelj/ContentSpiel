@@ -2,7 +2,7 @@ require "test_helper"
 
 # The mind graph's page (mind graph canvas spec §3.2): a frame -- heading,
 # legend, filter, an empty canvas -- with NO graph data in it. The
-# `admin--mind-graph` controller fetches the data from the URL the page names
+# `admin--mind-graph--graph` controller fetches the data from the URL the page names
 # (`test/integration/admin/mind_graph_data_test.rb` covers that endpoint) and
 # draws it (`test/system/admin/mind_graph_test.rb`). Same session gate as every
 # other CS Studio screen -- not public.
@@ -26,8 +26,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "script#mind-graph-data", count: 0
     assert_no_match "A very particular title", response.body
-    assert_select "[data-controller='admin--mind-graph'][data-url='/cs-studio/mind_graph/data'][data-state='loading']"
-    assert_select "[data-controller='admin--mind-graph'][data-worker-url*='mind_graph/layout_worker'][data-d3-url*='d3-force']"
+    assert_select "[data-controller='admin--mind-graph--graph'][data-url='/cs-studio/mind_graph/data'][data-state='loading']"
+    assert_select "[data-controller='admin--mind-graph--graph'][data-worker-url*='mind_graph/layout_worker'][data-d3-url*='d3-force']"
     assert_select "canvas[role='img'][tabindex='0'][aria-label]"
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/mind_graph']", text: "Mind graph"
   end
@@ -41,11 +41,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-controller='admin--mind-graph'][data-post-focus-url='/cs-studio/mind_graph?post=__ID__'][data-tag-focus-url='/cs-studio/mind_graph?tag=__ID__'][data-tag-posts-url='/cs-studio/posts?tag=__NAME__']"
+    assert_select "[data-controller='admin--mind-graph--graph'][data-post-focus-url='/cs-studio/mind_graph?post=__ID__'][data-tag-focus-url='/cs-studio/mind_graph?tag=__ID__'][data-tag-posts-url='/cs-studio/posts?tag=__NAME__']"
     # A post's notes for its card (notes spec §4.4): the route takes digits
     # only, so the template is built for id 0 and the segment swapped.
-    assert_select "[data-controller='admin--mind-graph'][data-post-notes-url='/cs-studio/notes/post/__ID__/threads']"
-    labels = JSON.parse(css_select("[data-controller='admin--mind-graph']").first["data-type-labels"])
+    assert_select "[data-controller='admin--mind-graph--graph'][data-post-notes-url='/cs-studio/notes/post/__ID__/threads']"
+    labels = JSON.parse(css_select("[data-controller='admin--mind-graph--graph']").first["data-type-labels"])
     assert_equal({ "resume_entry" => ContentTypes.fetch("resume_entry").label }, labels)
     assert_select "[data-mind-graph-card][hidden]:empty"
     assert_select "[data-mind-graph-tooltip][hidden]:empty"
@@ -59,7 +59,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_equal "{}", css_select("[data-controller='admin--mind-graph']").first["data-type-labels"]
+    assert_equal "{}", css_select("[data-controller='admin--mind-graph--graph']").first["data-type-labels"]
   end
 
   # The strings the script shows are the server's (docs/reference/i18n.md): a
@@ -70,7 +70,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    messages = JSON.parse(css_select("[data-controller='admin--mind-graph']").first["data-messages"])
+    messages = JSON.parse(css_select("[data-controller='admin--mind-graph--graph']").first["data-messages"])
     assert_equal "The graph could not be loaded.", messages["mind_graph.script.load_failed"]
     assert_equal({ "one" => "%{figure} other post has no connections yet and isn't shown.", "other" => "%{figure} other posts have no connections yet and aren't shown." }, messages["mind_graph.script.isolated"])
     assert_equal({ "one" => "%{figure} post has no connections yet.", "other" => "%{figure} posts have no connections yet." }, messages["mind_graph.script.isolated_only"])
@@ -97,12 +97,12 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-controller='admin--mind-graph'] > *", count: 3
-    assert_select "[data-controller='admin--mind-graph'] > :nth-child(1) #mind-graph-search"
-    assert_select "[data-controller='admin--mind-graph'] > :nth-child(2) canvas"
-    assert_select "[data-controller='admin--mind-graph'] > :nth-child(3)[data-mind-graph-list][role='region'][aria-label='Posts and tags in this graph']:empty"
+    assert_select "[data-controller='admin--mind-graph--graph'] > *", count: 3
+    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(1) #mind-graph-search"
+    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(2) canvas"
+    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(3)[data-mind-graph-list][role='region'][aria-label='Posts and tags in this graph']:empty"
     assert_select "details", count: 0
-    assert_select "button[data-mind-graph-release][hidden][data-action='admin--mind-graph#releasePinned']:empty"
+    assert_select "button[data-mind-graph-release][hidden][data-action='admin--mind-graph--graph#releasePinned']:empty"
     assert_select "[role='group'][aria-label='Zoom'] button", count: 3
     assert_select "button[aria-label='Zoom out'][title='Zoom out']", text: "−"
     assert_select "button[aria-label='Zoom in'][title='Zoom in']", text: "+"
@@ -119,7 +119,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    element = css_select("[data-controller='admin--mind-graph']").first
+    element = css_select("[data-controller='admin--mind-graph--graph']").first
     buttons = JSON.parse(element["data-button-classes"])
     assert_equal "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", buttons["primary"]
     assert_equal "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}", buttons["secondary"]
@@ -133,7 +133,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph", params: { post: post.id, depth: 2, locale: "de" }
 
-    url = css_select("[data-controller='admin--mind-graph']").first["data-url"]
+    url = css_select("[data-controller='admin--mind-graph--graph']").first["data-url"]
     assert_equal "/cs-studio/mind_graph/data", URI(url).path
     assert_equal({ "post" => post.id.to_s, "depth" => "2", "locale" => "de" }, Rack::Utils.parse_query(URI(url).query))
   end
@@ -145,7 +145,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph", params: { tag: tag.id, depth: 7 }
 
-    url = css_select("[data-controller='admin--mind-graph']").first["data-url"]
+    url = css_select("[data-controller='admin--mind-graph--graph']").first["data-url"]
     assert_equal({ "tag" => tag.id.to_s, "depth" => "1" }, Rack::Utils.parse_query(URI(url).query))
   end
 
@@ -187,7 +187,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
     assert_select "canvas", count: 0
-    assert_select "[data-controller='admin--mind-graph']", count: 0
+    assert_select "[data-controller='admin--mind-graph--graph']", count: 0
     assert_not_includes response.body, "Hidden from them"
   end
 
@@ -198,7 +198,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
-    assert_select "[data-controller~='admin--mind-graph']", count: 0
+    assert_select "[data-controller~='admin--mind-graph--graph']", count: 0
   end
 
   test "the legend names only the content types of the viewer's posts, plus the shapes" do
@@ -265,13 +265,13 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    order = css_select("[data-controller='admin--mind-graph'] input[type=search], [data-controller='admin--mind-graph'] input[type=radio], [data-controller='admin--mind-graph'] button, [data-controller='admin--mind-graph'] canvas")
+    order = css_select("[data-controller='admin--mind-graph--graph'] input[type=search], [data-controller='admin--mind-graph--graph'] input[type=radio], [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas")
       .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name }
     assert_equal [ "input", "input", "input", "input", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
-    assert_equal "search", css_select("[data-controller='admin--mind-graph'] input, [data-controller='admin--mind-graph'] button, [data-controller='admin--mind-graph'] canvas").first["type"]
+    assert_equal "search", css_select("[data-controller='admin--mind-graph--graph'] input, [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas").first["type"]
     # Nothing is taken out of the Tab order or moved within it; only the card
     # can be handed the focus by the script (`tabindex="-1"`).
-    assert_equal [ "aside" ], css_select("[data-controller='admin--mind-graph'] [tabindex]:not([tabindex='0'])").map(&:name)
+    assert_equal [ "aside" ], css_select("[data-controller='admin--mind-graph--graph'] [tabindex]:not([tabindex='0'])").map(&:name)
   end
 
   test "a focused view names its focus, offers both depths and the way back" do
@@ -280,7 +280,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph", params: { post: post.id }
 
-    assert_select "[data-controller='admin--mind-graph'] [data-mind-graph-focus]", text: /Around “Alpha”/
+    assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-focus]", text: /Around “Alpha”/
     link = css_select("[data-mind-graph-focus] a").find { |a| a.text == "2" }
     assert_equal({ "post" => post.id.to_s, "depth" => "2" }, Rack::Utils.parse_query(URI(link["href"]).query))
     assert_select "[data-mind-graph-focus] [aria-current='true']", text: /\ADepth\s+1\z/
@@ -320,7 +320,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "[data-mind-graph-focus]", count: 0
-    assert_select "[data-controller='admin--mind-graph'] [data-mind-graph-search][data-url^='/cs-studio/mind_graph/search'] input[type=search]#mind-graph-search"
+    assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-search][data-url^='/cs-studio/mind_graph/search'] input[type=search]#mind-graph-search"
     assert_select "label.sr-only[for=mind-graph-search]", text: "Find a post or tag"
     assert_select "[data-mind-graph-search] [data-mind-graph-results][hidden]:empty"
   end
@@ -334,7 +334,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph", params: { post: post.id }
 
-    order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=radio] button canvas].map { |part| "[data-controller='admin--mind-graph'] #{part}" }.join(", "))
+    order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=radio] button canvas].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }.join(", "))
       .map { |node| { "button" => node["aria-label"] || "hidden", "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
     assert_equal [ "search", "link:2", "link:Whole graph", "radio", "radio", "radio", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
   end
@@ -348,8 +348,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-controller='admin--mind-graph'] [data-mind-graph-list]:empty"
-    order = css_select("[data-controller='admin--mind-graph'] canvas, [data-controller='admin--mind-graph'] [data-mind-graph-card], [data-controller='admin--mind-graph'] [data-mind-graph-list]").map(&:name)
+    assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-list]:empty"
+    order = css_select("[data-controller='admin--mind-graph--graph'] canvas, [data-controller='admin--mind-graph--graph'] [data-mind-graph-card], [data-controller='admin--mind-graph--graph'] [data-mind-graph-list]").map(&:name)
     assert_equal %w[canvas aside div], order
   end
 
@@ -402,7 +402,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-admin--mind-graph-target='notice'][role='status']", count: 1
+    assert_select "[data-admin--mind-graph--graph-target='notice'][role='status']", count: 1
   end
 
   test "zoom in, zoom out and Fit all are buttons beside the canvas" do
@@ -412,7 +412,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     { "Zoom in" => "zoomIn", "Zoom out" => "zoomOut", "Fit all" => "fit" }.each do |label, action|
-      assert_select "button[type=button][data-action='admin--mind-graph##{action}'][aria-label='#{label}']"
+      assert_select "button[type=button][data-action='admin--mind-graph--graph##{action}'][aria-label='#{label}']"
     end
   end
 end

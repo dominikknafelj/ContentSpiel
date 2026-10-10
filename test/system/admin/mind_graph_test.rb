@@ -12,7 +12,7 @@ require "application_system_test_case"
 # `await_graph` here waits that out, which is the screen as a person gets it. What a mark LOOKS like is read from the canvas's own pixels
 # (`pixel_at`): a canvas can pass every other test and still draw nothing.
 class Admin::MindGraphSystemTest < ApplicationSystemTestCase
-  GRAPH = "[data-controller~='admin--mind-graph']".freeze
+  GRAPH = "[data-controller~='admin--mind-graph--graph']".freeze
   CANVAS = "#{GRAPH} canvas".freeze
   LIST = "#{GRAPH} [data-mind-graph-list]".freeze
 
@@ -426,7 +426,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         const graph = document.querySelector(#{GRAPH.to_json})
         const width = (element) => element.getBoundingClientRect().width
         const text = (element) => { const range = document.createRange(); range.selectNodeContents(element); return width(range) }
-        const line = Array.from(graph.querySelectorAll("[data-admin--mind-graph-target='notice'] p")).at(0)
+        const line = Array.from(graph.querySelectorAll("[data-admin--mind-graph--graph-target='notice'] p")).at(0)
         const link = graph.querySelector("[data-mind-graph-card] a")
         return { line: width(line), lineText: text(line), notice: width(line.parentElement), link: width(link), linkText: text(link), card: width(link.closest("[data-mind-graph-card]")) }
       })()
@@ -2224,7 +2224,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
           if (element.id === "mind-graph-search") return "search"
           if (element.closest("[data-mind-graph-focus]")) return "focus bar"
           if (element.name === "mind_graph_filter") return "filter"
-          if (element.dataset.action?.includes("admin--mind-graph#")) return "zoom"
+          if (element.dataset.action?.includes("admin--mind-graph--graph#")) return "zoom"
           if (element.tagName === "CANVAS") return "canvas"
           if (element.closest("[data-mind-graph-card]")) return "card"
           if (element.closest("[data-mind-graph-list]")) return "list"
