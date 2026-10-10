@@ -209,7 +209,7 @@ module Admin
       # itself was actually in this particular PATCH's own params: the tree
       # render costs a fixed handful of queries however many pages it shows
       # (`Admin::PagesScreen::TreeComponent`'s own comment; pinned by
-      # test/components/admin/tree_component_test.rb), its translation
+      # test/components/admin/pages_screen/tree_component_test.rb), its translation
       # markers are one read of the stored `translation_states`, and there's no cheaper way to know
       # from here whether *this* save happened to be the one that mattered
       # to it.
