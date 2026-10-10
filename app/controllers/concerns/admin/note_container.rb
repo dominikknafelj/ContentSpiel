@@ -23,11 +23,11 @@ module Admin
 
     def set_container
       kind = RecordKinds.named(params[:container_type]) or raise ActiveRecord::RecordNotFound
-      # A kind with no per-record scope (the library: `media.upload` opens it
-      # whole) is a 403 for someone without the right, as
-      # `Admin::MediaController`'s gate is; the registry answers nil for it,
-      # as for any record it does not find.
-      return forbidden! if kind.readable && !can?(kind.read)
+      # Rights that are per record make every nil a 404. A kind whose right
+      # opens every record (the library: `media.upload`) is a 403 for someone
+      # without it, as `Admin::MediaController`'s gate is; that says nothing
+      # of any one record (`RecordKinds::Kind#scoped`).
+      return forbidden! if !kind.scoped && !can?(kind.read)
 
       @container = kind.find(Current.actor, params[:container_id], channel: Current.channel) or raise ActiveRecord::RecordNotFound
     end

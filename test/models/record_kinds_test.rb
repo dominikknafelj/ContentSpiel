@@ -78,9 +78,9 @@ class RecordKindsTest < ActiveSupport::TestCase
   end
 
   test "registering a name or a model twice raises" do
-    taken = RecordKinds::Kind.new(name: "page", model_name: "Tag", read: "tags.manage", moderate: "tags.manage", finder: ->(*) { nil }, readable: nil)
-    assert_raises(ArgumentError) { RecordKinds.register("page", model: Tag, read: "tags.manage", moderate: "tags.manage", finder: taken.finder) }
-    assert_raises(ArgumentError) { RecordKinds.register("again", model: Page, read: "pages.read", moderate: "pages.edit", finder: taken.finder) }
+    assert_raises(ArgumentError) { RecordKinds.register("page", model: Tag, read: "tags.manage", moderate: "tags.manage", scoped: false, base: -> { Tag.all }) }
+    assert_raises(ArgumentError) { RecordKinds.register("again", model: Page, read: "pages.read", moderate: "pages.edit") }
+    assert_raises(ArgumentError) { RecordKinds.register("whole", model: Tag, read: "tags.manage", moderate: "tags.manage", scoped: false) } # an unscoped kind needs its base
     assert_equal %w[page post media], RecordKinds.all.map(&:name).first(3)
   end
 
@@ -104,6 +104,45 @@ class RecordKindsTest < ActiveSupport::TestCase
     assert_not_includes Notes.subject_types, "Tag"
   end
 
+  test "the property is named: page and post are scoped, the library is not" do
+    assert_equal [ true, true, false ], RecordKinds.all.first(3).map(&:scoped)
+  end
+
+  test "readable is a relation of the kind's records the user may read; the library's is none without its right" do
+    assert_equal [ @asset.id ], RecordKinds.named("media").readable(@owner).pluck(:id)
+    assert_empty RecordKinds.named("media").readable(@nobody)
+    assert_empty RecordKinds.named("media").readable_ids(@nobody)
+    assert_equal [ @asset.id ], RecordKinds.named("media").readable_ids(@owner).pluck(:id)
+    assert_empty RecordKinds.named("page").readable(nil)
+    assert_kind_of ActiveRecord::Relation, RecordKinds.named("post").readable(@owner)
+  end
+
+  test "find answers exactly the records readable holds, whoever asks, trashed ones included" do
+    create_post(title: "Now", content_type: "now_update")
+    trashed = [ create_page(title: "Gone"), create_post(title: "Gone too"), create_media_asset ]
+    trashed.each { |record| record.update_columns(trashed_at: Time.current) } # version: none (the test sets the state up)
+    each_viewer do |who, user|
+      RecordKinds.all.first(3).each do |kind|
+        found = kind.model.unscoped.pluck(:id).select { |id| kind.find(user, id) }.sort
+        assert_equal kind.readable(user).pluck(:id).sort, found, "#{kind.name} for #{who}"
+        assert_equal found, kind.readable_ids(user).pluck(:id).sort, "#{kind.name} ids for #{who}"
+        assert_not_includes found, trashed.find { |record| record.is_a?(kind.model) }.id
+      end
+    end
+  end
+
+  test "a partial scope finds some of the records and not the rest" do
+    each_viewer do |who, user|
+      next unless who == :partial
+
+      out = create_post(title: "Now", content_type: "now_update")
+      assert RecordKinds.find("post", user, @post.id)
+      assert_nil RecordKinds.find("post", user, out.id)
+      assert RecordKinds.find("page", user, @other_page.id)
+      assert_nil RecordKinds.find("page", user, @page.id)
+    end
+  end
+
   test "the subject types are the kinds' types and ContentBlock" do
     assert_equal %w[Page Post Media::Asset ContentBlock].sort, Notes.subject_types.sort
   end
@@ -111,10 +150,16 @@ class RecordKindsTest < ActiveSupport::TestCase
   private
 
   def tag_kind
-    RecordKinds::Kind.new(
-      name: "tag", model_name: "Tag", read: "tags.manage", moderate: "tags.manage",
-      finder: ->(user, id, channel) { Tag.find_by(id: id) if id && user && AccessControl.holds?(user, "tags.manage", channel:) },
-      readable: nil
-    )
+    RecordKinds::Kind.new(name: "tag", model_name: "Tag", read: "tags.manage", moderate: "tags.manage", scoped: false, base: -> { Tag.all })
+  end
+
+  def each_viewer
+    branch = access_control_groups(:branch_editors)
+    @other_page = create_page(title: "Elsewhere")
+    AccessControl::Grant.create!(group: branch, permission: "pages.read", scope: { "page_ids" => [ @other_page.id ] })
+    AccessControl::Grant.create!(group: branch, permission: "posts.read", scope: { "content_types" => [ "blog" ] })
+    yield :owner, @owner
+    yield :partial, users(:editor_branch)
+    yield :nothing, @nobody
   end
 end

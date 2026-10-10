@@ -81,7 +81,7 @@ module Notes
     # Every thread the actor may read, as one relation: one branch per record
     # kind, the threads whose container is a readable page or post
     # (`AccessControl.scope`, which also hides the trash) or, for a
-    # `media.upload` holder, a kept image (`RecordKinds::Kind#readable_ids`). A branch
+    # `media.upload` holder, a kept image (`RecordKinds::Kind#readable`). A branch
     # is only added when the actor holds the right at all, like
     # `Dashboard::Activity#readable_subjects`. The inbox, "Open threads" and
     # the sidebar's count all narrow through here, so a person who loses a
