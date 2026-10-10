@@ -7,7 +7,7 @@ module Admin
     # **Try again** button instead.
     #
     # It is never rendered into a page by the server: the layout holds one copy
-    # inside a `<template>` and `admin--translate` clones it into the field's
+    # inside a `<template>` and `admin--translation--translate` clones it into the field's
     # box (`[data-translation-box]`) before each request, so the box exists the
     # instant the editor presses the button. Both states are in the markup;
     # the controller flips them with `hidden` and ticks `[data-pending-elapsed]`
@@ -17,7 +17,7 @@ module Admin
     # is stale and the controller ignores it unless Try again was pressed.
     #
     # Its buttons are `type="button"`: the box sits inside an autosave `<form>`.
-    # Cancel / Try again are `admin--translate#cancelPending` / `#retry`, run by
+    # Cancel / Try again are `admin--translation--translate#cancelPending` / `#retry`, run by
     # the box's own controller instance (`admin/shared/_translation_box`).
     class PendingComponent < Admin::AdminComponent
       TIMEOUT_SECONDS = 25

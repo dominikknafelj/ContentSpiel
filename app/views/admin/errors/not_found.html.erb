@@ -12,5 +12,5 @@
   <%# A screen that knows a nearer way on says so (`@not_found_back`: the
       Media library for a `?selected=` that names nothing). %>
   <% back = @not_found_back || { label: "Back to the dashboard", url: admin_root_path(**admin_url_options) } %>
-  <%= link_to back[:label], back[:url], class: "#{Admin::ButtonComponent::BASE_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}" %>
+  <%= link_to back[:label], back[:url], class: "#{Admin::Ui::ButtonComponent::BASE_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" %>
 </section>

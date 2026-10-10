@@ -14,7 +14,7 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
   def assert_drawer_outside_every_form
     assert_select "form aside#notes-drawer", count: 0
     assert_select "form turbo-frame#notes", count: 0
-    assert_select "[data-controller~='admin--autosave'] turbo-frame#notes", count: 0
+    assert_select "[data-controller~='admin--saving--autosave'] turbo-frame#notes", count: 0
     assert_select "turbo-frame#content aside#notes-drawer turbo-frame#notes", count: 1
   end
 
@@ -31,14 +31,14 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
     assert_select "button#notes-open[class*='text-[13px]'], button#notes-open[class~='text-sm']", count: 0
     assert_select "button#notes-open[class~='aria-pressed:bg-sunken'][class~='aria-pressed:border-ink']"
     assert_select "#notes-open-count[class~='font-cs-mono'][class~='text-xs'][class~='text-dim'][class~='data-[unread]:bg-accent']"
-    assert_select "aside#notes-drawer[hidden][data-admin--notes-target=drawer][data-key='Page-#{@page.id}'][data-src='/cs-studio/notes/page/#{@page.id}']" do
-      assert_select "turbo-frame#notes[data-admin--notes-target=frame]"
+    assert_select "aside#notes-drawer[hidden][data-admin--notes--drawer-target=drawer][data-key='Page-#{@page.id}'][data-src='/cs-studio/notes/page/#{@page.id}']" do
+      assert_select "turbo-frame#notes[data-admin--notes--drawer-target=frame]"
       assert_select "button", text: "Back to Pricing"
       assert_select "form", count: 0
     end
     assert_drawer_outside_every_form
     assert_select "span#notes-counts[data-counts]"
-    assert_select "body[data-controller~='admin--notes']"
+    assert_select "body[data-controller~='admin--notes--drawer']"
     # One element answers to the header button's id (the plan's stable ids).
     assert_select "#notes-open", count: 1
   end
@@ -62,7 +62,7 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:two))
 
     get "/cs-studio/pages/#{@page.id}"
-    assert_select "header.admin-editor-header button.admin-editor-header__tree[aria-controls=tree-column][aria-expanded=false][aria-label='Open page tree'][data-action='admin--drawer#toggle'][data-admin--drawer-name-param=tree][data-admin--drawer-target=trigger]", text: "Pages ▾", count: 1
+    assert_select "header.admin-editor-header button.admin-editor-header__tree[aria-controls=tree-column][aria-expanded=false][aria-label='Open page tree'][data-action='admin--shell--drawer#toggle'][data-admin--shell--drawer-name-param=tree][data-admin--shell--drawer-target=trigger]", text: "Pages ▾", count: 1
     assert_select "header.admin-editor-header button.admin-editor-header__tree + nav[aria-label=Breadcrumb]"
 
     get "/cs-studio/posts/#{@post.id}"
@@ -89,7 +89,7 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
       assert_select "#notes-open-count[hidden]"
     end
     # Nor does the drawer's own header say "0 open".
-    assert_select "aside#notes-drawer header [data-admin--notes-target=total][hidden]"
+    assert_select "aside#notes-drawer header [data-admin--notes--drawer-target=total][hidden]"
   end
 
   test "a view-only reader gets the button and the drawer" do

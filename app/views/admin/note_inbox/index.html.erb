@@ -14,14 +14,14 @@
 <% else %>
   <div class="max-w-[880px] rounded-cs border border-line bg-surface">
     <% if @rows.empty? %>
-      <%= render Admin::EmptyStateComponent.new(title: t(".empty")) %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty")) %>
     <% else %>
       <ul class="px-4">
         <% @rows.each do |row| %>
           <li class="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0"><%= render Admin::NotesScreen::InboxRowComponent.new(row: row) %></li>
         <% end %>
       </ul>
-      <%= render Admin::PaginationComponent.new(pagination: @pagination, url: ->(page) { admin_notes_path(**admin_url_options, page: page) }) %>
+      <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: ->(page) { admin_notes_path(**admin_url_options, page: page) }) %>
     <% end %>
   </div>
 <% end %>

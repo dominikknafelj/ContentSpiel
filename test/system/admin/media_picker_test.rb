@@ -52,7 +52,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     # Image block: the same image.
     visit_editor
-    within("##{Admin::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
+    within("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
     pick_from_library(@asset)
     assert_eventually { block.reload.media_asset_id == @asset.id }
 
@@ -99,7 +99,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     block = @landing.content_blocks.create!(block_type: "image", position: 0)
     visit_editor
 
-    within("##{Admin::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
+    within("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
     within("dialog[open]") do
       assert_button @asset.title
       attach_file "Image file", file_fixture("fake.png").to_s
@@ -118,7 +118,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     end
     refute_selector "dialog[open]"
 
-    within("##{Admin::BlockCardComponent.error_prefix(block)}-image-section") { assert_button "Change image" }
+    within("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section") { assert_button "Change image" }
     uploaded = Media::Asset.where.not(id: @asset.id).sole
     assert_equal "tiny", uploaded.title
     assert_eventually { block.reload.media_asset_id == uploaded.id }
@@ -149,7 +149,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   # `after_a_save:`, a save is pushed through with another field first, after
   # which the record's own value means something.
   def assert_no_image_chosen(after_a_save: nil)
-    assert_equal "", find("#page-hero-image-section input[data-admin--media-field-target=input]", visible: :all).value
+    assert_equal "", find("#page-hero-image-section input[data-admin--media--field-target=input]", visible: :all).value
     return unless after_a_save
 
     fill_in "Title", with: after_a_save

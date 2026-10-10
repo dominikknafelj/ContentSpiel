@@ -7,14 +7,14 @@ module Admin
     # `#settings-ai-key-forms` (rendered by `show` AFTER the main form --
     # forms can't nest) through `form=`.
     #
-    # `admin--ai-settings` (this card's root) owns Replace/Cancel and gates
+    # `admin--settings--ai` (this card's root) owns Replace/Cancel and gates
     # Test connection: it tests the SAVED settings, so it is disabled while
     # Provider or Model differ from `data-saved-value` ("Save provider and model
     # first. Tests the saved settings.") and, as every instant action is
     # while the main form has unsaved changes (decision D10), while anything is
     # pending ("Save or cancel your changes first."). The two can both apply --
     # a changed field is itself a pending change -- and then only the specific
-    # one shows. `admin--pending-lock` (same root) locks the key's controls and
+    # one shows. `admin--saving--pending-lock` (same root) locks the key's controls and
     # carries the key row's own hint; Test connection is NOT one of its
     # controls, since its state is the union of both rules and is decided in
     # one place.

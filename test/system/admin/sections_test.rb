@@ -175,7 +175,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     find(face(@left)).click
     page.execute_script(<<~JS)
       const field = document.getElementById(#{caption(@left).to_json})
-      field.form.setAttribute("data-admin--autosave-debounce-value", "600000")
+      field.form.setAttribute("data-admin--saving--autosave-debounce-value", "600000")
       field.value = "Sent by the close"
       field.dispatchEvent(new Event("input", { bubbles: true }))
     JS
@@ -188,8 +188,8 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{face(@left).to_json})")
   end
 
-  # The section's card is moved in the DOM by `admin--blocks`, which
-  # disconnects and reconnects every tile and panel of `admin--section`. The
+  # The section's card is moved in the DOM by `admin--editor--blocks`, which
+  # disconnects and reconnects every tile and panel of `admin--editor--section`. The
   # open form must still be the one form open afterwards: pressing another
   # tile closes it instead of opening a second one beside it.
   test "a section moved with a form open still has one form open, and the next tile closes it" do
@@ -211,7 +211,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_selector panel(@right)
     assert_no_selector panel(@left)
     assert_selector "#{face(@left)}[aria-expanded='false']"
-    assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']", count: 1
+    assert_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']", count: 1
   end
 
   # A save refused as invalid leaves its error in a form that closing hides,
@@ -275,7 +275,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
     assert_no_selector tile(gone)
     assert_no_selector panel(gone), visible: :all
-    assert_no_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']"
+    assert_no_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']"
     assert_not ContentBlock.exists?(gone.id)
     # The header counted three; the delete's answer brings the new count.
     assert_selector "#section-#{@section.id}-summary", text: "2 columns · 2 blocks", exact_text: true
@@ -283,7 +283,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     find(face(@left)).click
 
     assert_selector panel(@left)
-    assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']", count: 1
+    assert_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']", count: 1
   end
 
   test "a section is added from the picker and a block added to its second lane opens at once" do
@@ -292,7 +292,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     within("#block-picker-end") { press "Section" }
-    assert_selector ".admin-section-card [data-admin--blocks-target='lane']", count: 2
+    assert_selector ".admin-section-card [data-admin--editor--blocks-target='lane']", count: 2
     section = plain.content_blocks.sole
 
     find("#block-picker-#{section.id}-2 button[aria-haspopup=menu]").click
@@ -329,7 +329,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
     assert_no_selector panel(@left)
     assert_selector "#{face(@left)}[aria-expanded='false']"
-    assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']", count: 1
+    assert_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']", count: 1
     assert_selector "#section-#{@section.id}-summary", text: "2 columns · 3 blocks"
     assert_writes_settled
     assert_equal "Held when the next block was added", @left.reload.caption
@@ -353,7 +353,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     @section.update!(settings: @section.settings.merge("layout" => "four"))
     far = @page.content_blocks.create!(block_type: "image", section: @section, section_column: 4, position: 0)
     open_editor
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 4
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 4
     find(face(@left)).click
     as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
     assert_equal 2, far.reload.section_column
@@ -362,7 +362,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     within("#block-picker-#{@section.id}-4") { press "Image" }
 
     assert_selector "#content-blocks-alert", text: "isn't a column of this section"
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 2
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 2
     assert_equal [ @right.id, far.id ], page.all("#section-#{@section.id}-lane-2 > .admin-block-tile").map { |tile| tile["data-block-id"].to_i }
     assert_no_selector "#block-picker-#{@section.id}-4", visible: :all
     assert_selector panel(@left)
@@ -383,9 +383,9 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     fill_in id: caption(@right), with: "Typed before the fold"
 
     find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-label='Layout']").click
-    find("button[data-admin--section-layout-param='one']").click
+    find("button[data-admin--editor--section-layout-param='one']").click
 
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 1
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 1
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
     assert_selector panel(@right), text: "Image · column 1"
     assert_selector "#section-#{@section.id}-summary", text: "1 column · 2 blocks"
@@ -401,7 +401,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     find(face(@right)).click
     find(layout_button).click
-    find("button[data-admin--section-layout-param='one']").click
+    find("button[data-admin--editor--section-layout-param='one']").click
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
 
     assert_selector "#{face(@right)}[aria-expanded='true']"
@@ -413,8 +413,8 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_no_text "CHANGED ELSEWHERE"
     assert_equal "Typed after the fold", @right.reload.caption
     find(layout_button).click
-    assert_selector "#{section_card} button[data-admin--section-layout-param='one'][aria-current='true']"
-    assert_selector "#{section_card} button[data-admin--section-layout-param][aria-current='true']", count: 1
+    assert_selector "#{section_card} button[data-admin--editor--section-layout-param='one'][aria-current='true']"
+    assert_selector "#{section_card} button[data-admin--editor--section-layout-param][aria-current='true']", count: 1
     assert_equal "one", @section.reload.settings["layout"]
   end
 
@@ -428,11 +428,11 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     # element clicks it first, which would be the pointer opening the menu.
     page.execute_script("document.querySelector(#{layout_button.to_json}).focus()")
     page.driver.browser.keyboard.type(:enter)
-    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--section-layout-param]", count: 6
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-layout-param]", count: 6
     # Opening focuses the first choice; two steps down is "Three columns".
     page.driver.browser.keyboard.type(:down, :down, :enter)
 
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 3
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 3
     assert_no_selector "#{section_card} [role=menu]"
     assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
     assert_writes_settled
@@ -444,7 +444,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     count_writes
     find(layout_button).click
-    find("button[data-admin--section-layout-param='two']").click
+    find("button[data-admin--editor--section-layout-param='two']").click
 
     assert_no_selector "#{section_card} [role=menu]"
     await_frames
@@ -459,10 +459,10 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "background" => "tinted" } }).ok? }
 
     find(layout_button).click
-    find("button[data-admin--section-layout-param='one']").click
+    find("button[data-admin--editor--section-layout-param='one']").click
 
     assert_selector "#block-#{@section.id}-save-status", text: "CHANGED ELSEWHERE"
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 2
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 2
     assert_equal 2, @right.reload.section_column
     assert_equal "two", @section.reload.settings["layout"]
   end
@@ -518,13 +518,13 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
     select "Tinted", from: "block-#{@section.id}-background"
     find(layout_button).click
-    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--section-layout-param]", count: 6
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-layout-param]", count: 6
 
     assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
     assert_writes_settled
     await_frames
     assert_equal "tinted", @section.reload.settings["background"]
-    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--section-layout-param]", count: 6
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-layout-param]", count: 6
     assert_selector "#{layout_button}[aria-expanded='true']"
   end
 
@@ -545,7 +545,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     JS
 
     find(layout_button).click
-    find("button[data-admin--section-layout-param='one']").click
+    find("button[data-admin--editor--section-layout-param='one']").click
     # Not `assert_writes_settled`: a form whose save failed is not settled.
     assert_eventually(message: "the layout was never sent") { page.evaluate_script("window.__writes") == 1 }
     assert_no_selector "#{section_card} [role=menu]"
@@ -554,9 +554,9 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     # The pick alone, with the menu closed: opening the menu moves the focus
     # inside the form, and a form whose save failed sends again on that by
     # itself -- which is not the rule this is about.
-    page.execute_script("document.querySelector(#{"#{section_card} button[data-admin--section-layout-param='one']".to_json}).click()")
+    page.execute_script("document.querySelector(#{"#{section_card} button[data-admin--editor--section-layout-param='one']".to_json}).click()")
 
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 1
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 1
     assert_writes_settled
     assert_equal 2, page.evaluate_script("window.__writes")
     assert_equal "one", @section.reload.settings["layout"]
@@ -593,7 +593,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
   # "Remove section, keep blocks" is the one action of a section that replaces
   # the forms of blocks that STAY: its answer draws a card for each in the
-  # section's place. So it runs only on a settled screen (`admin--queue-hold`
+  # section's place. So it runs only on a settled screen (`admin--saving--queue-hold`
   # on its form): a form paused by a 409 holds text that is nowhere else, and
   # the bar over it has promised that it is still there.
   test "Remove section, keep blocks does not run while a form holds text that was refused, and says so" do
@@ -762,7 +762,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
     assert_selector "#content-blocks-list > .admin-block-card", count: 1
     assert_no_selector ".admin-section-card"
-    assert_no_selector "[data-controller~='admin--section']"
+    assert_no_selector "[data-controller~='admin--editor--section']"
   end
 
   # ---- Moving by drag (sections spec §4.4; plan D8, D9) ----
@@ -774,14 +774,14 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   # samples the pointer; the tests named "the pointer ..." use the pointer for
   # real, and are what holds the Sortables' own wiring (handle, group, `put`).
 
-  def blocks_controller = "window.Stimulus.getControllerForElementAndIdentifier(document.querySelector('[data-controller~=\"admin--blocks\"]'), 'admin--blocks')"
+  def blocks_controller = "window.Stimulus.getControllerForElementAndIdentifier(document.querySelector('[data-controller~=\"admin--editor--blocks\"]'), 'admin--editor--blocks')"
 
   # Moves `block`'s element to the end of `target` (a CSS selector of a lane or
   # the list), or to its start, and sends it, as a drop there does.
   def drop_into(block, target, at: :end)
     page.execute_script(<<~JS)
       const controller = #{blocks_controller}
-      const item = document.querySelector('[data-block-id="#{block.id}"]:not([data-admin--section-target="panel"])')
+      const item = document.querySelector('[data-block-id="#{block.id}"]:not([data-admin--editor--section-target="panel"])')
       const from = item.parentElement
       const before = controller.snapshot()
       document.querySelector(#{target.to_json}).#{at == :start ? "prepend" : "append"}(item)
@@ -870,7 +870,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     drop_into(@left, "#content-blocks-list")
 
-    assert_selector "#content-blocks-list > .admin-block-card[data-block-id='#{@left.id}'] form[data-controller~='admin--autosave']"
+    assert_selector "#content-blocks-list > .admin-block-card[data-block-id='#{@left.id}'] form[data-controller~='admin--saving--autosave']"
     assert_no_selector panel(@left), visible: :all
     assert_selector "#section-#{@section.id}-summary", text: "2 columns · 1 block"
     assert_nil @left.reload.section_id
@@ -1099,7 +1099,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     drop_into(@left, lane(2))
 
     assert_selector "#content-blocks-alert", text: "That section or column no longer exists"
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 1
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 1
     assert_selector "#{lane(1)} > .admin-block-tile", count: 2
     assert_selector "#content-blocks-status", text: /COULDN.T SAVE/i
     assert_writes_settled
@@ -1386,7 +1386,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   end
 
   # What the list does with a block the pointer holds over a section's card
-  # (`admin--blocks#besideSection`): before it from its header, after it from
+  # (`admin--editor--blocks#besideSection`): before it from its header, after it from
   # below its lanes, and nothing level with them -- there a lane takes it.
   test "over a section's card the list puts a dragged block before or after it only from its edges" do
     other = @page.content_blocks.create!(block_type: "section", position: 1)
@@ -1398,7 +1398,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
         const controller = #{blocks_controller}
         const find = (id) => document.querySelector(`.admin-block-card[data-block-id="${id}"]`)
         const [section, other, card] = [#{@section.id}, #{other.id}, #{card.id}].map(find)
-        const lanes = section.querySelector('[data-admin--section-target="lanes"]').getBoundingClientRect()
+        const lanes = section.querySelector('[data-admin--editor--section-target="lanes"]').getBoundingClientRect()
         const ask = (dragged, related, y, willInsertAfter) => controller.besideSection({ dragged, related, willInsertAfter }, { clientY: y })
         const middle = (lanes.top + lanes.bottom) / 2
         return {
@@ -1643,9 +1643,9 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_selector "#{tile(@right)} button[data-move='column'][disabled]", visible: :all
 
     find(layout_button).click
-    find("#{section_card} [role=menuitem][data-admin--section-layout-param='two']").click
+    find("#{section_card} [role=menuitem][data-admin--editor--section-layout-param='two']").click
 
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 2
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 2
     assert_selector "#{tile(@left)} button[data-move='column']:not([disabled])", visible: :all
     assert_writes_settled
   end
@@ -1681,7 +1681,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
         page.all("option").map(&:text)
       select "Section 2 · column 3", from: "move-block-destination"
     end
-    page.execute_script("document.querySelector('#move-block-dialog button[data-action=\"admin--blocks#moveTo\"]').focus()")
+    page.execute_script("document.querySelector('#move-block-dialog button[data-action=\"admin--editor--blocks#moveTo\"]').focus()")
     keyboard.type(:enter)
 
     assert_eventually { block.reload.then { |b| [ b.section_id, b.section_column ] } == [ second.id, 3 ] }
@@ -1713,7 +1713,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
     within("#block-picker-end") { press "Section" }
 
-    assert_selector ".admin-section-card [data-admin--blocks-target='lane']", count: 2
+    assert_selector ".admin-section-card [data-admin--editor--blocks-target='lane']", count: 2
     assert_selector "#{scope} button[data-move='into']:not([disabled])", visible: :all
     assert_writes_settled
 
@@ -1737,7 +1737,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
     pick_by_keyboard(scope, "Move into section…")
     within("#move-block-dialog") { select "Section 1 · column 2", from: "move-block-destination" }
-    page.execute_script("document.querySelector('#move-block-dialog button[data-action=\"admin--blocks#moveTo\"]').focus()")
+    page.execute_script("document.querySelector('#move-block-dialog button[data-action=\"admin--editor--blocks#moveTo\"]').focus()")
     keyboard.type(:enter)
 
     assert_selector "#{lane(2)} > .admin-block-tile[data-block-id='#{block.id}']"
@@ -1856,7 +1856,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     keyboard.type(:tab, :tab, :enter)
 
     assert_selector "#content-blocks-alert", text: "That section or column no longer exists"
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 1
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 1
     assert_writes_settled
     assert_equal [ @left.id, @right.id ], tiles_in(1)
     assert_equal [ [ 1, 0 ], [ 1, 1 ] ], [ @left, @right ].map { |block| block.reload.then { |b| [ b.section_column, b.position ] } }
@@ -1865,7 +1865,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   end
 
   # A block whose form holds a refused save is not moved by a drop
-  # (`admin--blocks#move`), and not by the menu either: the same sender.
+  # (`admin--editor--blocks#move`), and not by the menu either: the same sender.
   test "a block whose form was refused is not moved from the menu: it stays, with its text, and takes the focus back" do
     open_editor
     find(face(@left)).click
@@ -1888,7 +1888,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
   # ---- Menu moves: an unavailable tile, what is announced, where the focus stays
 
-  def announced = page.evaluate_script("document.querySelector('[data-admin--blocks-target=\"announcer\"]').textContent")
+  def announced = page.evaluate_script("document.querySelector('[data-admin--editor--blocks-target=\"announcer\"]').textContent")
 
   # Spec §1: the grip moves an unavailable tile, so the menu does too.
   test "a tile of an unregistered type is moved along its lane and out of its section from the keyboard" do
@@ -2111,7 +2111,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_equal "Still editable", @left.reload.caption
   end
 
-  # Its lanes take nothing (`admin--blocks#closed`): the server has no column
+  # Its lanes take nothing (`admin--editor--blocks#closed`): the server has no column
   # of it to put a block in. Asked of the controller as SortableJS asks it.
   test "a lane of a section whose type is gone takes no block, sorts nothing and sends no order" do
     lose_the_sections_type

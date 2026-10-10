@@ -15,7 +15,7 @@ class Admin::DashboardScreen::QuickCreateComponentTest < ViewComponent::TestCase
     assert_selector "option[value=page]"
     assert_selector "button", text: "Create draft"
     assert_no_text "Upload image"
-    assert_selector "a[hidden][data-admin--dialog-id-param=new-page-dialog]", visible: :all
+    assert_selector "a[hidden][data-admin--ui--dialog-id-param=new-page-dialog]", visible: :all
     assert_no_selector "a:not([hidden])"
   end
 

@@ -105,7 +105,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
       press "Delete block…"
     end
 
-    assert_selector "dialog[open] [data-admin--notes-target=warning]", text: "This block has 2 open notes. They will be deleted with it."
+    assert_selector "dialog[open] [data-admin--notes--drawer-target=warning]", text: "This block has 2 open notes. They will be deleted with it."
     within("dialog[open]") { press "Delete block" }
 
     assert_no_selector marker(@text)
@@ -118,12 +118,12 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     open_editor
 
     # The section's own sentence (the handoff's decision 7), not the block's.
-    assert_selector "#delete-section-#{@section.id} [data-admin--notes-target=warning]", visible: :all, text: "This section and its blocks have 1 open note. It will be deleted too."
-    assert_selector "#delete-block-#{@inside.id} [data-admin--notes-target=warning]", visible: :all, text: "This block has 1 open note. It will be deleted with it."
-    assert_selector "#delete-block-#{@text.id} [data-admin--notes-target=warning]", visible: :all, text: ""
+    assert_selector "#delete-section-#{@section.id} [data-admin--notes--drawer-target=warning]", visible: :all, text: "This section and its blocks have 1 open note. It will be deleted too."
+    assert_selector "#delete-block-#{@inside.id} [data-admin--notes--drawer-target=warning]", visible: :all, text: "This block has 1 open note. It will be deleted with it."
+    assert_selector "#delete-block-#{@text.id} [data-admin--notes--drawer-target=warning]", visible: :all, text: ""
     # An empty warning takes no room in the dialog: the box that holds it alone
     # is not laid out, while the section's, which also holds a sentence, is.
-    holder_display = ->(dialog) { page.evaluate_script("getComputedStyle(document.querySelector('##{dialog} [data-admin--notes-target=warning]').parentElement).display") }
+    holder_display = ->(dialog) { page.evaluate_script("getComputedStyle(document.querySelector('##{dialog} [data-admin--notes--drawer-target=warning]').parentElement).display") }
     assert_equal "none", holder_display.call("delete-block-#{@text.id}")
     assert_equal "block", holder_display.call("delete-section-#{@section.id}")
     assert_equal "block", holder_display.call("delete-block-#{@inside.id}")
@@ -140,7 +140,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
       Notes::Start.call(second, body: "Too long")
     end
     open_editor
-    warning = "#delete-section-#{@section.id} [data-admin--notes-target=warning]"
+    warning = "#delete-section-#{@section.id} [data-admin--notes--drawer-target=warning]"
 
     assert_selector warning, visible: :all, text: "This section and its blocks have 3 open notes. They will be deleted too."
 
@@ -148,7 +148,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
       find("button[aria-label='Section actions']").click
       press "Delete section and its blocks…"
     end
-    assert_selector "dialog[open] [data-admin--notes-target=warning][data-notes-warning=section]", text: "This section and its blocks have 3 open notes. They will be deleted too."
+    assert_selector "dialog[open] [data-admin--notes--drawer-target=warning][data-notes-warning=section]", text: "This section and its blocks have 3 open notes. They will be deleted too."
     within("dialog[open]") { press "Delete section" }
 
     assert_no_selector card(@section)
@@ -163,7 +163,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
 
     # No marker of the section's own: the only markers in its card are its tiles'.
     assert_no_selector "#notes-marker-ContentBlock-#{@section.id}", visible: :all
-    assert_equal [ "notes-marker-ContentBlock-#{@inside.id}" ], all("#{card(@section)} [data-admin--notes-target=marker]", visible: :all).map { |marker| marker[:id] }
+    assert_equal [ "notes-marker-ContentBlock-#{@inside.id}" ], all("#{card(@section)} [data-admin--notes--drawer-target=marker]", visible: :all).map { |marker| marker[:id] }
     within(card(@section)) do
       find("button[aria-label='Section actions']").click
       assert_no_selector "button[aria-label='Section actions'] + [role=menu] button", text: "Add note"
@@ -236,7 +236,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
   # element in a new place, and nothing is drawn again. Out of its section it
   # is REPLACED by the answer (`move_streams`: a card where the tile was), and
   # the card's marker is a new element the server drew without a number: it
-  # shows the count only because `admin--notes` fills a marker that connects.
+  # shows the count only because `admin--notes--drawer` fills a marker that connects.
   # The old marker is tagged before each move, so "the count is there" is
   # asked of the element that was drawn again and of no other.
   test "a tile with a count that a move replaces by a card shows its count on the new card" do

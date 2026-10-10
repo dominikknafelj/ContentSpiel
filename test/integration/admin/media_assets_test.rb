@@ -38,8 +38,8 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
     asset = Media::Asset.last
     tile = Nokogiri::HTML.fragment(body["tile"])
     assert_equal "media-picker-asset-#{asset.id}", tile.at_css("li")["id"]
-    button = tile.at_css("button[data-action*='admin--media-select#select']")
-    assert_equal asset.id, JSON.parse(button["data-admin--media-select-asset-param"])["id"]
+    button = tile.at_css("button[data-action*='admin--media--select#select']")
+    assert_equal asset.id, JSON.parse(button["data-admin--media--select-asset-param"])["id"]
     assert_equal 1, body["counts"]["all"]
   end
 

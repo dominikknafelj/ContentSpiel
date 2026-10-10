@@ -36,7 +36,7 @@
     <%= select_tag :translation, options_for_select(TRANSLATIONS, filters[:translation]), include_blank: "Translation: Any", class: setup_select_class %>
   </div>
 
-  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <noscript><%= render Admin::Ui::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
   <% if active? %>
     <%= link_to "Clear", path, class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
   <% end %>

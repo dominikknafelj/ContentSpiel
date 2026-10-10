@@ -15,10 +15,10 @@ class Admin::Columns::PlainColumnComponentTest < ViewComponent::TestCase
 
   test "a soft counter counts code points and turns to a warning past its limit" do
     render_inline Admin::Columns::PlainColumnComponent.new(name: "meta_title", value: "ab😀", counter: 60)
-    assert_selector "[data-admin--char-count-target=output].text-meta", text: "3 / 60"
+    assert_selector "[data-admin--ui--char-count-target=output].text-meta", text: "3 / 60"
 
     render_inline Admin::Columns::PlainColumnComponent.new(name: "meta_title", value: "x" * 70, counter: 60)
-    assert_selector "[data-admin--char-count-target=output].text-warn-ink", text: "70 / 60 · long"
+    assert_selector "[data-admin--ui--char-count-target=output].text-warn-ink", text: "70 / 60 · long"
   end
 
   # Review C, M14: the counter describes the field instead of being a live
@@ -27,8 +27,8 @@ class Admin::Columns::PlainColumnComponentTest < ViewComponent::TestCase
     render_inline Admin::Columns::PlainColumnComponent.new(name: "meta_title", id: "page-meta_title", value: "abc", counter: 60)
 
     assert_selector "input#page-meta_title[aria-describedby='page-meta_title-count']"
-    assert_selector "#page-meta_title-count[data-admin--char-count-target=output]:not([aria-live])"
-    assert_selector "[data-admin--char-count-target=announcement][role=status].sr-only", visible: :all, text: ""
+    assert_selector "#page-meta_title-count[data-admin--ui--char-count-target=output]:not([aria-live])"
+    assert_selector "[data-admin--ui--char-count-target=announcement][role=status].sr-only", visible: :all, text: ""
 
     render_inline Admin::Columns::PlainColumnComponent.new(name: "meta_title", id: "page-meta_title", value: "abc", counter: 60, errors: [ "is bad" ])
     assert_selector "input[aria-invalid=true][aria-describedby='page-meta_title-count page-meta_title-errors']"

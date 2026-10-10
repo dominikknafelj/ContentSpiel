@@ -113,7 +113,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       assert_select PICK, count: 1
       assert_select "a[href*='selected=#{asset.id}']", count: 0
     end
-    payload = JSON.parse(css_select(PICK).first["data-admin--media-select-asset-param"])
+    payload = JSON.parse(css_select(PICK).first["data-admin--media--select-asset-param"])
     assert_equal({ "id" => asset.id, "url" => asset.src, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
   end
 
@@ -142,7 +142,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { picker: 1 }
 
     assert_select "turbo-frame#media-picker-grid form[data-turbo-frame='media-picker-grid']" do
-      assert_select "form[data-controller='admin--auto-submit']"
+      assert_select "form[data-controller='admin--ui--auto-submit']"
       assert_select "input[type=search][name=q]"
       assert_select "input[type=radio][name=filter]", count: 4
       assert_select "input[type=radio][value=untranslated]", count: 0
@@ -282,7 +282,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media"
 
-    assert_select "[data-admin--media-upload-target='status'][aria-live='polite']"
+    assert_select "[data-admin--media--upload-target='status'][aria-live='polite']"
   end
 
   # Final fix wave (M8): a forged non-String `q` (`?q[]=x`, `?q[a]=x`)
@@ -587,7 +587,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { selected: asset.id, q: "sel", filter: "unused", page: 1 }
     assert_response :success
-    assert_select "div #media-panel form[data-controller='admin--autosave'][action^='/cs-studio/media/#{asset.id}?']"
+    assert_select "div #media-panel form[data-controller='admin--saving--autosave'][action^='/cs-studio/media/#{asset.id}?']"
     assert_select "#media-panel form input[name='media_asset[alt]']"
     assert_select "#media-panel #media-save-status"
     assert_select "#media-asset-#{asset.id} a[aria-current='true']"
@@ -792,9 +792,9 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { selected: asset.id }
 
-    assert_select "[data-controller='admin--media-panel'] > div + div #media-panel[tabindex='-1']"
-    assert_no_match(/\border-[12]\b/, css_select("[data-controller='admin--media-panel']").first.to_s)
-    assert_select "#media-asset-#{asset.id} a[data-action='click->admin--media-panel#choose']"
+    assert_select "[data-controller='admin--media--panel'] > div + div #media-panel[tabindex='-1']"
+    assert_no_match(/\border-[12]\b/, css_select("[data-controller='admin--media--panel']").first.to_s)
+    assert_select "#media-asset-#{asset.id} a[data-action='click->admin--media--panel#choose']"
   end
 
   test "several files upload successfully, one request per file" do
@@ -880,7 +880,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
   private
 
-  PICK = "button[data-action*='admin--media-select#select']".freeze
+  PICK = "button[data-action*='admin--media--select#select']".freeze
 
   # A real, saved `Media::Asset` through the actual write path
   # (`Media::Upload`), with a custom logical filename independent of the

@@ -205,7 +205,7 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
   test "the set opens above its chip, and below it where row 1 leaves no room above" do
     last = as(users(:two)) { Array.new(2) { |index| Notes::Reply.call(@thread, body: "Reply #{index}\nwith\nseveral\nlines").record } }.last
     open_thread
-    panel = ->(note) { "#{set(note)} form[data-admin--note-reactions-target=panel]" }
+    panel = ->(note) { "#{set(note)} form[data-admin--notes--reactions-target=panel]" }
 
     add_chip(last).click
     assert_selector "#{set(last)}[open]:not([data-side])"

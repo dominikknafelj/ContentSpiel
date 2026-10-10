@@ -176,7 +176,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_equal "page", css_select("select[name=content_type] option").last["value"]
     assert_select "select[name=content_type] option", text: "Page"
     assert_select "a", text: "Upload image", count: 0
-    assert_select "form[action='#{admin_dashboard_draft_path}'] a[data-admin--dialog-id-param=new-page-dialog][hidden]", count: 1
+    assert_select "form[action='#{admin_dashboard_draft_path}'] a[data-admin--ui--dialog-id-param=new-page-dialog][hidden]", count: 1
     assert_select "a", text: /Full audit log/
   end
 

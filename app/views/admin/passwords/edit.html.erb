@@ -9,8 +9,8 @@
   <% end %>
 
   <%= form_with url: admin_update_password_path(params[:token]), method: :patch, class: "flex flex-col gap-[18px]" do |form| %>
-    <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, autofocus: true) %>
-    <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Repeat new password") %>
-    <%= render Admin::ButtonComponent.new(label: "Set password", type: "submit", class: "w-full", data: { password_submit: true }) %>
+    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, autofocus: true) %>
+    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Repeat new password") %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Set password", type: "submit", class: "w-full", data: { password_submit: true }) %>
   <% end %>
 </div>

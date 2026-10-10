@@ -2,7 +2,7 @@ module Admin
   module AuditScreen
     # The audit log's filters as one row of drop-downs (design pass round 3,
     # Task 15, handoff §4.9 and B30): User, Action, Type, Channel and a Date
-    # preset, applied as they change (`admin--auto-submit`, no Filter button;
+    # preset, applied as they change (`admin--ui--auto-submit`, no Filter button;
     # `FilterHelper#filter_form_options`). Choosing Custom submits at once and
     # the answer shows From and To beside the Date select, so no script beyond
     # the auto-submit one is needed; the same two inputs also work without any.

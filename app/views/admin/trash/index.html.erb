@@ -36,6 +36,6 @@
   <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
 <% else %>
   <%= render Admin::TrashScreen::ListComponent.new(items: @items, retention_days: @retention_days, tab: @tab, hidden_items: @hidden_items, url_options: admin_url_options) do |list| %>
-    <% list.with_footer { render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
+    <% list.with_footer { render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
   <% end %>
 <% end %>

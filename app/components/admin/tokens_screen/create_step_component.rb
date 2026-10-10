@@ -3,7 +3,7 @@ module Admin
     # Step 1 of the AI assistant page, "Create a token": a Name (required,
     # 1-60 characters, round 3 decision D2), a Group select with the selected
     # group's description on one line beneath (every option carries it in
-    # `data-description`, `admin--group-hint` swaps the text, so no request),
+    # `data-description`, `admin--tokens--group-hint` swaps the text, so no request),
     # and Create token.
     #
     # The form is a plain, non-Turbo POST (`data-turbo="false"`): the answer to
@@ -11,7 +11,7 @@ module Admin
     # a Turbo form submission would refuse (it demands a redirect) and a
     # redirect must never carry. With `raw_token:` -- only ever the
     # create response -- this step also shows the warn box, the token itself
-    # (`#api-token-value`, blanked on `pagehide` by `admin--token-reveal`) and
+    # (`#api-token-value`, blanked on `pagehide` by `admin--tokens--reveal`) and
     # Copy token; the form stays below it so another can be made.
     #
     # `name_errors:` / `group_errors:` print under their own field (a failed

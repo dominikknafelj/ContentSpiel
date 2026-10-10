@@ -23,21 +23,21 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     assert_selector "button[aria-haspopup='menu'][aria-label='Block actions']", text: "⋯"
     assert_equal [ "Add note", "Move up", "Move down", "Move to column…", "Move out of section", "Duplicate", "", "Delete block…" ], menu_items
-    assert_selector "[role=menu][data-action~='click->admin--menu#select']", visible: :all
-    assert_selector "[role=menu] button[data-move='up'][data-action='click->admin--blocks#moveUp']", visible: :all
-    assert_selector "[role=menu] button[data-move='down'][data-action='click->admin--blocks#moveDown']", visible: :all
-    assert_selector "[role=menu] button[data-move='out'][data-action='click->admin--blocks#moveOut']", visible: :all
+    assert_selector "[role=menu][data-action~='click->admin--ui--menu#select']", visible: :all
+    assert_selector "[role=menu] button[data-move='up'][data-action='click->admin--editor--blocks#moveUp']", visible: :all
+    assert_selector "[role=menu] button[data-move='down'][data-action='click->admin--editor--blocks#moveDown']", visible: :all
+    assert_selector "[role=menu] button[data-move='out'][data-action='click->admin--editor--blocks#moveOut']", visible: :all
     assert_selector "[role=menu] form[action$='/content_blocks/#{@block.id}/duplicate'][method='post']", visible: :all
     assert_selector "[role=menu] button.text-danger-ink", text: "Delete block…", visible: :all
   end
 
-  # One click, two actions, in this order: `admin--blocks` fills the dialog's
-  # choices from the screen, then `admin--dialog` shows it -- so opening,
+  # One click, two actions, in this order: `admin--editor--blocks` fills the dialog's
+  # choices from the screen, then `admin--ui--dialog` shows it -- so opening,
   # where the focus goes and where it returns are the dialog controller's own.
   test "Move to column… fills the Move dialog and then opens it" do
     render_tile
 
-    assert_selector "[role=menu] button[data-move='column'][data-action='click->admin--blocks#askWhere admin--dialog#open'][data-admin--dialog-id-param='move-block-dialog']",
+    assert_selector "[role=menu] button[data-move='column'][data-action='click->admin--editor--blocks#askWhere admin--ui--dialog#open'][data-admin--ui--dialog-id-param='move-block-dialog']",
       text: "Move to column…", visible: :all
   end
 
@@ -46,7 +46,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   test "the block's delete dialog is in the tile, with the delete form" do
     render_tile
 
-    assert_selector "[role=menu] button[data-admin--dialog-id-param='delete-block-#{@block.id}']", text: "Delete block…", visible: :all
+    assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='delete-block-#{@block.id}']", text: "Delete block…", visible: :all
     assert_selector ".admin-block-tile > dialog#delete-block-#{@block.id}[data-destructive]", visible: :all
     assert_selector "dialog#delete-block-#{@block.id}", text: "Blocks don’t go to the trash. This can’t be undone.", visible: :all
     assert_selector "dialog form[action$='/content_blocks/#{@block.id}'] input[name='_method'][value='delete']", visible: :all
@@ -62,10 +62,10 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     assert_selector ".admin-block-tile > .admin-block-tile__face"
     assert_selector ".admin-block-tile > *", count: 3, visible: :all
-    assert_selector ".admin-block-tile > div > [data-admin--notes-target=marker]", visible: :all
+    assert_selector ".admin-block-tile > div > [data-admin--notes--drawer-target=marker]", visible: :all
     assert_no_selector ".admin-block-tile__grip", visible: :all
     assert_equal [ "Add note" ], menu_items
-    assert_selector "[role=menu] button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all
+    assert_selector "[role=menu] button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes--drawer#open']", visible: :all
     assert_no_selector "[data-move]", visible: :all
     assert_no_selector "dialog", visible: :all
   end
@@ -103,8 +103,8 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     render_tile
     assert_selector "#notes-marker-ContentBlock-#{@block.id}"
-    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
-    assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
+    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes--drawer#open']", visible: :all, text: "Add note"
+    assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes--drawer-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
   end
 
   # The handoff's decision 6: at rest for nobody.

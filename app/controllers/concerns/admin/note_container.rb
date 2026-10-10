@@ -33,7 +33,7 @@ module Admin
         end
     end
 
-    # Which tab this is (`X-Notes-Tab`, set by `admin--notes-live` on its
+    # Which tab this is (`X-Notes-Tab`, set by `admin--notes--live` on its
     # notes requests): an id the tab made up, checked for shape
     # (`Notes::Signals::TAB`) and used for nothing but being echoed in the
     # record's signal, so the tab can tell its own change from someone

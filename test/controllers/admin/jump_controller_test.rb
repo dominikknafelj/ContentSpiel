@@ -44,10 +44,10 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
     get admin_jump_path(q: "new p")
 
     %w[page post].each do |kind|
-      assert_select "a[href=?][data-action='admin--command-palette#close admin--dialog#open'][data-admin--dialog-id-param=?]",
+      assert_select "a[href=?][data-action='admin--shell--command-palette#close admin--ui--dialog#open'][data-admin--ui--dialog-id-param=?]",
         public_send("new_admin_#{kind}_path"), "new-#{kind}-dialog", text: /New #{kind}/
     end
-    assert_select "a[data-admin--dialog-id-param]", count: 2
+    assert_select "a[data-admin--ui--dialog-id-param]", count: 2
   end
 
   test "the fragment echoes the trimmed, capped query it answered" do

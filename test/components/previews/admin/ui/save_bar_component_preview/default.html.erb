@@ -1,0 +1,7 @@
+<form id="preview-form" class="max-w-md" data-controller="admin--saving--save-bar"
+      data-action="input->admin--saving--save-bar#refresh change->admin--saving--save-bar#refresh turbo:submit-start->admin--saving--save-bar#markSubmitting"
+      onsubmit="return false">
+  <label class="font-cs-mono text-label uppercase tracking-mono text-meta" for="preview_name">Name</label>
+  <input id="preview_name" name="name" value="Ada" class="block w-full rounded-cs border border-line-strong bg-surface px-3 py-2">
+  <%= render Admin::Ui::SaveBarComponent.new(form_id: "preview-form", cancel_url: "#") %>
+</form>

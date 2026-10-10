@@ -8,7 +8,7 @@ module Admin
     # language tabs, an autosaving title/alt/caption form (`Media::Save`,
     # alt/caption per locale), "Used on" and Move to trash with its help text.
     # The form is the detail page's own, moved: it saves through the write
-    # queue (`admin--autosave`) and its answer (`Admin::MediaController#update`)
+    # queue (`admin--saving--autosave`) and its answer (`Admin::MediaController#update`)
     # also moves the tile and the segment counts, so nothing reloads under the
     # typing editor. The panel is narrower than 880px, so the translation pair
     # stacks on its own (`container-type` on the form).
@@ -17,7 +17,7 @@ module Admin
     # the editors' drawer shows, in place -- this screen has no drawer, so a
     # thread opens where the list was. It stands OUTSIDE the autosave form:
     # the frame brings forms of its own, a form cannot nest, and inside an
-    # `admin--autosave` form a note's field would be the image's. Anyone who
+    # `admin--saving--autosave` form a note's field would be the image's. Anyone who
     # may open the panel may read and write notes there (`media.upload`,
     # `Admin::NoteContainer`), whether or not the image is theirs to edit.
     #
@@ -87,18 +87,18 @@ module Admin
       end
 
       # The image's counts as the page loaded them (`#notes-counts`), which
-      # `admin--notes` on <body> reads; every answer of the frame brings a
+      # `admin--notes--drawer` on <body> reads; every answer of the frame brings a
       # newer copy. Read here and not left to the frame, because that
       # controller keeps the last counts it saw: the panel of the image chosen
       # next would show the last image's number until its own frame had loaded.
       def note_counts = @note_counts ||= ::Notes::Counts.for_container(asset, user: Current.user)
 
       # "Notes · 2 open" (in mono capitals, the handoff's header). The number
-      # is an `admin--notes` `total`, like the one beside the drawer's title,
+      # is an `admin--notes--drawer` `total`, like the one beside the drawer's title,
       # so it follows a note added or resolved in the frame below.
       def notes_open
         total = note_counts.fetch("total").to_i
-        t(".notes_open_html", number: tag.span(total, hidden: total.zero?, data: { "admin--notes-target": "total" }))
+        t(".notes_open_html", number: tag.span(total, hidden: total.zero?, data: { "admin--notes--drawer-target": "total" }))
       end
 
       def status_id = "media-save-status"
@@ -116,9 +116,9 @@ module Admin
         return {} unless editable?
 
         {
-          controller: "admin--autosave",
-          action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-          "admin--autosave-status-id-value": status_id
+          controller: "admin--saving--autosave",
+          action: "input->admin--saving--autosave#queue change->admin--saving--autosave#queue focusout->admin--saving--autosave#saveNow",
+          "admin--saving--autosave-status-id-value": status_id
         }
       end
 
@@ -130,7 +130,7 @@ module Admin
       # reader -- this is the asset's own literal default in the locale
       # being edited, the same "no cross-locale fallback while editing"
       # rule every other translated column's own admin field already
-      # follows (`Admin::BlockCardComponent#value_for`'s own comment).
+      # follows (`Admin::EditorScreen::BlockCardComponent#value_for`'s own comment).
       def alt_value = asset.alt(locale: locale)
 
       def caption_value = asset.caption(locale: locale)
@@ -159,7 +159,7 @@ module Admin
       # See `Admin::EditorScreen::HeaderComponent#switcher_locales`.
       def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(asset)
 
-      # See `Admin::PageSettingsFormComponent#translation`.
+      # See `Admin::EditorScreen::PageSettingsFormComponent#translation`.
       def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(asset, field, locale: locale, confirmable: editable?)
 
       # The tabs keep `selected` and the grid's state; only the language changes.

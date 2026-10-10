@@ -1,0 +1,139 @@
+# CS Studio's shared building blocks, the components in `app/components/admin/ui/`
+# (docs/reference/i18n.md); every other component folder has its own file,
+# `config/locales/admin/<folder>.en.yml`. A component's keys are
+# `admin.components.ui.<its class name without Admin::Ui:: and Component, underscored>`:
+# `Admin::Ui::ConfirmDialogComponent#t(".cancel")` reads
+# `admin.components.ui.confirm_dialog.cancel`. Strings a script shows sit here too,
+# beside the component whose server-rendered text they repeat, and reach the script
+# through `messages_data` (`app/helpers/admin/messages_helper.rb`) -- one key for the
+# server's render and the script's, so they cannot drift.
+#
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      ui:
+        dialog:
+          close: "Close"
+
+        confirm_dialog:
+          cancel: "Cancel"
+
+        toast:
+          dismiss: "Dismiss"
+          # What the layout's `<template id="toast-error-template">` is cloned
+          # with when a save got no answer at all, and the two sentences a
+          # script puts into a clone of it (`saving/order_request.js`,
+          # `saving/promotion_hold.js`).
+          save_failed: "Couldn't save."
+          order_failed: "Couldn't save the new order. Check your connection and try again."
+          dropped: "That didn't go through — the screen changed. Try again."
+
+        save_bar:
+          save: "Save"
+          cancel: "Cancel"
+          # The footer's count line, written by `admin--saving--save-bar`.
+          changes:
+            one: "%{count} unsaved change"
+            other: "%{count} unsaved changes"
+          unsaved: "Unsaved changes"
+          no_changes: "No unsaved changes"
+          # Shown while another form on the screen has to be saved first; also
+          # `admin--saving--pending-lock`'s hint on an instant action.
+          blocked: "Save or cancel your changes first."
+
+        save_status:
+          saving: "SAVING…"
+          saving_live: "SAVING TO SITE…"
+          saved: "SAVED"
+          saved_at: "SAVED %{time}"
+          saved_live: "● SAVED TO SITE"
+          saved_live_at: "● SAVED TO SITE %{time}"
+          error:
+            one: "Couldn't save — %{count} problem"
+            other: "Couldn't save — %{count} problems"
+          forbidden: "Not saved — you don't have permission to change this"
+          retrying: "NOT SAVED · RETRYING…"
+          offline: "NOT SAVED · "
+          stale: "● CHANGED ELSEWHERE"
+          saved_over: "SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST"
+          signed_out: "Signed out — sign in again to keep saving"
+          retry: "Retry"
+
+        status_chip:
+          labels:
+            draft: "Draft"
+            scheduled: "Scheduled"
+            live: "Live"
+
+        translation_chip:
+          aria_label:
+            complete: "%{language}: translated"
+            missing: "%{language}: not translated"
+            outdated: "%{language}: outdated"
+          tooltip:
+            complete: "Translated"
+            missing: "Not translated"
+            outdated: "%{language} changed since translation"
+
+        language_tabs:
+          nav_label: "Languages"
+          missing_title: "Missing required fields"
+          missing: "%{language}: not translated"
+          outdated_title: "Original changed"
+          outdated: "%{language}: original changed"
+          more: "+%{count} ▾"
+
+        pagination:
+          nav_label: "Pagination"
+          range: "%{first}–%{last} OF %{total}"
+          previous: "Previous"
+          next: "Next"
+
+        time_ago:
+          just_now: "just now"
+          minutes_ago:
+            one: "%{count}m ago"
+            other: "%{count}m ago"
+          hours_ago:
+            one: "%{count}h ago"
+            other: "%{count}h ago"
+          yesterday: "yesterday"
+          days_ago:
+            one: "%{count}d ago"
+            other: "%{count}d ago"
+
+        error_summary:
+          # A field's name and the model's message, in the order a language wants.
+          sentence: "%{field} %{message}"
+          heading:
+            one: "%{count} thing needs fixing"
+            other: "%{count} things need fixing"
+
+        chip_input:
+          # The two sentences that name what the chips are, by the caller's
+          # `noun:`, each whole so a translator can inflect the noun in it. A new
+          # noun is a new entry here.
+          nouns:
+            tag:
+              no_matches: "No matching tags."
+              create: "Create tag “%{label}”"
+            user:
+              no_matches: "No matching users."
+              create: "Create user “%{label}”"
+            post:
+              no_matches: "No matching posts."
+              create: "Create post “%{label}”"
+          remove: "Remove %{label}"
+          invalid: "(invalid)"
+          untitled: "(untitled)"
+          too_long: "(too long)"
+          suggestions_label: "%{label} suggestions"
+          results:
+            one: "%{count} suggestion."
+            other: "%{count} suggestions."
+          search_failed: "Search failed — try again."
+          already_added: "%{label} is already added."
+          added: "Added %{label}."
+          removed: "Removed %{label}."

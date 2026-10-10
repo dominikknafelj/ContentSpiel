@@ -14,7 +14,7 @@
     <% end %>
   </header>
   <% if rows.empty? %>
-    <%= render Admin::EmptyStateComponent.new(title: empty) %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: empty) %>
   <% else %>
     <ul class="px-4">
       <% visible_rows.each do |row| %>

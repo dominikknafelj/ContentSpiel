@@ -65,7 +65,7 @@ class InlineHandlersTest < ActiveSupport::TestCase
       %(<x-thing onwhatever="x">) ].each do |sample|
       assert_match HTML_ATTRIBUTE, sample
     end
-    [ %(<button data-action="click->admin--dialog#open">), %(<div data-controller="x" aria-controls="only">), %(<p>once = twice</p>),
+    [ %(<button data-action="click->admin--ui--dialog#open">), %(<div data-controller="x" aria-controls="only">), %(<p>once = twice</p>),
       %(only = "x"), %(onStart: (event) => this.start(event)), %(new Sortable(list, { onEnd: done })), %(<form data-turbo-confirm="on = off">x</form>),
       %(for (let i = 0; i < count; i++) { once = true }), %(<option value="on">on = default</option>) ].each do |sample|
       assert_no_match HTML_ATTRIBUTE, sample

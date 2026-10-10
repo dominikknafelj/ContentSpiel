@@ -126,7 +126,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "data-open"
     assert_includes response.body, "1 block"
     assert_select "turbo-stream[action=append][target='section-#{section.id}-panels'] template" do
-      assert_select "#block-#{block.id}-panel[hidden][data-open][data-admin--section-target='panel']"
+      assert_select "#block-#{block.id}-panel[hidden][data-open][data-admin--editor--section-target='panel']"
     end
     assert_select "turbo-stream[action=append][target='section-#{section.id}-lane-2'] template" do
       assert_select "##{ActionView::RecordIdentifier.dom_id(block)}.admin-block-tile .admin-block-tile__face[aria-expanded='true']"
@@ -178,7 +178,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "turbo-stream[action=replace][target='content-blocks-alert'] template", text: /isn't a column of this section/
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-lanes'] template" do
-      assert_select "#section-#{section.id}-lanes [data-admin--blocks-target='lane']", count: 2
+      assert_select "#section-#{section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 2
       assert_equal [ kept.id, folded.id ], css_select("#section-#{section.id}-lane-2 > .admin-block-tile").map { |tile| tile["data-block-id"].to_i }
       assert_select "#section-#{section.id}-lane-4", count: 0
     end
@@ -215,7 +215,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target='block-#{stays.id}-panel']", count: 0
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "1 column · 2 blocks"
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template" do
-      assert_select "button[data-admin--section-layout-param='one'][aria-current='true']"
+      assert_select "button[data-admin--editor--section-layout-param='one'][aria-current='true']"
       assert_select "button[aria-current='true']", count: 1
     end
     assert_select "turbo-stream[action=replace][target='block-#{section.id}-base-updated-at']"
@@ -241,7 +241,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
-    assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--section-layout-param='one_two'][aria-current='true']"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--editor--section-layout-param='one_two'][aria-current='true']"
   end
 
   test "the first save of a section that stores no settings yet is no change of layout" do
@@ -325,8 +325,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal [ before.id, left.id, right.id ], @page.content_blocks.top_level.reorder(:position).ids
     assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(section)}'] template" do
-      assert_equal [ left.id, right.id ], css_select(".admin-block-card[data-admin--blocks-target='card']").map { |card| card["data-block-id"].to_i }
-      assert_select "[data-admin--section-target]", count: 0
+      assert_equal [ left.id, right.id ], css_select(".admin-block-card[data-admin--editor--blocks-target='card']").map { |card| card["data-block-id"].to_i }
+      assert_select "[data-admin--editor--section-target]", count: 0
       assert_select "##{ActionView::RecordIdentifier.dom_id(left)} button[data-move='up']:not([disabled])"
       assert_select "##{ActionView::RecordIdentifier.dom_id(right)} button[data-move='down'][disabled]"
     end
@@ -431,15 +431,15 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@page.id}"
     assert_response :success
     assert_select "#content-blocks-list > .admin-block-card", count: 2
-    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card[data-controller~='admin--section']"
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card[data-controller~='admin--editor--section']"
     assert_select "#section-#{section.id}-lane-2 > ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-tile"
     assert_select "#section-#{section.id}-panels > #block-#{inside.id}-panel[hidden] form[action$='/content_blocks/#{inside.id}']"
-    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--blocks-target='card']"
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--editor--blocks-target='card']"
 
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
     assert_response :success
     assert_select ".admin-section-card", count: 0
-    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}[data-admin--blocks-target='card']"
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}[data-admin--editor--blocks-target='card']"
   end
 
   # Sections spec §4.5. Until the translation view was built a translation tab
@@ -455,11 +455,11 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       assert_select "#content-blocks-list > *", count: 2
-      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group[data-admin--blocks-target='card'] > h3", text: "Section"
+      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group[data-admin--editor--blocks-target='card'] > h3", text: "Section"
       assert_equal [ left.id, right.id ], css_select(".admin-section-group > .admin-block-card").map { |card| card["data-block-id"].to_i }
-      assert_select "##{ActionView::RecordIdentifier.dom_id(right)} form[action$='/content_blocks/#{right.id}?locale=de'][data-controller~='admin--autosave'] .admin-translation-pair", text: /Right original/
-      assert_select ".admin-block-tile, [data-admin--blocks-target='lane'], [data-admin--section-target]", count: 0
-      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--blocks-target='card'] .admin-block-card__handle"
+      assert_select "##{ActionView::RecordIdentifier.dom_id(right)} form[action$='/content_blocks/#{right.id}?locale=de'][data-controller~='admin--saving--autosave'] .admin-translation-pair", text: /Right original/
+      assert_select ".admin-block-tile, [data-admin--editor--blocks-target='lane'], [data-admin--editor--section-target]", count: 0
+      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--editor--blocks-target='card'] .admin-block-card__handle"
     end
   end
 
@@ -504,7 +504,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card.border-danger", text: /Unavailable type — gone\/section/
     assert_select "#section-#{section.id}-lane-1[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(first)}.admin-block-tile"
     assert_select "#section-#{section.id}-lane-3[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(third)}.admin-block-tile"
-    assert_select "#section-#{section.id}-panels > #block-#{first.id}-panel form[data-controller~='admin--autosave']"
+    assert_select "#section-#{section.id}-panels > #block-#{first.id}-panel form[data-controller~='admin--saving--autosave']"
     assert_select "[id^='block-picker-#{section.id}-']", count: 0
   end
 
@@ -539,7 +539,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal [ first.id, third.id ], @page.content_blocks.top_level.reorder(:position).ids
     assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(section)}'] template" do
-      assert_equal [ first.id, third.id ], css_select(".admin-block-card[data-admin--blocks-target='card']").map { |card| card["data-block-id"].to_i }
+      assert_equal [ first.id, third.id ], css_select(".admin-block-card[data-admin--editor--blocks-target='card']").map { |card| card["data-block-id"].to_i }
     end
   end
 
@@ -553,7 +553,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
       statements = capture_sql { delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream }
       assert_response :success
-      assert_select "turbo-stream[action=replace] template .admin-block-card[data-admin--blocks-target='card']", count: size
+      assert_select "turbo-stream[action=replace] template .admin-block-card[data-admin--editor--blocks-target='card']", count: size
       statements.count { |sql| sql.start_with?('SELECT "content_blocks".*') }
     end
 
@@ -568,7 +568,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_nil third.reload.section_id
     assert_equal section.id, first.reload.section_id
-    assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(third)}'] template .admin-block-card[data-admin--blocks-target='card']"
+    assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(third)}'] template .admin-block-card[data-admin--editor--blocks-target='card']"
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-delete-count'] template", text: "This also deletes the 1 block in it."
   end
 
@@ -603,7 +603,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   # One "Add block" row at the end of the list (design pass round 2): the
   # between-cards pickers are gone, so an append only streams the new card in
   # before that row -- nothing about the previously-last card changes (its
-  # Move down is re-enabled client-side, `admin--blocks#refreshMoveState`).
+  # Move down is re-enabled client-side, `admin--editor--blocks#refreshMoveState`).
   test "adding a block appends its card to the list and replaces nothing else" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
 
@@ -686,7 +686,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
   test "typed-setting errors name their field in words in the block's error slot" do
     block = @page.content_blocks.create!(block_type: "post_list", position: 0)
-    prefix = Admin::BlockCardComponent.error_prefix(block)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
 
     patch "#{blocks_path}/#{block.id}", params: { block: { settings: { limit: "0" } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :unprocessable_entity
@@ -890,12 +890,12 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   test "an image block's card shows the picker field and the image's defaults as the overrides' placeholders" do
     block = image_block_with_image
     block.media_asset.update!(alt: "A dog", caption: "Our dog")
-    prefix = Admin::BlockCardComponent.error_prefix(block)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
 
     get "/cs-studio/pages/#{@page.id}"
     assert_response :success
 
-    assert_select "##{prefix}-image-section[data-controller='admin--media-field']" do
+    assert_select "##{prefix}-image-section[data-controller='admin--media--field']" do
       assert_select "p", text: "Image"
       assert_select "input[type=hidden][name='block[media_asset_id]'][value='#{block.media_asset_id}']"
       assert_select "button", text: "Change image"
@@ -904,7 +904,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "input[name='block[alt]'][placeholder='A dog']"
     assert_select "input[name='block[caption]'][placeholder='Our dog']"
     assert_equal({ "alt" => "#{prefix}-alt", "caption" => "#{prefix}-caption" },
-      JSON.parse(css_select("##{prefix}-image-section").first["data-admin--media-field-placeholder-ids-value"]))
+      JSON.parse(css_select("##{prefix}-image-section").first["data-admin--media--field-placeholder-ids-value"]))
   end
 
   # Every autosave resends the hidden input's stored id -- a no-op.
@@ -953,16 +953,16 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       params: { block: { media_asset_id: (Media::Asset.maximum(:id) + 1).to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :unprocessable_entity
 
-    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-errors")
+    assert_includes response.body, %(target="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-errors")
     assert_includes response.body, "Image doesn&#39;t exist"
     assert_equal previous, block.reload.media_asset
 
     # Fix round 1 (I2): the field comes back with the stored image and the
     # message inside it.
-    section = response.body.index(%(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section"))
+    section = response.body.index(%(target="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section"))
     assert section, "expected a stream replacing the image field"
     field = response.body[section..]
-    assert_includes field, %(name="block[media_asset_id]" id="#{Admin::BlockCardComponent.error_prefix(block)}-image" value="#{previous.id}")
+    assert_includes field, %(name="block[media_asset_id]" id="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image" value="#{previous.id}")
     assert_includes field, "Image doesn&#39;t exist"
   end
 
@@ -982,7 +982,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     assert_equal stored, block.reload.media_asset
     assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
-    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section")
+    assert_includes response.body, %(target="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section")
   end
 
   # Final fix wave (T6), pinning the Task 6 ruling: a duplicate chooses its

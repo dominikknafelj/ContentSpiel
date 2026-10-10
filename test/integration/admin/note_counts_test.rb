@@ -62,8 +62,8 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     # The handoff's header, "NOTES · 1 OPEN": the number follows the counts
     # every answer of the frame brings, and the page has its own copy.
     assert_select "#media-notes h3", text: /\ANotes\s+·\s+1 open\z/
-    assert_select "#media-notes h3 [data-admin--notes-target=total]", text: "1"
-    assert_select "#media-notes #notes-counts[data-admin--notes-target=counts]"
+    assert_select "#media-notes h3 [data-admin--notes--drawer-target=total]", text: "1"
+    assert_select "#media-notes #notes-counts[data-admin--notes--drawer-target=counts]"
     # No drawer on this screen (the spec wins over the handoff's "Open in drawer").
     assert_select "aside#notes-drawer", count: 0
     # Asked of the frame's own answer: in the page above the frame is not loaded yet.
@@ -77,10 +77,10 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     # The panel is the image's autosaving form, and a form cannot nest: the
     # frame brings forms of its own, and inside an autosave form a note's
     # field would be the image's.
-    assert_select "#media-panel form[data-controller~='admin--autosave']"
+    assert_select "#media-panel form[data-controller~='admin--saving--autosave']"
     assert_select "#media-panel form #media-notes", count: 0
     assert_select "form turbo-frame#notes", count: 0
-    assert_select "[data-controller~='admin--autosave'] turbo-frame#notes", count: 0
+    assert_select "[data-controller~='admin--saving--autosave'] turbo-frame#notes", count: 0
 
     get "/cs-studio/media", params: { picker: 1 }
     assert_select "[data-notes-chip]", count: 0
@@ -97,7 +97,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { selected: quiet.id }
 
-    assert_select "#media-notes h3 [data-admin--notes-target=total][hidden]"
+    assert_select "#media-notes h3 [data-admin--notes--drawer-target=total][hidden]"
     assert_select "#media-asset-#{quiet.id} [data-notes-chip]", count: 0
   end
 
@@ -107,7 +107,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { selected: @asset.id }
 
     assert_response :success
-    assert_select "#media-panel form[data-controller~='admin--autosave']", count: 0
+    assert_select "#media-panel form[data-controller~='admin--saving--autosave']", count: 0
     assert_select "#media-panel #media-notes turbo-frame#notes"
   end
 

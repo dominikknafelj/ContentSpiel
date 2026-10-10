@@ -20,7 +20,7 @@
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <header class="flex items-center justify-between px-7 py-5">
       <%= link_to "CONTENT·SPIEL", admin_sign_in_path, class: "font-cs text-xs font-bold uppercase tracking-wide text-ink" %>
-      <%= render Admin::ThemeSwitchComponent.new %>
+      <%= render Admin::Ui::ThemeSwitchComponent.new %>
     </header>
     <main class="px-[22px] pb-16 pt-16">
       <div class="mx-auto w-full max-w-[360px]"><%= yield %></div>

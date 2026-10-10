@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The chip input (`Admin::ChipInputComponent`, `admin--chip-input`) on the post
+# The chip input (`Admin::Ui::ChipInputComponent`, `admin--ui--chip-input`) on the post
 # editor: tags with autocomplete and "Create tag", related posts with the
 # type dot and status, keyboard-only use, and the rule that searching alone
 # never saves.
@@ -28,7 +28,7 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     assert_selector "#post-tag_names-listbox [role=option]", text: "rails"
     tag_field.send_keys(:down, :enter)
 
-    assert_selector "[data-controller~='admin--chip-input'] li", text: "rails"
+    assert_selector "[data-controller~='admin--ui--chip-input'] li", text: "rails"
     assert saved?
     assert_equal [ "rails" ], @post.tags.reload.map(&:name)
 

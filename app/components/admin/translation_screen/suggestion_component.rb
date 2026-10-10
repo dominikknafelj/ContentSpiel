@@ -16,14 +16,14 @@ module Admin
     # field's own input (`admin/shared/_translation_box`), in the `.admin-
     # translation-suggestion` class that stops the textarea turning red with
     # the field's error. Its `input`/`change`/`focusout` are stopped at the
-    # box (`admin--translate#contain`): the box sits inside the autosave
+    # box (`admin--translation--translate#contain`): the box sits inside the autosave
     # `<form>`, whose listeners would otherwise save on every edit of text
     # that is not a field yet.
     #
-    # Nothing here saves anything: **Use** is `admin--translate#use`, which
+    # Nothing here saves anything: **Use** is `admin--translation--translate#use`, which
     # fills the input named by `data-translate-input-id` (a plain field's
     # value plus a bubbling `input` event; a rich-text body through a
-    # `translate:use` event its `admin--rich-text` handles) and lets that
+    # `translate:use` event its `admin--rich-text--editor` handles) and lets that
     # form's own autosave write it, as an ordinary edit (Review Focus 4).
     #
     # The suggestion only ever reaches the page escaped: plain text as a
@@ -90,10 +90,10 @@ module Admin
       def rows = [ suggestion.to_s.lines.count, 2 ].max
 
       # A plain suggestion's text is NOT carried on Use: Use reads the
-      # editable textarea's current value (`admin--translate#use`), so what
+      # editable textarea's current value (`admin--translation--translate#use`), so what
       # the editor changed by hand is what gets applied.
       def use_data
-        data = { action: "admin--translate#use", translate_use: true, translate_kind: rich? ? "rich" : "plain", translate_input_id: input_id }
+        data = { action: "admin--translation--translate#use", translate_use: true, translate_kind: rich? ? "rich" : "plain", translate_input_id: input_id }
         return data unless rich?
 
         lookups = Admin::Columns::RichTextColumnComponent.new(name: "body", value: suggestion, locale: locale)

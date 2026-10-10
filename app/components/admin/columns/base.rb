@@ -2,23 +2,23 @@ module Admin
   module Columns
     # Shared shape for the "opted-in column" field components (spec §4.3):
     # unlike `Admin::Fields::*`, which render a schema field named under a
-    # `form_name` prefix supplied by `FieldComponent`, a column field edits
+    # `form_name` prefix supplied by `Ui::FieldComponent`, a column field edits
     # an existing AR column directly (`page.title`, `post.body`, a block's
     # `caption`) and is named by that bare column name -- there's no prefix
     # to compute, since the record's own `update`/save endpoint reads
     # `params[name]` straight off the top level. `original`/`errors` follow
-    # the same convention `FieldComponent` gives every schema field, so a
+    # the same convention `Ui::FieldComponent` gives every schema field, so a
     # page/post editor can lay out its typed fields and its column fields
     # side by side with identical read-only-original and error-slot
     # behaviour.
     class Base < Admin::AdminComponent
       # `id:`/`html_name:` exist for exactly one caller so far
-      # (`Admin::PageSettingsFormComponent`, cs-studio spec §5.1/Task 4): a
+      # (`Admin::EditorScreen::PageSettingsFormComponent`, cs-studio spec §5.1/Task 4): a
       # page/post editor's own top-level form needs its inputs named with
       # bracket notation (`page[title]`) so the params it PATCHes arrive
       # nested the way `Admin::PagesController#update` expects, but the
       # *id* every Turbo Stream error-slot replace targets has to be
-      # bracket-free to agree with `Admin::FieldComponent.error_id`'s
+      # bracket-free to agree with `Admin::Ui::FieldComponent.error_id`'s
       # dash-joined `"#{prefix}-#{field}"` format -- Turbo resolves a
       # stream's `target` with `getElementById`, which tolerates brackets
       # just fine, but a *mismatched* id between what this renders and what
@@ -35,7 +35,7 @@ module Admin
       # caller's to work out: only it knows the record behind the value.
       #
       # `**html` is the same "anything else passes through" escape hatch
-      # `Admin::ButtonComponent` already uses, needed here so a caller can
+      # `Admin::Ui::ButtonComponent` already uses, needed here so a caller can
       # wire a Stimulus target/action onto the actual `<input>` (the live
       # slug-preview controller, Task 4) without this component knowing
       # anything about that controller.

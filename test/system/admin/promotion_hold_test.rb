@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The promotion hold (`app/javascript/autosave/promotion_hold.js`, "THE PROMOTION
+# The promotion hold (`app/javascript/saving/promotion_hold.js`, "THE PROMOTION
 # HOLD"). A link into `#content` is a frame navigation that Turbo promotes to
 # a page visit once the frame has rendered, and that visit's start stops any
 # form submission Turbo's session is running: the POST is done on the server,
@@ -170,7 +170,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     visit admin_posts_path
     await_admin_controllers
     find("#select-post-#{draft.id}").click
-    within("[data-admin--bulk-select-target=bar]") { press "Move to trash" }
+    within("[data-admin--posts--bulk-select-target=bar]") { press "Move to trash" }
     assert_selector "dialog#bulk-trash-dialog[open]"
     hold_frame_fetches
     count_writes
@@ -323,7 +323,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-editor-header button:not([disabled])", text: "Publish"
   end
 
-  # `admin--queue-hold` drains first and submits again itself: with both
+  # `admin--saving--queue-hold` drains first and submits again itself: with both
   # holds in the way the action still runs exactly once. The press is made in
   # the NEW content, between its render and the promoted visit's end -- the
   # header a re-render replaced is gone, and a press on it is dropped.

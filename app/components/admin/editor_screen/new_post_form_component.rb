@@ -16,7 +16,7 @@ module Admin
     # (`PublicSite::Paths.canonical_pages`, asked once for an unsaved post of
     # every creatable type), so each radio carries `data-path`: that page's path in the editing
     # language, locale prefix included, no trailing slash -- blank when no page
-    # lists the type, which is what makes `admin--new-record` print the
+    # lists the type, which is what makes `admin--editor--new-record` print the
     # "Not listed" line. The first type is preselected unless one was asked for
     # (a split button's type, the posts list) or typed before a refusal.
     class NewPostFormComponent < Admin::AdminComponent

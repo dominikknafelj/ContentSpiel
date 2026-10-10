@@ -1,4 +1,4 @@
-<section class="rounded-cs border border-line bg-surface p-4" data-controller="admin--group-hint">
+<section class="rounded-cs border border-line bg-surface p-4" data-controller="admin--tokens--group-hint">
   <h2 class="text-h2 text-ink">1 · Create a token</h2>
 
   <% if raw_token %>
@@ -7,12 +7,12 @@
     <div class="mt-3 rounded-cs border border-warn bg-warn-tint p-3">
       <p role="status" class="font-semibold text-warn-ink">Copy this token now. It won't be shown again.</p>
       <div class="mt-2 flex flex-wrap items-start gap-2">
-        <pre id="api-token-value" data-admin--token-reveal-target="secret"
+        <pre id="api-token-value" data-admin--tokens--reveal-target="secret"
           class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= raw_token %></pre>
-        <%= render Admin::ButtonComponent.new(label: "Copy token", variant: :secondary,
-              data: { action: "admin--token-reveal#copy", "admin--token-reveal-source-param": "api-token-value" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Copy token", variant: :secondary,
+              data: { action: "admin--tokens--reveal#copy", "admin--tokens--reveal-source-param": "api-token-value" }) %>
       </div>
-      <p data-admin--token-reveal-target="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
+      <p data-admin--tokens--reveal-target="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
     </div>
   <% end %>
 
@@ -33,20 +33,20 @@
     <div>
       <%= label_tag "group_id", "Group", class: setup_label_class %>
       <select name="group_id" id="group_id" required class="<%= setup_select_class %>"
-        data-admin--group-hint-target="select" data-action="change->admin--group-hint#show"
+        data-admin--tokens--group-hint-target="select" data-action="change->admin--tokens--group-hint#show"
         aria-describedby="token-group-description <%= GROUP_ERROR_ID if group_errors.any? %>">
         <% groups.each do |group| %>
           <option value="<%= group.id %>" data-description="<%= group.description %>" <%= "selected" if group == selected_group %>><%= group.name %></option>
         <% end %>
       </select>
-      <p id="token-group-description" data-admin--group-hint-target="text" class="mt-1 text-sm text-meta"><%= selected_description %></p>
+      <p id="token-group-description" data-admin--tokens--group-hint-target="text" class="mt-1 text-sm text-meta"><%= selected_description %></p>
       <% if group_errors.any? %>
         <p id="<%= GROUP_ERROR_ID %>" class="mt-1 text-sm text-danger-ink"><%= group_errors.to_sentence %></p>
       <% end %>
     </div>
 
     <div>
-      <%= render Admin::ButtonComponent.new(label: "Create token", variant: :primary, type: "submit") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Create token", variant: :primary, type: "submit") %>
     </div>
   <% end %>
 </section>

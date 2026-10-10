@@ -49,8 +49,8 @@ class Admin::FieldErrorBorderSystemTest < ApplicationSystemTestCase
   end
 
   # The rule under test is CSS, so these inject the nested-wrapper shapes a
-  # group field and a repeater render (a FieldComponent inside a
-  # FieldComponent) straight into the page rather than provoking a sub-field
+  # group field and a repeater render (a Ui::FieldComponent inside a
+  # Ui::FieldComponent) straight into the page rather than provoking a sub-field
   # error through a content type's UI.
   def inject_nested_fields
     page.execute_script(<<~JS)

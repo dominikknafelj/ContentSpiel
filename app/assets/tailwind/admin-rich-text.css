@@ -4,7 +4,7 @@
    are no per-element classes to hang utilities on -- element styles here,
    product tokens only (--cs-*), never the public theme's --th-*.
 
-   `injectCSS: false` in `admin--rich-text` turns off Tiptap's own injected
+   `injectCSS: false` in `admin--rich-text--editor` turns off Tiptap's own injected
    <style>, so the few rules ProseMirror actually depends on (whitespace
    handling, the gap cursor, the selected-node outline) live here too. */
 .admin-rich-text-content { line-height: 1.6; overflow-wrap: break-word; }

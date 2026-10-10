@@ -52,7 +52,7 @@
 }
 
 /* The active theme choice needs no JS: shared/_theme_head sets
-   <html data-theme-choice> before first paint, and Admin::ThemeSwitchComponent's
+   <html data-theme-choice> before first paint, and Admin::Ui::ThemeSwitchComponent's
    buttons carry their own choice as data-theme-choice-param. */
 [data-theme-choice="light"] .admin-theme-switch__choice[data-theme-choice-param="light"],
 [data-theme-choice="dark"] .admin-theme-switch__choice[data-theme-choice-param="dark"],
@@ -63,7 +63,7 @@
 
 /* The shell (design pass spec §4, handoff §9 A7). Real CSS rather than
    utilities because the drawers' open state is the `data-open` attribute
-   `admin--drawer` toggles. Desktop: sidebar | [tree] | content in a grid.
+   `admin--shell--drawer` toggles. Desktop: sidebar | [tree] | content in a grid.
    Below 1280px the sidebar leaves the grid and becomes a fixed drawer behind
    the top bar; below 1024px the tree does too. A closed drawer is also
    `visibility: hidden` (after the slide), so its links leave the tab order. */
@@ -76,7 +76,7 @@
 @media (max-width: 1279px) { :root { --admin-top-offset: 3rem; } }
 /* A save footer sticks to the bottom of the window; toasts rise above it, or
    on a narrow window (where the form's column is the window) they cover Save.
-   By the footer's MEASURED height (`admin--save-bar` writes it: a footer that
+   By the footer's MEASURED height (`admin--saving--save-bar` writes it: a footer that
    wraps onto two or three lines is taller than any fixed offset), 4rem until
    it has been measured. */
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
@@ -104,7 +104,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
 }
 @media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
-/* The scrim belongs to a drawer, and `admin--drawer` only un-hides it when
+/* The scrim belongs to a drawer, and `admin--shell--drawer` only un-hides it when
    one opens -- it knows nothing about widths. A drawer left open while the
    window is widened stops being a drawer (the rules above no longer apply),
    and its scrim would be left covering a page that has nothing over it. So
@@ -130,7 +130,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    it still reaches the window's edge, and the drawer is fixed in the room
    that was made, from the header's bottom edge to the window's. The header
    is stuck to `--admin-top-offset` at every scroll position, so its bottom
-   edge is that plus its height, which `admin--notes` measures and keeps
+   edge is that plus its height, which `admin--notes--drawer` measures and keeps
    current (`--admin-editor-header-height`, on the drawer: a notice bar or a
    wrapped row makes the header taller). No shadow: it is beside the content,
    not over it.
@@ -140,12 +140,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    layout's head script sets it before the first paint when this browser
    remembers the drawer as open, so the page is laid out with the column from
    the start and the editor does not change width when the script connects.
-   `admin--notes` owns it from then on (`setOpen`); a screen without a drawer
+   `admin--notes--drawer` owns it from then on (`setOpen`); a screen without a drawer
    never matches.
 
    THE PAGE TREE FOLDS while the column is there, at every width from 1024px,
    the way it does below 1024px: the same element, the same `data-open`,
-   `admin--drawer` and the scrim -- these rules only add a second condition
+   `admin--shell--drawer` and the scrim -- these rules only add a second condition
    to the ones above. What opens it is a "Pages ▾" button: from 1024px to
    1279px the top bar's own, and from 1280px, where there is no top bar, the
    one at the start of the page editor's breadcrumb row
@@ -176,8 +176,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 }
 @media (prefers-reduced-motion: reduce) { :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
 
-/* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
-   and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */
+/* Admin::Ui::DialogComponent: a native <dialog> needs real CSS for its backdrop
+   and max sizes (widths mirror Admin::Ui::DialogComponent::WIDTHS). */
 .admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }
 .admin-dialog[open] { display: flex; flex-direction: column; }
 .admin-dialog::backdrop { background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
@@ -200,7 +200,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    downwards. `test/system/admin/media_picker_test.rb` pins it. */
 .admin-media-picker { margin-top: 7.5vh; }
 /* The same fixed top edge for the New page and New post dialogs
-   (`Admin::DialogComponent`'s `hang:`), round 3 Task 9: they open as a shell
+   (`Admin::Ui::DialogComponent`'s `hang:`), round 3 Task 9: they open as a shell
    with a loading line and the form loads into it, so a centred one grew in both
    directions and moved its own header (and the Create button at the foot) under
    the pointer. 7.5vh as above, where the top of a full-height dialog sits when
@@ -208,7 +208,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    hang_test.rb` pins it. */
 .admin-dialog[data-dialog-hang] { margin-top: 7.5vh; }
 
-/* The busy button's spinner (`admin--busy`): 11px, inherits the label's colour. */
+/* The busy button's spinner (`admin--ui--busy`): 11px, inherits the label's colour. */
 .admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .admin-spinner { animation-duration: 2s; } }
@@ -239,7 +239,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
 
-/* Styled native checkbox (Admin::CheckboxComponent, round 1 departure). The
+/* Styled native checkbox (Admin::Ui::CheckboxComponent, round 1 departure). The
    browser draws the tick; `accent-color` gives it the token fill in both
    themes, and the radius and focus ring come from tokens too. */
 .cs-checkbox { accent-color: var(--cs-accent); border-radius: var(--cs-radius); width: 1rem; height: 1rem; flex: none; cursor: pointer; }
@@ -289,8 +289,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    Wrappers that render a slot (always as their own direct child):
    `.admin-column` (Columns::*, the settings fields, tag and related-post
    inputs, the AI key form, a tag row's form) and `.admin-field` (the schema
-   fields of Admin::FieldComponent). Wrappers NEST: a group field's sub-fields
-   and a repeater's rows are FieldComponents inside a FieldComponent, so one
+   fields of Admin::Ui::FieldComponent). Wrappers NEST: a group field's sub-fields
+   and a repeater's rows are FieldComponents inside a Ui::FieldComponent, so one
    sub-field's error must colour only that sub-field's own controls, never its
    siblings' (a descendant `:has` would, since the outer wrapper contains every
    inner slot). So the colour travels as an inherited custom property that
@@ -371,13 +371,13 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    about the room a section has. `--lanes` is the section's column count, set
    on the lanes element by `Admin::EditorScreen::SectionLanesComponent`. A
    lane keeps a minimum height so an empty column still has a place on screen
-   -- and under the pointer: it is what a block is dropped into (`admin--blocks`).
+   -- and under the pointer: it is what a block is dropped into (`admin--editor--blocks`).
    The open tile -- the one whose form is showing under the lanes -- is marked
    by its border, read from the face's own `aria-expanded`, so the look cannot
-   drift from what `admin--section` tells a screen reader. */
+   drift from what `admin--editor--section` tells a screen reader. */
 .admin-section-card { container-type: inline-size; }
 .admin-section-lanes { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
-.admin-section-lane > [data-admin--blocks-target="lane"] { display: flex; flex-direction: column; gap: 0.5rem; min-height: 2.5rem; }
+.admin-section-lane > [data-admin--editor--blocks-target="lane"] { display: flex; flex-direction: column; gap: 0.5rem; min-height: 2.5rem; }
 .admin-section-lane__label { display: block; }
 @container (min-width: 40rem) {
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
@@ -401,7 +401,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-block-tile { border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
 .admin-block-tile:has(> .admin-block-tile__face[aria-expanded="true"]) { border-color: var(--cs-accent); }
 /* The tile of the block whose thread is open in the notes drawer
-   (`admin--notes#markActive`). Here and not a utility on the tile: the tile's
+   (`admin--notes--drawer#markActive`). Here and not a utility on the tile: the tile's
    border is set by the rule above, which a utility does not outweigh. */
 .admin-block-tile[data-notes-active] { border-color: var(--cs-accent); }
 
@@ -417,7 +417,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 
 /* A block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
    handoff "Block card marker" and "Section tile marker"). Four states, set by
-   `admin--notes` as attributes:
+   `admin--notes--drawer` as attributes:
    - at rest without notes it is in its place and not shown (the system draws
      no count at zero);
    - while the pointer is over its card or tile, or the focus is inside it,
@@ -503,7 +503,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    scroll under a thread. By where the frame stands, like the rules around
    this one: in the media panel and on a record's notes page the same thread
    is in the flow of what scrolls there, and none of this applies.
-   `admin--notes-live#scroller` reads `overflow-y` to tell the two apart. */
+   `admin--notes--live#scroller` reads `overflow-y` to tell the two apart. */
 .admin-notes-drawer [data-notes-scroller]:has([data-notes-view="thread"]) { overflow: hidden; }
 .admin-notes-drawer turbo-frame#notes:has(> [data-notes-view="thread"]),
 .admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }
@@ -555,7 +555,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    it: sunken too, or it keeps a white frame around a sunken inner field. */
 .admin-view-only .admin-chip-field { background: var(--cs-sunken); }
 
-/* A link `admin--pending-lock` has locked (an instant action waiting for the
+/* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
    main form's unsaved changes, round 3 decision D10): it can't be `disabled`
    like a button, so it is dimmed the way a disabled button is. The controller
    swallows its click. */
@@ -591,14 +591,14 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
    same `--cs-*` tokens through `app/javascript/mind_graph/theme.js` and draws
    the shapes in `mind_graph/renderer.js`, whose header says what each one
    means. These rules are what is left in CSS: the small inline SVG swatches of
-   `Admin::MindGraphLegendComponent`, which must look like what the canvas
+   `Admin::MindGraphScreen::LegendComponent`, which must look like what the canvas
    draws -- a tag is a square outlined in `meta`; a related edge is solid and a
    shared tag's dashed (line style, not colour alone); a draft or scheduled
    post is a dashed ring; a post whose type is no longer registered is a `meta`
    ring WITH A STROKE THROUGH IT, so it differs from a ring of slots 7-12 by
    shape; a pinned node carries a small ink dot with a surface ring at its
    top-right (here on a faint stand-in for the node). (A type's own dot is
-   `Admin::ContentTypeDotComponent`.) Change one side and the other with it. */
+   `Admin::Ui::ContentTypeDotComponent`.) Change one side and the other with it. */
 .mg-tag rect { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 1.5; }
 .mg-edge { fill: none; }
 .mg-edge-related { stroke: var(--cs-ink); stroke-opacity: 0.35; stroke-width: 1.5; }

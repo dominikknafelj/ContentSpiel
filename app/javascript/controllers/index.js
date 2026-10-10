@@ -11,7 +11,7 @@
 // Eager: each controller is imported and registered as soon as the page
 // loads (a dynamic `import()` per controller, as stimulus-loading's own
 // eager loader does). An identifier is derived the stimulus-loading way:
-// `controllers/admin/rich_text_controller` -> `admin--rich-text`.
+// `controllers/admin/rich_text/editor_controller` -> `admin--rich-text--editor`.
 import { application } from "controllers/application"
 
 const imports = JSON.parse(document.querySelector("script[type=importmap]").text).imports

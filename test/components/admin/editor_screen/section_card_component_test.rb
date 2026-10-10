@@ -18,8 +18,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   test "it is a card of the block list, framed, with one lane per column and a tile per block" do
     render_card
 
-    assert_selector "##{ActionView::RecordIdentifier.dom_id(@section)}.admin-section-card[data-admin--blocks-target='card'][data-container][data-controller~='admin--section']"
-    assert_selector "#section-#{@section.id}-lanes[data-admin--section-target='lanes'] > .admin-section-lane > [data-admin--blocks-target='lane']", count: 3
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(@section)}.admin-section-card[data-admin--editor--blocks-target='card'][data-container][data-controller~='admin--editor--section']"
+    assert_selector "#section-#{@section.id}-lanes[data-admin--editor--section-target='lanes'] > .admin-section-lane > [data-admin--editor--blocks-target='lane']", count: 3
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", text: "Hello from a column"
     assert_selector "#section-#{@section.id}-lane-2 > *", count: 0
     assert_selector "#section-#{@section.id}-lane-3 > .admin-block-tile", text: "No image chosen"
@@ -28,8 +28,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   test "every block's form is in the panels, hidden" do
     render_card
 
-    assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel'][hidden]", count: 2, visible: :all
-    assert_selector "#block-#{@text.id}-panel form[data-controller~='admin--autosave']", visible: :all
+    assert_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel'][hidden]", count: 2, visible: :all
+    assert_selector "#block-#{@text.id}-panel form[data-controller~='admin--saving--autosave']", visible: :all
   end
 
   # The "+" at the end of each lane (spec §4.2) is in the lane's wrapper,
@@ -38,7 +38,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     as(users(:one), channel: :admin) { render_card }
 
     (1..3).each do |column|
-      assert_selector "#section-#{@section.id}-lanes > .admin-section-lane > [data-admin--blocks-target='lane'] + #block-picker-#{@section.id}-#{column}"
+      assert_selector "#section-#{@section.id}-lanes > .admin-section-lane > [data-admin--editor--blocks-target='lane'] + #block-picker-#{@section.id}-#{column}"
       assert_no_selector "#section-#{@section.id}-lane-#{column} #block-picker-#{@section.id}-#{column}", visible: :all
     end
     assert_selector "#section-#{@section.id}-lane-1 > *", count: 1
@@ -48,7 +48,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   test "a viewer who can't edit gets no picker in a lane" do
     as(users(:reader), channel: :admin) { render_card }
 
-    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 3
+    assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 3
     assert_no_selector "[id^='block-picker-']", visible: :all
   end
 
@@ -65,7 +65,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
       assert_no_selector "#notes-marker-ContentBlock-#{@section.id}", visible: :all
       assert_no_selector "[data-notes-key='ContentBlock-#{@section.id}']", visible: :all
       assert_equal [ @text, @image ].map { |block| "ContentBlock-#{block.id}" }.sort,
-        page.all("[data-admin--notes-target=marker]", visible: :all).map { |marker| marker["data-notes-key"] }.sort
+        page.all("[data-admin--notes--drawer-target=marker]", visible: :all).map { |marker| marker["data-notes-key"] }.sort
       assert_equal [ @text, @image ].map { |block| "ContentBlock-#{block.id}" }.sort,
         page.all("button[data-notes-compose]", visible: :all).map { |item| item["data-notes-key"] }.sort
       assert_no_selector "button[aria-label='Section actions'] + [role=menu] button", text: "Add note", visible: :all
@@ -77,9 +77,9 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   test "the section's delete dialog asks for the sentence that counts its blocks' notes, and Remove section, keep blocks has no dialog" do
     as(users(:one), channel: :admin) { render_card }
 
-    assert_selector "#delete-section-#{@section.id} p[hidden][data-admin--notes-target=warning][data-notes-warning=section][data-notes-within='#{ActionView::RecordIdentifier.dom_id(@section)}']", visible: :all
+    assert_selector "#delete-section-#{@section.id} p[hidden][data-admin--notes--drawer-target=warning][data-notes-warning=section][data-notes-within='#{ActionView::RecordIdentifier.dom_id(@section)}']", visible: :all
     assert_selector "dialog", visible: :all, count: 3 # the section's delete dialog and one per tile
-    assert_selector "form[data-controller='admin--queue-hold'] input[name=keep_blocks]", visible: :all
+    assert_selector "form[data-controller='admin--saving--queue-hold'] input[name=keep_blocks]", visible: :all
   end
 
   # The header's count is drawn by the one method a stream redraws it with
@@ -111,7 +111,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     render_card
 
     assert_selector ".admin-section-card > div:first-child .admin-block-card__handle[aria-label='Move section'][aria-describedby='block-drag-help']"
-    assert_selector "button[aria-expanded='true'][aria-controls='section-#{@section.id}-body'][data-action$='admin--blocks#toggle']", text: "Section"
+    assert_selector "button[aria-expanded='true'][aria-controls='section-#{@section.id}-body'][data-action$='admin--editor--blocks#toggle']", text: "Section"
     assert_selector ".admin-section-card > #section-#{@section.id}-body[data-block-body]"
 
     outline = BlockOutline.new(site_page.content_blocks.reload)
@@ -119,18 +119,18 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     assert_no_selector ".admin-block-card__handle"
     assert_selector "#block-#{@text.id}-panel fieldset[disabled]", visible: :all
-    assert_no_selector "form[data-controller~='admin--autosave']", visible: :all
+    assert_no_selector "form[data-controller~='admin--saving--autosave']", visible: :all
   end
 
   test "the header carries the section's own autosaving form: layout, background, width" do
     render_card
 
-    assert_selector "form#section-#{@section.id}-form[data-controller~='admin--autosave'][action$='/content_blocks/#{@section.id}']"
+    assert_selector "form#section-#{@section.id}-form[data-controller~='admin--saving--autosave'][action$='/content_blocks/#{@section.id}']"
     assert_selector "input[type=hidden][name='block[settings][layout]'][value='three']", visible: :all
     assert_selector "select[name='block[settings][background]'] option[selected][value='none']"
     assert_selector "select[name='block[settings][width]'] option", count: 2
-    assert_selector "button[data-action='admin--section#chooseLayout'][data-admin--section-layout-param]", count: 6, visible: :all
-    assert_selector "button[data-admin--section-layout-param='three'][aria-current='true']", visible: :all
+    assert_selector "button[data-action='admin--editor--section#chooseLayout'][data-admin--editor--section-layout-param]", count: 6, visible: :all
+    assert_selector "button[data-admin--editor--section-layout-param='three'][aria-current='true']", visible: :all
     assert_selector "#block-#{@section.id}-save-status"
   end
 
@@ -143,7 +143,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#{form} input[type=hidden][name='base_updated_at']#block-#{@section.id}-base-updated-at[value='#{@section.reload.updated_at.iso8601(6)}']", visible: :all
     assert_selector "#{form} input#block-#{@section.id}-layout[name='block[settings][layout]']", visible: :all
     %w[layout background width].each do |name|
-      assert_selector "#{form} ##{Admin::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all
+      assert_selector "#{form} ##{Admin::Ui::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all
     end
     assert_selector "#{form} select#block-#{@section.id}-background[aria-label='Background']"
     assert_selector "#{form} select#block-#{@section.id}-width[aria-label='Width']"
@@ -158,7 +158,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     render_card
 
     assert_selector "input[type=hidden][name='block[settings][layout]'][value='two']", visible: :all
-    assert_selector "button[data-admin--section-layout-param='two'][aria-current='true']", visible: :all
+    assert_selector "button[data-admin--editor--section-layout-param='two'][aria-current='true']", visible: :all
     assert_selector "select[name='block[settings][background]'] option[selected][value='none']"
     assert_selector "select[name='block[settings][width]'] option[selected][value='content']"
   end
@@ -169,10 +169,10 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     render_card
 
     menu = "#section-#{@section.id}-layout-menu"
-    assert_selector "#{menu}[data-admin--section-target='layoutMenu'] button[aria-haspopup='menu'][aria-label='Layout']", text: "Layout"
+    assert_selector "#{menu}[data-admin--editor--section-target='layoutMenu'] button[aria-haspopup='menu'][aria-label='Layout']", text: "Layout"
     assert_no_selector "#{menu} input", visible: :all
-    assert_selector "#{menu} button[data-admin--section-layout-param='one_two'] .admin-layout-diagram[aria-hidden='true'] > span", count: 2, visible: :all
-    assert_selector "#{menu} button[data-admin--section-layout-param='one_two'] .sr-only", text: "One third, two thirds", visible: :all
+    assert_selector "#{menu} button[data-admin--editor--section-layout-param='one_two'] .admin-layout-diagram[aria-hidden='true'] > span", count: 2, visible: :all
+    assert_selector "#{menu} button[data-admin--editor--section-layout-param='one_two'] .sr-only", text: "One third, two thirds", visible: :all
     assert_selector "#{menu} button[aria-current='false']", count: 5, visible: :all
     # The trigger shows the current layout: three equal columns.
     assert_selector "#{menu} button[aria-haspopup='menu'] .admin-layout-diagram > span", count: 3
@@ -193,9 +193,9 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     header = ".admin-section-card > div:first-child"
     assert_selector "#{header} button[aria-haspopup='menu'][aria-label='Section actions']", text: "⋯"
-    assert_selector "#{header} button[data-move='up'][disabled][data-action='click->admin--blocks#moveUp']", visible: :all
-    assert_selector "#{header} button[data-move='down']:not([disabled])[data-action='click->admin--blocks#moveDown']", text: "Move down", visible: :all
-    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", visible: :all
+    assert_selector "#{header} button[data-move='up'][disabled][data-action='click->admin--editor--blocks#moveUp']", visible: :all
+    assert_selector "#{header} button[data-move='down']:not([disabled])[data-action='click->admin--editor--blocks#moveDown']", text: "Move down", visible: :all
+    assert_selector "#{header} button[data-admin--ui--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", visible: :all
     assert_selector "dialog#delete-section-#{@section.id} form[action$='/content_blocks/#{@section.id}'] button[type=submit]", text: "Delete section", visible: :all
     assert_no_selector "dialog#delete-section-#{@section.id} input[name='keep_blocks']", visible: :all
     # No form inside the settings form: a nested form is dropped by the parser.
@@ -234,21 +234,21 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_no_selector "[aria-label='Section actions']"
     assert_selector "fieldset[disabled] select[name='block[settings][background]']"
     assert_selector "fieldset[disabled] button[aria-haspopup='menu'][aria-label='Layout']"
-    assert_no_selector "form[data-controller~='admin--autosave']"
+    assert_no_selector "form[data-controller~='admin--saving--autosave']"
     assert_no_selector "dialog#delete-section-#{@section.id}", visible: :all
   end
 
   # One string for a menu item's look, wherever a menu of the block list is drawn.
   test "the lane picker's and the section menu's items use the block card's menu item class" do
-    assert_same Admin::BlockCardComponent::MENU_ITEM_CLASS, Admin::BlockPickerComponent::MENU_ITEM_CLASS
+    assert_same Admin::EditorScreen::BlockCardComponent::MENU_ITEM_CLASS, Admin::EditorScreen::BlockPickerComponent::MENU_ITEM_CLASS
   end
 
   test "a tile is the block's element: its dom id, a button that names the panel it opens, collapsed" do
     render_card
 
-    tile = "#section-#{@section.id}-lane-3 > ##{ActionView::RecordIdentifier.dom_id(@image)}[role='listitem'][data-block-id='#{@image.id}'][data-admin--section-target='tile'][data-admin--blocks-target='tile']"
+    tile = "#section-#{@section.id}-lane-3 > ##{ActionView::RecordIdentifier.dom_id(@image)}[role='listitem'][data-block-id='#{@image.id}'][data-admin--editor--section-target='tile'][data-admin--editor--blocks-target='tile']"
     assert_selector tile
-    assert_selector "#{tile} > button.admin-block-tile__face[type='button'][aria-expanded='false'][aria-controls='block-#{@image.id}-panel'][data-action='admin--section#toggle']", text: "Image"
+    assert_selector "#{tile} > button.admin-block-tile__face[type='button'][aria-expanded='false'][aria-controls='block-#{@image.id}-panel'][data-action='admin--editor--section#toggle']", text: "Image"
     assert_selector "#section-#{@section.id}-lane-3[role='list'][data-section-id='#{@section.id}'][data-column='3']"
   end
 
@@ -276,7 +276,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     late = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
     render_card
 
-    ids = page.all("#section-#{@section.id}-panels > [data-admin--section-target='panel']", visible: :all).map { |panel| panel["data-block-id"].to_i }
+    ids = page.all("#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']", visible: :all).map { |panel| panel["data-block-id"].to_i }
     assert_equal [ @text.id, late.id, @image.id ], ids
   end
 
@@ -313,11 +313,11 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     @section.update_columns(block_type: "gone/section")
     as(users(:one), channel: :admin) { render_card }
 
-    assert_selector ".admin-section-card.border-danger[data-container][data-admin--blocks-target='card']", text: "Unavailable type — gone/section"
+    assert_selector ".admin-section-card.border-danger[data-container][data-admin--editor--blocks-target='card']", text: "Unavailable type — gone/section"
     assert_selector ".admin-section-card", text: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
     assert_selector ".admin-block-tile", count: 2
-    assert_selector "[data-admin--blocks-target='lane'][data-no-drop]", count: 2
-    assert_no_selector "[data-admin--blocks-target='lane']:not([data-no-drop])", visible: :all
+    assert_selector "[data-admin--editor--blocks-target='lane'][data-no-drop]", count: 2
+    assert_no_selector "[data-admin--editor--blocks-target='lane']:not([data-no-drop])", visible: :all
     assert_no_selector "form#section-#{@section.id}-form", visible: :all
     assert_selector "button[type='submit']", text: "Remove section, keep blocks", exact_text: true
     assert_selector "button", text: "Delete section and its blocks…", exact_text: true
@@ -335,12 +335,12 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#section-#{@section.id}-lane-3[data-column='3'] > ##{ActionView::RecordIdentifier.dom_id(@image)}"
     assert_no_selector "#section-#{@section.id}-lane-2", visible: :all
     assert_no_selector "[id^='block-picker-']", visible: :all
-    assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']", count: 2, visible: :all
+    assert_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']", count: 2, visible: :all
   end
 
   # Its two actions are a section's two removals, under the menu's own words:
   # the one that keeps the blocks is a form of its own, sent with
-  # `keep_blocks` and only on a settled screen (`admin--queue-hold`: its
+  # `keep_blocks` and only on a settled screen (`admin--saving--queue-hold`: its
   # answer replaces the blocks' forms); the other opens the dialog.
   test "it has no handle, no menu and no settings; its two actions are Remove section, keep blocks and the dialog that counts its blocks" do
     @section.update_columns(block_type: "gone/section")
@@ -349,13 +349,13 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     assert_no_selector ".admin-block-card__handle", visible: :all
     assert_no_selector "button[aria-label='Section actions']", visible: :all
-    assert_no_selector "select, [data-admin--section-target='layoutMenu']", visible: :all
+    assert_no_selector "select, [data-admin--editor--section-target='layoutMenu']", visible: :all
     assert_no_selector "#section-#{@section.id}-summary", visible: :all
-    keep = "#{header} form[action$='/content_blocks/#{@section.id}'][data-controller='admin--queue-hold'][data-action='submit->admin--queue-hold#submit']"
+    keep = "#{header} form[action$='/content_blocks/#{@section.id}'][data-controller='admin--saving--queue-hold'][data-action='submit->admin--saving--queue-hold#submit']"
     assert_selector "#{keep} input[name='_method'][value='delete']", visible: :all
     assert_selector "#{keep} input[name='keep_blocks'][value='1']", visible: :all
     assert_selector "#{keep} button[type='submit']", text: "Remove section, keep blocks", exact_text: true
-    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", exact_text: true
+    assert_selector "#{header} button[data-admin--ui--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", exact_text: true
     assert_selector "#{header} button", count: 2
     assert_selector "dialog#delete-section-#{@section.id} #section-#{@section.id}-delete-count", text: "This also deletes the 2 blocks in it.", visible: :all
     assert_selector "dialog#delete-section-#{@section.id} form[action$='/content_blocks/#{@section.id}'] input[name='_method'][value='delete']", visible: :all
@@ -372,7 +372,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: "Remove section, keep blocks", visible: :all
     assert_no_selector "button", text: "Delete section and its blocks…", visible: :all
     assert_no_selector "input[name='keep_blocks']", visible: :all
-    assert_no_selector "form[data-controller='admin--queue-hold']", visible: :all
+    assert_no_selector "form[data-controller='admin--saving--queue-hold']", visible: :all
     assert_no_selector "dialog", visible: :all
     assert_no_selector ".admin-block-tile__grip", visible: :all
   end

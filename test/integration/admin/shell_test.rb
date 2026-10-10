@@ -126,7 +126,7 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # Round 3, Task 1 (decision D24): the one Leave dialog every explicit-save
   # screen shares. Keep editing is the primary button and takes the focus, and
   # closes the dialog without any script (a `method="dialog"` submit); Discard
-  # changes is the button `admin--save-bar` wires up.
+  # changes is the button `admin--saving--save-bar` wires up.
   test "the layout carries the Leave dialog with Keep editing first in focus" do
     sign_in_as(users(:one))
     get "/cs-studio/users"
@@ -150,7 +150,7 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     get "/cs-studio/users/#{users(:two).id}/edit", headers: { "Turbo-Frame" => "content" }
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
     get "/cs-studio/account"
-    assert_select "form[data-controller~='admin--save-bar']", count: 2
+    assert_select "form[data-controller~='admin--saving--save-bar']", count: 2
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
     get "/cs-studio/users"
     assert_select "head meta[name='turbo-cache-control']", count: 0

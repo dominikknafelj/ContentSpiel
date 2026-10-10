@@ -21,7 +21,7 @@ class TailwindSourcesTest < ActiveSupport::TestCase
   # A script that names only classes written by hand in the stylesheets, so
   # there is nothing in it for the build to find. Each entry says which.
   HAND_WRITTEN_ONLY = {
-    "app/javascript/autosave/promotion_hold.js" => "`admin-spinner`, defined in content-spiel.tailwind.css"
+    "app/javascript/saving/promotion_hold.js" => "`admin-spinner`, defined in content-spiel.tailwind.css"
   }.freeze
 
   def sources

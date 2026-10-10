@@ -4,7 +4,7 @@ require "application_system_test_case"
 # Focus 4): a read-only user opening a post sees "View only", every field
 # disabled -- the Tiptap editor included, which a `<fieldset disabled>`
 # alone wouldn't reach -- and nothing they do sends a PATCH, because
-# `admin--autosave` isn't attached at all. System-level because "sends no
+# `admin--saving--autosave` isn't attached at all. System-level because "sends no
 # request" is only observable in a real browser: PATCHes are counted with
 # the same `window.fetch` hook `Admin::AutosaveSystemTest` uses.
 class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
@@ -51,7 +51,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     JS
 
     assert_selector "[data-view-only]", text: "View only"
-    assert_no_selector "[data-controller~='admin--autosave']"
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
     assert_no_button "Publish"
     assert_no_selector "button[aria-label='More actions']"
     assert_no_button "Delete"
@@ -105,7 +105,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_no_selector ".admin-block-card__handle"
     assert_menus_hold_only_add_note(".admin-content-blocks", count: 1)
     assert_no_text "Add block"
-    assert_no_selector "[data-controller~='admin--autosave']"
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
     assert_selector ".admin-view-only"
     assert find_field("Title", disabled: true).disabled?
   end
@@ -128,8 +128,8 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_no_selector ".admin-section-card dialog", visible: :all
     find("##{ActionView::RecordIdentifier.dom_id(block)} .admin-block-tile__face").click
     assert_selector "#block-#{block.id}-panel fieldset[disabled]"
-    assert_no_selector "#block-#{block.id}-panel form[data-controller~='admin--autosave']"
-    assert_no_selector "[data-controller~='admin--autosave']", visible: :all
+    assert_no_selector "#block-#{block.id}-panel form[data-controller~='admin--saving--autosave']"
+    assert_no_selector "[data-controller~='admin--saving--autosave']", visible: :all
   end
 
   test "a read-only user's translation tab lists a section's blocks disabled, with nothing that writes" do
@@ -143,7 +143,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
       assert_selector ".admin-section-group > .admin-block-card[data-block-id='#{block.id}'] fieldset[disabled]"
       assert_selector ".admin-section-group .admin-translation-pair", text: "Original caption"
       assert find_field("block-#{block.id}-caption", disabled: true).disabled?
-      assert_no_selector "[data-controller~='admin--autosave']", visible: :all
+      assert_no_selector "[data-controller~='admin--saving--autosave']", visible: :all
       assert_no_selector ".admin-block-card__handle", visible: :all
       assert_menus_hold_only_add_note(".admin-section-group", count: 1)
       assert_no_selector ".admin-section-group dialog", visible: :all

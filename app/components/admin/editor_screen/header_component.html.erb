@@ -8,13 +8,13 @@
         hold the button, so from 1280px with notes open and at no other time
         (`.admin-editor-header__tree` in content-spiel.tailwind.css). The same
         drawer, panel and controller as the top bar's button
-        (`admin--drawer#toggle`, `aria-controls`). A page's editor only: a
+        (`admin--shell--drawer#toggle`, `aria-controls`). A page's editor only: a
         post's screen has no tree. %>
     <div class="flex min-w-0 items-center gap-1.5">
     <% if page? %>
       <%= tag.button t(".tree"), type: "button", class: "admin-editor-header__tree -ml-2 shrink-0 cursor-pointer rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken",
             aria: { label: t(".tree_label"), controls: "tree-column", expanded: "false" },
-            data: { action: "admin--drawer#toggle", admin__drawer_name_param: "tree", admin__drawer_target: "trigger" } %>
+            data: { action: "admin--shell--drawer#toggle", admin__shell__drawer_name_param: "tree", admin__shell__drawer_target: "trigger" } %>
     <% end %>
     <nav aria-label="Breadcrumb" class="min-w-0 truncate text-[12px] text-meta">
       <% breadcrumb.each do |label, url| %>
@@ -29,7 +29,7 @@
     </div>
 
     <div class="flex shrink-0 flex-wrap items-center gap-2">
-      <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle, live: live?) %>
+      <%= render Admin::Ui::SaveStatusComponent.new(id: save_status_id, state: :idle, live: live?) %>
 
       <%# Notes (notes spec §4.3, handoff "Notes header button" as its
           decision 2 corrects it): a toggle for the drawer
@@ -37,7 +37,7 @@
           the header's shared secondary style, as Preview beside it (16px,
           `px-4 py-2`), with a 16px icon and its count in 12px mono. Four
           states: the word alone; with open threads their number
-          in mono; `data-unread` on the number (set by `admin--notes` from the
+          in mono; `data-unread` on the number (set by `admin--notes--drawer` from the
           counts) makes it the filled accent pill, accent meaning "unread for
           you" and nothing else; `aria-pressed` while the drawer is open. The
           id `notes-open` is this button's alone. %>
@@ -45,12 +45,12 @@
         <%= tag.button type: "button", id: "notes-open",
               class: "#{notes_button_class} items-center gap-2 focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
               aria: { controls: "notes-drawer", expanded: "false", pressed: "false", label: t(".notes_label", count: open_notes) },
-              data: { "admin--notes-target": "opener", action: "admin--notes#toggle" } do %>
+              data: { "admin--notes--drawer-target": "opener", action: "admin--notes--drawer#toggle" } do %>
           <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>
           <span><%= t(".notes") %></span>
           <%= tag.span open_notes, id: "notes-open-count", hidden: open_notes.zero?,
                 class: "font-cs-mono text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
-                data: { "admin--notes-target": "total" } %>
+                data: { "admin--notes--drawer-target": "total" } %>
         <% end %>
       <% end %>
 
@@ -61,15 +61,15 @@
       <% end %>
 
       <% if can_publish? %>
-        <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } } %>
+        <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
       <% end %>
 
       <% if can_edit_schedule? %>
-        <%= render Admin::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
       <% end %>
 
       <% if menu_items? %>
-        <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "More actions", close_on_select: true,
+        <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More actions", close_on_select: true,
               button_class: "inline-flex cursor-pointer items-center rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:bg-sunken") do |menu| %>
           <% if can?("audit.view") %>
             <% menu.with_item do %><%= link_to "Activity", activity_url %><% end %>
@@ -82,7 +82,7 @@
           <% end %>
           <% if may_delete? %>
             <%# The divider is an item of its own (a `role="separator"`, which
-                `admin--menu` skips: it only walks links and buttons). %>
+                `admin--ui--menu` skips: it only walks links and buttons). %>
             <% menu.with_item do %><div role="separator" class="my-1 border-t border-line"></div><% end %>
             <% menu.with_item do %>
               <% if can_delete? %>
@@ -100,20 +100,20 @@
   <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3">
     <h1 class="min-w-0 truncate text-[26px] font-semibold leading-tight text-ink"><%= title %></h1>
     <%# Never hidden in an editor: here the state is the point. %>
-    <%= render Admin::StatusChipComponent.new(status: status, at: scheduled_at) %>
+    <%= render Admin::Ui::StatusChipComponent.new(status: status, at: scheduled_at) %>
     <% unless editable? %>
       <%= render "admin/shared/view_only_badge" %>
     <% end %>
     <% unless page? %>
-      <%= render Admin::ContentTypeDotComponent.new(content_type: record.content_type) %>
+      <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type) %>
     <% end %>
   </div>
 
   <% if public_path.present? %>
     <div class="mt-1 flex items-center gap-2 font-cs-mono text-[12px] text-dim">
       <span class="truncate"><%= public_path %></span>
-      <button type="button" data-controller="admin--clipboard" data-admin--clipboard-url-value="<%= public_url %>"
-        data-action="click->admin--clipboard#copy" class="shrink-0 cursor-pointer rounded-cs border border-line-strong px-2 py-0.5 hover:bg-sunken">Copy</button>
+      <button type="button" data-controller="admin--ui--clipboard" data-admin--ui--clipboard-url-value="<%= public_url %>"
+        data-action="click->admin--ui--clipboard#copy" class="shrink-0 cursor-pointer rounded-cs border border-line-strong px-2 py-0.5 hover:bg-sunken">Copy</button>
       <% if live? %>
         <%# The path, not the absolute URL: the public site is served by this
             same app, so a same-origin link opens the live page wherever CS
@@ -135,7 +135,7 @@
 
   <%# `-mb-px` lets the active tab's underline sit on the header's own border. %>
   <div class="mt-3 -mb-px flex flex-wrap items-end justify-between gap-3">
-    <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+    <%= render Admin::Ui::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
     <% if suggest? %>
       <div class="ml-auto pb-2"><%= suggest %></div>
     <% end %>
@@ -159,20 +159,20 @@
 <% end %>
 
 <% if can_unpublish? %>
-  <%= render Admin::ConfirmDialogComponent.new(id: unpublish_dialog_id, title: "Unpublish this #{type}?", body: unpublish_dialog_body) do |dialog| %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(id: unpublish_dialog_id, title: "Unpublish this #{type}?", body: unpublish_dialog_body) do |dialog| %>
     <% dialog.with_confirm_action do %>
-      <%= form_with url: unpublish_url, method: :post, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } do %>
-        <%= render Admin::ButtonComponent.new(label: "Unpublish", variant: :primary, type: "submit") %>
+      <%= form_with url: unpublish_url, method: :post, data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Unpublish", variant: :primary, type: "submit") %>
       <% end %>
     <% end %>
   <% end %>
 <% end %>
 
 <% if may_delete? && can_delete? %>
-  <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this #{type} to the trash?", body: delete_dialog_body) do |dialog| %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this #{type} to the trash?", body: delete_dialog_body) do |dialog| %>
     <% dialog.with_confirm_action do %>
-      <%= form_with url: record_url, method: :delete, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } do %>
-        <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
+      <%= form_with url: record_url, method: :delete, data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
       <% end %>
     <% end %>
   <% end %>

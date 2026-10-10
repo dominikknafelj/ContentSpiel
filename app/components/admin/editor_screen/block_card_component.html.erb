@@ -1,0 +1,183 @@
+<%# `data-notes-active` is set by `admin--notes--drawer#markActive` while a thread on this
+    block is the one open in the drawer (notes handoff, "Block card marker"). %>
+<%= tag.div id: wrapper_id, class: [ "admin-block-card rounded-cs border bg-surface data-[notes-active]:border-accent", (unavailable? ? "border-danger" : "border-line") ], **wrapper_attributes do %>
+  <div class="flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">
+    <%# Not for an unavailable card: it has no body, no menu with Move up / Move
+        down, and a handle that only moves a card nobody can read would be the one
+        move a keyboard user couldn't undo with the menu. %>
+    <% if list? && editable? && !unavailable? %>
+      <%# A real button for the keyboard path (`admin--editor--blocks#key`); the mouse
+          drag starts from it too (SortableJS `handle:`). %>
+      <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              aria-label="Move <%= label %>" aria-describedby="block-drag-help"
+              data-action="keydown->admin--editor--blocks#key focusout->admin--editor--blocks#blur">⠿</button>
+    <% end %>
+
+    <% if unavailable? %>
+      <span class="flex-1 truncate text-sm font-semibold text-danger-ink"><%= unavailable_label %></span>
+      <% if editable? %>
+        <%# The only action an unavailable card has (it has no body to move, copy or edit). %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Delete block…", variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
+      <% end %>
+    <% elsif panel? %>
+      <%# The open form of a block in a section (sections spec §4.3): a heading, not a
+          collapse button -- the tile is what opens and closes it. %>
+      <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= render panel_title %></h3>
+    <% elsif !list? %>
+      <%# `:group`: nothing to collapse, move or delete from here, only the type's name. %>
+      <%# The notes marker stands directly after the name, on the left, where the notes
+          drawer cannot cover it; the spacer after it takes the rest of the row. %>
+      <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
+      <%= render note_marker %>
+      <span class="flex-1"></span>
+      <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+        <% menu.with_item { add_note_item } %>
+      <% end %>
+    <% else %>
+      <%# The name and the notes marker share the row's free width: the marker stands
+          directly after the name, on the left, where the notes drawer cannot cover it
+          (notes handoff), and the rest of the row is the spacer after it. %>
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <button type="button" class="min-w-0 truncate text-left text-sm font-semibold text-ink"
+                aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--editor--blocks#toggle">
+          <%= label %>
+        </button>
+        <%= render note_marker %>
+      </div>
+
+      <%# Move up / Move down keep calling `admin--editor--blocks#moveUp|moveDown`; their `data-move` is how
+          `refreshMoveState` finds them to enable or disable them after a reorder, add or delete. %>
+      <% if editable? %>
+        <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+          <%# Always first, and always there: the marker of a block without notes shows only
+              on hover or focus, and neither touch nor a test depends on that (notes spec §4.3). %>
+          <% menu.with_item { add_note_item } %>
+          <% menu.with_item do %>
+            <%= tag.button "Move up", type: "button", disabled: first?, class: menu_item_class,
+                  data: { move: "up", action: "click->admin--editor--blocks#moveUp" } %>
+          <% end %>
+          <% menu.with_item do %>
+            <%= tag.button "Move down", type: "button", disabled: last?, class: menu_item_class,
+                  data: { move: "down", action: "click->admin--editor--blocks#moveDown" } %>
+          <% end %>
+          <%# Disabled as it is drawn, and enabled by `admin--editor--blocks#refreshMoveState` while the
+              page has a section: sections come and go without this card being drawn again,
+              so only the screen can say. %>
+          <% if move_into? %>
+            <% menu.with_item do %>
+              <%= tag.button t(".move_into"), type: "button", disabled: true, class: menu_item_class, data: move_into %>
+            <% end %>
+          <% end %>
+          <% menu.with_item do %>
+            <%= button_to "Duplicate", duplicate_path, method: :post, class: menu_item_class %>
+          <% end %>
+          <% menu.with_item do %>
+            <%= tag.div role: "separator", class: "my-1 h-px bg-line" %>
+          <% end %>
+          <% menu.with_item do %>
+            <%= tag.button "Delete block…", type: "button", class: "#{menu_item_class} text-danger-ink", data: dialog_trigger(delete_dialog_id) %>
+          <% end %>
+        <% end %>
+      <% else %>
+        <%# A viewer who can only read the page: the same "⋯", with "Add note" as its
+            only item (the handoff's decision 6). %>
+        <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+          <% menu.with_item { add_note_item } %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%# Every panel can be closed, an unavailable block's too: `admin--editor--section#close`,
+        like Escape and a second press on the tile. %>
+    <% if panel? %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".close"), variant: :ghost, size: :small, data: { action: "admin--editor--section#close" }) %>
+    <% end %>
+  </div>
+
+  <% if unavailable? %>
+    <p class="px-3 pb-3 text-xs text-meta">Its content is kept but can’t be shown or edited.</p>
+  <% end %>
+
+  <% unless unavailable? %>
+    <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 p-3">
+      <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
+
+      <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4", data: form_data do %>
+      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
+        <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+        <% if settings_row? %>
+          <%# A post list's three settings in one row (handoff B22): Type, Tag, Limit (72px). %>
+          <% type_field, tag_field, limit_field = settings_row_fields %>
+          <div class="admin-block-settings-row grid grid-cols-1 items-start gap-x-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_72px]">
+            <%= render Admin::Ui::FieldComponent.new(
+                  field: type_field, form_name: "block[settings]",
+                  value: value_for(type_field), original: original_for(type_field), locale: locale,
+                  errors: field_errors(type_field), id_prefix: error_prefix, **translation(type_field.name)
+                ) %>
+            <%= render Admin::Ui::ChipInputComponent.new(
+                  name: "block[settings][#{tag_field.name}]", id: field_id(tag_field.name), label: tag_field.name.humanize,
+                  search_url: tag_search_url, chips: tag_chips(tag_field), single: true, create: false, noun: "tag",
+                  placeholder: "Any", errors: field_errors(tag_field)
+                ) %>
+            <%= render Admin::Ui::FieldComponent.new(
+                  field: limit_field, form_name: "block[settings]",
+                  value: value_for(limit_field), original: original_for(limit_field), locale: locale,
+                  errors: field_errors(limit_field), id_prefix: error_prefix, **translation(limit_field.name)
+                ) %>
+          </div>
+          <p class="-mt-2 text-sm text-meta">Shows the newest posts of this type.</p>
+        <% end %>
+
+        <% other_schema_fields.each do |field| %>
+          <%= render Admin::Ui::FieldComponent.new(
+                field: field, form_name: "block[settings]",
+                value: value_for(field), original: original_for(field), locale: locale,
+                errors: field_errors(field), id_prefix: error_prefix, **translation(field.name)
+              ) %>
+        <% end %>
+
+        <%# Same-in-every-language fields: read-only on a translation tab (see `#schema_fields`). %>
+        <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields) %>
+
+        <% uses_columns.each do |column| %>
+          <% case column
+             when "body" %>
+            <%= render Admin::Columns::RichTextColumnComponent.new(
+                  name: "body", id: field_id("body"), html_name: field_html_name("body"),
+                  value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale,
+                  editable: editable?, **translation("body")
+                ) %>
+          <% when "caption" %>
+            <%= render Admin::Columns::PlainColumnComponent.new(
+                  name: "caption", id: field_id("caption"), html_name: field_html_name("caption"),
+                  value: column_value("caption"), original: column_original("caption"), errors: column_errors("caption"), locale: locale,
+                  placeholder: column_placeholder("caption"), override: "caption", **translation("caption")
+                ) %>
+          <% when "alt" %>
+            <%= render Admin::Columns::PlainColumnComponent.new(
+                  name: "alt", id: field_id("alt"), html_name: field_html_name("alt"),
+                  value: column_value("alt"), original: column_original("alt"), errors: column_errors("alt"), locale: locale,
+                  placeholder: column_placeholder("alt"), override: "alt text", **translation("alt")
+                ) %>
+          <% when "image" %>
+            <%# A library image, chosen through the picker (media library
+                Task 8) into a hidden `media_asset_id` the card's own
+                autosave sends -- see `Admin::Columns::MediaColumnComponent`.
+                Its id is `<prefix>-image` so a refused choice lands in
+                this column's error slot (`ContentBlocks::Save` reports it
+                under `image`). %>
+            <%= render self.class.image_field(block: block, asset: column_value("image"), locale: locale, errors: column_errors("image")) %>
+          <% end %>
+        <% end %>
+      <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Not in a panel: see `delete_dialog`. %>
+  <% if delete_dialog? %>
+    <%= render delete_dialog %>
+  <% end %>
+<% end %>

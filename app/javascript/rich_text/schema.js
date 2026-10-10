@@ -167,7 +167,7 @@ const SchemaOrderedList = OrderedList.extend({
 })
 
 // `resolveAssetUrl(assetId)`, `resolveLinkTitle(type, id)` and
-// `onEditImage(position)` come from `admin--rich-text` -- see `image.js` /
+// `onEditImage(position)` come from `admin--rich-text--editor` -- see `image.js` /
 // `internal_link.js`.
 export function extensions({ resolveAssetUrl, resolveLinkTitle, onEditImage }) {
   return [

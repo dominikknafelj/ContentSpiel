@@ -46,13 +46,13 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     # A social link row added is counted, and removed it is not.
     click_on "+ Add link"
-    assert_selector "[data-admin--repeat-rows-target=list] input[name$='[name]']", count: 2
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 2
     assert_selector footer, text: /\b1 unsaved change\b/i # a blank row is nothing yet
-    page.all("[data-admin--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
+    page.all("[data-admin--settings--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
     assert_selector footer, text: /\b2 unsaved changes\b/i # typed in, it is one more
-    page.all("[data-admin--repeat-rows-target=row]").last.find("button[aria-label='Remove link']").click
+    page.all("[data-admin--settings--repeat-rows-target=row]").last.find("button[aria-label='Remove link']").click
     assert_selector footer, text: /\b1 unsaved change\b/i # and gone with its row
-    assert_selector "[data-admin--repeat-rows-target=list] input[name$='[name]']", count: 1
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 1
 
     click_on "English"
     fill_in "settings-en-tagline", with: "Things I learned lately"
@@ -72,14 +72,14 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     fill_in "settings-social-0-name", with: "GitHub"
     fill_in "settings-social-0-url", with: "https://github.com/dana"
     click_on "+ Add link"
-    fields = page.all("[data-admin--repeat-rows-target=row]").last
+    fields = page.all("[data-admin--settings--repeat-rows-target=row]").last
     fields.find("input[name$='[name]']").set("Blog")
     fields.find("input[name$='[url]']").set("https://example.org/blog")
     click_on "Save"
 
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal({ "GitHub" => "https://github.com/dana", "Blog" => "https://example.org/blog" }, site_settings(:default).reload.social_links)
-    assert_selector "[data-admin--repeat-rows-target=list] input[name$='[name]']", count: 2
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 2
   end
 
   test "Back with a typed change asks first, and Cancel discards without asking" do
@@ -123,7 +123,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     click_on "+ Add link"
     assert_selector footer, text: /No unsaved changes/i
-    page.all("[data-admin--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
+    page.all("[data-admin--settings--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
     assert_selector footer, text: /\b1 unsaved change/i
   end
 
@@ -243,10 +243,10 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     handle = find("button[aria-label='Move English']")
     handle.send_keys(:space)
-    assert_selector "[data-admin--sortable-rows-target=announcer]", text: /Picked up English\. Position 1 of 3/, visible: :all
+    assert_selector "[data-admin--settings--sortable-rows-target=announcer]", text: /Picked up English\. Position 1 of 3/, visible: :all
     handle.send_keys(:down)
     handle.send_keys(:space)
-    assert_selector "[data-admin--sortable-rows-target=announcer]", text: /Dropped English\. Position 2 of 3/, visible: :all
+    assert_selector "[data-admin--settings--sortable-rows-target=announcer]", text: /Dropped English\. Position 2 of 3/, visible: :all
     assert_language_order %w[de en es]
     assert_selector footer, text: /\b1 unsaved change\b/i
 

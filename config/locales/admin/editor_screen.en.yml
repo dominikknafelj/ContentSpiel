@@ -1,0 +1,148 @@
+# CS Studio's editor-screen components, `app/components/admin/editor_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.editor_screen.<class name without Admin:: and Component, underscored>`.
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      editor_screen:
+        # A block's form drawn as the open panel of a section (sections spec
+        # §4.3). The rest of the block card is not converted yet. The panel's
+        # heading is `editor_screen.panel_title`. `move_into` is the one item
+        # of a top-level card's "⋯" menu that sections added (spec §4.4).
+        block_card:
+          close: "Close"
+          move_into: "Move into section…"
+
+        # The "+" at the end of a section's lane (sections spec §4.2): the
+        # name of a button whose label is the glyph.
+        block_picker:
+          add_to_column: "Add a block to column %{number}"
+        # One line of a block's content on its tile in a section (sections
+        # spec §4.2), and what marks a tile that needs attention.
+        tile_summary:
+          unavailable: "Unavailable type — %{type}"
+          no_image: "No image chosen"
+          empty_text: "Empty text"
+          any_type: "All posts"
+          tag: "tag %{name}"
+          needs_fixing: "Needs fixing"
+          attention: "Needs attention"
+        # A tile's "⋯" menu (sections spec §4.4): every move a drag makes,
+        # by name. `actions` names the button, whose label is the glyph.
+        block_tile:
+          actions: "Block actions"
+          move_up: "Move up"
+          move_down: "Move down"
+          move_to_column: "Move to column…"
+          move_out: "Move out of section"
+          duplicate: "Duplicate"
+          delete: "Delete block…"
+        # The one "Move block" dialog of the page editor. `column` and
+        # `section_column` are the choices `admin--editor--blocks#askWhere` writes
+        # into its select: a tile is offered the other columns of its own
+        # section; a card every column of every section, the sections
+        # numbered as they stand in the page's list, top to bottom.
+        move_dialog:
+          title: "Move block"
+          destination: "Move to"
+          cancel: "Cancel"
+          move: "Move"
+          column: "Column %{column}"
+          section_column: "Section %{section} · column %{column}"
+        # What `admin--editor--blocks` says in its live region after a move made
+        # from a "⋯" menu: the focus lands on a button every block names the
+        # same, so this is what tells a screen reader which block went where.
+        # `block` is the block's type as its card or tile shows it; the
+        # position is the block's place among the blocks of where it now is.
+        # `back` follows a move that was refused or failed.
+        block_moves:
+          up: "%{block} moved up. Position %{position} of %{count}."
+          down: "%{block} moved down. Position %{position} of %{count}."
+          column: "%{block} moved to column %{column}. Position %{position} of %{count}."
+          into: "%{block} moved to column %{column} of section %{section}. Position %{position} of %{count}."
+          out: "%{block} moved out of the section. Position %{position} of %{count}."
+          back: "%{block} is back where it was."
+        # The confirmation behind every "Delete block…", in a card and in a
+        # tile.
+        delete_block_dialog:
+          title: "Delete this block?"
+          body: "Blocks don’t go to the trash. This can’t be undone."
+          confirm: "Delete block"
+        # The heading of a block's form under a section's lanes.
+        panel_title:
+          title: "%{type} · column %{column}"
+        section_card:
+          name: "Section"
+          move: "Move section"
+          # The header's two selects (sections spec §4.1); the labels name
+          # controls that show only their value.
+          background: "Background"
+          backgrounds:
+            none: "No background"
+            tinted: "Tinted"
+            strong: "Strong"
+          width: "Width"
+          widths:
+            content: "Content width"
+            full: "Full width"
+          # The section's "⋯" menu and the dialog its last item opens.
+          actions: "Section actions"
+          move_up: "Move up"
+          move_down: "Move down"
+          duplicate: "Duplicate"
+          remove_keep: "Remove section, keep blocks"
+          delete: "Delete section and its blocks…"
+          delete_title: "Delete this section?"
+          delete_body: "Blocks don’t go to the trash. This can’t be undone."
+          delete_confirm: "Delete section"
+          # A section whose type is no longer registered (sections spec §6):
+          # the unavailable block card's own heading, over the blocks it
+          # holds. Its two buttons are `remove_keep` and `delete` above, the
+          # menu's own words, and the sentence names all three ways out
+          # without promising that the blocks are safe from the second.
+          unavailable: "Unavailable type — %{type}"
+          unavailable_hint: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
+          # The toast of a block that was not moved between the list and a
+          # column, or between sections, because its form holds an edit that
+          # was not saved (`admin--editor--blocks#move`): the move would redraw the
+          # form.
+          unsaved_move: "Reload or fix this block before moving it."
+          # Under the reason of a refused move whose answer did not redraw
+          # the list, because a form on the screen holds text that is not
+          # saved (`admin--editor--blocks#renderKeepingForms`).
+          reload_later: "Something on this page changed elsewhere. Reload once your unsaved text is safe."
+        # The layout menu in a section's header: `name` is the button's
+        # accessible name, `label` the word on it beside the diagram, and
+        # each layout's name is what a screen reader gets for its diagram.
+        section_layout_menu:
+          name: "Layout"
+          label: "Layout"
+          layouts:
+            one: "One column"
+            two: "Two columns"
+            three: "Three columns"
+            four: "Four columns"
+            one_two: "One third, two thirds"
+            two_one: "Two thirds, one third"
+        # Under the delete dialog's sentence, for a section that holds blocks.
+        section_delete_count:
+          blocks:
+            one: "This also deletes the %{count} block in it."
+            other: "This also deletes the %{count} blocks in it."
+        # "3 columns · 5 blocks" in a section's header.
+        section_summary:
+          columns:
+            one: "%{count} column"
+            other: "%{count} columns"
+          blocks:
+            one: "%{count} block"
+            other: "%{count} blocks"
+        section_lanes:
+          column: "Column %{number}"
+        # A section on a translation tab (sections spec §4.5): a heading over
+        # its blocks' cards. `unavailable` is the heading of one whose type
+        # is no longer registered.
+        section_group:
+          heading: "Section"
+          unavailable: "Unavailable type — %{type}"

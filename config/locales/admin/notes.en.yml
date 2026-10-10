@@ -64,8 +64,8 @@ en:
           not_stored: "The files could not be stored. Nothing was saved: try again."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
         pin_resolved: "Reopen this note before pinning it."
-      # What the notes' scripts say. `mentions` is `admin--note-composer`'s
-      # (`messages_data` on the composer's form); the rest is `admin--notes`',
+      # What the notes' scripts say. `mentions` is `admin--notes--composer`'s
+      # (`messages_data` on the composer's form); the rest is `admin--notes--drawer`',
       # which lives on <body>, so they are <body>'s
       # (`Admin::MessagesHelper::SCRIPT_MESSAGES`): the header button's name,
       # a marker's name in each of its three states, and the sentence a
@@ -93,7 +93,7 @@ en:
           count:
             one: "%{count} person. Use the arrow keys and Enter."
             other: "%{count} people. Use the arrow keys and Enter."
-        # The composer's chosen files (`admin--note-composer`): what is
+        # The composer's chosen files (`admin--notes--composer`): what is
         # refused in place, before anything is sent, and the name of a row's
         # remove button.
         files:
@@ -107,7 +107,7 @@ en:
         # What the submit reads while its note is being sent, once that has
         # taken longer than a moment (the handoff's decision 41).
         sending: "Sending…"
-        # The toast a note addressed to the viewer raises (`admin--notes-live`):
+        # The toast a note addressed to the viewer raises (`admin--notes--live`):
         # "Dana mentioned you on Pricing", with "Open". `placeholder` is what
         # the layout's template holds until the script writes the sentence.
         toast:
@@ -219,18 +219,19 @@ en:
             failed: "The notes couldn't be loaded or saved. Try again."
     components:
       # The legend's swatch for a node's notes badge.
-      mind_graph_legend:
-        notes: "Open notes"
+      mind_graph_screen:
+        legend:
+          notes: "Open notes"
       # "Add note", first in the "⋯" menu of a block's card and of its tile in
       # a section. Neither component's other strings live here
-      # (`components.en.yml` has the tile's; the card is not converted): these
+      # (`editor_screen.en.yml` has the tile's; the card is not converted): these
       # two merge into their scopes.
-      block_card:
-        add_note: "Add note"
       editor_screen:
+        block_card:
+          add_note: "Add note"
         block_tile:
           add_note: "Add note"
-        # The editor header's Notes button. `components.en.yml` holds nothing
+        # The editor header's Notes button. `editor_screen.en.yml` holds nothing
         # of the header's yet (it is not converted); these merge into its
         # scope.
         header:
@@ -267,10 +268,11 @@ en:
           open_notes:
             one: "%{count} open note"
             other: "%{count} open notes"
-      tree_node:
-        open_notes:
-          one: "%{count} open note"
-          other: "%{count} open notes"
+      pages_screen:
+        tree_node:
+          open_notes:
+            one: "%{count} open note"
+            other: "%{count} open notes"
       notes_screen:
         drawer:
           title: "Notes"

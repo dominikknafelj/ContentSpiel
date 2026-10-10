@@ -1,7 +1,7 @@
 module Admin
   module TranslationScreen
     # `Admin::TranslationScreen::PendingComponent`: the running state. The
-    # 25-second state is in the markup too, hidden (`admin--translate` flips
+    # 25-second state is in the markup too, hidden (`admin--translation--translate` flips
     # it); the preview shows it by itself.
     class PendingComponentPreview < ViewComponent::Preview
       def running

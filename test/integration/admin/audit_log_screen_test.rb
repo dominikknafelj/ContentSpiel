@@ -136,7 +136,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
   test "the toolbar is one row of selects that apply on change" do
     get "/cs-studio/audit_events"
 
-    assert_select "form[data-controller='admin--auto-submit'][data-turbo-frame=content]" do
+    assert_select "form[data-controller='admin--ui--auto-submit'][data-turbo-frame=content]" do
       %w[user_id event_action subject_type channel range].each { |name| assert_select "select##{name}" }
       assert_select "select#range option", text: "Today"
       assert_select "select#range option", text: "Last 7 days"

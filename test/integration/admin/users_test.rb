@@ -285,7 +285,7 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_select "#user_name[value=?]", "Typed name"
     assert_select "#user_email_address[value=?]", "typed@example.com"
     assert_select "input[name=base_updated_at][value=?]", stale
-    assert_select "#user-form[data-admin--save-bar-dirty-value=true]", 1, "the typed values count as unsaved"
+    assert_select "#user-form[data-admin--saving--save-bar-dirty-value=true]", 1, "the typed values count as unsaved"
     assert_equal "Renamed elsewhere", user.reload.name
     assert_not_equal "typed@example.com", user.email_address
   end

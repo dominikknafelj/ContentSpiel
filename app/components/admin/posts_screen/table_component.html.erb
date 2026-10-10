@@ -4,8 +4,8 @@
       <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
         <% if selectable? %>
           <th scope="col" class="w-10 py-2 pl-3.5 pr-2">
-            <%= render Admin::CheckboxComponent.new(name: "select_all", id: "posts-select-all", aria: { label: "Select all posts on this page" },
-                  data: { "admin--bulk-select-target": "all", action: "change->admin--bulk-select#toggleAll" }) %>
+            <%= render Admin::Ui::CheckboxComponent.new(name: "select_all", id: "posts-select-all", aria: { label: "Select all posts on this page" },
+                  data: { "admin--posts--bulk-select-target": "all", action: "change->admin--posts--bulk-select#toggleAll" }) %>
           </th>
         <% end %>
         <th scope="col" class="py-2 pr-4<%= " pl-3.5" unless selectable? %>">Title</th>
@@ -30,8 +30,8 @@
         <tr id="<%= helpers.dom_id(post) %>" class="border-b border-line align-middle hover:bg-paper data-[selected]:bg-accent-tint">
           <% if selectable? %>
           <td class="py-2.5 pl-3.5 pr-2">
-            <%= render Admin::CheckboxComponent.new(name: "select[]", value: post.id, id: "select-post-#{post.id}", aria: { label: "Select #{title_of(post)}" },
-                  data: { "admin--bulk-select-target": "row", action: "change->admin--bulk-select#sync" }) %>
+            <%= render Admin::Ui::CheckboxComponent.new(name: "select[]", value: post.id, id: "select-post-#{post.id}", aria: { label: "Select #{title_of(post)}" },
+                  data: { "admin--posts--bulk-select-target": "row", action: "change->admin--posts--bulk-select#sync" }) %>
           </td>
           <% end %>
           <th scope="row" class="w-2/5 max-w-0 py-2.5 pr-4 text-left font-normal<%= " pl-3.5" unless selectable? %>">
@@ -40,8 +40,8 @@
               <span class="truncate font-cs-mono text-[11px] text-meta"><%= path_of(post) || "Not listed" %></span>
             <% end %>
           </th>
-          <td class="py-2.5 pr-4 text-dim"><%= render Admin::ContentTypeDotComponent.new(content_type: post.content_type) %></td>
-          <td class="py-2.5 pr-4"><%= render Admin::StatusChipComponent.new(status: post.status, at: post.published_at, hide_live: true) %></td>
+          <td class="py-2.5 pr-4 text-dim"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: post.content_type) %></td>
+          <td class="py-2.5 pr-4"><%= render Admin::Ui::StatusChipComponent.new(status: post.status, at: post.published_at, hide_live: true) %></td>
           <%# One chip per *target* language (translation helpers spec §4): the
               original is what the others are measured against, so it has no
               state of its own here. %>
@@ -49,7 +49,7 @@
             <span class="inline-flex flex-wrap gap-1">
               <% translation_states.fetch(post).each do |code, state| %>
                 <%= link_to editor_path(post, locale: code), class: "no-underline" do %>
-                  <%= render Admin::TranslationChipComponent.new(state: state, locale: code) %>
+                  <%= render Admin::Ui::TranslationChipComponent.new(state: state, locale: code) %>
                 <% end %>
               <% end %>
             </span>
@@ -62,22 +62,22 @@
                     data: { notes_count: true, has_notes: true, unread: (true if notes_unread?(post)) } %>
             <% end %>
           </td>
-          <td class="py-2.5 pr-4 text-meta"><%= render Admin::TimeAgoComponent.new(time: post.updated_at) %></td>
+          <td class="py-2.5 pr-4 text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: post.updated_at) %></td>
           <td class="py-2.5 pr-3 text-right">
-            <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Actions for #{title_of(post)}", close_on_select: true) do |menu| %>
+            <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Actions for #{title_of(post)}", close_on_select: true) do |menu| %>
               <% menu.with_item { link_to "Open", editor_path(post) } %>
               <% if site_path(post) %>
                 <% menu.with_item { link_to "View on site", site_path(post), target: "_blank", rel: "noopener" } %>
               <% end %>
               <% if can?("posts.delete", post) %>
                 <%# Selects just this row and opens the bulk trash confirmation
-                    (`admin--bulk-select#only`): one path for trashing, with
+                    (`admin--posts--bulk-select#only`): one path for trashing, with
                     its confirmation, its filters and its Undo. %>
                 <% menu.with_item do %>
                   <%= tag.button "Move to trash", type: "button", class: "text-danger-ink",
-                        data: { action: "admin--bulk-select#only admin--dialog#open", "admin--bulk-select-id-param": post.id,
-                                "admin--bulk-select-dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID,
-                                "admin--dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID } %>
+                        data: { action: "admin--posts--bulk-select#only admin--ui--dialog#open", "admin--posts--bulk-select-id-param": post.id,
+                                "admin--posts--bulk-select-dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID,
+                                "admin--ui--dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID } %>
                 <% end %>
               <% end %>
             <% end %>

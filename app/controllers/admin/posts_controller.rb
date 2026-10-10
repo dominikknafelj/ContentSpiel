@@ -3,9 +3,9 @@ module Admin
   # post" (content type first, then everything else, like the page tree's
   # own title-only "Add a page"), and the post editor -- the page editor's
   # own shell/autosave/publish shape (`Admin::PagesController`), just folded
-  # into one component (`Admin::PostFormComponent`) instead of a header plus
+  # into one component (`Admin::EditorScreen::PostFormComponent`) instead of a header plus
   # a settings form, since there's exactly one post form per screen (no
-  # `Admin::BlockCardComponent`-style multi-instance-per-page id collision
+  # `Admin::EditorScreen::BlockCardComponent`-style multi-instance-per-page id collision
   # to disambiguate against either).
   class PostsController < BaseController
     include AutosaveResponses
@@ -152,7 +152,7 @@ module Admin
     # `title`/`slug`/`excerpt`/`body` are translated columns, split into
     # `attributes:`/`translations:` the same fixed way every PATCH here does
     # (`body` is the rich-text document JSON the Tiptap editor writes into
-    # its hidden input, `admin--rich-text`, passed through untouched --
+    # its hidden input, `admin--rich-text--editor`, passed through untouched --
     # `HasRichTextBody` parses and validates it); the content type's own
     # typed `fields` are split *per field*
     # (`split_fields`, mirroring `Admin::ContentBlocksController
@@ -190,7 +190,7 @@ module Admin
       tag_names = split_tag_names(post_params[:tag_names]) if post_params.key?(:tag_names)
       attributes[:tag_names] = tag_names if tag_names
 
-      # The related-posts picker's own contract (`Admin::RelatedPostsComponent`
+      # The related-posts picker's own contract (`Admin::EditorScreen::RelatedPostsComponent`
       # / `Posts::Save#assign_related_posts`): passed on only when the key
       # was actually submitted -- absent leaves the relations alone, the
       # picker's blank sentinel alone (`[""]`) clears them.
@@ -439,7 +439,7 @@ module Admin
     # already knows the raw string is comma-separated at all -- `assign_tags`
     # only ever sees a plain Array by the time it runs.
     #
-    # The chip input (`Admin::ChipInputComponent`) submits `post[tag_names][]`
+    # The chip input (`Admin::Ui::ChipInputComponent`) submits `post[tag_names][]`
     # instead -- one element per tag, plus an empty sentinel so an emptied list
     # still arrives.
     #
@@ -514,11 +514,11 @@ module Admin
     # slots `group_error_streams` below handles instead, since the row count
     # isn't known ahead of time the way this fixed field list is).
     #
-    # Every `Admin::FieldComponent` this controller's own view renders for a
+    # Every `Admin::Ui::FieldComponent` this controller's own view renders for a
     # typed field is given `id_prefix: "post"` explicitly (`Admin::
-    # PostFormComponent::ID_PREFIX`) rather than the default derived from
+    # EditorScreen::PostFormComponent::ID_PREFIX`) rather than the default derived from
     # `form_name` ("post[fields]" -> "post_fields") -- so its errors_id
-    # agrees with `Admin::FieldComponent.error_id("post", field.name)` here,
+    # agrees with `Admin::Ui::FieldComponent.error_id("post", field.name)` here,
     # the same bare-"post" prefix every column field's own id already uses.
     def post_error_fields
       fields = {
@@ -529,14 +529,14 @@ module Admin
         # No validation reports against `:tag_names` today (`Posts::Save
         # #assign_tags` finds-or-builds a `Tag` per name, and a blank/
         # duplicate name is already filtered out before it ever reaches
-        # that point) -- wired up anyway so `Admin::ChipInputComponent`'s own
+        # that point) -- wired up anyway so `Admin::Ui::ChipInputComponent`'s own
         # error slot (fix round 1 review) is always cleared/replaced like
         # every other field's, and a later validation on this attribute
         # (e.g. rejecting a tag name that's too long) has somewhere to land
         # without a second wiring pass.
         tag_names: [ "tag_names" ],
         # `Posts::Save#assign_related_posts`' unknown-id error, in
-        # `Admin::RelatedPostsComponent`'s own slot.
+        # `Admin::EditorScreen::RelatedPostsComponent`'s own slot.
         related_post_ids: [ "related_post_ids" ]
       }
 
@@ -561,12 +561,12 @@ module Admin
     # asked of `Admin::Fields::GroupField`/`GroupsField` directly (there's no
     # instance of either in a controller) -- but by the *exact* formula those
     # components' own default `id_prefix` (no override passed at the render
-    # site, unlike `Admin::BlockCardComponent`'s -- see `Admin::
-    # PostFormComponent`'s own comment for why there's nothing to
-    # disambiguate against here) already derives: `Admin::FieldComponent.
+    # site, unlike `Admin::EditorScreen::BlockCardComponent`'s -- see `Admin::
+    # EditorScreen::PostFormComponent`'s own comment for why there's nothing to
+    # disambiguate against here) already derives: `Admin::Ui::FieldComponent.
     # dom_id_prefix("post[fields][#{field.name}]" plus, for a `groups` row,
     # "[#{index}]")`. Keeping the two in sync is why both this method and
-    # `Admin::PostFormComponent`'s own field loop are the only two places
+    # `Admin::EditorScreen::PostFormComponent`'s own field loop are the only two places
     # that ever have to agree on that literal `"post[fields]"` string.
     def group_error_streams(record, definition, fields_hash)
       definition.fields.select(&:group?).flat_map do |field|
@@ -575,11 +575,11 @@ module Admin
 
         rows.each_with_index.flat_map do |_row, index|
           row_form_name = field.type == :groups ? "post[fields][#{field.name}][#{index}]" : "post[fields][#{field.name}]"
-          id_prefix = Admin::FieldComponent.dom_id_prefix(row_form_name)
+          id_prefix = Admin::Ui::FieldComponent.dom_id_prefix(row_form_name)
 
           group_definition.fields.map do |subfield|
             attribute = field.type == :groups ? "fields.#{field.name}.#{index}.#{subfield.name}" : "fields.#{field.name}.#{subfield.name}"
-            id = Admin::FieldComponent.error_id(id_prefix, subfield.name)
+            id = Admin::Ui::FieldComponent.error_id(id_prefix, subfield.name)
             messages = record.errors.full_messages_for(attribute)
             turbo_stream.replace(id, partial: "admin/shared/field_errors", locals: { id: id, messages: messages })
           end

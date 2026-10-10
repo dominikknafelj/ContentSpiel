@@ -30,8 +30,8 @@ module Audit
   # not a later change.
   #
   # It answers data only (the event, whose `user`/`user_id` and
-  # `last_occurred_at` the caller draws through `Admin::UserNameComponent` and
-  # `Admin::TimeAgoComponent`), and takes the viewer as an argument rather
+  # `last_occurred_at` the caller draws through `Admin::Ui::UserNameComponent` and
+  # `Admin::Ui::TimeAgoComponent`), and takes the viewer as an argument rather
   # than reading `Current`.
   class ChangeSince
     SLACK = 1.second

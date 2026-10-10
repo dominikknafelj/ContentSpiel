@@ -308,13 +308,13 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
   test "a type nothing lists says so in the URL line; a listed one shows its page's path" do
     sign_in_as(users(:one))
     get "/cs-studio/posts/new", headers: { "Turbo-Frame" => "new-post-form-frame" }
-    assert_select "p[data-admin--new-record-target=url]", text: "Not listed on any page yet"
+    assert_select "p[data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
     assert_select "input[value=blog][data-path]", count: 0
 
     ContentBlock.create!(owner: @services, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     get "/cs-studio/posts/new", headers: { "Turbo-Frame" => "new-post-form-frame" }
     assert_select "input[value=blog][data-path='/services']"
-    assert_select "p[data-admin--new-record-target=url]", text: "URL: /services/"
+    assert_select "p[data-admin--editor--new-record-target=url]", text: "URL: /services/"
   end
 
   test "the New post form is forbidden when no type can be created" do
@@ -333,7 +333,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/pages/new", headers: { "Turbo-Frame" => "new-page-form-frame" }
     assert_select "#new-page-inside", count: 0
-    assert_select "[data-admin--new-record-target=note]", text: "Created as the home page."
+    assert_select "[data-admin--editor--new-record-target=note]", text: "Created as the home page."
 
     assert_difference "Page.count", 1 do
       post "/cs-studio/pages", params: { page: { title: "Home" } }

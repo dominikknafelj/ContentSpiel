@@ -5,7 +5,7 @@ module Admin
     # trigger names: `dialog_trigger`).
     #
     # ONE COMPONENT, DRAWN WHERE THE BLOCK'S OWN ELEMENT IS: inside the card
-    # of a block of the page's list (`Admin::BlockCardComponent`), and inside
+    # of a block of the page's list (`Admin::EditorScreen::BlockCardComponent`), and inside
     # the TILE of a block in a section's column (`BlockTileComponent`) --
     # not in that block's form panel, where it used to be. A panel is `hidden`
     # until its tile is pressed, and a `<dialog>` inside a hidden element is
@@ -42,7 +42,7 @@ module Admin
 
       # The dialog's warning about open notes (notes spec D12), for this
       # dialog and for a section's: an empty, hidden paragraph that
-      # `admin--notes` fills and shows while what `within` names has open
+      # `admin--notes--drawer` fills and shows while what `within` names has open
       # threads. The look is the warn alert's (`border-warn bg-warn-tint`).
       # The server writes no number into it, for the reason a marker holds
       # none (`Admin::NotesScreen::MarkerComponent`).
@@ -62,7 +62,7 @@ module Admin
       # inside it: a section takes none of its own (the handoff's decision 10).
       def self.notes_warning_attributes(within, spacing: nil, alone: false, kind: :block)
         { hidden: true, class: [ NOTES_WARNING_CLASS, spacing ],
-          data: { "admin--notes-target": "warning", notes_within: within, notes_warning: kind, **(alone ? { notes_alone: "" } : {}) } }
+          data: { "admin--notes--drawer-target": "warning", notes_within: within, notes_warning: kind, **(alone ? { notes_alone: "" } : {}) } }
       end
 
       def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)

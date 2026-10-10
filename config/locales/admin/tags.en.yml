@@ -6,7 +6,7 @@
 # column and the tag chips' suggestions share.
 #
 # THE NAME IN THE DIALOG SENTENCES stays in “curly quotes”, literally:
-# `admin--tag-dialogs` finds the live tag name inside the finished sentence by
+# `admin--tags--dialogs` finds the live tag name inside the finished sentence by
 # those quotes and swaps it after an inline rename. A language that quotes
 # differently (German „Name“) changes the quotes here and in that controller's
 # one `QUOTES` pair together.
@@ -52,7 +52,7 @@ en:
           submit: "Delete tag"
 
       dialogs:
-        # Said by `admin--tag-dialogs` when the delete answer is a refusal.
+        # Said by `admin--tags--dialogs` when the delete answer is a refusal.
         delete_failed: "The tag wasn't deleted. Reload the list and try again."
         merge:
           title: "Merge “%{name}” into…"

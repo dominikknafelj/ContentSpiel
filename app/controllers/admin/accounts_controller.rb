@@ -47,7 +47,7 @@ module Admin
         # the focus. The fragment in `Location` is for a client that follows
         # it itself; Turbo drops it, so the page is told whose answer it is
         # (`flash[:password_answer]`, a mark and no message) and draws the
-        # card's alert, which `admin--password-answer` brings into view.
+        # card's alert, which `admin--account--password-answer` brings into view.
         flash[:password_answer] = "saved"
         redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other
       else
@@ -76,10 +76,10 @@ module Admin
     # happened. The stream replaces the one thing a new name changes outside
     # the field itself, the sidebar's account block, and says "Settings saved";
     # the footer takes what it sent as its new baseline
-    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect.
+    # (`admin--saving--save-bar#submitEnded`). Without Turbo it is the redirect.
     #
     # The stream carries a second thing a save changes outside the form: the
-    # two notes settings as the scripts hold them (`admin--notes-alert`, on
+    # two notes settings as the scripts hold them (`admin--notes--alert`, on
     # <body>). <body> is not drawn again by this answer, nor by any move
     # between screens inside `#content`, so its values stayed what they were
     # when the tab was loaded: a desktop notification switched on here was

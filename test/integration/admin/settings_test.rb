@@ -90,7 +90,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Settings sections'] a[href='#ai']", text: "AI translation"
     assert_select ".admin-save-bar", 1
     assert_select "form#settings-form .admin-save-bar"
-    assert_select "[data-controller~='admin--autosave']", count: 0
+    assert_select "[data-controller~='admin--saving--autosave']", count: 0
   end
 
   # -- saving -------------------------------------------------------------------
@@ -130,7 +130,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select ".admin-error-summary a[href='#settings-en-title']", text: "Title can't be blank"
     assert_select "input#settings-de-title[value=?]", "Danas Notizen"
-    assert_select "form#settings-form[data-admin--save-bar-dirty-value='true']"
+    assert_select "form#settings-form[data-admin--saving--save-bar-dirty-value='true']"
     assert_not_equal "", @site.reload.title(locale: "en")
     assert_nil @site.read_attribute(:title)["de"]
   end
@@ -244,7 +244,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_response :see_other
     assert_equal({ "GitHub" => "https://github.com/dana", "Blog" => "https://example.org/blog" }, @site.reload.social_links)
     get "/cs-studio/settings"
-    assert_select "#settings-social-links [data-admin--repeat-rows-target=list] input[name$='[name]']", 2
+    assert_select "#settings-social-links [data-admin--settings--repeat-rows-target=list] input[name$='[name]']", 2
     assert_select "#settings-social-links input[value='GitHub']"
     assert_select "#settings-social-links input[value='https://example.org/blog']"
   end
@@ -271,7 +271,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/settings"
 
     assert_select "input[name='site_setting[social_links][0][name]']", 1
-    assert_select "#settings-social-links [data-admin--repeat-rows-target=list] input[name$='[name]']", 1
+    assert_select "#settings-social-links [data-admin--settings--repeat-rows-target=list] input[name$='[name]']", 1
     assert_select "template#settings-social-link-template input[name$='[name]']", 1
     assert_select "button", text: "+ Add link"
   end

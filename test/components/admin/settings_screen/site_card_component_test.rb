@@ -25,11 +25,11 @@ class Admin::SettingsScreen::SiteCardComponentTest < ViewComponent::TestCase
     assert_selector "label", text: "Title · translatable", visible: :all, minimum: 3
   end
 
-  test "the tabs are driven by admin--settings-tabs and the pairs sit in a translation form container" do
+  test "the tabs are driven by admin--settings--tabs and the pairs sit in a translation form container" do
     render_card
 
-    assert_selector "section[data-controller='admin--settings-tabs'][data-admin--settings-tabs-current-value='en']"
-    assert_selector "button[role=tab][data-admin--settings-tabs-target=tab][data-code=de]"
+    assert_selector "section[data-controller='admin--settings--tabs'][data-admin--settings--tabs-current-value='en']"
+    assert_selector "button[role=tab][data-admin--settings--tabs-target=tab][data-code=de]"
     assert_selector ".admin-translation-form [data-language-panel='de']", visible: :all
   end
 
@@ -55,11 +55,11 @@ class Admin::SettingsScreen::SiteCardComponentTest < ViewComponent::TestCase
 
     assert_selector "select[name='site_setting[time_zone]']"
     assert_text "Used for scheduled publishing."
-    assert_selector "[data-admin--repeat-rows-target=list] input[name='site_setting[social_links][0][name]'][placeholder='Label, e.g. GitHub']", count: 1
-    assert_selector "[data-admin--repeat-rows-target=list] input", count: 2
-    assert_selector "[data-admin--repeat-rows-target=list] button[aria-label='Remove link']", count: 1
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name='site_setting[social_links][0][name]'][placeholder='Label, e.g. GitHub']", count: 1
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input", count: 2
+    assert_selector "[data-admin--settings--repeat-rows-target=list] button[aria-label='Remove link']", count: 1
     assert_selector "template#settings-social-link-template", visible: :all
-    assert_selector "button[data-action='admin--repeat-rows#add']", text: "+ Add link"
+    assert_selector "button[data-action='admin--settings--repeat-rows#add']", text: "+ Add link"
   end
 
   test "typed values beat stored ones, and the stored time zone is always an option" do
@@ -70,6 +70,6 @@ class Admin::SettingsScreen::SiteCardComponentTest < ViewComponent::TestCase
     assert_selector "input#settings-de-title[value='Typed']"
     assert_selector "select[name='site_setting[time_zone]'] option[selected][value='Mars/Olympus']"
     assert_selector "input[name='site_setting[social_links][0][url]'][value='github.com/x']"
-    assert_selector "[data-admin--repeat-rows-target=list] input[name$='[name]']", count: 2
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 2
   end
 end

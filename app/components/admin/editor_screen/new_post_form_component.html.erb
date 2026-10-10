@@ -1,5 +1,5 @@
 <%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top" } do %>
-  <%= render Admin::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
 
   <fieldset id="<%= TYPE_ID %>" class="mb-4">
     <legend class="<%= setup_label_class %>">Type</legend>
@@ -7,8 +7,8 @@
       <% choices.each do |choice| %>
         <label class="inline-flex cursor-pointer items-center rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:bg-sunken has-checked:border-accent has-checked:bg-accent-tint has-checked:font-semibold has-focus-visible:outline-2 has-focus-visible:outline-accent">
           <%= radio_button_tag "post[content_type]", choice.name, selected?(choice), id: "#{TYPE_ID}-#{choice.name.parameterize}", class: "sr-only",
-                data: { path: choice.path, admin__new_record_target: "type" } %>
-          <%= render Admin::ContentTypeDotComponent.new(content_type: choice.name) %>
+                data: { path: choice.path, admin__editor__new_record_target: "type" } %>
+          <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: choice.name) %>
         </label>
       <% end %>
     </div>
@@ -17,9 +17,9 @@
   <div class="mb-2">
     <label for="<%= TITLE_ID %>" class="<%= setup_label_class %>">Title</label>
     <%= text_field_tag "post[title]", title, id: TITLE_ID, autofocus: true, autocomplete: "off", class: setup_input_class,
-          data: { admin__new_record_target: "title" }, aria: { invalid: (title_invalid? ? "true" : nil) } %>
+          data: { admin__editor__new_record_target: "title" }, aria: { invalid: (title_invalid? ? "true" : nil) } %>
   </div>
 
-  <p data-admin--new-record-target="url" class="font-cs-mono text-[13px] text-dim"><%= initial_url %></p>
+  <p data-admin--editor--new-record-target="url" class="font-cs-mono text-[13px] text-dim"><%= initial_url %></p>
   <p class="mt-1 text-[13px] text-meta"><%= note %></p>
 <% end %>

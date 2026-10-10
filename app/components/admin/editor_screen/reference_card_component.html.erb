@@ -3,7 +3,7 @@
     <summary class="flex cursor-pointer items-baseline justify-between gap-2 font-cs-mono text-label uppercase tracking-mono text-meta">
       <span><%= language_name %></span>
       <% if changed_at %>
-        <span class="text-warn-ink">↻ Changed <%= render Admin::TimeAgoComponent.new(time: changed_at) %></span>
+        <span class="text-warn-ink">↻ Changed <%= render Admin::Ui::TimeAgoComponent.new(time: changed_at) %></span>
       <% end %>
     </summary>
 

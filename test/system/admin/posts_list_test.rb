@@ -22,14 +22,14 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     visit admin_posts_path
     await_admin_controllers
     assert_selector "tbody tr", count: 3
-    assert_no_selector "[data-admin--bulk-select-target=bar]", visible: :visible
+    assert_no_selector "[data-admin--posts--bulk-select-target=bar]", visible: :visible
 
     tick(@first)
     tick(@second)
-    assert_selector "[data-admin--bulk-select-target=bar]", text: "2 selected"
-    assert_selector "thead input[data-admin--bulk-select-target=all]:indeterminate"
+    assert_selector "[data-admin--posts--bulk-select-target=bar]", text: "2 selected"
+    assert_selector "thead input[data-admin--posts--bulk-select-target=all]:indeterminate"
 
-    within("[data-admin--bulk-select-target=bar]") { press "Publish" }
+    within("[data-admin--posts--bulk-select-target=bar]") { press "Publish" }
     assert_selector "#toasts .admin-toast", text: "Published 2 posts.", wait: 10
     assert @first.reload.live?
     assert @second.reload.live?
@@ -37,21 +37,21 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_selector "tr#post_#{@third.id} .admin-status-chip", text: "Draft"
     assert_no_selector "tr#post_#{@first.id} .admin-status-chip"
     assert_no_selector "tr#post_#{@second.id} .admin-status-chip"
-    assert_no_selector "[data-admin--bulk-select-target=bar]", visible: :visible
+    assert_no_selector "[data-admin--posts--bulk-select-target=bar]", visible: :visible
   end
 
   test "the header checkbox selects every row on the page and clears them again" do
     visit admin_posts_path
     await_admin_controllers
     find("#posts-select-all").click
-    assert_selector "[data-admin--bulk-select-target=bar]", text: "3 selected"
+    assert_selector "[data-admin--posts--bulk-select-target=bar]", text: "3 selected"
     find("#posts-select-all").click
-    assert_no_selector "[data-admin--bulk-select-target=bar]", visible: :visible
+    assert_no_selector "[data-admin--posts--bulk-select-target=bar]", visible: :visible
 
     tick(@first)
-    assert_selector "[data-admin--bulk-select-target=bar]", text: "1 selected"
-    within("[data-admin--bulk-select-target=bar]") { press "Clear" }
-    assert_no_selector "[data-admin--bulk-select-target=bar]", visible: :visible
+    assert_selector "[data-admin--posts--bulk-select-target=bar]", text: "1 selected"
+    within("[data-admin--posts--bulk-select-target=bar]") { press "Clear" }
+    assert_no_selector "[data-admin--posts--bulk-select-target=bar]", visible: :visible
     assert_not find("#select-post-#{@first.id}").checked?
   end
 
@@ -59,7 +59,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     visit admin_posts_path
     await_admin_controllers
     tick(@third)
-    within("[data-admin--bulk-select-target=bar]") { press "Move to trash" }
+    within("[data-admin--posts--bulk-select-target=bar]") { press "Move to trash" }
     within("dialog#bulk-trash-dialog[open]") do
       assert_text "1 post"
       press "Move to trash"
@@ -102,7 +102,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     tick(@first)
     tick(@third)
-    assert_selector "[data-admin--bulk-select-target=bar]", text: "2 selected"
+    assert_selector "[data-admin--posts--bulk-select-target=bar]", text: "2 selected"
 
     find("tr#post_#{@second.id} button[aria-label^='Actions for']").click
     find("tr#post_#{@second.id} [role=menu] button", text: "Move to trash").click
@@ -111,7 +111,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
       press "Cancel"
     end
     assert_no_selector "dialog[open]"
-    assert_selector "[data-admin--bulk-select-target=bar]", text: "2 selected"
+    assert_selector "[data-admin--posts--bulk-select-target=bar]", text: "2 selected"
     assert find("#select-post-#{@first.id}").checked?
     assert find("#select-post-#{@third.id}").checked?
     assert_not find("#select-post-#{@second.id}").checked?
@@ -125,18 +125,18 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
   test "reconnecting over ticked rows announces nothing until the selection changes" do
     visit admin_posts_path
     await_admin_controllers
-    status = "[data-admin--bulk-select-target=status]"
+    status = "[data-admin--posts--bulk-select-target=status]"
 
     page.execute_script(<<~JS)
       document.querySelector("#select-post-#{@first.id}").checked = true
-      const root = document.querySelector("[data-controller~='admin--bulk-select']")
+      const root = document.querySelector("[data-controller~='admin--posts--bulk-select']")
       window.__root = root
       window.__controllers = root.getAttribute("data-controller")
       root.setAttribute("data-controller", "")
     JS
     await_frames # Stimulus disconnects on the mutation, a task later
     page.execute_script("window.__root.setAttribute('data-controller', window.__controllers)")
-    assert_selector "[data-admin--bulk-select-target=bar]", text: "1 selected"
+    assert_selector "[data-admin--posts--bulk-select-target=bar]", text: "1 selected"
     assert_equal "", find(status, visible: :all).text(:all)
 
     tick(@second)

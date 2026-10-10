@@ -90,7 +90,7 @@ Rails.application.routes.draw do
     # upload, edit and delete library images, all through `Media::Upload`/
     # `Save`/`Destroy`. `index` is the grid (search, filters, pagination);
     # `show` is one image's detail panel; `create` is the grid's own
-    # multi-file upload (`admin--media-upload`, one request per file, per
+    # multi-file upload (`admin--media--upload`, one request per file, per
     # the global constraints' own ruling); `update`/`destroy` save/delete.
     # `resources :media` singularizes to "medium" for its member routes
     # (`admin_medium_path`) -- the plain, if slightly odd-looking, Rails

@@ -167,11 +167,11 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
   test "the save's stream hands the stored notes settings to the tab, and the layout holds the same element" do
     sign_in_as(users(:one))
     get "/cs-studio/account"
-    assert_select "body > span#notes-alert-settings[hidden][data-admin--notes-alert-target=settings][data-sound=true][data-desktop=false]", count: 1
+    assert_select "body > span#notes-alert-settings[hidden][data-admin--notes--alert-target=settings][data-sound=true][data-desktop=false]", count: 1
 
     patch admin_account_profile_path, params: { name: "Ada", notes_sound: "0", notes_desktop: "1" }, as: :turbo_stream
 
-    assert_select "turbo-stream[action=replace][target=notes-alert-settings] template span#notes-alert-settings[data-admin--notes-alert-target=settings][data-sound=false][data-desktop=true]"
+    assert_select "turbo-stream[action=replace][target=notes-alert-settings] template span#notes-alert-settings[data-admin--notes--alert-target=settings][data-sound=false][data-desktop=true]"
   end
 
   # The format is decided without `respond_to`: the name is saved by then.
@@ -194,7 +194,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:reader))
     get "/cs-studio/account"
 
-    assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--save-bar']" do
+    assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--saving--save-bar']" do
       # Decisions 19 and 20: "Your account", then two cards of one width,
       # Profile and Notes, and one footer under both, whose button is "Save".
       assert_select "section.max-w-\\[560px\\]", count: 2
@@ -202,22 +202,22 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
       assert_select "section[aria-labelledby=account-profile] label[for=name]", text: "Your name"
       assert_select "section[aria-labelledby=account-profile] input[name=name]"
       assert_select "section[aria-labelledby=account-notes] h3#account-notes", text: "Notes"
-      assert_select "section ~ [data-admin--save-bar-target=bar] button[type=submit]", text: "Save"
+      assert_select "section ~ [data-admin--saving--save-bar-target=bar] button[type=submit]", text: "Save"
       assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
       assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
       assert_select "label", text: "Play a sound when I'm mentioned"
       assert_select "label", text: "Show a desktop notification when I'm mentioned"
       # The permission is this browser's: both lines are drawn hidden, and
       # the script shows one while the switch is on.
-      assert_select "[data-controller='admin--notes-permission'] input[name=notes_desktop][data-admin--notes-permission-target=switch]"
-      assert_select "[data-controller='admin--notes-permission'] [hidden] button[type=button]:not([name])", text: "Allow in this browser"
-      assert_select "[data-controller='admin--notes-permission'] [hidden]", text: "Blocked in this browser. Change it in the site settings of your browser."
-      assert_select "[data-admin--save-bar-target=bar]", count: 1
+      assert_select "[data-controller='admin--notes--permission'] input[name=notes_desktop][data-admin--notes--permission-target=switch]"
+      assert_select "[data-controller='admin--notes--permission'] [hidden] button[type=button]:not([name])", text: "Allow in this browser"
+      assert_select "[data-controller='admin--notes--permission'] [hidden]", text: "Blocked in this browser. Change it in the site settings of your browser."
+      assert_select "[data-admin--saving--save-bar-target=bar]", count: 1
     end
     assert_select "form#notes-form", count: 0
-    assert_select "body[data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false][data-admin--notes-alert-person-value='#{users(:reader).id}']"
+    assert_select "body[data-admin--notes--alert-sound-value=true][data-admin--notes--alert-desktop-value=false][data-admin--notes--alert-person-value='#{users(:reader).id}']"
     # Changing the password draws the screen again: it waits for that one form.
-    assert_select "form#password-form[data-admin--save-bar-after-value='profile-form']"
+    assert_select "form#password-form[data-admin--saving--save-bar-after-value='profile-form']"
 
     patch "/cs-studio/account/profile", params: { name: "Ada", notes_sound: "0", notes_desktop: "1" }, headers: { "Accept" => "text/vnd.turbo-stream.html, text/html" }
 
@@ -231,7 +231,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/account"
     assert_select "input[name=notes_sound]:not([checked])"
     assert_select "input[name=notes_desktop][checked]"
-    assert_select "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
+    assert_select "body[data-admin--notes--alert-sound-value=false][data-admin--notes--alert-desktop-value=true]"
   end
 
   test "a request that sends no switch leaves both as they are" do
@@ -251,13 +251,13 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_equal [ nil, true, false ], users(:reader).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
-    assert_select "form#profile-form[data-admin--save-bar-dirty-value=true]" do
+    assert_select "form#profile-form[data-admin--saving--save-bar-dirty-value=true]" do
       assert_select "input[name=name][value='#{"a" * 121}']"
       assert_select "input[name=notes_sound]:not([checked])"
       assert_select "input[name=notes_desktop][checked]"
     end
     # The rest of the page is drawn from what is stored, not from what was refused.
-    assert_select "body[data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false]"
+    assert_select "body[data-admin--notes--alert-sound-value=true][data-admin--notes--alert-desktop-value=false]"
   end
 
   # Only ever the signed-in person's own: the request names no user.
@@ -337,7 +337,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/account/password", params: { current_password: "wrong", password: "new-password-1", password_confirmation: "new-password-1" }
     assert_response :unprocessable_entity
-    assert_select "section#password[data-controller='admin--password-answer']"
+    assert_select "section#password[data-controller='admin--account--password-answer']"
 
     patch "/cs-studio/account/profile", params: { name: "Ada" }
     follow_redirect!
@@ -345,7 +345,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/account/password", params: { current_password: "password", password: "new-password-1", password_confirmation: "new-password-1" }
     follow_redirect!
-    assert_select "section#password[data-controller='admin--password-answer']"
+    assert_select "section#password[data-controller='admin--account--password-answer']"
     get "/cs-studio/account"
     assert_select "section#password[data-controller]", count: 0
   end

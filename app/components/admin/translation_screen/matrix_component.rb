@@ -2,7 +2,7 @@ module Admin
   module TranslationScreen
     # The Translations matrix (design pass round 2, Task 18, handoff §4.4):
     # rows are items that need work in any target language, columns the target
-    # languages. Each cell is that language's `TranslationChipComponent`
+    # languages. Each cell is that language's `Ui::TranslationChipComponent`
     # linking to the item's editor in that language (a complete language in an
     # incomplete row still links); the row title links to the first outdated
     # language's editor, else the first missing; the call to action reads

@@ -18,7 +18,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_selector "li[data-page-id='#{@alpha.id}']"
     assert_selector "ul[data-parent-id='#{@beta.id}']"
 
-    # `admin--tree` drives SortableJS the same way `admin--blocks` does (see
+    # `admin--pages--tree` drives SortableJS the same way `admin--editor--blocks` does (see
     # that test's own comment for why): native HTML5 drag-and-drop, which
     # a driver's synthesized mouse events can't reliably trigger in
     # headless Chrome. Moving Alpha's `<li>` into Beta's own children `<ul>`
@@ -33,7 +33,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
       targetList.appendChild(item)
 
       const frame = document.getElementById("tree")
-      const controller = window.Stimulus.getControllerForElementAndIdentifier(frame, "admin--tree")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(frame, "admin--pages--tree")
       controller.onDrop({ item: item, to: targetList, newIndex: targetList.children.length - 1 })
     JS
 
@@ -80,7 +80,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
       const item = document.querySelector('li[data-page-id="#{@alpha.id}"]')
       const targetList = document.querySelector('ul[data-parent-id="#{@beta.id}"]')
       targetList.appendChild(item)
-      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.getElementById("tree"), "admin--tree")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.getElementById("tree"), "admin--pages--tree")
       controller.onDrop({ item: item, to: targetList, newIndex: targetList.children.length - 1 })
     JS
     assert_eventually(wait: 10) { @alpha.reload.parent_id == @beta.id }
@@ -115,7 +115,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
       const item = document.querySelector('li[data-page-id="#{@alpha.id}"]')
       const targetList = document.querySelector('ul[data-parent-id="#{@beta.id}"]')
       targetList.appendChild(item)
-      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.getElementById("tree"), "admin--tree")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.getElementById("tree"), "admin--pages--tree")
       controller.onDrop({ item: item, to: targetList, newIndex: 0 })
     JS
     assert_eventually(wait: 10) { @alpha.reload.parent_id == @beta.id }

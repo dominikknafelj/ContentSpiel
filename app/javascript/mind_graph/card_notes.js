@@ -16,25 +16,26 @@
 // count may have: this writes `node.open_notes`, which the canvas draws as
 // the node's badge (`renderer.js`), from the endpoint's exact `open`.
 //
-// LIVE (notes spec §6). The section is a `record` of `admin--notes-live`, the
+// LIVE (notes spec §6). The section is a `record` of `admin--notes--live`, the
 // controller on <body> that holds the socket: it subscribes to this post's
 // signals for as long as the section is in the page and, when a thread of the
-// post changed, says so with `admin--notes-live:changed` on the section, which
+// post changed, says so with `admin--notes--live:changed` on the section, which
 // reads the list again. The target is written with `setAttribute`: the
 // identifier's double dash can't be spelled through `dataset`, whose
-// `adminNotesLiveTarget` is `data-admin-notes-live-target`, a target of
-// nothing. A note started here says which tab it came from (`X-Notes-Tab`,
+// `adminNotesLiveTarget` would be `data-admin-notes-live-target`, a target of
+// nothing, where the attribute the controller reads is
+// `data-admin--notes--live-target`. A note started here says which tab it came from (`X-Notes-Tab`,
 // the id that controller wrote on <body>), so this tab is not told about its
 // own note: it has read the list again already.
 //
 // THE FIELD'S DRAFT. The card is built anew every time a node is selected,
 // and Escape in the field, a click on the canvas and another node all close
 // it: a half-typed note went with it. So what is typed is kept like a
-// composer's (`admin--note-composer`), per person and per post, under
+// composer's (`admin--notes--composer`), per person and per post, under
 // `cs-note-draft:<user id>:graph-Post-<id>` in `sessionStorage`; put back
 // when that post's card is built again; removed when the note is saved or
 // the field emptied, and with every other draft when the person signs out
-// (`forgetDrafts`). The person is the one `admin--notes-live` was given on
+// (`forgetDrafts`). The person is the one `admin--notes--live` was given on
 // <body>. While a note is on its way the field is read-only, so nothing is
 // typed that the emptied field would throw away. A draft is a convenience:
 // storage that is absent or full is the same as having none.
@@ -51,7 +52,7 @@
 // dim, the accent dot (spec §4.5: the one meaning accent has in notes) and
 // the word "new" for a screen reader, so it is never colour alone -- and the
 // link to the rest is `a[data-note-more]`.
-import { draftKey } from "controllers/admin/note_composer_controller"
+import { draftKey } from "controllers/admin/notes/composer_controller"
 
 const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
 // Three rows, then "+N more" (handoff, "Node card thread list").
@@ -76,7 +77,7 @@ function element(tag, className, content) {
 export function cardNotes(node, { text, url, postUrl, onChange }) {
   const section = element("section", "flex flex-col gap-2")
   section.dataset.mindGraphCardNotes = ""
-  section.setAttribute("data-admin--notes-live-target", "record")
+  section.setAttribute("data-admin--notes--live-target", "record")
   section.dataset.notesType = "post"
   section.dataset.notesId = node.id
   const heading = element("h3", LABEL)
@@ -97,7 +98,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   submit.type = "submit"
   form.append(field, submit)
 
-  const key = draftKey(document.body.getAttribute("data-admin--notes-live-person-value") || "", `graph-Post-${node.id}`)
+  const key = draftKey(document.body.getAttribute("data-admin--notes--live-person-value") || "", `graph-Post-${node.id}`)
   const draft = {
     read() {
       try {
@@ -241,7 +242,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
     }
   })
 
-  section.addEventListener("admin--notes-live:changed", load)
+  section.addEventListener("admin--notes--live:changed", load)
   title(node.open_notes ?? 0)
   section.append(heading, list, status, form)
   if ((node.open_notes ?? 0) > 0) load()

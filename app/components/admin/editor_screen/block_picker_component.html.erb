@@ -1,0 +1,20 @@
+<% if section %>
+  <%# A lane's "+" (see the component). The wrapper carries the id: the menu has none of its own. %>
+  <div id="<%= id %>">
+    <%= render Admin::Ui::MenuComponent.new(label: "+", align: :left, aria_label: t(".add_to_column", number: column), close_on_select: true) do |menu| %>
+      <% types.each do |type| %>
+        <% menu.with_item do %>
+          <%= button_to type.label, create_path, method: :post, class: menu_item_class,
+                params: { block: { block_type: type.name }, section_id: section.id, column: column } %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+<% else %>
+  <div id="<%= id %>" class="admin-block-picker mt-3 flex flex-wrap items-center gap-2 rounded-cs border border-dashed border-line-strong px-3 py-2.5 text-sm text-dim">
+    <span class="font-medium text-ink">+ Add block</span>
+    <% types.each do |type| %>
+      <%= button_to type.label, create_path, method: :post, params: { block: { block_type: type.name } }, class: button_class %>
+    <% end %>
+  </div>
+<% end %>

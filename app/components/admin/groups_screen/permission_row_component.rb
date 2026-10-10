@@ -30,7 +30,7 @@ module Admin
     #   therefore posts it back identically (Review Focus 3). A forged request that
     #   unticks or narrows it is `Groups::Save`'s call: lawful narrowing is allowed
     #   for someone who can manage the group, anything else is a 403. Defensive: no
-    #   stored state reaches it (see `PermissionMatrixComponent`).
+    #   stored state reaches it (see `GroupsScreen::PermissionMatrixComponent`).
     # - VIEW ONLY (`view_only:`, a group the viewer can't manage as it stands): the
     #   whole form sits in a `<fieldset disabled>`, which would disable "Edit
     #   scope" too, and a scope is still worth reading. So the toggle is an
@@ -44,7 +44,7 @@ module Admin
     # use them, and the key sits beside the label in mono with itself as title.
     #
     # THE CHIPS are drawn here for the first paint and by
-    # `admin--permission-matrix` after every change: the same rules in both
+    # `admin--groups--permission-matrix` after every change: the same rules in both
     # (`#chips` / `rewriteChips`), which a system test pins side by side.
     #
     # NO SCRIPT: the scope editor is rendered open and "Edit scope" is held back
@@ -142,7 +142,7 @@ module Admin
 
       def dot_class(name)
         definition = ContentTypes.find(name)
-        ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
+        Ui::ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
       end
 
       def chip_class(chip)

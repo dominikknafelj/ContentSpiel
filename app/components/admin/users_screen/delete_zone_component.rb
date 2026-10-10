@@ -14,7 +14,7 @@ module Admin
     #   signs you out." (the controller ends the session).
     # - The LAST owner can't be deleted (`User#ensure_not_last_owner`): the button
     #   is disabled and the reason shown instead.
-    # - Like the owner zone, the trigger is an `admin--pending-lock` control (an
+    # - Like the owner zone, the trigger is an `admin--saving--pending-lock` control (an
     #   instant action must not run over an unsaved edit), and the zone and dialog
     #   sit after the user form, never inside it.
     class DeleteZoneComponent < AdminComponent

@@ -8,24 +8,24 @@
       `.admin-column`, below the pair. %>
   <% field_side = capture do %>
     <p id="<%= label_id %>" class="<%= setup_label_class %> mb-1"><%= name.to_s.humanize %></p>
-    <%# `admin--rich-text` (tiptap spec §4.1) -- see the class comment for
+    <%# `admin--rich-text--editor` (tiptap spec §4.1) -- see the class comment for
         every `data-*` value below. `relative` anchors the controller's own
         Link popover (the image, YouTube and page dialogs live once in the layout) to this editor. %>
     <%= tag.div class: "admin-rich-text relative min-w-0",
           data: {
-            controller: "admin--rich-text",
-            action: "focusout->admin--rich-text#containFocus media-picker:picked->admin--rich-text#picked translate:use->admin--rich-text#applySuggestion rich-text-dialog:closed->admin--rich-text#dialogClosed",
-            "admin--rich-text-link-targets-url-value": link_targets_url,
-            "admin--rich-text-locale-value": editor_locale,
-            "admin--rich-text-assets-value": assets_json,
-            "admin--rich-text-link-titles-value": link_titles_json
+            controller: "admin--rich-text--editor",
+            action: "focusout->admin--rich-text--editor#containFocus media-picker:picked->admin--rich-text--editor#picked translate:use->admin--rich-text--editor#applySuggestion rich-text-dialog:closed->admin--rich-text--editor#dialogClosed",
+            "admin--rich-text--editor-link-targets-url-value": link_targets_url,
+            "admin--rich-text--editor-locale-value": editor_locale,
+            "admin--rich-text--editor-assets-value": assets_json,
+            "admin--rich-text--editor-link-titles-value": link_titles_json
           } do %>
       <%# The document JSON under `html_name` (e.g. `post[body]`) -- see the
           class comment. `html_name`, not `name`: a caller nesting this
           under a form object needs the param to arrive as
           `params[:post][:body]`, and `name` alone is only the label/
           `data-field-name`'s concern. %>
-      <%= tag.input type: "hidden", name: html_name, id: "#{id}-json", value: json_value, data: { "admin--rich-text-target": "input" } %>
+      <%= tag.input type: "hidden", name: html_name, id: "#{id}-json", value: json_value, data: { "admin--rich-text--editor-target": "input" } %>
 
       <%# One row whenever it fits (design pass round 1, bug 5): grouped tools
           with separators, and an Insert menu for everything that inserts. No
@@ -37,12 +37,12 @@
           Children stretch (`items-stretch`) so every one shares the
           row's top edge; the separators are full-height boxes whose rule is clipped to their
           content box (`bg-clip-content` + `py-1`), shorter than the row without a margin that
-          would shift their top. Choosing a menu item closes the menu (`admin--menu#close`) before the
+          would shift their top. Choosing a menu item closes the menu (`admin--ui--menu#close`) before the
           command runs; the command then moves focus (editor or popover). %>
       <% if editable? %>
       <div role="toolbar" aria-label="<%= name.to_s.humanize %> formatting" aria-controls="<%= editor_id %>"
            class="flex flex-wrap items-stretch gap-0.5 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
-           data-action="mousedown->admin--rich-text#keepFocus">
+           data-action="mousedown->admin--rich-text--editor#keepFocus">
         <% toolbar_groups.each do |group| %>
           <div role="group" class="flex shrink-0 items-center gap-0.5">
             <% group.each do |action, label, text, toggle| %>
@@ -51,11 +51,11 @@
           </div>
           <span role="separator" aria-orientation="vertical" class="mx-0.5 w-px shrink-0 bg-line bg-clip-content py-1"></span>
         <% end %>
-        <%= render Admin::MenuComponent.new(label: "Insert ▾", align: :right,
+        <%= render Admin::Ui::MenuComponent.new(label: "Insert ▾", align: :right,
               button_class: "inline-flex cursor-pointer whitespace-nowrap items-center gap-1 rounded-cs px-2 py-1 font-cs-mono text-sm text-ink hover:bg-surface") do |menu| %>
           <% insert_menu.each do |action, label, text, toggle| %>
             <% menu.with_item do %>
-              <%= tool_button(action, label, text, toggle, extra_action: "click->admin--menu#close") %>
+              <%= tool_button(action, label, text, toggle, extra_action: "click->admin--ui--menu#close") %>
             <% end %>
           <% end %>
         <% end %>
@@ -67,9 +67,9 @@
           `data-labelledby`. %>
       <%= tag.div id: editor_id,
             class: "admin-rich-text-editor #{editable? ? "rounded-b-cs" : "rounded-cs"} border border-line-strong bg-surface text-ink",
-            data: { "admin--rich-text-target": "editor", labelledby: label_id } %>
+            data: { "admin--rich-text--editor-target": "editor", labelledby: label_id } %>
 
-      <p class="mt-1 text-sm text-danger-ink" role="alert" data-admin--rich-text-target="message"></p>
+      <p class="mt-1 text-sm text-danger-ink" role="alert" data-admin--rich-text--editor-target="message"></p>
     <% end %>
     <div data-translate-slot="<%= name %>"><% if translate %><%= render translate %><% end %></div>
     <%= render "admin/shared/translation_box", button: box_button %>

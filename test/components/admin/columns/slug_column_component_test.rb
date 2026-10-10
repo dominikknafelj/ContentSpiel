@@ -32,11 +32,11 @@ class Admin::Columns::SlugColumnComponentTest < ViewComponent::TestCase
 
   test "the slug sits in a prefix input and keeps its data attributes and error slot" do
     render_inline Admin::Columns::SlugColumnComponent.new(value: "x", base_url: "/de", id: "page_slug", html_name: "page[slug]",
-      errors: [ "is taken" ], data: { "admin--slug-preview-target": "slug" })
+      errors: [ "is taken" ], data: { "admin--editor--slug-preview-target": "slug" })
 
     assert_selector ".admin-prefix-input span.bg-sunken", text: "/de/"
-    assert_selector "input#page_slug[name='page[slug]'][data-admin--slug-preview-target=slug][aria-invalid=true]"
+    assert_selector "input#page_slug[name='page[slug]'][data-admin--editor--slug-preview-target=slug][aria-invalid=true]"
     assert_selector "#page_slug-errors", text: "is taken"
-    assert_selector "[data-admin--slug-preview-target=output]", text: "x"
+    assert_selector "[data-admin--editor--slug-preview-target=output]", text: "x"
   end
 end

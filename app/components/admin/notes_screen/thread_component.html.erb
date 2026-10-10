@@ -23,7 +23,7 @@
         wherever the reader is. That is the stylesheet's, by where the frame
         stands (`.admin-notes-drawer`, content-spiel.tailwind.css): in the
         media panel and on a record's notes page the thread is in the flow
-        of whatever scrolls there. `admin--notes-live` asks which of the two
+        of whatever scrolls there. `admin--notes--live` asks which of the two
         it is (`scroller`). %>
     <div class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto]" data-note-rows>
       <div class="col-start-1 row-start-1 flex items-center border-b border-line py-2.5 pl-3">
@@ -41,7 +41,7 @@
               header is hidden while a thread is open, so this is the drawer's
               Close -- the same action, the focus given back the same way. Shown
               only in the editors' drawer from 1024px (`.admin-note-close`). %>
-          <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { note_close: true, action: "admin--notes#close" },
+          <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { note_close: true, action: "admin--notes--drawer#close" },
                 class: "admin-note-close ml-2 size-7 shrink-0 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" do %>
             <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
           <% end %>
@@ -54,7 +54,7 @@
               same way. Shown only in the sheet (`.admin-note-leave`); not
               drawn where the notes are no drawer at all (the media panel). %>
           <% if leave? %>
-            <%= tag.button t(".leave"), type: "button", data: { note_leave: true, action: "admin--notes#close" }, class: "admin-note-leave ml-3 #{LEAVE_CLASS}" %>
+            <%= tag.button t(".leave"), type: "button", data: { note_leave: true, action: "admin--notes--drawer#close" }, class: "admin-note-leave ml-3 #{LEAVE_CLASS}" %>
           <% end %>
         </div>
         <%# Always there, for the row's line; empty for someone who may not pin. %>
@@ -79,13 +79,13 @@
         from the drawer's edges, so it does not read as part of the thread;
         with a control to close it. The person's next action in the thread
         redraws this part and so clears it. When it says the note is gone,
-        `admin--note-refusal` takes the frame back to the list after four
+        `admin--notes--refusal` takes the frame back to the list after four
         seconds. A refused reply, Resolve or Reopen is said in the composer. %>
     <% if button_failure %>
       <%= tag.div role: "alert", class: "mx-2 my-2 flex shrink-0 items-start gap-2 #{REFUSAL_CLASS}",
-            data: { note_refusal: true, controller: "admin--note-refusal", "admin--note-refusal-gone-value": gone_refusal?, "admin--note-refusal-back-value": back_path } do %>
+            data: { note_refusal: true, controller: "admin--notes--refusal", "admin--notes--refusal-gone-value": gone_refusal?, "admin--notes--refusal-back-value": back_path } do %>
         <ul class="min-w-0 flex-1"><% button_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
-        <%= tag.button type: "button", title: t(".dismiss"), aria: { label: t(".dismiss") }, data: { action: "admin--note-refusal#close" },
+        <%= tag.button type: "button", title: t(".dismiss"), aria: { label: t(".dismiss") }, data: { action: "admin--notes--refusal#close" },
               class: "-my-0.5 -mr-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-cs hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent" do %>
           <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
         <% end %>

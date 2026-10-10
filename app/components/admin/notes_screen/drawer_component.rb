@@ -11,8 +11,8 @@ module Admin
     # (nothing is designed below 768px). The editor beside it stays usable.
     # Rendered once per screen, inside `#content` (a frame navigation to
     # another record replaces it) and OUTSIDE EVERY FORM: the frame brings
-    # forms of its own, forms can't nest, and inside an `admin--autosave` form
-    # a note's field would be the record's. `hidden` until `admin--notes`
+    # forms of its own, forms can't nest, and inside an `admin--saving--autosave` form
+    # a note's field would be the record's. `hidden` until `admin--notes--drawer`
     # opens it.
     #
     # It holds the notes frame empty: the controller sets the frame's `src`
@@ -22,7 +22,7 @@ module Admin
     # answer of the frame brings a newer copy.
     #
     # Its header is the LIST's: the title, how many are open (the number is
-    # an `admin--notes` `total`, like the header button's, so it follows the
+    # an `admin--notes--drawer` `total`, like the header button's, so it follows the
     # counts), "New note" -- a note on the record itself, no chooser -- and
     # Close. While a thread is the view it is not shown, and the thread's
     # first row is the header, with a Close of its own (the handoff's
@@ -31,7 +31,7 @@ module Admin
     # header is hidden over a thread as well: there the thread's first row
     # ends in "Back to page", the same action, in Close's place.
     #
-    # WHEN TO USE WHICH: the shell's left drawers (`admin--drawer`) are the
+    # WHEN TO USE WHICH: the shell's left drawers (`admin--shell--drawer`) are the
     # navigation at narrow widths, with a scrim; the media panel is a column
     # of its screen, in the flow; this is a companion to an editor that must
     # not take the editor away.
@@ -56,7 +56,7 @@ module Admin
       def key = ::Notes.key(container)
 
       # The address of the editor this drawer belongs to, without its query:
-      # `admin--notes` writes `notes=open` into the page's address only while
+      # `admin--notes--drawer` writes `notes=open` into the page's address only while
       # the address is this one (`syncAddress`). The record's own screen, by
       # the route its kind has (`Audit::Sentence.route_for`), resolved from
       # the notes' list of routes like every other.
@@ -69,7 +69,7 @@ module Admin
       # "4 open" beside the title. The number is a span the script rewrites;
       # the word around it is the locale file's.
       def open_count
-        number = tag.span(total, hidden: total.zero?, data: { "admin--notes-target": "total" })
+        number = tag.span(total, hidden: total.zero?, data: { "admin--notes--drawer-target": "total" })
         t(".open_html", number: number)
       end
     end

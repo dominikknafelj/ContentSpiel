@@ -1,9 +1,9 @@
-// Small DOM builders for `admin--rich-text`'s Link popover (the image, YouTube
+// Small DOM builders for `admin--rich-text--editor`'s Link popover (the image, YouTube
 // and page dialogs are server-rendered, `RichTextDialogsComponent`) -- task 7's "no browser dialogs" ruling: no
 // `window.prompt`/`confirm`/`alert` anywhere, just a panel under the
 // toolbar built from CS Studio's own product token classes. The class
 // strings here mirror `SetupHelper#setup_input_class`/`#setup_label_class`
-// and `Admin::ButtonComponent`'s variants, so a popover reads like every
+// and `Admin::Ui::ButtonComponent`'s variants, so a popover reads like every
 // other CS Studio form; `app/assets/tailwind/application.css` `@source`s
 // this directory so Tailwind actually generates them.
 //
@@ -13,7 +13,7 @@
 //   implicitly submitting that form (a full-page PATCH navigation);
 // - `input`/`change` from popover fields stop at the popover. Those fields
 //   have no `name` and never reach the server, so letting them bubble would
-//   only make `admin--autosave` save an unchanged form on every keystroke.
+//   only make `admin--saving--autosave` save an unchanged form on every keystroke.
 
 const INPUT_CLASS = "mt-1 block w-full rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
 const LABEL_CLASS = "block font-cs-mono text-label uppercase tracking-mono text-meta"

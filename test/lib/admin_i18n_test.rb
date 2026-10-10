@@ -32,7 +32,7 @@ require "ripper"
 #   fixing", "m ago"), or two words ending in a sentence mark. A Tailwind class,
 #   a `data` key, an id, a symbol and a `strftime` pattern are lower-case tokens
 #   with hyphens, dots or percent signs ("flex items-center gap-1.5",
-#   "admin--save-bar-target", "%-d %b"), which none of that matches. Exempt by
+#   "admin--saving--save-bar-target", "%-d %b"), which none of that matches. Exempt by
 #   rule, not by marker: `Admin::Foo` (a `::`), an HTTP header (an `X-` one, or a name in
 #   `STANDARD_HEADERS`: "Content-Type"; "Read-Only" is a label), a single word in capitals
 #   with no ellipsis ("PATCH", "UTC"), and a literal with SQL in it ("LOWER(",
@@ -77,58 +77,58 @@ require "ripper"
 class AdminI18nTest < ActiveSupport::TestCase
   CONVERTED = %w[
     app/views/layouts/admin.html.erb
-    app/components/admin/button_component.rb
-    app/components/admin/button_component.html.erb
-    app/components/admin/dialog_component.rb
-    app/components/admin/dialog_component.html.erb
-    app/components/admin/confirm_dialog_component.rb
-    app/components/admin/confirm_dialog_component.html.erb
-    app/components/admin/toast_component.rb
-    app/components/admin/toast_component.html.erb
-    app/components/admin/toast_region_component.rb
-    app/components/admin/toast_region_component.html.erb
-    app/components/admin/save_bar_component.rb
-    app/components/admin/save_bar_component.html.erb
-    app/components/admin/save_status_component.rb
-    app/components/admin/save_status_component.html.erb
-    app/components/admin/status_chip_component.rb
-    app/components/admin/status_chip_component.html.erb
-    app/components/admin/translation_chip_component.rb
-    app/components/admin/language_tabs_component.rb
-    app/components/admin/language_tabs_component.html.erb
-    app/components/admin/pagination_component.rb
-    app/components/admin/pagination_component.html.erb
-    app/components/admin/time_ago_component.rb
-    app/components/admin/empty_state_component.rb
-    app/components/admin/empty_state_component.html.erb
-    app/components/admin/error_summary_component.rb
-    app/components/admin/error_summary_component.html.erb
-    app/components/admin/chip_input_component.rb
-    app/components/admin/chip_input_component.html.erb
-    app/components/admin/menu_component.rb
-    app/components/admin/menu_component.html.erb
-    app/components/admin/mind_graph_legend_component.rb
-    app/components/admin/mind_graph_legend_component.html.erb
+    app/components/admin/ui/button_component.rb
+    app/components/admin/ui/button_component.html.erb
+    app/components/admin/ui/dialog_component.rb
+    app/components/admin/ui/dialog_component.html.erb
+    app/components/admin/ui/confirm_dialog_component.rb
+    app/components/admin/ui/confirm_dialog_component.html.erb
+    app/components/admin/ui/toast_component.rb
+    app/components/admin/ui/toast_component.html.erb
+    app/components/admin/ui/toast_region_component.rb
+    app/components/admin/ui/toast_region_component.html.erb
+    app/components/admin/ui/save_bar_component.rb
+    app/components/admin/ui/save_bar_component.html.erb
+    app/components/admin/ui/save_status_component.rb
+    app/components/admin/ui/save_status_component.html.erb
+    app/components/admin/ui/status_chip_component.rb
+    app/components/admin/ui/status_chip_component.html.erb
+    app/components/admin/ui/translation_chip_component.rb
+    app/components/admin/ui/language_tabs_component.rb
+    app/components/admin/ui/language_tabs_component.html.erb
+    app/components/admin/ui/pagination_component.rb
+    app/components/admin/ui/pagination_component.html.erb
+    app/components/admin/ui/time_ago_component.rb
+    app/components/admin/ui/empty_state_component.rb
+    app/components/admin/ui/empty_state_component.html.erb
+    app/components/admin/ui/error_summary_component.rb
+    app/components/admin/ui/error_summary_component.html.erb
+    app/components/admin/ui/chip_input_component.rb
+    app/components/admin/ui/chip_input_component.html.erb
+    app/components/admin/ui/menu_component.rb
+    app/components/admin/ui/menu_component.html.erb
+    app/components/admin/mind_graph_screen/legend_component.rb
+    app/components/admin/mind_graph_screen/legend_component.html.erb
     app/helpers/admin/messages_helper.rb
     app/javascript/i18n/messages.js
-    app/javascript/controllers/admin/save_bar_controller.js
-    app/javascript/controllers/admin/pending_lock_controller.js
-    app/javascript/controllers/admin/chip_input_controller.js
-    app/javascript/controllers/admin/autosave_controller.js
-    app/javascript/autosave/order_request.js
-    app/javascript/autosave/queue.js
-    app/javascript/autosave/queue_state.js
-    app/javascript/autosave/queue_core.js
-    app/javascript/autosave/frame_hold.js
-    app/javascript/autosave/promotion_hold.js
+    app/javascript/controllers/admin/saving/save_bar_controller.js
+    app/javascript/controllers/admin/saving/pending_lock_controller.js
+    app/javascript/controllers/admin/ui/chip_input_controller.js
+    app/javascript/controllers/admin/saving/autosave_controller.js
+    app/javascript/saving/order_request.js
+    app/javascript/saving/queue.js
+    app/javascript/saving/queue_state.js
+    app/javascript/saving/queue_core.js
+    app/javascript/saving/frame_hold.js
+    app/javascript/saving/promotion_hold.js
     app/views/admin/tags/index.html.erb
     app/controllers/admin/tags_controller.rb
     app/controllers/admin/tag_suggestions_controller.rb
     app/helpers/admin/tags_helper.rb
     app/services/tags/merge.rb
-    app/javascript/controllers/admin/tag_dialogs_controller.js
+    app/javascript/controllers/admin/tags/dialogs_controller.js
     app/views/admin/mind_graph/show.html.erb
-    app/javascript/controllers/admin/mind_graph_controller.js
+    app/javascript/controllers/admin/mind_graph/graph_controller.js
     app/javascript/mind_graph/app.js
     app/javascript/mind_graph/card.js
     app/javascript/mind_graph/card_notes.js
@@ -156,7 +156,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/move_dialog_component.html.erb
     app/components/admin/editor_screen/delete_block_dialog_component.rb
     app/components/admin/editor_screen/delete_block_dialog_component.html.erb
-    app/javascript/controllers/admin/section_controller.js
+    app/javascript/controllers/admin/editor/section_controller.js
     app/components/admin/notes_screen/avatar_component.rb
     app/components/admin/notes_screen/body_component.rb
     app/components/admin/notes_screen/body_component.html.erb
@@ -170,8 +170,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/reactions_component.rb
     app/components/admin/notes_screen/reactions_component.html.erb
     app/controllers/admin/note_reactions_controller.rb
-    app/javascript/controllers/admin/note_reactions_controller.js
-    app/javascript/controllers/admin/note_unsaved_controller.js
+    app/javascript/controllers/admin/notes/reactions_controller.js
+    app/javascript/controllers/admin/notes/unsaved_controller.js
     app/components/admin/notes_screen/thread_component.rb
     app/components/admin/notes_screen/thread_component.html.erb
     app/components/admin/notes_screen/thread_row_component.rb
@@ -187,19 +187,19 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/helpers/admin/note_counts_helper.rb
     app/components/admin/notes_screen/composer_component.rb
     app/components/admin/notes_screen/composer_component.html.erb
-    app/javascript/controllers/admin/note_composer_controller.js
+    app/javascript/controllers/admin/notes/composer_controller.js
     app/controllers/admin/note_messages_controller.rb
     app/controllers/admin/note_mentions_controller.rb
     app/controllers/admin/note_files_controller.rb
     app/components/admin/notes_screen/files_component.rb
     app/components/admin/notes_screen/files_component.html.erb
-    app/javascript/controllers/admin/note_gif_controller.js
+    app/javascript/controllers/admin/notes/gif_controller.js
     app/components/admin/notes_screen/drawer_component.rb
     app/components/admin/notes_screen/drawer_component.html.erb
-    app/javascript/controllers/admin/notes_controller.js
-    app/javascript/controllers/admin/notes_live_controller.js
-    app/javascript/controllers/admin/notes_alert_controller.js
-    app/javascript/controllers/admin/notes_permission_controller.js
+    app/javascript/controllers/admin/notes/drawer_controller.js
+    app/javascript/controllers/admin/notes/live_controller.js
+    app/javascript/controllers/admin/notes/alert_controller.js
+    app/javascript/controllers/admin/notes/permission_controller.js
     app/components/admin/notes_screen/inbox_row_component.rb
     app/components/admin/notes_screen/inbox_row_component.html.erb
     app/components/admin/notes_screen/open_thread_row_component.rb
@@ -416,7 +416,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     sixteen = %w[button dialog confirm_dialog toast toast_region save_bar status_chip translation_chip language_tabs
       pagination time_ago empty_state error_summary chip_input menu save_status]
     sixteen.each do |name|
-      assert CONVERTED.any? { |path| path == "app/components/admin/#{name}_component.rb" }, "#{name}_component.rb is not in CONVERTED"
+      assert CONVERTED.any? { |path| path == "app/components/admin/ui/#{name}_component.rb" }, "#{name}_component.rb is not in CONVERTED"
     end
   end
 
@@ -460,8 +460,8 @@ class AdminI18nTest < ActiveSupport::TestCase
       "Read-Only", "Sign-In", "Up-To-Date" ].each do |text|
       assert copy?(text), "#{text.inspect} should count as copy"
     end
-    [ "flex items-center gap-1.5 rounded-cs", "admin--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
-      "Admin::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
+    [ "flex items-center gap-1.5 rounded-cs", "admin--saving--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
+      "Admin::Ui::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
       "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
     end
@@ -498,14 +498,14 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_equal [ %(1: "Dismiss") ], js_offences(%(el.setAttribute("aria-label", "Dismiss")\n))
     assert_equal [ %(1: "Name") ], js_offences(%(input.placeholder = "Name"\n))
     assert_equal [ %(1: "go") ], js_offences(%(if (confirm("go")) {}\n))
-    assert_empty js_offences(%(// "Couldn't save the new order"\nconst a = "components.save_bar.blocked"\n))
+    assert_empty js_offences(%(// "Couldn't save the new order"\nconst a = "components.ui.save_bar.blocked"\n))
     assert_empty js_offences(%(/* "Save or cancel" */ x.replace(/'Save or "cancel/g, "")\n))
-    assert_empty js_offences(%(const total = a / b; const k = "admin--save-bar"\n))
+    assert_empty js_offences(%(const total = a / b; const k = "admin--saving--save-bar"\n))
     assert_empty js_offences(%(x.querySelector("[data-leave-count]").dataset.foo = "NOT"\n))
-    assert_empty js_offences(%(toast.querySelector("span").textContent = messages(el).t("components.toast.dropped")\n))
-    assert_empty js_offences(%(button.textContent = this.text("components.save_status.retry")\n))
+    assert_empty js_offences(%(toast.querySelector("span").textContent = messages(el).t("components.ui.toast.dropped")\n))
+    assert_empty js_offences(%(button.textContent = this.text("components.ui.save_status.retry")\n))
     assert_empty js_offences("note.textContent = ` ${this.text(\"a.b\")}`\n")
-    assert_empty js_offences(%(el.setAttribute("aria-label", this.text("components.chip_input.remove", { label }))\n))
+    assert_empty js_offences(%(el.setAttribute("aria-label", this.text("components.ui.chip_input.remove", { label }))\n))
     assert_empty js_offences(%(headers["Content-Type"] = "x"; method: "PATCH"; zone = "UTC"\n))
     assert_empty js_offences(%(headers["X-Page-Base-Updated-At"] = base; el.textContent = "\\u00b7\\u2192"\n))
     assert_empty js_offences(%(status.textContent = "" // i18n-ok: emptying the line, not saying anything\n))

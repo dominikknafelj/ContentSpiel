@@ -24,11 +24,11 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_equal @services.id.to_s, find("#new-page-inside").value
     assert_selector "dialog#new-page-dialog form#new-page-form"
     assert_eventually { page.evaluate_script("document.activeElement.id") == "new-page-title" }
-    assert_selector "dialog#new-page-dialog [data-admin--new-record-target=url]", text: "URL: /services/"
+    assert_selector "dialog#new-page-dialog [data-admin--editor--new-record-target=url]", text: "URL: /services/"
 
     fill_in "new-page-title", with: "Our Team"
-    assert_selector "dialog#new-page-dialog [data-admin--new-record-target=url]", text: "URL: /services/our-team"
-    assert_selector "dialog#new-page-dialog [data-admin--new-record-target=note]", text: "Created as a draft at the end of Services."
+    assert_selector "dialog#new-page-dialog [data-admin--editor--new-record-target=url]", text: "URL: /services/our-team"
+    assert_selector "dialog#new-page-dialog [data-admin--editor--new-record-target=note]", text: "Created as a draft at the end of Services."
 
     click_button "Create page"
 
@@ -98,7 +98,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_selector "dialog#new-post-dialog[open]"
     assert_selector "dialog#new-post-dialog form#new-post-form"
     assert_eventually { page.evaluate_script("document.activeElement.id") == "new-post-title" }
-    assert_selector "dialog#new-post-dialog [data-admin--new-record-target=url]", text: "Not listed on any page yet"
+    assert_selector "dialog#new-post-dialog [data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
 
     find("dialog#new-post-dialog label", text: ContentTypes.find("now_update").label).click
     fill_in "new-post-title", with: "Writing this down"
@@ -114,20 +114,20 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
   test "a form that fails to load shows a message with Try again, never an empty dialog" do
     visit admin_page_path(@about)
     await_admin_controllers
-    good = page.evaluate_script("document.querySelector('[data-admin--new-record-kind-value=page]').dataset['admin-NewRecordUrlValue'] || document.querySelector('[data-admin--new-record-kind-value=page]').getAttribute('data-admin--new-record-url-value')")
-    page.execute_script("document.querySelector('[data-admin--new-record-kind-value=page]').setAttribute('data-admin--new-record-url-value', '/cs-studio/pages/does-not-exist')")
+    good = page.evaluate_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').getAttribute('data-admin--editor--new-record-url-value')")
+    page.execute_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').setAttribute('data-admin--editor--new-record-url-value', '/cs-studio/pages/does-not-exist')")
 
     # Review C, M15: the alert is empty until the failure happens (text that is
     # already in the page and merely un-hidden is not announced).
-    assert_equal "", page.evaluate_script("document.querySelector('[data-admin--new-record-target=failure] [role=alert]').textContent")
+    assert_equal "", page.evaluate_script("document.querySelector('[data-admin--editor--new-record-target=failure] [role=alert]').textContent")
     click_link "+ New page"
-    assert_selector "dialog#new-page-dialog [data-admin--new-record-target=failure] [role=alert]", text: "The form couldn’t be loaded.", visible: :visible
+    assert_selector "dialog#new-page-dialog [data-admin--editor--new-record-target=failure] [role=alert]", text: "The form couldn’t be loaded.", visible: :visible
     assert_button "Create page", disabled: true
 
-    page.execute_script("document.querySelector('[data-admin--new-record-kind-value=page]').setAttribute('data-admin--new-record-url-value', #{good.to_json})")
+    page.execute_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').setAttribute('data-admin--editor--new-record-url-value', #{good.to_json})")
     click_button "Try again"
     assert_selector "dialog#new-page-dialog form#new-page-form"
-    assert_no_selector "[data-admin--new-record-target=failure]", visible: :visible
+    assert_no_selector "[data-admin--editor--new-record-target=failure]", visible: :visible
     assert_button "Create page", disabled: false
   end
 
@@ -192,13 +192,13 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     page.execute_script("const real = window.fetch; window.fetch = (url, options) => (options && options.method && options.method.toUpperCase() === 'POST') ? Promise.reject(new TypeError('offline')) : real(url, options)")
 
     fill_in "new-page-title", with: "Offline attempt"
-    assert_equal "", page.evaluate_script("document.querySelector('[data-admin--new-record-target=submitFailure]').textContent")
+    assert_equal "", page.evaluate_script("document.querySelector('[data-admin--editor--new-record-target=submitFailure]').textContent")
     click_button "Create page"
 
-    assert_selector "[data-admin--new-record-target=submitFailure]", text: "Couldn’t save.", visible: :visible
+    assert_selector "[data-admin--editor--new-record-target=submitFailure]", text: "Couldn’t save.", visible: :visible
     assert_equal "Offline attempt", find("#new-page-title").value
     assert_button "Create page", disabled: false
-    assert_no_selector "[data-admin--new-record-target=failure]", visible: :visible
+    assert_no_selector "[data-admin--editor--new-record-target=failure]", visible: :visible
     # Turbo rethrows the failed submission's fetch, unhandled, after the
     # controller has shown its message; that is the failure this test provokes.
     expect_js_error(/TypeError: offline/, times: 2)

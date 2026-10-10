@@ -101,7 +101,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_select "#note-thread-#{@thread.id}-reply form[action$='/resolve']"
     # Someone else's note: nothing to edit or delete. (Its reactions' forms are anyone's who may read it.)
     assert_select "#note-message-#{@thread.first_message.id} form:not([action*='/reactions'])", count: 0
-    assert_select "#note-thread-#{@thread.id}-reply form[data-controller='admin--note-composer'][data-turbo-frame=notes] textarea[name=body]"
+    assert_select "#note-thread-#{@thread.id}-reply form[data-controller='admin--notes--composer'][data-turbo-frame=notes] textarea[name=body]"
   end
 
   # The handoff's decision 3: where a thread's controls stand.
@@ -116,7 +116,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
       assert_select "[data-note-actions] > [class~='row-start-1'] form[action$='/unfollow'] button", text: "Stop notifying me"
       assert_select "[data-note-actions] > [class~='row-start-2'] form[action$='/pin'] button[aria-label=Pin]"
       # Row 1 ends with Close, the drawer's own action (the handoff's decision 11).
-      assert_select "[data-note-actions] > [class~='row-start-1'] form[action$='/unfollow'] + button.admin-note-close[data-note-close][data-action='admin--notes#close'][aria-label=Close]"
+      assert_select "[data-note-actions] > [class~='row-start-1'] form[action$='/unfollow'] + button.admin-note-close[data-note-close][data-action='admin--notes--drawer#close'][aria-label=Close]"
       assert_select "a[data-note-back]", text: /All notes\s*1/
       # Neither Resolve nor a reply field among what is read.
       assert_select "[data-note-state]", count: 0
@@ -410,11 +410,11 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
       assert_select "li", text: /This note is gone/
       assert_select "button[type=button][aria-label=Dismiss]"
     end
-    assert_select "[data-note-refusal][data-admin--note-refusal-gone-value=true][data-admin--note-refusal-back-value='#{@base}']"
+    assert_select "[data-note-refusal][data-admin--notes--refusal-gone-value=true][data-admin--notes--refusal-back-value='#{@base}']"
 
     refused = ApplicationService::Result.failure(nil, [ "Reopen this note before pinning it." ])
     answering(Notes::Pin, -> { refused }) { post "#{@base}/threads/#{other.id}/pin", headers: frame }
-    assert_select "[data-note-refusal][data-admin--note-refusal-gone-value=false] li", text: "Reopen this note before pinning it."
+    assert_select "[data-note-refusal][data-admin--notes--refusal-gone-value=false] li", text: "Reopen this note before pinning it."
     assert_select "#note-thread-#{other.id}-reply form[data-note-composer] ul[role=alert]", count: 0
 
     first = other.first_message
@@ -477,9 +477,9 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:reader))
 
     get @base, params: { compose: "Page-#{@page.id}" }, headers: frame
-    assert_select "#notes-new form[data-admin--note-composer-user-value='#{users(:reader).id}']"
+    assert_select "#notes-new form[data-admin--notes--composer-user-value='#{users(:reader).id}']"
     get "#{@base}/threads/#{@thread.id}", headers: frame
-    assert_select "#note-thread-#{@thread.id}-reply form[data-admin--note-composer-user-value='#{users(:reader).id}']"
+    assert_select "#note-thread-#{@thread.id}-reply form[data-admin--notes--composer-user-value='#{users(:reader).id}']"
   end
 
   test "Edit, Delete or a refused edit of a message folded into Show more opens the fold" do

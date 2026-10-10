@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The rich-text column (tiptap spec §4.1): the `admin--rich-text` mount with
+# The rich-text column (tiptap spec §4.1): the `admin--rich-text--editor` mount with
 # its hidden JSON input (the editor's one contract with the server), the
 # toolbar, the endpoint URLs and lookups the editor reads from `data-*`
 # values, and -- in a translation -- the primary language's document
@@ -9,14 +9,14 @@ require "test_helper"
 class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
   def doc(markdown) = RichText::Document.from_markdown(markdown).first
 
-  def controller_element = page.find("[data-controller='admin--rich-text']")
+  def controller_element = page.find("[data-controller='admin--rich-text--editor']")
 
   test "renders the hidden JSON input inside the editor mount" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: doc("Hello **there**"))
 
-    hidden = page.find("[data-controller='admin--rich-text'] input[type=hidden][name=body][data-admin--rich-text-target=input]", visible: false)
+    hidden = page.find("[data-controller='admin--rich-text--editor'] input[type=hidden][name=body][data-admin--rich-text--editor-target=input]", visible: false)
     assert_equal doc("Hello **there**").to_h, JSON.parse(hidden.value)
-    assert_selector "[data-admin--rich-text-target=editor]"
+    assert_selector "[data-admin--rich-text--editor-target=editor]"
   end
 
   test "no Markdown textarea any more" do
@@ -50,13 +50,13 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_selector "[role=toolbar].flex-wrap"
     assert_selector "[role=toolbar] [role=group].shrink-0", minimum: 3
     assert_selector "[role=toolbar] [role=separator]", minimum: 3
-    assert_selector "[role=toolbar] [data-controller='admin--menu'] button[aria-haspopup=menu]", text: "Insert"
+    assert_selector "[role=toolbar] [data-controller='admin--ui--menu'] button[aria-haspopup=menu]", text: "Insert"
     %w[Image YouTube].each do |label|
       assert_selector "[role=toolbar] [role=menu] button", text: label, visible: :all
     end
     assert_no_selector "[role=toolbar] > button", text: "Image"
     # Every menu item closes the menu before its command runs.
-    assert page.all("[role=menu] button", visible: :all).all? { |button| button["data-action"].include?("click->admin--menu#close") }
+    assert page.all("[role=menu] button", visible: :all).all? { |button| button["data-action"].include?("click->admin--ui--menu#close") }
   end
 
   # Only toggle buttons announce a pressed state; the ones that open a
@@ -78,21 +78,21 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
     assert_selector "[role=toolbar] button[aria-label='Image'][aria-haspopup=dialog]", visible: :all
     assert_no_selector "input[type=file]", visible: :all
-    assert_includes controller_element["data-action"], "media-picker:picked->admin--rich-text#picked"
-    assert_nil controller_element["data-admin--rich-text-upload-url-value"]
+    assert_includes controller_element["data-action"], "media-picker:picked->admin--rich-text--editor#picked"
+    assert_nil controller_element["data-admin--rich-text--editor-upload-url-value"]
   end
 
   test "endpoint URLs come from the route helpers, and the editing locale is passed along" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, locale: "de")
 
-    assert_equal "/#{ContentSpiel::ADMIN_PATH}/link_targets", controller_element["data-admin--rich-text-link-targets-url-value"]
-    assert_equal "de", controller_element["data-admin--rich-text-locale-value"]
+    assert_equal "/#{ContentSpiel::ADMIN_PATH}/link_targets", controller_element["data-admin--rich-text--editor-link-targets-url-value"]
+    assert_equal "de", controller_element["data-admin--rich-text--editor-locale-value"]
   end
 
   test "without a locale the editor edits the primary language" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
 
-    assert_equal Locales.default.to_s, controller_element["data-admin--rich-text-locale-value"]
+    assert_equal Locales.default.to_s, controller_element["data-admin--rich-text--editor-locale-value"]
   end
 
   # Only what still exists is listed -- a deleted asset or link target is
@@ -113,8 +113,8 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document)
 
     assert_equal({ asset.id.to_s => { "url" => asset.url, "alt" => "A dog", "caption" => "Our dog" } },
-      JSON.parse(controller_element["data-admin--rich-text-assets-value"]))
-    assert_equal({ "page:#{target.id}" => "Contact" }, JSON.parse(controller_element["data-admin--rich-text-link-titles-value"]))
+      JSON.parse(controller_element["data-admin--rich-text--editor-assets-value"]))
+    assert_equal({ "page:#{target.id}" => "Contact" }, JSON.parse(controller_element["data-admin--rich-text--editor-link-titles-value"]))
   end
 
   # The image defaults are read in the column's editing locale, falling
@@ -128,7 +128,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document, locale: "de")
 
     assert_equal({ "url" => asset.url, "alt" => "Ein Hund", "caption" => "Our dog" },
-      JSON.parse(controller_element["data-admin--rich-text-assets-value"])[asset.id.to_s])
+      JSON.parse(controller_element["data-admin--rich-text--editor-assets-value"])[asset.id.to_s])
   end
 
   test "renders the default-locale original as html, labelled, with the translate slot" do
@@ -163,8 +163,8 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     refute_selector "[data-original-for]"
   end
 
-  # A caller nesting this under a form object (`Admin::BlockCardComponent`,
-  # `Admin::PostFormComponent`) needs the input's own `name=` to carry that
+  # A caller nesting this under a form object (`Admin::EditorScreen::BlockCardComponent`,
+  # `Admin::EditorScreen::PostFormComponent`) needs the input's own `name=` to carry that
   # nesting (`post[body]`), not the bare column name `name:` only drives the
   # label/`data-field-name` for.
   test "an explicit html_name, not the bare name, drives the input's own name" do
@@ -178,7 +178,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", id: "post-body", value: nil, errors: [ "Body is invalid" ])
 
     assert_selector "#post-body-errors", text: "Body is invalid"
-    assert_selector "#post-body-editor[data-admin--rich-text-target=editor][data-labelledby=post-body-label]"
+    assert_selector "#post-body-editor[data-admin--rich-text--editor-target=editor][data-labelledby=post-body-label]"
   end
 end
 

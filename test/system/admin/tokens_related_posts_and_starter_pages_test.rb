@@ -63,12 +63,12 @@ class Admin::TokensRelatedPostsAndStarterPagesSystemTest < ApplicationSystemTest
     # mousedown handler keeps focus in the search box, so nothing blurs (and
     # nothing autosaves) before the click lands.
     within("#post-related_post_ids-listbox") { find("[role=option]", text: "Satellite").click }
-    assert_selector "[data-controller~='admin--chip-input'] li", text: "Satellite"
+    assert_selector "[data-controller~='admin--ui--chip-input'] li", text: "Satellite"
     assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal [ other.id ], post_record.post_relations.reload.pluck(:related_post_id)
 
-    find("[data-controller~='admin--chip-input'] button[aria-label='Remove Satellite']").click
-    assert_no_selector "[data-controller~='admin--chip-input'] li", text: "Satellite"
+    find("[data-controller~='admin--ui--chip-input'] button[aria-label='Remove Satellite']").click
+    assert_no_selector "[data-controller~='admin--ui--chip-input'] li", text: "Satellite"
     assert_eventually { post_record.post_relations.reload.empty? }
   end
 

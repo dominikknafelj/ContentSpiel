@@ -19,7 +19,7 @@ class ShellTest < ApplicationSystemTestCase
     page.driver.resize(1400, 1400)
   end
 
-  # The scrim is un-hidden by `admin--drawer`, which knows nothing about
+  # The scrim is un-hidden by `admin--shell--drawer`, which knows nothing about
   # widths; widening the window with the drawer open turns the drawer back
   # into the ordinary sidebar, and the scrim must not stay over the page.
   test "a drawer left open across a resize to desktop width leaves no scrim over the page" do

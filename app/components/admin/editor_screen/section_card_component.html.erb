@@ -1,5 +1,5 @@
 <%= tag.div id: dom_id, class: [ "admin-block-card admin-section-card rounded-cs border bg-sunken", (unavailable? ? "border-danger" : "border-line-strong") ],
-      data: { block_id: section.id, container: "", "admin--blocks-target": "card", controller: "admin--section", action: "keydown.esc->admin--section#escape" } do %>
+      data: { block_id: section.id, container: "", "admin--editor--blocks-target": "card", controller: "admin--editor--section", action: "keydown.esc->admin--editor--section#escape" } do %>
   <% if unavailable? %>
     <%# A section whose type is gone (see the component): the unavailable block card's
         header and a sentence, over the blocks it still holds, and a section's own two
@@ -10,9 +10,9 @@
       <% if editable? %>
         <%= form_with url: destroy_path, method: :delete, data: settled_screen_data do %>
           <%= hidden_field_tag :keep_blocks, 1, id: nil %>
-          <%= render Admin::ButtonComponent.new(label: t(".remove_keep"), variant: :secondary, size: :small, type: "submit") %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".remove_keep"), variant: :secondary, size: :small, type: "submit") %>
         <% end %>
-        <%= render Admin::ButtonComponent.new(label: t(".delete"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".delete"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
       <% end %>
     </div>
     <p class="px-3 pb-3 text-xs text-meta"><%= t(".unavailable_hint") %></p>
@@ -23,18 +23,18 @@
   <div class="flex flex-wrap items-center gap-2 p-3">
     <div class="flex min-w-48 flex-1 items-center gap-2">
       <% if editable? %>
-        <%# The block card's own handle, class and actions: `admin--blocks` drags and
+        <%# The block card's own handle, class and actions: `admin--editor--blocks` drags and
             moves a section's card as it does any card of the list. %>
         <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
                 aria-label="<%= t(".move") %>" aria-describedby="block-drag-help"
-                data-action="keydown->admin--blocks#key focusout->admin--blocks#blur">⠿</button>
+                data-action="keydown->admin--editor--blocks#key focusout->admin--editor--blocks#blur">⠿</button>
       <% end %>
 
       <%# The name collapses the card, as a block card's does. Collapsed, the lanes and the
           forms are gone and the header is the whole card: "Section · 3 columns · 5 blocks"
           (sections spec §4.1). %>
       <button type="button" class="shrink-0 truncate text-left text-sm font-semibold text-ink"
-              aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--blocks#toggle">
+              aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--editor--blocks#toggle">
         <%= t(".name") %>
       </button>
       <span class="shrink-0 text-sm text-meta" aria-hidden="true">·</span>
@@ -54,7 +54,7 @@
               id: field_id("background"), class: select_class, "aria-label": t(".background") %>
         <%= select_tag "block[settings][width]", options_for_select(width_options, setting("width")),
               id: field_id("width"), class: select_class, "aria-label": t(".width") %>
-        <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
+        <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
         <%# One slot per setting, as every field of a block has: `update` replaces all three
             with each answer. Together they take a line of their own, and no room at all
             while none holds a message (`.admin-section-errors`). %>
@@ -67,14 +67,14 @@
     <% end %>
 
     <% if editable? %>
-      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <% menu.with_item do %>
           <%= tag.button t(".move_up"), type: "button", disabled: first?, class: menu_item_class,
-                data: { move: "up", action: "click->admin--blocks#moveUp" } %>
+                data: { move: "up", action: "click->admin--editor--blocks#moveUp" } %>
         <% end %>
         <% menu.with_item do %>
           <%= tag.button t(".move_down"), type: "button", disabled: last?, class: menu_item_class,
-                data: { move: "down", action: "click->admin--blocks#moveDown" } %>
+                data: { move: "down", action: "click->admin--editor--blocks#moveDown" } %>
         <% end %>
         <% menu.with_item do %>
           <%= button_to t(".duplicate"), duplicate_path, method: :post, class: menu_item_class %>
@@ -108,11 +108,11 @@
   <%# "Delete section and its blocks…": after the body, outside the settings form. Its
       count is kept current by every add and delete inside the section. %>
   <% if editable? %>
-    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".delete_title"), body: t(".delete_body")) do |dialog| %>
+    <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".delete_title"), body: t(".delete_body")) do |dialog| %>
       <% dialog.with_details do %>
         <%= render self.class.delete_count(section: section, count: blocks.size) %>
         <%# The open notes on the section's blocks, deleted with them (notes spec D12), in
-            a sentence of their own (the handoff's decision 7): filled by `admin--notes`
+            a sentence of their own (the handoff's decision 7): filled by `admin--notes--drawer`
             from the markers of the tiles inside this card. The section itself takes no
             notes (decision 10): this card has no marker and no "Add note" in its menu,
             and "Remove section, keep blocks" above stays one press with nothing to say. %>
@@ -120,7 +120,7 @@
       <% end %>
       <% dialog.with_confirm_action do %>
         <%= form_with url: destroy_path, method: :delete do %>
-          <%= render Admin::ButtonComponent.new(label: t(".delete_confirm"), variant: :danger, type: "submit") %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".delete_confirm"), variant: :danger, type: "submit") %>
         <% end %>
       <% end %>
     <% end %>

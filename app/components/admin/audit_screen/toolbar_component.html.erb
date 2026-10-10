@@ -49,7 +49,7 @@
     </div>
   <% end %>
 
-  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <noscript><%= render Admin::Ui::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
   <% if filter.active? %>
     <%= link_to "Clear", path, class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
   <% end %>

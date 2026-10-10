@@ -8,7 +8,7 @@
       <span class="admin-wordmark font-cs text-xs font-bold uppercase tracking-wide text-ink">CONTENT·SPIEL</span>
       <span class="admin-site-name truncate text-[13px] text-dim"><%= site_name %></span>
     </div>
-    <%= tag.button type: "button", data: { action: "admin--command-palette#open" },
+    <%= tag.button type: "button", data: { action: "admin--shell--command-palette#open" },
           class: "flex w-full cursor-pointer items-center justify-between rounded-cs border border-line-strong px-2 py-1.5 text-left text-sm text-meta" do %>
       <span>Jump to…</span><span class="font-cs-mono text-label">⌘K</span>
     <% end %>
@@ -40,7 +40,7 @@
   </div>
 
   <div class="flex flex-col gap-3 border-t border-line p-3">
-    <%= render Admin::ThemeSwitchComponent.new %>
+    <%= render Admin::Ui::ThemeSwitchComponent.new %>
     <%# The account block: who is signed in (`AccountIdentityComponent`, its
         own element so the account screen's "Save" can replace it by stream, and a
         link to that screen), then "Your account" -- the same screen: the
@@ -59,8 +59,8 @@
             footer's and the write queue's `beforeunload` guards). What the
             tab's `sessionStorage` holds is not the document's and would
             stay: the unsent note drafts are removed as the document goes
-            (`admin--notes-live#signingOut`). %>
-        <%= button_to "Sign out", admin_sign_out_path, method: :delete, form: { data: { turbo: false, action: "submit->admin--notes-live#signingOut" } }, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
+            (`admin--notes--live#signingOut`). %>
+        <%= button_to "Sign out", admin_sign_out_path, method: :delete, form: { data: { turbo: false, action: "submit->admin--notes--live#signingOut" } }, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
       </div>
     </div>
   </div>

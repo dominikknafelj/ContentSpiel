@@ -3,7 +3,7 @@ require "application_system_test_case"
 # A repeatable `groups` field (cs-studio spec §4.3/§9), exercised on the
 # test-only `test/event` content type's own `speakers` field
 # (`test/support/test_types.rb`) -- add, reorder, remove, each round-tripping
-# through the surrounding post form's own autosave (`admin--groups` never
+# through the surrounding post form's own autosave (`admin--editor--groups` never
 # talks to the server on its own; see that controller's own class comment).
 class Admin::GroupsSystemTest < ApplicationSystemTestCase
   include TestTypes
@@ -20,11 +20,11 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
 
       # "+ Add Test/speaker" -- `Admin::Fields::GroupsField#add_label`, built
       # off `test/speaker`'s own default (unlabeled) `humanize`d name --
-      # purely client-side (`admin--groups#add`), no request of its own.
+      # purely client-side (`admin--editor--groups#add`), no request of its own.
       press "+ Add Test/speaker"
-      # Row 0's `name` input id, by `Admin::FieldComponent`'s own formula
+      # Row 0's `name` input id, by `Admin::Ui::FieldComponent`'s own formula
       # (`dom_id_prefix("post[fields][speakers][0]")`) -- see that
-      # component's class comment, and `admin--groups#renumber`'s own for
+      # component's class comment, and `admin--editor--groups#renumber`'s own for
       # why this id moves with a row across a later reorder/remove.
       fill_in "post_fields_speakers_0-name", with: "Ada"
 
@@ -33,8 +33,8 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
 
       assert_speakers_eventually(post_record, %w[Ada Grace])
 
-      # `admin--groups` drives SortableJS the same way `admin--blocks`/
-      # `admin--tree` do (see those tests' own comments for why native
+      # `admin--editor--groups` drives SortableJS the same way `admin--editor--blocks`/
+      # `admin--pages--tree` do (see those tests' own comments for why native
       # drag-and-drop isn't driven through the browser here): moving the two
       # rows' DOM nodes and calling the controller's own `renumber()`
       # directly leaves the DOM in exactly the shape a real drop's `onEnd`
@@ -42,12 +42,12 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
       # same bubbling `input` event that hands off to the surrounding
       # form's own autosave.
       page.execute_script(<<~JS)
-        const list = document.querySelector('[data-admin--groups-target="list"]')
-        const rows = list.querySelectorAll('[data-admin--groups-target="row"]')
+        const list = document.querySelector('[data-admin--editor--groups-target="list"]')
+        const rows = list.querySelectorAll('[data-admin--editor--groups-target="row"]')
         list.insertBefore(rows[1], rows[0])
 
-        const container = document.querySelector('[data-controller="admin--groups"]')
-        window.Stimulus.getControllerForElementAndIdentifier(container, "admin--groups").renumber()
+        const container = document.querySelector('[data-controller="admin--editor--groups"]')
+        window.Stimulus.getControllerForElementAndIdentifier(container, "admin--editor--groups").renumber()
       JS
 
       assert_speakers_eventually(post_record, %w[Grace Ada])
@@ -55,7 +55,7 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
       # Remove the row now in first position (Grace, after the reorder
       # above) -- scoped to that row alone since every row's own ×
       # button shares the same label.
-      first_row = all('[data-admin--groups-target="row"]').first
+      first_row = all('[data-admin--editor--groups-target="row"]').first
       first_row.find("button[aria-label='Remove Test/speaker']").click
 
       assert_speakers_eventually(post_record, %w[Ada])

@@ -240,7 +240,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_select "[data-translate-slot='title'] [data-controller='admin--translate']" do |wrappers|
+    assert_select "[data-translate-slot='title'] [data-controller='admin--translation--translate']" do |wrappers|
       wrapper = wrappers.first
       assert_equal "Post", wrapper["data-translate-record-type"]
       assert_equal record.id.to_s, wrapper["data-translate-record-id"]
@@ -248,26 +248,26 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
       assert_equal "post-title", wrapper["data-translate-input-id"]
       assert_equal "plain", wrapper["data-translate-kind"]
       assert_equal "5", wrapper["data-translate-characters"]
-      assert_equal "/cs-studio/translations/suggest", wrapper["data-admin--translate-url-value"]
-      assert_equal "de", wrapper["data-admin--translate-locale-value"]
+      assert_equal "/cs-studio/translations/suggest", wrapper["data-admin--translation--translate-url-value"]
+      assert_equal "de", wrapper["data-admin--translation--translate-locale-value"]
     end
     assert_select "[data-translate-slot='title'] button[type='button']", text: "Translate"
     assert_select "[data-translate-slot='title'] #translation-suggestion-post-title", count: 0
     assert_select "[data-field-name='title'] > div > div > #translation-suggestion-post-title[data-translation-box]"
     assert_select "[data-translate-slot='body'] [data-translate-input-id='post-body-json'][data-translate-kind='rich']"
-    assert_select "button[type='button'][data-action~='admin--translate#translateEmpty']", text: "Suggest translations for 2 empty fields"
-    assert_select "[data-admin--translate-max-fields-value='#{AI::Translate::MAX_FIELDS}'][data-admin--translate-max-characters-value='#{AI::Translate::MAX_CHARACTERS}']"
+    assert_select "button[type='button'][data-action~='admin--translation--translate#translateEmpty']", text: "Suggest translations for 2 empty fields"
+    assert_select "[data-admin--translation--translate-max-fields-value='#{AI::Translate::MAX_FIELDS}'][data-admin--translation--translate-max-characters-value='#{AI::Translate::MAX_CHARACTERS}']"
   end
 
   test "no Translate buttons in the default language, without AI, without ai.translate, or view only" do
     record = create_post(title: "Hello")
 
     get "/cs-studio/posts/#{record.id}"
-    assert_select "[data-controller~='admin--translate']", count: 0
+    assert_select "[data-controller~='admin--translation--translate']", count: 0
 
     site_settings(:default).update!(ai_provider: nil)
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
-    assert_select "[data-controller~='admin--translate']", count: 0
+    assert_select "[data-controller~='admin--translation--translate']", count: 0
     site_settings(:default).update!(ai_provider: "test/stub")
 
     # Read only: may read every post, but neither edit nor translate.
@@ -276,7 +276,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
     assert_response :success
     assert_select "[data-original-for='title']"
-    assert_select "[data-controller~='admin--translate']", count: 0
+    assert_select "[data-controller~='admin--translation--translate']", count: 0
 
     # An Author on their own draft: may edit it, but holds no ai.translate.
     sign_in_as(users(:author))
@@ -285,7 +285,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{own.id}", params: { locale: "de" }
     assert_response :success
     assert_select "[data-original-for='title']"
-    assert_select "[data-controller~='admin--translate']", count: 0
+    assert_select "[data-controller~='admin--translation--translate']", count: 0
   end
 
   test "the settings form, the page editor and its blocks get the buttons too" do
@@ -371,7 +371,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_select "[data-translate-slot='title'] button[data-action='admin--translate#translate']", text: "Translate"
+    assert_select "[data-translate-slot='title'] button[data-action='admin--translation--translate#translate']", text: "Translate"
     assert_select "[data-translate-slot='excerpt'] button", count: 0
     assert_select "[data-original-for='excerpt'] [data-translate-mode='update'] button", text: "Suggest update"
     assert_select "[data-field-name='excerpt'] #translation-suggestion-post-excerpt[data-translation-box]"

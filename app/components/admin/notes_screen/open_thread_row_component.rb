@@ -12,7 +12,7 @@ module Admin
     # is the card beside this one.
     #
     # The type is led by a 6px marker: round, in the content type's category
-    # colour, for a post (`Admin::ContentTypeDotComponent`'s own colour for
+    # colour, for a post (`Admin::Ui::ContentTypeDotComponent`'s own colour for
     # the type, as the posts list and the mind graph's legend draw it), and
     # square in meta for a page and an image. Never the only cue: the type's
     # name stands beside it.
@@ -31,7 +31,7 @@ module Admin
 
       def post? = row.kind == "post"
 
-      def type_dot = @type_dot ||= Admin::ContentTypeDotComponent.new(content_type: row.record.content_type)
+      def type_dot = @type_dot ||= Admin::Ui::ContentTypeDotComponent.new(content_type: row.record.content_type)
 
       def type_name = post? ? type_dot.label : t(".kind.#{row.kind}")
 

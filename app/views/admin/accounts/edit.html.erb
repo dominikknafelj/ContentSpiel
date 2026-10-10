@@ -8,7 +8,7 @@
     spec §5.1). A deliberate submit, never autosave, like the Users module's
     own forms.
 
-    Two forms, so two footers: each `Admin::SaveBarComponent` is the footer of
+    Two forms, so two footers: each `Admin::Ui::SaveBarComponent` is the footer of
     its own form and counts only that form's changes (one Leave prompt serves
     both). The first form is the person's preferences -- the name and the two
     Notes switches (notes handoff, decision 13: preferences save the same
@@ -46,7 +46,7 @@
   <%# The page's summary is the Profile and Notes form's. The password form's
       answer, refused or saved, is said inside its own card (the notes
       handoff's decision 43; see the card below). %>
-  <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
   <%# What the form shows: the account as stored, or, after a refusal, what
       was sent (`@profile_values`, see the controller). %>
@@ -67,14 +67,14 @@
         decisions 13-16): two settings of the person's, saved with this
         form's footer like any configuration -- never autosaved, never
         through the write queue. A hidden "0" ahead of each box makes an
-        unticked switch submit; `admin--save-bar` does not count a hidden
+        unticked switch submit; `admin--saving--save-bar` does not count a hidden
         input, so the box alone is.
 
         The SETTING is the person's and follows them to every browser; the
         PERMISSION to notify is this browser's. The lines under the second
         switch are about the permission and are shown ONLY WHILE THAT SWITCH
         IS ON -- as it stands in the page, saved or not: turning it on shows
-        the line at once (`admin--notes-permission`, which holds the switch
+        the line at once (`admin--notes--permission`, which holds the switch
         as its target). Not asked yet: the accent-toned info line with
         "Allow in this browser", which asks at once, in the click, outside
         the save -- the button is `type="button"` with no name, so it is no
@@ -95,26 +95,26 @@
           <%= check_box_tag "notes_sound", "1", profile[:notes_sound], role: "switch", class: "cs-toggle" %>
         </label>
       </div>
-      <div class="px-[18px] py-3.5" data-controller="admin--notes-permission" data-state="unsupported"
-           data-action="visibilitychange@document->admin--notes-permission#render focus@window->admin--notes-permission#render">
+      <div class="px-[18px] py-3.5" data-controller="admin--notes--permission" data-state="unsupported"
+           data-action="visibilitychange@document->admin--notes--permission#render focus@window->admin--notes--permission#render">
         <label class="flex items-center justify-between gap-4 text-sm text-ink">
           <span><%= t("admin.accounts.notes.notes_desktop") %></span>
           <%= hidden_field_tag "notes_desktop", "0", id: nil %>
           <%= check_box_tag "notes_desktop", "1", profile[:notes_desktop], role: "switch", class: "cs-toggle",
-                data: { "admin--notes-permission-target": "switch", action: "change->admin--notes-permission#render" } %>
+                data: { "admin--notes--permission-target": "switch", action: "change->admin--notes--permission#render" } %>
         </label>
         <div role="status">
-          <div class="mt-2 flex items-center justify-between gap-3 rounded-cs bg-accent-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes-permission-target="ask" hidden>
+          <div class="mt-2 flex items-center justify-between gap-3 rounded-cs bg-accent-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes--permission-target="ask" hidden>
             <span><%= t("admin.accounts.notes.permission.ask") %></span>
-            <%= render Admin::ButtonComponent.new(label: t("admin.accounts.notes.permission.allow"), variant: :secondary, size: :small, type: "button",
-                  class: "shrink-0", data: { action: "admin--notes-permission#allow" }) %>
+            <%= render Admin::Ui::ButtonComponent.new(label: t("admin.accounts.notes.permission.allow"), variant: :secondary, size: :small, type: "button",
+                  class: "shrink-0", data: { action: "admin--notes--permission#allow" }) %>
           </div>
-          <p class="mt-2 rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes-permission-target="blocked" hidden><%= t("admin.accounts.notes.permission.blocked") %></p>
+          <p class="mt-2 rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes--permission-target="blocked" hidden><%= t("admin.accounts.notes.permission.blocked") %></p>
         </div>
       </div>
     </section>
 
-    <%= render Admin::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: t("admin.accounts.save")) %>
+    <%= render Admin::Ui::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: t("admin.accounts.save")) %>
   <% end %>
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
@@ -122,10 +122,10 @@
         link to "change your password" names, and where the form's own
         answer comes back to. `scroll-mt`: clear of whatever is stuck to the top. %>
     <%# Drawn as the password form's own answer, saved or refused (decision
-        42): `admin--password-answer` puts `#password` in the address, the
+        42): `admin--account--password-answer` puts `#password` in the address, the
         card in view and the focus on the message. %>
     <section id="password" class="max-w-[560px] scroll-mt-6 rounded-cs border border-line bg-surface" aria-labelledby="account-password"
-             <%= tag.attributes(data: { controller: "admin--password-answer" }) if password_answer %>>
+             <%= tag.attributes(data: { controller: "admin--account--password-answer" }) if password_answer %>>
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-password" class="text-base font-semibold text-ink"><%= t("admin.accounts.password.title") %></h3>
         <p class="text-[13px] text-dim"><%= t("admin.accounts.password.sessions") %></p>
@@ -137,30 +137,30 @@
             their fields (each field keeps its own line too); the service's
             own sentences stand when it left no per-field errors (a denial,
             too many tries). A save is the success alert as the sign-in
-            screen draws one. Either takes the focus (`admin--password-answer`). %>
-        <%= render Admin::ErrorSummaryComponent.new(errors: password_errors,
+            screen draws one. Either takes the focus (`admin--account--password-answer`). %>
+        <%= render Admin::Ui::ErrorSummaryComponent.new(errors: password_errors,
               field_ids: { current_password: "current_password", password: "new_password", password_confirmation: "password_confirmation" }) %>
         <% if password_answer == "saved" %>
           <p class="mb-4 rounded-cs bg-ok-tint px-3 py-2.5 text-[13px] leading-normal text-ok-ink" role="status" tabindex="-1" data-password-saved><%= t("admin.accounts.password.changed") %></p>
         <% end %>
         <div class="mb-4">
-          <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
+          <%= render Admin::Ui::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
                 autocomplete: "current-password", autofocus: true, errors: field_errors[:current_password], "data-save-bar-ignore": true) %>
         </div>
 
         <div class="mb-4">
           <%# Its id is `new_password`: `password` is the card's, the page's anchor
               (decision 38), and an id names one element. The field's name is unchanged. %>
-          <%= render Admin::PasswordFieldComponent.new(name: "password", id: "new_password", label: "New password", meter: true, errors: field_errors[:password]) %>
+          <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "new_password", label: "New password", meter: true, errors: field_errors[:password]) %>
         </div>
 
         <div class="mb-4">
-          <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password",
+          <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password",
                 errors: field_errors[:password_confirmation]) %>
         </div>
       </div>
       <%# The card's own footer, inside it (the notes handoff's decision 34). %>
-      <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }, contained: true) do %>
+      <%= render Admin::Ui::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }, contained: true) do %>
       <%# The reset flow is public and signs nobody out by being visited; it
           asks for an email, so it is only useful where mail is configured
           (System status says when it isn't). Opened in the page, not the

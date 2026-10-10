@@ -57,13 +57,13 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
   test "Schedule… and Edit schedule open the Schedule dialog, rendered after the header" do
     page_record = create_page(title: "About", published: false)
     render_header(page_record)
-    assert_selector "[role=menu] button[data-action='admin--dialog#open'][data-admin--dialog-id-param='schedule-page-#{page_record.id}']", text: "Schedule…", visible: :all
+    assert_selector "[role=menu] button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='schedule-page-#{page_record.id}']", text: "Schedule…", visible: :all
     assert_selector "dialog#schedule-page-#{page_record.id}", visible: :all
 
     post = create_post(title: "Later", published: false)
     as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
     render_header(post.reload)
-    assert_selector "button[data-admin--dialog-id-param='schedule-post-#{post.id}']", text: "Edit schedule"
+    assert_selector "button[data-admin--ui--dialog-id-param='schedule-post-#{post.id}']", text: "Edit schedule"
     assert_selector "dialog#schedule-post-#{post.id} button", text: "Remove schedule", visible: :all
   end
 
@@ -181,7 +181,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
       render_header(page_record.reload)
 
       assert_selector "a[href='/about']", text: "View on site"
-      assert_selector "button[data-admin--clipboard-url-value='http://test.host/about']", text: "Copy"
+      assert_selector "button[data-admin--ui--clipboard-url-value='http://test.host/about']", text: "Copy"
       assert_no_text "example.com"
     end
   end
@@ -194,7 +194,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
       render_header(page_record.reload)
 
       assert_selector "a[href='/about']", text: "View on site"
-      assert_selector "button[data-admin--clipboard-url-value='https://www.my-site.test/about']"
+      assert_selector "button[data-admin--ui--clipboard-url-value='https://www.my-site.test/about']"
     end
   end
 

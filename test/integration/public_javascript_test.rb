@@ -12,7 +12,7 @@ require "test_helper"
 # The import map itself is the same on both (it's only a lookup table);
 # what differs is what each page preloads and imports.
 class PublicJavascriptTest < ActionDispatch::IntegrationTest
-  ADMIN_ONLY = %w[controllers/admin/ rich_text/ autosave/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
+  ADMIN_ONLY = %w[controllers/admin/ rich_text/ saving/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
 
   test "a public page loads the application entry point without any admin module" do
     create_page(title: "About")
@@ -38,7 +38,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     preloads = modulepreloads
-    %w[admin @tiptap--core controllers/admin/rich_text_controller rich_text/schema prosemirror-model].each do |name|
+    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema prosemirror-model].each do |name|
       assert preloads.any? { |href| href.include?(name) }, "expected #{name} to be modulepreloaded in CS Studio: #{preloads.inspect}"
     end
     assert_includes entry_point_script, %(import "admin")
@@ -58,23 +58,30 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       preloads = modulepreloads
-      assert preloads.any? { |href| href.include?("controllers/admin/mind_graph_controller") }, "the thin controller is an admin controller like any other"
-      %w[mind_graph/ d3-force].each do |name|
-        assert preloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on #{path}: #{preloads.grep(/#{Regexp.escape(name)}/).inspect}"
+      assert preloads.any? { |href| href.include?("controllers/admin/mind_graph/graph_controller") }, "the thin controller is an admin controller like any other"
+      # The module folder app/javascript/mind_graph/ is the one that stays unloaded, whatever
+      # prefix the assets are served under; the thin controller's own file lives in
+      # controllers/admin/mind_graph/ and is preloaded like any admin controller. So the
+      # test is "mind_graph/ with no admin/ before it": it matches /assets/mind_graph/app-x.js
+      # and /any/prefix/mind_graph/layout_worker-x.js, and lets controllers/admin/mind_graph/ through.
+      [ %r{(?<!admin/)mind_graph/}, /d3-force/ ].each do |pattern|
+        assert preloads.none? { |href| href.match?(pattern) }, "#{pattern.inspect} is modulepreloaded on #{path}: #{preloads.grep(pattern).inspect}"
       end
-      assert_not_includes entry_point_script, "mind_graph/"
+      # Both are `preload: false`, so an inline `import "mind_graph/app"` in a layout would add no
+      # modulepreload link and pass the lines above; the entry-point script is where it would show.
+      assert_no_match(/(?<!admin\/)mind_graph\//, entry_point_script, "the entry-point script of #{path} imports the mind graph's modules")
       assert_not_includes entry_point_script, "d3-force"
     end
 
     # The Mind graph names the worker and d3-force as plain asset URLs, for the
     # script to start a worker from; no other screen mentions either.
-    assert_select "[data-controller='admin--mind-graph'][data-worker-url*='mind_graph/layout_worker'][data-d3-url*='d3-force']"
+    assert_select "[data-controller='admin--mind-graph--graph'][data-worker-url*='mind_graph/layout_worker'][data-d3-url*='d3-force']"
     get "/cs-studio/tags"
     assert_select "[data-worker-url], [data-d3-url]", count: 0
   end
 
   # Notes spec §6.2: the cable is CS Studio's. A public page names no cable
-  # address, carries nothing that subscribes (`admin--notes-live` is the one
+  # address, carries nothing that subscribes (`admin--notes--live` is the one
   # script that asks turbo-rails for its consumer, and Turbo's own stream
   # element is used nowhere) and preloads no script that would.
   test "a public page asks for no cable connection" do
@@ -84,11 +91,13 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "meta[name=action-cable-url]", count: 0
-    assert_select "[data-controller*='notes-live']", count: 0
-    assert_select "[data-controller*='notes-alert']", count: 0
+    assert_select "[data-controller*='notes--live']", count: 0
+    assert_select "[data-controller*='notes--alert']", count: 0
     assert_no_match "turbo-cable-stream-source", response.body
-    assert modulepreloads.none? { |href| href.include?("notes_live_controller") }
-    assert_not_includes entry_point_script, "notes_live"
+    assert modulepreloads.none? { |href| href.include?("notes/live_controller") }
+    # "notes/live" is in every specifier of the controller (`controllers/admin/notes/live_controller`),
+    # so an inline import of it would contain it; modulepreload alone would not see an inline import.
+    assert_not_includes entry_point_script, "notes/live"
   end
 
   # The other half: CS Studio does load it, on every screen, on <body>.
@@ -99,13 +108,13 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     get "/cs-studio/tags"
 
     assert_response :success
-    assert_select "body[data-controller~='admin--notes-live'][data-admin--notes-live-unread-url-value='/cs-studio/notes/unread'][data-admin--notes-live-delivery-url-value='/cs-studio/notes/deliveries/0'][data-action~='visibilitychange@document->admin--notes-live#visible']"
+    assert_select "body[data-controller~='admin--notes--live'][data-admin--notes--live-unread-url-value='/cs-studio/notes/unread'][data-admin--notes--live-delivery-url-value='/cs-studio/notes/deliveries/0'][data-action~='visibilitychange@document->admin--notes--live#visible']"
     assert_select "template#toast-note-template", count: 1
-    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes_live_controller") }
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/live_controller") }
     # And beside it what makes a mention heard (notes spec §6.4), with the
     # person's two settings as data.
-    assert_select "body[data-controller~='admin--notes-alert'][data-action~='admin--notes-live:delivery@document->admin--notes-alert#delivery'][data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false][data-admin--notes-alert-person-value='#{users(:one).id}']"
-    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes_alert_controller") }
+    assert_select "body[data-controller~='admin--notes--alert'][data-action~='admin--notes--live:delivery@document->admin--notes--alert#delivery'][data-admin--notes--alert-sound-value=true][data-admin--notes--alert-desktop-value=false][data-admin--notes--alert-person-value='#{users(:one).id}']"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/alert_controller") }
   end
 
   private

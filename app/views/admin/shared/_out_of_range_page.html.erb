@@ -2,7 +2,7 @@
     empty-state card, saying so, with the way back -- never an error, never a
     silent clamp. Local: `url`, the list's first page. %>
 <div class="rounded-cs border border-line bg-surface">
-  <%= render Admin::EmptyStateComponent.new(title: "Nothing on this page") do |empty_state| %>
+  <%= render Admin::Ui::EmptyStateComponent.new(title: "Nothing on this page") do |empty_state| %>
     <% empty_state.with_action do %>
       <%= link_to "Back to page 1", url, class: setup_secondary_link_class %>
     <% end %>

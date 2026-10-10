@@ -80,8 +80,8 @@ module Admin
       # A successful key write makes a shown "CONNECTED · N MS" stale (it was
       # measured against the key just replaced or removed): back to the empty slot.
       streams << turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new) if notice
-      streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: notice, kind: :success)) if notice
-      streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: error, kind: :error)) if toast && error
+      streams << turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: notice, kind: :success)) if notice
+      streams << turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: error, kind: :error)) if toast && error
       # Without Turbo (no JavaScript, a scripted client) a stream body would
       # be shown as text: the same outcome as a redirect to the card instead.
       # Decided by "does the client take a stream", not `respond_to`: the

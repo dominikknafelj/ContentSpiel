@@ -16,7 +16,7 @@ module Admin
     # post with its drawer open (`?notes=open`); accent only while something
     # there is unread and addressed to the viewer; nothing at zero.
     #
-    # Selection is `admin--bulk-select`'s (on the wrapper around this and the
+    # Selection is `admin--posts--bulk-select`'s (on the wrapper around this and the
     # bulk bar): every row's checkbox is a `row` target, the header one is the
     # `all` target ("select all on this page"). They carry no form -- the bulk
     # forms are outside the table -- so their own name is never submitted.

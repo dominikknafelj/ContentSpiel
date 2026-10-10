@@ -2,10 +2,10 @@
     status (handoff §10 item 14): warnings first, then OK, each group in the
     checks' own order. `copyable` is false in the wizard, which loads no admin
     JavaScript, so a Copy button there would do nothing
-    (`Admin::SystemCheckRowComponent`). %>
+    (`Admin::Ui::SystemCheckRowComponent`). %>
 <% copyable = local_assigns.fetch(:copyable, false) %>
 <ul class="mt-6 divide-y divide-line border-y border-line">
   <% results.sort_by.with_index { |result, index| [ result.ok? ? 1 : 0, index ] }.each do |result| %>
-    <%= render Admin::SystemCheckRowComponent.new(result: result, copyable: copyable) %>
+    <%= render Admin::Ui::SystemCheckRowComponent.new(result: result, copyable: copyable) %>
   <% end %>
 </ul>

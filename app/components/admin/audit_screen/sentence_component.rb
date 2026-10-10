@@ -4,7 +4,7 @@ module Admin
     # rows, the event page's title and the dashboard's "Recent activity" all
     # draw a sentence here, so the wording AND the look agree. The sentence is
     # plain data (the model knows no components); this is where it becomes
-    # HTML: the actor named through `Admin::UserNameComponent` ("You" for the
+    # HTML: the actor named through `Admin::Ui::UserNameComponent` ("You" for the
     # viewer, "You, via <token>" for the viewer's own token, nothing at all for
     # an event with no user, like a failed sign-in), the subject quoted and
     # linked when the sentence carries a route (a route NAME and params,
@@ -36,7 +36,7 @@ module Admin
       def actor_html
         return if actor.none
 
-        name = actor.you ? "You" : render(Admin::UserNameComponent.new(user: actor.user, user_id: actor.user_id))
+        name = actor.you ? "You" : render(Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id))
         via = actor.via_label.present? ? (actor.you ? ", via #{actor.via_label}" : " via #{actor.via_label}") : ""
         safe_join([ content_tag(:span, name, class: "font-semibold"), via, " " ])
       end

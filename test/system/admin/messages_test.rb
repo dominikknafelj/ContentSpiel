@@ -41,10 +41,10 @@ class Admin::MessagesTest < ApplicationSystemTestCase
   end
 
   test "a string, a plural and an interpolated sentence read as the server wrote them" do
-    assert_equal "Save or cancel your changes first.", in_page(%(messages(document.body).t("components.save_bar.blocked")))["value"]
-    assert_equal "1 unsaved change", in_page(%(messages(document.body).t("components.save_bar.changes", { count: 1 })))["value"]
-    assert_equal "0 unsaved changes", in_page(%(messages(document.body).t("components.save_bar.changes", { count: 0 })))["value"]
-    assert_equal "3 unsaved changes", in_page(%(messages(document.body).t("components.save_bar.changes", { count: 3 })))["value"]
+    assert_equal "Save or cancel your changes first.", in_page(%(messages(document.body).t("components.ui.save_bar.blocked")))["value"]
+    assert_equal "1 unsaved change", in_page(%(messages(document.body).t("components.ui.save_bar.changes", { count: 1 })))["value"]
+    assert_equal "0 unsaved changes", in_page(%(messages(document.body).t("components.ui.save_bar.changes", { count: 0 })))["value"]
+    assert_equal "3 unsaved changes", in_page(%(messages(document.body).t("components.ui.save_bar.changes", { count: 3 })))["value"]
     assert_equal "You have 1 unsaved change on this screen.",
       in_page(%(messages(document.body).t("layout.leave_dialog.body_with_count", { count: 1 })))["value"]
   end
@@ -54,7 +54,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
 
     assert_equal "Hi <Dom>", in_page(%(messages(document.querySelector("#near .inner")).t("hello", { name: "<Dom>" })))["value"]
     assert_equal "Save or cancel your changes first.",
-      in_page(%(messages(document.querySelector("#near .inner")).t("components.save_bar.blocked")))["value"], "a key only <body> has"
+      in_page(%(messages(document.querySelector("#near .inner")).t("components.ui.save_bar.blocked")))["value"], "a key only <body> has"
   end
 
   test "nested holders answer nearest first, and an inner one never hides an outer one's other keys" do
@@ -69,7 +69,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
 
     assert_equal [ "inner a", "outer b" ], in_page(%([ "a", "b" ].map((key) => messages(document.querySelector("#inner-holder .leaf")).t(key))))["value"]
     assert_equal "Save or cancel your changes first.",
-      in_page(%(messages(document.querySelector("#inner-holder .leaf")).t("components.save_bar.blocked")))["value"]
+      in_page(%(messages(document.querySelector("#inner-holder .leaf")).t("components.ui.save_bar.blocked")))["value"]
   end
 
   test "the tag dialogs' root and an autosaving row both get the page's messages as well as their own" do
@@ -78,11 +78,11 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     await_admin_controllers
     field = "#tag-#{Tag.first.id}-name"
 
-    assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{field}")).t("components.save_status.saving")))["value"]
-    assert_equal "1 unsaved change", in_page(%(messages(document.querySelector("#{field}")).t("components.save_bar.changes", { count: 1 })))["value"]
-    root = "[data-controller='admin--tag-dialogs']"
+    assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{field}")).t("components.ui.save_status.saving")))["value"]
+    assert_equal "1 unsaved change", in_page(%(messages(document.querySelector("#{field}")).t("components.ui.save_bar.changes", { count: 1 })))["value"]
+    root = "[data-controller='admin--tags--dialogs']"
     assert_match(/wasn't deleted/, in_page(%(messages(document.querySelector("#{root}")).t("tags.dialogs.delete_failed")))["value"].to_s)
-    assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{root}")).t("components.save_status.saving")))["value"], "the root's own data-messages does not hide <body>'s"
+    assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{root}")).t("components.ui.save_status.saving")))["value"], "the root's own data-messages does not hide <body>'s"
 
     find(field).set("renamed")
     assert_selector "#tag-#{Tag.first.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 8
@@ -92,7 +92,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     add_messages_element("strict", { "@locale" => "en", "greeting" => "Hi %{name}", "n" => { "one" => "a", "other" => "b" } }.to_json)
 
     assert_match(/no message "nope"/, in_page(%(messages(document.body).t("nope")))["error"])
-    assert_match(/needs a count/, in_page(%(messages(document.body).t("components.save_bar.changes")))["error"])
+    assert_match(/needs a count/, in_page(%(messages(document.body).t("components.ui.save_bar.changes")))["error"])
     assert_match(/needs %\{name\}/, in_page(%(messages(document.getElementById("strict")).t("greeting")))["error"])
   end
 

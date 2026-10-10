@@ -2,11 +2,11 @@
     Media screen's own layout and the tests look for; the title, the save status
     and the base-updated-at field keep stable ids because the autosave answer
     (`Admin::MediaController#update`) addresses them. %>
-<section id="media-panel" class="admin-media-panel flex flex-col gap-4 focus:outline-none" aria-labelledby="media-panel-title" tabindex="-1" data-admin--media-panel-target="panel">
+<section id="media-panel" class="admin-media-panel flex flex-col gap-4 focus:outline-none" aria-labelledby="media-panel-title" tabindex="-1" data-admin--media--panel-target="panel">
   <div class="flex items-start justify-between gap-3">
     <h2 id="media-panel-title" class="min-w-0 break-words text-lg font-semibold text-ink"><%= asset.title %></h2>
     <%= link_to "×", close_path, aria: { label: "Close panel" }, title: "Close", class: "-mt-1 shrink-0 rounded-cs px-2 text-xl leading-none text-meta hover:text-ink",
-          data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media-panel#close", "admin--media-panel-tile-id-param": asset.id } %>
+          data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media--panel#close", "admin--media--panel-tile-id-param": asset.id } %>
   </div>
 
   <span class="block overflow-hidden rounded-cs border border-line bg-sunken">
@@ -20,14 +20,14 @@
     <dt>TYPE</dt><dd class="text-right text-dim"><%= file_facts %></dd>
     <dt>UPLOADED</dt>
     <dd class="text-right text-dim">
-      <% if uploader? %>by <%= render Admin::UserNameComponent.new(user: uploader, user_id: asset.created_by_id) %> · <% end %><%= uploaded_on %>
+      <% if uploader? %>by <%= render Admin::Ui::UserNameComponent.new(user: uploader, user_id: asset.created_by_id) %> · <% end %><%= uploaded_on %>
     </dd>
   </dl>
 
   <div class="flex items-center justify-between gap-3">
-    <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+    <%= render Admin::Ui::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
     <% if editable? %>
-      <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
+      <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle) %>
     <% end %>
   </div>
 
@@ -94,7 +94,7 @@
       which here is the panel's padding. Nothing at zero: the "· N open"
       hides with its number. %>
   <%= tag.div id: "media-notes", class: "-mx-4 border-t border-line",
-        data: { "admin--notes-live-target": "record", notes_type: "media", notes_id: asset.id, notes_counts_url: helpers.admin_record_note_counts_path("media", asset.id) } do %>
+        data: { "admin--notes--live-target": "record", notes_type: "media", notes_id: asset.id, notes_counts_url: helpers.admin_record_note_counts_path("media", asset.id) } do %>
     <h3 class="px-4 pb-1.5 pt-3 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
       <%= t(".notes") %> <span class="has-[[hidden]]:hidden"><%= notes_open %></span>
     </h3>
@@ -107,19 +107,19 @@
   <% if can_delete? %>
     <div class="flex flex-col items-start gap-1.5 border-t border-line pt-4">
       <% if move_to_trash_disabled? %>
-        <%= render Admin::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button", disabled: true, aria: { describedby: "media-trash-help" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button", disabled: true, aria: { describedby: "media-trash-help" }) %>
         <%# `text-dim`, not `text-meta`: the low contrast was bug 7. %>
         <p id="media-trash-help" class="text-sm text-dim"><%= in_use_reason %> <a href="#media-used-on" class="underline">See where it's used</a></p>
       <% else %>
-        <%= render Admin::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button",
+        <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button",
               data: dialog_trigger(delete_dialog_id), aria: { describedby: "media-trash-help" }) %>
         <p id="media-trash-help" class="text-sm text-dim"><%= retention_help %></p>
-        <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this image to the trash?", body: "You can restore it from the trash.") do |dialog| %>
+        <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this image to the trash?", body: "You can restore it from the trash.") do |dialog| %>
           <% dialog.with_confirm_action do %>
             <%# `_top`: a whole-page visit, so the sidebar's Trash badge
                 updates and the Undo toast isn't relayed out of the frame. %>
             <%= form_with url: destroy_path, method: :delete, data: { turbo_frame: "_top" } do %>
-              <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
+              <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
             <% end %>
           <% end %>
         <% end %>

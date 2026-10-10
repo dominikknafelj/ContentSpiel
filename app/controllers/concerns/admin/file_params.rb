@@ -2,7 +2,7 @@ module Admin
   # Strips a blank attachment param out of a params hash before it ever
   # reaches a write service (cs-studio spec §6.1, Task 4 fix round 1).
   #
-  # An autosaving form's own `FormData` (`admin--autosave`) always includes
+  # An autosaving form's own `FormData` (`admin--saving--autosave`) always includes
   # *every* field in the form on *every* PATCH -- including a
   # `<input type="file">` nobody touched this round. Rack parses an
   # untouched file input as an empty string, not "this key is absent"; and

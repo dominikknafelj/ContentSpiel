@@ -75,7 +75,7 @@ module AccessControl
     # that aren't readable themselves, which the tree shows greyed out,
     # without actions, so a readable page deep in the tree still has its
     # path to the root. (`context_only` is the spec's name, used the same
-    # in `Admin::TreeNodeComponent`.) Three queries at most, whatever the
+    # in `Admin::PagesScreen::TreeNodeComponent`.) Three queries at most, whatever the
     # tree's size: the grants (memoised), the readable ids, and their
     # ancestors from the closure table (a subquery on the first, not a list
     # of ids).

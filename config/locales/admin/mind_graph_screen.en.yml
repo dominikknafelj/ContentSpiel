@@ -1,0 +1,18 @@
+# CS Studio's mind-graph-screen components, `app/components/admin/mind_graph_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.mind_graph_screen.<class name without Admin:: and Component, underscored>`.
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      # The Mind graph's legend. The content types' own names come from the
+      # registry (`Admin::Ui::ContentTypeDotComponent`); these are the shapes.
+      mind_graph_screen:
+        legend:
+          label: "Legend"
+          tag: "Tag"
+          hollow: "Draft or scheduled"
+          retired: "Retired type"
+          related: "Related post"
+          tag_edge: "Shares a tag"
+          pinned: "Pinned"

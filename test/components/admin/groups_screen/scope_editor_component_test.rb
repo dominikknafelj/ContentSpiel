@@ -59,7 +59,7 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
 
     assert_selector "[data-removed-type='retired_type']", text: "! retired_type · this type no longer exists"
     assert_selector "[data-removed-type='retired_type'] input[type=hidden][name='group[grants][posts.edit][content_types][]'][value='retired_type'][data-save-bar-track]", visible: :all
-    assert_selector "[data-removed-type='retired_type'] button[type=button][data-action='click->admin--permission-matrix#removeType']", text: "Remove"
+    assert_selector "[data-removed-type='retired_type'] button[type=button][data-action='click->admin--groups--permission-matrix#removeType']", text: "Remove"
     # It is no box: nothing offers the gone type as a choice.
     assert_no_selector "input[type=checkbox][value='retired_type']"
   end
@@ -68,7 +68,7 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     home, about, team, member = family
     editor("pages.edit", scope: { "page_ids" => [ team.id ] }, tree: tree_for([ home, about, team, member ]))
 
-    assert_selector ".admin-branch-picker[data-controller='admin--branch-picker']"
+    assert_selector ".admin-branch-picker[data-controller='admin--groups--branch-picker']"
     # Chosen: ticked, enabled, submitted.
     assert_selector "#{page_box("pages.edit", team)}[checked]:not([disabled])"
     assert_selector "li[data-chosen='1']", count: 1
@@ -79,9 +79,9 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
       assert_selector "#{page_box("pages.edit", ancestor)}[data-partial]:not([checked]):not([disabled])"
     end
     assert_selector "#{page_box("pages.edit", team)}:not([data-partial])"
-    assert_selector "[data-admin--branch-picker-target=note]", text: "contains a chosen page", count: 2
-    assert_selector "[data-admin--branch-picker-target=note]", text: "includes 1 subpage", count: 1
-    assert_selector "[data-admin--branch-picker-target=note]", text: "included", exact_text: true, count: 1
+    assert_selector "[data-admin--groups--branch-picker-target=note]", text: "contains a chosen page", count: 2
+    assert_selector "[data-admin--groups--branch-picker-target=note]", text: "includes 1 subpage", count: 1
+    assert_selector "[data-admin--groups--branch-picker-target=note]", text: "included", exact_text: true, count: 1
     # What the form would submit as rendered: exactly the stored root.
     assert_equal [ team.id.to_s ], submitted_page_ids("pages.edit")
     assert_no_text "A page you can't open (kept)"
@@ -114,7 +114,7 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     assert_no_selector page_box("pages.edit", team)
     assert_no_selector page_box("pages.edit", member)
     assert_no_text "Team"
-    assert_selector "#{carried("pages.edit", team)}[data-admin--branch-picker-target=kept]:not([disabled])", visible: :all
+    assert_selector "#{carried("pages.edit", team)}[data-admin--groups--branch-picker-target=kept]:not([disabled])", visible: :all
     assert_selector "p", text: "A page you can't open (kept)", count: 1
     assert_selector "p.admin-unreadable-branches", text: "Some of these branches are pages you can't open. Only someone who can open them can change this permission."
     # Nothing above it reads partial: the tree doesn't know where it was.
@@ -131,13 +131,13 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     editor("pages.edit", scope: { "page_ids" => [ team.id ] }, tree: tree)
     assert_no_selector page_box("pages.edit", about)
     assert_selector "span[title=\"You can't open this page\"]", text: "About"
-    assert_selector "span[title=\"You can't open this page\"] [data-admin--branch-picker-target=mark]", text: "–", count: 2
+    assert_selector "span[title=\"You can't open this page\"] [data-admin--groups--branch-picker-target=mark]", text: "–", count: 2
     assert_no_text "A page you can't open (kept)"
 
     editor("pages.edit", scope: { "page_ids" => [ about.id ] }, tree: tree)
     assert_no_selector page_box("pages.edit", about)
     assert_selector "span[title=\"You can't open this page\"]", text: "✓About"
-    assert_selector "#{carried("pages.edit", about)}[data-admin--branch-picker-target=kept]", visible: :all
+    assert_selector "#{carried("pages.edit", about)}[data-admin--groups--branch-picker-target=kept]", visible: :all
     assert_selector "#{page_box("pages.edit", team)}[checked][disabled]"
     assert_equal [ about.id.to_s ], submitted_page_ids("pages.edit")
   end

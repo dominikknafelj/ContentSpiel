@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The three-way theme switch (Admin::ThemeSwitchComponent). `choice` is what
+// The three-way theme switch (Admin::Ui::ThemeSwitchComponent). `choice` is what
 // the user picked (light | dark | auto) and lives in localStorage and on
 // <html data-theme-choice>; `data-theme` is what it resolves to and is what
 // the token CSS keys every colour off. shared/_theme_head does the same

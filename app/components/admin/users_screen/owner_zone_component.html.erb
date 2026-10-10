@@ -1,22 +1,22 @@
 <section class="admin-owner-zone mt-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3.5 rounded-cs border border-dashed border-line-strong px-3.5 py-3"
-         aria-labelledby="owner-zone-title" data-controller="admin--pending-lock">
+         aria-labelledby="owner-zone-title" data-controller="admin--saving--pending-lock">
   <div class="flex min-w-0 flex-col gap-0.5">
     <h2 id="owner-zone-title" class="text-base font-medium text-ink">Owner</h2>
     <p class="text-sm text-dim">Owners can do everything, whatever their groups, and are the only ones who can change who is an owner.</p>
     <% if owner? && last_owner %><p class="text-sm text-dim" data-owner-zone-reason><%= reason %></p><% end %>
-    <p class="text-sm text-meta" data-admin--pending-lock-target="hint" hidden></p>
+    <p class="text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
   </div>
-  <%= render Admin::ButtonComponent.new(label: trigger_label, variant: :secondary, size: :small, disabled: (owner? && last_owner) || nil,
-        data: dialog_trigger(dialog_id).merge("admin--pending-lock-target": "control")) %>
+  <%= render Admin::Ui::ButtonComponent.new(label: trigger_label, variant: :secondary, size: :small, disabled: (owner? && last_owner) || nil,
+        data: dialog_trigger(dialog_id).merge("admin--saving--pending-lock-target": "control")) %>
 </section>
 
 <%# After the user's form, never inside it (forms don't nest). Not destructive: the confirm is the primary button. %>
 <% unless owner? && last_owner %>
-  <%= render Admin::ConfirmDialogComponent.new(id: dialog_id, title: dialog_title, body: dialog_body) do |dialog| %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(id: dialog_id, title: dialog_title, body: dialog_body) do |dialog| %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: url, method: :patch, data: { turbo_frame: "_top" } do %>
         <%= hidden_field_tag "owner", requested_value, id: nil %>
-        <%= render Admin::ButtonComponent.new(label: confirm_label, variant: :primary, type: "submit") %>
+        <%= render Admin::Ui::ButtonComponent.new(label: confirm_label, variant: :primary, type: "submit") %>
       <% end %>
     <% end %>
   <% end %>

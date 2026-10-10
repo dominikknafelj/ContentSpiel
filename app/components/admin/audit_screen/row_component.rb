@@ -29,7 +29,7 @@ module Admin
         actor = sentence.actor
         return "–" if actor.none
 
-        Admin::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label.to_s.strip[0].to_s.upcase
+        Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label.to_s.strip[0].to_s.upcase
       end
     end
   end

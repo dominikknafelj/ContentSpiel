@@ -53,9 +53,9 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     # The test environment sends no real mail, so the warning is always there.
     command = Setup::SystemCheck::MAIL_FALLBACK_COMMAND
     assert_select "li[data-status=warning]", text: /Outgoing mail/
-    assert_select "[data-controller='admin--clipboard'][data-admin--clipboard-text-value=?]", command
+    assert_select "[data-controller='admin--ui--clipboard'][data-admin--ui--clipboard-text-value=?]", command
     assert_select "code", text: command
-    assert_select "button[data-action='click->admin--clipboard#copy']", text: "Copy"
+    assert_select "button[data-action='click->admin--ui--clipboard#copy']", text: "Copy"
   end
 
   test "a status is a dot and a word, never colour alone" do

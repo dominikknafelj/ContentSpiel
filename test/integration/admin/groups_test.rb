@@ -338,7 +338,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "[data-permission='posts.edit'] input[name$='[own]'][checked]"
     assert_select "[data-removed-type=retired_type]"
-    assert_select "[data-save-bar-dirty-value], [data-admin--save-bar-dirty-value=true]"
+    assert_select "[data-save-bar-dirty-value], [data-admin--saving--save-bar-dirty-value=true]"
   end
 
   test "a plugin permission is a toggle in a card of its own area, and saves" do
@@ -482,7 +482,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_select "#group_name[value=?]", "Typed name"
     assert_select "input[name='group[member_ids][]'][value='#{users(:author).id}']"
     assert_select "input[name=base_updated_at][value=?]", stale
-    assert_select "#group-form[data-admin--save-bar-dirty-value=true]", 1, "the typed values count as unsaved"
+    assert_select "#group-form[data-admin--saving--save-bar-dirty-value=true]", 1, "the typed values count as unsaved"
     group.reload
     assert_equal "Shared", group.name
     assert_equal "changed by somebody else", group.description

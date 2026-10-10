@@ -30,7 +30,7 @@
         <%= form.label :email_address, "Email", class: setup_label_class %>
         <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address], class: setup_input_class %>
       </div>
-      <%= render Admin::ButtonComponent.new(label: "Send reset link", type: "submit", class: "w-full") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Send reset link", type: "submit", class: "w-full") %>
     <% end %>
 
     <%# No console command is named here on purpose: this repo ships no rake

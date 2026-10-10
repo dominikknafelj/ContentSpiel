@@ -24,10 +24,10 @@ pin "@hotwired/stimulus", to: "stimulus.min.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
 pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", preload: "admin"
 # The Tiptap editor's own extensions/schema (tiptap spec §4.1), imported by
-# `controllers/admin/rich_text_controller.js` as `rich_text/...`.
+# `controllers/admin/rich_text/editor_controller.js` as `rich_text/...`.
 pin_all_from "app/javascript/rich_text", under: "rich_text", preload: "admin"
 # The one-at-a-time write queue every autosaving form and block action shares.
-pin_all_from "app/javascript/autosave", under: "autosave", preload: "admin"
+pin_all_from "app/javascript/saving", under: "saving", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"
@@ -41,7 +41,7 @@ pin_all_from "app/javascript/i18n", under: "i18n", preload: "admin"
 # files go up one at a time as progress tiles at the start of a grid.
 pin_all_from "app/javascript/media", under: "media", preload: "admin"
 
-# The mind graph's modules: imported only by `controllers/admin/mind_graph_controller.js`
+# The mind graph's modules: imported only by `controllers/admin/mind_graph/graph_controller.js`
 # through a dynamic `import()`, so no other CS Studio screen fetches them --
 # `preload: false`. `layout_worker.js` is in this directory too but is never
 # imported: it is started as a module Worker from its asset URL.

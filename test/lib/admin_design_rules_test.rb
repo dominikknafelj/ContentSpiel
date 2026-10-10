@@ -9,19 +9,19 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # (`components/media`: the picker and the picture tag), the public site's own
   # components (`components/public`: the preview bar, whose two colours are
   # theme tokens too), and every script -- the Stimulus controllers and the
-  # modules beside them (`media/`, `autosave/`, `search/`, `rich_text/`,
+  # modules beside them (`media/`, `saving/`, `search/`, `rich_text/`,
   # `mind_graph/`), which build markup and set classes as well. The mind
   # graph's draw onto a canvas, where a colour is a string handed to the
   # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
     views/admin views/layouts views/setup components/admin components/media components/public
-    javascript/controllers javascript/media javascript/autosave javascript/search javascript/rich_text javascript/mind_graph
+    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 
   # A raw colour literal, in any of the spellings CSS has for one:
   # - hex with 3, 4, 6 or 8 digits. The lookbehind is what keeps the things
-  #   that merely look like one out: a Stimulus action (`admin--menu#add`), a
+  #   that merely look like one out: a Stimulus action (`admin--ui--menu#add`), a
   #   Ruby interpolation (`"##{id}"`), an HTML character reference (`&#8203;`)
   #   and a URL fragment (`/path#fade`) all have a word character, `#`, `&` or
   #   `/` in front of the `#`. An id selector that happens to spell hex
@@ -78,7 +78,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       "hsl(210 50% 40%)", "hsla(210, 50%, 40%, .5)" ].each do |sample|
       assert_match RAW_COLOUR, sample
     end
-    [ 'find("#toasts")', "#content", 'action: "admin--menu#add"', "admin--tree#face", '"##{dom_id}"', "&#8203;", "&#x200b;",
+    [ 'find("#toasts")', "#content", 'action: "admin--ui--menu#add"', "admin--pages--tree#face", '"##{dom_id}"', "&#8203;", "&#x200b;",
       "/cs-studio/pages#add", "#fade-in", "issue #12345", "#abcde" ].each do |sample|
       assert_no_match RAW_COLOUR, sample
     end
@@ -96,8 +96,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # failure, never for "missing" or "outdated" (final review C, M13).
   test "translation chips, language tabs, tree markers, the matrix and the summary and dashboard cards never use the danger colour" do
     %w[
-      app/components/admin/translation_chip_component.rb app/components/admin/language_tabs_component.html.erb
-      app/components/admin/tree_node_component.html.erb app/components/admin/tree_node_component.rb
+      app/components/admin/ui/translation_chip_component.rb app/components/admin/ui/language_tabs_component.html.erb
+      app/components/admin/pages_screen/tree_node_component.html.erb app/components/admin/pages_screen/tree_node_component.rb
       app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
       app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
       app/components/admin/dashboard_screen/translation_card_component.html.erb app/components/admin/dashboard_screen/translation_card_component.rb

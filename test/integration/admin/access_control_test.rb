@@ -350,7 +350,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@inside.id}"
 
     assert_response :success
-    titles = JSON.parse(css_select("[data-admin--rich-text-link-titles-value]").first["data-admin--rich-text-link-titles-value"])
+    titles = JSON.parse(css_select("[data-admin--rich-text--editor-link-titles-value]").first["data-admin--rich-text--editor-link-titles-value"])
     assert_equal({ "page:#{@outside.id}" => "A page you can't open" }, titles)
     # Whole word: the toolbar's Insert menu carries a `closeOutside` action.
     assert_no_match(/\bOutside\b/, response.body)
@@ -367,7 +367,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:editor_branch))
     path = "/cs-studio/pages/#{@inside.id}/content_blocks/#{block.id}"
 
-    error_id = Admin::FieldComponent.error_id(Admin::BlockCardComponent.error_prefix(block), "body")
+    error_id = Admin::Ui::FieldComponent.error_id(Admin::EditorScreen::BlockCardComponent.error_prefix(block), "body")
     unreadable, missing = [ @outside.id, Page.maximum(:id) + 1000 ].map do |target_id|
       patch path, params: { block: { body: link_doc("page", target_id).to_json } }, as: :turbo_stream
       assert_response :unprocessable_entity
@@ -461,7 +461,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{@own_post.id}"
 
     assert_response :success
-    assert_select "form[data-controller~='admin--autosave']"
+    assert_select "form[data-controller~='admin--saving--autosave']"
     assert_select "button, input[type=submit]", text: /Publish|Move to trash/, count: 0
   end
 
@@ -485,7 +485,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-view-only]", text: "View only"
-    assert_select "[data-controller~='admin--autosave']", count: 0
+    assert_select "[data-controller~='admin--saving--autosave']", count: 0
     assert_select "form fieldset[disabled]"
   end
 
@@ -496,7 +496,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{@own_post.id}"
 
     assert_select "[data-view-only]", text: "View only"
-    assert_select "[data-controller~='admin--autosave']", count: 0
+    assert_select "[data-controller~='admin--saving--autosave']", count: 0
   end
 
   test "a readable but not editable page renders its settings and blocks view only" do
@@ -506,7 +506,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_select "[data-view-only]", text: "View only"
-    assert_select "[data-controller~='admin--autosave']", count: 0
+    assert_select "[data-controller~='admin--saving--autosave']", count: 0
     assert_select ".admin-block-card fieldset[disabled]"
     assert_select ".admin-block-card__handle", count: 0
     assert_select ".admin-block-card__menu", count: 0

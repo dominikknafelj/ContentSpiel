@@ -1,0 +1,14 @@
+<%= render Admin::Ui::DialogComponent.new(id: id, title: title, width: :confirm, destructive: destructive) do |dialog| %>
+  <% if body.present? %>
+    <p class="text-ink"><%= body %></p>
+  <% end %>
+  <% if details? %>
+    <div class="mt-2 text-ink"><%= details %></div>
+  <% end %>
+  <% dialog.with_footer do %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: cancel_label, variant: :ghost, type: "submit", autofocus: destructive) %>
+    <% end %>
+    <%= confirm_action %>
+  <% end %>
+<% end %>

@@ -1,0 +1,10 @@
+<% toasts = capture do %>
+  <%= render Admin::Ui::ToastComponent.new(message: notice, kind: notice_kind, action: undo) if notice.present? %>
+  <%= render Admin::Ui::ToastComponent.new(message: warning, kind: :warning, action: undo) if warning.present? %>
+  <%= render Admin::Ui::ToastComponent.new(message: alert, kind: :error) if alert.present? %>
+<% end %>
+<% if relay %>
+  <%= toasts %>
+<% else %>
+  <div id="toasts" class="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2"><%= toasts %></div>
+<% end %>

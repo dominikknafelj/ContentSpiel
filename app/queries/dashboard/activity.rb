@@ -65,7 +65,7 @@ module Dashboard
     # `Audit::Sentence` (the actor as facts -- the viewer, a user, a deleted
     # user, nobody -- plus the token's name for a change made through one, and
     # the sentence's parts); `ActivityRowComponent` renders it, naming the user
-    # through `Admin::UserNameComponent`. `at` is when the (first) change
+    # through `Admin::Ui::UserNameComponent`. `at` is when the (first) change
     # happened and `span_end` when the coalesced burst last extended (nil for a
     # single moment). `record` is the page, post or image the sentence is
     # about (a block's owner).

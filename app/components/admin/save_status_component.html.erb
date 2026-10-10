@@ -1,8 +1,0 @@
-<%# `min-h-[1lh]`: the line's height is reserved even while `idle` renders it
-    empty -- see this component's class comment for why. `data-live` is read by
-    `autosave_controller.js` (see `#initialize`). The Retry button is outside
-    the form that owns `admin--autosave`, so its `data-action` is only
-    functional on the JS-built copy `autosave_controller.js` writes for
-    the offline state (it binds its own listener); it is here for the same
-    markup in previews and tests. %>
-<%= tag.p id: id, role: "status", class: css_class, data: { live: live ? "" : nil } do %><%= text %><% if retry_button? %><button type="button" data-action="admin--autosave#saveNow" class="cursor-pointer underline hover:text-ink"><%= t(".retry") %></button><% end %><% end %>

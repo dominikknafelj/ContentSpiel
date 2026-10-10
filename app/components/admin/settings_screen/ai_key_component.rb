@@ -4,7 +4,7 @@ module Admin
     # "● Key saved · added 2 Oct" ("Key saved" alone for a key stored before
     # the date column existed, "No key yet" without one) with Replace and
     # Remove… (Add key when there is none). Replace/Add key swaps the chip for
-    # a password input with Save key and Cancel -- client side, `admin--ai-settings`.
+    # a password input with Save key and Cancel -- client side, `admin--settings--ai`.
     #
     # NO PART OF THE KEY IS EVER RENDERED, and nothing here decrypts it: only
     # `SiteSetting#ai_api_key_set?` (the raw column) and the saved-on date are
@@ -16,7 +16,7 @@ module Admin
     # the key's own form (`settings-ai-key-form`, a sibling after the main
     # form) through `form=`, so the footer never counts them and Save never
     # sends them; Replace, Remove… and Cancel are unnamed buttons. Replace /
-    # Add key, Remove…, the input and Save key are `admin--pending-lock`
+    # Add key, Remove…, the input and Save key are `admin--saving--pending-lock`
     # controls (decision D10): they wait while the main form has unsaved changes.
     #
     # The root's id is what a Turbo Stream `replace` of a key save targets.
@@ -25,7 +25,7 @@ module Admin
       ID = "settings-ai-key".freeze
       KEY_FORM = "settings-ai-key-form".freeze
       REMOVE_DIALOG = "settings-ai-remove-key-dialog".freeze
-      LOCK = { "admin--pending-lock-target": "control" }.freeze
+      LOCK = { "admin--saving--pending-lock-target": "control" }.freeze
 
       def initialize(site_setting:, error: nil)
         @site_setting = site_setting

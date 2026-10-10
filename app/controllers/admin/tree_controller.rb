@@ -97,7 +97,7 @@ module Admin
     # move it") -- locked that page's own form: its next save was a final
     # 409, "Changed elsewhere" against the editor's own move, the typed text
     # not saved. So this answers the way a block write does (`Admin::
-    # ContentBlocksController#page_base_streams`): `admin--tree` sends the
+    # ContentBlocksController#page_base_streams`): `admin--pages--tree` sends the
     # open form's base as `X-Page-Base-Updated-At`, through the same queue as
     # every other write on the screen, and the form's base is moved forward
     # to the page's new `updated_at`.
@@ -119,7 +119,7 @@ module Admin
       sent = request.headers["X-Page-Base-Updated-At"]
       return [] unless sent.present? && Time.iso8601(sent) == updated_at_before_move
 
-      id = "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+      id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
       [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
         locals: { id: id, value: Page.where(id: page.id).pick(:updated_at).iso8601(6) }) ]
     rescue ArgumentError
@@ -128,7 +128,7 @@ module Admin
 
     def tree_stream(selected:, message: nil)
       [
-        turbo_stream.replace("tree", Admin::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options)),
+        turbo_stream.replace("tree", Admin::PagesScreen::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options)),
         turbo_stream.replace("tree-status", partial: "admin/tree/status", locals: { message: message })
       ]
     end

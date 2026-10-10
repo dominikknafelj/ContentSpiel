@@ -32,8 +32,8 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     find("summary", text: "SEO · META TITLE, META DESCRIPTION").click
-    announcement = "[data-admin--char-count-target=announcement]"
-    assert_no_selector "[data-admin--char-count-target=output][aria-live]", visible: :all
+    announcement = "[data-admin--ui--char-count-target=announcement]"
+    assert_no_selector "[data-admin--ui--char-count-target=output][aria-live]", visible: :all
     fill_in "Meta title", with: "x" * 59
     assert_selector announcement, exact_text: "", visible: :all
     fill_in "Meta title", with: "x" * 61

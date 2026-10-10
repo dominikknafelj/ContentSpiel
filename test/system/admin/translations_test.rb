@@ -2,10 +2,10 @@ require "application_system_test_case"
 
 # The translation helpers end to end, in a real browser (translation
 # helpers spec §4-§6): the editor's Translate / Use / "Translate empty
-# fields" / "Use all" (`admin--translate`), which only a browser can run --
+# fields" / "Use all" (`admin--translation--translate`), which only a browser can run --
 # the request is a `fetch`, Use fills the input and lets the form's own
-# `admin--autosave` save it, and a rich-text Use goes through the Tiptap
-# editor (`admin--rich-text#applySuggestion`) -- plus the outdated note,
+# `admin--saving--autosave` save it, and a rich-text Use goes through the Tiptap
+# editor (`admin--rich-text--editor#applySuggestion`) -- plus the outdated note,
 # the Translations overview and the translated site tagline.
 #
 # The AI provider is `GatedProvider` (test/support/gated_provider.rb),
@@ -180,7 +180,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       # Sent together they would carry the same page base, and the second
       # would leave the page form holding a base nobody else made stale: its
       # next save would be refused ("changed elsewhere") with no one else
-      # involved. The page-level queue (`autosave/queue.js`) prevents that.
+      # involved. The page-level queue (`saving/queue.js`) prevents that.
       fill_in id: "page-subtitle", with: "[de] Typed after Use all"
       assert_eventually { page_record.reload.subtitle(locale: "de", fallback: false) == "[de] Typed after Use all" }
       assert_no_text "CHANGED ELSEWHERE"
@@ -310,7 +310,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
     await_provider_request # the request has reached the provider: its answer is a late one
 
-    within("[data-admin--translate-target='running']") { click_on "Cancel" }
+    within("[data-admin--translation--translate-target='running']") { click_on "Cancel" }
 
     assert_no_selector "[data-translation-pending]"
     assert_button "Suggest translations for 2 empty fields"
@@ -398,9 +398,9 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
     press "Suggest translations for 2 empty fields"
-    assert_selector "[role='status'][aria-live='polite'][data-admin--translate-target='status']", text: /Suggesting 1 of 2 fields/, visible: :all
+    assert_selector "[role='status'][aria-live='polite'][data-admin--translation--translate-target='status']", text: /Suggesting 1 of 2 fields/, visible: :all
     GatedProvider.release
-    assert_selector "[data-admin--translate-target='status']", text: "2 suggestions ready", visible: :all, wait: 8
+    assert_selector "[data-admin--translation--translate-target='status']", text: "2 suggestions ready", visible: :all, wait: 8
 
     # Focus inside the box moves to the field after Use, to Translate-ish after Discard.
     find("#translation-suggestion-post-title [data-translate-use]").click
@@ -438,7 +438,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
     # Trashed after the page loaded: the request is now a 404 page, not a
-    # stream, so the box is filled by `admin--translate` itself.
+    # stream, so the box is filled by `admin--translation--translate` itself.
     assert Trash::Move.call(post).ok?
 
     press_within slot("title"), "Translate"

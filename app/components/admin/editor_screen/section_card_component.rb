@@ -2,18 +2,18 @@ module Admin
   module EditorScreen
     # A section in the page editor's block list (sections spec §4.1–§4.3): a
     # card like any other block's -- it is dragged, moved and collapsed by
-    # `admin--blocks` exactly as one -- but framed and tinted, and holding the
+    # `admin--editor--blocks` exactly as one -- but framed and tinted, and holding the
     # section's columns as lanes of tiles (`SectionLanesComponent`) in its
     # body, where a block card has its fields. Its own three settings are a
     # form in its header (below).
     #
     # EVERY BLOCK'S FORM IS RENDERED WITH THE PAGE (plan decision D3). Under
-    # the lanes sits one `Admin::BlockCardComponent` per block of the section,
+    # the lanes sits one `Admin::EditorScreen::BlockCardComponent` per block of the section,
     # drawn as a `placement: :panel`: hidden, and shown one at a time by
-    # `admin--section` when its tile is pressed. A form is never fetched when
+    # `admin--editor--section` when its tile is pressed. A form is never fetched when
     # a tile is opened and never removed when it is closed. That is what makes
     # the pattern safe on top of autosave: each form registers with the write
-    # queue once (`admin--autosave`'s `connect`), and its debounce, its queued
+    # queue once (`admin--saving--autosave`'s `connect`), and its debounce, its queued
     # or in-flight save and its save state (paused by a 409, failed) are the
     # same whether it is showing or not. A design that fetched the form on
     # demand would have to answer what happens to a save whose form has left
@@ -24,7 +24,7 @@ module Admin
     # order a screen reader meets them in; only one is ever visible, so the
     # order is not a layout.
     #
-    # `data-container` is how `admin--blocks` and the stylesheet tell a
+    # `data-container` is how `admin--editor--blocks` and the stylesheet tell a
     # section's card from a block's without asking for a type by name: the
     # code asks `container?` (`self.draws?`), the markup says the answer.
     #
@@ -64,11 +64,11 @@ module Admin
     # is an autosave form like a card's, answered by the same action (`Admin
     # ::ContentBlocksController#update`) into the same ids -- the wiring, the
     # base field, the status line and one error slot per setting are all
-    # `Admin::BlockCardComponent`'s, asked of its class, so a section's save
+    # `Admin::EditorScreen::BlockCardComponent`'s, asked of its class, so a section's save
     # is refused as stale (409) and reported exactly as a block's is. Layout
     # is a menu over a hidden input (`SectionLayoutMenuComponent`); the other
     # two are plain selects. A viewer who can't edit sees the three as they
-    # are, disabled, in a form with no `admin--autosave` -- as a view-only
+    # are, disabled, in a form with no `admin--saving--autosave` -- as a view-only
     # block card shows its fields.
     #
     # The form holds no other form: the "⋯" menu's Duplicate and Remove are
@@ -78,10 +78,10 @@ module Admin
     # would then submit the settings form.)
     #
     # THE "⋯" MENU (spec §4.1), for a viewer who may edit: Move up and Move
-    # down are the block card's own buttons (`data-move`, `admin--blocks
+    # down are the block card's own buttons (`data-move`, `admin--editor--blocks
     # #moveUp|moveDown`), since a section's card is moved as any card is;
     # `first:` and `last:` are the card's place in the list and say which of
-    # the two starts disabled, and `admin--blocks#refreshMoveState` keeps
+    # the two starts disabled, and `admin--editor--blocks#refreshMoveState` keeps
     # them right afterwards. Duplicate copies the section with its blocks.
     # Then the two deletes, which are the two explicit choices a section's
     # removal is: "Remove section, keep blocks" is sent without a question
@@ -95,7 +95,7 @@ module Admin
     # block in the section's place (`Admin::ContentBlocksController
     # #removal_streams`), and the panels' forms go with the section's card.
     # A row is never lost by it; what a form holds and has not saved would
-    # be. So its form carries `admin--queue-hold`, as the editor
+    # be. So its form carries `admin--saving--queue-hold`, as the editor
     # header's actions do: the press first waits until the write queue is
     # EMPTY (`drained()` -- an edit inside its debounce is sent, and so is one
     # typed while the block's save was on the wire, whose follow-up the
@@ -185,19 +185,19 @@ module Admin
 
       def form_url = helpers.admin_page_content_block_path(page, section, **url_options)
 
-      def form_data = editable? ? Admin::BlockCardComponent.autosave_form_data(section) : {}
+      def form_data = editable? ? Admin::EditorScreen::BlockCardComponent.autosave_form_data(section) : {}
 
-      def error_prefix = Admin::BlockCardComponent.error_prefix(section)
+      def error_prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(section)
 
-      def status_id = Admin::BlockCardComponent.status_id(section)
+      def status_id = Admin::EditorScreen::BlockCardComponent.status_id(section)
 
-      def base_updated_at_id = Admin::BlockCardComponent.base_updated_at_id(section)
+      def base_updated_at_id = Admin::EditorScreen::BlockCardComponent.base_updated_at_id(section)
 
       def base_updated_at_value = section.updated_at.iso8601(6)
 
       def field_id(name) = "#{error_prefix}-#{name}"
 
-      def error_id(name) = Admin::FieldComponent.error_id(error_prefix, name)
+      def error_id(name) = Admin::Ui::FieldComponent.error_id(error_prefix, name)
 
       # One menu object for the card: it is drawn in the form, and the layout
       # it shows as current is the value of the form's hidden input.
@@ -225,9 +225,9 @@ module Admin
 
       # On the form of "Remove section, keep blocks", in the menu and on the
       # card of a section whose type is gone: see the class comment.
-      def settled_screen_data = { controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" }
+      def settled_screen_data = { controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" }
 
-      def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS
+      def menu_item_class = Admin::EditorScreen::BlockCardComponent::MENU_ITEM_CLASS
 
       def blocks = outline.blocks_in(section)
 
@@ -236,7 +236,7 @@ module Admin
       end
 
       def panel(block)
-        Admin::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel)
+        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel)
       end
 
       private

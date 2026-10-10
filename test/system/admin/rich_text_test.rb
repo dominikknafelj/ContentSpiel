@@ -1,9 +1,9 @@
 require "application_system_test_case"
 
-# The Tiptap editor in CS Studio (tiptap spec §4.1/§9): `admin--rich-text`
+# The Tiptap editor in CS Studio (tiptap spec §4.1/§9): `admin--rich-text--editor`
 # mounts Tiptap on `Admin::Columns::RichTextColumnComponent`, writes
 # `editor.getJSON()` into the column's hidden `…[body]` input and dispatches
-# `input` so the form's own `admin--autosave` sends it. Every test here ends
+# `input` so the form's own `admin--saving--autosave` sends it. Every test here ends
 # by reading the *saved* document back and running it through
 # `RichText::Document#validate` -- the editor's schema has to match
 # `RichText::Schema` exactly (task 7's "schema fidelity" ruling), so anything
@@ -16,7 +16,7 @@ require "application_system_test_case"
 # setting a value from JS would bypass exactly the code under test.
 class Admin::RichTextSystemTest < ApplicationSystemTestCase
   YOUTUBE_ID = "dQw4w9WgXcQ".freeze
-  # The editor's read-only notice (`admin--rich-text`'s `invalidContent`).
+  # The editor's read-only notice (`admin--rich-text--editor`'s `invalidContent`).
   INVALID_CONTENT = "This text contains something the editor can't show".freeze
 
   setup do
@@ -718,7 +718,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   end
 
   # Turbo Stream replacement of a whole block card (task 7's lifecycle
-  # ruling): the old card's `admin--rich-text` disconnects (destroying its
+  # ruling): the old card's `admin--rich-text--editor` disconnects (destroying its
   # editor), the new card's connects and mounts exactly one editor, and
   # typing into the new one still autosaves. Also detaches and re-attaches
   # the *same* card element (what a drag reorder does), which Stimulus
@@ -904,7 +904,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
       visit_post
       assert_selector ".ProseMirror[contenteditable='true']"
       assert_no_text INVALID_CONTENT, wait: 0.5
-      assert_selector "[data-admin--rich-text-command]:not([disabled])", minimum: 1
+      assert_selector "[data-admin--rich-text--editor-command]:not([disabled])", minimum: 1
     end
   end
 

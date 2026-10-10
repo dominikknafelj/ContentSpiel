@@ -1,9 +1,9 @@
 <%# The announcement lives outside the bar: the bar is toggled `hidden`, and a
     live region that appears together with its text is often not read out. %>
-<p role="status" aria-live="polite" aria-atomic="true" class="sr-only" data-admin--bulk-select-target="status"></p>
-<div hidden data-admin--bulk-select-target="bar"
+<p role="status" aria-live="polite" aria-atomic="true" class="sr-only" data-admin--posts--bulk-select-target="status"></p>
+<div hidden data-admin--posts--bulk-select-target="bar"
      class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-cs bg-accent-tint px-3 py-2 text-sm text-ink">
-  <span><b class="font-semibold" data-admin--bulk-select-target="count">0</b> selected</span>
+  <span><b class="font-semibold" data-admin--posts--bulk-select-target="count">0</b> selected</span>
   <span class="flex flex-wrap items-center gap-2">
     <% if may_publish? %>
       <%= form_with url: helpers.admin_posts_bulk_path, method: :post, class: "contents", data: { turbo_frame: "_top" } do %>
@@ -11,22 +11,22 @@
         <% list_fields.each do |name, value| %>
           <%= hidden_field_tag name, value, id: nil %>
         <% end %>
-        <span class="contents" data-admin--bulk-select-target="ids"></span>
-        <%= render Admin::ButtonComponent.new(label: "Publish", variant: :secondary, type: "submit", size: :small) %>
+        <span class="contents" data-admin--posts--bulk-select-target="ids"></span>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Publish", variant: :secondary, type: "submit", size: :small) %>
       <% end %>
     <% end %>
     <% if may_trash? %>
-      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_text, type: "button", size: :small, data: dialog_trigger(trash_dialog_id)) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash", variant: :danger_text, type: "button", size: :small, data: dialog_trigger(trash_dialog_id)) %>
     <% end %>
-    <%= render Admin::ButtonComponent.new(label: "Clear", variant: :ghost, type: "button", size: :small, data: { action: "admin--bulk-select#clear" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Clear", variant: :ghost, type: "button", size: :small, data: { action: "admin--posts--bulk-select#clear" }) %>
   </span>
 </div>
 
 <% if may_trash? %>
-  <%= render Admin::ConfirmDialogComponent.new(id: trash_dialog_id, title: "Move the selected posts to the trash?", destructive: true,
+  <%= render Admin::Ui::ConfirmDialogComponent.new(id: trash_dialog_id, title: "Move the selected posts to the trash?", destructive: true,
         body: "They disappear from the site and from every list. You can undo this right afterwards or restore them from the trash.") do |dialog| %>
     <% dialog.with_details do %>
-      This moves <strong data-admin--bulk-select-target="confirmCount">0 posts</strong> to the trash.
+      This moves <strong data-admin--posts--bulk-select-target="confirmCount">0 posts</strong> to the trash.
     <% end %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: helpers.admin_posts_bulk_path, method: :post, data: { turbo_frame: "_top" } do %>
@@ -34,8 +34,8 @@
         <% list_fields.each do |name, value| %>
           <%= hidden_field_tag name, value, id: nil %>
         <% end %>
-        <span class="contents" data-admin--bulk-select-target="ids"></span>
-        <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
+        <span class="contents" data-admin--posts--bulk-select-target="ids"></span>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
       <% end %>
     <% end %>
   <% end %>

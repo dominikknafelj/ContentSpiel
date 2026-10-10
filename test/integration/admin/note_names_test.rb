@@ -100,7 +100,7 @@ class Admin::NoteNamesTest < ActionDispatch::IntegrationTest
 
   test "the rest of CS Studio names a nameless user by the whole address, as before" do
     assert_equal "two@example.com", users(:two).display_name
-    assert_equal "two@example.com", Admin::UserNameComponent.new(user: users(:two)).label
+    assert_equal "two@example.com", Admin::Ui::UserNameComponent.new(user: users(:two)).label
     assert_equal "two", Notes.name_of(users(:two))
     users(:two).update!(name: "Dana")
     assert_equal "Dana", Notes.name_of(users(:two))

@@ -34,7 +34,7 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
   # file field INSIDE it. The field is out of sight; the paperclip opens it.
   def choose(*paths, within: reply) = find("#{within} input[type=file]", visible: :all).set(paths.map(&:to_s))
 
-  def chosen(within: reply) = all("#{within} [data-admin--note-composer-target=chosen] [data-note-chosen]").map { |row| row.text.squish }
+  def chosen(within: reply) = all("#{within} [data-admin--notes--composer-target=chosen] [data-note-chosen]").map { |row| row.text.squish }
 
   # A file of its own name with `bytes` of text, for the test to choose.
   def file_of(name, bytes)
@@ -90,16 +90,16 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
 
     assert_equal 5, chosen.size
     assert_includes chosen, "#{Process.pid}-fifth.txt TXT · 1.9 MB"
-    assert_selector "#{reply} [data-admin--note-composer-target=fileError][class~='text-danger-ink'][class~='text-[12px]']", text: "A note can carry at most 5 files."
+    assert_selector "#{reply} [data-admin--notes--composer-target=fileError][class~='text-danger-ink'][class~='text-[12px]']", text: "A note can carry at most 5 files."
     assert_no_selector "#toasts .admin-toast"
 
     find("#{reply} [data-note-chosen] button[aria-label='Remove #{Process.pid}-fifth.txt']").click
     assert_equal 4, chosen.size
-    assert_no_selector "#{reply} [data-admin--note-composer-target=fileError]"
+    assert_no_selector "#{reply} [data-admin--notes--composer-target=fileError]"
 
     choose(file_of("big.bin", 10.megabytes + 1))
     assert_equal 4, chosen.size
-    assert_selector "#{reply} [data-admin--note-composer-target=fileError]", text: "#{Process.pid}-big.bin is over 10 MB."
+    assert_selector "#{reply} [data-admin--notes--composer-target=fileError]", text: "#{Process.pid}-big.bin is over 10 MB."
     assert_equal 4, page.evaluate_script("document.querySelector('#{reply} input[type=file]').files.length")
     assert_equal 1, Notes::Message.count
   end
@@ -145,11 +145,11 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
 
     reply_field.send_keys([ :control, :enter ])
     await_js("window.__posts === 1")
-    assert_selector "#{reply} button[type=submit][data-admin--note-composer-target=submit][disabled]"
+    assert_selector "#{reply} button[type=submit][data-admin--notes--composer-target=submit][disabled]"
     # The two ways a person sends: the key again, and the button, which is
     # disabled for as long (a press on it does nothing).
     reply_field.send_keys([ :control, :enter ], [ :control, :enter ])
-    page.execute_script("document.querySelector('#{reply} button[data-admin--note-composer-target=submit]').click()")
+    page.execute_script("document.querySelector('#{reply} button[data-admin--notes--composer-target=submit]').click()")
     await_frames
     assert_equal 1, page.evaluate_script("window.__posts")
     assert_equal 1, Notes::Message.count
@@ -210,11 +210,11 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     open_thread
     apple = page.evaluate_script("/mac|iphone|ipad|ipod/i.test(navigator.userAgentData?.platform || navigator.platform || '')")
 
-    button = find("#{reply} button[data-admin--note-composer-target=submit]")
+    button = find("#{reply} button[data-admin--notes--composer-target=submit]")
     assert_equal (apple ? [ "Send (⌘↵)", "Meta+Enter" ] : [ "Send (Ctrl+Enter)", "Control+Enter" ]), [ button[:title], button["aria-keyshortcuts"] ]
     assert_no_text "Ctrl+Enter to send"
     # The row holds its controls on one line in the 400px drawer.
-    middles = [ "button[data-note-attach]", "button[data-note-state]", "button[data-admin--note-composer-target=submit]" ].map do |control|
+    middles = [ "button[data-note-attach]", "button[data-note-state]", "button[data-admin--notes--composer-target=submit]" ].map do |control|
       page.evaluate_script("(() => { const r = document.querySelector(#{"#{reply} #{control}".to_json}).getBoundingClientRect(); return Math.round(r.top + r.height / 2) })()")
     end
     assert_operator middles.max - middles.min, :<=, 2, middles.inspect

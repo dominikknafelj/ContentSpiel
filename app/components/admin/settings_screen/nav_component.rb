@@ -9,7 +9,7 @@ module Admin
     #
     # These are plain same-page links, never `data-turbo-frame="_top"`: on a
     # screen with the save footer a `#fragment` link is neither a visit nor a
-    # history entry (`admin--save-bar` moves the focus by hand), so following
+    # history entry (`admin--saving--save-bar` moves the focus by hand), so following
     # one never asks "Leave without saving?". The ⌘K palette's Settings rows
     # use the same ids from another screen, as ordinary visits.
     class NavComponent < Admin::AdminComponent

@@ -3,7 +3,7 @@ require "application_system_test_case"
 # The page settings form's own autosave (cs-studio spec §6.1/§9): a debounced
 # PATCH, the status line's exact wording (global constraints), and the
 # "one in-flight save, at most one queued" concurrency rule
-# `admin--autosave` itself is built around (see that controller's own class
+# `admin--saving--autosave` itself is built around (see that controller's own class
 # comment). System-level, not integration-level, because both of these need
 # a real browser's own timers/`fetch` -- neither is observable through a
 # plain Rack request.
@@ -34,7 +34,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # earlier Turbo Stream) can raise `ElementNotFound` well before the
     # longer wait this assertion actually needs gets any say. Scoped to the
     # status line itself (`page-save-status`, in the record header -- see
-    # `admin--autosave`'s own comment for why it lives outside this form's
+    # `admin--saving--autosave`'s own comment for why it lives outside this form's
     # DOM subtree) rather than the whole page, since the exact wording
     # (global constraints) is this element's *entire* text content, not
     # just some text on the page.
@@ -46,7 +46,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # Review focus #1 (this task's own brief): a second edit made while the
   # first save is still in flight must be the one that wins -- never the
   # first attempt's stale value landing *after* the second request, and
-  # never both firing at once and racing each other. `admin--autosave`'s own
+  # never both firing at once and racing each other. `admin--saving--autosave`'s own
   # `busy`/`pending` flags (see that controller's class comment) are what
   # this proves: exactly one request in flight, the newest edit always the
   # next (and last) one sent.
@@ -61,7 +61,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # delayed every fetch by 500ms and flaked when the second edit took
     # longer than that to type on a loaded machine). Counts every PATCH
     # started, so the test can also prove the second edit *waited*
-    # (`admin--autosave`'s `busy`/`pending`) instead of firing alongside.
+    # (`admin--saving--autosave`'s `busy`/`pending`) instead of firing alongside.
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
       window.__patchesStarted = 0
@@ -78,7 +78,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # already focused, rather than a fresh click on some other element --
     # sidesteps the native-click-drop risk `press`'s own comment describes
     # entirely, since there's no click here at all. `focusout` ->
-    # `admin--autosave#saveNow` fires the save immediately, with no
+    # `admin--saving--autosave#saveNow` fires the save immediately, with no
     # debounce wait.
     title_field = find_field("Title")
     title_field.set("First edit")
@@ -94,7 +94,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     assert_equal 1, page.evaluate_script("window.__patchesStarted")
     assert_selector "#page-save-status", text: /SAVING/
 
-    # Releasing the first request lets `admin--autosave` notice `pending`
+    # Releasing the first request lets `admin--saving--autosave` notice `pending`
     # and send the second attempt with whatever the form holds *now*.
     page.execute_script("window.__releaseFirstPatch()")
     await_js "window.__patchesStarted === 2"
@@ -178,7 +178,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # Ledger m7 (final fix wave 1): a save the server refuses for want of
   # permission (a tab left open while the editor's rights were taken away)
   # is answered 403 WITH the stream that says so. 403 was not among the
-  # statuses `admin--autosave` took for an answer, so it was retried as a
+  # statuses `admin--saving--autosave` took for an answer, so it was retried as a
   # network failure three times and ended in "NOT SAVED · Retry" -- which
   # can never succeed and never says why.
   test "an autosave refused for want of permission says so at once, and is not retried" do
@@ -212,7 +212,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # its last save sent" compares what the form would submit. An EMPTY file
   # input submits a File whose `lastModified` is the moment it was read, so
   # a form with one never compared equal to itself and sent a save on every
-  # `focusout` (`admin--autosave#comparable`). No autosave form carries a file
+  # `focusout` (`admin--saving--autosave#comparable`). No autosave form carries a file
   # input any more (Settings, the one that did, saves with a footer now), so
   # the test gives the page form one: a copy of the form with an empty file
   # input in it takes the form's place -- a new element, so the controller
@@ -228,7 +228,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
         if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
         return originalFetch(url, options)
       }
-      const form = document.getElementById(#{subtitle.to_json}).closest("form[data-controller~='admin--autosave']")
+      const form = document.getElementById(#{subtitle.to_json}).closest("form[data-controller~='admin--saving--autosave']")
       const copy = form.cloneNode(true)
       const file = document.createElement("input")
       file.type = "file"
@@ -237,7 +237,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
       form.replaceWith(copy)
     JS
     await_admin_controllers
-    assert_selector "form[data-controller~='admin--autosave'] input[type=file][name='page[probe]']", visible: :all
+    assert_selector "form[data-controller~='admin--saving--autosave'] input[type=file][name='page[probe]']", visible: :all
 
     page.execute_script("document.getElementById(#{subtitle.to_json}).focus()")
     # `lastModified` has millisecond precision: the blur must read the file a millisecond later than the focus did.
@@ -258,7 +258,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # the snapshot is taken with whatever the forms held at that moment -- here
   # an edit that is only sent as the page is torn down, whose answer (and new
   # base) reaches no document. Forward then restored that snapshot: the text
-  # in the field, the OLD base in the hidden field, and `admin--autosave`
+  # in the field, the OLD base in the hidden field, and `admin--saving--autosave`
   # taking what it found for "what the server holds". The next edit was
   # refused as "Changed elsewhere" against one's own save. With
   # `turbo-cache-control: no-cache` Forward fetches the editor afresh.

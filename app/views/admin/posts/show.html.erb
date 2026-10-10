@@ -10,7 +10,7 @@
 
     And no link is prefetched from an editor (follow-up N1): Turbo fetches a
     link on hover and reuses that answer for the click. From an editor the
-    click first waits for the save queue (`autosave/queue.js`), so a
+    click first waits for the save queue (`saving/queue.js`), so a
     prefetched answer for the same record -- its other language tab, its own
     row in the tree -- shows it as it was BEFORE those saves, with the old
     base: the saved text missing and the next edit refused. %>
@@ -24,7 +24,7 @@
     view, because every way this screen is rendered needs them. %>
 <% note_counts = Notes::Counts.for_container(@post, user: Current.user) %>
 
-<%= render Admin::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) %>
+<%= render Admin::EditorScreen::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) %>
 
 <%# The notes drawer (notes spec §4.1): once per screen, after everything
     else and outside every form -- the post's form above is closed. `?notes=open`

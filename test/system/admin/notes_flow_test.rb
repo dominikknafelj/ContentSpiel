@@ -133,7 +133,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #notes-list"
     assert_eventually(message: "the focus never moved into the drawer") { focus_in_drawer? }
 
-    tab_to("#notes-drawer > header button[data-action='admin--notes#compose']")
+    tab_to("#notes-drawer > header button[data-action='admin--notes--drawer#compose']")
     keyboard.type(:Enter)
     assert_eventually(message: "the new note's field never took the focus") { focused?("#notes-new textarea[name=body]") }
     keyboard.type("A note without a mouse")
@@ -237,7 +237,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     pdf = Tempfile.new([ "report", ".pdf" ], binmode: true).tap { |file| file.write(PDF); file.close }
     # `set` on the field itself: it is out of sight, and the paperclip opens it.
     find("#notes-new input[type=file]", visible: :all).set([ file_fixture("tiny.png").to_s, pdf.path ])
-    assert_selector "#notes-new [data-admin--note-composer-target=chosen] [data-note-chosen]", count: 2
+    assert_selector "#notes-new [data-admin--notes--composer-target=chosen] [data-note-chosen]", count: 2
     new_note_field.send_keys("Two files")
     within("#notes-new") { press "Add note" }
 

@@ -18,7 +18,7 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
 
     assert_selector "h2", text: "Delete this group"
     assert_text "2 members lose its permissions. 1 AI token is revoked."
-    assert_selector "button[data-action='admin--dialog#open'][data-admin--dialog-id-param='delete-group-#{group.id}']", text: "Delete group…"
+    assert_selector "button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='delete-group-#{group.id}']", text: "Delete group…"
     assert_selector "dialog#delete-group-#{group.id}", visible: :all do
       assert_selector "form[action='/cs-studio/groups/#{group.id}'] input[name=_method][value=delete]", visible: :all
     end

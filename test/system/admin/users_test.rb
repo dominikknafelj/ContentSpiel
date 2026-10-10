@@ -67,8 +67,8 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
     fill_in "Name", with: "Typed"
     assert_selector ".admin-owner-zone button[disabled]", text: "Make owner…"
     assert_selector ".admin-delete-zone button[disabled]", text: "Delete user…"
-    assert_selector ".admin-owner-zone [data-admin--pending-lock-target=hint]", text: "Save or cancel your changes first.", visible: :visible
-    assert_selector ".admin-delete-zone [data-admin--pending-lock-target=hint]", text: "Save or cancel your changes first.", visible: :visible
+    assert_selector ".admin-owner-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or cancel your changes first.", visible: :visible
+    assert_selector ".admin-delete-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or cancel your changes first.", visible: :visible
 
     fill_in "Name", with: ""
     assert_selector ".admin-owner-zone button:not([disabled])", text: "Make owner…"

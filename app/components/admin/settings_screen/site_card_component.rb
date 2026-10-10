@@ -7,15 +7,15 @@ module Admin
     #
     # Every language's pair is in the page (`site_setting[translations][<code>]
     # [title|tagline]`, ids `settings-<code>-title`), one panel per language;
-    # the language tabs in the header (`LanguageTabsComponent`, `mode:
-    # :buttons`) only switch which panel is visible (`admin--settings-tabs`,
+    # the language tabs in the header (`Ui::LanguageTabsComponent`, `mode:
+    # :buttons`) only switch which panel is visible (`admin--settings--tabs`,
     # `hidden` and `aria-selected`) and never navigate, so switching tabs is
     # not a change and cannot trigger the leave guard. `locale:` is the tab
     # shown first (`?locale=`). A non-default language shows the original
     # beside each field in the editors' reference card, with the same
     # Translate / Suggest update / Still correct controls, and its own "Suggest
     # translations for N empty fields" -- which acts on the language that is
-    # visible (`admin--translate` ignores fields inside a hidden panel).
+    # visible (`admin--translation--translate` ignores fields inside a hidden panel).
     #
     # Everything below the pairs is one value for the whole site.
     class SiteCardComponent < Admin::AdminComponent
@@ -52,12 +52,12 @@ module Admin
         site_setting.public_send(field, locale: ::Locales.default)
       end
 
-      # See `Admin::PageSettingsFormComponent#translation`. Anyone seeing this
+      # See `Admin::EditorScreen::PageSettingsFormComponent#translation`. Anyone seeing this
       # card holds `settings.manage`, the same right `Translations::Confirm`
       # asks for a site field.
       def translation(code, field) = Admin::EditorScreen::ReferenceCardComponent.options_for(site_setting, field, locale: code, confirmable: true)
 
-      def tabs_data(code) = { "admin--settings-tabs-target": "tab", action: "admin--settings-tabs#select keydown->admin--settings-tabs#keydown", code: code }
+      def tabs_data(code) = { "admin--settings--tabs-target": "tab", action: "admin--settings--tabs#select keydown->admin--settings--tabs#keydown", code: code }
 
       def errors_for(attribute) = errors ? errors.full_messages_for(attribute) : []
 
@@ -79,7 +79,7 @@ module Admin
       end
 
       # A social link's row for the `<template>`: the same markup as a stored
-      # one, its index a placeholder `admin--repeat-rows` fills in.
+      # one, its index a placeholder `admin--settings--repeat-rows` fills in.
       TEMPLATE_INDEX = "__INDEX__".freeze
 
       private

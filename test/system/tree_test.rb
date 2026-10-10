@@ -30,9 +30,9 @@ class TreeSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     find("button[aria-label='Move Alpha']").send_keys(:space)
-    assert_selector "[data-admin--tree-target=announcer]", text: /Picked up Alpha. Position 1 of 3/, visible: :all
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Alpha. Position 1 of 3/, visible: :all
     find("button[aria-label='Move Alpha']").send_keys(:down)
-    assert_selector "[data-admin--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
     find("button[aria-label='Move Alpha']").send_keys(:space)
 
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Alpha./, wait: 10
@@ -93,7 +93,7 @@ class TreeSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     find("button[aria-label='Move Alpha']").send_keys(:space, :down, :escape)
-    assert_selector "[data-admin--tree-target=announcer]", text: /Cancelled/, visible: :all
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /Cancelled/, visible: :all
     assert_equal %w[Alpha Beta Gamma], tree_order
     assert_no_selector "#toasts .admin-toast"
     assert_equal %w[Alpha Beta Gamma], children_titles
@@ -127,9 +127,9 @@ class TreeSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     find("button[aria-label='Move Alpha']").send_keys(:space, :down)
-    assert_selector "[data-admin--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
     find("button[aria-label='Move Gamma']").send_keys(:space)
-    assert_selector "[data-admin--tree-target=announcer]", text: /Picked up Gamma/, visible: :all
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Gamma/, visible: :all
     assert_equal %w[Alpha Beta Gamma], tree_order
     assert_equal %w[Alpha Beta Gamma], children_titles
   end

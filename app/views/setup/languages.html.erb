@@ -7,7 +7,7 @@
 </p>
 
 <%= form_with model: @site_setting, url: setup_step_path("languages"), method: :patch, class: "mt-6 space-y-4" do |form| %>
-  <%= render Admin::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
 
   <div>
     <%= form.label :default_locale, "Default language", class: setup_label_class %>
@@ -21,7 +21,7 @@
   </div>
 
   <div class="flex items-center gap-4">
-    <%= render Admin::ButtonComponent.new(label: "Continue", type: "submit") %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Continue", type: "submit") %>
     <%= render "setup/back" %>
   </div>
 <% end %>

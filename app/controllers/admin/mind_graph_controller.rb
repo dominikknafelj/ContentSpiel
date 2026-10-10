@@ -1,6 +1,6 @@
 module Admin
   # The mind graph (mind graph canvas spec §3): the page is a FRAME -- heading,
-  # legend, filter, an empty canvas -- and holds no graph data. `admin--mind-graph`
+  # legend, filter, an empty canvas -- and holds no graph data. `admin--mind-graph--graph`
   # fetches the graph from `data` and draws it on the canvas, laid out by
   # d3-force in a worker. Read-only -- relations are edited in the post editor's
   # related-posts picker, not here. Each node's editor URL is built through the
@@ -28,7 +28,7 @@ module Admin
     # focus, which is not found when it is outside their scope. `@type_labels`
     # is the human name of each of those types that is still registered, for
     # the selection card (a retired type has none; the card shows its stored
-    # name, as `Admin::ContentTypeDotComponent` does).
+    # name, as `Admin::Ui::ContentTypeDotComponent` does).
     def show
       @focus = PostGraph::Focus.find(actor: Current.actor, post: params[:post], tag: params[:tag], locale: admin_locale)
       @depth = params[:depth].to_s == "2" ? 2 : 1

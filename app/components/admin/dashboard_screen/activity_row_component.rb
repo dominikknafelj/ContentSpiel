@@ -24,7 +24,7 @@ module Admin
       # The avatar's letter: the person's own initial, "You" included.
       def initial
         actor = sentence.actor
-        Admin::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label.to_s.strip[0].to_s.upcase
+        Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label.to_s.strip[0].to_s.upcase
       end
 
       def via_token? = sentence.actor.via_label.present?

@@ -1,0 +1,90 @@
+<details open class="admin-page-settings rounded-cs border border-line bg-surface p-4">
+  <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
+
+  <%# `data-controller="admin--saving--autosave"` sits on this form directly (not a
+      wrapping element) -- see that controller's own comment for why its
+      save-status line, which lives in the record header instead, doesn't
+      need a Stimulus target here to reach it. Only on an editable page
+      (`form_data`); the `contents` fieldset disables every field of a
+      view-only one without touching the layout. %>
+  <%= form_with url: form_url, method: :patch, class: "admin-translation-form mt-4 flex flex-col gap-4", data: form_data do %>
+  <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
+
+    <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+    <%# Wraps title + slug only, for `admin--editor--slug-preview` (Task 4, carried
+        in from Task 2's review): a bubbling `input` listener here is enough
+        to keep the slug preview live without either field's own component
+        knowing that controller exists. %>
+    <div data-controller="admin--editor--slug-preview" data-action="input->admin--editor--slug-preview#update">
+      <%= render Admin::Columns::PlainColumnComponent.new(
+            name: "title", id: field_id("title"), html_name: field_html_name("title"),
+            value: value(:title), original: original(:title), locale: locale, **translation(:title),
+            data: { "admin--editor--slug-preview-target": "title" }
+          ) %>
+
+      <% if show_slug? %>
+        <%= render Admin::Columns::SlugColumnComponent.new(
+              name: "slug", id: field_id("slug"), html_name: field_html_name("slug"),
+              value: value(:slug), base_url: slug_base_url, original: original(:slug), locale: locale,
+              data: { "admin--editor--slug-preview-target": "slug" }, help: "The last part of the page’s address. Changing it leaves a redirect from the old address."
+            ) %>
+      <% end %>
+    </div>
+
+    <% if translation_tab? %>
+      <%# The page type is the same in every language: a read-only line here, not a `<select>`,
+          so this tab's autosave never sends it. %>
+      <p class="admin-column mb-4 text-sm text-meta" data-field-name="page_type">
+        Page type: <span class="text-ink"><%= page.page_type.humanize %></span> — Shared by all languages.
+      </p>
+    <% else %>
+      <div class="admin-column mb-4" data-field-name="page_type">
+        <%= label_tag field_id("page_type"), "Page type", class: setup_label_class %>
+        <%= select_tag field_html_name("page_type"), options_for_select(page_type_options, page.page_type),
+              id: field_id("page_type"), class: setup_select_class %>
+        <div id="<%= errors_id("page_type") %>" class="mt-1 text-sm text-danger-ink"></div>
+      </div>
+    <% end %>
+
+    <%= render Admin::Columns::PlainColumnComponent.new(
+          name: "subtitle", id: field_id("subtitle"), html_name: field_html_name("subtitle"),
+          value: value(:subtitle), original: original(:subtitle), locale: locale, **translation(:subtitle)
+        ) %>
+
+    <% if landing? %>
+      <%# The hero is a library image (media library Task 8): chosen
+          through the picker into a hidden `hero_media_asset_id` that
+          autosaves like any other field, with `hero_alt` as this page's
+          own per-use override -- its placeholder is the image's own
+          default alt in this language, kept current by
+          `admin--media--field` when the image changes. %>
+      <%= render self.class.hero_image_field(asset: page.hero_media_asset, locale: locale) %>
+
+      <%= render Admin::Columns::PlainColumnComponent.new(
+            name: "hero_alt", id: field_id("hero_alt"), html_name: field_html_name("hero_alt"),
+            value: value(:hero_alt), original: original(:hero_alt), locale: locale, **translation(:hero_alt),
+            placeholder: hero_alt_placeholder, override: "alt text"
+          ) %>
+    <% end %>
+
+    <details class="admin-page-settings__seo">
+      <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">SEO · META TITLE, META DESCRIPTION</summary>
+
+      <div class="mt-3 flex flex-col gap-4">
+        <%= render Admin::Columns::PlainColumnComponent.new(
+              name: "meta_title", id: field_id("meta_title"), html_name: field_html_name("meta_title"),
+              value: value(:meta_title), original: original(:meta_title), locale: locale, **translation(:meta_title),
+              counter: META_TITLE_LIMIT
+            ) %>
+
+        <%= render Admin::Columns::PlainColumnComponent.new(
+              name: "meta_description", id: field_id("meta_description"), html_name: field_html_name("meta_description"),
+              value: value(:meta_description), original: original(:meta_description), locale: locale, **translation(:meta_description), multiline: true,
+              counter: META_DESCRIPTION_LIMIT
+            ) %>
+      </div>
+    </details>
+  <% end %>
+  <% end %>
+</details>

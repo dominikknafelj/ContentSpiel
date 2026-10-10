@@ -104,7 +104,7 @@ module Admin
       else
         # `head` would label the empty body with the *request's* format --
         # for a Turbo Stream request, "text/vnd.turbo-stream.html" -- and
-        # a `fetch` like `admin--translate`'s suggest request takes that
+        # a `fetch` like `admin--translation--translate`'s suggest request takes that
         # content type to mean "a stream, render it" (an empty one) rather
         # than "not a stream, show the generic error". An explicit
         # text/plain keeps a bare 404 reading as what it is.
@@ -179,7 +179,7 @@ module Admin
     # HTML in place. `message` is a service's refusal ("You don't have
     # permission to publish posts") when there is one.
     #
-    # An autosave (a Turbo Stream request from `admin--autosave`) refused
+    # An autosave (a Turbo Stream request from `admin--saving--autosave`) refused
     # here -- a tab left open after the user lost the area -- gets the
     # 403 save-status stream a service refusal gets
     # (`AutosaveResponses#autosave_status`), in the status line the
@@ -192,7 +192,7 @@ module Admin
       if request.format.json?
         render json: { errors: [ message ] }, status: :forbidden
       elsif status_id
-        render turbo_stream: turbo_stream.replace(status_id, Admin::SaveStatusComponent.new(id: status_id, state: :forbidden)), status: :forbidden
+        render turbo_stream: turbo_stream.replace(status_id, Admin::Ui::SaveStatusComponent.new(id: status_id, state: :forbidden)), status: :forbidden
       else
         render "admin/errors/forbidden", status: :forbidden, formats: [ :html ], content_type: "text/html", locals: { message: message }
       end

@@ -21,7 +21,7 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
     # far enough out that the suite stays green regardless of which day it
     # actually runs on -- the scheduled-time input only shows `published_at`
     # at all while the post's own status is "scheduled" (`Post#status`,
-    # `PostFormComponent#scheduled_at_input_value`), so this has to stay in
+    # `EditorScreen::PostFormComponent#scheduled_at_input_value`), so this has to stay in
     # the future.
     @post.update_columns(published_at: Time.utc(2030, 7, 1, 7, 30))      # CEST = UTC+2
     get admin_post_path(@post)

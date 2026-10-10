@@ -1,7 +1,7 @@
 module Admin
   # The Groups module (access-control design spec §5): the list with member
   # counts, the editor (name, description, members, the permission matrix
-  # -- `Admin::PermissionMatrixComponent`), and delete behind the confirm
+  # -- `Admin::GroupsScreen::PermissionMatrixComponent`), and delete behind the confirm
   # dialog, which names the tokens `Groups::Destroy` will revoke.
   #
   # `groups.manage` opens the module; `Groups::Save`/`Groups::Destroy`
@@ -152,7 +152,7 @@ module Admin
       }
     end
 
-    # `Admin::PermissionMatrixComponent`'s params back into `[{ permission:,
+    # `Admin::GroupsScreen::PermissionMatrixComponent`'s params back into `[{ permission:,
     # scope: }]`: only ticked permissions, and for each only the scope
     # controls its permission takes; an empty control is no key at all ("no
     # restriction"). An unregistered key is passed through untouched for

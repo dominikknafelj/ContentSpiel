@@ -1,13 +1,13 @@
 module Admin
   module Columns
     # The rich-text column (`Post`/`ContentBlock` body, tiptap spec §4.1):
-    # the Tiptap editor, mounted by the `admin--rich-text` Stimulus
+    # the Tiptap editor, mounted by the `admin--rich-text--editor` Stimulus
     # controller. Renders:
     # - a hidden input (`html_name`, e.g. `post[body]`) holding the
     #   document's JSON -- the one contract between the editor and the
     #   server. The controller writes `JSON.stringify(editor.getJSON())`
     #   into it on every change and dispatches `input`, so the enclosing
-    #   form's own `admin--autosave` sends it like any other field; the
+    #   form's own `admin--saving--autosave` sends it like any other field; the
     #   controllers hand it to their services untouched as
     #   `translations[locale][:body]`, and `HasRichTextBody` parses and
     #   validates it (`RichText::Document#validate`). It is also where the
@@ -54,7 +54,7 @@ module Admin
     #
     # `editable: false` (a view-only editor, handoff §10 B20) renders no
     # toolbar at all -- a row of dead, disabled buttons would only suggest
-    # something could be done. `admin--rich-text` already mounts the editor
+    # something could be done. `admin--rich-text--editor` already mounts the editor
     # read-only inside a `fieldset[disabled]` and guards every popover and
     # command on that, so the missing toolbar costs it nothing.
     class RichTextColumnComponent < Base
@@ -66,7 +66,7 @@ module Admin
       def editable? = @editable
 
       # [action, accessible name, visible text, toggle?]. `action` is the
-      # `admin--rich-text` method the button runs (`data-action` below) and
+      # `admin--rich-text--editor` method the button runs (`data-action` below) and
       # the key the controller reports active state under. Toggle buttons
       # (a mark, a heading level, a list, a block wrapper) carry
       # `aria-pressed`; the rest open a popover or insert something, so they
@@ -142,7 +142,7 @@ module Admin
         tag.button text, type: "button", title: label, "aria-label": label, "aria-pressed": (toggle ? "false" : nil),
           "aria-haspopup": (DIALOG_ACTIONS.include?(action) ? "dialog" : nil),
           class: [ "admin-rich-text-button cursor-pointer whitespace-nowrap rounded-cs px-1.5 py-1 font-cs-mono text-sm text-ink hover:bg-surface aria-pressed:bg-accent-tint aria-pressed:text-accent data-active:bg-accent-tint data-active:text-accent", extra_class ].compact.join(" "),
-          data: { action: [ "admin--rich-text##{action}", extra_action ].compact.join(" "), "admin--rich-text-command": action }
+          data: { action: [ "admin--rich-text--editor##{action}", extra_action ].compact.join(" "), "admin--rich-text--editor-command": action }
       end
 
       def document = self.class.to_document(value)
@@ -226,7 +226,7 @@ module Admin
 
       # Use loads the suggestion into this editor through its hidden JSON
       # input (`translate:use`, dispatched there, bubbles to
-      # `admin--rich-text#applySuggestion`), and the original counts as the
+      # `admin--rich-text--editor#applySuggestion`), and the original counts as the
       # Markdown `AI::Translate` actually sends.
       def translate_target = { input_id: "#{id}-json", kind: :rich, characters: original_document.to_markdown.length }
 

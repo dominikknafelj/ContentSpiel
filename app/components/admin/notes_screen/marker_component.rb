@@ -10,7 +10,7 @@ module Admin
     #
     # The server draws it WITHOUT a number: a card is drawn by the page and by
     # every stream that adds, moves or redraws a block, and none of them
-    # should cost a query for a count. `admin--notes` fills it from the
+    # should cost a query for a count. `admin--notes--drawer` fills it from the
     # record's counts when it connects (`data-has-notes`, `data-unread`, the
     # number, the label), and turns it into "Note on selection" while text is
     # selected in that block's rich text. So a marker drawn again by a stream

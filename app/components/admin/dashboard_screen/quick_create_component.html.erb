@@ -3,22 +3,22 @@
     <p class="text-danger-ink" role="alert"><%= errors.to_sentence %></p>
   <% end %>
   <%= form_with url: helpers.admin_dashboard_draft_path(**url_options), method: :post, class: "flex flex-wrap items-end gap-3",
-        data: { controller: "admin--quick-create", action: "submit->admin--quick-create#submit turbo:submit-start->admin--quick-create#submitStart turbo:submit-end->admin--quick-create#submitEnd" } do %>
+        data: { controller: "admin--dashboard--quick-create", action: "submit->admin--dashboard--quick-create#submit turbo:submit-start->admin--dashboard--quick-create#submitStart turbo:submit-end->admin--dashboard--quick-create#submitEnd" } do %>
     <div class="min-w-48 flex-1">
       <%= label_tag "dashboard_draft_title", "Title", class: setup_label_class %>
       <%= text_field_tag :title, title, id: "dashboard_draft_title", placeholder: "A new idea…", class: setup_input_class,
-            data: { "admin--quick-create-target": "title" } %>
+            data: { "admin--dashboard--quick-create-target": "title" } %>
     </div>
     <div>
       <%= label_tag "dashboard_draft_content_type", "Type", class: setup_label_class %>
       <%= select_tag :content_type, options_for_select(choices, content_type), id: "dashboard_draft_content_type", class: setup_select_class,
-            data: { "admin--quick-create-target": "type" } %>
+            data: { "admin--dashboard--quick-create-target": "type" } %>
     </div>
-    <%= render Admin::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit") %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit") %>
     <% if new_page? %>
       <%# The real "New page" trigger a Page submit clicks: a link, so it also works without JS. %>
       <%= link_to "New page", helpers.new_admin_page_path(**url_options), hidden: true, tabindex: -1, aria: { hidden: true },
-            data: dialog_trigger("new-page-dialog").merge(turbo_frame: "_top", "admin--quick-create-target": "pageTrigger") %>
+            data: dialog_trigger("new-page-dialog").merge(turbo_frame: "_top", "admin--dashboard--quick-create-target": "pageTrigger") %>
     <% end %>
   <% end %>
 </div>

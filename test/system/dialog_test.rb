@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The one dialog component and controller (`admin--dialog` on <body>): a
+# The one dialog component and controller (`admin--ui--dialog` on <body>): a
 # trigger opens a dialog by id, a destructive one starts on Cancel, Esc
 # closes without acting, and the confirm button does the write.
 class DialogSystemTest < ApplicationSystemTestCase

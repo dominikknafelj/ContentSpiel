@@ -28,8 +28,8 @@ module Admin
     #
     # The URL line's prefix comes from each option's `data-path` (the parent's
     # stored public path in the editing language, locale prefix included, no
-    # trailing slash), the slug part from `admin--new-record`, which slugifies
-    # the typed title exactly like `admin--slug-preview`. The server renders a
+    # trailing slash), the slug part from `admin--editor--new-record`, which slugifies
+    # the typed title exactly like `admin--editor--slug-preview`. The server renders a
     # first guess (`parameterize`) so the line is right before any script runs.
     class NewPageFormComponent < Admin::AdminComponent
       FORM_ID = "new-page-form".freeze
@@ -43,7 +43,7 @@ module Admin
       end
 
       # `errors` is an `ActiveModel::Errors`, a hash or an array of sentences
-      # (`Admin::ErrorSummaryComponent` takes all three).
+      # (`Admin::Ui::ErrorSummaryComponent` takes all three).
       def initialize(url_options: {}, locale: ::Locales.default, parent_id: nil, title: nil, page_type: nil, errors: nil)
         @url_options = url_options
         @locale = locale.to_s

@@ -22,19 +22,19 @@ class Admin::AdminComponentTest < ViewComponent::TestCase
   end
 
   test "the scope is the class name without Admin:: and Component, one segment per namespace" do
-    assert_equal "confirm_dialog", Admin::ConfirmDialogComponent.translation_scope
+    assert_equal "ui.confirm_dialog", Admin::Ui::ConfirmDialogComponent.translation_scope
     assert_equal "editor_screen.header", Admin::EditorScreen::HeaderComponent.translation_scope
     assert_equal "i18n_probe", Admin::I18nProbeComponent.translation_scope
   end
 
-  test "t(\".cancel\") in the confirm dialog reads admin.components.confirm_dialog.cancel" do
-    assert_equal "Cancel", I18n.t("admin.components.confirm_dialog.cancel")
+  test "t(\".cancel\") in the confirm dialog reads admin.components.ui.confirm_dialog.cancel" do
+    assert_equal "Cancel", I18n.t("admin.components.ui.confirm_dialog.cancel")
 
-    I18n.backend.store_translations(:en, admin: { components: { confirm_dialog: { cancel: "Dismiss it" } } })
-    render_inline Admin::ConfirmDialogComponent.new(id: "d", title: "T")
+    I18n.backend.store_translations(:en, admin: { components: { ui: { confirm_dialog: { cancel: "Dismiss it" } } } })
+    render_inline Admin::Ui::ConfirmDialogComponent.new(id: "d", title: "T")
     assert_selector "form[method='dialog'] button", text: "Dismiss it"
   ensure
-    I18n.backend.store_translations(:en, admin: { components: { confirm_dialog: { cancel: "Cancel" } } })
+    I18n.backend.store_translations(:en, admin: { components: { ui: { confirm_dialog: { cancel: "Cancel" } } } })
   end
 
   test "a missing key raises, relative or absolute" do

@@ -16,7 +16,7 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     press "Copy"
 
     assert_selector "button", text: "Copied"
-    assert_selector "[data-admin--clipboard-target=status][aria-live=polite]", text: "Copied", visible: :all
+    assert_selector "[data-admin--ui--clipboard-target=status][aria-live=polite]", text: "Copied", visible: :all
     assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.__copied")
     # The label comes back.
     assert_selector "button", text: "Copy", exact_text: true
@@ -29,7 +29,7 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
 
     press "Copy"
 
-    assert_selector "[data-admin--clipboard-target=status]", text: "the text is selected", visible: :all
+    assert_selector "[data-admin--ui--clipboard-target=status]", text: "the text is selected", visible: :all
     assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.getSelection().toString()").strip
   end
 

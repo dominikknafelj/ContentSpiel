@@ -26,7 +26,7 @@ module Admin
     class TileSummaryComponent < AdminComponent
       LENGTH = 80
 
-      def self.dom_id(block) = "#{Admin::BlockCardComponent.error_prefix(block)}-tile-summary"
+      def self.dom_id(block) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-tile-summary"
 
       def initialize(block:, locale:, invalid: false)
         @block = block

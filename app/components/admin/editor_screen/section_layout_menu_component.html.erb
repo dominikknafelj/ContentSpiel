@@ -1,10 +1,10 @@
-<div id="<%= dom_id %>" data-admin--section-target="layoutMenu">
-  <%= render Admin::MenuComponent.new(label: button_label, aria_label: t(".name"), align: :left, close_on_select: true) do |menu| %>
+<div id="<%= dom_id %>" data-admin--editor--section-target="layoutMenu">
+  <%= render Admin::Ui::MenuComponent.new(label: button_label, aria_label: t(".name"), align: :left, close_on_select: true) do |menu| %>
     <% layouts.each_key do |name| %>
       <% menu.with_item do %>
         <%# `aria-current` marks the layout the section has; the stylesheet draws it from that. %>
         <button type="button" class="<%= item_class %>" aria-current="<%= current?(name) %>"
-                data-action="admin--section#chooseLayout" data-admin--section-layout-param="<%= name %>">
+                data-action="admin--editor--section#chooseLayout" data-admin--editor--section-layout-param="<%= name %>">
           <%= diagram(name) %>
           <span class="sr-only"><%= t(".layouts.#{name}") %></span>
         </button>

@@ -27,7 +27,7 @@ module Admin
     # A GIF moves. Without reduced motion it plays, like any image. With it,
     # the tile shows a STILL: the picture itself is drawn invisible
     # (`motion-reduce:opacity-0`, so it keeps the tile's shape) and
-    # `admin--note-gif` paints its first frame on the canvas over it, under a
+    # `admin--notes--gif` paints its first frame on the canvas over it, under a
     # Play button; Play shows the picture and reads Pause. No variant is
     # made for the still: the browser has the frame already.
     class FilesComponent < Admin::AdminComponent

@@ -1,19 +1,19 @@
 <div class="admin-column mb-4" data-field-name="<%= name %>">
   <label class="<%= setup_label_class %> mb-1" for="<%= id %>">Slug</label>
 
-  <%= render Admin::PrefixInputComponent.new(name: html_name, id: id, value: value, prefix: prefix, errors: errors, **html) %>
+  <%= render Admin::Ui::PrefixInputComponent.new(name: html_name, id: id, value: value, prefix: prefix, errors: errors, **html) %>
 
-  <%# `data-admin--slug-preview-target="output"` is always present, not
+  <%# `data-admin--editor--slug-preview-target="output"` is always present, not
       passed in via `**html` the way the input's own target is (Task 4) --
       this span only ever plays one role, so there's no caller-specific
       variation to thread through, unlike the input above which is also a
       plain slug field with no live-preview controller in view (e.g. a
       future post editor that hasn't wired one up yet). A wrapping
-      `data-controller="admin--slug-preview"` that never shows up (this
+      `data-controller="admin--editor--slug-preview"` that never shows up (this
       component's own Lookbook preview, a post form before Task 6 adds this
       controller there) simply leaves the attribute inert. %>
   <p class="mt-1 font-cs-mono text-sm text-meta">
-    <span data-slug-preview-base><%= prefix %></span><span data-admin--slug-preview-target="output"><%= value %></span>
+    <span data-slug-preview-base><%= prefix %></span><span data-admin--editor--slug-preview-target="output"><%= value %></span>
   </p>
   <% if help %>
     <p class="mt-1 text-xs text-meta"><%= help %></p>

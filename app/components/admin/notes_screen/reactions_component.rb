@@ -19,7 +19,7 @@ module Admin
     #   at all, so the control costs no height at rest. The set hangs from its
     #   right edge there, since the control stands at the end of the line.
     # For touch the message's "⋯" menu has "React", which opens the same set
-    # wherever it stands (`admin--note-reactions#open`).
+    # wherever it stands (`admin--notes--reactions#open`).
     #
     # THREE STATES (`state`).
     # - `:open`: the chips are buttons and the way to the set is there.
@@ -38,7 +38,7 @@ module Admin
     # Every button is a submit of a small Turbo form into the notes frame; no
     # autosave form. The forms stand below the message's text or beside its
     # edit form, inside no other form. Where the set opens, Escape and a
-    # press outside it are `admin--note-reactions`' (on the message).
+    # press outside it are `admin--notes--reactions`' (on the message).
     #
     # Accent here means "yours": the one control the handoff gives the accent
     # tint to for something other than "unread for you".
@@ -60,7 +60,7 @@ module Admin
       META_CONTROL = "flex size-6 items-center justify-center rounded-cs text-meta hover:text-ink".freeze
       # Shown on hover or focus of the message, and while the set is open.
       AT_REST_HIDDEN = "opacity-0 group-hover/note:opacity-100 group-focus-within/note:opacity-100 open:opacity-100".freeze
-      # Above the chip; below it when `admin--note-reactions` found no room
+      # Above the chip; below it when `admin--notes--reactions` found no room
       # above inside the thread's scroll area (`data-side` on the <details>).
       PANEL_SIDE = "bottom-full mb-1.5 [[data-side=below]_&]:bottom-auto [[data-side=below]_&]:top-full [[data-side=below]_&]:mb-0 [[data-side=below]_&]:mt-1.5".freeze
       # Only one message's set is open at a time: `<details>` of one name

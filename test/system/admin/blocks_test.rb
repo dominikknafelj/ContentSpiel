@@ -1,8 +1,8 @@
 require "application_system_test_case"
 
 # The page editor's block list (cs-studio spec §5.1/§9): adding a block
-# through the picker (a plain form submission, `admin--blocks` itself has no
-# hand in it) and drag-reordering existing ones (`admin--blocks#reorder`).
+# through the picker (a plain form submission, `admin--editor--blocks` itself has no
+# hand in it) and drag-reordering existing ones (`admin--editor--blocks#reorder`).
 class Admin::BlocksSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -16,7 +16,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     # The end-of-list picker (`after_id` absent) is open by default -- no
     # disclosure click needed before its own type buttons are visible.
-    # Every button here is a plain `button_to` (`Admin::BlockPickerComponent`'s
+    # Every button here is a plain `button_to` (`Admin::EditorScreen::BlockPickerComponent`'s
     # own comment): Turbo Drive already appends the Turbo Stream `Accept`
     # header to a non-GET form submission on its own, so this is a normal
     # submit, not a fetch this test would otherwise have to wait on by hand.
@@ -160,7 +160,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
   end
 
   # Ledger m2 (final fix wave 1): moving a card in the DOM (a drag, Move
-  # up/down) disconnects and reconnects its form's `admin--autosave`. The
+  # up/down) disconnects and reconnects its form's `admin--saving--autosave`. The
   # reconnect used to take whatever the form held for "what the server
   # holds", and the disconnect had cleared the debounce timer: an edit made
   # by code inside its debounce (a translation's Use, with focus elsewhere)
@@ -305,7 +305,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     assert_selector "#content-blocks-list .admin-block-card:first-child[data-block-id='#{first.id}']"
 
-    # `admin--blocks` drives SortableJS with no `forceFallback` option (see
+    # `admin--editor--blocks` drives SortableJS with no `forceFallback` option (see
     # that controller's own source), so a drag here is the browser's native
     # HTML5 drag-and-drop under the hood -- `dragstart`/`dragover`/`drop`
     # events a synthesized mouse sequence (Capybara's `drag_to`) can't
@@ -323,8 +323,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
       const firstCard = list.querySelector('[data-block-id="#{first.id}"]')
       list.insertBefore(secondCard, firstCard)
 
-      const section = document.querySelector('[data-controller~="admin--blocks"]')
-      window.Stimulus.getControllerForElementAndIdentifier(section, "admin--blocks").reorder()
+      const section = document.querySelector('[data-controller~="admin--editor--blocks"]')
+      window.Stimulus.getControllerForElementAndIdentifier(section, "admin--editor--blocks").reorder()
     JS
 
     # `assert_selector(id, text:, wait:)`, not `within(id) { assert_text }`
@@ -358,7 +358,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_no_selector "#changed-elsewhere"
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
-  # Fix round 3: a card's queued follow-up save (`admin--autosave`'s
+  # Fix round 3: a card's queued follow-up save (`admin--saving--autosave`'s
   # `pending` retrigger) runs before Turbo applies the previous response's
   # streams (next animation frame), so it used to send the page form's
   # *old* base -- the server then rightly refused to move it, the write
@@ -420,11 +420,11 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     card = "##{ActionView::RecordIdentifier.dom_id(block)}"
     find("#{card} input[name='block[settings][limit]']").set("0")
     find("#{card} input[name='block[settings][limit]']").send_keys(:tab)
-    assert_selector "##{Admin::BlockCardComponent.error_prefix(block)}-limit-errors p", wait: 6
+    assert_selector "##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-limit-errors p", wait: 6
 
     rects = page.evaluate_script(<<~JS)
       (() => {
-        const error = document.querySelector("##{Admin::BlockCardComponent.error_prefix(block)}-limit-errors").getBoundingClientRect()
+        const error = document.querySelector("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-limit-errors").getBoundingClientRect()
         const input = document.querySelector("#{card} input[name='block[settings][limit]']").getBoundingClientRect()
         return { errorWidth: error.width, errorRight: error.right, inputRight: input.right }
       })()

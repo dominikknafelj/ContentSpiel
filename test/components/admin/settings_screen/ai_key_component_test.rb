@@ -20,7 +20,7 @@ class Admin::SettingsScreen::AiKeyComponentTest < ViewComponent::TestCase
     assert_selector "#settings-ai-key [data-ai-key-state=unset]", text: "No key yet"
     assert_selector "button", text: "Add key"
     assert_no_selector "button", text: "Remove…"
-    assert_selector "[data-admin--ai-settings-target=entry][hidden]", visible: :all
+    assert_selector "[data-admin--settings--ai-target=entry][hidden]", visible: :all
   end
 
   test "a key without a date reads Key saved alone, with Replace and Remove…" do
@@ -51,18 +51,18 @@ class Admin::SettingsScreen::AiKeyComponentTest < ViewComponent::TestCase
   test "its controls are pending-lock controls" do
     render_key(site: site_with_key(nil))
 
-    %w[Replace Remove…].each { |label| assert_selector "button[data-admin--pending-lock-target=control]", text: label }
-    assert_selector "input[data-admin--pending-lock-target=control]", visible: :all
-    assert_selector "button[data-admin--pending-lock-target=control]", text: "Save key", visible: :all
-    assert_selector "[data-admin--pending-lock-target=hint]", visible: :all
+    %w[Replace Remove…].each { |label| assert_selector "button[data-admin--saving--pending-lock-target=control]", text: label }
+    assert_selector "input[data-admin--saving--pending-lock-target=control]", visible: :all
+    assert_selector "button[data-admin--saving--pending-lock-target=control]", text: "Save key", visible: :all
+    assert_selector "[data-admin--saving--pending-lock-target=hint]", visible: :all
   end
 
   test "an error shows in the slot with the input open" do
     render_key(error: "Enter the API key first.")
 
     assert_selector "#settings-ai-key-errors", text: "Enter the API key first."
-    assert_no_selector "[data-admin--ai-settings-target=entry][hidden]", visible: :all
-    assert_selector "[data-admin--ai-settings-target=chip][hidden]", visible: :all
+    assert_no_selector "[data-admin--settings--ai-target=entry][hidden]", visible: :all
+    assert_selector "[data-admin--settings--ai-target=chip][hidden]", visible: :all
     assert_selector "input[aria-invalid=true]"
   end
 end

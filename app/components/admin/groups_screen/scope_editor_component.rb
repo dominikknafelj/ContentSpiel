@@ -7,7 +7,7 @@ module Admin
     # - posts: the content types as a multi-select (none ticked = all) and an
     #   "Own only" toggle ("Only posts the user wrote." -- the rule that exists:
     #   `Scoping` matches `author_id`);
-    # - pages: the branch tree, tri-state (`BranchTree`, `admin--branch-picker`).
+    # - pages: the branch tree, tri-state (`BranchTree`, `admin--groups--branch-picker`).
     #
     # Everything stays in the form whether the editor is open or closed (open and
     # close are only `hidden`), and `GroupsController#grants_from` ignores the
@@ -59,7 +59,7 @@ module Admin
 
       def dot_class(name)
         definition = ContentTypes.find(name)
-        ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
+        Ui::ContentTypeDotComponent.new(content_type: name).mark_class(definition.colour_index) if definition
       end
 
       # --- Branch tree ------------------------------------------------------
@@ -92,29 +92,29 @@ module Admin
       def branch_node(page_id)
         node = tree.node(page_id)
         state = states.fetch(page_id)
-        tag.li(class: "admin-branch-node", data: { admin__branch_picker_target: "node", chosen: (state.chosen ? "1" : "") }) do
+        tag.li(class: "admin-branch-node", data: { admin__groups__branch_picker_target: "node", chosen: (state.chosen ? "1" : "") }) do
           row = tag.div(class: "flex items-center gap-2.5 px-2 py-1 text-sm") do
             control = if node.readable
               box_id = field_id("page", page_id)
               tag.label(for: box_id, class: "flex min-w-0 items-center gap-2.5 text-ink") do
-                render(Admin::CheckboxComponent.new(name: field_name("page_ids") + "[]", value: page_id, id: box_id,
+                render(Admin::Ui::CheckboxComponent.new(name: field_name("page_ids") + "[]", value: page_id, id: box_id,
                   checked: %i[chosen implied].include?(state.state), disabled: state.state == :implied,
-                  data: { admin__branch_picker_target: "box", action: "admin--branch-picker#change", chip_label: node.title, partial: (state.state == :partial || nil) })) + node.title
+                  data: { admin__groups__branch_picker_target: "box", action: "admin--groups--branch-picker#change", chip_label: node.title, partial: (state.state == :partial || nil) })) + node.title
               end
             else
               tag.span(class: "flex min-w-0 items-center gap-2.5 text-dim", title: "You can't open this page") do
-                tag.span(mark_for(state), class: "admin-tri-mark inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-cs border border-line-strong text-xs", aria: { hidden: true }, data: { admin__branch_picker_target: "mark" }) + node.title
+                tag.span(mark_for(state), class: "admin-tri-mark inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-cs border border-line-strong text-xs", aria: { hidden: true }, data: { admin__groups__branch_picker_target: "mark" }) + node.title
               end
             end
             # A root that is chosen AND below another chosen root (a stored state the
             # editor never writes itself: sibling roots, then one moved under the other)
             # has a disabled box, which isn't submitted -- so an untouched save would
             # normalise it away. This carries it, in the row, submitted exactly while it
-            # is chosen and implied; `admin--branch-picker#refresh` keeps that in step
+            # is chosen and implied; `admin--groups--branch-picker#refresh` keeps that in step
             # (the box takes over once the ancestor is unticked, never both). Untracked:
             # a hidden input never counts towards the footer, so nothing here is a change.
             carried = node.readable && state.chosen ? hidden_field_tag(field_name("page_ids") + "[]", page_id, id: nil, disabled: state.state != :implied) : "".html_safe
-            control + carried + tag.span(note_for(state), class: "ml-auto text-xs text-meta", data: { admin__branch_picker_target: "note" })
+            control + carried + tag.span(note_for(state), class: "ml-auto text-xs text-meta", data: { admin__groups__branch_picker_target: "note" })
           end
           row + tag.div(branch_list(node.child_ids), class: "ml-5")
         end

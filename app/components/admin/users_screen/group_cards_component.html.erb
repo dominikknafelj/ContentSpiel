@@ -14,7 +14,7 @@
           <% if group.description.present? %><span class="text-xs leading-snug text-dim"><%= group.description %></span><% end %>
           <% if locked?(group) %><span class="text-xs text-meta">You can't grant this group.</span><% end %>
         </span>
-        <%= render Admin::CheckboxComponent.new(name: "user[group_ids][]", value: group.id, checked: checked?(group), id: input_id(group), disabled: locked?(group), class: "col-start-2 row-start-1 mt-0.5") %>
+        <%= render Admin::Ui::CheckboxComponent.new(name: "user[group_ids][]", value: group.id, checked: checked?(group), id: input_id(group), disabled: locked?(group), class: "col-start-2 row-start-1 mt-0.5") %>
       </label>
     <% end %>
   </div>

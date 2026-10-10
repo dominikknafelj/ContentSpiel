@@ -1,6 +1,6 @@
 <%= form_with url: url, method: method, multipart: files?, class: "flex flex-col gap-2", data: form_data do %>
   <% hidden.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
-  <%= hidden_field_tag "mention_names", names.to_json, id: nil, data: { "admin--note-composer-target": "names" } %>
+  <%= hidden_field_tag "mention_names", names.to_json, id: nil, data: { "admin--notes--composer-target": "names" } %>
   <% if errors.any? %>
     <ul role="alert" class="flex flex-col gap-0.5 text-[12px] text-danger-ink">
       <% errors.each do |error| %><li><%= error %></li><% end %>
@@ -10,15 +10,15 @@
     <%# The chosen files, above the field (handoff "Composer"): attachment
         rows the script fills from the template below, and the line that
         says why a file was not taken. %>
-    <ul class="flex flex-col gap-2" hidden aria-label="<%= t(".chosen") %>" data-admin--note-composer-target="chosen"></ul>
-    <p class="text-[12px] text-danger-ink" role="alert" hidden data-admin--note-composer-target="fileError"></p>
+    <ul class="flex flex-col gap-2" hidden aria-label="<%= t(".chosen") %>" data-admin--notes--composer-target="chosen"></ul>
+    <p class="text-[12px] text-danger-ink" role="alert" hidden data-admin--notes--composer-target="fileError"></p>
     <%# Files that were chosen and are gone with the form they were chosen
         in (decision 33): after a refusal the server names them; for a draft
         that comes back, the script does. `data-names` is what the script
         keeps beside the draft while the line stands. %>
     <%= tag.p (t(".files_lost", names: files_lost.join(", ")) if files_lost.any?), class: "text-[12px] text-meta", hidden: files_lost.none?,
-          data: { note_files_lost: true, "admin--note-composer-target": "lost", names: files_lost.to_json } %>
-    <template data-admin--note-composer-target="row">
+          data: { note_files_lost: true, "admin--notes--composer-target": "lost", names: files_lost.to_json } %>
+    <template data-admin--notes--composer-target="row">
       <li class="<%= file_row::ROW_CLASS %>" data-note-chosen>
         <%= helpers.render "admin/shared/icon", name: :file_text, size: "size-4" %>
         <span class="flex min-w-0 flex-col">
@@ -26,7 +26,7 @@
           <span class="<%= file_row::FACTS_CLASS %>" data-facts></span>
         </span>
         <button type="button" class="<%= file_row::ROW_BUTTON_CLASS %> cursor-pointer hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
-                data-action="admin--note-composer#removeFile"><%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %></button>
+                data-action="admin--notes--composer#removeFile"><%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %></button>
       </li>
     </template>
   <% end %>
@@ -37,11 +37,11 @@
     <%= text_area_tag "body", body, id: field_id, rows: rows, maxlength: ::Notes::Message::MAX_BODY, required: true, placeholder: t(".placeholder", label: label),
           autocomplete: "off", aria: { autocomplete: "list", controls: "#{field_id}-people" },
           class: "block max-h-[200px] min-h-[62px] w-full resize-none field-sizing-content rounded-cs bg-transparent px-2.5 py-[9px] text-sm leading-normal text-ink placeholder:text-meta focus:outline-none",
-          data: { "admin--note-composer-target": "field", action: "input->admin--note-composer#typed keydown->admin--note-composer#key blur->admin--note-composer#left" } %>
+          data: { "admin--notes--composer-target": "field", action: "input->admin--notes--composer#typed keydown->admin--notes--composer#key blur->admin--notes--composer#left" } %>
     <%# The mention picker (handoff "Mention picker"): the menu panel, filled by the script, six rows at most. %>
-    <ul id="<%= field_id %>-people" role="listbox" hidden aria-label="<%= t(".people") %>" data-admin--note-composer-target="suggestions"
+    <ul id="<%= field_id %>-people" role="listbox" hidden aria-label="<%= t(".people") %>" data-admin--notes--composer-target="suggestions"
         class="absolute left-0 z-30 w-[250px] max-w-full rounded-cs border border-line bg-surface p-1 shadow-menu <%= POPOVER_SIDE %>"></ul>
-    <p class="sr-only" role="status" aria-live="polite" data-admin--note-composer-target="status"></p>
+    <p class="sr-only" role="status" aria-live="polite" data-admin--notes--composer-target="status"></p>
     <div class="flex items-center justify-between gap-2 border-t border-line px-1.5 py-1">
       <%# The toolbar's controls, on the left (handoff "Composer"): the paperclip, emoji and the at-sign. %>
       <div class="flex items-center gap-0.5" data-note-toolbar>
@@ -49,28 +49,28 @@
           <%# The field is the form's own and is opened by the button: it is out
               of sight and out of the Tab order, and the button carries its name. %>
           <%= file_field_tag "files[]", id: "#{field_id}-files", multiple: true, class: "sr-only", tabindex: -1, aria: { hidden: true },
-                data: { "admin--note-composer-target": "files", action: "change->admin--note-composer#filesChosen", max_count: ::Notes::Files::MAX_COUNT, max_bytes: ::Notes::Files::MAX_BYTES, max_size: max_size } %>
+                data: { "admin--notes--composer-target": "files", action: "change->admin--notes--composer#filesChosen", max_count: ::Notes::Files::MAX_COUNT, max_bytes: ::Notes::Files::MAX_BYTES, max_size: max_size } %>
           <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".attach") %>" title="<%= t(".attach_title", count: ::Notes::Files::MAX_COUNT, size: max_size) %>"
-                  data-note-attach data-admin--note-composer-target="tool" data-action="admin--note-composer#browse"><%= helpers.render "admin/shared/icon", name: :paperclip, size: "size-4" %></button>
+                  data-note-attach data-admin--notes--composer-target="tool" data-action="admin--notes--composer#browse"><%= helpers.render "admin/shared/icon", name: :paperclip, size: "size-4" %></button>
         <% end %>
         <%# While a note is being sent (the handoff's decisions 41 and 45): a
             <details> has no `disabled`, so it is `inert`, and its <summary>
             says `aria-disabled` and takes the look the paperclip and the
             at-sign have when disabled -- the same opacity, not one of its own. %>
-        <details class="group relative" data-admin--note-composer-target="emoji">
+        <details class="group relative" data-admin--notes--composer-target="emoji">
           <summary class="<%= TOOL_CLASS %> <%= TOOL_DISABLED_CLASS %> list-none group-open:bg-sunken group-open:text-ink [&::-webkit-details-marker]:hidden" aria-label="<%= t(".emoji") %>" title="<%= t(".emoji") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: "size-4" %></summary>
           <div class="<%= EMOJI_PANEL_CLASS %> left-0 <%= POPOVER_SIDE %>">
             <% ::Notes::EMOJI.each do |emoji| %>
-              <button type="button" class="<%= EMOJI_BUTTON_CLASS %>" data-emoji="<%= emoji %>" data-action="admin--note-composer#emoji"><%= emoji %></button>
+              <button type="button" class="<%= EMOJI_BUTTON_CLASS %>" data-emoji="<%= emoji %>" data-action="admin--notes--composer#emoji"><%= emoji %></button>
             <% end %>
           </div>
         </details>
         <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".mention") %>" title="<%= t(".mention") %>"
-                data-admin--note-composer-target="tool" data-action="admin--note-composer#mention"><%= helpers.render "admin/shared/icon", name: :at_sign, size: "size-4" %></button>
+                data-admin--notes--composer-target="tool" data-action="admin--notes--composer#mention"><%= helpers.render "admin/shared/icon", name: :at_sign, size: "size-4" %></button>
       </div>
       <div class="flex items-center gap-2">
         <%= secondary %>
-        <%= render Admin::ButtonComponent.new(label: submit, variant: :primary, size: :small, type: "submit", **submit_attributes) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: submit, variant: :primary, size: :small, type: "submit", **submit_attributes) %>
       </div>
     </div>
   </div>

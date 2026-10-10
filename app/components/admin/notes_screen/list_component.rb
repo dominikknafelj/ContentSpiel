@@ -7,7 +7,7 @@ module Admin
     # when a new note just failed, the field for a new note (`#notes-new`), on
     # the record or on the block the key names. The same list in the editors' drawer
     # and in the media panel. It carries the record's counts for
-    # `admin--notes`, so every answer of the frame also corrects the header's
+    # `admin--notes--drawer`, so every answer of the frame also corrects the header's
     # number and the markers.
     class ListComponent < Admin::AdminComponent
       def initialize(listing:, viewer:, locale:, view:, type:, compose: nil, failed: nil, notice: nil)

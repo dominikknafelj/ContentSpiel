@@ -19,7 +19,7 @@
     <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, pick: true, locale: admin_locale) %>
     <% if @pagination.total_pages > 1 %>
       <div class="mt-4 rounded-cs border border-line bg-surface">
-        <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+        <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
       </div>
     <% end %>
   <% end %>

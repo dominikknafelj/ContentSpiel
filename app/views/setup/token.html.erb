@@ -11,5 +11,5 @@
     <%= form.text_field :token, required: true, autofocus: true, autocomplete: "off", spellcheck: false,
       class: "#{setup_input_class} font-cs-mono" %>
   </div>
-  <%= render Admin::ButtonComponent.new(label: "Continue", type: "submit") %>
+  <%= render Admin::Ui::ButtonComponent.new(label: "Continue", type: "submit") %>
 <% end %>

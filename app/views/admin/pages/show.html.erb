@@ -10,7 +10,7 @@
 
     And no link is prefetched from an editor (follow-up N1): Turbo fetches a
     link on hover and reuses that answer for the click. From an editor the
-    click first waits for the save queue (`autosave/queue.js`), so a
+    click first waits for the save queue (`saving/queue.js`), so a
     prefetched answer for the same record -- its other language tab, its own
     row in the tree -- shows it as it was BEFORE those saves, with the old
     base: the saved text missing and the next edit refused. %>
@@ -20,7 +20,7 @@
 <% end %>
 
 <% content_for :tree do %>
-  <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
 <%# The page's open notes (notes spec §4.3): two queries for the header's
@@ -39,7 +39,7 @@
   <% end %>
 <% end %>
 
-<%= render Admin::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+<%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
 
 <%# The one slot a block action with nothing left to replace on the page
     (a stale PATCH/DELETE against an already-deleted block, spec §5.1's 410;
@@ -47,13 +47,13 @@
     `Admin::ContentBlocksController#render_gone`/`#picker_error_stream`. %>
 <div id="content-blocks-alert"></div>
 
-<%# `data-messages`: the two sentences `admin--blocks` says itself (a block not
+<%# `data-messages`: the two sentences `admin--editor--blocks` says itself (a block not
     moved because its form holds an unsaved edit; a refused move whose list was
     not redrawn over unsaved text), the two choices it writes into the Move
     dialog and what it announces after a move made from a menu. Here and not on
     <body>: only this screen's script asks for them. %>
-<section class="admin-content-blocks mt-6" data-controller="admin--blocks"
-     data-admin--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>"
+<section class="admin-content-blocks mt-6" data-controller="admin--editor--blocks"
+     data-admin--editor--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>"
      data-messages="<%= messages_data("components.editor_screen.section_card.unsaved_move", "components.editor_screen.section_card.reload_later",
                                       "components.editor_screen.move_dialog.column", "components.editor_screen.move_dialog.section_column",
                                       "components.editor_screen.block_moves.up", "components.editor_screen.block_moves.down",
@@ -61,7 +61,7 @@
                                       "components.editor_screen.block_moves.out", "components.editor_screen.block_moves.back") %>">
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-h2 text-ink">Blocks</h2>
-    <%= render Admin::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>
+    <%= render Admin::Ui::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>
   </div>
 
   <%# Whether the blocks can be changed at all (access-control design spec
@@ -69,10 +69,10 @@
       every card, and for "+ Add block". %>
   <% blocks_editable = can_edit?(@page) %>
   <%# The keyboard path for a block drag (handoff §9 A9): the instruction every
-      handle points at, and the live region `admin--blocks` announces in. %>
+      handle points at, and the live region `admin--editor--blocks` announces in. %>
   <p id="block-drag-help" class="sr-only">Press Space to pick up, arrow keys to move, Space to drop, Escape to cancel.</p>
-  <p data-admin--blocks-target="announcer" aria-live="assertive" class="sr-only"></p>
-  <div id="content-blocks-list" data-admin--blocks-target="list" class="flex flex-col gap-3">
+  <p data-admin--editor--blocks-target="announcer" aria-live="assertive" class="sr-only"></p>
+  <div id="content-blocks-list" data-admin--editor--blocks-target="list" class="flex flex-col gap-3">
     <%# The page's own list is its top-level blocks (sections spec §3.1); a
         block in a section's column is not a card of this list but a tile of
         its section's card, which draws it and its form (spec §4.1-§4.3) -- or,
@@ -88,15 +88,15 @@
       <% if Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline) %>
         <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
       <% else %>
-        <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+        <%= render Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
       <% end %>
     <% end %>
   </div>
 
   <% if blocks_editable %>
-    <%= render Admin::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+    <%= render Admin::EditorScreen::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
     <%# "Move to column…" and "Move into section…" (sections spec §4.4): one dialog for the
-        page, inside this section because `admin--blocks` fills and reads it. %>
+        page, inside this section because `admin--editor--blocks` fills and reads it. %>
     <%= render Admin::EditorScreen::MoveDialogComponent.new %>
   <% end %>
 </section>

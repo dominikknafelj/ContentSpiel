@@ -24,10 +24,10 @@ module Admin
     include Admin::MessagesHelper
 
     # The component's own translation scope, from its class name:
-    # `Admin::ConfirmDialogComponent` is `confirm_dialog`,
+    # `Admin::Ui::ConfirmDialogComponent` is `confirm_dialog`,
     # `Admin::EditorScreen::HeaderComponent` is `editor_screen.header`. Keys
     # live under `admin.components.<that>` (`config/locales/admin/
-    # components.en.yml`, docs/reference/i18n.md).
+    # <that folder>.en.yml`, docs/reference/i18n.md: one file per folder).
     def self.translation_scope
       @translation_scope ||= name.delete_prefix("Admin::").delete_suffix("Component").underscore.tr("/", ".")
     end

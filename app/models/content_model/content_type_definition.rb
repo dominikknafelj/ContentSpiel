@@ -9,7 +9,7 @@ module ContentModel
     dsl_attribute :detail_component
 
     # The 1-based slot in CS Studio's six-hue content-type palette
-    # (`Admin::ContentTypeDotComponent`; 7-12 are the same hues as rings, 13+
+    # (`Admin::Ui::ContentTypeDotComponent`; 7-12 are the same hues as rings, 13+
     # cycle). A plain accessor, not a `dsl_attribute`: it is assigned
     # (`type.colour_index = 4`), and `Registry#register` fills in a default
     # when a type states none.

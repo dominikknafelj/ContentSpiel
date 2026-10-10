@@ -12,11 +12,11 @@
       <% if mine? %><span>by you</span><% end %>
     <% else %>
       <% if record.is_a?(Post) %>
-        <%= render Admin::ContentTypeDotComponent.new(content_type: record.content_type) %>
+        <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type) %>
       <% else %>
         <span>Page</span>
       <% end %>
-      <span>edited <%= render Admin::TimeAgoComponent.new(time: record.updated_at) %></span>
+      <span>edited <%= render Admin::Ui::TimeAgoComponent.new(time: record.updated_at) %></span>
     <% end %>
   </div>
 </div>

@@ -12,8 +12,8 @@ gem "puma", ">= 5.0"
 gem "importmap-rails"
 # Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]
 # Pinned to an exact version: CS Studio's save footer
-# (app/javascript/controllers/admin/save_bar_controller.js) and write queue
-# (app/javascript/autosave/queue.js) rely on Turbo internals -- its history
+# (app/javascript/controllers/admin/saving/save_bar_controller.js) and write queue
+# (app/javascript/saving/queue.js) rely on Turbo internals -- its history
 # bookkeeping and popstate listener, the current visit, the order its events
 # come in. An upgrade is a deliberate change: bump the pin, then rerun their
 # system tests (test/system/save_bar_test.rb, test/system/admin/autosave_test.rb,

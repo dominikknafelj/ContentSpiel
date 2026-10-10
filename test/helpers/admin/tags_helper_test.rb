@@ -4,7 +4,7 @@ require "test_helper"
 # whole sentence per shape (no posts, one, many, more than the viewer can see
 # in the list's own column in the singular and the plural, and a viewer who may
 # not read posts at all, who is told no number). The curly quotes round the
-# name are part of the sentence: `admin--tag-dialogs` finds the live name in
+# name are part of the sentence: `admin--tags--dialogs` finds the live name in
 # the finished sentence by them.
 class Admin::TagsHelperTest < ActionView::TestCase
   Named = Struct.new(:name)

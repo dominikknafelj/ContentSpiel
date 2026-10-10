@@ -8,7 +8,7 @@ en:
       title: "CS Studio"
       leave_dialog:
         title: "Leave without saving?"
-        # `admin--save-bar` writes the sentence as it opens the dialog:
+        # `admin--saving--save-bar` writes the sentence as it opens the dialog:
         # `body` where nothing is counted (a form the server re-rendered
         # with errors), `body_with_count` otherwise.
         body: "You have unsaved changes on this screen."

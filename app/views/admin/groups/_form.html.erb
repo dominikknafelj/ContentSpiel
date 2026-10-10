@@ -19,7 +19,7 @@
     shows no count, and leaving doesn't ask). %>
 <% drops_dormant = !view_only && stale.present? && stale.dead.any?(&:dormant) %>
 <div class="max-w-[1000px]">
-<%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
+<%= render Admin::Ui::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
 <% if view_only %>
   <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">This group has permissions you can't hand out, so you can only view it.</p>
@@ -51,12 +51,12 @@
     </div>
 
     <div class="mb-6">
-      <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale, open_keys: @open_keys || [], view_only: view_only, stored: @stored_grants || []) %>
+      <%= render Admin::GroupsScreen::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale, open_keys: @open_keys || [], view_only: view_only, stored: @stored_grants || []) %>
     </div>
   <% end %>
 
   <% unless view_only %>
-    <%= render Admin::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: group.new_record? ? "Create group" : "Save group") %>
+    <%= render Admin::Ui::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: group.new_record? ? "Create group" : "Save group") %>
   <% end %>
 <% end %>
 </div>

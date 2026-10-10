@@ -50,8 +50,8 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_select "#language-en select[disabled] option[selected][value='']", text: "None (default)"
     # The default's row has only the inert spacer copy of the button (it keeps the columns in line).
     assert_select "#language-en button:not([disabled])", text: "Turn off…", count: 0
-    assert_select "#language-en button[data-admin--dialog-id-param^='language-off-dialog']", count: 0
-    assert_select "#language-de button[data-admin--dialog-id-param='language-off-dialog-de']", text: "Turn off…"
+    assert_select "#language-en button[data-admin--ui--dialog-id-param^='language-off-dialog']", count: 0
+    assert_select "#language-de button[data-admin--ui--dialog-id-param='language-off-dialog-de']", text: "Turn off…"
   end
 
   test "the default is a tag and buttons, never a field of the Settings form, and the instant actions sit outside it" do
@@ -62,7 +62,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_select "#settings-languages-card input[type=radio]", count: 0
     assert_select "#language-en [data-default-tag]", text: "Default"
     assert_select "#settings-languages-card button[type=button]:not([name])", text: "Make default", count: 2
-    assert_select "#language-de button[data-admin--dialog-id-param='language-default-dialog-de'][aria-label='Make Deutsch the default language']"
+    assert_select "#language-de button[data-admin--ui--dialog-id-param='language-default-dialog-de'][aria-label='Make Deutsch the default language']"
     assert_select "form#settings-form form", count: 0
     assert_select "form#language-default-form", count: 0
     assert_select "form#language-add-form[action='/cs-studio/settings/languages'][method=post]"
@@ -78,12 +78,12 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
   test "Default, Turn off and Add carry the pending-lock controls and its hint" do
     get "/cs-studio/settings"
 
-    assert_select "#settings-languages-card[data-controller~='admin--pending-lock']"
-    assert_select "#settings-languages-card [data-admin--pending-lock-target=hint]"
-    assert_select "#settings-languages-card button[data-admin--pending-lock-target=control]", text: "Make default", count: 2
-    assert_select "#settings-languages-card button[data-admin--pending-lock-target=control]", text: "Turn off…", count: 2
-    assert_select "#settings-languages-card #language-add-code[data-admin--pending-lock-target=control]"
-    assert_select "#settings-languages-card button[type=submit][form='language-add-form'][data-admin--pending-lock-target=control]", text: "Add language"
+    assert_select "#settings-languages-card[data-controller~='admin--saving--pending-lock']"
+    assert_select "#settings-languages-card [data-admin--saving--pending-lock-target=hint]"
+    assert_select "#settings-languages-card button[data-admin--saving--pending-lock-target=control]", text: "Make default", count: 2
+    assert_select "#settings-languages-card button[data-admin--saving--pending-lock-target=control]", text: "Turn off…", count: 2
+    assert_select "#settings-languages-card #language-add-code[data-admin--saving--pending-lock-target=control]"
+    assert_select "#settings-languages-card button[type=submit][form='language-add-form'][data-admin--saving--pending-lock-target=control]", text: "Add language"
   end
 
   test "the Turn off dialog is neutral, and the default dialog names the move and the item count" do
@@ -271,7 +271,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_select ".admin-error-summary[role=alert]", text: /isn't enabled|isn’t enabled/
-    assert_select "form#settings-form[data-admin--save-bar-dirty-value='true']"
+    assert_select "form#settings-form[data-admin--saving--save-bar-dirty-value='true']"
     # The order as typed, not the stored one.
     assert_select "#settings-language-order[value='de,en']"
     assert_equal %w[en de], @site.reload.locale_codes

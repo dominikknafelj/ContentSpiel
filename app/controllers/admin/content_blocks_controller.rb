@@ -111,8 +111,8 @@ module Admin
       # save vouches for nothing, so it also streams no page base
       # (`page_base_streams` is only reached on success) -- see
       # `AutosaveResponses#refuse_stale_autosave`.
-      return if refuse_stale_autosave(block, status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
-        error_prefix: Admin::BlockCardComponent.error_prefix(block),
+      return if refuse_stale_autosave(block, status_id: Admin::EditorScreen::BlockCardComponent.error_prefix(block) + "-save-status",
+        error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block),
         reload_url: admin_page_path(@page, **admin_url_options))
 
       attributes, translations = split_block_params(block)
@@ -124,8 +124,8 @@ module Admin
       streams = autosave_stream(
         record: result.record,
         result: result,
-        status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
-        error_prefix: Admin::BlockCardComponent.error_prefix(block),
+        status_id: Admin::EditorScreen::BlockCardComponent.error_prefix(block) + "-save-status",
+        error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block),
         fields: without_untouched_media_slot(block_error_fields(block), "image", sent: attributes[:media_asset_id], stored_before: stored_asset_id)
       )
 
@@ -133,7 +133,7 @@ module Admin
       # shows why) -- see `Admin::MediaFields`.
       refused = refused_media_field_stream(result, attribute: :media_asset_id, error_attribute: :image,
         sent: attributes[:media_asset_id]) do |stored, errors|
-        Admin::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
+        Admin::EditorScreen::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
       end
       streams << refused if refused
       streams << tile_summary_stream(result) if block.section_id
@@ -145,7 +145,7 @@ module Admin
 
     # Permanent (spec §7's "No trash" interim state) -- the card simply
     # disappears from the list, no confirmation round trip beyond the
-    # `ConfirmDialogComponent` the card's own "⋯" menu already gated this
+    # `Ui::ConfirmDialogComponent` the card's own "⋯" menu already gated this
     # request behind client-side. A refusal (no `pages.edit` -- a view-only
     # editor never shows the menu, so a stale tab or a forged request) or
     # any other failure leaves the card in place and says why in the
@@ -232,7 +232,7 @@ module Admin
     #   where it was dragged from, the column is gone -- and how far behind
     #   is not known here, so nothing less than the list puts it right. That
     #   replaces every form on the screen, as an Undo's answer does;
-    #   `admin--blocks#move` has had each send what it held first, and does
+    #   `admin--editor--blocks#move` has had each send what it held first, and does
     #   not draw the list at all while a form holds text that is not saved
     #   (`#renderKeepingForms`) -- which only the browser can know, so the
     #   list is sent regardless.
@@ -251,9 +251,9 @@ module Admin
       result = ContentBlocks::Reorder.call(@page, ordered_ids_param, section: section_id, column: one_value(params[:column]), moved_from: origins)
       status_id = "content-blocks-status"
 
-      state = if result.ok? then Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current)
-      elsif result.denied? then Admin::SaveStatusComponent.new(id: status_id, state: :forbidden)
-      else Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size)
+      state = if result.ok? then Admin::Ui::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current)
+      elsif result.denied? then Admin::Ui::SaveStatusComponent.new(id: status_id, state: :forbidden)
+      else Admin::Ui::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size)
       end
 
       streams = [ turbo_stream.replace(status_id, state) ]
@@ -312,7 +312,7 @@ module Admin
     #
     # So a block response may move that form's base forward to the page's
     # new `updated_at` -- but only when the base the form holds (sent by
-    # `admin--autosave`/`admin--blocks` as `X-Page-Base-Updated-At`) was
+    # `admin--saving--autosave`/`admin--editor--blocks` as `X-Page-Base-Updated-At`) was
     # still current *before* this write (fix round 2). If the page was saved
     # elsewhere since the form loaded it (another tab, another user), the
     # sent base is older than `@page_updated_at_before_write`, and moving it
@@ -324,7 +324,7 @@ module Admin
     def page_base_streams
       return [] unless page_base_was_current?
 
-      id = "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+      id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
       [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
         locals: { id: id, value: Page.where(id: @page.id).pick(:updated_at).iso8601(6) }) ]
     end
@@ -384,13 +384,13 @@ module Admin
     # card, and its form's panel under the lanes. The panel goes with it --
     # and it can be the very thing on screen: an unavailable block's panel
     # has "Delete block…" in it. Left behind it would stay open with no tile
-    # to close it from, its Delete answering 410. `admin--section` needs no
+    # to close it from, its Delete answering 410. `admin--editor--section` needs no
     # telling: the open form is whichever panel is showing, and none is.
     def panel_removal_streams(block)
-      block.section_id ? [ turbo_stream.remove(Admin::BlockCardComponent.panel_id(block)) ] : []
+      block.section_id ? [ turbo_stream.remove(Admin::EditorScreen::BlockCardComponent.panel_id(block)) ] : []
     end
 
-    # A block's two halves inside a section, in the order `admin--section`
+    # A block's two halves inside a section, in the order `admin--editor--section`
     # needs them: the panel (its form) first, then the tile that opens it.
     # Either order would open the form -- whichever target connects second
     # finds the other (`openIfNew`) -- but with the form already there the
@@ -418,7 +418,7 @@ module Admin
     # what follows a Duplicate is as often moving the copy as editing it.
     # Opening it would also close the form that is open in the section, which
     # may be the source's, mid-edit. The focus goes to the copy's menu
-    # (`admin--blocks#focusCopy`), from where it is opened, moved or copied on.
+    # (`admin--editor--blocks#focusCopy`), from where it is opened, moved or copied on.
     def copy_tile_streams(copy, source)
       section = copy.section
       [ turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(section), panel_component(copy)),
@@ -427,7 +427,7 @@ module Admin
     end
 
     def panel_component(block, open: false)
-      Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
+      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
     end
 
     def tile_component(block, open: false)
@@ -448,7 +448,7 @@ module Admin
     # - A tile that changed lanes inside its section keeps both. Only its
     #   panel's heading is rewritten, which names the column.
     #
-    # THE BROWSER HAS ALREADY MOVED THE ELEMENT (`admin--blocks#move`), so the
+    # THE BROWSER HAS ALREADY MOVED THE ELEMENT (`admin--editor--blocks#move`), so the
     # `replace` of the block's `dom_id` lands where it was dropped, and
     # nothing here says a position.
     #
@@ -478,10 +478,10 @@ module Admin
         from = origins.dig(block.id.to_s, "section_id").presence&.to_i
         touched.push(from, block.section_id)
         dom = ActionView::RecordIdentifier.dom_id(block)
-        old_panel = turbo_stream.remove(Admin::BlockCardComponent.panel_id(block))
+        old_panel = turbo_stream.remove(Admin::EditorScreen::BlockCardComponent.panel_id(block))
 
         if from == block.section_id
-          [ turbo_stream.update(Admin::BlockCardComponent.panel_title_id(block), Admin::EditorScreen::PanelTitleComponent.new(block: block)) ]
+          [ turbo_stream.update(Admin::EditorScreen::BlockCardComponent.panel_title_id(block), Admin::EditorScreen::PanelTitleComponent.new(block: block)) ]
         elsif block.section_id
           [ old_panel,
             turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(block.section), panel_component(block)),
@@ -505,14 +505,14 @@ module Admin
     # connects. The forms they replace -- the section's panels -- go with the
     # section's card, and none of them holds anything the database does not
     # have: the request was not sent until the screen's write queue was empty
-    # and every form clean (`admin--queue-hold` on the "Remove section, keep
+    # and every form clean (`admin--saving--queue-hold` on the "Remove section, keep
     # blocks" form, `SectionCardComponent#settled_screen_data`). Waiting its
     # turn in the queue would not be enough -- the delete would go ahead of
     # the follow-up of a save still on the wire, and over a form paused by a
     # 409 (`test/system/admin/sections_test.rb`, the two "Remove section,
     # keep blocks" tests about unsaved text). Each card is
     # told whether it is the list's first or last, as on a page load; its
-    # neighbours are corrected in the browser (`admin--blocks
+    # neighbours are corrected in the browser (`admin--editor--blocks
     # #refreshMoveState`, on every change of the list's children).
     def removal_streams(block, kept_ids, section)
       id = ActionView::RecordIdentifier.dom_id(block)
@@ -565,7 +565,7 @@ module Admin
       blocks = outline.blocks_in(fresh)
       lanes = Admin::EditorScreen::SectionLanesComponent.new(page: @page, section: fresh, outline: outline, locale: admin_locale, url_options: admin_url_options, editable: true)
       titles = blocks.map do |inner|
-        turbo_stream.update(Admin::BlockCardComponent.panel_title_id(inner), Admin::EditorScreen::PanelTitleComponent.new(block: inner))
+        turbo_stream.update(Admin::EditorScreen::BlockCardComponent.panel_title_id(inner), Admin::EditorScreen::PanelTitleComponent.new(block: inner))
       end
       [ turbo_stream.replace(Admin::EditorScreen::SectionCardComponent.lanes_id(fresh), lanes), *titles, *section_count_streams(fresh, count: blocks.size) ]
     end
@@ -581,7 +581,7 @@ module Admin
     # current one, and the diagram on its button, follow what was saved. Not
     # otherwise: replaced by a save of the background, the menu's button lost the focus someone had just
     # Shift+Tabbed onto it -- to <body>, since nothing was picked for
-    # `admin--section` to carry the focus over from -- and a menu just opened
+    # `admin--editor--section` to carry the focus over from -- and a menu just opened
     # by pointer was swapped for a closed one. The menu only -- the hidden
     # input the pick was written into is the form's own and is left alone,
     # as every field of a saved form is.
@@ -655,7 +655,7 @@ module Admin
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
     def block_card_component(block, first: false, last: false)
-      Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last)
+      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last)
     end
 
     # The card of a top-level block, as the page view draws it: for a block

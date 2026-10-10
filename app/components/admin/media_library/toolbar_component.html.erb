@@ -28,7 +28,7 @@
     </div>
   </fieldset>
 
-  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <noscript><%= render Admin::Ui::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
   <% if active? %>
     <%= link_to "Clear", clear_path, class: setup_secondary_link_class,
           data: (picker? ? { turbo_frame: "media-picker-grid" } : { turbo_frame: "content", turbo_action: "replace" }) %>

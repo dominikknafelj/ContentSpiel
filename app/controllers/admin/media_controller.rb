@@ -87,7 +87,7 @@ module Admin
     end
 
     # The grid's own multi-file upload (design spec §6, global
-    # constraints): one request per file -- `admin--media-upload` calls
+    # constraints): one request per file -- `admin--media--upload` calls
     # this once per selected/dropped file, one at a time, never a batch -- so a
     # refused or oversized file never blocks its siblings and keeps its own
     # progress tile with the reason rather than one dialog for a whole batch.

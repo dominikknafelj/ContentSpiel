@@ -4,18 +4,18 @@ module Admin
     # fields (e.g. `test/event#speakers`). Rows are named
     # `form_name[field][index][subfield]`; a hidden `<template>` holds one
     # blank row with the literal placeholder `__INDEX__` in place of an
-    # index, which `app/javascript/controllers/admin/groups_controller.js`
+    # index, which `app/javascript/controllers/admin/editor/groups_controller.js`
     # clones and renumbers on "Add" -- see that file for the add/remove/
     # reorder mechanics this only has to render the markup for.
     #
     # Per-subfield errors are threaded by the caller directly (cs-studio
     # Task 7, carried in from Task 2's review): `Admin::PostsController`
     # replaces each row's own error slot by the exact same id
-    # `Admin::FieldComponent`'s default `dom_id_prefix(form_name)` already
+    # `Admin::Ui::FieldComponent`'s default `dom_id_prefix(form_name)` already
     # derives for `row_form_name(index)` below -- see that controller's
     # `group_error_streams` -- so nothing here has to *receive* them, only
-    # render the (initially always empty, see `Admin::FieldComponent`'s own
-    # class comment for why) slot each subfield's own `FieldComponent`
+    # render the (initially always empty, see `Admin::Ui::FieldComponent`'s own
+    # class comment for why) slot each subfield's own `Ui::FieldComponent`
     # already reserves.
     #
     # `original` rows are matched to this field's own rows by plain index

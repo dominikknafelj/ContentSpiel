@@ -1,7 +1,7 @@
 require "test_helper"
 
 # Every message a script asks for is one the server serves. A script's
-# `messages(element).t("components.save_bar.blocked")` throws when no
+# `messages(element).t("components.ui.save_bar.blocked")` throws when no
 # `data-messages` up to <body> has the key (`i18n/messages.js`), and a path no
 # test walks would ship that throw. So this reads the script sources for
 # every string literal that is a message key -- one whose first segment is a
@@ -10,7 +10,7 @@ require "test_helper"
 # set on <body>) or the literal arguments of a `messages_data(...)` call in a
 # view or component. A `${...}` in the script's key stands for one segment
 # and is served if any served key fits it, a `#{...}` in the server's for a
-# placeholder (`components.chip_input.nouns.#{noun}.create`).
+# placeholder (`components.ui.chip_input.nouns.#{noun}.create`).
 class ScriptMessagesTest < ActiveSupport::TestCase
   SCRIPTS = Dir[Rails.root.join("app/javascript/**/*.js")].reject { |path| path.include?("/javascript/i18n/") }
   KEY = /(?<=["`'])(?:#{I18n.t("admin").keys.map { |key| Regexp.escape(key.to_s) }.join("|")})\.[\w.${}]+(?=["`'])/

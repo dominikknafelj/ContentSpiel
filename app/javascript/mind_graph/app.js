@@ -1,6 +1,6 @@
 // The mind graph, wired together (mind graph canvas spec §4): fetch the data,
 // hand the layout to the worker, and redraw the canvas when something changed.
-// `mount(element)` is everything `admin--mind-graph` asks for; `destroy()`
+// `mount(element)` is everything `admin--mind-graph--graph` asks for; `destroy()`
 // stops all of it -- the request, the worker, the frame, the observers -- so
 // nothing runs or draws after the screen is left.
 //
@@ -97,7 +97,7 @@ export function labelFor(node) {
 
 export function mount(element) {
   const canvas = element.querySelector("canvas")
-  const notice = element.querySelector("[data-admin--mind-graph-target='notice']")
+  const notice = element.querySelector("[data-admin--mind-graph--graph-target='notice']")
   const context = canvas.getContext("2d")
   const text = messages(element)
   const aborter = new AbortController()

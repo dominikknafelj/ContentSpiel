@@ -3,7 +3,7 @@ module Admin
     # The **Translate** button under a translated field's own input, on the
     # field's side of the translation pair (translation helpers spec §6.4),
     # rendered into its `data-translate-slot` by the three field renderers
-    # (`Admin::FieldComponent`, `Admin::Columns::PlainColumnComponent`/
+    # (`Admin::Ui::FieldComponent`, `Admin::Columns::PlainColumnComponent`/
     # `RichTextColumnComponent`). The empty box a suggestion streams into
     # (`SuggestionComponent.dom_id(input_id)`, `box_id`) is NOT part of this
     # component: the renderers put it right beside the button, under the
@@ -18,14 +18,14 @@ module Admin
     # needs AI set up (`AI.configured?`) and `ai.translate`; asking for a
     # suggestion is then decided again, for real, by `AI::Translate`.
     #
-    # Everything the `admin--translate` controller needs to ask for this
+    # Everything the `admin--translation--translate` controller needs to ask for this
     # field is on the wrapper as plain `data-translate-*` attributes rather
     # than Stimulus values, because the header's "Suggest translations for N empty fields"
     # (`TranslateAllComponent`, another instance of the same controller)
     # reads them off every field on the screen:
     # - `input-id` is the input **Use** fills -- for rich text the editor's
     #   hidden JSON input (`"#{id}-json"`), which the `translate:use` event
-    #   is dispatched on so it bubbles to that editor's `admin--rich-text`;
+    #   is dispatched on so it bubbles to that editor's `admin--rich-text--editor`;
     # - `kind` (`plain`/`rich`) is how Use fills it;
     # - `characters` is the original's size as `AI::Translate` counts it
     #   (rich text as its Markdown), so the bulk request can split itself
@@ -48,14 +48,14 @@ module Admin
       # `mode: :update` is the outdated reference card's **Suggest update**
       # (`Admin::EditorScreen::ReferenceCardComponent`): the same wrapper and
       # the same single-field request as **Translate**, carrying
-      # `data-translate-mode="update"` so `admin--translate` sends `mode=update`
+      # `data-translate-mode="update"` so `admin--translation--translate` sends `mode=update`
       # and the suggestion that comes back also shows the field's current
       # translation (`SuggestionComponent` `mode: :update`). The header's bulk
-      # run skips it (`admin--translate`'s `emptyFields`): its field already has
+      # run skips it (`admin--translation--translate`'s `emptyFields`): its field already has
       # a translation.
       #
       # **Translate** itself only renders on an empty field; the renderers
-      # (`Admin::Columns::Base#translate_button`, `Admin::FieldComponent`) decide
+      # (`Admin::Columns::Base#translate_button`, `Admin::Ui::FieldComponent`) decide
       # that, and put the suggestion box under the input for either mode.
       def initialize(confirm:, input_id:, kind: :plain, characters: 0, mode: :translate)
         raise ArgumentError, "unknown translate mode #{mode.inspect}" unless MODES.include?(mode.to_sym)
@@ -75,9 +75,9 @@ module Admin
 
       def wrapper_data
         {
-          controller: "admin--translate",
-          "admin--translate-url-value": helpers.admin_translation_suggestions_path,
-          "admin--translate-locale-value": confirm[:locale],
+          controller: "admin--translation--translate",
+          "admin--translation--translate-url-value": helpers.admin_translation_suggestions_path,
+          "admin--translation--translate-locale-value": confirm[:locale],
           translate_record_type: confirm[:record_type],
           translate_record_id: confirm[:record_id],
           translate_field: confirm[:field],

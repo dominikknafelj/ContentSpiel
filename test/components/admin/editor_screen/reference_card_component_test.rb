@@ -223,7 +223,7 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
 
     with_ai { render_with_suggest(post) }
 
-    assert_selector ".admin-reference-card [data-translate-mode='update'] button[data-action='admin--translate#translate']", text: "Suggest update"
+    assert_selector ".admin-reference-card [data-translate-mode='update'] button[data-action='admin--translation--translate#translate']", text: "Suggest update"
   end
 
   test "no Suggest update button without AI set up" do
