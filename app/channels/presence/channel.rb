@@ -30,7 +30,8 @@ module Presence
   # with it. And a keep-alive or a report that finds no row (any cause:
   # swept, deleted, a late leave) re-creates it with the subscription's token
   # and the state last reported (`@state`) and signals, so a person who is
-  # there is back within one keep-alive.
+  # there is back within one keep-alive. A subscription that HAS LEFT heals
+  # nothing (`unsubscribed`).
   #
   # Arriving writes the row and signals; leaving signals only when it deleted
   # a row; a change of state signals only when it was one (the channel
@@ -43,6 +44,8 @@ module Presence
   class Channel < Live::RecordChannel
     # The tab says its state: "away" or "here". Anything else is ignored.
     def report(data)
+      return if left?
+
       state = state_of(data)
       apply(state) if @record && state
     end
@@ -50,7 +53,7 @@ module Presence
     # The tab is still here (`data["state"]`: what it is now; absent or
     # unknown, what it last reported).
     def beat(data)
-      return unless @record
+      return if left? || !@record
 
       state = state_of(data) || @state
       return apply(state) if state != @state
@@ -79,7 +82,18 @@ module Presence
 
     # The record is the one found at subscribe time: it may have been trashed
     # since, and its row is still this subscription's to take away.
+    #
+    # `@left` is set FIRST, before the row is deleted. Action Cable hands each
+    # of a connection's commands to a pool of threads and takes a
+    # subscription out of its list only after this method has returned, so a
+    # `beat` or a `report` sent in the same moment as the leave can still be
+    # worked on this object, find no row and put one back (`heal`), with
+    # nobody left to delete it: the person would be shown for as long as a
+    # row stays fresh. Once it has left, a subscription writes nothing and
+    # tells nobody: `report` and `beat` return at once, and `heal` asks again
+    # for the action that had already passed that check when the leave began.
     def unsubscribed
+      @left = true
       return unless @record
 
       Signals.changed(@record) if Mark.leave(user: @user, record: @record, tab: @tab, token: @token)
@@ -102,7 +116,11 @@ module Presence
       end
     end
 
+    def left? = @left == true
+
     def heal(state)
+      return if left?
+
       @state = state
       Mark.arrive(user: @user, record: @record, tab: @tab, token: @token, state:)
       Signals.changed(@record)

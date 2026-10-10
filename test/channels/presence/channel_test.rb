@@ -184,6 +184,51 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
     assert_equal 0, Presence::Mark.count
   end
 
+  # Action Cable works a connection's commands on a pool of threads and takes
+  # a subscription out of its list only AFTER `unsubscribed` has run: a beat
+  # or a report sent in the same moment as a leave can still reach this
+  # object once the row is gone. It must not put the row back, or the person
+  # would be shown for as long as a row stays fresh with nobody to remove it.
+  test "a beat and a report that come after the leave write no row and tell nobody" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id, tab: TAB
+    left = subscription
+    left.unsubscribe_from_channel
+    assert_equal 0, Presence::Mark.count
+    clear_messages
+
+    left.perform_action("action" => "beat", "state" => "here")
+    left.perform_action("action" => "beat", "state" => "away")
+    left.perform_action("action" => "report", "state" => "away")
+    left.perform_action("action" => "report", "state" => "here")
+
+    assert_equal 0, Presence::Mark.count
+    assert_equal 0, broadcasts(record_stream).size
+    assert_equal 0, broadcasts("presence:list").size
+  end
+
+  # The same for a row that is another subscription's by now: the one that
+  # left neither moves its state nor its `seen_at`.
+  test "a report that comes after the leave does not touch the row a newer subscription of the tab holds" do
+    user = users(:reader)
+    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    subscribe type: "page", id: @page.id, tab: TAB
+    old = subscription
+    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    subscribe type: "page", id: @page.id, tab: TAB
+    old.unsubscribe_from_channel
+    before = Presence::Mark.sole.attributes
+    clear_messages
+
+    travel 10.seconds do
+      old.perform_action("action" => "report", "state" => "away")
+      old.perform_action("action" => "beat", "state" => "away")
+    end
+
+    assert_equal before, Presence::Mark.sole.attributes
+    assert_equal 0, broadcasts(record_stream).size
+  end
+
   test "a beat finds no row, puts it back with the subscription's token and the state it carries, and tells the others" do
     connect_as users(:reader)
     subscribe type: "page", id: @page.id, tab: TAB
