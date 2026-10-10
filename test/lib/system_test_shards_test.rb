@@ -1,4 +1,5 @@
 require "test_helper"
+require "tmpdir"
 
 load Rails.root.join("bin/system-test-shard").to_s
 
@@ -32,13 +33,18 @@ class SystemTestShardsTest < ActiveSupport::TestCase
     assert_operator loads.max, :<=, limit, "shard seconds: #{loads.map(&:round).inspect}"
   end
 
-  test "every measured file exists, and an unmeasured one still gets a weight" do
-    measured = SystemTestShard.measured(Rails.root.to_s)
-    gone = measured.keys.reject { |path| Rails.root.join(path).exist? }
-    assert_empty gone, "test/system_test_seconds.yml names files that are gone: #{gone.inspect}"
+  # The table is allowed to go stale: a file it does not know is weighed by its
+  # tests, and an entry for a file that is gone is simply not used.
+  test "a file the table does not know, and an entry for a file that is gone, break nothing" do
+    Dir.mktmpdir do |root|
+      FileUtils.mkdir_p(File.join(root, "test/system"))
+      File.write(File.join(root, "test/system/known_test.rb"), "test \"a\" do\nend\n")
+      File.write(File.join(root, "test/system/new_test.rb"), "test \"a\" do\nend\ntest \"b\" do\nend\n")
+      File.write(File.join(root, "test/system_test_seconds.yml"), "test/system/known_test.rb: 10\ntest/system/gone_test.rb: 99\n")
 
-    weights = SystemTestShard.weights(Rails.root.to_s)
-    assert weights.values.all?(&:positive?), "a file with no weight: #{weights.select { |_, weight| weight <= 0 }.keys.inspect}"
+      assert_equal({ "test/system/known_test.rb" => 10.0, "test/system/new_test.rb" => 20.0 }, SystemTestShard.weights(root))
+      assert_equal %w[test/system/known_test.rb test/system/new_test.rb], SystemTestShard.shards(2, root).flatten.sort
+    end
   end
 
   test "the workflow's shard list and its total agree" do

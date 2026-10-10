@@ -1,14 +1,10 @@
-# Seconds each system test file takes ON A CI RUNNER: the sum of its tests' own
-# times, read from the log of one CI run on 2026-10-10 (the job runs
-# `bin/rails test -v`, which prints every test with its time). Measured there and
-# not on a laptop, because the two do not differ by one factor: a mind graph test
-# is mostly fixed waits and takes the same anywhere, while most others are page
-# loads and take twice as long on a runner. `bin/system-test-shard` deals CI's
-# shards by these numbers, so the jobs finish at about the same time. A file that
-# is not listed counts by its number of tests at the average pace, so a new file
-# needs no entry. Measure again when the shards drift apart; the numbers only
-# have to be roughly right. An entry for a file that no longer exists fails
-# test/lib/system_test_shards_test.rb.
+# Seconds each system test file took on a CI runner (one run, 2026-10-10; the job
+# prints every test with its time). `bin/system-test-shard` deals CI's four
+# shards by these numbers so the jobs finish at about the same time. This table
+# needs no upkeep: a file it does not list is weighed by its number of tests, an
+# entry for a file that is gone is ignored, and a stale number only makes the
+# shards a little uneven. Measure again from a run's log only if CI's wait
+# becomes a nuisance.
 test/system/admin/account_password_answer_test.rb: 19
 test/system/admin/ai_settings_test.rb: 41
 test/system/admin/audit_log_test.rb: 7
