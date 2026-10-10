@@ -11,13 +11,13 @@
 #
 # Inside this module `Thread` is `Notes::Thread`; Ruby's own is `::Thread`.
 module Notes
-  SUBJECT_TYPES = %w[Page Post ContentBlock Media::Asset].freeze
-
-  # A library image has no per-image read right: `media.upload` is what opens
-  # the library (`Admin::MediaController`).
-  READ_KEYS = { "Page" => "pages.read", "Post" => "posts.read", "Media::Asset" => "media.upload" }.freeze
-  # `edit`, not `edit` plus `publish`: a note changes nothing a visitor sees.
-  MODERATE_KEYS = { "Page" => "pages.edit", "Post" => "posts.edit", "Media::Asset" => "media.manage" }.freeze
+  # Which records take notes, the right that reads each and the right that
+  # moderates it are the registry's (`RecordKinds`): a library image has no
+  # per-image read right (`media.upload` opens the library), and moderating is
+  # `edit`, not `edit` plus `publish`, since a note changes nothing a visitor
+  # sees. A thread's SUBJECT may also be a block, whose container is its page
+  # (`container_for`), so a block is no kind and is added here.
+  SUBJECT_ONLY_TYPES = %w[ContentBlock].freeze
 
   # The composer's emoji popover and the reactions offer the same small set
   # (spec §4.2); the operating system's own picker works in the field as
@@ -42,9 +42,17 @@ module Notes
     # section's columns keeps its page, so its threads need no update.
     def container_for(subject) = subject.is_a?(ContentBlock) ? subject.owner : subject
 
-    def read_key(container) = READ_KEYS.fetch(container.class.polymorphic_name)
+    # What a thread's `subject_type` may be: every kind's type and a block's.
+    # Computed where asked, so a kind registered later is accepted.
+    def subject_types = RecordKinds.all.map(&:type) + SUBJECT_ONLY_TYPES
 
-    def moderate_key(container) = MODERATE_KEYS.fetch(container.class.polymorphic_name)
+    def read_key(container) = kind_of!(container).read
+
+    def moderate_key(container) = kind_of!(container).moderate
+
+    # A container is always a kind's record; one that is not is a bug, as the
+    # `fetch` that stood here raised for it.
+    def kind_of!(container) = RecordKinds.of(container) || raise(KeyError, "no record kind for #{container.class.polymorphic_name}")
 
     # "ContentBlock-12", "MediaAsset-5": a record's name in a DOM id, a
     # `data-` attribute and the counts payload. No colon, so it needs no
@@ -70,22 +78,19 @@ module Notes
       user.present? && container.created_by_id == user.id && AccessControl.allowed?(actor, "media.upload", container, channel:)
     end
 
-    # Every thread the actor may read, as one relation: the threads whose
-    # container is a readable page or post (`AccessControl.scope`, which also
-    # hides the trash) or, for a `media.upload` holder, a kept image. A branch
+    # Every thread the actor may read, as one relation: one branch per record
+    # kind, the threads whose container is a readable page or post
+    # (`AccessControl.scope`, which also hides the trash) or, for a
+    # `media.upload` holder, a kept image (`RecordKinds::Kind#readable_ids`). A branch
     # is only added when the actor holds the right at all, like
     # `Dashboard::Activity#readable_subjects`. The inbox, "Open threads" and
     # the sidebar's count all narrow through here, so a person who loses a
     # right stops seeing what was addressed to them without a row changing.
     def readable_threads(actor, channel: Current.channel)
-      branches = { "Page" => Page, "Post" => Post }.filter_map do |type, model|
-        next unless AccessControl.holds?(actor, READ_KEYS.fetch(type), channel:)
+      branches = RecordKinds.all.filter_map do |kind|
+        next unless AccessControl.holds?(actor, kind.read, channel:)
 
-        readable = AccessControl.scope(actor, READ_KEYS.fetch(type), model.all, channel:).unscope(:order).select(:id)
-        Thread.where(container_type: type, container_id: readable)
-      end
-      if AccessControl.holds?(actor, "media.upload", channel:)
-        branches << Thread.where(container_type: "Media::Asset", container_id: Media::Asset.kept.select(:id))
+        Thread.where(container_type: kind.type, container_id: kind.readable_ids(actor, channel:))
       end
       branches.reduce(:or) || Thread.none
     end

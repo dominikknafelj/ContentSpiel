@@ -27,11 +27,7 @@ module Notes
       id = params[:id].to_s[/\A\d{1,18}\z/] or return
       user = subscriber or return
 
-      case params[:type]
-      when "page" then AccessControl.scope(user, "pages.read", Page.where(id: id), channel: :admin).first
-      when "post" then AccessControl.scope(user, "posts.read", Post.where(id: id), channel: :admin).first
-      when "media" then (Media::Asset.kept.find_by(id: id) if AccessControl.holds?(user, "media.upload", channel: :admin))
-      end
+      RecordKinds.find(params[:type], user, id, channel: :admin)
     end
   end
 end

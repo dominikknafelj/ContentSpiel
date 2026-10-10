@@ -22,15 +22,14 @@ module Admin
     private
 
     def set_container
-      @container =
-        case params[:container_type]
-        when "page" then admin_scope(Page.all).find(params[:container_id])
-        when "post" then admin_scope(Post.all).find(params[:container_id])
-        else
-          return forbidden! unless can?("media.upload")
+      kind = RecordKinds.named(params[:container_type]) or raise ActiveRecord::RecordNotFound
+      # A kind with no per-record scope (the library: `media.upload` opens it
+      # whole) is a 403 for someone without the right, as
+      # `Admin::MediaController`'s gate is; the registry answers nil for it,
+      # as for any record it does not find.
+      return forbidden! if kind.readable && !can?(kind.read)
 
-          Media::Asset.kept.find(params[:container_id])
-        end
+      @container = kind.find(Current.actor, params[:container_id], channel: Current.channel) or raise ActiveRecord::RecordNotFound
     end
 
     # Which tab this is (`X-Notes-Tab`, set by `admin--notes--live` on its
