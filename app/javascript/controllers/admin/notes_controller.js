@@ -35,7 +35,9 @@ import { messages } from "i18n/messages"
 // answer removed what held it (a row followed, a note sent): then it goes to
 // the thread, or to the drawer, never out to the page. A drawer that opens by
 // itself because it was open on the last editor takes no focus at all, and
-// neither does an answer that arrives while the person types in the editor.
+// neither does an answer that arrives while the person types in the editor
+// -- the first answer after an opener's press included, when the person has
+// moved into the editor before it is in (`focusStayed`).
 //
 // THE COUNTS (`counts` target). One record's open-thread counts,
 // `{ total, subjects: { "<key>": n }, unread: [ "<key>" ] }`, written by the
@@ -280,25 +282,42 @@ export default class extends Controller {
     if (!view || !this.isOpen) return
 
     const lost = inside && !this.drawerTarget.contains(document.activeElement)
+    // What an opener asked for is given only while the focus is where it was
+    // at the ask (the button that was pressed, or nowhere) or already in the
+    // drawer. The view is on screen a few frames before this runs -- Turbo
+    // repaints between drawing a frame and saying it has loaded, and on a
+    // slow machine that is long -- and a person who has clicked into the
+    // editor meanwhile keeps the focus there: taken into the drawer, their
+    // typing went to the wrong place and Escape closed the drawer. (CI's
+    // browser suite met exactly that.)
+    const asked = Boolean(pending) && this.focusStayed(pending.from)
 
     if (view.dataset.notesView === "thread") {
       // A thread opened from far down the list starts at its top; one drawn
       // again after a note was sent from it stays where it is. The list's
       // own position (`listScroll`) is kept until the list is back.
       if (fromList && this.scroller) this.scroller.scrollTop = 0
-      if (pending?.thread || pending?.focus || lost) this.focus(view)
+      if ((asked && (pending.thread || pending.focus)) || lost) this.focus(view)
       return
     }
 
     if (pending?.compose) {
-      this.focus(view.querySelector("#notes-new textarea"), { reveal: true })
+      if (asked) this.focus(view.querySelector("#notes-new textarea"), { reveal: true })
     } else if (pending?.group) {
-      this.focus(view.querySelector(`[data-notes-group="${CSS.escape(pending.group)}"]`), { reveal: true })
+      if (asked) this.focus(view.querySelector(`[data-notes-group="${CSS.escape(pending.group)}"]`), { reveal: true })
     } else {
-      if (pending?.focus || lost) this.focus(this.drawerTarget)
+      if ((asked && pending.focus) || lost) this.focus(this.drawerTarget)
       if (this.listScroll != null && this.scroller) this.scroller.scrollTop = this.listScroll
     }
     this.listScroll = null
+  }
+
+  // Whether the focus is still where it was when the drawer was asked for
+  // (`from`), or nowhere, or inside the drawer: then nobody has put it
+  // anywhere else since.
+  focusStayed(from) {
+    const active = document.activeElement
+    return !active || active === document.body || active === from || !active.isConnected || this.drawerTarget.contains(active)
   }
 
   // The block whose thread is showing (handoff: its card's border is accent
@@ -363,7 +382,8 @@ export default class extends Controller {
     this.listScroll = null
     this.fromList = false
     this.inside = false
-    this.pending = { thread, group, compose, focus }
+    // `from`: where the focus is as the drawer is asked for (`loaded`).
+    this.pending = { thread, group, compose, focus, from: document.activeElement }
 
     const wasOpen = this.isOpen
     this.setOpen(true)

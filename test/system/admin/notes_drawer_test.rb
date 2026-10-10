@@ -95,6 +95,41 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_selector "dialog[open]"
   end
 
+  # The list is on screen a few frames before Turbo says the frame has loaded
+  # (it repaints in between), and that is when the drawer takes the focus an
+  # opener asked for. A person who has clicked into the editor in that gap --
+  # a long one on a slow machine -- keeps the focus there: taken from them,
+  # their typing went into the drawer, and Escape closed it. (CI met this:
+  # the test above focused the editor in the gap, and its Escape then
+  # belonged to the drawer.) The moment is made here, not waited for: the
+  # editor is focused in the same task in which the list is drawn.
+  test "the focus is not taken into the drawer from someone who moved into the editor before the notes had finished loading" do
+    open_editor
+    page.execute_script(<<~JS)
+      window.__loaded = false
+      document.addEventListener("turbo:frame-load", (event) => { if (event.target.id === "notes") window.__loaded = true })
+      new MutationObserver((_records, observer) => {
+        if (!document.querySelector("#notes-drawer #notes-list")) return
+        observer.disconnect()
+        window.__movedBeforeLoad = !window.__loaded
+        document.querySelector(".admin-content-blocks [contenteditable=true]").focus()
+      }).observe(document.querySelector("#notes-drawer turbo-frame#notes"), { childList: true, subtree: true })
+    JS
+
+    find("#notes-open").click
+
+    assert_selector "#notes-drawer #notes-list"
+    await_js("window.__loaded === true")
+    await_frames
+    assert page.evaluate_script("window.__movedBeforeLoad"), "the editor was not focused before the frame had loaded: this test made no race"
+    assert_equal false, focus_in_drawer?, "the focus was taken out of the editor into the drawer"
+    assert page.evaluate_script("document.activeElement.matches('.admin-content-blocks [contenteditable=true]')")
+    # So Escape is the editor's, and the drawer stays.
+    page.driver.browser.keyboard.type(:escape)
+    await_frames
+    assert_selector "#notes-drawer #notes-list"
+  end
+
   test "open is remembered for the next editor in this browser without taking the focus, and Close forgets it" do
     other = create_page(title: "Other")
     open_editor
