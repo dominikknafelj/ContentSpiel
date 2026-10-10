@@ -194,7 +194,9 @@ jobs:
       # ship preinstalled; BROWSER_PATH pins it rather than relying on
       # Ferrum's PATH search. The files are named, so this is `bin/rails test`
       # (`test:system` would ignore them), and the stylesheet is built first,
-      # which `test:system` did by itself.
+      # which `test:system` did by itself. `-v` prints each test with its time:
+      # test/system_test_seconds.yml is measured from this log, since a runner's
+      # pace is not a laptop's.
       - name: Run System Tests
         env:
           RAILS_ENV: test
@@ -203,7 +205,7 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           bin/rails db:test:prepare tailwindcss:build
-          bin/rails test $(bin/system-test-shard ${{ matrix.shard }} 4)
+          bin/rails test -v $(bin/system-test-shard ${{ matrix.shard }} 4)
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v7
