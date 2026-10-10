@@ -15,7 +15,7 @@ module Admin
     # - `rich-text-page-dialog`: search pages and posts, pick one -- the
     #   Insert menu's "Page link".
     #
-    # `admin--rich-text-dialog` (the wrapper's controller) fills and opens
+    # `admin--rich-text--dialog` (the wrapper's controller) fills and opens
     # them. The wire is `CustomEvent`s: the editor dispatches
     # `rich-text-dialog:open` on `window` naming itself as the `opener`, and
     # the answer comes back as `rich-text-dialog:closed` on that one element
@@ -23,7 +23,7 @@ module Admin
     # buttons name their form with `form=`, which keeps the footer (a
     # sibling of the dialog body) in the same form.
     #
-    # A view-only editor opens none of them (`admin--rich-text` refuses every
+    # A view-only editor opens none of them (`admin--rich-text--editor` refuses every
     # command read-only), so they are rendered for everyone and simply idle.
     class RichTextDialogsComponent < AdminComponent
       IMAGE = "rich-text-image-dialog".freeze

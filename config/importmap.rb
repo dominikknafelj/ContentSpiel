@@ -24,7 +24,7 @@ pin "@hotwired/stimulus", to: "stimulus.min.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
 pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", preload: "admin"
 # The Tiptap editor's own extensions/schema (tiptap spec §4.1), imported by
-# `controllers/admin/rich_text_controller.js` as `rich_text/...`.
+# `controllers/admin/rich_text/editor_controller.js` as `rich_text/...`.
 pin_all_from "app/javascript/rich_text", under: "rich_text", preload: "admin"
 # The one-at-a-time write queue every autosaving form and block action shares.
 pin_all_from "app/javascript/saving", under: "saving", preload: "admin"

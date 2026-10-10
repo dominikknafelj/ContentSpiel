@@ -10,7 +10,7 @@
 # Why a mirror of ProseMirror's rule, not a looser server-only one: the
 # editor loads a stored document with `enableContentCheck`, which runs
 # ProseMirror's own `Node#check` and refuses the whole document on any
-# mismatch (CS Studio then shows it read-only, `admin--rich-text
+# mismatch (CS Studio then shows it read-only, `admin--rich-text--editor
 # #handleInvalidContent`). Everything `RichText::Document#validate`
 # accepts must therefore be something the editor accepts too, or a body
 # written through MCP/Markdown becomes uneditable -- the final review's

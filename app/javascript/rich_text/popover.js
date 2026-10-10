@@ -1,4 +1,4 @@
-// Small DOM builders for `admin--rich-text`'s Link popover (the image, YouTube
+// Small DOM builders for `admin--rich-text--editor`'s Link popover (the image, YouTube
 // and page dialogs are server-rendered, `RichTextDialogsComponent`) -- task 7's "no browser dialogs" ruling: no
 // `window.prompt`/`confirm`/`alert` anywhere, just a panel under the
 // toolbar built from CS Studio's own product token classes. The class

@@ -152,7 +152,7 @@ module Admin
     # `title`/`slug`/`excerpt`/`body` are translated columns, split into
     # `attributes:`/`translations:` the same fixed way every PATCH here does
     # (`body` is the rich-text document JSON the Tiptap editor writes into
-    # its hidden input, `admin--rich-text`, passed through untouched --
+    # its hidden input, `admin--rich-text--editor`, passed through untouched --
     # `HasRichTextBody` parses and validates it); the content type's own
     # typed `fields` are split *per field*
     # (`split_fields`, mirroring `Admin::ContentBlocksController

@@ -39,7 +39,7 @@ import { createTargetSearch } from "rich_text/target_search"
 //
 // Dialogs (design pass round 2, Task 13): the image, YouTube and "Page link"
 // forms are three shared `<dialog>`s rendered once by the layout
-// (`Admin::EditorScreen::RichTextDialogsComponent`, `admin--rich-text-dialog`).
+// (`Admin::EditorScreen::RichTextDialogsComponent`, `admin--rich-text--dialog`).
 // `openDialog` asks for one on `window`, naming this element as the opener;
 // the answer is a `rich-text-dialog:closed` event on this element alone (so
 // two editors on a page never cross wires), applied by `#dialogClosed`
@@ -151,7 +151,7 @@ export default class extends Controller {
     this.contentInvalid = true
     queueMicrotask(() => this.editor?.setEditable(false))
     this.showMessage(this.constructor.texts.invalidContent)
-    this.element.querySelectorAll("[data-admin--rich-text-command]").forEach((button) => { button.disabled = true })
+    this.element.querySelectorAll("[data-admin--rich-text--editor-command]").forEach((button) => { button.disabled = true })
   }
 
   // Until the first real edit, an update whose own (root) transaction
@@ -191,7 +191,7 @@ export default class extends Controller {
     if (event.target.closest("button")) event.preventDefault()
   }
 
-  // Toolbar commands. `data-action="admin--rich-text#<name>"` on each
+  // Toolbar commands. `data-action="admin--rich-text--editor#<name>"` on each
   // button (`RichTextColumnComponent::TOOLBAR_GROUPS` and, for the Insert menu's
   // items, `INSERT_MENU`).
   bold() { this.run((chain) => chain.toggleBold()) }
@@ -267,8 +267,8 @@ export default class extends Controller {
       youtube: () => this.editor.isActive("youtube")
     }
 
-    this.element.querySelectorAll("[data-admin--rich-text-command]").forEach((button) => {
-      const check = active[button.getAttribute("data-admin--rich-text-command")]
+    this.element.querySelectorAll("[data-admin--rich-text--editor-command]").forEach((button) => {
+      const check = active[button.getAttribute("data-admin--rich-text--editor-command")]
       const on = Boolean(check && check())
       if (button.hasAttribute("aria-pressed")) {
         button.setAttribute("aria-pressed", on ? "true" : "false")

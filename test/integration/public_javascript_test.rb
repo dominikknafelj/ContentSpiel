@@ -38,7 +38,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     preloads = modulepreloads
-    %w[admin @tiptap--core controllers/admin/rich_text_controller rich_text/schema prosemirror-model].each do |name|
+    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema prosemirror-model].each do |name|
       assert preloads.any? { |href| href.include?(name) }, "expected #{name} to be modulepreloaded in CS Studio: #{preloads.inspect}"
     end
     assert_includes entry_point_script, %(import "admin")

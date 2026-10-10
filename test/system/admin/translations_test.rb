@@ -5,7 +5,7 @@ require "application_system_test_case"
 # fields" / "Use all" (`admin--translate`), which only a browser can run --
 # the request is a `fetch`, Use fills the input and lets the form's own
 # `admin--saving--autosave` save it, and a rich-text Use goes through the Tiptap
-# editor (`admin--rich-text#applySuggestion`) -- plus the outdated note,
+# editor (`admin--rich-text--editor#applySuggestion`) -- plus the outdated note,
 # the Translations overview and the translated site tagline.
 #
 # The AI provider is `GatedProvider` (test/support/gated_provider.rb),

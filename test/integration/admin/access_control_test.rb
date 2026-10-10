@@ -350,7 +350,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@inside.id}"
 
     assert_response :success
-    titles = JSON.parse(css_select("[data-admin--rich-text-link-titles-value]").first["data-admin--rich-text-link-titles-value"])
+    titles = JSON.parse(css_select("[data-admin--rich-text--editor-link-titles-value]").first["data-admin--rich-text--editor-link-titles-value"])
     assert_equal({ "page:#{@outside.id}" => "A page you can't open" }, titles)
     # Whole word: the toolbar's Insert menu carries a `closeOutside` action.
     assert_no_match(/\bOutside\b/, response.body)

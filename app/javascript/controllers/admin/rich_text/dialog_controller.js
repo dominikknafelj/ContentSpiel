@@ -5,7 +5,7 @@ import { createTargetSearch } from "rich_text/target_search"
 // The rich-text editor's three shared dialogs -- image (alt text and caption),
 // YouTube and "Page link" -- on `Admin::EditorScreen::RichTextDialogsComponent`,
 // rendered once by the admin layout. This controller only gathers input; the
-// editor (`admin--rich-text`) applies it through a Tiptap command, so the
+// editor (`admin--rich-text--editor`) applies it through a Tiptap command, so the
 // document change goes down the one path that writes the hidden input and
 // fires the autosave `input` event. Nothing here writes a form field, and
 // the dialogs sit outside every autosave form with `name`-less fields.

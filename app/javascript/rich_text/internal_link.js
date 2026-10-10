@@ -10,13 +10,13 @@ import { Mark } from "@tiptap/core"
 // it never navigates away from the editor, and `link`'s own `a[href]` parse
 // rule can't claim it on a copy/paste round trip), titled with the
 // target's title via `resolveTitle(type, id)` -- an option the
-// `admin--rich-text` controller supplies from what the column rendered
+// `admin--rich-text--editor` controller supplies from what the column rendered
 // (`#link_titles_json`) plus whatever the picker added this session. No
 // title means the target is gone: rendered as "missing" (spec §7).
 //
 // `excludes: "link internalLink"` -- a run of text links to one place:
 // applying either kind of link replaces the other (the controller unsets
-// the other mark explicitly as well, see `admin--rich-text#applyLink`), and
+// the other mark explicitly as well, see `admin--rich-text--editor#applyLink`), and
 // re-pointing an internal link replaces it. ProseMirror's default (a mark
 // excludes only itself) stops applying once `excludes` is given, so
 // `internalLink` has to name itself: without it, re-pointing added a

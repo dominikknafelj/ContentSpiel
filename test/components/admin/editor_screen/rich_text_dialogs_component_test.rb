@@ -5,7 +5,7 @@ class Admin::EditorScreen::RichTextDialogsComponentTest < ViewComponent::TestCas
 
   test "renders the three 560 form dialogs under one controller, none of them open" do
     @rendered.call
-    assert_selector "[data-controller='admin--rich-text-dialog']", count: 1
+    assert_selector "[data-controller='admin--rich-text--dialog']", count: 1
     %w[rich-text-image-dialog rich-text-youtube-dialog rich-text-page-dialog].each do |id|
       assert_selector "dialog##{id}.admin-dialog[data-dialog-width=form]:not([open])", visible: :all
     end
@@ -35,7 +35,7 @@ class Admin::EditorScreen::RichTextDialogsComponentTest < ViewComponent::TestCas
 
   test "the page dialog searches through the link-targets endpoint" do
     @rendered.call
-    assert_selector "[data-admin--rich-text-dialog-search-url-value='/cs-studio/link_targets']", visible: :all
+    assert_selector "[data-admin--rich-text--dialog-search-url-value='/cs-studio/link_targets']", visible: :all
     assert_selector "#rich-text-page-dialog input#rich-text-page-search", visible: :all
   end
 end

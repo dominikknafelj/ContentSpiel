@@ -1,7 +1,7 @@
 module Admin
   module Columns
     # The Tiptap rich-text column (tiptap spec §4.1). The preview layout
-    # loads the import map, so `admin--rich-text` mounts a live editor here
+    # loads the import map, so `admin--rich-text--editor` mounts a live editor here
     # (typing works). It isn't inside an autosave form, so nothing is ever
     # saved.
     class RichTextColumnComponentPreview < ViewComponent::Preview

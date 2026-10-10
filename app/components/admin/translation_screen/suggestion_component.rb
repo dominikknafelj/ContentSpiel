@@ -23,7 +23,7 @@ module Admin
     # Nothing here saves anything: **Use** is `admin--translate#use`, which
     # fills the input named by `data-translate-input-id` (a plain field's
     # value plus a bubbling `input` event; a rich-text body through a
-    # `translate:use` event its `admin--rich-text` handles) and lets that
+    # `translate:use` event its `admin--rich-text--editor` handles) and lets that
     # form's own autosave write it, as an ordinary edit (Review Focus 4).
     #
     # The suggestion only ever reaches the page escaped: plain text as a

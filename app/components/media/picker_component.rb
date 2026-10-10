@@ -6,7 +6,7 @@ module Media
   # back one asset id. Every place that sets a library image goes through it: a
   # page's hero (`Admin::Columns::MediaColumnComponent`), an image block's image
   # (the same column), and the rich-text editor's Image button
-  # (`admin--rich-text`).
+  # (`admin--rich-text--editor`).
   #
   # Rendered once per CS Studio page, by the admin layout, outside the
   # `#content` frame and outside every form -- not once per field: one

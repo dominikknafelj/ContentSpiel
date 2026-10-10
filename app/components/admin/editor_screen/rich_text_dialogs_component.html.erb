@@ -1,25 +1,25 @@
 <%# Display-contents wrapper: it only carries the controller and the window-level
     actions; the <dialog>s are top-layer when open. %>
-<div class="contents" data-controller="admin--rich-text-dialog"
-     data-admin--rich-text-dialog-search-url-value="<%= search_url %>"
-     data-action="rich-text-dialog:open@window->admin--rich-text-dialog#open rich-text-dialog:withdraw@window->admin--rich-text-dialog#withdraw">
+<div class="contents" data-controller="admin--rich-text--dialog"
+     data-admin--rich-text--dialog-search-url-value="<%= search_url %>"
+     data-action="rich-text-dialog:open@window->admin--rich-text--dialog#open rich-text-dialog:withdraw@window->admin--rich-text--dialog#withdraw">
 
   <%= render Admin::Ui::DialogComponent.new(id: IMAGE, title: "Image", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Remove image", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text-dialog#remove", "admin--rich-text-dialog-target": "imageRemove" }) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Insert image", type: "submit", form: "rich-text-image-form", data: { "admin--rich-text-dialog-target": "imageSubmit" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Remove image", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text--dialog#remove", "admin--rich-text--dialog-target": "imageRemove" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text--dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Insert image", type: "submit", form: "rich-text-image-form", data: { "admin--rich-text--dialog-target": "imageSubmit" }) %>
     <% end %>
-    <form id="rich-text-image-form" class="flex flex-col gap-4" novalidate data-action="submit->admin--rich-text-dialog#submit" data-kind="image">
-      <img alt="" class="max-h-40 self-start rounded-cs border border-line" hidden data-admin--rich-text-dialog-target="imagePreview">
+    <form id="rich-text-image-form" class="flex flex-col gap-4" novalidate data-action="submit->admin--rich-text--dialog#submit" data-kind="image">
+      <img alt="" class="max-h-40 self-start rounded-cs border border-line" hidden data-admin--rich-text--dialog-target="imagePreview">
       <div>
         <label class="<%= setup_label_class %>" for="rich-text-image-alt">Alt text</label>
-        <input id="rich-text-image-alt" type="text" autocomplete="off" class="<%= setup_input_class %>" aria-describedby="rich-text-image-alt-help" data-admin--rich-text-dialog-target="imageAlt">
+        <input id="rich-text-image-alt" type="text" autocomplete="off" class="<%= setup_input_class %>" aria-describedby="rich-text-image-alt-help" data-admin--rich-text--dialog-target="imageAlt">
         <p id="rich-text-image-alt-help" class="mt-1 text-sm text-meta">Empty uses the text from Media</p>
       </div>
       <div>
         <label class="<%= setup_label_class %>" for="rich-text-image-caption">Caption</label>
-        <input id="rich-text-image-caption" type="text" autocomplete="off" class="<%= setup_input_class %>" aria-describedby="rich-text-image-caption-help" data-admin--rich-text-dialog-target="imageCaption">
+        <input id="rich-text-image-caption" type="text" autocomplete="off" class="<%= setup_input_class %>" aria-describedby="rich-text-image-caption-help" data-admin--rich-text--dialog-target="imageCaption">
         <p id="rich-text-image-caption-help" class="mt-1 text-sm text-meta">Empty uses the text from Media</p>
       </div>
     </form>
@@ -27,30 +27,30 @@
 
   <%= render Admin::Ui::DialogComponent.new(id: YOUTUBE, title: "YouTube video", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text--dialog#cancel" }) %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Insert video", type: "submit", form: "rich-text-youtube-form") %>
     <% end %>
-    <form id="rich-text-youtube-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text-dialog#submit" data-kind="youtube">
+    <form id="rich-text-youtube-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text--dialog#submit" data-kind="youtube">
       <label class="<%= setup_label_class %>" for="rich-text-youtube-url">YouTube URL or video ID</label>
       <input id="rich-text-youtube-url" type="text" autocomplete="off" spellcheck="false" placeholder="https://www.youtube.com/watch?v=…"
              class="<%= setup_input_class %>" aria-describedby="rich-text-youtube-status rich-text-youtube-error"
-             data-action="input->admin--rich-text-dialog#youtubeTyped" data-admin--rich-text-dialog-target="youtubeInput">
-      <p id="rich-text-youtube-status" class="font-cs-mono text-sm text-meta" role="status" aria-live="polite" data-admin--rich-text-dialog-target="youtubeStatus"></p>
-      <p id="rich-text-youtube-error" class="text-sm text-danger-ink" role="alert" data-admin--rich-text-dialog-target="youtubeError"></p>
+             data-action="input->admin--rich-text--dialog#youtubeTyped" data-admin--rich-text--dialog-target="youtubeInput">
+      <p id="rich-text-youtube-status" class="font-cs-mono text-sm text-meta" role="status" aria-live="polite" data-admin--rich-text--dialog-target="youtubeStatus"></p>
+      <p id="rich-text-youtube-error" class="text-sm text-danger-ink" role="alert" data-admin--rich-text--dialog-target="youtubeError"></p>
     </form>
   <% end %>
 
   <%= render Admin::Ui::DialogComponent.new(id: PAGE, title: "Page link", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Remove link", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text-dialog#remove", "admin--rich-text-dialog-target": "pageRemove" }) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text-dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Remove link", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text--dialog#remove", "admin--rich-text--dialog-target": "pageRemove" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text--dialog#cancel" }) %>
     <% end %>
-    <form id="rich-text-page-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text-dialog#submit" data-kind="page">
+    <form id="rich-text-page-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text--dialog#submit" data-kind="page">
       <label class="<%= setup_label_class %>" for="rich-text-page-search">Search pages and posts</label>
       <input id="rich-text-page-search" type="text" autocomplete="off" placeholder="Title…" class="<%= setup_input_class %>"
-             aria-describedby="rich-text-page-message" data-admin--rich-text-dialog-target="pageInput">
-      <ul aria-label="Pages and posts" class="flex max-h-60 flex-col gap-0.5 overflow-y-auto" data-admin--rich-text-dialog-target="pageList"></ul>
-      <p id="rich-text-page-message" class="text-sm text-meta" role="status" aria-live="polite" data-admin--rich-text-dialog-target="pageMessage"></p>
+             aria-describedby="rich-text-page-message" data-admin--rich-text--dialog-target="pageInput">
+      <ul aria-label="Pages and posts" class="flex max-h-60 flex-col gap-0.5 overflow-y-auto" data-admin--rich-text--dialog-target="pageList"></ul>
+      <p id="rich-text-page-message" class="text-sm text-meta" role="status" aria-live="polite" data-admin--rich-text--dialog-target="pageMessage"></p>
     </form>
   <% end %>
 </div>

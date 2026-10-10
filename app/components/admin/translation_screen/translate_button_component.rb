@@ -25,7 +25,7 @@ module Admin
     # reads them off every field on the screen:
     # - `input-id` is the input **Use** fills -- for rich text the editor's
     #   hidden JSON input (`"#{id}-json"`), which the `translate:use` event
-    #   is dispatched on so it bubbles to that editor's `admin--rich-text`;
+    #   is dispatched on so it bubbles to that editor's `admin--rich-text--editor`;
     # - `kind` (`plain`/`rich`) is how Use fills it;
     # - `characters` is the original's size as `AI::Translate` counts it
     #   (rich text as its Markdown), so the bulk request can split itself

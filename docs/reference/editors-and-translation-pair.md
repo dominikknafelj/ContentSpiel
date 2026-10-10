@@ -12,7 +12,7 @@
 
 ## Rich-text dialogs
 
-**Rich-text dialogs.** The editor's toolbar is grouped (`RichTextColumnComponent::TOOLBAR_GROUPS`, plus the Insert menu) and one row wide. Insert image goes through the media picker and then a form-width dialog for alt text and caption; YouTube and "Page link" are dialogs too. `Admin::EditorScreen::RichTextDialogsComponent` renders the three once in the layout (outside `#content` and every autosave form, so their fields never feed an autosave); `admin--rich-text-dialog` fills and opens them over `rich-text-dialog:open` / `rich-text-dialog:closed` events naming the opening editor, so two editors on one page never cross wires. The page search is `app/javascript/rich_text/target_search.js` over `Admin::LinkTargetsController`.
+**Rich-text dialogs.** The editor's toolbar is grouped (`RichTextColumnComponent::TOOLBAR_GROUPS`, plus the Insert menu) and one row wide. Insert image goes through the media picker and then a form-width dialog for alt text and caption; YouTube and "Page link" are dialogs too. `Admin::EditorScreen::RichTextDialogsComponent` renders the three once in the layout (outside `#content` and every autosave form, so their fields never feed an autosave); `admin--rich-text--dialog` fills and opens them over `rich-text-dialog:open` / `rich-text-dialog:closed` events naming the opening editor, so two editors on one page never cross wires. The page search is `app/javascript/rich_text/target_search.js` over `Admin::LinkTargetsController`.
 
 ## New page and New post
 

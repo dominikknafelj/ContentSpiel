@@ -40,7 +40,7 @@ module RichText
     # `{ "type" => "doc", "content" => [] }` is this app's canonical empty
     # document (`RichText::Document::EMPTY_HASH`, what every new record and
     # locale starts as), and the editor never sees it as such: the
-    # `admin--rich-text` controller mounts an empty document as no content
+    # `admin--rich-text--editor` controller mounts an empty document as no content
     # at all, which Tiptap turns into one empty paragraph.
     def self.register_nodes
       # "doc" (the document root) and "text" render as themselves plus

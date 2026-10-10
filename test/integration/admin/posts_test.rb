@@ -406,10 +406,10 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "textarea[name='post[body_markdown]']", count: 0
-    assert_select "[data-controller='admin--rich-text'] input[type=hidden][name='post[body]']" do |inputs|
+    assert_select "[data-controller='admin--rich-text--editor'] input[type=hidden][name='post[body]']" do |inputs|
       assert_equal rich_doc("Hello **there**"), JSON.parse(inputs.first["value"])
     end
-    assert_select "[data-controller='admin--rich-text'][data-admin--rich-text-locale-value='en']"
+    assert_select "[data-controller='admin--rich-text--editor'][data-admin--rich-text--editor-locale-value='en']"
   end
 
   test "a translation shows the primary language's body rendered read-only" do

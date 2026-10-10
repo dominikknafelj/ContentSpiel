@@ -45,7 +45,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 // `input` event (what typing does -- the autosave queue only sends a form
 // whose submitted data changed, so this event is what makes Use save); a
 // rich-text body gets a `translate:use` event on its editor's hidden JSON
-// input, which bubbles to `admin--rich-text#applySuggestion` -- that editor
+// input, which bubbles to `admin--rich-text--editor#applySuggestion` -- that editor
 // loads the document and writes it back through its own `input` event.
 export default class extends Controller {
   static targets = [ "idle", "running", "ready", "status" ]
@@ -490,7 +490,7 @@ function refocus(box) {
 // input is a hidden JSON field) its editable area.
 function fieldFocusTarget(input) {
   if (input.type !== "hidden") return input
-  return input.closest("[data-controller~='admin--rich-text']")?.querySelector("[contenteditable='true']")
+  return input.closest("[data-controller~='admin--rich-text--editor']")?.querySelector("[contenteditable='true']")
 }
 
 function isPendingOf(box, job) {
