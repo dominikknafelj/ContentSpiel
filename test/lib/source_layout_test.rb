@@ -12,7 +12,6 @@ class SourceLayoutTest < ActiveSupport::TestCase
   # Files that hold made-up identifiers on purpose.
   LEFT_OUT = %w[
     test/lib/source_layout_test.rb
-    test/lib/layout_tools_test.rb
     test/lib/admin_i18n_test.rb
   ].freeze # admin_i18n_test: sample markup (admin--x-target, admin--a) fed to the i18n scanner
   # An identifier, also after "data-" (a target, value, param or class attribute).
@@ -142,12 +141,15 @@ class SourceLayoutTest < ActiveSupport::TestCase
     admin--tree
   ].freeze
 
-  # Not scanned for old names: this file (it lists them), layout_tools_test.rb (the cleanup's
-  # tool test, deleted with the tool in the plan's last task) and admin_i18n_test.rb (made-up
+  # Not scanned for old names: this file (it lists them) and admin_i18n_test.rb (made-up
   # sample markup).
+  #
+  # The documents are scanned too, because that is where an old name is most likely to be typed
+  # again from memory. docs/superpowers, docs/product and docs/architecture are left out: dated
+  # records of what was true when they were written (the plan and spec of this very cleanup
+  # name every old identifier).
   OLD_NAMES_LEFT_OUT = %w[
     test/lib/source_layout_test.rb
-    test/lib/layout_tools_test.rb
     test/lib/admin_i18n_test.rb
   ].freeze
 
@@ -183,6 +185,7 @@ class SourceLayoutTest < ActiveSupport::TestCase
     identifiers = self.class.identifiers
     known = ORIGINAL | identifiers
     paths = SOURCES.flat_map { |dir| Dir[ROOT.join(dir, "**/*.{rb,erb,js,css}")] }
+    paths += Dir[ROOT.join("config/**/*.{rb,yml,js,css}")] + Dir[ROOT.join("docs/reference/*.md")] + [ ROOT.join("CLAUDE.md").to_s ]
     paths.reject! { |path| OLD_NAMES_LEFT_OUT.include?(Pathname(path).relative_path_from(ROOT).to_s) }
     left = paths.flat_map do |path|
       # Whole text, comments too: a comment that names a dead identifier misleads as much.

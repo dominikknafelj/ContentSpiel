@@ -22,8 +22,9 @@
 // post changed, says so with `admin--notes--live:changed` on the section, which
 // reads the list again. The target is written with `setAttribute`: the
 // identifier's double dash can't be spelled through `dataset`, whose
-// `adminNotesLiveTarget` is `data-admin-notes-live-target`, a target of
-// nothing. A note started here says which tab it came from (`X-Notes-Tab`,
+// `adminNotesLiveTarget` would be `data-admin-notes-live-target`, a target of
+// nothing, where the attribute the controller reads is
+// `data-admin--notes--live-target`. A note started here says which tab it came from (`X-Notes-Tab`,
 // the id that controller wrote on <body>), so this tab is not told about its
 // own note: it has read the list again already.
 //
