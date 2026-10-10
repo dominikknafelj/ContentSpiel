@@ -171,7 +171,7 @@ export function syncBases(streamText, ids) {
 //
 // "Of that answer" (follow-up N5): the event is heard on `document`, where
 // every stream on the page passes -- a translation suggestion arriving in the
-// same moment (`admin--translate` renders its own), a toast. Counting events
+// same moment (`admin--translation--translate` renders its own), a toast. Counting events
 // let a foreign stream stand in for the held answer's and release the slot
 // before the card was in the list. The held answer is rendered by Turbo, so
 // its elements cannot be tagged beforehand; they are recognised by their

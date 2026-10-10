@@ -18,7 +18,7 @@ module Admin
     # needs AI set up (`AI.configured?`) and `ai.translate`; asking for a
     # suggestion is then decided again, for real, by `AI::Translate`.
     #
-    # Everything the `admin--translate` controller needs to ask for this
+    # Everything the `admin--translation--translate` controller needs to ask for this
     # field is on the wrapper as plain `data-translate-*` attributes rather
     # than Stimulus values, because the header's "Suggest translations for N empty fields"
     # (`TranslateAllComponent`, another instance of the same controller)
@@ -48,10 +48,10 @@ module Admin
       # `mode: :update` is the outdated reference card's **Suggest update**
       # (`Admin::EditorScreen::ReferenceCardComponent`): the same wrapper and
       # the same single-field request as **Translate**, carrying
-      # `data-translate-mode="update"` so `admin--translate` sends `mode=update`
+      # `data-translate-mode="update"` so `admin--translation--translate` sends `mode=update`
       # and the suggestion that comes back also shows the field's current
       # translation (`SuggestionComponent` `mode: :update`). The header's bulk
-      # run skips it (`admin--translate`'s `emptyFields`): its field already has
+      # run skips it (`admin--translation--translate`'s `emptyFields`): its field already has
       # a translation.
       #
       # **Translate** itself only renders on an empty field; the renderers
@@ -75,9 +75,9 @@ module Admin
 
       def wrapper_data
         {
-          controller: "admin--translate",
-          "admin--translate-url-value": helpers.admin_translation_suggestions_path,
-          "admin--translate-locale-value": confirm[:locale],
+          controller: "admin--translation--translate",
+          "admin--translation--translate-url-value": helpers.admin_translation_suggestions_path,
+          "admin--translation--translate-locale-value": confirm[:locale],
           translate_record_type: confirm[:record_type],
           translate_record_id: confirm[:record_id],
           translate_field: confirm[:field],

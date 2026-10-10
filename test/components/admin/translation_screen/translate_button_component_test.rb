@@ -25,12 +25,12 @@ class Admin::TranslationScreen::TranslateButtonComponentTest < ViewComponent::Te
   test "the button, what it asks for, and the empty box its suggestion lands in" do
     render_inline component
 
-    wrapper = page.find("[data-controller='admin--translate']")
+    wrapper = page.find("[data-controller='admin--translation--translate']")
     expected = { "record-type" => "Post", "record-id" => "7", "field" => "title", "input-id" => "post-title", "kind" => "plain", "characters" => "5" }
     expected.each { |key, value| assert_equal value, wrapper["data-translate-#{key}"], key }
-    assert_equal "/cs-studio/translations/suggest", wrapper["data-admin--translate-url-value"]
-    assert_equal "de", wrapper["data-admin--translate-locale-value"]
-    assert_selector "button[type='button'][data-action='admin--translate#translate']", text: "Translate"
+    assert_equal "/cs-studio/translations/suggest", wrapper["data-admin--translation--translate-url-value"]
+    assert_equal "de", wrapper["data-admin--translation--translate-locale-value"]
+    assert_selector "button[type='button'][data-action='admin--translation--translate#translate']", text: "Translate"
     assert_equal "translation-suggestion-post-title", component.box_id
   end
 

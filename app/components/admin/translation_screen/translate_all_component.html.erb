@@ -1,31 +1,31 @@
-<%= tag.div class: "flex flex-wrap items-center gap-2", data: wrapper_data.merge(action: "translate:changed@document->admin--translate#refresh") do %>
-  <%# Idle: the button. Its label is rewritten by `admin--translate#refresh` as the screen's empty fields change. %>
-  <%= tag.div data: { "admin--translate-target": "idle" } do %>
+<%= tag.div class: "flex flex-wrap items-center gap-2", data: wrapper_data.merge(action: "translate:changed@document->admin--translation--translate#refresh") do %>
+  <%# Idle: the button. Its label is rewritten by `admin--translation--translate#refresh` as the screen's empty fields change. %>
+  <%= tag.div data: { "admin--translation--translate-target": "idle" } do %>
     <%= tag.button type: "button", class: Admin::TranslationScreen::TranslateButtonComponent::BUTTON_CLASS,
-          data: { action: "admin--translate#translateEmpty" } do %>
+          data: { action: "admin--translation--translate#translateEmpty" } do %>
       <span data-translate-label><%= label %></span>
     <% end %>
   <% end %>
 
   <%# Running: "Suggesting i of n fields", a 4px bar (its width is set from script,
       through the CSSOM -- the strict CSP refuses a style attribute) and Cancel. %>
-  <%= tag.div hidden: true, class: "flex items-center gap-3", data: { "admin--translate-target": "running" } do %>
+  <%= tag.div hidden: true, class: "flex items-center gap-3", data: { "admin--translation--translate-target": "running" } do %>
     <div>
       <p class="text-sm text-dim" data-translate-progress-text>Suggesting…</p>
       <div class="mt-1 h-1 w-48 overflow-hidden rounded-full bg-line" aria-hidden="true">
         <div class="h-1 w-0 rounded-full bg-accent transition-[width] motion-reduce:transition-none" data-translate-progress-bar></div>
       </div>
     </div>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancel" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translation--translate#cancel" }) %>
   <% end %>
 
   <%# Ready: what came back, and the two ways to settle it. %>
-  <%= tag.div hidden: true, class: "flex items-center gap-2", data: { "admin--translate-target": "ready" } do %>
+  <%= tag.div hidden: true, class: "flex items-center gap-2", data: { "admin--translation--translate-target": "ready" } do %>
     <p class="text-sm text-dim" data-translate-ready-text>0 suggestions ready</p>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Use all", variant: :primary, size: :small, data: { action: "admin--translate#useAll" }) %>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Discard all", variant: :secondary, size: :small, data: { action: "admin--translate#discardAll" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Use all", variant: :primary, size: :small, data: { action: "admin--translation--translate#useAll" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Discard all", variant: :secondary, size: :small, data: { action: "admin--translation--translate#discardAll" }) %>
   <% end %>
 
   <%# Screen readers only: the visible states (running line, ready line) already show this text. %>
-  <p role="status" aria-live="polite" class="sr-only" data-admin--translate-target="status"></p>
+  <p role="status" aria-live="polite" class="sr-only" data-admin--translation--translate-target="status"></p>
 <% end %>

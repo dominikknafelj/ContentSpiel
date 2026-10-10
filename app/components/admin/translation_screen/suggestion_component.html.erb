@@ -6,12 +6,12 @@
   <div class="mt-2 border-t border-line pt-2 text-sm" data-translation-suggestion>
     <p role="alert" class="text-danger-ink"><%= error %></p>
     <div class="mt-2">
-      <%= tag.button "Dismiss", type: "button", class: self.class::BUTTON_CLASS, data: { action: "admin--translate#discard" } %>
+      <%= tag.button "Dismiss", type: "button", class: self.class::BUTTON_CLASS, data: { action: "admin--translation--translate#discard" } %>
     </div>
   </div>
 <% else %>
   <%= tag.div class: "admin-translation-suggestion mt-2 rounded-cs border border-accent bg-accent-tint p-3 text-sm",
-        data: { translation_suggestion: true, action: "input->admin--translate#contain change->admin--translate#contain focusout->admin--translate#contain" } do %>
+        data: { translation_suggestion: true, action: "input->admin--translation--translate#contain change->admin--translation--translate#contain focusout->admin--translation--translate#contain" } do %>
     <div class="flex items-baseline gap-3">
       <p class="<%= setup_label_class %>" data-suggestion-label><%= self.class::LABEL %></p>
       <% if model_name %><p class="ml-auto font-cs-mono text-label text-meta" data-suggestion-model><%= model_name %></p><% end %>
@@ -30,7 +30,7 @@
     <% end %>
     <div class="mt-2 flex flex-wrap gap-2">
       <%= render Admin::Ui::ButtonComponent.new(label: "Use", variant: :primary, size: :small, data: use_data) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Discard", variant: :secondary, size: :small, data: { action: "admin--translate#discard" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Discard", variant: :secondary, size: :small, data: { action: "admin--translation--translate#discard" }) %>
     </div>
   <% end %>
 <% end %>

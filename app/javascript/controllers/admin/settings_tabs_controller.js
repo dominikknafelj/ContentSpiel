@@ -15,7 +15,7 @@ import { Controller } from "@hotwired/stimulus"
 // the selected one is in the tab order, Left/Right/Home/End move between them
 // as the ARIA tabs pattern asks.
 //
-// Switching tells `admin--translate` (`translate:changed`): its header counts
+// Switching tells `admin--translation--translate` (`translate:changed`): its header counts
 // the empty fields of the language that is visible, and which one that is
 // just changed.
 export default class extends Controller {

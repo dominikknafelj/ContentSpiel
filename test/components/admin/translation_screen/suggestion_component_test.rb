@@ -3,7 +3,7 @@ require "test_helper"
 # One AI suggestion under a field's original (translation helpers spec
 # §6.4): the text or a rich-text preview, Use/Discard as plain buttons
 # (never submits -- these sit inside autosave forms), the warnings, and the
-# inline error variant. Use itself is `admin--translate#use`, exercised by
+# inline error variant. Use itself is `admin--translation--translate#use`, exercised by
 # the system tests.
 class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCase
   setup { Current.actor = users(:one) }
@@ -33,8 +33,8 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     assert_equal "plain", use["data-translate-kind"]
     assert_equal "post-title", use["data-translate-input-id"]
     assert_nil use["data-translate-text"]
-    assert_equal "admin--translate#use", use["data-action"]
-    assert_selector "button[type='button'][data-action='admin--translate#discard']", text: "Discard"
+    assert_equal "admin--translation--translate#use", use["data-action"]
+    assert_selector "button[type='button'][data-action='admin--translation--translate#discard']", text: "Discard"
     refute_selector "[role='alert']"
   end
 
@@ -42,7 +42,7 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "post-title", locale: "de", suggestion: "Hallo")
 
     actions = page.find("[data-translation-suggestion]")["data-action"]
-    %w[input change focusout].each { |event| assert_includes actions, "#{event}->admin--translate#contain" }
+    %w[input change focusout].each { |event| assert_includes actions, "#{event}->admin--translation--translate#contain" }
   end
 
   test "without a model name there is only the label" do
@@ -54,7 +54,7 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
   test "Use is the small primary button, Discard the secondary one" do
     render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "t", locale: "de", suggestion: "Hallo"))
     assert_selector "button[data-translate-use].bg-accent.text-sm", text: "Use"
-    assert_no_selector "button[data-action='admin--translate#discard'].bg-accent"
+    assert_no_selector "button[data-action='admin--translation--translate#discard'].bg-accent"
   end
 
   test "repair notes are warn-ink lines after the text and before Use / Discard" do
@@ -122,7 +122,7 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "post-title", locale: "de", error: "The AI provider is busy")
 
     assert_selector "[role='alert']", text: "The AI provider is busy"
-    assert_selector "button[type='button'][data-action='admin--translate#discard']", text: "Dismiss"
+    assert_selector "button[type='button'][data-action='admin--translation--translate#discard']", text: "Dismiss"
     refute_selector "[data-translate-use]"
   end
 end

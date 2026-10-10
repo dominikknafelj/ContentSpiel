@@ -5,7 +5,7 @@ module Admin
     # the header of the page, post and settings editors in a non-default
     # language.
     #
-    # Three states in one element, flipped by `admin--translate` with `hidden`:
+    # Three states in one element, flipped by `admin--translation--translate` with `hidden`:
     # - **idle**: the button, with the real N (`count`, below), hidden when N is
     #   0 -- the whole component is not rendered at 0;
     # - **running**: "Suggesting i of n fields", a 4px progress bar and Cancel;
@@ -17,7 +17,7 @@ module Admin
     # skips it) that is blank in `locale` and has a non-blank original. It is
     # what pressing the button will ask for, give or take a field the screen
     # has no input for; the client recounts from the page after every run, Use
-    # and Discard (`admin--translate#refresh`).
+    # and Discard (`admin--translation--translate#refresh`).
     #
     # Pressing it asks for every field on the screen that has a Translate
     # button (`TranslateButtonComponent` -- so exactly the fields this viewer
@@ -59,11 +59,11 @@ module Admin
 
       def wrapper_data
         {
-          controller: "admin--translate",
-          "admin--translate-url-value": helpers.admin_translation_suggestions_path,
-          "admin--translate-locale-value": locale,
-          "admin--translate-max-fields-value": AI::Translate::MAX_FIELDS,
-          "admin--translate-max-characters-value": AI::Translate::MAX_CHARACTERS
+          controller: "admin--translation--translate",
+          "admin--translation--translate-url-value": helpers.admin_translation_suggestions_path,
+          "admin--translation--translate-locale-value": locale,
+          "admin--translation--translate-max-fields-value": AI::Translate::MAX_FIELDS,
+          "admin--translation--translate-max-characters-value": AI::Translate::MAX_CHARACTERS
         }
       end
 

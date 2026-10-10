@@ -504,7 +504,7 @@ function jobOf(box) {
 }
 
 // Something about the suggestions on the page changed: the header
-// (`translate:changed@document->admin--translate#refresh`) works out its state.
+// (`translate:changed@document->admin--translation--translate#refresh`) works out its state.
 function announceChange() {
   if (muteChanges) return
   document.dispatchEvent(new CustomEvent("translate:changed"))
@@ -542,7 +542,7 @@ function describe(element) {
     kind: translateKind,
     mode: translateMode === "update" ? "update" : "translate",
     characters: Number(translateCharacters) || 0,
-    button: element.querySelector("[data-admin--translate-target='button']"),
+    button: element.querySelector("[data-admin--translation--translate-target='button']"),
     // The box lives under the field's input, not in this wrapper (which sits
     // in the original's panel): found by the id the server also streams to.
     box: document.getElementById(`translation-suggestion-${translateInputId}`)
@@ -628,7 +628,7 @@ function showError(box, message) {
   const dismiss = document.createElement("button")
   dismiss.type = "button"
   dismiss.className = "cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-ink hover:bg-sunken"
-  dismiss.dataset.action = "admin--translate#discard"
+  dismiss.dataset.action = "admin--translation--translate#discard"
   dismiss.textContent = "Dismiss"
   actions.append(dismiss)
   wrapper.append(text, actions)

@@ -104,7 +104,7 @@ module Admin
       else
         # `head` would label the empty body with the *request's* format --
         # for a Turbo Stream request, "text/vnd.turbo-stream.html" -- and
-        # a `fetch` like `admin--translate`'s suggest request takes that
+        # a `fetch` like `admin--translation--translate`'s suggest request takes that
         # content type to mean "a stream, render it" (an empty one) rather
         # than "not a stream, show the generic error". An explicit
         # text/plain keeps a bare 404 reading as what it is.

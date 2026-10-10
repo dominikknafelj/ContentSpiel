@@ -298,7 +298,7 @@ export default class extends Controller {
 
   // --- AI translation (translation helpers spec §6.4) -----------------------
   //
-  // `translate:use` from `admin--translate#use`, dispatched on this editor's
+  // `translate:use` from `admin--translation--translate#use`, dispatched on this editor's
   // hidden input: replaces the document with the suggested one and writes
   // it back exactly like an edit (`writeDocument`, whose `input` event the
   // form's autosave saves). `assets`/`linkTitles` are what the suggestion's

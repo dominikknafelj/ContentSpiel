@@ -71,20 +71,20 @@ class Admin::TranslationScreen::TranslateAllComponentTest < ViewComponent::TestC
   test "the three states: the idle button, the running line with its bar and Cancel, the ready line" do
     render_all english_post
 
-    wrapper = page.find("[data-controller='admin--translate']")
-    assert_equal AI::Translate::MAX_FIELDS.to_s, wrapper["data-admin--translate-max-fields-value"]
-    assert_equal AI::Translate::MAX_CHARACTERS.to_s, wrapper["data-admin--translate-max-characters-value"]
-    assert_equal "de", wrapper["data-admin--translate-locale-value"]
-    assert_selector "[data-admin--translate-target='idle'] button[type='button'][data-action='admin--translate#translateEmpty']"
-    assert_selector "[data-admin--translate-target='running'][hidden]", visible: :hidden
-    assert_selector "[data-admin--translate-target='running'] [data-translate-progress-bar]", visible: :hidden
-    assert_selector "[data-admin--translate-target='running'] button[type='button'][data-action='admin--translate#cancel']", text: "Cancel", visible: :hidden
-    assert_selector "[data-admin--translate-target='ready'][hidden]", visible: :hidden
-    assert_selector "[data-admin--translate-target='ready'] button[type='button'][data-action='admin--translate#useAll']", text: "Use all", visible: :hidden
-    assert_selector "[data-admin--translate-target='ready'] button[type='button'][data-action='admin--translate#discardAll']", text: "Discard all", visible: :hidden
+    wrapper = page.find("[data-controller='admin--translation--translate']")
+    assert_equal AI::Translate::MAX_FIELDS.to_s, wrapper["data-admin--translation--translate-max-fields-value"]
+    assert_equal AI::Translate::MAX_CHARACTERS.to_s, wrapper["data-admin--translation--translate-max-characters-value"]
+    assert_equal "de", wrapper["data-admin--translation--translate-locale-value"]
+    assert_selector "[data-admin--translation--translate-target='idle'] button[type='button'][data-action='admin--translation--translate#translateEmpty']"
+    assert_selector "[data-admin--translation--translate-target='running'][hidden]", visible: :hidden
+    assert_selector "[data-admin--translation--translate-target='running'] [data-translate-progress-bar]", visible: :hidden
+    assert_selector "[data-admin--translation--translate-target='running'] button[type='button'][data-action='admin--translation--translate#cancel']", text: "Cancel", visible: :hidden
+    assert_selector "[data-admin--translation--translate-target='ready'][hidden]", visible: :hidden
+    assert_selector "[data-admin--translation--translate-target='ready'] button[type='button'][data-action='admin--translation--translate#useAll']", text: "Use all", visible: :hidden
+    assert_selector "[data-admin--translation--translate-target='ready'] button[type='button'][data-action='admin--translation--translate#discardAll']", text: "Discard all", visible: :hidden
     # Persistent live region, screen readers only (the running and ready
     # lines already show the same sentence; two copies were visible).
-    assert_selector "[role='status'][data-admin--translate-target='status'].sr-only", visible: :all
+    assert_selector "[role='status'][data-admin--translation--translate-target='status'].sr-only", visible: :all
     assert_selector "[class*='motion-reduce:transition-none'][data-translate-progress-bar]", visible: :all
   end
 

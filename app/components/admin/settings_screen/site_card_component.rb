@@ -15,7 +15,7 @@ module Admin
     # beside each field in the editors' reference card, with the same
     # Translate / Suggest update / Still correct controls, and its own "Suggest
     # translations for N empty fields" -- which acts on the language that is
-    # visible (`admin--translate` ignores fields inside a hidden panel).
+    # visible (`admin--translation--translate` ignores fields inside a hidden panel).
     #
     # Everything below the pairs is one value for the whole site.
     class SiteCardComponent < Admin::AdminComponent

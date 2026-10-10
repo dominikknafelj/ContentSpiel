@@ -146,7 +146,7 @@
     <template id="toast-note-template"><%= render Admin::Ui::ToastComponent.new(message: t("admin.notes.script.toast.placeholder"), kind: :undo,
           action: { label: t("admin.notes.script.toast.open"), url: admin_notes_path, method: :get }) %></template>
 
-    <%# The pending-suggestion box `admin--translate` clones into a field's
+    <%# The pending-suggestion box `admin--translation--translate` clones into a field's
         suggestion slot before each AI request (`Admin::TranslationScreen::
         PendingComponent`): a `<template>` is inert, so its buttons and spinner
         do nothing here, and it sits outside every form. %>

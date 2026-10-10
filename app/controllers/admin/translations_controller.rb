@@ -112,7 +112,7 @@ module Admin
     # that field's suggestion box: the suggestion with Use/Discard, or the
     # inline error. The status says how it went (403 for a refusal, 422 for
     # any other failure) but the streams are sent either way, so
-    # `admin--translate` always has something to show under the field.
+    # `admin--translation--translate` always has something to show under the field.
     #
     # `mode=update` is the outdated card's **Suggest update**: the fields
     # already have a translation, and each answer then also shows it
@@ -125,7 +125,7 @@ module Admin
     # A request in which no field names a valid input id has nowhere to show
     # anything, so it's a bare 422 before `AI::Translate` runs: no provider
     # call (nothing paid for that nobody could see), no `ai.translated`
-    # event. The editor never sends one; `admin--translate` shows its own
+    # event. The editor never sends one; `admin--translation--translate` shows its own
     # generic error for a non-stream answer.
     def suggest
       record = load_translatable_record
