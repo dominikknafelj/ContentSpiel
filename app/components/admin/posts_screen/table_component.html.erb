@@ -75,9 +75,9 @@
                     its confirmation, its filters and its Undo. %>
                 <% menu.with_item do %>
                   <%= tag.button "Move to trash", type: "button", class: "text-danger-ink",
-                        data: { action: "admin--bulk-select#only admin--dialog#open", "admin--bulk-select-id-param": post.id,
+                        data: { action: "admin--bulk-select#only admin--ui--dialog#open", "admin--bulk-select-id-param": post.id,
                                 "admin--bulk-select-dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID,
-                                "admin--dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID } %>
+                                "admin--ui--dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID } %>
                 <% end %>
               <% end %>
             <% end %>

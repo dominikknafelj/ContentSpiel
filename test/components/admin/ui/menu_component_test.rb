@@ -6,7 +6,7 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
       menu.with_item { "<a href='/a'>Rename</a>".html_safe }
       menu.with_item { "<a href='/b'>Delete…</a>".html_safe }
     end
-    assert_selector "[data-controller='admin--menu'] button[aria-haspopup=menu][aria-expanded=false]", text: "More"
+    assert_selector "[data-controller='admin--ui--menu'] button[aria-haspopup=menu][aria-expanded=false]", text: "More"
     assert_selector "[role=menu][hidden] a", count: 2, visible: :all
   end
 
@@ -19,7 +19,7 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
   test "aria_label names an icon-only trigger; close_on_select closes the panel on a pick" do
     render_inline(Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More actions", close_on_select: true)) { |menu| menu.with_item { "x" } }
     assert_selector "button[aria-label='More actions']", text: "⋯"
-    assert_selector "[role=menu][data-action~='click->admin--menu#select']", visible: :all
+    assert_selector "[role=menu][data-action~='click->admin--ui--menu#select']", visible: :all
   end
 
   test "without close_on_select the panel stays open on a pick" do

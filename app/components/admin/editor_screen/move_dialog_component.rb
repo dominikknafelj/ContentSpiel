@@ -20,10 +20,10 @@ module Admin
     #
     # `trigger` is the `data:` of a menu item that opens it: one click, two
     # actions in this order. `admin--blocks#askWhere` first -- it notes which
-    # block is being moved and writes the choices -- then `admin--dialog#open`,
+    # block is being moved and writes the choices -- then `admin--ui--dialog#open`,
     # so the dialog is shown the way every dialog is: the focus goes to its
     # first field, the select, and comes back to the menu's button when it is
-    # closed without a move (`admin--dialog#returnFocus`). `move` is the
+    # closed without a move (`admin--ui--dialog#returnFocus`). `move` is the
     # item's `data-move`, by which `admin--blocks#refreshMoveState` finds it
     # to disable it while there is nowhere to go.
     #
@@ -36,7 +36,7 @@ module Admin
       DESTINATION_ID = "move-block-destination".freeze
 
       def self.trigger(move)
-        { move: move, action: "click->admin--blocks#askWhere admin--dialog#open", "admin--dialog-id-param": ID }
+        { move: move, action: "click->admin--blocks#askWhere admin--ui--dialog#open", "admin--ui--dialog-id-param": ID }
       end
 
       def dialog_id = ID

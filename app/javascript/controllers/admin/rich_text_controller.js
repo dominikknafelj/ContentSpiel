@@ -226,7 +226,7 @@ export default class extends Controller {
     // Focus returns to the opener on Cancel/Escape: the item itself sits in
     // the Insert menu, which has closed by then (hidden, unfocusable), so the
     // menu's own button is the opener there.
-    const opener = event.currentTarget.closest("[role=menu]")?.closest("[data-controller~='admin--menu']")?.querySelector("[aria-haspopup=menu]") || event.currentTarget
+    const opener = event.currentTarget.closest("[role=menu]")?.closest("[data-controller~='admin--ui--menu']")?.querySelector("[aria-haspopup=menu]") || event.currentTarget
     window.dispatchEvent(new CustomEvent("media-picker:open", { detail: { opener } }))
   }
 

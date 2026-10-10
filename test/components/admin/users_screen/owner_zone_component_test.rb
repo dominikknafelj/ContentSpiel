@@ -12,7 +12,7 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
 
     assert_text "Owners can do everything, whatever their groups, and are the only ones who can change who is an owner."
     assert_selector ".admin-owner-zone[data-controller='admin--pending-lock']"
-    assert_selector "button[data-action='admin--dialog#open'][data-admin--dialog-id-param='owner-user-#{users(:two).id}'][data-admin--pending-lock-target=control]", text: "Make owner…"
+    assert_selector "button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='owner-user-#{users(:two).id}'][data-admin--pending-lock-target=control]", text: "Make owner…"
     assert_selector "dialog#owner-user-#{users(:two).id}", visible: :all do
       assert_selector "dialog", text: "Make two@example.com an owner?", visible: :all
       assert_selector "dialog", text: "Owners have every permission, including managing other owners and removing your owner rights.", visible: :all

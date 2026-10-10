@@ -17,7 +17,7 @@ import { Controller } from "@hotwired/stimulus"
 // remembers the menu's own button and `returnFocus` gives it focus when the
 // dialog closes with focus on nothing.
 export default class extends Controller {
-  // A server-requested dialog (`data-admin--dialog-open-on-load`, a form
+  // A server-requested dialog (`data-admin--ui--dialog-open-on-load`, a form
   // dialog reopened with its error after a refused submit). The controller
   // lives on <body>, which Turbo Drive keeps across visits, so `connect` only
   // covers a full load; `turbo:load` covers every visit. Turbo's cache
@@ -34,8 +34,8 @@ export default class extends Controller {
   }
 
   openRequested() {
-    document.querySelectorAll("dialog[data-admin--dialog-open-on-load]").forEach((dialog) => {
-      dialog.removeAttribute("data-admin--dialog-open-on-load")
+    document.querySelectorAll("dialog[data-admin--ui--dialog-open-on-load]").forEach((dialog) => {
+      dialog.removeAttribute("data-admin--ui--dialog-open-on-load")
       if (dialog.open) return
       dialog.showModal()
       this.focusFirstField(dialog)
@@ -66,7 +66,7 @@ export default class extends Controller {
   // replaced the page or removed the card has nothing to return to, and one
   // that handed focus on itself is left alone).
   returnFocus(dialog, trigger) {
-    const button = trigger.closest?.("[role=menu]")?.closest("[data-controller~='admin--menu']")?.querySelector("[data-admin--menu-target='button']")
+    const button = trigger.closest?.("[role=menu]")?.closest("[data-controller~='admin--ui--menu']")?.querySelector("[data-admin--ui--menu-target='button']")
     if (!button) return
 
     // As `close` fires, focus has not reached <body> yet: the item it should

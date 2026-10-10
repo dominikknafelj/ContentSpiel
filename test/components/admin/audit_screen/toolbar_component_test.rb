@@ -9,7 +9,7 @@ class Admin::AuditScreen::ToolbarComponentTest < ViewComponent::TestCase
   test "one row of drop-downs, applied on change, with the date presets" do
     toolbar
 
-    assert_selector "form[data-controller='admin--auto-submit']"
+    assert_selector "form[data-controller='admin--ui--auto-submit']"
     %w[user_id event_action subject_type channel range].each { |id| assert_selector "select##{id}" }
     assert_selector "select#range option", count: 6 # Any time + five
     assert_selector "select#channel option", text: "Other"

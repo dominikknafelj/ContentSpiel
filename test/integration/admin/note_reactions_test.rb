@@ -145,7 +145,7 @@ class Admin::NoteReactionsTest < ActionDispatch::IntegrationTest
     assert_select "#note-message-#{reply.id} button[data-reaction]", count: 0
     hidden_at_rest = "[class~='opacity-0'][class~='group-hover/note:opacity-100'][class~='group-focus-within/note:opacity-100'][class~='open:opacity-100']"
     meta = "#note-message-#{reply.id}[class~='group/note'] > div:first-child > details[data-reaction-add=meta]#{hidden_at_rest}"
-    assert_select "#{meta} + [data-controller='admin--menu']" # just left of the "⋯" menu
+    assert_select "#{meta} + [data-controller='admin--ui--menu']" # just left of the "⋯" menu
     assert_select "#{meta} > summary[aria-label='Add a reaction'][class~='size-6'][class~='text-meta']"
     assert_select "#{meta} form[data-turbo-frame=notes]:has(input[name=on][value=true]) button[name=emoji]", count: Notes::EMOJI.size
     assert_select "#note-message-#{reply.id} [data-note-react]", text: "React"

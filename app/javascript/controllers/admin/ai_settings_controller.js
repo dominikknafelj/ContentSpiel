@@ -55,7 +55,7 @@ export default class extends Controller {
       this.refresh()
     }
     document.addEventListener("admin--save-bar:state", this.onState)
-    // The test's own submission. `admin--busy` (on the test form) disables the
+    // The test's own submission. `admin--ui--busy` (on the test form) disables the
     // button for the flight and, when the answer lands, puts it back ENABLED
     // from a snapshot -- which would undo this gate (a Model edited during the
     // flight, a refresh() that re-enabled it for a second concurrent provider

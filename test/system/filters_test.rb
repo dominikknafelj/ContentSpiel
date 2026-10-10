@@ -4,7 +4,7 @@ require "application_system_test_case"
 # without any button, focus stays in the search box across the reload, a
 # select applies on choosing, and Clear brings everything back (and empties
 # the search box -- the reason focus is restored by hand rather than with
-# `data-turbo-permanent`, see `admin--auto-submit`).
+# `data-turbo-permanent`, see `admin--ui--auto-submit`).
 class FiltersSystemTest < ApplicationSystemTestCase
   test "typing, choosing and clearing filter the posts list with no button" do
     site_settings(:default).update!(setup_completed_at: Time.current)

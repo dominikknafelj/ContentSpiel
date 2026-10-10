@@ -1,9 +1,9 @@
 <%= tag.div id: id, role: role, class: "admin-toast pointer-events-auto flex items-center gap-3 rounded-cs bg-ink px-4 py-2.5 text-sm text-paper shadow-menu",
-      data: { controller: "admin--toast", admin__toast_timeout_value: timeout, kind: kind,
-              action: "mouseenter->admin--toast#pause mouseleave->admin--toast#start focusin->admin--toast#pause focusout->admin--toast#start" } do %>
+      data: { controller: "admin--ui--toast", admin__ui__toast_timeout_value: timeout, kind: kind,
+              action: "mouseenter->admin--ui--toast#pause mouseleave->admin--ui--toast#start focusin->admin--ui--toast#pause focusout->admin--ui--toast#start" } do %>
   <span><%= message %></span>
   <% if action %>
     <%= button_to action[:label], action[:url], method: action_method, form: { class: "inline", data: { turbo_frame: "_top" } }, class: "cursor-pointer font-semibold underline" %>
   <% end %>
-  <button type="button" aria-label="<%= t(".dismiss") %>" data-action="admin--toast#dismiss" class="cursor-pointer text-lg leading-none opacity-70 after:content-['×'] hover:opacity-100"></button>
+  <button type="button" aria-label="<%= t(".dismiss") %>" data-action="admin--ui--toast#dismiss" class="cursor-pointer text-lg leading-none opacity-70 after:content-['×'] hover:opacity-100"></button>
 <% end %>

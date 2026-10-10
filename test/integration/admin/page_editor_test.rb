@@ -199,7 +199,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
       [ "2026-10-04T11:59", "2026-10-04T12:00" ].each do |value|
         post schedule_admin_page_path(page), params: { published_at: value }
         follow_redirect!
-        assert_select "dialog#schedule-page-#{page.id}[data-admin--dialog-open-on-load] [role=alert]", text: "Pick a time in the future."
+        assert_select "dialog#schedule-page-#{page.id}[data-admin--ui--dialog-open-on-load] [role=alert]", text: "Pick a time in the future."
         # A form error is never a toast.
         assert_select "#toasts .admin-toast", count: 0
         assert_nil page.reload.published_at
@@ -258,7 +258,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     follow_redirect!
     get admin_page_path(page)
     assert_select "dialog#schedule-page-#{page.id} [role=alert]", count: 0
-    assert_select "dialog#schedule-page-#{page.id}[data-admin--dialog-open-on-load]", count: 0
+    assert_select "dialog#schedule-page-#{page.id}[data-admin--ui--dialog-open-on-load]", count: 0
   end
 
   test "a time inside a daylight-saving gap is accepted the way the site zone resolves it" do
@@ -533,9 +533,9 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{landing.id}"
     assert_response :success
 
-    assert_select "fieldset[disabled] button[data-action='admin--override-field#reset']"
-    assert_select "fieldset[disabled] [data-controller='admin--char-count'] input[name='page[meta_title]']"
-    assert_select "fieldset[disabled] [data-controller='admin--char-count'] textarea[name='page[meta_description]']"
+    assert_select "fieldset[disabled] button[data-action='admin--ui--override-field#reset']"
+    assert_select "fieldset[disabled] [data-controller='admin--ui--char-count'] input[name='page[meta_title]']"
+    assert_select "fieldset[disabled] [data-controller='admin--ui--char-count'] textarea[name='page[meta_description]']"
     assert_select "form[data-controller~='admin--autosave']", count: 0
   end
 end

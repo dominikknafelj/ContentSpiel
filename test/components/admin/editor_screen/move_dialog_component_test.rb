@@ -21,7 +21,7 @@ class Admin::EditorScreen::MoveDialogComponentTest < ViewComponent::TestCase
   end
 
   test "a trigger fills the dialog before it opens it" do
-    assert_equal({ move: "into", action: "click->admin--blocks#askWhere admin--dialog#open", "admin--dialog-id-param": "move-block-dialog" },
+    assert_equal({ move: "into", action: "click->admin--blocks#askWhere admin--ui--dialog#open", "admin--ui--dialog-id-param": "move-block-dialog" },
       Admin::EditorScreen::MoveDialogComponent.trigger("into"))
   end
 end

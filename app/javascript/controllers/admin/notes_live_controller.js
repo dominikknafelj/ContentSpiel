@@ -934,7 +934,7 @@ export default class extends Controller {
       else message.append(row)
     }
     if (control) {
-      const menu = message.querySelector(":scope > div > [data-controller~='admin--menu']")
+      const menu = message.querySelector(":scope > div > [data-controller~='admin--ui--menu']")
       if (menu) menu.before(control)
       else message.firstElementChild?.append(control)
     }
@@ -1037,7 +1037,7 @@ export default class extends Controller {
 
   // "You have 3 new notes": in the place of the burst's named toasts, and of
   // itself when the count grows -- a new element, so its 8 seconds start
-  // again (`admin--toast` counts from when it connects). "Open" is the
+  // again (`admin--ui--toast` counts from when it connects). "Open" is the
   // template's own, which leads to the inbox.
   summarise() {
     burst.named.forEach((toast) => toast.remove())

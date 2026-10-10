@@ -16,14 +16,14 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", setup_step_path("admin"), text: "Continue"
   end
 
-  # The wizard loads `application` only, where `admin--clipboard` doesn't
+  # The wizard loads `application` only, where `admin--ui--clipboard` doesn't
   # exist: the shared rows must not draw a Copy button there.
   test "the system check shows the mail command but no dead Copy button" do
     get setup_step_path("system_check")
 
     assert_select "code", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND
     assert_select "button", text: "Copy", count: 0
-    assert_select "[data-controller='admin--clipboard']", count: 0
+    assert_select "[data-controller='admin--ui--clipboard']", count: 0
   end
 
   test "the step list marks the current step, done steps and optional ones" do

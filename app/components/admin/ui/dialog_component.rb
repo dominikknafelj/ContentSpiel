@@ -6,7 +6,7 @@ module Admin
     # and a confirm slot; a form dialog (new post, rename) passes its own
     # footer.
     #
-    # Opening is `Admin::DialogController` (`admin--dialog`), one instance on
+    # Opening is `Admin::DialogController` (`admin--ui--dialog`), one instance on
     # `<body>`, looking the dialog up by id -- so a trigger anywhere (even
     # one a Turbo Stream or a `<turbo-frame id="content">` response put on
     # the page later) opens it; see `Admin::DialogHelper#dialog_trigger`.
@@ -24,7 +24,7 @@ module Admin
 
       # `open_on_load:` marks a dialog the server wants open as soon as the page
       # appears (a form dialog whose submission was refused, with the message
-      # inside it): `admin--dialog` opens it on connect and on every Turbo load
+      # inside it): `admin--ui--dialog` opens it on connect and on every Turbo load
       # and strips the attribute, so a Turbo cache restore never reopens it.
       #
       # `hang: true` is for a dialog whose height changes while it is open (the New

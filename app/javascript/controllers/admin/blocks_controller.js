@@ -441,7 +441,7 @@ export default class extends Controller {
     const index = items.indexOf(item)
     if (index < 0 || index >= items.length - 1) return
     // The block itself is what moves, not the neighbour past it: its menu is
-    // closed by being moved (`admin--menu#disconnect`), and by nothing else
+    // closed by being moved (`admin--ui--menu#disconnect`), and by nothing else
     // here -- the menu's own close on a pick stands back from a disabled
     // item, which is what Move down has just become on a block that is now
     // the last.
@@ -464,7 +464,7 @@ export default class extends Controller {
   // A choice's value is its lane's id, looked up again when Move is pressed.
   //
   // This only FILLS the dialog and notes whose move it is. Showing it is
-  // `admin--dialog#open`, the next action of the same click (the item names
+  // `admin--ui--dialog#open`, the next action of the same click (the item names
   // both, in this order): the focus goes to the select, and comes back to
   // the block's "⋯" when the dialog is closed without a move.
   askWhere(event) {
@@ -744,7 +744,7 @@ export default class extends Controller {
   // Only when nothing has the focus: a person who went somewhere else while
   // the request was out is left there. "Nothing" includes an element that is
   // no longer drawn, which is where Chrome leaves the focus for a moment
-  // after a dialog or a menu closes (`admin--dialog#returnFocus`).
+  // after a dialog or a menu closes (`admin--ui--dialog#returnFocus`).
   focusMoved(item) {
     const active = document.activeElement
     if (active && active !== document.body && active.getClientRects().length > 0) return
@@ -1109,7 +1109,7 @@ export default class extends Controller {
   // its own; a card is asked for its handle first, so a menu inside its form
   // (the rich-text toolbar's) is never taken for it.
   focusItem(item) {
-    const control = item.querySelector(".admin-block-card__handle") || item.querySelector('[data-admin--menu-target="button"]')
+    const control = item.querySelector(".admin-block-card__handle") || item.querySelector('[data-admin--ui--menu-target="button"]')
     control?.focus()
   }
 

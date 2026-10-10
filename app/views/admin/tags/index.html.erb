@@ -95,17 +95,17 @@
 
   <%# The two dialogs, once. `admin--tag-dialogs` fills the open one from the
       trigger's `data-tag-*` (title, sentence, the form's URL) on
-      `admin--dialog:opening`, before it is shown. The URL templates carry a
+      `admin--ui--dialog:opening`, before it is shown. The URL templates carry a
       placeholder id the controller replaces. %>
   <div data-controller="admin--tag-dialogs"
        data-messages="<%= messages_data("tags.dialogs.delete_failed") %>"
        data-admin--tag-dialogs-merge-url-value="<%= merge_admin_tag_path("__ID__", **admin_url_options) %>"
        data-admin--tag-dialogs-delete-url-value="<%= admin_tag_path("__ID__", **admin_url_options) %>"
-       data-action="admin--dialog:opening@document->admin--tag-dialogs#opened change->admin--tag-dialogs#targetChanged turbo:submit-end->admin--tag-dialogs#submitted">
+       data-action="admin--ui--dialog:opening@document->admin--tag-dialogs#opened change->admin--tag-dialogs#targetChanged turbo:submit-end->admin--tag-dialogs#submitted">
 
     <%= render Admin::Ui::DialogComponent.new(id: "merge-tag-dialog", title: t(".merge_dialog.title"), width: :form_narrow) do |dialog| %>
       <%# `data-turbo-frame="_top"`: the answer is a redirect with a toast, shown by a full visit. %>
-      <%= form_with url: "#", method: :post, id: "merge-tag-form", data: { turbo_frame: "_top", "admin--tag-dialogs-target": "mergeForm", controller: "admin--busy" } do %>
+      <%= form_with url: "#", method: :post, id: "merge-tag-form", data: { turbo_frame: "_top", "admin--tag-dialogs-target": "mergeForm", controller: "admin--ui--busy" } do %>
         <%# The picker: one value, no "create new" path, the merged tag itself never offered
             (`admin--tag-dialogs` sets `exclude` per opening; `Tags::Merge` refuses it again
             on the server). Its controls live in this dialog's own form, so they feed no

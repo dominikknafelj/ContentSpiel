@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // The dashboard's quick-create row (`Admin::DashboardScreen::QuickCreateComponent`).
 // A post type just submits the form (a quick draft). Choosing "Page" opens the
 // New page dialog instead, with the typed title carried over: the form holds
-// a hidden real "New page" link wired to `admin--dialog#open`, and this
+// a hidden real "New page" link wired to `admin--ui--dialog#open`, and this
 // controller hands it the title as the `data-new-page-title-param` the dialog's
 // form (`admin--new-record`) presets from, then clicks it -- so the dialog is
 // opened by its one ordinary path and nothing here knows how a dialog works.

@@ -3,23 +3,23 @@ require "test_helper"
 class Admin::Ui::ToastComponentTest < ViewComponent::TestCase
   test "success is a status that hides after four seconds" do
     render_inline(Admin::Ui::ToastComponent.new(message: "Saved."))
-    assert_selector ".admin-toast[role=status][data-controller='admin--toast'][data-admin--toast-timeout-value='4000']", text: "Saved."
+    assert_selector ".admin-toast[role=status][data-controller='admin--ui--toast'][data-admin--ui--toast-timeout-value='4000']", text: "Saved."
   end
 
   test "undo carries its action and stays eight seconds" do
     render_inline(Admin::Ui::ToastComponent.new(message: "Moved to trash.", kind: :undo, action: { label: "Undo", url: "/undo", method: :post }))
-    assert_selector ".admin-toast[data-admin--toast-timeout-value='8000'] form[action='/undo'] button", text: "Undo"
+    assert_selector ".admin-toast[data-admin--ui--toast-timeout-value='8000'] form[action='/undo'] button", text: "Undo"
   end
 
   test "an error is an alert that stays until dismissed" do
     render_inline(Admin::Ui::ToastComponent.new(message: "Couldn't save.", kind: :error))
-    assert_selector ".admin-toast[role=alert][data-admin--toast-timeout-value='0']"
+    assert_selector ".admin-toast[role=alert][data-admin--ui--toast-timeout-value='0']"
     assert_selector ".admin-toast button[aria-label='Dismiss']"
   end
 
   test "a warning is an alert that stays until dismissed" do
     render_inline(Admin::Ui::ToastComponent.new(message: "Careful.", kind: :warning))
-    assert_selector ".admin-toast[role=alert][data-admin--toast-timeout-value='0']"
+    assert_selector ".admin-toast[role=alert][data-admin--ui--toast-timeout-value='0']"
   end
 
   test "the message is escaped" do
@@ -37,7 +37,7 @@ class Admin::Ui::ToastComponentTest < ViewComponent::TestCase
   # `data-turbo-temporary`: Turbo removes such an element from the *live*
   # page whenever it caches a snapshot, which a frame navigation promoted to
   # a history entry does too, deleting the toast that frame's response had
-  # just relayed. `admin--toast` strips toasts from cached renders instead
+  # just relayed. `admin--ui--toast` strips toasts from cached renders instead
   # (test/system/toast_test.rb: "going Back ... never brings its toast back").
   test "a toast is not data-turbo-temporary, which would delete a relayed toast as it appears" do
     render_inline(Admin::Ui::ToastComponent.new(message: "Moved.", kind: :undo, action: { label: "Undo", url: "/u" }))
@@ -75,7 +75,7 @@ class Admin::Ui::ToastRegionComponentTest < ViewComponent::TestCase
   # them away before they could be read.
   test "a warning stays until dismissed, keeps its Undo, and is an alert" do
     render_inline(Admin::Ui::ToastRegionComponent.new(flash: { warning: "Moved 2 posts to the trash. 1 was refused: “A”.", undo: { "label" => "Undo", "url" => "/u", "method" => "post" } }))
-    assert_selector "#toasts .admin-toast[role=alert][data-kind=warning][data-admin--toast-timeout-value='0']", text: "1 was refused"
+    assert_selector "#toasts .admin-toast[role=alert][data-kind=warning][data-admin--ui--toast-timeout-value='0']", text: "1 was refused"
     assert_selector "#toasts .admin-toast form[action='/u']"
   end
 

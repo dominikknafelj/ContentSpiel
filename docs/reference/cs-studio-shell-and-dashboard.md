@@ -26,7 +26,7 @@ Every CS Studio and MCP request also runs inside the **site time zone** (`site_s
 
 ## System status
 
-**System status** (`Admin::SystemStatusController`, `system_status.view`): "N of M checks passed · last run HH:MM", warnings first, each check an `Admin::Ui::SystemCheckRowComponent` (the setup wizard draws the same rows with `copyable: false`). A check may carry a console `command`, shown in a code box with Copy (`admin--clipboard`). The outgoing-mail warning's command resets a password through `Users::UpdatePassword` — never `update!` on the model — so it is audited and ends that user's sessions (`Setup::SystemCheck::MAIL_FALLBACK_COMMAND`, a static string). "Run checks again" is a GET with prefetch off, because the storage check writes and deletes a probe.
+**System status** (`Admin::SystemStatusController`, `system_status.view`): "N of M checks passed · last run HH:MM", warnings first, each check an `Admin::Ui::SystemCheckRowComponent` (the setup wizard draws the same rows with `copyable: false`). A check may carry a console `command`, shown in a code box with Copy (`admin--ui--clipboard`). The outgoing-mail warning's command resets a password through `Users::UpdatePassword` — never `update!` on the model — so it is audited and ends that user's sessions (`Setup::SystemCheck::MAIL_FALLBACK_COMMAND`, a static string). "Run checks again" is a GET with prefetch off, because the storage check writes and deletes a probe.
 
 ## The preview bar
 

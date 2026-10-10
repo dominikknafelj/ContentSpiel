@@ -11,7 +11,7 @@ module Admin
     # a close button and a padded body, and the palette is a bare search
     # field over a results list. It does reuse the `.admin-dialog` CSS (the
     # backdrop and max-width) and so the body-level backdrop-click and Esc
-    # handling `admin--dialog` already gives every dialog.
+    # handling `admin--ui--dialog` already gives every dialog.
     #
     # The frame has no `src` until the palette opens -- the controller sets
     # it then -- so no page load makes a request for a palette nobody

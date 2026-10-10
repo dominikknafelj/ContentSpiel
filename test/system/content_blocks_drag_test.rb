@@ -110,7 +110,7 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
 
   # The pick moves the card in the DOM before its click has reached the
   # menu's panel, which is what closes a menu on a pick: the menu went with
-  # the card and stayed open over it (`admin--menu#disconnect`).
+  # the card and stayed open over it (`admin--ui--menu#disconnect`).
   test "the card's menu is closed after its Move up, and the focus is on the card's handle" do
     sign_in_via_form(users(:one))
     visit admin_page_path(@page)

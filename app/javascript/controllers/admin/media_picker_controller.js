@@ -158,7 +158,7 @@ export default class extends Controller {
   }
 
   // True when the search box held text and was emptied. `change` (not `input`)
-  // so `admin--auto-submit` answers at once instead of after its typing delay.
+  // so `admin--ui--auto-submit` answers at once instead of after its typing delay.
   clearSearch(field) {
     const search = this.search
     if (!search || (field !== search && field !== this.element) || search.value === "") return false

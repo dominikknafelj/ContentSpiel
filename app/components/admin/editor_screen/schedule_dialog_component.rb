@@ -6,7 +6,7 @@ module Admin
     # schedule" at the bottom left. It posts to the page's or post's own
     # `schedule` route; a refusal comes back as the controller's
     # `flash[:schedule_error]`, which `HeaderComponent` hands in as `error:` so
-    # the dialog reopens (`data-admin--dialog-open-on-load`) with its own
+    # the dialog reopens (`data-admin--ui--dialog-open-on-load`) with its own
     # message -- a form error is never a toast.
     #
     # The input is `datetime-local` with `min` = now, which steers the native

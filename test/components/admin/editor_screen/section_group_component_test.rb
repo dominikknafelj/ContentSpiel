@@ -86,7 +86,7 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
 
     as(users(:one), channel: :admin) { render_group }
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@late)}.border-danger", text: "Unavailable type — gone/thing"
-    assert_selector "##{ActionView::RecordIdentifier.dom_id(@late)} button[data-admin--dialog-id-param='delete-block-#{@late.id}']", text: "Delete block…"
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(@late)} button[data-admin--ui--dialog-id-param='delete-block-#{@late.id}']", text: "Delete block…"
     assert_selector "dialog#delete-block-#{@late.id}", count: 1, visible: :all
 
     as(users(:reader), channel: :admin) { render_group }

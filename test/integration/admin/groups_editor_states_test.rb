@@ -31,7 +31,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
       assert_select "li[data-chip-value='#{users(:reader).id}'] input[type=hidden][name='group[member_ids][]'][data-save-bar-track]"
       assert_select "li[data-chip-value='#{users(:author).id}']", text: /author@example\.com/
       assert_select "li[data-chip-value='#{users(:author).id}'] [data-chip-hint]", count: 0
-      assert_select "[data-controller='admin--chip-input'][data-admin--chip-input-search-url-value='/cs-studio/users/suggest']"
+      assert_select "[data-controller='admin--ui--chip-input'][data-admin--ui--chip-input-search-url-value='/cs-studio/users/suggest']"
       assert_select "p", text: "Owners aren't listed: they already have every permission."
     end
     assert_select "input[type=checkbox][name='group[member_ids][]']", count: 0

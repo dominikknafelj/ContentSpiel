@@ -38,7 +38,7 @@ class Admin::MediaLibrary::ToolbarComponentTest < ViewComponent::TestCase
   test "the form auto-submits into the content frame, keeping the chosen image and the language" do
     render_inline Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "all", q: "sun", selected_id: 7, url_options: { locale: "de" })
 
-    assert_selector "form[data-controller='admin--auto-submit'][data-turbo-frame='content']"
+    assert_selector "form[data-controller='admin--ui--auto-submit'][data-turbo-frame='content']"
     assert_selector "input[type=hidden][name=selected][value='7']", visible: :all
     assert_selector "input[type=hidden][name=locale][value='de']", visible: :all
     assert_selector "input[type=search][name=q][value='sun']"
@@ -57,7 +57,7 @@ class Admin::MediaLibrary::ToolbarComponentTest < ViewComponent::TestCase
 
     render_inline Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "all", q: "dune", picker: true)
 
-    assert_selector "form[data-turbo-frame='media-picker-grid'][data-controller='admin--auto-submit']"
+    assert_selector "form[data-turbo-frame='media-picker-grid'][data-controller='admin--ui--auto-submit']"
     assert_no_selector "form[data-turbo-action]"
     assert_selector "input[type=hidden][name=picker][value='1']", visible: :all
     assert_selector "input#media-picker-q[type=search][value=dune]"

@@ -1,7 +1,7 @@
 module Admin
   module Ui
     # `Admin::Ui::ToastComponent`, one per kind. Each is wrapped in a `#toasts`
-    # region so `admin--toast` finds it and the fixed positioning applies.
+    # region so `admin--ui--toast` finds it and the fixed positioning applies.
     class ToastComponentPreview < ViewComponent::Preview
       def success
         render Admin::Ui::ToastRegionComponent.new(flash: { notice: "Saved." })

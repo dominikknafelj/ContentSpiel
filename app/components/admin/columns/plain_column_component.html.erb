@@ -11,16 +11,16 @@
 
     <%# With a soft counter, the controller wraps the input and its counter only (never the label or the
         translation pieces below), so the translate slot and suggestion box keep their own wrappers. %>
-    <%= tag.div(data: (counter? ? { controller: "admin--char-count", "admin--char-count-limit-value": counter } : {})) do %>
+    <%= tag.div(data: (counter? ? { controller: "admin--ui--char-count", "admin--ui--char-count-limit-value": counter } : {})) do %>
       <% if multiline %>
         <%= tag.textarea value, **input_html.merge(name: html_name, id: id, class: input_class, rows: 3, **invalid_attrs) %>
       <% else %>
         <%= tag.input(**input_html.merge(type: "text", name: html_name, id: id, value: value, class: input_class, **invalid_attrs)) %>
       <% end %>
       <% if counter? %>
-        <p id="<%= counter_id %>" class="mt-1 text-right font-cs-mono text-xs <%= counter_long? ? "text-warn-ink" : "text-meta" %>" data-admin--char-count-target="output"><%= counter_text %></p>
+        <p id="<%= counter_id %>" class="mt-1 text-right font-cs-mono text-xs <%= counter_long? ? "text-warn-ink" : "text-meta" %>" data-admin--ui--char-count-target="output"><%= counter_text %></p>
         <%# Only the crossing of the limit is announced, never each keystroke's count. %>
-        <p class="sr-only" role="status" data-admin--char-count-target="announcement"></p>
+        <p class="sr-only" role="status" data-admin--ui--char-count-target="announcement"></p>
       <% end %>
     <% end %>
     <% if override? %>

@@ -38,7 +38,7 @@ class Admin::EditorScreen::RelatedPostsComponentTest < ViewComponent::TestCase
   test "searches the post link targets in the editing locale" do
     render_inline Admin::EditorScreen::RelatedPostsComponent.new(post: create_post(title: "Hub"), locale: "de")
 
-    assert_selector "[data-admin--chip-input-search-url-value*='type=post'][data-admin--chip-input-search-url-value*='locale=de']"
+    assert_selector "[data-admin--ui--chip-input-search-url-value*='type=post'][data-admin--ui--chip-input-search-url-value*='locale=de']"
   end
 
   test "the post itself is never offered as a related post" do
@@ -46,6 +46,6 @@ class Admin::EditorScreen::RelatedPostsComponentTest < ViewComponent::TestCase
 
     render_inline Admin::EditorScreen::RelatedPostsComponent.new(post: post, locale: "en")
 
-    assert_selector "[data-admin--chip-input-exclude-value='[\"#{post.id}\"]']"
+    assert_selector "[data-admin--ui--chip-input-exclude-value='[\"#{post.id}\"]']"
   end
 end

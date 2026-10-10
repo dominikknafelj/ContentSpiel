@@ -10,7 +10,7 @@ module Admin
     # `post[tag_names][]`) plus a blank sentinel ahead of them, so a list the
     # editor emptied still submits the key and saves as empty -- absent would
     # mean "this PATCH says nothing about it" (`Admin::EditorScreen::RelatedPostsComponent`'s
-    # own class comment has the contract). `admin--chip-input` adds and removes
+    # own class comment has the contract). `admin--ui--chip-input` adds and removes
     # those inputs and dispatches a bubbling `change` from the sentinel, which
     # the form's autosave (`admin--autosave`) already listens for; typing in the
     # search box is swallowed at this component's root, so it never queues a
@@ -33,7 +33,7 @@ module Admin
     # name is a plain scalar (`block[settings][tag]`, no `[]`) and the blank
     # sentinel ahead of the one chip makes the chip win when there is one -- a
     # repeated scalar name reads as its last occurrence -- and "" when there is
-    # none. Choosing a suggestion replaces the chip it finds (`admin--chip-input`'s
+    # none. Choosing a suggestion replaces the chip it finds (`admin--ui--chip-input`'s
     # `single` value) instead of adding a second.
     #
     # `exclude:` lists values never offered as suggestions (a post's own id in
@@ -87,7 +87,7 @@ module Admin
 
       def remove_label(chip) = t(".remove", label: chip[:label])
 
-      # What `admin--chip-input` says and writes into the page, by key
+      # What `admin--ui--chip-input` says and writes into the page, by key
       # (`app/javascript/i18n/messages.js`): the same keys the server-rendered
       # chips above use, so a chip the script adds reads like one rendered here.
       # The noun is the caller's `noun:` (a key under `nouns`, each with the two

@@ -31,10 +31,10 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     render_settings(page.reload)
 
     assert_selector "details.admin-page-settings__seo:not([open]) summary", text: "SEO · META TITLE, META DESCRIPTION"
-    assert_selector "[data-controller='admin--char-count'][data-admin--char-count-limit-value='60'] input[name='page[meta_title]']", visible: :all
-    assert_selector "[data-controller='admin--char-count'][data-admin--char-count-limit-value='160'] textarea[name='page[meta_description]']", visible: :all
-    assert_selector "[data-admin--char-count-target='output']", text: "5 / 60", visible: :all
-    assert_selector "[data-admin--char-count-target='output']", text: "13 / 160", visible: :all
+    assert_selector "[data-controller='admin--ui--char-count'][data-admin--ui--char-count-limit-value='60'] input[name='page[meta_title]']", visible: :all
+    assert_selector "[data-controller='admin--ui--char-count'][data-admin--ui--char-count-limit-value='160'] textarea[name='page[meta_description]']", visible: :all
+    assert_selector "[data-admin--ui--char-count-target='output']", text: "5 / 60", visible: :all
+    assert_selector "[data-admin--ui--char-count-target='output']", text: "13 / 160", visible: :all
     assert_no_selector "input[name*='share'], input[name*='og_image']", visible: :all
   end
 
@@ -44,16 +44,16 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     assert_selector "input[name='page[hero_alt]'][placeholder='A dog on a beach']"
     assert_text "Empty uses the alt text from Media"
     assert_selector "button", text: "Reset", visible: :all, count: 1
-    assert_selector "[data-admin--override-field-target='reset'][hidden]", visible: :all
-    assert_selector "[data-admin--override-field-target='library'][hidden]", visible: :all
+    assert_selector "[data-admin--ui--override-field-target='reset'][hidden]", visible: :all
+    assert_selector "[data-admin--ui--override-field-target='library'][hidden]", visible: :all
   end
 
   test "an overridden hero alt shows Reset and the library text beneath" do
     render_settings(landing_with_hero(hero_alt: "My own alt"))
 
     assert_selector "input[name='page[hero_alt]'][value='My own alt']"
-    assert_no_selector "[data-admin--override-field-target='reset'][hidden]", visible: :all
-    assert_selector "[data-admin--override-field-target='library']:not([hidden])", text: "A dog on a beach"
-    assert_selector "button[data-action='admin--override-field#reset']", text: "Reset"
+    assert_no_selector "[data-admin--ui--override-field-target='reset'][hidden]", visible: :all
+    assert_selector "[data-admin--ui--override-field-target='library']:not([hidden])", text: "A dog on a beach"
+    assert_selector "button[data-action='admin--ui--override-field#reset']", text: "Reset"
   end
 end

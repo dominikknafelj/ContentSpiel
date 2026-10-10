@@ -21,7 +21,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # A raw colour literal, in any of the spellings CSS has for one:
   # - hex with 3, 4, 6 or 8 digits. The lookbehind is what keeps the things
-  #   that merely look like one out: a Stimulus action (`admin--menu#add`), a
+  #   that merely look like one out: a Stimulus action (`admin--ui--menu#add`), a
   #   Ruby interpolation (`"##{id}"`), an HTML character reference (`&#8203;`)
   #   and a URL fragment (`/path#fade`) all have a word character, `#`, `&` or
   #   `/` in front of the `#`. An id selector that happens to spell hex
@@ -78,7 +78,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       "hsl(210 50% 40%)", "hsla(210, 50%, 40%, .5)" ].each do |sample|
       assert_match RAW_COLOUR, sample
     end
-    [ 'find("#toasts")', "#content", 'action: "admin--menu#add"', "admin--tree#face", '"##{dom_id}"', "&#8203;", "&#x200b;",
+    [ 'find("#toasts")', "#content", 'action: "admin--ui--menu#add"', "admin--tree#face", '"##{dom_id}"', "&#8203;", "&#x200b;",
       "/cs-studio/pages#add", "#fade-in", "issue #12345", "#abcde" ].each do |sample|
       assert_no_match RAW_COLOUR, sample
     end

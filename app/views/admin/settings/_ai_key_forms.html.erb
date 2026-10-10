@@ -10,7 +10,7 @@
     deliberately not read from the main form's live field. %>
 <div id="settings-ai-key-forms">
   <%= form_with method: :post, id: "settings-ai-test-form", html: { class: "hidden" },
-        data: { controller: "admin--busy" }, url: test_ai_connection_admin_settings_path do end %>
+        data: { controller: "admin--ui--busy" }, url: test_ai_connection_admin_settings_path do end %>
   <%= form_with url: admin_settings_ai_key_path, method: :patch, id: Admin::SettingsScreen::AiKeyComponent::KEY_FORM, html: { class: "hidden" } do %>
     <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
   <% end %>

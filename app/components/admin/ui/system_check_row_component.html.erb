@@ -12,12 +12,12 @@
           itself and the status line can speak politely; without JavaScript
           (or in the wizard) the command is plain selectable text. %>
       <div class="mt-2 flex items-start gap-2 rounded-cs border border-line bg-sunken p-2"
-           <% if copyable? %>data-controller="admin--clipboard" data-admin--clipboard-text-value="<%= result.command %>"<% end %>>
-        <code class="min-w-0 flex-1 break-words font-cs-mono text-[13px] text-ink" <% if copyable? %>data-admin--clipboard-target="source"<% end %>><%= result.command %></code>
+           <% if copyable? %>data-controller="admin--ui--clipboard" data-admin--ui--clipboard-text-value="<%= result.command %>"<% end %>>
+        <code class="min-w-0 flex-1 break-words font-cs-mono text-[13px] text-ink" <% if copyable? %>data-admin--ui--clipboard-target="source"<% end %>><%= result.command %></code>
         <% if copyable? %>
-          <button type="button" data-admin--clipboard-target="button" data-action="click->admin--clipboard#copy" aria-label="Copy command for <%= result.label %>"
+          <button type="button" data-admin--ui--clipboard-target="button" data-action="click->admin--ui--clipboard#copy" aria-label="Copy command for <%= result.label %>"
                   class="shrink-0 cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-sm text-ink hover:bg-sunken">Copy</button>
-          <span data-admin--clipboard-target="status" role="status" aria-live="polite" class="sr-only"></span>
+          <span data-admin--ui--clipboard-target="status" role="status" aria-live="polite" class="sr-only"></span>
         <% end %>
       </div>
     <% end %>

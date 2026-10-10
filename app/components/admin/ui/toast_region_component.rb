@@ -16,7 +16,7 @@ module Admin
     # `relay: true` renders only the toasts, with no container: the layout uses
     # that inside `<turbo-frame id="content">` for a frame request, whose
     # response keeps nothing outside the frame, so a flash rendered into the
-    # region would be consumed and lost. `admin--toast` moves a toast that sits
+    # region would be consumed and lost. `admin--ui--toast` moves a toast that sits
     # outside `#toasts` into it.
     #
     # Deliberately NOT `data-turbo-permanent`: Turbo would keep the old region

@@ -142,7 +142,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { picker: 1 }
 
     assert_select "turbo-frame#media-picker-grid form[data-turbo-frame='media-picker-grid']" do
-      assert_select "form[data-controller='admin--auto-submit']"
+      assert_select "form[data-controller='admin--ui--auto-submit']"
       assert_select "input[type=search][name=q]"
       assert_select "input[type=radio][name=filter]", count: 4
       assert_select "input[type=radio][value=untranslated]", count: 0

@@ -16,7 +16,7 @@ class Admin::PostsScreen::ToolbarComponentTest < ViewComponent::TestCase
 
   test "a GET form that applies as it changes, with the four counts in a radio group" do
     render_toolbar(scope: "drafts")
-    assert_selector "form[method=get][data-controller='admin--auto-submit'][data-turbo-frame=content]"
+    assert_selector "form[method=get][data-controller='admin--ui--auto-submit'][data-turbo-frame=content]"
     assert_selector "fieldset legend", text: "Show", visible: :all
     assert_selector "label[for=posts-scope-all]", text: /All\s*128/
     assert_selector "label[for=posts-scope-live]", text: /Live\s*96/

@@ -22,7 +22,7 @@ class Admin::EditorScreen::ScheduleDialogComponentTest < ViewComponent::TestCase
     assert_selector "dialog##{id}", text: "Berlin time (GMT+2), the site’s time zone.", visible: :all
     assert_no_selector "button", text: "Remove schedule", visible: :all
     assert_no_selector "[role=alert]", visible: :all
-    assert_no_selector "dialog[data-admin--dialog-open-on-load]", visible: :all
+    assert_no_selector "dialog[data-admin--ui--dialog-open-on-load]", visible: :all
     assert_selector "form[action='/cs-studio/pages/#{page_record.id}/schedule'][data-turbo-frame='_top'][novalidate]", visible: :all
   end
 
@@ -42,7 +42,7 @@ class Admin::EditorScreen::ScheduleDialogComponentTest < ViewComponent::TestCase
   test "an error shows as an alert, marks the field invalid and asks to be opened on load" do
     page_record = create_page(title: "Later", published: false)
     render_dialog(page_record, error: "Pick a time in the future.")
-    assert_selector "dialog[data-admin--dialog-open-on-load] [role=alert]", text: "Pick a time in the future.", visible: :all
+    assert_selector "dialog[data-admin--ui--dialog-open-on-load] [role=alert]", text: "Pick a time in the future.", visible: :all
     assert_selector "input[name=published_at][aria-invalid=true]", visible: :all
   end
 

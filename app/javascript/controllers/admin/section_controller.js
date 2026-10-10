@@ -82,7 +82,7 @@ export default class extends Controller {
   // write queue -- and sent at once rather than after the debounce: a layout
   // is one deliberate choice, and its answer redraws the lanes.
   //
-  // The item pressed is in a menu that closes on the pick (`admin--menu
+  // The item pressed is in a menu that closes on the pick (`admin--ui--menu
   // #select`, which runs after this on the same click), and a hidden button
   // cannot keep the focus: it goes to the menu's button here, whether or not
   // anything is sent.
@@ -185,9 +185,9 @@ export default class extends Controller {
   // it: a menu, a suggestion list or a dialog closes itself on Escape, and
   // the same key press must not also take the form away. Their listeners sit
   // on descendants of the card, so they have run by the time this one does,
-  // and each marks the press as handled (`admin--menu#keydown`, the rich-text
+  // and each marks the press as handled (`admin--ui--menu#keydown`, the rich-text
   // popover and `admin--blocks#key` for a picked-up card call
-  // `preventDefault`; `admin--chip-input` and the link search also stop it
+  // `preventDefault`; `admin--ui--chip-input` and the link search also stop it
   // from getting here at all). The checks after `defaultPrevented` are for a
   // widget that closes on Escape without saying so: the press is left alone
   // while it comes from inside a menu, a list or an open dialog, or while a
@@ -197,7 +197,7 @@ export default class extends Controller {
     if (!id || event.defaultPrevented) return
     const target = event.target
     if (target.closest("[role=menu], [role=listbox], dialog[open]")) return
-    if (target.closest("[data-controller~='admin--menu']")?.querySelector("[aria-expanded=true]")) return
+    if (target.closest("[data-controller~='admin--ui--menu']")?.querySelector("[aria-expanded=true]")) return
     if (this.panelFor(id)?.querySelector("[role=listbox]:not([hidden])")) return
 
     event.preventDefault()

@@ -7,12 +7,12 @@ module Admin
     # header's "⋯", a block card's "⋯", a posts-list row's "⋯" and the New post
     # split button's caret) -- there is no `<details>` menu left.
     # Each item is arbitrary content -- a `link_to` or a `button_to` -- and
-    # `admin--menu` gives every link or button inside the panel
+    # `admin--ui--menu` gives every link or button inside the panel
     # `role="menuitem"` and the keyboard behaviour.
     #
     # `aria_label` names an icon-only trigger (the editor header's "⋯": the label
     # is the glyph, the name is "More actions"). `close_on_select` closes the
-    # panel after a pick (`admin--menu#select`), for a menu whose items open a
+    # panel after a pick (`admin--ui--menu#select`), for a menu whose items open a
     # dialog or reveal a panel and so would otherwise stay open behind it; the
     # older menus keep their panel open, as before.
     #
@@ -36,7 +36,7 @@ module Admin
 
       attr_reader :label, :align, :button_class, :aria_label, :close_on_select
 
-      def panel_data = close_on_select ? { action: "click->admin--menu#select" } : {}
+      def panel_data = close_on_select ? { action: "click->admin--ui--menu#select" } : {}
 
       def button_classes = button_class || "inline-flex cursor-pointer items-center gap-1 rounded-cs px-2 py-1 text-sm text-meta hover:bg-sunken hover:text-ink"
 

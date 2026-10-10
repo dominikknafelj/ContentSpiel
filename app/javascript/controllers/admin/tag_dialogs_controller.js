@@ -7,13 +7,13 @@ import { messages } from "i18n/messages"
 // the dialog with `data: dialog_trigger(id)` and carries that row's facts as
 // `data-tag-*` attributes (the id, the name, the already-worded title and
 // sentence -- `Admin::TagsHelper` chooses them from the locale file, so the copy is tested in Ruby).
-// `admin--dialog#open` announces the opening (`admin--dialog:opening`, on
+// `admin--ui--dialog#open` announces the opening (`admin--ui--dialog:opening`, on
 // `document`, before the dialog is shown) with the trigger; this controller
 // reads the trigger and fills the dialog, the way `admin--new-record` does for
 // the New page dialog.
 //
 // Merge: sets the title and the sentence, points the form at
-// `POST /tags/:id/merge`, and resets the picker -- an `admin--chip-input`
+// `POST /tags/:id/merge`, and resets the picker -- an `admin--ui--chip-input`
 // (`single`, no create) over the tag suggestions. Its `exclude` value is set
 // per opening to the source's own name, so the tag being merged is never
 // offered (`Tags::Merge` refuses it again on the server). "Merge tags" is
@@ -64,11 +64,11 @@ export default class extends Controller {
     this.mergeTextTarget.textContent = this.reword(data.tagMergeText, data, name)
     this.mergeFormTarget.action = this.mergeUrlValue.replace("__ID__", encodeURIComponent(data.tagId))
 
-    const picker = this.mergeFormTarget.querySelector("[data-controller~='admin--chip-input']")
-    picker.setAttribute("data-admin--chip-input-exclude-value", JSON.stringify([name]))
+    const picker = this.mergeFormTarget.querySelector("[data-controller~='admin--ui--chip-input']")
+    picker.setAttribute("data-admin--ui--chip-input-exclude-value", JSON.stringify([name]))
     // Through the picker's own controller, so an answer still on its way from
     // the last opening is dropped and `aria-expanded` follows the list.
-    this.application.getControllerForElementAndIdentifier(picker, "admin--chip-input")?.reset()
+    this.application.getControllerForElementAndIdentifier(picker, "admin--ui--chip-input")?.reset()
     this.mergeButtonTarget.disabled = true
   }
 

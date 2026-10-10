@@ -29,9 +29,9 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
 
     assert_selector "code", text: command
     assert_no_selector "code b"
-    assert_equal command, page.find("[data-controller='admin--clipboard']")["data-admin--clipboard-text-value"]
-    assert_selector "button[data-action='click->admin--clipboard#copy']", text: "Copy"
-    assert_selector "[data-admin--clipboard-target=status][aria-live=polite]", visible: :all
+    assert_equal command, page.find("[data-controller='admin--ui--clipboard']")["data-admin--ui--clipboard-text-value"]
+    assert_selector "button[data-action='click->admin--ui--clipboard#copy']", text: "Copy"
+    assert_selector "[data-admin--ui--clipboard-target=status][aria-live=polite]", visible: :all
   end
 
   test "not copyable (the setup wizard): the command shows but there is no Copy button or controller" do

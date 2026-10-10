@@ -208,7 +208,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    hang_test.rb` pins it. */
 .admin-dialog[data-dialog-hang] { margin-top: 7.5vh; }
 
-/* The busy button's spinner (`admin--busy`): 11px, inherits the label's colour. */
+/* The busy button's spinner (`admin--ui--busy`): 11px, inherits the label's colour. */
 .admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .admin-spinner { animation-duration: 2s; } }

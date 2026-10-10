@@ -74,7 +74,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_card(block, page: page)
 
-    assert_selector "[role=menu] button[disabled][data-move='into'][data-action='click->admin--blocks#askWhere admin--dialog#open'][data-admin--dialog-id-param='move-block-dialog']",
+    assert_selector "[role=menu] button[disabled][data-move='into'][data-action='click->admin--blocks#askWhere admin--ui--dialog#open'][data-admin--ui--dialog-id-param='move-block-dialog']",
       text: "Move into section…", visible: :all
   end
 
@@ -121,7 +121,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_card(block, page: page)
 
-    assert_selector "[role=menu] button[data-admin--dialog-id-param='delete-block-#{block.id}']", text: "Delete block…", visible: :all
+    assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='delete-block-#{block.id}']", text: "Delete block…", visible: :all
     assert_selector "dialog#delete-block-#{block.id}", visible: :all
     assert_text "Delete this block?", normalize_ws: true
     assert_text "Blocks don’t go to the trash. This can’t be undone.", normalize_ws: true
@@ -136,9 +136,9 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_card(block, page: page)
 
     assert_selector ".admin-block-settings-row select[name='block[settings][content_type]']"
-    assert_selector ".admin-block-settings-row [data-controller='admin--chip-input'][data-admin--chip-input-single-value='true'][data-admin--chip-input-create-value='false']"
+    assert_selector ".admin-block-settings-row [data-controller='admin--ui--chip-input'][data-admin--ui--chip-input-single-value='true'][data-admin--ui--chip-input-create-value='false']"
     assert_selector ".admin-block-settings-row input[type=hidden][name='block[settings][tag]'][value='news']", visible: :all
-    assert_selector ".admin-block-settings-row [data-admin--chip-input-search-url-value$='/tags/suggest']"
+    assert_selector ".admin-block-settings-row [data-admin--ui--chip-input-search-url-value$='/tags/suggest']"
     assert_selector ".admin-block-settings-row input[type=number][name='block[settings][limit]'][value='3']"
     assert_selector "##{prefix}-limit-errors", visible: :all
     assert_selector "##{prefix}-tag-errors", visible: :all
@@ -195,8 +195,8 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     assert_selector "input##{prefix}-alt[name='block[alt]'][placeholder='A dog'][value='Mine']"
     assert_selector "input##{prefix}-caption[name='block[caption]'][placeholder='Our dog']"
-    assert_selector "[data-admin--override-field-input-id-value='#{prefix}-alt']"
-    assert_selector "[data-admin--override-field-input-id-value='#{prefix}-caption']"
+    assert_selector "[data-admin--ui--override-field-input-id-value='#{prefix}-alt']"
+    assert_selector "[data-admin--ui--override-field-input-id-value='#{prefix}-caption']"
     assert_text "Empty uses the alt text from Media"
     assert_text "Empty uses the caption from Media"
   end

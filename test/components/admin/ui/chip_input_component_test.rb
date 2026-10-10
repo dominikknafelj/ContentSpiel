@@ -19,7 +19,7 @@ class Admin::Ui::ChipInputComponentTest < ViewComponent::TestCase
 
   test "its script gets whole sentences per noun, never one glued from a noun" do
     render_chips(noun: "tag")
-    messages = JSON.parse(page.find("[data-controller='admin--chip-input']")["data-messages"])
+    messages = JSON.parse(page.find("[data-controller='admin--ui--chip-input']")["data-messages"])
 
     assert_equal "No matching tags.", messages["components.ui.chip_input.nouns.tag.no_matches"]
     assert_equal "Create tag “%{label}”", messages["components.ui.chip_input.nouns.tag.create"]
@@ -77,7 +77,7 @@ class Admin::Ui::ChipInputComponentTest < ViewComponent::TestCase
   test "the controller's configuration is on the root" do
     render_chips(create: true, noun: "tag")
 
-    assert_selector "[data-controller='admin--chip-input'][data-admin--chip-input-search-url-value='/cs-studio/tags/suggest'][data-admin--chip-input-create-value='true']"
+    assert_selector "[data-controller='admin--ui--chip-input'][data-admin--ui--chip-input-search-url-value='/cs-studio/tags/suggest'][data-admin--ui--chip-input-create-value='true']"
   end
 
   test "errors and the hidden note render" do
@@ -90,7 +90,7 @@ class Admin::Ui::ChipInputComponentTest < ViewComponent::TestCase
   test "a single-value input names a plain scalar, flags the controller and keeps the one chip's hidden input" do
     render_chips(name: "block[settings][tag]", id: "block-1-tag", chips: [ { value: "news", label: "news" } ], single: true, create: false)
 
-    assert_selector "[data-controller='admin--chip-input'][data-admin--chip-input-single-value='true']"
+    assert_selector "[data-controller='admin--ui--chip-input'][data-admin--ui--chip-input-single-value='true']"
     assert_selector "input[type=hidden][name='block[settings][tag]']", count: 2, visible: :all
     assert_selector "li[data-chip-value='news'] input[type=hidden][name='block[settings][tag]'][value='news']", visible: :all
     assert_selector "[data-field-name='tag']"
@@ -99,12 +99,12 @@ class Admin::Ui::ChipInputComponentTest < ViewComponent::TestCase
   test "is multi-value unless asked" do
     render_chips
 
-    assert_selector "[data-admin--chip-input-single-value='false']"
+    assert_selector "[data-admin--ui--chip-input-single-value='false']"
   end
 
   test "exclude, lowercase and max_length reach the controller as values" do
     render_chips(exclude: [ 12 ], lowercase: true, max_length: 50)
 
-    assert_selector "[data-admin--chip-input-exclude-value='[\"12\"]'][data-admin--chip-input-lowercase-value='true'][data-admin--chip-input-max-length-value='50']"
+    assert_selector "[data-admin--ui--chip-input-exclude-value='[\"12\"]'][data-admin--ui--chip-input-lowercase-value='true'][data-admin--ui--chip-input-max-length-value='50']"
   end
 end

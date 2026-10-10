@@ -50,13 +50,13 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_selector "[role=toolbar].flex-wrap"
     assert_selector "[role=toolbar] [role=group].shrink-0", minimum: 3
     assert_selector "[role=toolbar] [role=separator]", minimum: 3
-    assert_selector "[role=toolbar] [data-controller='admin--menu'] button[aria-haspopup=menu]", text: "Insert"
+    assert_selector "[role=toolbar] [data-controller='admin--ui--menu'] button[aria-haspopup=menu]", text: "Insert"
     %w[Image YouTube].each do |label|
       assert_selector "[role=toolbar] [role=menu] button", text: label, visible: :all
     end
     assert_no_selector "[role=toolbar] > button", text: "Image"
     # Every menu item closes the menu before its command runs.
-    assert page.all("[role=menu] button", visible: :all).all? { |button| button["data-action"].include?("click->admin--menu#close") }
+    assert page.all("[role=menu] button", visible: :all).all? { |button| button["data-action"].include?("click->admin--ui--menu#close") }
   end
 
   # Only toggle buttons announce a pressed state; the ones that open a

@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 
 // Notes on an editor screen (notes spec §4.1, §4.3). Lives on <body>, like
-// `admin--dialog`: the header's button, the markers on the block cards and
+// `admin--ui--dialog`: the header's button, the markers on the block cards and
 // the drawer are far apart in the document, and cards come and go by Turbo
 // Stream without the screen being drawn again.
 //
@@ -225,7 +225,7 @@ export default class extends Controller {
       const key = from.dataset.notesKey
       const marker = key ? this.markerTargets.find((candidate) => candidate.dataset.notesKey === key) : null
       if (marker && this.laidOut(marker) && window.getComputedStyle(marker).opacity !== "0") return marker
-      const menu = from.closest("[data-controller~='admin--menu']")?.querySelector("[aria-haspopup='menu']")
+      const menu = from.closest("[data-controller~='admin--ui--menu']")?.querySelector("[aria-haspopup='menu']")
       if (menu && this.laidOut(menu)) return menu
     }
     return this.hasOpenerTarget ? this.openerTarget : null

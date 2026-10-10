@@ -17,7 +17,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     travel_to Time.zone.local(2026, 10, 4, 12, 0) do
       post schedule_admin_post_path(post_record), params: { published_at: "2026-10-04T12:00" }
       follow_redirect!
-      assert_select "dialog#schedule-post-#{post_record.id}[data-admin--dialog-open-on-load] [role=alert]", text: "Pick a time in the future."
+      assert_select "dialog#schedule-post-#{post_record.id}[data-admin--ui--dialog-open-on-load] [role=alert]", text: "Pick a time in the future."
       assert_select "#toasts .admin-toast", count: 0
       assert_nil post_record.reload.published_at
 
@@ -483,7 +483,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/posts/#{post_record.id}"
 
-    assert_select "[data-controller~='admin--chip-input'][data-admin--chip-input-search-url-value='/cs-studio/link_targets?locale=en&type=post']" do
+    assert_select "[data-controller~='admin--ui--chip-input'][data-admin--ui--chip-input-search-url-value='/cs-studio/link_targets?locale=en&type=post']" do
       assert_select "input[type=hidden][name='post[related_post_ids][]'][value='']", 1
       assert_select "input[type=hidden][name='post[related_post_ids][]'][value='#{related.id}']", 1
       assert_select "li", text: /Related one/

@@ -5,7 +5,7 @@ module Admin
     # The Media grid's toolbar (round 3, Task 8, handoff §4.6): an instant
     # search and the segments All / Unused / Missing alt / Untranslated / Mine,
     # each with its count. One GET form that applies as it changes
-    # (`admin--auto-submit`, no Filter button, only the `content` frame
+    # (`admin--ui--auto-submit`, no Filter button, only the `content` frame
     # reloads), like the posts list's (`Admin::PostsScreen::ToolbarComponent`,
     # whose radio-group shape this follows: one tab stop, arrows move it).
     #

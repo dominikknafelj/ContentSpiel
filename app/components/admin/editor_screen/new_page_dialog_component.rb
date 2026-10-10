@@ -15,7 +15,7 @@ module Admin
     #
     # Opened with `data: dialog_trigger("new-page-dialog")` merged with
     # `"new-page-parent-id-param": id` and `"new-page-title-param": text`
-    # (read from the trigger's own attributes on the `admin--dialog:opening` event).
+    # (read from the trigger's own attributes on the `admin--ui--dialog:opening` event).
     class NewPageDialogComponent < Admin::AdminComponent
       ID = "new-page-dialog".freeze
       FRAME_ID = "new-page-form-frame".freeze

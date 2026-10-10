@@ -50,8 +50,8 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_select "#language-en select[disabled] option[selected][value='']", text: "None (default)"
     # The default's row has only the inert spacer copy of the button (it keeps the columns in line).
     assert_select "#language-en button:not([disabled])", text: "Turn off…", count: 0
-    assert_select "#language-en button[data-admin--dialog-id-param^='language-off-dialog']", count: 0
-    assert_select "#language-de button[data-admin--dialog-id-param='language-off-dialog-de']", text: "Turn off…"
+    assert_select "#language-en button[data-admin--ui--dialog-id-param^='language-off-dialog']", count: 0
+    assert_select "#language-de button[data-admin--ui--dialog-id-param='language-off-dialog-de']", text: "Turn off…"
   end
 
   test "the default is a tag and buttons, never a field of the Settings form, and the instant actions sit outside it" do
@@ -62,7 +62,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_select "#settings-languages-card input[type=radio]", count: 0
     assert_select "#language-en [data-default-tag]", text: "Default"
     assert_select "#settings-languages-card button[type=button]:not([name])", text: "Make default", count: 2
-    assert_select "#language-de button[data-admin--dialog-id-param='language-default-dialog-de'][aria-label='Make Deutsch the default language']"
+    assert_select "#language-de button[data-admin--ui--dialog-id-param='language-default-dialog-de'][aria-label='Make Deutsch the default language']"
     assert_select "form#settings-form form", count: 0
     assert_select "form#language-default-form", count: 0
     assert_select "form#language-add-form[action='/cs-studio/settings/languages'][method=post]"

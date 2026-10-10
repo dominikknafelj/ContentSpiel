@@ -8,7 +8,7 @@ module Admin
     # with a Copy button.
     #
     # `copyable:` is off in the setup wizard. The wizard loads the `application`
-    # entry point only, and `admin--clipboard` is an admin controller, so a Copy
+    # entry point only, and `admin--ui--clipboard` is an admin controller, so a Copy
     # button there would be dead; the command is still shown, in a box a visitor
     # can select, and the browser's own copy does the rest.
     #

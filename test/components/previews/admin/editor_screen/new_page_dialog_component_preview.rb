@@ -1,7 +1,7 @@
 module Admin
   module EditorScreen
     # `Admin::EditorScreen::NewPageDialogComponent`: the dialog starts closed
-    # (Lookbook's layout has no `admin--dialog` on `<body>`), so open it from the
+    # (Lookbook's layout has no `admin--ui--dialog` on `<body>`), so open it from the
     # console with `document.querySelector("dialog").showModal()`. `form` shows
     # the form alone, as the no-JS page renders it; `with_error` is a refused
     # create's replacement form.

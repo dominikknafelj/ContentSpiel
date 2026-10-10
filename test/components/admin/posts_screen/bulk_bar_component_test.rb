@@ -10,7 +10,7 @@ class Admin::PostsScreen::BulkBarComponentTest < ViewComponent::TestCase
     assert_selector "p.sr-only[role=status][aria-live=polite][aria-atomic=true][data-admin--bulk-select-target=status]", visible: :all
     assert_selector "[data-admin--bulk-select-target=count]", text: "0", visible: :all
     assert_selector "[data-admin--bulk-select-target=bar] button[data-action='admin--bulk-select#clear']", text: "Clear", visible: :all
-    assert_selector "button[data-admin--dialog-id-param=bulk-trash-dialog]", text: "Move to trash", visible: :all
+    assert_selector "button[data-admin--ui--dialog-id-param=bulk-trash-dialog]", text: "Move to trash", visible: :all
   end
 
   test "Publish and the trash confirmation are separate forms that repeat the list's filters and hold an ids container" do

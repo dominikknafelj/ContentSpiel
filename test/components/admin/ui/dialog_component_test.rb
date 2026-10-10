@@ -11,10 +11,10 @@ class Admin::Ui::DialogComponentTest < ViewComponent::TestCase
 
   test "open_on_load marks the dialog for the server-requested open, and is absent otherwise" do
     render_inline(Admin::Ui::DialogComponent.new(id: "d4", title: "t", open_on_load: true)) { "Body" }
-    assert_selector "dialog#d4[data-admin--dialog-open-on-load]", visible: :all
+    assert_selector "dialog#d4[data-admin--ui--dialog-open-on-load]", visible: :all
 
     render_inline(Admin::Ui::DialogComponent.new(id: "d5", title: "t")) { "Body" }
-    assert_no_selector "dialog#d5[data-admin--dialog-open-on-load]", visible: :all
+    assert_no_selector "dialog#d5[data-admin--ui--dialog-open-on-load]", visible: :all
   end
 
   # Round 3 Task 9: a dialog whose height changes while open hangs from a fixed

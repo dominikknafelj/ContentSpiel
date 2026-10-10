@@ -3,7 +3,7 @@ module Admin
     # The posts list's toolbar (design pass round 2, Task 17, handoff §4.3):
     # title search, a segmented control with counts -- "All 128 · Live 96 ·
     # Drafts 20 · Scheduled 12" -- and Type, Tag and Translation drop-downs.
-    # One GET form that applies as it changes (`admin--auto-submit`, no
+    # One GET form that applies as it changes (`admin--ui--auto-submit`, no
     # Filter button; `FilterHelper#filter_form_options`), reloading only the
     # `content` frame. "Clear" appears when anything is active.
     #

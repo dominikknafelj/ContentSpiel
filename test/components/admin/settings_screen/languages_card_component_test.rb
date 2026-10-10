@@ -21,7 +21,7 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     assert_no_selector "input[type=radio]"
     assert_selector "#language-de [data-default-tag]", text: "Default"
     assert_no_selector "#language-de button", text: "Make default"
-    assert_selector "#language-en button[aria-label='Make English the default language'][data-admin--dialog-id-param='language-default-dialog-en'][data-admin--pending-lock-target=control]", text: "Make default"
+    assert_selector "#language-en button[aria-label='Make English the default language'][data-admin--ui--dialog-id-param='language-default-dialog-en'][data-admin--pending-lock-target=control]", text: "Make default"
     assert_selector "button", text: "Make default", count: 2
     assert_selector "#language-en-fallback option[selected][value=de]"
     assert_selector "#language-de-fallback[disabled]"

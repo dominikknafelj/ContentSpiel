@@ -7,8 +7,8 @@ import { slugify } from "controllers/admin/slug_preview_controller"
 // line, an empty <turbo-frame> and a disabled Create button -- and this
 // controller fills it:
 //
-// 1. Loads the form when the dialog opens. `admin--dialog#open` announces the
-//    opening (`admin--dialog:opening`, on `document`) with the trigger that was
+// 1. Loads the form when the dialog opens. `admin--ui--dialog#open` announces the
+//    opening (`admin--ui--dialog:opening`, on `document`) with the trigger that was
 //    clicked; the trigger's own attributes carry the preset --
 //    `data-new-page-parent-id-param` / `data-new-page-title-param`, or
 //    `data-new-post-type-param` / `data-new-post-title-param` -- and become query

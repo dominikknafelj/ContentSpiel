@@ -1,6 +1,6 @@
 <%= render Admin::Ui::DialogComponent.new(id: ID, title: "New page", width: :form, hang: true) do |dialog| %>
   <div data-controller="admin--new-record" data-admin--new-record-kind-value="page" data-admin--new-record-url-value="<%= form_url %>"
-       data-action="admin--dialog:opening@document->admin--new-record#opened input->admin--new-record#update change->admin--new-record#update turbo:submit-start->admin--new-record#submitting turbo:submit-end->admin--new-record#submitted turbo:frame-missing->admin--new-record#failed turbo:before-fetch-response->admin--new-record#checkResponse turbo:fetch-request-error->admin--new-record#failed">
+       data-action="admin--ui--dialog:opening@document->admin--new-record#opened input->admin--new-record#update change->admin--new-record#update turbo:submit-start->admin--new-record#submitting turbo:submit-end->admin--new-record#submitted turbo:frame-missing->admin--new-record#failed turbo:before-fetch-response->admin--new-record#checkResponse turbo:fetch-request-error->admin--new-record#failed">
     <p data-admin--new-record-target="loading" class="py-6 text-center text-dim">Loading…</p>
     <%# The two failure messages are written into their `role="alert"` elements when
         they happen (`admin--new-record`): an alert whose text was already in the page and was

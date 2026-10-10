@@ -63,7 +63,7 @@ export default class extends Controller {
   }
 
   // Closes the palette without following anything: a row that opens another
-  // dialog (New page, New post) calls this first, then `admin--dialog#open`.
+  // dialog (New page, New post) calls this first, then `admin--ui--dialog#open`.
   close() {
     this.dialog?.close()
   }

@@ -3,7 +3,7 @@ module Admin
     # `Admin::Ui::DialogComponent` at each width step (the footer slot carries the
     # actions). The dialogs are closed until a trigger opens them, so each
     # preview renders its own `dialog_trigger` button -- Lookbook's layout has
-    # no `<body data-controller="admin--dialog">`, so open them from the
+    # no `<body data-controller="admin--ui--dialog">`, so open them from the
     # browser console with `document.getElementById(id).showModal()`.
     class DialogComponentPreview < ViewComponent::Preview
       def form

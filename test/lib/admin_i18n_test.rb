@@ -113,7 +113,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/i18n/messages.js
     app/javascript/controllers/admin/save_bar_controller.js
     app/javascript/controllers/admin/pending_lock_controller.js
-    app/javascript/controllers/admin/chip_input_controller.js
+    app/javascript/controllers/admin/ui/chip_input_controller.js
     app/javascript/controllers/admin/autosave_controller.js
     app/javascript/autosave/order_request.js
     app/javascript/autosave/queue.js

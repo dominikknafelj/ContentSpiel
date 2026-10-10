@@ -13,7 +13,7 @@ module Admin
     #
     # * `counter:` is a soft recommended length (a meta title's 60, a meta
     #   description's 160). The field gets "42 / 60" beneath it
-    #   (`admin--char-count`) and, past the limit, "70 / 60 · long" in the
+    #   (`admin--ui--char-count`) and, past the limit, "70 / 60 · long" in the
     #   warning colour -- never a validation, the field still saves.
     # * `override:` names what the field overrides ("alt text", "caption"): it
     #   is a per-use override of a Media library text whose own value is the
@@ -41,7 +41,7 @@ module Admin
       # The field is described by its counter (read when the field is entered,
       # with the current count) rather than the counter being a live region
       # rewritten on every keystroke; only crossing the limit is announced
-      # (`admin--char-count`'s announcement target). The error slot keeps its
+      # (`admin--ui--char-count`'s announcement target). The error slot keeps its
       # own id in the same list.
       def invalid_attrs
         ids = [ (counter_id if counter?), (errors_id if errors.any?) ].compact
@@ -52,7 +52,7 @@ module Admin
 
       def override? = override.present?
 
-      # "42 / 60", as first painted; `admin--char-count` keeps it current (and
+      # "42 / 60", as first painted; `admin--ui--char-count` keeps it current (and
       # adds " · long") from the input's own value.
       def counter_text = "#{counter_length} / #{counter}#{" · long" if counter_long?}"
 
@@ -61,11 +61,11 @@ module Admin
       def counter_length = value.to_s.each_char.count
 
       # The input's own attributes: the caller's, plus -- with a counter -- the
-      # `admin--char-count` target and the action that recounts on typing.
+      # `admin--ui--char-count` target and the action that recounts on typing.
       def input_html
         return html unless counter?
 
-        data = (html[:data] || {}).merge("admin--char-count-target": "input", action: [ html.dig(:data, :action), "input->admin--char-count#update" ].compact.join(" "))
+        data = (html[:data] || {}).merge("admin--ui--char-count-target": "input", action: [ html.dig(:data, :action), "input->admin--ui--char-count#update" ].compact.join(" "))
         html.merge(data: data)
       end
 

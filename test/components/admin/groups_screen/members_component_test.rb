@@ -28,7 +28,7 @@ class Admin::GroupsScreen::MembersComponentTest < ViewComponent::TestCase
     render_members([])
 
     assert_text "Owners aren't listed: they already have every permission."
-    assert_selector "[data-admin--chip-input-search-url-value='/cs-studio/users/suggest']"
-    assert_selector "[data-admin--chip-input-create-value='false']"
+    assert_selector "[data-admin--ui--chip-input-search-url-value='/cs-studio/users/suggest']"
+    assert_selector "[data-admin--ui--chip-input-create-value='false']"
   end
 end

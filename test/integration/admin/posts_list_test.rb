@@ -197,8 +197,8 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
 
   test "the New post split button opens the dialog preset to its type; the menu offers the others" do
     get "/cs-studio/posts"
-    assert_select "a[data-admin--dialog-id-param=new-post-dialog][data-new-post-type-param=blog]", text: /New blog post/i
-    assert_select "[role=menu] a[data-admin--dialog-id-param=new-post-dialog][data-new-post-type-param=resume_entry]", visible: :all
+    assert_select "a[data-admin--ui--dialog-id-param=new-post-dialog][data-new-post-type-param=blog]", text: /New blog post/i
+    assert_select "[role=menu] a[data-admin--ui--dialog-id-param=new-post-dialog][data-new-post-type-param=resume_entry]", visible: :all
   end
 
   test "the dashboard's All drafts link opens the list on Drafts" do

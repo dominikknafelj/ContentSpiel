@@ -2,7 +2,7 @@ module Admin
   module EditorScreen
     # `Admin::EditorScreen::ScheduleDialogComponent`: a draft, a scheduled
     # record (Remove schedule at the bottom left) and a refused submit. The
-    # dialogs start closed -- Lookbook's layout has no `admin--dialog` on
+    # dialogs start closed -- Lookbook's layout has no `admin--ui--dialog` on
     # `<body>` -- so open one from the console with
     # `document.querySelector("dialog").showModal()`.
     class ScheduleDialogComponentPreview < ViewComponent::Preview

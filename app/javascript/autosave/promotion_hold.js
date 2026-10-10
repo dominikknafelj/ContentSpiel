@@ -48,7 +48,7 @@
 // - a double press holds one entry (a `Map` keyed by the form);
 // - the submitter shows the press was taken: disabled, the width it had, a
 //   spinner before its label (`markBusy`, the same look `admin--queue-hold`
-//   and `admin--busy` give), and the form is `aria-busy`. Put back when the
+//   and `admin--ui--busy` give), and the form is `aria-busy`. Put back when the
 //   entry is dropped or released;
 // - a press made in a DIALOG is taken back by closing the dialog (Cancel,
 //   Escape, the x, the backdrop): the entry is deleted on the dialog's

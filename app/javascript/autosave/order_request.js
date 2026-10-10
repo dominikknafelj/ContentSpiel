@@ -65,7 +65,7 @@ export async function sendOrder(url, { headers, body }) {
 // holds one `Admin::Ui::ToastComponent` (kind `error`, so `role=alert` and no
 // auto-hide) in `<template id="toast-error-template">`, and this clones it,
 // writes the message as text and appends it to `#toasts`, where
-// `admin--toast` takes over like for any other toast.
+// `admin--ui--toast` takes over like for any other toast.
 //
 // `id` makes it one toast per cause: dropping again while still offline
 // replaces the toast instead of stacking three of the same sentence.

@@ -11,7 +11,7 @@ module Admin
     #
     # A failure never auto-hides: it is the one thing the editor must not miss
     # because they looked away for five seconds. The clock itself is
-    # `admin--toast` (it pauses on hover and focus, so an Undo can't vanish
+    # `admin--ui--toast` (it pauses on hover and focus, so an Undo can't vanish
     # under the pointer).
     #
     # `action` is `{ label:, url:, method: :post }` -- a `button_to`, never a
@@ -29,7 +29,7 @@ module Admin
     #
     # A toast never comes back from Turbo's page cache (coming Back to a
     # screen must not show a stale Undo, or an error that has since been
-    # fixed). `admin--toast` sees to that, and its comment says why this
+    # fixed). `admin--ui--toast` sees to that, and its comment says why this
     # element must NOT carry `data-turbo-temporary` to get there: Turbo would
     # delete a live, just-relayed toast on the next frame navigation.
     class ToastComponent < AdminComponent

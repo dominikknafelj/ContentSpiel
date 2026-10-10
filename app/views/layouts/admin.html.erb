@@ -29,10 +29,10 @@
       elements, slid off-screen until the top bar's buttons set `data-open`
       (`admin--drawer`, which also owns the scrim and Escape). That is real
       CSS rather than utilities because the open state is an attribute
-      selector. `admin--drawer` joins `admin--dialog` on <body> -- both
+      selector. `admin--drawer` joins `admin--ui--dialog` on <body> -- both
       listen at the document level, and the existing dialog actions stay.
 
-      `admin--notes` is on <body> for the same reason as `admin--dialog`: the
+      `admin--notes` is on <body> for the same reason as `admin--ui--dialog`: the
       editor header's Notes button, the markers on the block cards and the
       notes drawer are far apart in the document. The two drawer controllers
       tell each other when one opens (`admin--notes:opened`,
@@ -75,13 +75,13 @@
       the pending-lock hint -- `Admin::MessagesHelper`,
       `app/javascript/i18n/messages.js`); a script that finds no nearer
       `data-messages` reads these. %>
-  <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes admin--notes-live admin--notes-alert" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
+  <body data-controller="admin--ui--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes admin--notes-live admin--notes-alert" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
         data-admin--notes-live-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes-live-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
         data-admin--notes-live-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
         data-admin--notes-live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes-live-person-value="<%= Current.user&.id %>"
         data-admin--notes-alert-sound-value="<%= Current.user&.notes_sound ? true : false %>" data-admin--notes-alert-desktop-value="<%= Current.user&.notes_desktop ? true : false %>"
         data-admin--notes-alert-person-value="<%= Current.user&.id %>"
-        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:load@document->admin--notes#syncAddress turbo:before-fetch-request@document->admin--notes-live#tag turbo:before-fetch-request@document->admin--notes-live#asked turbo:before-frame-render@document->admin--notes-live#answered admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible admin--notes-live:delivery@document->admin--notes-alert#delivery"
+        data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:load@document->admin--notes#syncAddress turbo:before-fetch-request@document->admin--notes-live#tag turbo:before-fetch-request@document->admin--notes-live#asked turbo:before-frame-render@document->admin--notes-live#answered admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible admin--notes-live:delivery@document->admin--notes-alert#delivery"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render "admin/shared/notes_alert_settings" %>
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
@@ -111,7 +111,7 @@
       <main class="admin-shell__main min-w-0 p-6">
         <turbo-frame id="content" data-turbo-action="advance">
           <%# A frame request's response keeps only this frame, so the flash
-              it carries is rendered here (as bare toasts that `admin--toast`
+              it carries is rendered here (as bare toasts that `admin--ui--toast`
               moves into `#toasts`) instead of in the region below, where it
               would be consumed and dropped. %>
           <%= render Admin::Ui::ToastRegionComponent.new(flash: flash, relay: true) if turbo_frame_request? %>

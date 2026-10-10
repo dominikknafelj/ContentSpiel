@@ -1,5 +1,5 @@
 // The one suggestions search shared by the chip input
-// (`admin--chip-input`: tags, related posts) and the rich-text editor's link
+// (`admin--ui--chip-input`: tags, related posts) and the rich-text editor's link
 // search (`rich_text/target_search.js`): debounce, one request at a time, the
 // stale-answer guard and the status wording. Each caller keeps what is its
 // own -- rendering rows and selecting one -- so a fix here (a late answer, an

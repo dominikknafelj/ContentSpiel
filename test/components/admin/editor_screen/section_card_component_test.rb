@@ -195,7 +195,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#{header} button[aria-haspopup='menu'][aria-label='Section actions']", text: "⋯"
     assert_selector "#{header} button[data-move='up'][disabled][data-action='click->admin--blocks#moveUp']", visible: :all
     assert_selector "#{header} button[data-move='down']:not([disabled])[data-action='click->admin--blocks#moveDown']", text: "Move down", visible: :all
-    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", visible: :all
+    assert_selector "#{header} button[data-admin--ui--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", visible: :all
     assert_selector "dialog#delete-section-#{@section.id} form[action$='/content_blocks/#{@section.id}'] button[type=submit]", text: "Delete section", visible: :all
     assert_no_selector "dialog#delete-section-#{@section.id} input[name='keep_blocks']", visible: :all
     # No form inside the settings form: a nested form is dropped by the parser.
@@ -355,7 +355,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#{keep} input[name='_method'][value='delete']", visible: :all
     assert_selector "#{keep} input[name='keep_blocks'][value='1']", visible: :all
     assert_selector "#{keep} button[type='submit']", text: "Remove section, keep blocks", exact_text: true
-    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", exact_text: true
+    assert_selector "#{header} button[data-admin--ui--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", exact_text: true
     assert_selector "#{header} button", count: 2
     assert_selector "dialog#delete-section-#{@section.id} #section-#{@section.id}-delete-count", text: "This also deletes the 2 blocks in it.", visible: :all
     assert_selector "dialog#delete-section-#{@section.id} form[action$='/content_blocks/#{@section.id}'] input[name='_method'][value='delete']", visible: :all
