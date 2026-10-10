@@ -36,14 +36,16 @@
     typed password is ever rendered back: the inputs have no `value`. %>
 <% content_for :title, t("admin.accounts.title") %>
 <% field_errors = @field_errors || {} %>
+<%# Whose answer this page is, when it is the password form's: "refused"
+    (drawn again, 422), or after its redirect "saved" or "limited". %>
+<% password_answer = @password_answer || flash[:password_answer] %>
+<% password_errors = password_answer == "limited" ? [ t("admin.accounts.password.limited") ] : (field_errors.presence || Array(@errors)) %>
 <div class="max-w-[560px]">
   <h1 class="mb-4 text-h1 text-ink"><%= t("admin.accounts.title") %></h1>
 
-  <%# One summary at a time: only one of the two forms was submitted. The
-      password form's messages link to their fields; the service's own
-      sentences stand when it left no per-field errors (a denial). %>
-  <%= render Admin::ErrorSummaryComponent.new(errors: field_errors.presence || Array(@errors),
-        field_ids: { current_password: "current_password", password: "new_password", password_confirmation: "password_confirmation" }) %>
+  <%# The page's summary is the Profile and Notes form's. The password form's
+      answer, refused or saved, is said inside its own card (the notes
+      handoff's decision 43; see the card below). %>
   <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
   <%# What the form shows: the account as stored, or, after a refusal, what
@@ -123,12 +125,24 @@
         42): `admin--password-answer` puts `#password` in the address, the
         card in view and the focus on the message. %>
     <section id="password" class="max-w-[560px] scroll-mt-6 rounded-cs border border-line bg-surface" aria-labelledby="account-password"
-             <%= tag.attributes(data: { controller: "admin--password-answer" }) if @password_answer || flash[:password_answer] %>>
+             <%= tag.attributes(data: { controller: "admin--password-answer" }) if password_answer %>>
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-password" class="text-base font-semibold text-ink"><%= t("admin.accounts.password.title") %></h3>
         <p class="text-[13px] text-dim"><%= t("admin.accounts.password.sessions") %></p>
       </div>
       <div class="px-[18px] pt-3.5">
+        <%# The form's answer, at the top of the card: under the sentence
+            about sessions, above the fields (decision 43). A refusal is the
+            shared danger alert, the error summary, whose lines link to
+            their fields (each field keeps its own line too); the service's
+            own sentences stand when it left no per-field errors (a denial,
+            too many tries). A save is the success alert as the sign-in
+            screen draws one. Either takes the focus (`admin--password-answer`). %>
+        <%= render Admin::ErrorSummaryComponent.new(errors: password_errors,
+              field_ids: { current_password: "current_password", password: "new_password", password_confirmation: "password_confirmation" }) %>
+        <% if password_answer == "saved" %>
+          <p class="mb-4 rounded-cs bg-ok-tint px-3 py-2.5 text-[13px] leading-normal text-ok-ink" role="status" tabindex="-1" data-password-saved><%= t("admin.accounts.password.changed") %></p>
+        <% end %>
         <div class="mb-4">
           <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
                 autocomplete: "current-password", autofocus: true, errors: field_errors[:current_password], "data-save-bar-ignore": true) %>

@@ -153,6 +153,9 @@ en:
       password:
         title: "Password"
         sessions: "You'll stay signed in here. Other sessions are signed out."
+        # The form's answer, said in the card (the handoff's decision 43).
+        changed: "Password changed. Your other sessions were signed out."
+        limited: "Try again later."
       notes:
         title: "Notes"
         description: "What happens in this browser when someone mentions you in a note."

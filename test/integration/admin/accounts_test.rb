@@ -31,7 +31,9 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/account/password", params: { current_password: "wrong", password: "new-password-1", password_confirmation: "new-password-1" }
 
     assert_response :unprocessable_entity
-    assert_select ".admin-error-summary[role=alert] li", text: "That's not your current password."
+    # In the Password card, not above the cards (the handoff's decision 43).
+    assert_select "#password .admin-error-summary[role=alert] li", text: "That's not your current password."
+    assert_select ".admin-error-summary", count: 1
     assert_select "#current_password-errors", text: "That's not your current password."
     assert_select "#current_password[aria-invalid=true][aria-describedby~='current_password-errors']"
     assert users(:reader).reload.authenticate("password")
@@ -119,7 +121,9 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to "/cs-studio/account#password"
     follow_redirect!
-    assert_select "[role=status]", text: /Password changed/
+    # Said in the card, and by no toast (the handoff's decision 43).
+    assert_select "#password [data-password-saved][role=status][tabindex='-1']", text: "Password changed. Your other sessions were signed out."
+    assert_select "#toasts .admin-toast", count: 0
     assert user.reload.authenticate("new-password-1")
     assert_not Session.exists?(other_session.id)
     assert Session.exists?(current_session.id)

@@ -19,8 +19,9 @@ module Admin
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
     rate_limit to: 10, within: 3.minutes, only: :update, with: -> {
-      flash[:password_answer] = true
-      redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other, alert: "Try again later."
+      # The form's answer, said in its card like any other refusal of it.
+      flash[:password_answer] = "limited"
+      redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other
     }
 
     def edit
@@ -40,20 +41,22 @@ module Admin
         password: params[:password], password_confirmation: params[:password_confirmation])
 
       if result.ok?
-        # Back to the card the form is in (`#password`), not the top of the
-        # page (the notes handoff's decision 42). The fragment in `Location`
-        # is for a client that follows it itself; Turbo drops it, so the page
-        # is told it is this form's answer (`flash[:password_answer]`, a
-        # mark and no message) and `admin--password-answer` does the rest.
-        flash[:password_answer] = true
-        redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other, notice: "Password changed. Your other sessions were signed out."
+        # Back to the card the form is in (`#password`), and said IN it (the
+        # notes handoff's decisions 42 and 43): no toast, which would stand
+        # at the bottom of the screen, far from the card, and go away under
+        # the focus. The fragment in `Location` is for a client that follows
+        # it itself; Turbo drops it, so the page is told whose answer it is
+        # (`flash[:password_answer]`, a mark and no message) and draws the
+        # card's alert, which `admin--password-answer` brings into view.
+        flash[:password_answer] = "saved"
+        redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other
       else
         @errors = result.errors
         # By field too, so the current-password message can sit under its own
         # input as well as in the summary. A denied result carries no record
         # errors, only its sentence.
         @field_errors = result.record.errors.to_hash(true)
-        @password_answer = true
+        @password_answer = "refused"
         render :edit, status: :unprocessable_entity
       end
     end
