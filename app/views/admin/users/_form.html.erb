@@ -10,7 +10,7 @@
     PASSWORD. On a NEW user the two fields, Show and the strength meter. On an edit
     they sit behind "Set a new password…" (`<details>`, so it opens without
     script): a blank password means "keep" (`Users::Save`), and closing the
-    disclosure clears what was typed (`admin--password-disclosure`), so a
+    disclosure clears what was typed (`admin--users--password-disclosure`), so a
     half-typed password can't be submitted by accident. A typed password is never
     rendered back; after a refusal it opens again on the field the error names.
 
@@ -56,7 +56,7 @@
         <%# No `data-password-submit` on this form's button: a blank password means "keep the current one"
             (Users::Save), so the meter must not hold the submit back; the server still enforces the
             minimum on a typed one. %>
-        <details class="admin-set-password" data-controller="admin--password-disclosure" data-action="toggle->admin--password-disclosure#toggled"
+        <details class="admin-set-password" data-controller="admin--users--password-disclosure" data-action="toggle->admin--users--password-disclosure#toggled"
                  <%# Open again when a password was posted, even after a refusal for another reason: the typed value is never rendered back, so the editor must see the empty fields and retype. %>
                  <%= "open" if user.errors.include?(:password) || user.errors.include?(:password_confirmation) || params.dig(:user, :password).present? || params.dig(:user, :password_confirmation).present? %>>
           <summary class="inline-block cursor-pointer text-sm text-accent hover:text-accent-hover">Set a new password…</summary>
