@@ -79,9 +79,9 @@ Notes holds a fixed list of what a note can be on, the right that lets a person 
 
 - **Editor header and media panel** (`editor.header.status`, `media.panel.sections`): the others on this record as initials, here before away, each group by name. Away is dimmed. Hover or focus says the name and "here" or "away for 12 minutes". Beyond a few, the rest are "+3", which lists them on hover or focus.
 - **Tree row and posts row** (`tree.row.markers`, `posts.row.markers`): a marker when at least one other person is here on that record; its accessible name says who.
-- A screen reader hears a change politely and not more than once per person per change.
+- A screen reader finds the people by the group's label and each avatar's own; a change is not announced (presence is background information, not an event).
 
-The look (size, colour and order of the initials, the dimmed state, the overflow, the marker) is Claude Design's, asked before the plan is written and recorded beside this spec.
+The look is Claude Design's and is recorded in `2026-10-10-presence-handoff.md`, which is binding for it: 24px initials first in the header's action row, one neutral style, away as an unfilled circle, here before away in order of arrival, three and then "+N"; a 12px user icon as the row marker, with a count from two; 20px avatars at the right of the media panel's file-name row; one circle and "+N" below 1024px and nothing in the notes sheet.
 
 ### 5.2 How it works
 
