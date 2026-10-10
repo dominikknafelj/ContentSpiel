@@ -5,7 +5,7 @@ module Admin
     # trigger names: `dialog_trigger`).
     #
     # ONE COMPONENT, DRAWN WHERE THE BLOCK'S OWN ELEMENT IS: inside the card
-    # of a block of the page's list (`Admin::BlockCardComponent`), and inside
+    # of a block of the page's list (`Admin::EditorScreen::BlockCardComponent`), and inside
     # the TILE of a block in a section's column (`BlockTileComponent`) --
     # not in that block's form panel, where it used to be. A panel is `hidden`
     # until its tile is pressed, and a `<dialog>` inside a hidden element is

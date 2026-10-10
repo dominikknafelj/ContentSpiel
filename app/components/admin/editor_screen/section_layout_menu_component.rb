@@ -62,7 +62,7 @@ module Admin
       # The button: the current layout's diagram and the word.
       def button_label = safe_join([ diagram(current), tag.span(t(".label")) ])
 
-      def item_class = "admin-layout-choice #{Admin::BlockCardComponent::MENU_ITEM_CLASS}"
+      def item_class = "admin-layout-choice #{Admin::EditorScreen::BlockCardComponent::MENU_ITEM_CLASS}"
 
       private
 

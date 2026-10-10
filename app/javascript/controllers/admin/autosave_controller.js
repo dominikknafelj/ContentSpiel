@@ -89,7 +89,7 @@ export default class extends Controller {
     statusId: String,
     debounce: { type: Number, default: 1000 },
     // A block card's form names the page settings form's base field here
-    // (`Admin::BlockCardComponent#form_data`): its current value rides
+    // (`Admin::EditorScreen::BlockCardComponent#form_data`): its current value rides
     // along as `X-Page-Base-Updated-At`, so the server only moves that
     // form's base forward when it was still current (`Admin::
     // ContentBlocksController#page_base_streams`).

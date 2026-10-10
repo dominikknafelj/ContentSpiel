@@ -4,7 +4,7 @@ import { Controller } from "@hotwired/stimulus"
 // the title or the slug field is typed (cs-studio spec §5.1 -- carried in
 // from Task 2's review, where the preview line was still a load-time
 // snapshot with nothing to keep it current). Wraps both fields in
-// `Admin::PageSettingsFormComponent`'s own markup, so a plain bubbling
+// `Admin::EditorScreen::PageSettingsFormComponent`'s own markup, so a plain bubbling
 // `input` listener at that shared ancestor is enough; no Stimulus target
 // lives outside it.
 //

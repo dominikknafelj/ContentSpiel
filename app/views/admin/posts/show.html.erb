@@ -24,7 +24,7 @@
     view, because every way this screen is rendered needs them. %>
 <% note_counts = Notes::Counts.for_container(@post, user: Current.user) %>
 
-<%= render Admin::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) %>
+<%= render Admin::EditorScreen::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) %>
 
 <%# The notes drawer (notes spec §4.1): once per screen, after everything
     else and outside every form -- the post's form above is closed. `?notes=open`

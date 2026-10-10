@@ -279,7 +279,7 @@ module Posts
     # whole contract -- absent means "leave the relations alone" (MCP, the
     # header's publish buttons, any PATCH that didn't come from the
     # picker), `[]` means "clear the ones you can see". The
-    # admin picker (`Admin::RelatedPostsComponent`) always submits a blank
+    # admin picker (`Admin::EditorScreen::RelatedPostsComponent`) always submits a blank
     # sentinel entry alongside its real ones, so the key is present exactly
     # when the picker itself was on the page.
     #
@@ -332,7 +332,7 @@ module Posts
     # Existing forward relations to posts the actor can't read. They're
     # outside the actor's say (access-control design spec §3.3): kept
     # whatever the submitted list contains -- the admin picker never
-    # renders them (`Admin::RelatedPostsComponent`), so they're never in
+    # renders them (`Admin::EditorScreen::RelatedPostsComponent`), so they're never in
     # it, and `[]` clears only the readable ones. A relation to a trashed
     # post counts as unreadable here too (the scope is kept-only), so saving
     # the list never drops it and restoring the post brings it back.

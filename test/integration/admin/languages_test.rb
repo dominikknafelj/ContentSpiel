@@ -34,7 +34,7 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
   # Fix (final-fixes round, finding 1): the switcher lives inside the
   # layout's own `<turbo-frame id="content">`, so without `_top` targeting
   # a locale switch would only ever refresh that frame -- the page tree
-  # outside it (`Admin::TreeNodeComponent#title` reads the current locale)
+  # outside it (`Admin::PagesScreen::TreeNodeComponent#title` reads the current locale)
   # would keep showing every node's title in whichever language was
   # selected before the switch.
   test "the switcher's own links target the top level, not just the content frame" do

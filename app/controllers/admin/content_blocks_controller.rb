@@ -111,8 +111,8 @@ module Admin
       # save vouches for nothing, so it also streams no page base
       # (`page_base_streams` is only reached on success) -- see
       # `AutosaveResponses#refuse_stale_autosave`.
-      return if refuse_stale_autosave(block, status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
-        error_prefix: Admin::BlockCardComponent.error_prefix(block),
+      return if refuse_stale_autosave(block, status_id: Admin::EditorScreen::BlockCardComponent.error_prefix(block) + "-save-status",
+        error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block),
         reload_url: admin_page_path(@page, **admin_url_options))
 
       attributes, translations = split_block_params(block)
@@ -124,8 +124,8 @@ module Admin
       streams = autosave_stream(
         record: result.record,
         result: result,
-        status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
-        error_prefix: Admin::BlockCardComponent.error_prefix(block),
+        status_id: Admin::EditorScreen::BlockCardComponent.error_prefix(block) + "-save-status",
+        error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block),
         fields: without_untouched_media_slot(block_error_fields(block), "image", sent: attributes[:media_asset_id], stored_before: stored_asset_id)
       )
 
@@ -133,7 +133,7 @@ module Admin
       # shows why) -- see `Admin::MediaFields`.
       refused = refused_media_field_stream(result, attribute: :media_asset_id, error_attribute: :image,
         sent: attributes[:media_asset_id]) do |stored, errors|
-        Admin::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
+        Admin::EditorScreen::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
       end
       streams << refused if refused
       streams << tile_summary_stream(result) if block.section_id
@@ -324,7 +324,7 @@ module Admin
     def page_base_streams
       return [] unless page_base_was_current?
 
-      id = "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+      id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
       [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
         locals: { id: id, value: Page.where(id: @page.id).pick(:updated_at).iso8601(6) }) ]
     end
@@ -387,7 +387,7 @@ module Admin
     # to close it from, its Delete answering 410. `admin--section` needs no
     # telling: the open form is whichever panel is showing, and none is.
     def panel_removal_streams(block)
-      block.section_id ? [ turbo_stream.remove(Admin::BlockCardComponent.panel_id(block)) ] : []
+      block.section_id ? [ turbo_stream.remove(Admin::EditorScreen::BlockCardComponent.panel_id(block)) ] : []
     end
 
     # A block's two halves inside a section, in the order `admin--section`
@@ -427,7 +427,7 @@ module Admin
     end
 
     def panel_component(block, open: false)
-      Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
+      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
     end
 
     def tile_component(block, open: false)
@@ -478,10 +478,10 @@ module Admin
         from = origins.dig(block.id.to_s, "section_id").presence&.to_i
         touched.push(from, block.section_id)
         dom = ActionView::RecordIdentifier.dom_id(block)
-        old_panel = turbo_stream.remove(Admin::BlockCardComponent.panel_id(block))
+        old_panel = turbo_stream.remove(Admin::EditorScreen::BlockCardComponent.panel_id(block))
 
         if from == block.section_id
-          [ turbo_stream.update(Admin::BlockCardComponent.panel_title_id(block), Admin::EditorScreen::PanelTitleComponent.new(block: block)) ]
+          [ turbo_stream.update(Admin::EditorScreen::BlockCardComponent.panel_title_id(block), Admin::EditorScreen::PanelTitleComponent.new(block: block)) ]
         elsif block.section_id
           [ old_panel,
             turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(block.section), panel_component(block)),
@@ -565,7 +565,7 @@ module Admin
       blocks = outline.blocks_in(fresh)
       lanes = Admin::EditorScreen::SectionLanesComponent.new(page: @page, section: fresh, outline: outline, locale: admin_locale, url_options: admin_url_options, editable: true)
       titles = blocks.map do |inner|
-        turbo_stream.update(Admin::BlockCardComponent.panel_title_id(inner), Admin::EditorScreen::PanelTitleComponent.new(block: inner))
+        turbo_stream.update(Admin::EditorScreen::BlockCardComponent.panel_title_id(inner), Admin::EditorScreen::PanelTitleComponent.new(block: inner))
       end
       [ turbo_stream.replace(Admin::EditorScreen::SectionCardComponent.lanes_id(fresh), lanes), *titles, *section_count_streams(fresh, count: blocks.size) ]
     end
@@ -655,7 +655,7 @@ module Admin
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
     def block_card_component(block, first: false, last: false)
-      Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last)
+      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last)
     end
 
     # The card of a top-level block, as the page view draws it: for a block

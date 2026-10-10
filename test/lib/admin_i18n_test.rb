@@ -107,8 +107,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/chip_input_component.html.erb
     app/components/admin/ui/menu_component.rb
     app/components/admin/ui/menu_component.html.erb
-    app/components/admin/mind_graph_legend_component.rb
-    app/components/admin/mind_graph_legend_component.html.erb
+    app/components/admin/mind_graph_screen/legend_component.rb
+    app/components/admin/mind_graph_screen/legend_component.html.erb
     app/helpers/admin/messages_helper.rb
     app/javascript/i18n/messages.js
     app/javascript/controllers/admin/save_bar_controller.js

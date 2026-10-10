@@ -9,7 +9,7 @@ module Admin
     # hidden input per chip (`name` is an array name such as
     # `post[tag_names][]`) plus a blank sentinel ahead of them, so a list the
     # editor emptied still submits the key and saves as empty -- absent would
-    # mean "this PATCH says nothing about it" (`Admin::RelatedPostsComponent`'s
+    # mean "this PATCH says nothing about it" (`Admin::EditorScreen::RelatedPostsComponent`'s
     # own class comment has the contract). `admin--chip-input` adds and removes
     # those inputs and dispatches a bubbling `change` from the sentinel, which
     # the form's autosave (`admin--autosave`) already listens for; typing in the

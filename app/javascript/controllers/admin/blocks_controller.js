@@ -8,7 +8,7 @@ import { messages } from "i18n/messages"
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
 // handle (Space, arrows, Space). `card` targets are
-// `Admin::BlockCardComponent`'s own top-level wrapper -- one per block, in
+// `Admin::EditorScreen::BlockCardComponent`'s own top-level wrapper -- one per block, in
 // document order -- and the list's direct children are exactly the cards,
 // nothing else (the one "Add block" row sits after the list, not in it), so
 // Sortable never has to be told to skip anything. (The list is its own
@@ -965,7 +965,7 @@ export default class extends Controller {
 
   // The autosave controller of a block's own form: in its card, or -- for a
   // tile -- in its panel under the lanes, which is no descendant of the tile
-  // (`Admin::BlockCardComponent.panel_id`). Undefined for a block with no
+  // (`Admin::EditorScreen::BlockCardComponent.panel_id`). Undefined for a block with no
   // form: an unavailable type.
   formOf(item) {
     const holder = document.getElementById(`block-${item.dataset.blockId}-panel`) || item

@@ -240,7 +240,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
   # One string for a menu item's look, wherever a menu of the block list is drawn.
   test "the lane picker's and the section menu's items use the block card's menu item class" do
-    assert_same Admin::BlockCardComponent::MENU_ITEM_CLASS, Admin::BlockPickerComponent::MENU_ITEM_CLASS
+    assert_same Admin::EditorScreen::BlockCardComponent::MENU_ITEM_CLASS, Admin::EditorScreen::BlockPickerComponent::MENU_ITEM_CLASS
   end
 
   test "a tile is the block's element: its dom id, a button that names the panel it opens, collapsed" do

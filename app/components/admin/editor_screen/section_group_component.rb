@@ -3,7 +3,7 @@ module Admin
     # A section on a translation tab (sections spec §4.5): a plain group -- a
     # heading, then the card of each block it holds, in reading order, column
     # by column (`BlockOutline#blocks_in`). Each card is the block's own form
-    # (`Admin::BlockCardComponent`, `placement: :group`), so every translated
+    # (`Admin::EditorScreen::BlockCardComponent`, `placement: :group`), so every translated
     # field is its pair with the original, autosaved, refused when stale and
     # confirmed as on any card; a view-only viewer gets the same cards
     # disabled, with no autosave (`editable:` is handed down).
@@ -56,7 +56,7 @@ module Admin
       def blocks = outline.blocks_in(section)
 
       def card(block)
-        Admin::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :group)
+        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :group)
       end
 
       private

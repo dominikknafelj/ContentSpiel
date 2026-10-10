@@ -13,7 +13,7 @@ module Admin
     # behaviour.
     class Base < Admin::AdminComponent
       # `id:`/`html_name:` exist for exactly one caller so far
-      # (`Admin::PageSettingsFormComponent`, cs-studio spec §5.1/Task 4): a
+      # (`Admin::EditorScreen::PageSettingsFormComponent`, cs-studio spec §5.1/Task 4): a
       # page/post editor's own top-level form needs its inputs named with
       # bracket notation (`page[title]`) so the params it PATCHes arrive
       # nested the way `Admin::PagesController#update` expects, but the

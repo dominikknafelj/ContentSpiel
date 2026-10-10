@@ -591,7 +591,7 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
    same `--cs-*` tokens through `app/javascript/mind_graph/theme.js` and draws
    the shapes in `mind_graph/renderer.js`, whose header says what each one
    means. These rules are what is left in CSS: the small inline SVG swatches of
-   `Admin::MindGraphLegendComponent`, which must look like what the canvas
+   `Admin::MindGraphScreen::LegendComponent`, which must look like what the canvas
    draws -- a tag is a square outlined in `meta`; a related edge is solid and a
    shared tag's dashed (line style, not colour alone); a draft or scheduled
    post is a dashed ring; a post whose type is no longer registered is a `meta`

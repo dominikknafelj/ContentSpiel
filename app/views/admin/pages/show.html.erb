@@ -20,7 +20,7 @@
 <% end %>
 
 <% content_for :tree do %>
-  <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
 <%# The page's open notes (notes spec §4.3): two queries for the header's
@@ -39,7 +39,7 @@
   <% end %>
 <% end %>
 
-<%= render Admin::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+<%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
 
 <%# The one slot a block action with nothing left to replace on the page
     (a stale PATCH/DELETE against an already-deleted block, spec §5.1's 410;
@@ -88,13 +88,13 @@
       <% if Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline) %>
         <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
       <% else %>
-        <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+        <%= render Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
       <% end %>
     <% end %>
   </div>
 
   <% if blocks_editable %>
-    <%= render Admin::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+    <%= render Admin::EditorScreen::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
     <%# "Move to column…" and "Move into section…" (sections spec §4.4): one dialog for the
         page, inside this section because `admin--blocks` fills and reads it. %>
     <%= render Admin::EditorScreen::MoveDialogComponent.new %>

@@ -163,8 +163,8 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     refute_selector "[data-original-for]"
   end
 
-  # A caller nesting this under a form object (`Admin::BlockCardComponent`,
-  # `Admin::PostFormComponent`) needs the input's own `name=` to carry that
+  # A caller nesting this under a form object (`Admin::EditorScreen::BlockCardComponent`,
+  # `Admin::EditorScreen::PostFormComponent`) needs the input's own `name=` to carry that
   # nesting (`post[body]`), not the bare column name `name:` only drives the
   # label/`data-field-name` for.
   test "an explicit html_name, not the bare name, drives the input's own name" do

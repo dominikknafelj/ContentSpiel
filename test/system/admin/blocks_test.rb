@@ -16,7 +16,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     # The end-of-list picker (`after_id` absent) is open by default -- no
     # disclosure click needed before its own type buttons are visible.
-    # Every button here is a plain `button_to` (`Admin::BlockPickerComponent`'s
+    # Every button here is a plain `button_to` (`Admin::EditorScreen::BlockPickerComponent`'s
     # own comment): Turbo Drive already appends the Turbo Stream `Accept`
     # header to a non-GET form submission on its own, so this is a normal
     # submit, not a fetch this test would otherwise have to wait on by hand.
@@ -420,11 +420,11 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     card = "##{ActionView::RecordIdentifier.dom_id(block)}"
     find("#{card} input[name='block[settings][limit]']").set("0")
     find("#{card} input[name='block[settings][limit]']").send_keys(:tab)
-    assert_selector "##{Admin::BlockCardComponent.error_prefix(block)}-limit-errors p", wait: 6
+    assert_selector "##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-limit-errors p", wait: 6
 
     rects = page.evaluate_script(<<~JS)
       (() => {
-        const error = document.querySelector("##{Admin::BlockCardComponent.error_prefix(block)}-limit-errors").getBoundingClientRect()
+        const error = document.querySelector("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-limit-errors").getBoundingClientRect()
         const input = document.querySelector("#{card} input[name='block[settings][limit]']").getBoundingClientRect()
         return { errorWidth: error.width, errorRight: error.right, inputRight: input.right }
       })()

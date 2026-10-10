@@ -686,7 +686,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
   test "typed-setting errors name their field in words in the block's error slot" do
     block = @page.content_blocks.create!(block_type: "post_list", position: 0)
-    prefix = Admin::BlockCardComponent.error_prefix(block)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
 
     patch "#{blocks_path}/#{block.id}", params: { block: { settings: { limit: "0" } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :unprocessable_entity
@@ -890,7 +890,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   test "an image block's card shows the picker field and the image's defaults as the overrides' placeholders" do
     block = image_block_with_image
     block.media_asset.update!(alt: "A dog", caption: "Our dog")
-    prefix = Admin::BlockCardComponent.error_prefix(block)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
 
     get "/cs-studio/pages/#{@page.id}"
     assert_response :success
@@ -953,16 +953,16 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       params: { block: { media_asset_id: (Media::Asset.maximum(:id) + 1).to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :unprocessable_entity
 
-    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-errors")
+    assert_includes response.body, %(target="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-errors")
     assert_includes response.body, "Image doesn&#39;t exist"
     assert_equal previous, block.reload.media_asset
 
     # Fix round 1 (I2): the field comes back with the stored image and the
     # message inside it.
-    section = response.body.index(%(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section"))
+    section = response.body.index(%(target="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section"))
     assert section, "expected a stream replacing the image field"
     field = response.body[section..]
-    assert_includes field, %(name="block[media_asset_id]" id="#{Admin::BlockCardComponent.error_prefix(block)}-image" value="#{previous.id}")
+    assert_includes field, %(name="block[media_asset_id]" id="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image" value="#{previous.id}")
     assert_includes field, "Image doesn&#39;t exist"
   end
 
@@ -982,7 +982,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     assert_equal stored, block.reload.media_asset
     assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
-    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section")
+    assert_includes response.body, %(target="#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section")
   end
 
   # Final fix wave (T6), pinning the Task 6 ruling: a duplicate chooses its

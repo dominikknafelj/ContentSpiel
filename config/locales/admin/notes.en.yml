@@ -219,15 +219,16 @@ en:
             failed: "The notes couldn't be loaded or saved. Try again."
     components:
       # The legend's swatch for a node's notes badge.
-      mind_graph_legend:
-        notes: "Open notes"
+      mind_graph_screen:
+        legend:
+          notes: "Open notes"
       # "Add note", first in the "⋯" menu of a block's card and of its tile in
       # a section. Neither component's other strings live here
       # (`components.en.yml` has the tile's; the card is not converted): these
       # two merge into their scopes.
-      block_card:
-        add_note: "Add note"
       editor_screen:
+        block_card:
+          add_note: "Add note"
         block_tile:
           add_note: "Add note"
         # The editor header's Notes button. `components.en.yml` holds nothing
@@ -267,10 +268,11 @@ en:
           open_notes:
             one: "%{count} open note"
             other: "%{count} open notes"
-      tree_node:
-        open_notes:
-          one: "%{count} open note"
-          other: "%{count} open notes"
+      pages_screen:
+        tree_node:
+          open_notes:
+            one: "%{count} open note"
+            other: "%{count} open notes"
       notes_screen:
         drawer:
           title: "Notes"

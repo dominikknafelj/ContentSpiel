@@ -3,7 +3,7 @@
     move's outcome doesn't have to wait on (or get lost inside) the tree's
     own re-render. Empty and unstyled when there's nothing to report, e.g.
     the plain frame this same markup starts out as on every page load
-    (Admin::TreeComponent). Auto-escaped like any other admin-rendered text
+    (Admin::PagesScreen::TreeComponent). Auto-escaped like any other admin-rendered text
     -- `Pages::Move`'s own messages are fixed strings today, but nothing
     here should ever depend on that staying true. %>
 <p id="tree-status" role="status" aria-live="polite" class="min-h-[1.25rem] px-1 text-sm <%= "text-danger-ink" if message.present? %>"><%= message %></p>

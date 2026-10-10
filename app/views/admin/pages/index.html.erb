@@ -1,11 +1,11 @@
 <% content_for :tree do %>
-  <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
 <%# Reached only by a viewer who can't open Home (`PagesController#index`
     redirects everyone else to Home's editor), so the panel is a plain
     prompt (handoff §10 C34). "Create starter pages" lives in the tree's
-    "⋯" menu (`Admin::TreeComponent`), which is where it is offered while
+    "⋯" menu (`Admin::PagesScreen::TreeComponent`), which is where it is offered while
     Home is the only kept page. "Add a page" is offered only where `pages
     .create` allows a page under the homepage -- where `Admin::PagesController
     #create` puts a page with no parent named. %>

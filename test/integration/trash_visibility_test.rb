@@ -608,7 +608,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
   test "the related-posts editor neither shows a trashed post nor counts it as one you can't open" do
     PostRelation.create!(post: @kept_post, related_post: @gone_post)
-    component = Admin::RelatedPostsComponent.new(post: @kept_post, locale: "en")
+    component = Admin::EditorScreen::RelatedPostsComponent.new(post: @kept_post, locale: "en")
 
     as(users(:one)) do
       assert_empty component.related

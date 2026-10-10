@@ -138,7 +138,7 @@ module Admin
     # its own publish state/leaf-ness) plus the autosaving settings form,
     # rendered from the same `@page` a normal GET or a failed `destroy`
     # alike -- there's exactly one "what does this page's editor look like"
-    # template, same reasoning as `Admin::TreeComponent` being the one
+    # template, same reasoning as `Admin::PagesScreen::TreeComponent` being the one
     # thing "what does the tree look like" can mean.
     #
     # The editor asks `can?` about this one page many times (header
@@ -193,7 +193,7 @@ module Admin
       # shows why) -- see `Admin::MediaFields`.
       refused = refused_media_field_stream(result, attribute: :hero_media_asset_id, error_attribute: :hero_image,
         sent: page_params[:hero_media_asset_id]) do |stored, errors|
-        Admin::PageSettingsFormComponent.hero_image_field(asset: stored, locale: admin_locale, errors: errors)
+        Admin::EditorScreen::PageSettingsFormComponent.hero_image_field(asset: stored, locale: admin_locale, errors: errors)
       end
       streams << refused if refused
 
@@ -202,13 +202,13 @@ module Admin
       # response targeting *this* form's own elements would ever touch it
       # on its own (final-fixes round, finding 1) -- left alone, a title
       # edit saved here left the tree showing the page's stale title (and,
-      # since `Admin::TreeNodeComponent#status` reads straight off the same
+      # since `Admin::PagesScreen::TreeNodeComponent#status` reads straight off the same
       # `@page`, would go stale the same way for any other autosaved
       # attribute a later field ever changes what the tree itself renders).
       # Re-rendered on every successful save here, not just when `title`
       # itself was actually in this particular PATCH's own params: the tree
       # render costs a fixed handful of queries however many pages it shows
-      # (`Admin::TreeComponent`'s own comment; pinned by
+      # (`Admin::PagesScreen::TreeComponent`'s own comment; pinned by
       # test/components/admin/tree_component_test.rb), its translation
       # markers are one read of the stored `translation_states`, and there's no cheaper way to know
       # from here whether *this* save happened to be the one that mattered
@@ -322,7 +322,7 @@ module Admin
     # equivalent of), but kept in exact sync with it by hand for the one
     # line the two do share.
     def tree_replace_stream
-      turbo_stream.replace("tree", Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options))
+      turbo_stream.replace("tree", Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options))
     end
 
     def redirect_after(result, success:)

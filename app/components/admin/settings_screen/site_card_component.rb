@@ -52,7 +52,7 @@ module Admin
         site_setting.public_send(field, locale: ::Locales.default)
       end
 
-      # See `Admin::PageSettingsFormComponent#translation`. Anyone seeing this
+      # See `Admin::EditorScreen::PageSettingsFormComponent#translation`. Anyone seeing this
       # card holds `settings.manage`, the same right `Translations::Confirm`
       # asks for a site field.
       def translation(code, field) = Admin::EditorScreen::ReferenceCardComponent.options_for(site_setting, field, locale: code, confirmable: true)

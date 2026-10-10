@@ -7,7 +7,7 @@ module Admin
     # THE TILE HAS THE BLOCK'S `dom_id`, as a card of the block list has: it
     # is the element that stands for the block where the block is, the one a
     # lane's order is read from and a delete removes. The form is elsewhere
-    # -- `Admin::BlockCardComponent`'s `placement: :panel`, under its own
+    # -- `Admin::EditorScreen::BlockCardComponent`'s `placement: :panel`, under its own
     # `panel_id` -- and the face names it with `aria-controls`.
     #
     # The face is a real button, so a tile is opened by Enter and Space and
@@ -76,7 +76,7 @@ module Admin
 
       def label = block.definition&.label || block.block_type
 
-      def panel_id = Admin::BlockCardComponent.panel_id(block)
+      def panel_id = Admin::EditorScreen::BlockCardComponent.panel_id(block)
 
       def open? = @open
 
@@ -105,14 +105,14 @@ module Admin
       def note_key = ::Notes.key(block)
 
       # "Add note": first in an editor's menu, and the only item of the menu
-      # a view-only tile has (see `Admin::BlockCardComponent#add_note_item`).
+      # a view-only tile has (see `Admin::EditorScreen::BlockCardComponent#add_note_item`).
       def add_note_item
         tag.button(t(".add_note"), type: "button", class: menu_item_class, data: { action: "admin--notes#open", notes_key: note_key, notes_compose: true })
       end
 
       def move_to_column = Admin::EditorScreen::MoveDialogComponent.trigger("column")
 
-      def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS
+      def menu_item_class = Admin::EditorScreen::BlockCardComponent::MENU_ITEM_CLASS
 
       private
 

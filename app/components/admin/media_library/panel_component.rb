@@ -130,7 +130,7 @@ module Admin
       # reader -- this is the asset's own literal default in the locale
       # being edited, the same "no cross-locale fallback while editing"
       # rule every other translated column's own admin field already
-      # follows (`Admin::BlockCardComponent#value_for`'s own comment).
+      # follows (`Admin::EditorScreen::BlockCardComponent#value_for`'s own comment).
       def alt_value = asset.alt(locale: locale)
 
       def caption_value = asset.caption(locale: locale)
@@ -159,7 +159,7 @@ module Admin
       # See `Admin::EditorScreen::HeaderComponent#switcher_locales`.
       def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(asset)
 
-      # See `Admin::PageSettingsFormComponent#translation`.
+      # See `Admin::EditorScreen::PageSettingsFormComponent#translation`.
       def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(asset, field, locale: locale, confirmable: editable?)
 
       # The tabs keep `selected` and the grid's state; only the language changes.

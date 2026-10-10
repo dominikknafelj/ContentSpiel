@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // One block's form open per section (sections spec §4.3).
 //
 // EVERY FORM IS ALREADY IN THE PAGE. A section renders each of its blocks'
-// forms as a hidden panel under its lanes (`Admin::BlockCardComponent`,
+// forms as a hidden panel under its lanes (`Admin::EditorScreen::BlockCardComponent`,
 // `placement: :panel`), and this controller only shows one and hides the
 // rest. That is the whole point of the design: a form that is never removed
 // stays registered with the write queue (`autosave/queue.js`), keeps its

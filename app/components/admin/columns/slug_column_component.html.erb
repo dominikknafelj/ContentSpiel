@@ -1,7 +1,7 @@
 <div class="admin-column mb-4" data-field-name="<%= name %>">
   <label class="<%= setup_label_class %> mb-1" for="<%= id %>">Slug</label>
 
-  <%= render Admin::PrefixInputComponent.new(name: html_name, id: id, value: value, prefix: prefix, errors: errors, **html) %>
+  <%= render Admin::Ui::PrefixInputComponent.new(name: html_name, id: id, value: value, prefix: prefix, errors: errors, **html) %>
 
   <%# `data-admin--slug-preview-target="output"` is always present, not
       passed in via `**html` the way the input's own target is (Task 4) --

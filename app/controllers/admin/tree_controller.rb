@@ -119,7 +119,7 @@ module Admin
       sent = request.headers["X-Page-Base-Updated-At"]
       return [] unless sent.present? && Time.iso8601(sent) == updated_at_before_move
 
-      id = "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+      id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
       [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
         locals: { id: id, value: Page.where(id: page.id).pick(:updated_at).iso8601(6) }) ]
     rescue ArgumentError
@@ -128,7 +128,7 @@ module Admin
 
     def tree_stream(selected:, message: nil)
       [
-        turbo_stream.replace("tree", Admin::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options)),
+        turbo_stream.replace("tree", Admin::PagesScreen::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options)),
         turbo_stream.replace("tree-status", partial: "admin/tree/status", locals: { message: message })
       ]
     end

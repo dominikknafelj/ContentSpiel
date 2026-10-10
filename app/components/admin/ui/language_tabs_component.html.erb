@@ -41,7 +41,7 @@
               id="content">`, so left to its own default frame target a click
               here would only ever replace *that* frame -- the page tree
               outside it (spec §4.2) never re-renders with the new locale's
-              own titles (`Admin::TreeNodeComponent#title` reads `locale`), so
+              own titles (`Admin::PagesScreen::TreeNodeComponent#title` reads `locale`), so
               switching language while looking at the tree left every node's
               title showing whichever language was selected before the
               switch. A full top-level visit re-renders the tree along with

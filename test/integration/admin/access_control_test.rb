@@ -367,7 +367,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:editor_branch))
     path = "/cs-studio/pages/#{@inside.id}/content_blocks/#{block.id}"
 
-    error_id = Admin::Ui::FieldComponent.error_id(Admin::BlockCardComponent.error_prefix(block), "body")
+    error_id = Admin::Ui::FieldComponent.error_id(Admin::EditorScreen::BlockCardComponent.error_prefix(block), "body")
     unreadable, missing = [ @outside.id, Page.maximum(:id) + 1000 ].map do |target_id|
       patch path, params: { block: { body: link_doc("page", target_id).to_json } }, as: :turbo_stream
       assert_response :unprocessable_entity

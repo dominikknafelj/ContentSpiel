@@ -11,7 +11,7 @@ module Admin
     # `data-column` say which container the lane is).
     # So the column's label is the lane's sibling inside a wrapper, never its
     # child, and nothing else is ever put into a lane. The "+" that ends each
-    # lane (spec §4.2: `Admin::BlockPickerComponent` with the section and the
+    # lane (spec §4.2: `Admin::EditorScreen::BlockPickerComponent` with the section and the
     # column) is the same: it follows the lane inside the wrapper, so to the
     # eye it is the lane's last line and to a move it is not there. Only for
     # a viewer who may edit, as the "Add block" row is.
@@ -82,7 +82,7 @@ module Admin
       end
 
       def picker(column)
-        Admin::BlockPickerComponent.new(page: page, locale: locale, url_options: url_options, section: section, column: column)
+        Admin::EditorScreen::BlockPickerComponent.new(page: page, locale: locale, url_options: url_options, section: section, column: column)
       end
 
       private

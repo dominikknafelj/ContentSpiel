@@ -5,7 +5,7 @@ import { enqueue, holdTurboRequest, syncBases } from "autosave/queue"
 import { orderErrorToast, sendOrder } from "autosave/order_request"
 
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
-// children <ul> is a `list` target (Admin::TreeNodeComponent); they all
+// children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
 // share one `group`, so a node can be dropped under any other page in the
 // tree, not just reordered among its current siblings -- a nested-list
 // SortableJS setup.
@@ -49,7 +49,7 @@ export default class extends Controller {
   static targets = ["list", "announcer"]
   static values = { moveUrl: String }
 
-  // The page settings form's base field (`Admin::PageSettingsFormComponent`).
+  // The page settings form's base field (`Admin::EditorScreen::PageSettingsFormComponent`).
   static pageBaseId = "page-base-updated-at"
 
   connect() {
@@ -208,7 +208,7 @@ export default class extends Controller {
   // neither does a context-only page's list, so ArrowLeft out to a level
   // whose parent is context-only does nothing. (ArrowRight never meets a
   // context-only sibling: a row only has a handle when its parent is a page
-  // the editor can read -- `Admin::TreeNodeComponent#movable?` -- and every
+  // the editor can read -- `Admin::PagesScreen::TreeNodeComponent#movable?` -- and every
   // page under a readable one is readable.) A page can only nest under a
   // *sibling*, never into its own subtree.
   //

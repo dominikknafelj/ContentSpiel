@@ -14,7 +14,7 @@ class Admin::SlugBaseUrlTest < ViewComponent::TestCase
   test "a child of the root page: the page form's prefix has no doubled slash, in either language" do
     child = PreviewFixtures.page(title: "Child")
     %w[en de].each do |locale|
-      component = Admin::PageSettingsFormComponent.new(page: child, locale: locale)
+      component = Admin::EditorScreen::PageSettingsFormComponent.new(page: child, locale: locale)
       # The source, not just the defensive `SlugColumnComponent#prefix` on top of it.
       assert_no_match %r{/\z}, component.send(:slug_base_url) unless component.send(:slug_base_url).empty?
       as_owner { render_inline component }
@@ -26,7 +26,7 @@ class Admin::SlugBaseUrlTest < ViewComponent::TestCase
   test "a page below another page keeps exactly one slash between segments" do
     parent = PreviewFixtures.page(title: "Parent")
     child = parent.children.create!(page_type: :standard, title: "Grandchild #{SecureRandom.hex(4)}", published_at: Time.current)
-    as_owner { render_inline Admin::PageSettingsFormComponent.new(page: child, locale: "de") }
+    as_owner { render_inline Admin::EditorScreen::PageSettingsFormComponent.new(page: child, locale: "de") }
     assert_no_text "//"
     assert_selector ".admin-prefix-input span.bg-sunken", text: %r{\A/de/.+/\z}
   end
@@ -35,7 +35,7 @@ class Admin::SlugBaseUrlTest < ViewComponent::TestCase
     @root.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = PreviewFixtures.post(title: "Listed")
     %w[en de].each do |locale|
-      component = Admin::PostFormComponent.new(post: post, locale: locale)
+      component = Admin::EditorScreen::PostFormComponent.new(post: post, locale: locale)
       assert_no_match %r{/\z}, component.send(:slug_base_url)
       as_owner { render_inline component }
       assert_no_text "//"

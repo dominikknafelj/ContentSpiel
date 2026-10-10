@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The group editor's permission rows (`Admin::PermissionMatrixComponent`,
+// The group editor's permission rows (`Admin::GroupsScreen::PermissionMatrixComponent`,
 // `Admin::GroupsScreen::PermissionRowComponent`, round 3 Task 10).
 //
 // - Opens and closes each row's scope editor ("Edit scope" / "Done": the

@@ -8,7 +8,7 @@ module Admin
     # form in its header (below).
     #
     # EVERY BLOCK'S FORM IS RENDERED WITH THE PAGE (plan decision D3). Under
-    # the lanes sits one `Admin::BlockCardComponent` per block of the section,
+    # the lanes sits one `Admin::EditorScreen::BlockCardComponent` per block of the section,
     # drawn as a `placement: :panel`: hidden, and shown one at a time by
     # `admin--section` when its tile is pressed. A form is never fetched when
     # a tile is opened and never removed when it is closed. That is what makes
@@ -64,7 +64,7 @@ module Admin
     # is an autosave form like a card's, answered by the same action (`Admin
     # ::ContentBlocksController#update`) into the same ids -- the wiring, the
     # base field, the status line and one error slot per setting are all
-    # `Admin::BlockCardComponent`'s, asked of its class, so a section's save
+    # `Admin::EditorScreen::BlockCardComponent`'s, asked of its class, so a section's save
     # is refused as stale (409) and reported exactly as a block's is. Layout
     # is a menu over a hidden input (`SectionLayoutMenuComponent`); the other
     # two are plain selects. A viewer who can't edit sees the three as they
@@ -185,13 +185,13 @@ module Admin
 
       def form_url = helpers.admin_page_content_block_path(page, section, **url_options)
 
-      def form_data = editable? ? Admin::BlockCardComponent.autosave_form_data(section) : {}
+      def form_data = editable? ? Admin::EditorScreen::BlockCardComponent.autosave_form_data(section) : {}
 
-      def error_prefix = Admin::BlockCardComponent.error_prefix(section)
+      def error_prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(section)
 
-      def status_id = Admin::BlockCardComponent.status_id(section)
+      def status_id = Admin::EditorScreen::BlockCardComponent.status_id(section)
 
-      def base_updated_at_id = Admin::BlockCardComponent.base_updated_at_id(section)
+      def base_updated_at_id = Admin::EditorScreen::BlockCardComponent.base_updated_at_id(section)
 
       def base_updated_at_value = section.updated_at.iso8601(6)
 
@@ -227,7 +227,7 @@ module Admin
       # card of a section whose type is gone: see the class comment.
       def settled_screen_data = { controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" }
 
-      def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS
+      def menu_item_class = Admin::EditorScreen::BlockCardComponent::MENU_ITEM_CLASS
 
       def blocks = outline.blocks_in(section)
 
@@ -236,7 +236,7 @@ module Admin
       end
 
       def panel(block)
-        Admin::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel)
+        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel)
       end
 
       private

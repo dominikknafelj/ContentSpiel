@@ -6,7 +6,7 @@
     redirect to the new page's editor a full visit, so the tree shows it. %>
 <% content_for :standalone_new_record, "page" %>
 <% content_for :tree do %>
-  <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
 <%# `@form` is built (and gated on) by `#new`; a refused create re-renders from what was typed. %>

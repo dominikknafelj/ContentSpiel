@@ -82,8 +82,8 @@ class SourceLayoutTest < ActiveSupport::TestCase
     assert_empty missing, "keys read but not defined:\n#{missing.join("\n")}"
   end
 
-  test "a shared building block lives in admin/ui" do
-    assert Dir[ROOT.join("app/components/admin/ui/*_component.rb")].size >= 25
-    assert_predicate ROOT.join("app/components/admin/ui/button_component.rb"), :exist?
+  test "nothing is loose in app/components/admin but the base class" do
+    loose = Dir[ROOT.join("app/components/admin/*.{rb,erb}")].map { |path| File.basename(path) }
+    assert_equal %w[admin_component.rb], loose
   end
 end
