@@ -29,7 +29,7 @@ class Admin::SlotsTest < ViewComponent::TestCase
   def entry(component, loader: nil) = Admin::Slots::Entry.new(component:, loader:)
 
   test "the names a screen may put a slot at" do
-    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers], Admin::Slots::NAMES
+    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title], Admin::Slots::NAMES
   end
 
   test "an unknown name is refused at registration" do
@@ -124,12 +124,17 @@ class Admin::SlotsTest < ViewComponent::TestCase
   test "the real registry holds notes' two components and nothing at the presence slots yet" do
     assert_equal [ Admin::NotesScreen::HeaderButtonComponent ], Admin::Slots.entries("editor.header.actions").map(&:component)
     assert_equal [ Admin::NotesScreen::MediaSectionComponent ], Admin::Slots.entries("media.panel.sections").map(&:component)
+    assert_equal [ Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("tree.row.markers").map(&:component)
+    assert_equal [ Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("posts.row.markers").map(&:component)
+    assert_empty Admin::Slots.entries("posts.row.title")
     assert_empty Admin::Slots.entries("editor.header.people")
     assert_empty Admin::Slots.entries("media.panel.header")
   end
 
   test "the initializer can run again, as after a development reload, without registering anything twice" do
     before = Admin::Slots::NAMES.to_h { |name| [ name, Admin::Slots.entries(name) ] }
+    shape = -> { Admin::Slots::NAMES.to_h { |name| [ name, Admin::Slots.entries(name).map { |entry| [ entry.component, !entry.loader.nil? ] } ] } }
+    expected = shape.call
 
     block = nil
     config = Rails.application.config
@@ -143,7 +148,7 @@ class Admin::SlotsTest < ViewComponent::TestCase
     assert_not_nil block, "the initializer registers inside to_prepare"
     2.times { block.call }
 
-    assert_equal before, Admin::Slots::NAMES.to_h { |name| [ name, Admin::Slots.entries(name) ] }
+    assert_equal expected, shape.call
   ensure
     Admin::Slots.reset!(to: before)
   end

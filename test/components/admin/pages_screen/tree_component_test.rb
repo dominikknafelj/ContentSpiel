@@ -44,6 +44,22 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "the tree with open notes on its pages costs the same queries for 3 pages as for 30, and draws a pill on each" do
+    add_notes = ->(pages) { as(users(:two)) { pages.each { |page| Notes::Start.call(page, body: "A note") } } }
+
+    small_pages = add_pages(3, "Small")
+    add_notes.(small_pages)
+    render_tree # warm up whatever a first render loads once
+    small = count_queries { render_tree }
+
+    large_pages = add_pages(27, "Large")
+    add_notes.(large_pages)
+    large = count_queries { render_tree }
+
+    assert_selector "span[data-notes-marker]", minimum: 30
+    assert_equal small, large, "the tree ran a notes query per page"
+  end
+
   # Handoff §10 B24: "↻N" outdated and "○N" missing, summed over the target
   # languages, no box, no "!", the tooltip naming the languages.
   test "a row shows outdated and missing counts summed over the languages, with labels and a tooltip" do

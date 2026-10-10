@@ -45,7 +45,7 @@ module Admin
     NAMES = %w[
       editor.header.people editor.header.actions
       media.panel.header media.panel.sections
-      tree.row.markers posts.row.markers
+      tree.row.markers posts.row.markers posts.row.title
     ].freeze
 
     @registry = NAMES.to_h { |name| [ name, [] ] }

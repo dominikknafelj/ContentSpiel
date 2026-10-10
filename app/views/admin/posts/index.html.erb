@@ -65,7 +65,7 @@
     </div>
   <% else %>
     <%= render Admin::PostsScreen::TableComponent.new(posts: @posts, paths: @paths, translation_states: @translation_states,
-          note_counts: @note_counts, note_unread: @note_unread, url_options: admin_url_options, locale: admin_locale) do |table| %>
+          url_options: admin_url_options, locale: admin_locale) do |table| %>
       <% table.with_footer { render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
     <% end %>
   <% end %>

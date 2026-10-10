@@ -238,9 +238,10 @@ en:
         header:
           tree: "Pages ▾"
           tree_label: "Open page tree"
-      # A record's open notes where it is listed (notes spec §4.4). None of
-      # these three components' other strings live here (they are not
-      # converted): these merge into their scopes.
+      # A record's open notes where it is listed (notes spec §4.4): the media
+      # tile's, and the posts table's column header. None of these components'
+      # other strings live here (they are not converted): these merge into
+      # their scopes. The tree's and the posts list's pill are `notes_screen.row_pill`.
       media_library:
         tile:
           open_notes:
@@ -251,14 +252,6 @@ en:
           # The column's name, for a screen reader: its header shows an icon.
           notes: "Notes"
           open_notes_title: "Open notes"
-          open_notes:
-            one: "%{count} open note"
-            other: "%{count} open notes"
-      pages_screen:
-        tree_node:
-          open_notes:
-            one: "%{count} open note"
-            other: "%{count} open notes"
       notes_screen:
         # The editor header's Notes button (`Admin::NotesScreen::HeaderButtonComponent`).
         header_button:
@@ -275,6 +268,12 @@ en:
           # rewrites as the count changes, so the sentence has one form.
           notes_open_html: "· %{number} open"
           notes_loading: "Loading notes…"
+        # The pill of a row in the page tree and the posts list
+        # (`Admin::NotesScreen::RowPillComponent`).
+        row_pill:
+          open_notes:
+            one: "%{count} open note"
+            other: "%{count} open notes"
         drawer:
           title: "Notes"
           # Beside the title: "4 open". `%{number}` is the element the script

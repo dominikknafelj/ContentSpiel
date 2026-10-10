@@ -11,6 +11,34 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     end
   end
 
+  def count_queries(&block)
+    count = 0
+    counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
+    count
+  end
+
+  test "the table with open notes costs the same queries for 3 posts as for 30, and draws a pill on each" do
+    add = lambda do |count, prefix|
+      Array.new(count) { |n| create_post(title: "#{prefix} #{n}") }.each { |post| as(users(:two)) { Notes::Start.call(post, body: "A note") } }
+    end
+    small_posts = add.(3, "Small")
+    render_table(small_posts)
+    small = count_queries { render_table(small_posts) }
+
+    large_posts = small_posts + add.(27, "Large")
+    large = count_queries { render_table(large_posts) }
+
+    assert_selector "a[data-notes-count]", count: 30
+    assert_equal small, large, "the table ran a notes query per post"
+  end
+
+  test "an empty slot after the title draws nothing" do
+    render_table([ create_post(title: "Plain") ])
+
+    assert_no_selector "tbody th[scope=row] > :not(a)"
+  end
+
   test "the columns, a checkbox per row, and the select-all header checkbox" do
     draft = create_post(title: "A draft", published: false)
     render_table([ draft ])

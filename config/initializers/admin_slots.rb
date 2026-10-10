@@ -7,4 +7,8 @@ Rails.application.config.to_prepare do
 
   Admin::Slots.register "editor.header.actions", Admin::NotesScreen::HeaderButtonComponent
   Admin::Slots.register "media.panel.sections", Admin::NotesScreen::MediaSectionComponent
+
+  # The lists' rows: the pill's loader reads each list's counts once for all rows.
+  Admin::Slots.register "tree.row.markers", Admin::NotesScreen::RowPillComponent, loader: Admin::NotesScreen::RowPillComponent.loader("Page")
+  Admin::Slots.register "posts.row.markers", Admin::NotesScreen::RowPillComponent, loader: Admin::NotesScreen::RowPillComponent.loader("Post")
 end

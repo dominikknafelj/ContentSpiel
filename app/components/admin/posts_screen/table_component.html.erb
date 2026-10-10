@@ -39,6 +39,8 @@
               <span class="truncate font-medium"><%= title_of(post) %></span>
               <span class="truncate font-cs-mono text-[11px] text-meta"><%= path_of(post) || "Not listed" %></span>
             <% end %>
+            <%# What features register at `posts.row.title`: right after the title. %>
+            <%= render Admin::Ui::SlotComponent.new(name: "posts.row.title", record: post, viewer: Current.actor, loaded: nil, locale: locale, url_options: url_options) %>
           </th>
           <td class="py-2.5 pr-4 text-dim"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: post.content_type) %></td>
           <td class="py-2.5 pr-4"><%= render Admin::Ui::StatusChipComponent.new(status: post.status, at: post.published_at, hide_live: true) %></td>
@@ -55,12 +57,7 @@
             </span>
           </td>
           <td class="py-2.5 pr-4">
-            <% if open_notes(post).positive? %>
-              <%# The notes pill without an icon; `no-underline`, it is a pill and not text. %>
-              <%= link_to open_notes(post), editor_path(post, notes: "open"), class: "admin-notes-marker no-underline",
-                    aria: { label: t(".open_notes", count: open_notes(post)) },
-                    data: { notes_count: true, has_notes: true, unread: (true if notes_unread?(post)) } %>
-            <% end %>
+            <%= render Admin::Ui::SlotComponent.new(name: "posts.row.markers", record: post, viewer: Current.actor, loaded: loaded, locale: locale, url_options: url_options) %>
           </td>
           <td class="py-2.5 pr-4 text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: post.updated_at) %></td>
           <td class="py-2.5 pr-3 text-right">

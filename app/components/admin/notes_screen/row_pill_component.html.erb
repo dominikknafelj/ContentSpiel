@@ -1,0 +1,15 @@
+<% if post? %>
+  <%# The notes pill without an icon; `no-underline`, it is a pill and not text. %>
+  <%= link_to open_notes, post_path, class: "admin-notes-marker no-underline",
+        aria: { label: t(".open_notes", count: open_notes) },
+        data: { notes_count: true, has_notes: true, unread: (true if unread?) } %>
+<% else %>
+  <%# Open notes on the page and its blocks (notes spec §4.4): the notes
+      pill at the tile's size, with its icon. Named like the markers
+      before it; the icon is decoration. %>
+  <%= tag.span data: { notes_marker: true, has_notes: true, unread: (true if unread?) }, role: "img",
+        title: t(".open_notes", count: open_notes), aria: { label: t(".open_notes", count: open_notes) },
+        class: "admin-notes-marker admin-notes-marker--readonly admin-notes-marker--small" do %>
+    <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %><%= open_notes %>
+  <% end %>
+<% end %>

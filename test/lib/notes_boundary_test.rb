@@ -90,6 +90,11 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/post_form_component.html.erb
     app/components/admin/media_library/panel_component.rb
     app/components/admin/media_library/panel_component.html.erb
+    app/components/admin/pages_screen/tree_component.rb
+    app/components/admin/pages_screen/tree_component.html.erb
+    app/components/admin/pages_screen/tree_node_component.rb
+    app/components/admin/pages_screen/tree_node_component.html.erb
+    app/components/admin/posts_screen/table_component.rb
   ].freeze
 
   NOTES_WORD = /\bnotes\b/i
@@ -112,14 +117,12 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     %w[app/components/admin/media_library/tile_component.rb app/components/admin/media_library/tile_component.html.erb
        app/components/admin/media_library/grid_component.rb] =>
       "the media tile's count chip and the grid's one read of the marks: a slot when a second feature marks a tile (presence in the grid is out of scope)",
-    %w[app/components/admin/pages_screen/tree_component.rb app/components/admin/pages_screen/tree_node_component.rb app/components/admin/pages_screen/tree_node_component.html.erb] =>
-      "the page tree's row marker: becomes the `tree.row.markers` slot when presence puts its own marker there",
-    %w[app/components/admin/posts_screen/table_component.rb app/components/admin/posts_screen/table_component.html.erb] =>
-      "the posts list's notes column: becomes the `posts.row.markers` slot when presence puts its own marker there"
+    %w[app/components/admin/posts_screen/table_component.html.erb] =>
+      "the posts table's Notes column HEADER (its icon and its name): the column is notes' alone, and a header mechanism for slots (a second slot) is more than two features justify; the CELL is the posts.row.markers slot, and the column becomes a slot's when a second feature wants a column of its own"
   }.freeze
 
   test "the editors' header and the media panel do not name notes: they draw their slots" do
-    assert_equal 6, SLOT_HOSTS.size
+    assert_equal 11, SLOT_HOSTS.size
     offences = SLOT_HOSTS.flat_map do |path|
       Rails.root.join(path).read.lines.each_with_index.filter_map { |line, index| "#{path}:#{index + 1}: #{line.strip}" if line.match?(NOTES_WORD) }
     end
