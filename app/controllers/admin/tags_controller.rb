@@ -5,7 +5,7 @@ module Admin
   # use, minus the locale switching neither a tag's name nor its post count
   # has any use for -- a tag has no translated attributes) plus a row menu
   # (⋯) that opens the list's one Merge dialog and one Delete dialog
-  # (`admin--tag-dialogs` fills them from the row). There is no `:show`/`:new`/
+  # (`admin--tags--dialogs` fills them from the row). There is no `:show`/`:new`/
   # `:create`: a tag has no editor screen of its own, and new tags are only
   # ever created in passing, through a post's `tag_names` (`Posts::Save`).
   class TagsController < BaseController
@@ -72,7 +72,7 @@ module Admin
     #
     # The answer removes the row and says so in a toast; the dialog it was
     # confirmed in lives outside the row now (one for the whole list), so
-    # `admin--tag-dialogs` closes it when this submission succeeds.
+    # `admin--tags--dialogs` closes it when this submission succeeds.
     #
     # A refusal (a stale tab whose `tags.manage` was taken away) leaves the
     # row in place and answers 403, rather than removing a tag that still

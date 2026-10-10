@@ -1,6 +1,6 @@
 module Admin
   # The wording of the Tags list's two dialogs, built on the server so the
-  # copy is tested in Ruby and the one JavaScript controller (`admin--tag-dialogs`)
+  # copy is tested in Ruby and the one JavaScript controller (`admin--tags--dialogs`)
   # only copies it into the dialog it is opening. Each row's menu items carry
   # these as `data-tag-*` attributes (`app/views/admin/tags/index.html.erb`);
   # the attribute encoding keeps a tag name -- which is whatever an editor typed

@@ -80,7 +80,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
 
     assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{field}")).t("components.ui.save_status.saving")))["value"]
     assert_equal "1 unsaved change", in_page(%(messages(document.querySelector("#{field}")).t("components.ui.save_bar.changes", { count: 1 })))["value"]
-    root = "[data-controller='admin--tag-dialogs']"
+    root = "[data-controller='admin--tags--dialogs']"
     assert_match(/wasn't deleted/, in_page(%(messages(document.querySelector("#{root}")).t("tags.dialogs.delete_failed")))["value"].to_s)
     assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{root}")).t("components.ui.save_status.saving")))["value"], "the root's own data-messages does not hide <body>'s"
 

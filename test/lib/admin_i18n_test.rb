@@ -126,7 +126,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/controllers/admin/tag_suggestions_controller.rb
     app/helpers/admin/tags_helper.rb
     app/services/tags/merge.rb
-    app/javascript/controllers/admin/tag_dialogs_controller.js
+    app/javascript/controllers/admin/tags/dialogs_controller.js
     app/views/admin/mind_graph/show.html.erb
     app/javascript/controllers/admin/mind_graph/graph_controller.js
     app/javascript/mind_graph/app.js
