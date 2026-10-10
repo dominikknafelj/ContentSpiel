@@ -22,7 +22,7 @@ Claude Design's decisions for presence (project "Content Spiel design system", 2
 
 ## The media library's image panel
 
-13. **Place:** the right end of the panel's file-name row, above the preview. 20px avatars, at most 2 and then "+N".
+13. **Place:** the right end of the panel's file-name row, above the preview. 20px avatars, at most 2 and then "+N". The people stand between the file name and the "×", and the "×" stays rightmost: the file name is `flex-1 min-w-0`, then the people group (`flex-none`, `ml-auto`) 8px after the name, then the "×" 12px after the people. A long file name is cut off with an ellipsis on one line, with the full name in a `title`; the people never give way (the name is shown in full in the fields below, and a presence group that vanished on long names would be unreliable). (Asked while the slots were built, 2026-10-10.)
 
 ## Arriving, leaving, small screens
 
