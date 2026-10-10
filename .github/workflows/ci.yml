@@ -124,8 +124,49 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
 
-  system-test:
+  # What changed, so the browser suite can be skipped when nothing it tests did.
+  # Only documents count as "nothing": the unit suite reads them (the guards in
+  # test/lib scan CLAUDE.md and docs/reference), so it always runs.
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Did anything but documents change?
+        id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.sha }}
+        run: |
+          # A push whose base is unknown (a new branch, a forced push) runs everything.
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE" "$HEAD" | grep -qvE '^(docs/|[^/]+\.md$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The browser suite, as four jobs side by side: a runner has two cores, and
+  # the whole suite on two processes took 28 minutes. `bin/system-test-shard`
+  # deals the files so each job holds about the same number of tests
+  # (test/lib/system_test_shards_test.rb keeps every file in exactly one).
+  system-test-shard:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
 
     services:
       postgres:
@@ -136,12 +177,6 @@ jobs:
         ports:
           - 5432:5432
         options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
-
-      # redis:
-      #   image: valkey/valkey:8
-      #   ports:
-      #     - 6379:6379
-      #   options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
       - name: Install packages
@@ -157,21 +192,41 @@ jobs:
 
       # Cuprite (via Ferrum) drives the Chrome that GitHub's ubuntu runners
       # ship preinstalled; BROWSER_PATH pins it rather than relying on
-      # Ferrum's PATH search.
+      # Ferrum's PATH search. The files are named, so this is `bin/rails test`
+      # (`test:system` would ignore them), and the stylesheet is built first,
+      # which `test:system` did by itself.
       - name: Run System Tests
         env:
           RAILS_ENV: test
           VERBOSE: "1"
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           BROWSER_PATH: /usr/bin/google-chrome
-          # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
-          # REDIS_URL: redis://localhost:6379/0
-        run: bin/rails db:test:prepare test:system
+        run: |
+          bin/rails db:test:prepare tailwindcss:build
+          bin/rails test $(bin/system-test-shard ${{ matrix.shard }} 4)
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: screenshots
+          name: screenshots-${{ matrix.shard }}
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
+
+  # One check that speaks for the four: green when every shard passed, or when
+  # the suite was skipped because only documents changed.
+  system-test:
+    needs: [changes, system-test-shard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Did every shard pass?
+        env:
+          CODE: ${{ needs.changes.outputs.code }}
+          SHARDS: ${{ needs.system-test-shard.result }}
+        run: |
+          if [ "$CODE" = "false" ] && [ "$SHARDS" = "skipped" ]; then
+            echo "Only documents changed: the browser suite was not run."
+            exit 0
+          fi
+          [ "$SHARDS" = "success" ] || { echo "system tests: $SHARDS"; exit 1; }
