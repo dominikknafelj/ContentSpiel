@@ -17,7 +17,7 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
 
   def record_stream = "presence:record:Page-#{@page.id}"
 
-  def list_payload = { "kind" => "presence", "record" => [ "page", @page.id ] }
+  def list_payload = { "kind" => "presence" }
 
   def decoded(stream) = broadcasts(stream).map { |payload| ActiveSupport::JSON.decode(payload) }
 
@@ -100,6 +100,104 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
 
     perform :report, state: "here"
     assert_equal 2, broadcasts(record_stream).size
+  end
+
+  test "a signal on the list names no record, whatever the kind" do
+    asset = create_media_asset
+    post = create_post(title: "Hello")
+    connect_as users(:two)
+    [ [ "page", @page.id ], [ "post", post.id ], [ "media", asset.id ] ].each do |type, id|
+      subscribe type: type, id: id, tab: TAB
+      perform :report, state: "away"
+      unsubscribe
+    end
+    assert_operator broadcasts("presence:list").size, :>=, 9
+    assert_equal [ { "kind" => "presence" } ], decoded("presence:list").uniq
+  end
+
+  test "a post without a grant and an image without media.upload are rejected through the channel itself" do
+    connect_as users(:reader)
+    subscribe type: "media", id: create_media_asset.id, tab: TAB
+    assert subscription.rejected?
+    connect_as @stranger
+    subscribe type: "post", id: create_post(title: "Hello").id, tab: TAB
+    assert subscription.rejected?
+    assert_equal 0, Presence::Mark.count
+  end
+
+  test "report always moves seen_at, and state_at only with a change" do
+    connect_as users(:reader)
+    travel_to(Time.zone.local(2026, 10, 10, 12, 0, 0)) { subscribe type: "page", id: @page.id, tab: TAB }
+    travel_to(Time.zone.local(2026, 10, 10, 12, 5, 0)) { perform :report, state: "away" }
+    travel_to(Time.zone.local(2026, 10, 10, 12, 9, 0)) { perform :report, state: "away" }
+    mark = Presence::Mark.sole
+    assert_equal Time.zone.local(2026, 10, 10, 12, 9, 0), mark.seen_at
+    assert_equal Time.zone.local(2026, 10, 10, 12, 5, 0), mark.state_at
+  end
+
+  test "two connections of one tab: a late unsubscribe of the older leaves the newer subscription's row, and the newer one's deletes it" do
+    user = users(:reader)
+    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    subscribe type: "page", id: @page.id, tab: TAB
+    first = subscription
+    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    subscribe type: "page", id: @page.id, tab: TAB
+    second = subscription
+    assert_equal 1, Presence::Mark.count
+    clear_messages
+
+    first.unsubscribe_from_channel
+    assert_equal 1, Presence::Mark.count
+    assert_equal 0, broadcasts(record_stream).size
+
+    perform :beat
+    assert_equal 1, Presence::Mark.count
+    second.unsubscribe_from_channel
+    assert_equal 0, Presence::Mark.count
+  end
+
+  test "a beat finds no row, puts it back with the subscription's token and the state it carries, and tells the others" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id, tab: TAB
+    token = Presence::Mark.sole.token
+    Presence::Mark.delete_all # version: none (a test of presence)
+    clear_messages
+
+    perform :beat, state: "away"
+    mark = Presence::Mark.sole
+    assert_equal [ "away", token ], mark.values_at(:state, :token)
+    assert_equal 1, broadcasts(record_stream).size
+
+    perform :beat, state: "away"
+    assert_equal 1, broadcasts(record_stream).size
+  end
+
+  test "a beat that finds no row heals with the remembered state when it carries none or a bad one" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id, tab: TAB
+    perform :report, state: "away"
+    [ {}, { state: "gone" }, { state: 3 } ].each do |data|
+      Presence::Mark.delete_all # version: none (a test of presence)
+      perform :beat, data
+      assert_equal "away", Presence::Mark.sole.state, data.inspect
+    end
+  end
+
+  test "a report that finds no row heals as well" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id, tab: TAB
+    Presence::Mark.delete_all # version: none (a test of presence)
+    perform :report, state: "away"
+    assert_equal "away", Presence::Mark.sole.state
+  end
+
+  test "a beat carrying a different state than the tab last reported is a report" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id, tab: TAB
+    clear_messages
+    perform :beat, state: "away"
+    assert_equal "away", Presence::Mark.sole.state
+    assert_equal 1, broadcasts(record_stream).size
   end
 
   test "beat moves seen_at and tells nobody" do

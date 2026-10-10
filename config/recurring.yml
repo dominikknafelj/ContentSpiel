@@ -24,7 +24,7 @@ production:
   presence_sweep:
     class: Presence::Sweep
     queue: default
-    schedule: every minute
+    schedule: every 5 minutes
 
 development:
   trash_purge_expired:
@@ -35,6 +35,10 @@ development:
     class: PublicSite::SyncWentLiveJob
     queue: default
     schedule: every 5 minutes
+  presence_sweep:
+    class: Presence::Sweep
+    queue: default
+    schedule: every 5 minutes
 
 test:
   trash_purge_expired:
@@ -43,5 +47,9 @@ test:
     schedule: every day at 3am
   public_paths_sync_went_live:
     class: PublicSite::SyncWentLiveJob
+    queue: default
+    schedule: every 5 minutes
+  presence_sweep:
+    class: Presence::Sweep
     queue: default
     schedule: every 5 minutes

@@ -11,30 +11,33 @@ class Presence::RosterTest < ActiveSupport::TestCase
     @third = users(:reader)
     @roster = Presence::Roster.new(viewer: @viewer)
     @now = Time.zone.local(2026, 10, 10, 12, 0, 0)
+    @page_kind = RecordKinds.named("page")
   end
 
-  def mark(user, record = @page, tab: "tab-#{user.id}-#{SecureRandom.hex(3)}", state: "here", seen: @now, arrived: seen)
-    Presence::Mark.insert!({ user_id: user.id, record_type: record.class.polymorphic_name, record_id: record.id, tab:, state:, seen_at: seen, arrived_at: arrived }) # version: none (a test of presence)
+  def mark(user, record = @page, tab: "tab-#{user.id}-#{SecureRandom.hex(3)}", state: "here", seen: @now, arrived: seen, state_at: arrived)
+    Presence::Mark.insert!({ user_id: user.id, record_type: record.class.polymorphic_name, record_id: record.id, tab:, token: SecureRandom.hex(8), state:, seen_at: seen, arrived_at: arrived, state_at: }) # version: none (a test of presence)
   end
+
+  def counts(records, kind: @page_kind) = @roster.here_counts(kind, records.map(&:id))
 
   test "nobody else is nobody" do
     travel_to(@now) do
       mark(@viewer)
       assert_equal [], @roster.on(@page)
-      assert_equal({}, @roster.here_counts([ @page ]))
+      assert_equal({}, counts([ @page ]))
     end
   end
 
-  test "a row 61 seconds old is not seen and one 59 seconds old is" do
+  test "a row just past STALE_AFTER is not seen and one just inside it is" do
     travel_to(@now) do
-      mark(@other, seen: @now - 61.seconds)
-      mark(@third, seen: @now - 59.seconds)
+      mark(@other, seen: @now - 151.seconds)
+      mark(@third, seen: @now - 149.seconds)
       assert_equal [ @third ], @roster.on(@page).map(&:user)
-      assert_equal({ @page.id => 1 }, @roster.here_counts([ @page ]))
+      assert_equal({ @page.id => 1 }, counts([ @page ]))
     end
   end
 
-  test "a person is one Person: here if any tab is here, with the earliest arrival" do
+  test "a person is one Person: here if any tab is here, since their earliest arrival among the tabs that are here" do
     travel_to(@now) do
       mark(@other, state: "away", arrived: @now - 10.minutes)
       mark(@other, state: "here", arrived: @now - 3.minutes)
@@ -45,15 +48,23 @@ class Presence::RosterTest < ActiveSupport::TestCase
     end
   end
 
-  test "two away tabs are one Person, away, since the later seen_at" do
+  test "an away person is away since the LAST of their tabs went away, however often the tabs beat" do
     travel_to(@now) do
-      mark(@other, state: "away", seen: @now - 40.seconds)
-      mark(@other, state: "away", seen: @now - 20.seconds)
-      assert_equal [ [ @other, "away", @now - 20.seconds ] ], @roster.on(@page).map(&:deconstruct)
+      mark(@other, state: "away", seen: @now - 5.seconds, arrived: @now - 30.minutes, state_at: @now - 20.minutes)
+      mark(@other, state: "away", seen: @now - 9.seconds, arrived: @now - 25.minutes, state_at: @now - 12.minutes)
+      assert_equal [ [ @other, "away", @now - 12.minutes ] ], @roster.on(@page).map(&:deconstruct)
     end
   end
 
-  test "here comes first, then the earliest arrival" do
+  test "a stale here row does not make a person here, nor give them an away time" do
+    travel_to(@now) do
+      mark(@other, state: "here", seen: @now - 151.seconds)
+      mark(@other, state: "away", seen: @now - 10.seconds, state_at: @now - 8.minutes)
+      assert_equal [ [ @other, "away", @now - 8.minutes ] ], @roster.on(@page).map(&:deconstruct)
+    end
+  end
+
+  test "here comes first, then the earliest arrival of any of the person's tabs, so a reload keeps their place" do
     travel_to(@now) do
       a = User.create!(email_address: "a@example.com", password: "a-long-password-1")
       b = User.create!(email_address: "b@example.com", password: "a-long-password-1")
@@ -62,14 +73,36 @@ class Presence::RosterTest < ActiveSupport::TestCase
       mark(a, state: "here", arrived: @now - 9.minutes)
       mark(b, state: "away", arrived: @now - 40.minutes)
       assert_equal [ a, @third, b, @other ], @roster.on(@page).map(&:user)
+
+      # `@third` reloads: a new tab, here since a minute ago, but their older tab came 20 minutes ago.
+      mark(@third, state: "here", arrived: @now - 20.minutes)
+      mark(@third, state: "here", arrived: @now - 1.minute)
+      assert_equal [ @third, a ], @roster.on(@page).first(2).map(&:user)
     end
   end
 
   test "only the record asked for" do
     travel_to(@now) do
-      other_page = create_page(title: "Other")
-      mark(@other, other_page)
+      mark(@other, create_page(title: "Other"))
       assert_equal [], @roster.on(@page)
+    end
+  end
+
+  test "a user deleted between the two statements is skipped, not an error" do
+    travel_to(@now) do
+      mark(@other)
+      mark(@third)
+      roster = @roster
+      deleted = false
+      callback = lambda do |*, payload|
+        next if deleted || !payload[:sql].include?("FROM \"presence_marks\"")
+
+        deleted = true
+        Presence::Mark.where(user_id: @third.id).delete_all # version: none (a test of presence)
+        User.where(id: @third.id).delete_all # version: none (a test of a user going between two statements)
+      end
+      people = ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { roster.on(@page) }
+      assert_equal [ @other ], people.map(&:user)
     end
   end
 
@@ -96,27 +129,32 @@ class Presence::RosterTest < ActiveSupport::TestCase
       mark(@third, busy, state: "away")
       mark(@other, quiet, state: "away")
       mark(@viewer, mine)
-      assert_equal({ busy.id => 2 }, @roster.here_counts([ busy, quiet, mine, @page ]))
-      assert_equal({}, @roster.here_counts([]))
+      assert_equal({ busy.id => 2 }, counts([ busy, quiet, mine, @page ]))
+      assert_equal({}, counts([]))
     end
   end
 
-  test "here_counts is one statement for 3 records and for 30" do
+  test "here_counts takes ids or a relation, and is one statement for 3 records and for 30, loading none" do
     travel_to(@now) do
       pages = Array.new(30) { |i| create_page(title: "Page #{i}") }
       pages.each { |page| mark(@other, page) }
-      assert_equal 1, capture_sql { @roster.here_counts(pages.first(3)) }.size
-      assert_equal 1, capture_sql { assert_equal 30, @roster.here_counts(pages).size }.size
+      assert_equal 1, capture_sql { counts(pages.first(3)) }.size
+      assert_equal 1, capture_sql { assert_equal 30, counts(pages).size }.size
+      relation = Page.where(id: pages.first(5).map(&:id)).select(:id)
+      statements = capture_sql { assert_equal 5, @roster.here_counts(@page_kind, relation).size }
+      assert_equal 1, statements.size
+      assert_not_includes statements.first, "SELECT \"pages\".* "
     end
   end
 
   test "here_counts for an image does not mix with a page of the same id" do
     travel_to(@now) do
       asset = create_media_asset
-      Presence::Mark.insert!({ user_id: @other.id, record_type: "Media::Asset", record_id: @page.id, tab: "tab-xxxxxxxx", state: "here", seen_at: @now, arrived_at: @now }) # version: none (a test of presence)
-      assert_equal({}, @roster.here_counts([ @page ]))
-      assert_equal({ @page.id => 1 }, @roster.here_counts([ Media::Asset.new(id: @page.id) ]))
-      assert_equal({}, @roster.here_counts([ asset ]))
+      media = RecordKinds.named("media")
+      mark(@other, Media::Asset.new(id: @page.id))
+      assert_equal({}, counts([ @page ]))
+      assert_equal({ @page.id => 1 }, counts([ Media::Asset.new(id: @page.id) ], kind: media))
+      assert_equal({}, counts([ asset ], kind: media))
     end
   end
 end

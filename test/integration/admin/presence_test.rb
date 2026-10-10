@@ -14,7 +14,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
   end
 
   def mark(user, record, state: "here", seen: Time.current, arrived: seen, tab: "tab-#{user.id}-#{SecureRandom.hex(3)}")
-    Presence::Mark.insert!({ user_id: user.id, record_type: record.class.polymorphic_name, record_id: record.id, tab:, state:, seen_at: seen, arrived_at: arrived }) # version: none (a test of presence)
+    Presence::Mark.insert!({ user_id: user.id, record_type: record.class.polymorphic_name, record_id: record.id, tab:, token: SecureRandom.hex(8), state:, seen_at: seen, arrived_at: arrived, state_at: arrived }) # version: none (a test of presence)
   end
 
   def here(kind, ids) = get(admin_presence_here_path(kind:, ids:, format: :json))
@@ -65,7 +65,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
   end
 
   test "a stale row is not shown" do
-    mark(@other, @page, seen: 61.seconds.ago)
+    mark(@other, @page, seen: 151.seconds.ago)
     sign_in_as @viewer
     get admin_record_presence_path("page", @page.id)
     assert_select "[data-presence-user]", count: 0
@@ -115,7 +115,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
   test "here leaves out the viewer, away-only records and stale rows" do
     mark(@viewer, @page)
     mark(@other, @post, state: "away")
-    mark(@other, @asset, seen: 61.seconds.ago)
+    mark(@other, @asset, seen: 151.seconds.ago)
     sign_in_as @viewer
     here("page", [ @page.id ])
     assert_equal({}, response.parsed_body)

@@ -330,9 +330,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.string "record_type", null: false
     t.bigint "record_id", null: false
     t.string "tab", null: false
+    t.string "token", null: false
     t.string "state", default: "here", null: false
     t.datetime "seen_at", null: false
     t.datetime "arrived_at", null: false
+    t.datetime "state_at", null: false
     t.index ["record_type", "record_id", "seen_at"], name: "index_presence_marks_on_record_and_seen_at"
     t.index ["user_id", "record_type", "record_id", "tab"], name: "index_presence_marks_on_user_record_tab", unique: true
     t.check_constraint "state::text = ANY (ARRAY['here'::character varying, 'away'::character varying]::text[])", name: "presence_marks_state_known"

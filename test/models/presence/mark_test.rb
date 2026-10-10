@@ -3,37 +3,47 @@ require "test_helper"
 # The row of one person's tab on one record (presence spec §5.2): each
 # method is one statement and none writes anything but its own row.
 class Presence::MarkTest < ActiveSupport::TestCase
-  include ActionCable::TestHelper
-
   setup do
     @page = create_page(title: "Pricing")
     @user = users(:two)
     @tab = "tab-aaaaaaaa"
   end
 
-  def arrive(tab: @tab, user: @user, record: @page) = Presence::Mark.arrive(user:, record:, tab:)
+  def arrive(tab: @tab, user: @user, record: @page, **options) = Presence::Mark.arrive(user:, record:, tab:, **options)
 
-  test "arriving writes a here row for the polymorphic type, the tab and now" do
+  def report(state, tab: @tab) = Presence::Mark.report(user: @user, record: @page, tab:, state:)
+
+  test "arriving writes a here row for the polymorphic type, the tab and now, and answers the token" do
+    token = nil
     freeze_time do
-      arrive
+      token = arrive
       mark = Presence::Mark.sole
-      assert_equal [ @user.id, "Page", @page.id, @tab, "here" ], mark.values_at(:user_id, :record_type, :record_id, :tab, :state)
-      assert_equal Time.current, mark.seen_at
-      assert_equal Time.current, mark.arrived_at
+      assert_equal [ @user.id, "Page", @page.id, @tab, "here", token ], mark.values_at(:user_id, :record_type, :record_id, :tab, :state, :token)
+      assert_match(/\A\h{16}\z/, token)
+      assert_equal [ Time.current ] * 3, mark.values_at(:seen_at, :arrived_at, :state_at)
     end
     arrive(record: create_media_asset)
     assert_equal "Media::Asset", Presence::Mark.order(:id).last.record_type
   end
 
-  test "arriving twice from one tab is one row and keeps the first arrival; the second is the newer seen_at and here again" do
+  test "arriving can carry the state and the token of a subscription that is being healed" do
+    arrive(token: "0123456789abcdef", state: "away")
+    mark = Presence::Mark.sole
+    assert_equal [ "away", "0123456789abcdef" ], mark.values_at(:state, :token)
+  end
+
+  test "arriving twice from one tab is one row: the newer token wins and the first arrival is kept" do
+    first = second = nil
     travel_to Time.zone.local(2026, 10, 10, 12, 0, 0) do
-      arrive
-      Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "away")
+      first = arrive
+      report("away")
     end
     travel_to Time.zone.local(2026, 10, 10, 12, 0, 20) do
-      arrive
+      second = arrive
     end
     mark = Presence::Mark.sole
+    assert_not_equal first, second
+    assert_equal second, mark.token
     assert_equal Time.zone.local(2026, 10, 10, 12, 0, 0), mark.arrived_at
     assert_equal Time.zone.local(2026, 10, 10, 12, 0, 20), mark.seen_at
     assert_equal "here", mark.state
@@ -47,64 +57,63 @@ class Presence::MarkTest < ActiveSupport::TestCase
     assert_equal 4, Presence::Mark.count
   end
 
-  test "arriving is one statement" do
-    assert_equal 1, capture_sql { arrive }.size
-  end
-
-  test "report changes the state and says whether it changed" do
-    arrive
-    assert Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "away")
-    assert_equal "away", Presence::Mark.sole.state
-    assert_not Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "away")
-    assert Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "here")
-  end
-
-  test "report moves seen_at with a change and leaves an unchanged row to beat" do
-    travel_to(2.minutes.ago) { arrive }
-    old = Presence::Mark.sole.seen_at
-    assert_not Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "here")
-    assert_equal old, Presence::Mark.sole.seen_at
-    assert Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "away")
-    assert_operator Presence::Mark.sole.seen_at, :>, old
-  end
-
-  test "report ignores a state that is not known, and a row that is not there" do
-    arrive
-    [ "gone", "", nil, "HERE", :away, 3 ].each do |state|
-      assert_not Presence::Mark.report(user: @user, record: @page, tab: @tab, state:), state.inspect
-    end
-    assert_equal "here", Presence::Mark.sole.state
-    assert_not Presence::Mark.report(user: @user, record: @page, tab: "tab-cccccccc", state: "away")
-  end
-
-  test "report and beat and leave are one statement each" do
-    arrive
-    assert_equal 1, capture_sql { Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "away") }.size
+  test "each method is one statement" do
+    token = nil
+    assert_equal 1, capture_sql { token = arrive }.size
+    assert_equal 1, capture_sql { report("away") }.size
     assert_equal 1, capture_sql { Presence::Mark.beat(user: @user, record: @page, tab: @tab) }.size
-    assert_equal 1, capture_sql { Presence::Mark.leave(user: @user, record: @page, tab: @tab) }.size
+    assert_equal 1, capture_sql { Presence::Mark.leave(user: @user, record: @page, tab: @tab, token:) }.size
   end
 
-  test "beat moves seen_at and answers false for a row that is not there" do
-    travel_to(30.seconds.ago) { arrive }
-    old = Presence::Mark.sole.seen_at
-    assert Presence::Mark.beat(user: @user, record: @page, tab: @tab)
-    assert_operator Presence::Mark.sole.seen_at, :>, old
+  test "report says whether the row is there, always moves seen_at and moves state_at only with a change" do
+    travel_to(Time.zone.local(2026, 10, 10, 12, 0, 0)) { arrive }
+    travel_to(Time.zone.local(2026, 10, 10, 12, 5, 0)) { assert report("away") }
+    mark = Presence::Mark.sole
+    assert_equal [ "away", Time.zone.local(2026, 10, 10, 12, 5, 0), Time.zone.local(2026, 10, 10, 12, 5, 0) ], mark.values_at(:state, :seen_at, :state_at)
+
+    travel_to(Time.zone.local(2026, 10, 10, 12, 9, 0)) { assert report("away") }
+    mark = Presence::Mark.sole
+    assert_equal Time.zone.local(2026, 10, 10, 12, 9, 0), mark.seen_at
+    assert_equal Time.zone.local(2026, 10, 10, 12, 5, 0), mark.state_at
+
+    travel_to(Time.zone.local(2026, 10, 10, 12, 10, 0)) { assert report("here") }
+    assert_equal Time.zone.local(2026, 10, 10, 12, 10, 0), Presence::Mark.sole.state_at
+
+    assert_not report("away", tab: "tab-cccccccc")
+  end
+
+  test "report ignores a state that is not known" do
+    arrive
+    [ "gone", "", nil, "HERE", :away, 3 ].each { |state| assert_not report(state), state.inspect }
+    assert_equal "here", Presence::Mark.sole.state
+  end
+
+  test "beat moves seen_at and nothing else, and answers false for a row that is not there" do
+    travel_to(Time.zone.local(2026, 10, 10, 12, 0, 0)) { arrive }
+    travel_to(Time.zone.local(2026, 10, 10, 12, 0, 30)) { assert Presence::Mark.beat(user: @user, record: @page, tab: @tab) }
+    mark = Presence::Mark.sole
+    assert_equal Time.zone.local(2026, 10, 10, 12, 0, 30), mark.seen_at
+    assert_equal Time.zone.local(2026, 10, 10, 12, 0, 0), mark.state_at
     assert_not Presence::Mark.beat(user: @user, record: @page, tab: "tab-cccccccc")
     assert_not Presence::Mark.beat(user: users(:one), record: @page, tab: @tab)
   end
 
-  test "leave deletes only that tab's row" do
-    arrive
+  test "leave deletes the row of that token only: a late leave of an older subscription deletes nothing" do
+    old = arrive
+    new = arrive
     arrive(tab: "tab-bbbbbbbb")
-    Presence::Mark.leave(user: @user, record: @page, tab: @tab)
+    assert_not Presence::Mark.leave(user: @user, record: @page, tab: @tab, token: old)
+    assert_equal 2, Presence::Mark.count
+    assert Presence::Mark.leave(user: @user, record: @page, tab: @tab, token: new)
     assert_equal [ "tab-bbbbbbbb" ], Presence::Mark.pluck(:tab)
   end
 
-  test "fresh is the last 60 seconds" do
+  test "fresh is the last STALE_AFTER" do
+    assert_equal 150.seconds, Presence::STALE_AFTER
     arrive
-    Presence::Mark.update_all(seen_at: 61.seconds.ago) # version: none (a test of presence)
+    Presence::Mark.update_all(seen_at: 151.seconds.ago) # version: none (a test of presence)
     assert_empty Presence::Mark.fresh
-    Presence::Mark.update_all(seen_at: 59.seconds.ago) # version: none (a test of presence)
+    Presence::Mark.update_all(seen_at: 149.seconds.ago) # version: none (a test of presence)
     assert_equal 1, Presence::Mark.fresh.count
   end
 
@@ -123,10 +132,10 @@ class Presence::MarkTest < ActiveSupport::TestCase
     updated_at = @page.reload.updated_at
     version = PublicSite::Version.current
     events = Audit::Event.count
-    arrive
-    Presence::Mark.report(user: @user, record: @page, tab: @tab, state: "away")
+    token = arrive
+    report("away")
     Presence::Mark.beat(user: @user, record: @page, tab: @tab)
-    Presence::Mark.leave(user: @user, record: @page, tab: @tab)
+    Presence::Mark.leave(user: @user, record: @page, tab: @tab, token:)
     assert_equal updated_at, @page.reload.updated_at
     assert_equal version, PublicSite::Version.current
     assert_equal events, Audit::Event.count

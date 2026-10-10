@@ -31,8 +31,12 @@ module Admin
     def here
       kind = RecordKinds.named(params[:kind])
       ids = Array.wrap(params[:ids]).grep(String).grep(/\A\d{1,18}\z/).uniq.first(MAX_IDS)
-      records = kind && ids.any? ? kind.readable(Current.actor, channel: Current.channel).where(id: ids).to_a : []
-      render json: Presence::Roster.new(viewer: Current.user).here_counts(records).transform_keys(&:to_s)
+      return render(json: {}) unless kind && ids.any?
+
+      # The asked ids narrowed through the kind's read scope as a subquery:
+      # one statement counts the readable ones, and no record is loaded.
+      readable = kind.readable_ids(Current.actor, channel: Current.channel).where(id: ids)
+      render json: Presence::Roster.new(viewer: Current.user).here_counts(kind, readable).transform_keys(&:to_s)
     end
   end
 end

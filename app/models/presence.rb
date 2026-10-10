@@ -9,8 +9,12 @@
 # without input (both the tab's script). A row not refreshed for STALE_AFTER
 # is ignored by EVERY read, whatever the sweep has or has not deleted: a
 # crashed tab or a dropped network sends no "leave", and nobody may be shown
-# as here for longer than that. The sweep only keeps the table small, so it
-# waits much longer than that (SWEEP_AFTER).
+# as here for longer than that. It is 150 seconds, not the spec's 60,
+# because browsers throttle timers in a tab that has been hidden for a while
+# (Chrome: to about one run a minute after five minutes hidden), and a hidden
+# tab is exactly an away person whose 30-second beat then arrives every 60
+# seconds or so: two throttled beats and some slack. The sweep only keeps the
+# table small, so it waits much longer than that (SWEEP_AFTER).
 #
 # PRESENCE IS NOT CONTENT. It is the one write that is not an
 # `ApplicationService` (`CLAUDE.md`): a channel writes and deletes its own
@@ -18,7 +22,7 @@
 # audited, never touches the record it is on and never moves the public
 # content version. It does not know notes, nor notes it.
 module Presence
-  STALE_AFTER = 60.seconds
+  STALE_AFTER = 150.seconds
   SWEEP_AFTER = 5.minutes
   STATES = %w[here away].freeze
 end
