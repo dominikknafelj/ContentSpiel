@@ -16,11 +16,11 @@ class Admin::EntryPointTest < ApplicationSystemTestCase
       const deadline = Date.now() + 5000
       const poll = () => {
         const ids = window.Stimulus ? Array.from(window.Stimulus.router.modulesByIdentifier.keys()) : []
-        if (ids.includes("admin--tree") || Date.now() > deadline) return done(ids)
+        if (ids.includes("admin--pages--tree") || Date.now() > deadline) return done(ids)
         setTimeout(poll, 20)
       }
       poll()
     JS
-    assert_includes registered, "admin--tree"
+    assert_includes registered, "admin--pages--tree"
   end
 end

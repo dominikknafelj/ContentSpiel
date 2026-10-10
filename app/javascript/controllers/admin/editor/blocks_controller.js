@@ -64,7 +64,7 @@ import { messages } from "i18n/messages"
 // (there's no `<form>` for Turbo Drive to intercept), which is exactly why
 // *this* controller still exists: it builds the request by hand, the same
 // "fetch bypasses Turbo Drive, so nothing else applies this for us"
-// pattern `admin--tree`'s own drag handler already uses.
+// pattern `admin--pages--tree`'s own drag handler already uses.
 export default class extends Controller {
   static targets = ["card", "list", "lane", "tile", "announcer", "destination"]
   static values = { reorderUrl: String }
@@ -281,7 +281,7 @@ export default class extends Controller {
       ghostClass: "admin-drag-ghost",
       chosenClass: "admin-drag-chosen",
       // SortableJS's own pointer-driven drag instead of native HTML5
-      // drag-and-drop, for the reason `admin--tree` spells out: the handle
+      // drag-and-drop, for the reason `admin--pages--tree` spells out: the handle
       // is a `<button>`, and Firefox never starts a native drag from one.
       // The fallback drags a clone of the card (`fallbackClass`), appended
       // to `<body>` -- so the list's direct children stay exactly the cards.

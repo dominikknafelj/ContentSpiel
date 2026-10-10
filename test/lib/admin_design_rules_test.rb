@@ -78,7 +78,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       "hsl(210 50% 40%)", "hsla(210, 50%, 40%, .5)" ].each do |sample|
       assert_match RAW_COLOUR, sample
     end
-    [ 'find("#toasts")', "#content", 'action: "admin--ui--menu#add"', "admin--tree#face", '"##{dom_id}"', "&#8203;", "&#x200b;",
+    [ 'find("#toasts")', "#content", 'action: "admin--ui--menu#add"', "admin--pages--tree#face", '"##{dom_id}"', "&#8203;", "&#x200b;",
       "/cs-studio/pages#add", "#fade-in", "issue #12345", "#abcde" ].each do |sample|
       assert_no_match RAW_COLOUR, sample
     end

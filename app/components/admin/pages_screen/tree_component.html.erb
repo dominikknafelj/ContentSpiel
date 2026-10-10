@@ -1,8 +1,8 @@
-<%# `data-admin--tree-move-url-value` is read once by the Stimulus controller
+<%# `data-admin--pages--tree-move-url-value` is read once by the Stimulus controller
     on connect -- every drop PATCHes that one URL regardless of which node in
     the tree moved (spec §4.2): one fixed URL, with the moved page's id
     travelling in the body instead. %>
-<turbo-frame id="tree" data-controller="admin--tree" data-admin--tree-move-url-value="<%= helpers.admin_tree_path(**url_options) %>">
+<turbo-frame id="tree" data-controller="admin--pages--tree" data-admin--pages--tree-move-url-value="<%= helpers.admin_tree_path(**url_options) %>">
   <%# A flash-style status for the last move, replaced on its own by
       Admin::TreeController#update -- kept empty (not `sr-only`'d away
       entirely) on an ordinary page load, since there is nothing to report
@@ -30,10 +30,10 @@
   <p id="tree-status" role="status" aria-live="polite" class="min-h-[1.25rem] px-1 text-sm"></p>
 
   <%# The keyboard path for a drag (handoff §9 A9): one instruction every
-      handle points at, and the live region `admin--tree` announces a pick-up
+      handle points at, and the live region `admin--pages--tree` announces a pick-up
       and each step in. %>
   <p id="tree-drag-help" class="sr-only">Press Space to pick up, arrow keys to move, Space to drop, Escape to cancel.</p>
-  <p data-admin--tree-target="announcer" aria-live="assertive" class="sr-only"></p>
+  <p data-admin--pages--tree-target="announcer" aria-live="assertive" class="sr-only"></p>
 
   <% if root %>
     <ul class="admin-tree flex flex-col gap-0.5">

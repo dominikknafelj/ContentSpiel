@@ -4,7 +4,7 @@ import { Controller } from "@hotwired/stimulus"
 // spec §5.1) and the System status rows' next to a console command.
 // `navigator.clipboard` needs no server round trip, so this stays its own
 // tiny controller rather than folding into `admin--saving--autosave` (which these
-// buttons have nothing to do with) or `admin--tree`.
+// buttons have nothing to do with) or `admin--pages--tree`.
 //
 // What is copied is `textValue` when set, else `urlValue` -- both read once
 // from a value the server already computed (the header's `PublicSite::Urls`,

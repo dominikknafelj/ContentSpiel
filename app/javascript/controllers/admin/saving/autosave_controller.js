@@ -37,7 +37,7 @@ const saveStates = new WeakMap()
 // AutosaveResponses#autosave_stream` names in the Turbo Stream it sends
 // back, applied wholesale via `Turbo.renderStreamMessage`, the same "fetch
 // bypasses Turbo Drive, so nothing else applies this for us" pattern
-// `admin--tree`'s own drag handler already uses.
+// `admin--pages--tree`'s own drag handler already uses.
 //
 // Debounced 1000ms after `input`/`change` (a rich-text editor reports its
 // own edits by dispatching `input` from its hidden field, tiptap spec

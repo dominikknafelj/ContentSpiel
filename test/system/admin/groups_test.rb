@@ -34,7 +34,7 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
       assert_speakers_eventually(post_record, %w[Ada Grace])
 
       # `admin--editor--groups` drives SortableJS the same way `admin--editor--blocks`/
-      # `admin--tree` do (see those tests' own comments for why native
+      # `admin--pages--tree` do (see those tests' own comments for why native
       # drag-and-drop isn't driven through the browser here): moving the two
       # rows' DOM nodes and calling the controller's own `renumber()`
       # directly leaves the DOM in exactly the shape a real drop's `onEnd`

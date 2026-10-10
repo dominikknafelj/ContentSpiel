@@ -1,5 +1,5 @@
 // The request behind a drag: a block move (`admin--editor--blocks#move`) and a
-// page tree move (`admin--tree#save`). Both are hand-built `fetch`es -- a drop
+// page tree move (`admin--pages--tree#save`). Both are hand-built `fetch`es -- a drop
 // is no form submission, so Turbo Drive sends nothing -- that ask for a Turbo
 // Stream and render it themselves. This module is the part the two share:
 // deciding whether what came back IS that stream.

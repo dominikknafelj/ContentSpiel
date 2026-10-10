@@ -9,16 +9,16 @@
     <div class="group/node flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken">
       <%# The homepage can't be moved (Pages::Move) -- no handle, nothing to
           grab; nor can a page the actor may not move. Every other node's
-          handle is the only part of the row that starts a drag (admin--tree's
+          handle is the only part of the row that starts a drag (admin--pages--tree's
           `handle:` option), so the title link below stays a plain, clickable
           link. %>
       <% if movable? %>
         <%# A real button, so the keyboard reaches it: Space picks the row up,
-            the arrows move it, Space drops it (`admin--tree#key`). The mouse
+            the arrows move it, Space drops it (`admin--pages--tree#key`). The mouse
             drag still starts from it (SortableJS `handle:`). %>
         <button type="button" class="admin-tree-node__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
                 aria-label="Move <%= title %>" aria-describedby="tree-drag-help"
-                data-action="keydown->admin--tree#key focusout->admin--tree#blur">⠿</button>
+                data-action="keydown->admin--pages--tree#key focusout->admin--pages--tree#blur">⠿</button>
       <% end %>
 
       <%# `title:` is the full name for a row the narrow column truncates. %>
@@ -70,10 +70,10 @@
   <% end %>
 
   <%# Always rendered, even with no children -- every node's children list is
-      a real SortableJS drop target (`data-admin--tree-target="list"`), so a
+      a real SortableJS drop target (`data-admin--pages--tree-target="list"`), so a
       currently-childless page can still receive a dropped page. Except under
       a context-only page (see the component's comment). %>
-  <ul <%= tag.attributes("data-admin--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
+  <ul <%= tag.attributes("data-admin--pages--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
     <% children.each do |child| %>
       <%= render Admin::PagesScreen::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, note_counts: note_counts, note_unread: note_unread, selected: selected, locale: locale, url_options: url_options) %>
     <% end %>

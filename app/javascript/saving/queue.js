@@ -29,7 +29,7 @@
 // (`holdTurboRequest`) -- and, from outside the editor's forms, the page
 // tree's move (`enqueue`) and its Undo toast (`holdTurboRequest`): moving the
 // page that is open moves its `updated_at` like any other write to it
-// (`admin--tree`).
+// (`admin--pages--tree`).
 //
 // THE RULE (fix round 3; final fix wave 1): nothing that REPLACES AN EDITOR
 // starts until the queue is empty. Three kinds of thing replace an editor:

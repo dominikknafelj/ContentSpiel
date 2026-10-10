@@ -203,7 +203,7 @@ export default class extends Controller {
   // it out one level; Space drops it (`save`, the mouse path's own request)
   // and Escape puts it back without saving. Only drops the mouse path could
   // also make are offered: the destination must be one of this controller's
-  // own `list` targets (`data-admin--tree-target="list"`): the homepage's own
+  // own `list` targets (`data-admin--pages--tree-target="list"`): the homepage's own
   // level has none (the homepage is the one root; a page can't leave it), and
   // neither does a context-only page's list, so ArrowLeft out to a level
   // whose parent is context-only does nothing. (ArrowRight never meets a
@@ -261,7 +261,7 @@ export default class extends Controller {
     // Under the sibling above: the last child of its own list, if that list
     // is a real drop target.
     const above = row.previousElementSibling
-    const list = above?.querySelector(":scope > ul[data-admin--tree-target='list']")
+    const list = above?.querySelector(":scope > ul[data-admin--pages--tree-target='list']")
     if (!list) return
     list.append(row)
     this.moved(row)
@@ -271,7 +271,7 @@ export default class extends Controller {
     // Out one level: right after its current parent, in the parent's own list.
     const parentRow = row.parentElement.closest("li[data-page-id]")
     const list = parentRow?.parentElement
-    if (!list?.matches("ul[data-admin--tree-target='list']")) return
+    if (!list?.matches("ul[data-admin--pages--tree-target='list']")) return
     list.insertBefore(row, parentRow.nextElementSibling)
     this.moved(row)
   }

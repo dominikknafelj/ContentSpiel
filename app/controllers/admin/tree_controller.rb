@@ -97,7 +97,7 @@ module Admin
     # move it") -- locked that page's own form: its next save was a final
     # 409, "Changed elsewhere" against the editor's own move, the typed text
     # not saved. So this answers the way a block write does (`Admin::
-    # ContentBlocksController#page_base_streams`): `admin--tree` sends the
+    # ContentBlocksController#page_base_streams`): `admin--pages--tree` sends the
     # open form's base as `X-Page-Base-Updated-At`, through the same queue as
     # every other write on the screen, and the form's base is moved forward
     # to the page's new `updated_at`.
