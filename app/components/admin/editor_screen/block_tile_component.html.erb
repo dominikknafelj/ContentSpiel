@@ -13,7 +13,7 @@
   <%# The notes marker (notes spec §4.3): beside the face, since a button cannot hold
       a button, and outside the `editable?` block below, because a viewer who can only
       read the page writes notes too. `data-notes-active` on the tile is
-      `admin--notes#markActive`'s. %>
+      `admin--notes--drawer#markActive`'s. %>
   <div class="flex shrink-0 items-center px-1"><%= render note_marker %></div>
   <% if editable? %>
     <%# Every move a drag makes, by name (see the component). Its `data-move` buttons are

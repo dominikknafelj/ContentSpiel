@@ -87,18 +87,18 @@ module Admin
       end
 
       # The image's counts as the page loaded them (`#notes-counts`), which
-      # `admin--notes` on <body> reads; every answer of the frame brings a
+      # `admin--notes--drawer` on <body> reads; every answer of the frame brings a
       # newer copy. Read here and not left to the frame, because that
       # controller keeps the last counts it saw: the panel of the image chosen
       # next would show the last image's number until its own frame had loaded.
       def note_counts = @note_counts ||= ::Notes::Counts.for_container(asset, user: Current.user)
 
       # "Notes · 2 open" (in mono capitals, the handoff's header). The number
-      # is an `admin--notes` `total`, like the one beside the drawer's title,
+      # is an `admin--notes--drawer` `total`, like the one beside the drawer's title,
       # so it follows a note added or resolved in the frame below.
       def notes_open
         total = note_counts.fetch("total").to_i
-        t(".notes_open_html", number: tag.span(total, hidden: total.zero?, data: { "admin--notes-target": "total" }))
+        t(".notes_open_html", number: tag.span(total, hidden: total.zero?, data: { "admin--notes--drawer-target": "total" }))
       end
 
       def status_id = "media-save-status"

@@ -14,7 +14,7 @@ import { Controller } from "@hotwired/stimulus"
 // nothing here has to know about widths. The scrim is shown while any panel
 // is open and closes them on click.
 //
-// The editors' notes drawer (`admin--notes`) is the one other drawer, on the
+// The editors' notes drawer (`admin--notes--drawer`) is the one other drawer, on the
 // right: opening a panel here says so (`admin--shell--drawer:opened`, with the
 // panel's name) and that one closes; when that one opens, these stand aside
 // (`standAside`). While the notes are a column beside the editor the page
@@ -45,7 +45,7 @@ export default class extends Controller {
     // on the page it covers.
     const first = panel.querySelector("a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])")
     ;(first || panel).focus({ preventScroll: true })
-    // The notes drawer hears this and makes room (`admin--notes#shellOpened`),
+    // The notes drawer hears this and makes room (`admin--notes--drawer#shellOpened`),
     // unless it is a column and this is the page tree folded beside it.
     this.dispatch("opened", { detail: { name: panel.dataset.drawer } })
   }
@@ -85,7 +85,7 @@ export default class extends Controller {
   // page that is about to be replaced.
   visiting() { this.closeAll({ refocus: false }) }
 
-  // The notes drawer opened (`admin--notes:opened`): a shell drawer makes
+  // The notes drawer opened (`admin--notes--drawer:opened`): a shell drawer makes
   // room. The focus is the notes drawer's, so it is not handed back here.
   standAside() { this.closeAll({ refocus: false }) }
 

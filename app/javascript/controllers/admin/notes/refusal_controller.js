@@ -8,7 +8,7 @@ import { Controller } from "@hotwired/stimulus"
 //   thread: never left to fall to <body>.
 // - The person's next action in the thread clears it without this script:
 //   that action's answer redraws the part the alert is in. (A refresh for
-//   someone else's change is no action of theirs; `admin--notes-live` carries
+//   someone else's change is no action of theirs; `admin--notes--live` carries
 //   the alert over it.)
 // - `gone`: the sentence is "This note is gone". Nothing is left to act on,
 //   so after `GONE_MS` the notes frame goes back to the list (`back`). The

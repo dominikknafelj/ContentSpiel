@@ -16,7 +16,7 @@ import { Controller } from "@hotwired/stimulus"
 // fragment; and a 422 is drawn in place under the address the page had. In
 // both cases Turbo then scrolls to the top. So the address is given its
 // fragment here -- replaced through Turbo's own history, with the
-// restoration identifier it has, as `admin--notes#syncAddress` does, never
+// restoration identifier it has, as `admin--notes--drawer#syncAddress` does, never
 // pushed -- and the card is scrolled to: smoothly, or at once for someone
 // who asked for reduced motion.
 //

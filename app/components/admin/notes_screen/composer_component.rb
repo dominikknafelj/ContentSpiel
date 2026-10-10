@@ -5,7 +5,7 @@ module Admin
     # line, its toolbar -- the paperclip, the emoji popover and the at-sign
     # on the left, the submit on the right (the send key is said by the
     # submit's tooltip, see below). "@" opens the mention
-    # picker. Enter adds a line; Ctrl/⌘+Enter sends (`admin--note-composer`).
+    # picker. Enter adds a line; Ctrl/⌘+Enter sends (`admin--notes--composer`).
     # An ordinary Turbo form inside the notes frame: it sends no base and is
     # no autosave form.
     #
@@ -23,7 +23,7 @@ module Admin
     # travel WITH the note, as one multipart post -- no direct upload, so
     # nothing is stored for a note that is not saved. The chosen files are
     # listed above the field as attachment rows, each with a remove button
-    # (`admin--note-composer` clones the row in the `<template>`, so the
+    # (`admin--notes--composer` clones the row in the `<template>`, so the
     # icons are drawn by the server); a sixth file or one over the limit is
     # refused there, in a 12px line, before anything is sent. The server
     # decides again, and alone decides what a file IS (`Notes::Files`).
@@ -62,7 +62,7 @@ module Admin
       TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-dim".freeze
 
       # `edit` makes it an EDIT form: its field is drawn with the saved text,
-      # and a draft is what differs from that (`admin--note-composer`, "an
+      # and a draft is what differs from that (`admin--notes--composer`, "an
       # edit that was left"). That a restored draft is unsaved is said in the
       # message's meta line, never above the field (decision 29): that space
       # is for errors. `saved` is the SAVED text of an edit whose field is drawn
@@ -101,7 +101,7 @@ module Admin
 
       # The submit button's data and what says the send key.
       def submit_attributes
-        { title: t(".send_title"), aria: { keyshortcuts: "Control+Enter" }, data: { "admin--note-composer-target": "submit" } } # i18n-ok: a key combination in ARIA's own notation
+        { title: t(".send_title"), aria: { keyshortcuts: "Control+Enter" }, data: { "admin--notes--composer-target": "submit" } } # i18n-ok: a key combination in ARIA's own notation
       end
 
       def max_size = ::Notes::Files.max_size
@@ -114,10 +114,10 @@ module Admin
       # belongs to the tab, not to the session, so without it the next person
       # to sign in on the same tab would be handed the last one's unsent text.
       def form_data
-        { controller: "admin--note-composer", turbo_frame: "notes", note_composer: key,
-          "admin--note-composer-key-value": key, "admin--note-composer-mentions-url-value": mentions_url,
-          "admin--note-composer-user-value": Current.user&.id, "admin--note-composer-edit-value": edit?, "admin--note-composer-saved-value": @saved,
-          action: "submit->admin--note-composer#sending turbo:submit-start->admin--note-composer#sending turbo:submit-end->admin--note-composer#sent", messages: script_messages }
+        { controller: "admin--notes--composer", turbo_frame: "notes", note_composer: key,
+          "admin--notes--composer-key-value": key, "admin--notes--composer-mentions-url-value": mentions_url,
+          "admin--notes--composer-user-value": Current.user&.id, "admin--notes--composer-edit-value": edit?, "admin--notes--composer-saved-value": @saved,
+          action: "submit->admin--notes--composer#sending turbo:submit-start->admin--notes--composer#sending turbo:submit-end->admin--notes--composer#sent", messages: script_messages }
       end
 
       # On a line of its own, ending the line: `test/lib/script_messages_test.rb`

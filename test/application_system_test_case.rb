@@ -333,7 +333,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     record.update_columns(updated_at: record.updated_at - by)
   end
 
-  # Waits until the page's notes are live (notes spec §6): `admin--notes-live`
+  # Waits until the page's notes are live (notes spec §6): `admin--notes--live`
   # is connected, the socket is up and EVERY subscription of the page -- the
   # person's and one per record shown -- has been answered by the server. A
   # signal the test causes after this is received; one caused a moment

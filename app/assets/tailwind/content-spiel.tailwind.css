@@ -130,7 +130,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    it still reaches the window's edge, and the drawer is fixed in the room
    that was made, from the header's bottom edge to the window's. The header
    is stuck to `--admin-top-offset` at every scroll position, so its bottom
-   edge is that plus its height, which `admin--notes` measures and keeps
+   edge is that plus its height, which `admin--notes--drawer` measures and keeps
    current (`--admin-editor-header-height`, on the drawer: a notice bar or a
    wrapped row makes the header taller). No shadow: it is beside the content,
    not over it.
@@ -140,7 +140,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    layout's head script sets it before the first paint when this browser
    remembers the drawer as open, so the page is laid out with the column from
    the start and the editor does not change width when the script connects.
-   `admin--notes` owns it from then on (`setOpen`); a screen without a drawer
+   `admin--notes--drawer` owns it from then on (`setOpen`); a screen without a drawer
    never matches.
 
    THE PAGE TREE FOLDS while the column is there, at every width from 1024px,
@@ -401,7 +401,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-block-tile { border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
 .admin-block-tile:has(> .admin-block-tile__face[aria-expanded="true"]) { border-color: var(--cs-accent); }
 /* The tile of the block whose thread is open in the notes drawer
-   (`admin--notes#markActive`). Here and not a utility on the tile: the tile's
+   (`admin--notes--drawer#markActive`). Here and not a utility on the tile: the tile's
    border is set by the rule above, which a utility does not outweigh. */
 .admin-block-tile[data-notes-active] { border-color: var(--cs-accent); }
 
@@ -417,7 +417,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 
 /* A block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
    handoff "Block card marker" and "Section tile marker"). Four states, set by
-   `admin--notes` as attributes:
+   `admin--notes--drawer` as attributes:
    - at rest without notes it is in its place and not shown (the system draws
      no count at zero);
    - while the pointer is over its card or tile, or the focus is inside it,
@@ -503,7 +503,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    scroll under a thread. By where the frame stands, like the rules around
    this one: in the media panel and on a record's notes page the same thread
    is in the flow of what scrolls there, and none of this applies.
-   `admin--notes-live#scroller` reads `overflow-y` to tell the two apart. */
+   `admin--notes--live#scroller` reads `overflow-y` to tell the two apart. */
 .admin-notes-drawer [data-notes-scroller]:has([data-notes-view="thread"]) { overflow: hidden; }
 .admin-notes-drawer turbo-frame#notes:has(> [data-notes-view="thread"]),
 .admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }

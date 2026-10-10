@@ -1,5 +1,5 @@
 <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: t(".title"), body: t(".body")) do |dialog| %>
-  <%# Filled by `admin--notes` while the block has open notes (notes spec D12): its
+  <%# Filled by `admin--notes--drawer` while the block has open notes (notes spec D12): its
       threads are deleted with it. Empty and hidden otherwise, and then its box
       takes no room (`alone:`, see the component). %>
   <% dialog.with_details do %>

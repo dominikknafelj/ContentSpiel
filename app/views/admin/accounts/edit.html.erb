@@ -74,7 +74,7 @@
         PERMISSION to notify is this browser's. The lines under the second
         switch are about the permission and are shown ONLY WHILE THAT SWITCH
         IS ON -- as it stands in the page, saved or not: turning it on shows
-        the line at once (`admin--notes-permission`, which holds the switch
+        the line at once (`admin--notes--permission`, which holds the switch
         as its target). Not asked yet: the accent-toned info line with
         "Allow in this browser", which asks at once, in the click, outside
         the save -- the button is `type="button"` with no name, so it is no
@@ -95,21 +95,21 @@
           <%= check_box_tag "notes_sound", "1", profile[:notes_sound], role: "switch", class: "cs-toggle" %>
         </label>
       </div>
-      <div class="px-[18px] py-3.5" data-controller="admin--notes-permission" data-state="unsupported"
-           data-action="visibilitychange@document->admin--notes-permission#render focus@window->admin--notes-permission#render">
+      <div class="px-[18px] py-3.5" data-controller="admin--notes--permission" data-state="unsupported"
+           data-action="visibilitychange@document->admin--notes--permission#render focus@window->admin--notes--permission#render">
         <label class="flex items-center justify-between gap-4 text-sm text-ink">
           <span><%= t("admin.accounts.notes.notes_desktop") %></span>
           <%= hidden_field_tag "notes_desktop", "0", id: nil %>
           <%= check_box_tag "notes_desktop", "1", profile[:notes_desktop], role: "switch", class: "cs-toggle",
-                data: { "admin--notes-permission-target": "switch", action: "change->admin--notes-permission#render" } %>
+                data: { "admin--notes--permission-target": "switch", action: "change->admin--notes--permission#render" } %>
         </label>
         <div role="status">
-          <div class="mt-2 flex items-center justify-between gap-3 rounded-cs bg-accent-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes-permission-target="ask" hidden>
+          <div class="mt-2 flex items-center justify-between gap-3 rounded-cs bg-accent-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes--permission-target="ask" hidden>
             <span><%= t("admin.accounts.notes.permission.ask") %></span>
             <%= render Admin::Ui::ButtonComponent.new(label: t("admin.accounts.notes.permission.allow"), variant: :secondary, size: :small, type: "button",
-                  class: "shrink-0", data: { action: "admin--notes-permission#allow" }) %>
+                  class: "shrink-0", data: { action: "admin--notes--permission#allow" }) %>
           </div>
-          <p class="mt-2 rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes-permission-target="blocked" hidden><%= t("admin.accounts.notes.permission.blocked") %></p>
+          <p class="mt-2 rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes--permission-target="blocked" hidden><%= t("admin.accounts.notes.permission.blocked") %></p>
         </div>
       </div>
     </section>
@@ -122,10 +122,10 @@
         link to "change your password" names, and where the form's own
         answer comes back to. `scroll-mt`: clear of whatever is stuck to the top. %>
     <%# Drawn as the password form's own answer, saved or refused (decision
-        42): `admin--password-answer` puts `#password` in the address, the
+        42): `admin--account--password-answer` puts `#password` in the address, the
         card in view and the focus on the message. %>
     <section id="password" class="max-w-[560px] scroll-mt-6 rounded-cs border border-line bg-surface" aria-labelledby="account-password"
-             <%= tag.attributes(data: { controller: "admin--password-answer" }) if password_answer %>>
+             <%= tag.attributes(data: { controller: "admin--account--password-answer" }) if password_answer %>>
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-password" class="text-base font-semibold text-ink"><%= t("admin.accounts.password.title") %></h3>
         <p class="text-[13px] text-dim"><%= t("admin.accounts.password.sessions") %></p>
@@ -137,7 +137,7 @@
             their fields (each field keeps its own line too); the service's
             own sentences stand when it left no per-field errors (a denial,
             too many tries). A save is the success alert as the sign-in
-            screen draws one. Either takes the focus (`admin--password-answer`). %>
+            screen draws one. Either takes the focus (`admin--account--password-answer`). %>
         <%= render Admin::Ui::ErrorSummaryComponent.new(errors: password_errors,
               field_ids: { current_password: "current_password", password: "new_password", password_confirmation: "password_confirmation" }) %>
         <% if password_answer == "saved" %>

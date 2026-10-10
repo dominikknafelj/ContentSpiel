@@ -5,7 +5,7 @@ require "application_system_test_case"
 # A reaction, Pin, "Notify me", Resolve and a sent reply all answer with the
 # whole thread view; drawn as it came, that answer would close an edit form
 # open on ANOTHER message and lose its text. It is merged instead, the way a
-# live refresh is (`admin--notes-live#answered`): each test types into an
+# live refresh is (`admin--notes--live#answered`): each test types into an
 # edit, presses something else, and asserts both that the action took effect
 # and that the very same field still holds the text.
 class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
@@ -218,16 +218,16 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     page.evaluate_script(<<~JS)
       (() => {
         const reply = document.querySelector("#note-thread-#{@thread.id}-reply")
-        const submit = reply.querySelector("[data-admin--note-composer-target~='submit']")
+        const submit = reply.querySelector("[data-admin--notes--composer-target~='submit']")
         const field = reply.querySelector("textarea[name=body]")
         return {
           label: submit.textContent.trim(), busy: submit.getAttribute("aria-busy"), disabled: submit.disabled, dim: field.classList.contains("text-dim"),
           attach: reply.querySelector("button[data-note-attach]").disabled, mention: reply.querySelector("button[aria-label='Mention someone']").disabled,
-          emoji: reply.querySelector("[data-admin--note-composer-target~='emoji']").inert, readonly: field.readOnly,
+          emoji: reply.querySelector("[data-admin--notes--composer-target~='emoji']").inert, readonly: field.readOnly,
           // The emoji control is a <details>: `inert`, and its <summary> says so and looks it (decision 45).
-          emojiSays: reply.querySelector("[data-admin--note-composer-target~='emoji'] > summary").getAttribute("aria-disabled"),
-          emojiLook: [ "opacity", "cursor" ].map((name) => getComputedStyle(reply.querySelector("[data-admin--note-composer-target~='emoji'] > summary"))[name]).join(" "),
-          emojiBox: getComputedStyle(reply.querySelector("[data-admin--note-composer-target~='emoji']")).opacity,
+          emojiSays: reply.querySelector("[data-admin--notes--composer-target~='emoji'] > summary").getAttribute("aria-disabled"),
+          emojiLook: [ "opacity", "cursor" ].map((name) => getComputedStyle(reply.querySelector("[data-admin--notes--composer-target~='emoji'] > summary"))[name]).join(" "),
+          emojiBox: getComputedStyle(reply.querySelector("[data-admin--notes--composer-target~='emoji']")).opacity,
           attachLook: [ "opacity", "cursor" ].map((name) => getComputedStyle(reply.querySelector("button[data-note-attach]"))[name]).join(" ")
         }
       })()

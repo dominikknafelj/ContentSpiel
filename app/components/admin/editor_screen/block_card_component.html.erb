@@ -1,4 +1,4 @@
-<%# `data-notes-active` is set by `admin--notes#markActive` while a thread on this
+<%# `data-notes-active` is set by `admin--notes--drawer#markActive` while a thread on this
     block is the one open in the drawer (notes handoff, "Block card marker"). %>
 <%= tag.div id: wrapper_id, class: [ "admin-block-card rounded-cs border bg-surface data-[notes-active]:border-accent", (unavailable? ? "border-danger" : "border-line") ], **wrapper_attributes do %>
   <div class="flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">

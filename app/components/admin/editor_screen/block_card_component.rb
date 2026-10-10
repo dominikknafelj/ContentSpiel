@@ -207,7 +207,7 @@ module Admin
       # touch screen has no hover, and the add-note control beside the name is
       # shown at rest for nobody: the menu is the path that depends on neither.
       def add_note_item
-        tag.button(t(".add_note"), type: "button", class: menu_item_class, data: { action: "admin--notes#open", notes_key: note_key, notes_compose: true })
+        tag.button(t(".add_note"), type: "button", class: menu_item_class, data: { action: "admin--notes--drawer#open", notes_key: note_key, notes_compose: true })
       end
 
       # A card of the list always has it (its menu opens it). A group card only

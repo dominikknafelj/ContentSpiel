@@ -77,7 +77,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
   end
 
   # Notes spec §6.2: the cable is CS Studio's. A public page names no cable
-  # address, carries nothing that subscribes (`admin--notes-live` is the one
+  # address, carries nothing that subscribes (`admin--notes--live` is the one
   # script that asks turbo-rails for its consumer, and Turbo's own stream
   # element is used nowhere) and preloads no script that would.
   test "a public page asks for no cable connection" do
@@ -90,8 +90,8 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller*='notes-live']", count: 0
     assert_select "[data-controller*='notes-alert']", count: 0
     assert_no_match "turbo-cable-stream-source", response.body
-    assert modulepreloads.none? { |href| href.include?("notes_live_controller") }
-    assert_not_includes entry_point_script, "notes_live"
+    assert modulepreloads.none? { |href| href.include?("notes/live_controller") }
+    assert_not_includes entry_point_script, "notes/live"
   end
 
   # The other half: CS Studio does load it, on every screen, on <body>.
@@ -102,13 +102,13 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     get "/cs-studio/tags"
 
     assert_response :success
-    assert_select "body[data-controller~='admin--notes-live'][data-admin--notes-live-unread-url-value='/cs-studio/notes/unread'][data-admin--notes-live-delivery-url-value='/cs-studio/notes/deliveries/0'][data-action~='visibilitychange@document->admin--notes-live#visible']"
+    assert_select "body[data-controller~='admin--notes--live'][data-admin--notes--live-unread-url-value='/cs-studio/notes/unread'][data-admin--notes--live-delivery-url-value='/cs-studio/notes/deliveries/0'][data-action~='visibilitychange@document->admin--notes--live#visible']"
     assert_select "template#toast-note-template", count: 1
-    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes_live_controller") }
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/live_controller") }
     # And beside it what makes a mention heard (notes spec §6.4), with the
     # person's two settings as data.
-    assert_select "body[data-controller~='admin--notes-alert'][data-action~='admin--notes-live:delivery@document->admin--notes-alert#delivery'][data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false][data-admin--notes-alert-person-value='#{users(:one).id}']"
-    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes_alert_controller") }
+    assert_select "body[data-controller~='admin--notes--alert'][data-action~='admin--notes--live:delivery@document->admin--notes--alert#delivery'][data-admin--notes--alert-sound-value=true][data-admin--notes--alert-desktop-value=false][data-admin--notes--alert-person-value='#{users(:one).id}']"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/alert_controller") }
   end
 
   private

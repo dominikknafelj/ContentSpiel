@@ -17,7 +17,7 @@ import { messages } from "i18n/messages"
 // `keydown.esc` action sits on the drawer itself). "Open" is remembered per
 // browser in `localStorage`, a convenience: the next editor opens with its
 // notes showing. A shell drawer opening closes this one, and this one opening
-// tells the shell's to stand aside (`admin--notes:opened`).
+// tells the shell's to stand aside (`admin--notes--drawer:opened`).
 //
 // FROM 1024PX THE DRAWER IS A COLUMN beside the editor and below its sticky
 // header (content-spiel.tailwind.css, "The editors' notes drawer"). Two things
@@ -498,7 +498,7 @@ export default class extends Controller {
       element.textContent = String(total)
       element.hidden = total === 0
       element.toggleAttribute("data-unread", unread.size > 0)
-      element.closest("[data-admin--notes-target~='opener']")?.setAttribute("aria-label", text.t("notes.script.total", { count: total }))
+      element.closest("[data-admin--notes--drawer-target~='opener']")?.setAttribute("aria-label", text.t("notes.script.total", { count: total }))
     })
     // A button that connected after the drawer opened (a header drawn again).
     this.syncOpeners()
@@ -529,7 +529,7 @@ export default class extends Controller {
     this.warningTargets.forEach((warning) => {
       const within = document.getElementById(warning.dataset.notesWithin)
       const section = warning.dataset.notesWarning === "section"
-      const keys = new Set([ ...(within?.querySelectorAll("[data-admin--notes-target~='marker']") || []) ].map((marker) => marker.dataset.notesKey))
+      const keys = new Set([ ...(within?.querySelectorAll("[data-admin--notes--drawer-target~='marker']") || []) ].map((marker) => marker.dataset.notesKey))
       const own = within && !section ? this.blockKey(within) : null
       if (own) keys.add(own)
       const count = [ ...keys ].reduce((sum, key) => sum + (subjects[key] || 0), 0)

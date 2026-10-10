@@ -170,8 +170,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/reactions_component.rb
     app/components/admin/notes_screen/reactions_component.html.erb
     app/controllers/admin/note_reactions_controller.rb
-    app/javascript/controllers/admin/note_reactions_controller.js
-    app/javascript/controllers/admin/note_unsaved_controller.js
+    app/javascript/controllers/admin/notes/reactions_controller.js
+    app/javascript/controllers/admin/notes/unsaved_controller.js
     app/components/admin/notes_screen/thread_component.rb
     app/components/admin/notes_screen/thread_component.html.erb
     app/components/admin/notes_screen/thread_row_component.rb
@@ -187,19 +187,19 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/helpers/admin/note_counts_helper.rb
     app/components/admin/notes_screen/composer_component.rb
     app/components/admin/notes_screen/composer_component.html.erb
-    app/javascript/controllers/admin/note_composer_controller.js
+    app/javascript/controllers/admin/notes/composer_controller.js
     app/controllers/admin/note_messages_controller.rb
     app/controllers/admin/note_mentions_controller.rb
     app/controllers/admin/note_files_controller.rb
     app/components/admin/notes_screen/files_component.rb
     app/components/admin/notes_screen/files_component.html.erb
-    app/javascript/controllers/admin/note_gif_controller.js
+    app/javascript/controllers/admin/notes/gif_controller.js
     app/components/admin/notes_screen/drawer_component.rb
     app/components/admin/notes_screen/drawer_component.html.erb
-    app/javascript/controllers/admin/notes_controller.js
-    app/javascript/controllers/admin/notes_live_controller.js
-    app/javascript/controllers/admin/notes_alert_controller.js
-    app/javascript/controllers/admin/notes_permission_controller.js
+    app/javascript/controllers/admin/notes/drawer_controller.js
+    app/javascript/controllers/admin/notes/live_controller.js
+    app/javascript/controllers/admin/notes/alert_controller.js
+    app/javascript/controllers/admin/notes/permission_controller.js
     app/components/admin/notes_screen/inbox_row_component.rb
     app/components/admin/notes_screen/inbox_row_component.html.erb
     app/components/admin/notes_screen/open_thread_row_component.rb

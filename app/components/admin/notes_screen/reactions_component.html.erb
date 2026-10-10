@@ -1,8 +1,8 @@
 <% set = capture do %>
   <%= tag.details class: "relative #{AT_REST_HIDDEN if meta?}", name: ADD_GROUP,
-        data: { reaction_add: @place, "admin--note-reactions-target": "add", action: "toggle->admin--note-reactions#toggled keydown.esc->admin--note-reactions#escape" } do %>
+        data: { reaction_add: @place, "admin--notes--reactions-target": "add", action: "toggle->admin--notes--reactions#toggled keydown.esc->admin--notes--reactions#escape" } do %>
     <summary class="<%= add_class %>" aria-label="<%= t(".add") %>" title="<%= t(".add") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: add_icon_size %></summary>
-    <%= form_with url: path, method: :post, class: panel_class, data: { turbo_frame: "notes", "admin--note-reactions-target": "panel" } do %>
+    <%= form_with url: path, method: :post, class: panel_class, data: { turbo_frame: "notes", "admin--notes--reactions-target": "panel" } do %>
       <%# The set gives; a chip takes back. %>
       <%= hidden_field_tag "on", "true", id: nil %>
       <% ::Notes::EMOJI.each do |emoji| %>

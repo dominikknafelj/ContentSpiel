@@ -73,7 +73,7 @@ class Admin::NoteEditDraftsSystemTest < ApplicationSystemTestCase
     # (the handoff's decision 29): no line above the field, which is for errors.
     assert_selector unsaved(@first), text: "Unsaved edit", count: 1
     assert_no_selector "#note-message-#{@first.id} form[data-note-composer] [data-note-unsaved]", visible: :all
-    assert_selector "#note-message-#{@first.id} [data-admin--note-unsaved-target=note]", text: "Unsaved edit"
+    assert_selector "#note-message-#{@first.id} [data-admin--notes--unsaved-target=note]", text: "Unsaved edit"
 
     within("#note-message-#{@first.id}") { find("a[data-note-cancel]").click }
 

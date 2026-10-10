@@ -2,8 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 // A mention's chime and desktop notification (notes spec §6.4, D18, D19).
-// Lives on <body>. `admin--notes-live` announces every delivery it has READ
-// through the scoped endpoint (`admin--notes-live:delivery` on `document`; a
+// Lives on <body>. `admin--notes--live` announces every delivery it has READ
+// through the scoped endpoint (`admin--notes--live:delivery` on `document`; a
 // delivery the person may no longer read is never announced, so nothing here
 // can speak of one); this acts on a `mention` only, and only as the person's
 // two settings say (`sound`, `desktop`: the account screen's switches, as
@@ -12,7 +12,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 // THE RULE, for one mention and all the tabs this person has open in this
 // browser:
 // - A tab is LOOKING AT the thread (`detail.shown`, which is
-//   `admin--notes-live#watching`, the one predicate: the thread is open
+//   `admin--notes--live#watching`, the one predicate: the thread is open
 //   there and the document is not hidden): nobody chimes and nobody
 //   notifies, in any tab. The person has seen it arrive.
 // - Otherwise exactly ONE tab chimes, if the sound setting is on: a visible
@@ -46,7 +46,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 //
 // ONCE PER BURST (the handoff's decision 18). Several notes at once make one
 // sound: within a burst -- deliveries within `burstMs` (10 s) of the one
-// before, `admin--notes-live`'s clock, handed over as `detail.burstMs` --
+// before, `admin--notes--live`'s clock, handed over as `detail.burstMs` --
 // only the first mention that would chime does, and only the first that
 // would notify the desktop does. DONE says whether its tab chimed and
 // notified, so every tab knows the burst has had its sound whichever of
@@ -65,7 +65,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 // characters, as plain text, exactly as the scoped endpoint gave them; a
 // click brings the tab forward and opens the thread (the toast's "Open").
 //
-// `admin--notes-alert:settled` on `document` (`detail: { id, chimed,
+// `admin--notes--alert:settled` on `document` (`detail: { id, chimed,
 // notified }`) says that this tab has made up its mind about a delivery and
 // what it did: when it decides, and for a delivery announced here that needs
 // no deciding (not a mention, both settings off, DONE heard before).
@@ -256,7 +256,7 @@ export default class extends Controller {
     if (tell) this.say({ type: "settings", sound, desktop })
   }
 
-  // `admin--notes-live:delivery` on the document.
+  // `admin--notes--live:delivery` on the document.
   delivery(event) {
     const delivery = event.detail
     arrival(delivery.burstMs)
@@ -322,13 +322,13 @@ export default class extends Controller {
     this.room.channel.postMessage(message)
   }
 
-  // `admin--notes-live#watching`, the one predicate, for a thread another tab
+  // `admin--notes--live#watching`, the one predicate, for a thread another tab
   // names.
   watching(thread) {
-    return Boolean(this.application.getControllerForElementAndIdentifier(this.element, "admin--notes-live")?.watching(thread))
+    return Boolean(this.application.getControllerForElementAndIdentifier(this.element, "admin--notes--live")?.watching(thread))
   }
 
   settled(id, { chimed = false, notified = false } = {}) {
-    document.dispatchEvent(new CustomEvent("admin--notes-alert:settled", { detail: { id, chimed, notified } }))
+    document.dispatchEvent(new CustomEvent("admin--notes--alert:settled", { detail: { id, chimed, notified } }))
   }
 }

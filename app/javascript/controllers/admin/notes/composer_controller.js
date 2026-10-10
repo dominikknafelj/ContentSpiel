@@ -25,12 +25,12 @@ import { messages } from "i18n/messages"
 //   the draft is what differs from the text the form was drawn with: typing
 //   that text back removes it, and a form drawn while one exists gets the
 //   draft IN PLACE of the saved text; that it is unsaved is said in the
-//   message's meta line (`admin--note-unsaved`), never above the field
+//   message's meta line (`admin--notes--unsaved`), never above the field
 //   (decision 29). That goes for a draft older than the saved text too (the
 //   author saved a newer one from another tab): it is their own words, so it
 //   is put back and said, never dropped in silence and never kept in
 //   silence -- Cancel shows the newer text. Saving forgets the draft here
-//   (`sent`); Cancel is a link beside the form, and `admin--note-unsaved`, on
+//   (`sent`); Cancel is a link beside the form, and `admin--notes--unsaved`, on
 //   the message, forgets it there and says "Unsaved edit" on the message
 //   while its form is closed. Both read the one key (`draftKey`).
 // - "@" opens the mention picker (six rows at most): the people who may read
@@ -82,7 +82,7 @@ export const draftKey = (user, key) => `${PREFIX}${user}:${key}`
 // session: the person in the key keeps the next one's forms from showing the
 // last one's text, but the text, and the names of the files chosen with it,
 // would stay readable in the tab until it is closed -- and a note's text is
-// kept out of every log for a reason. So `admin--notes-live` calls this when
+// kept out of every log for a reason. So `admin--notes--live` calls this when
 // the person signs out (all), and when a page loads for someone (all but
 // theirs: a session can end without the button). A draft is a convenience;
 // a failure here is the same as having none.
@@ -121,7 +121,7 @@ export default class extends Controller {
     // is measured against. The field's `defaultValue`, never its `value`:
     // this runs again whenever the element is MOVED (an open edit is moved
     // into the thread's new messages part by every live refresh and every
-    // merged answer, `admin--notes-live#redrawThread`), and a baseline read
+    // merged answer, `admin--notes--live#redrawThread`), and a baseline read
     // from `value` there was the text typed so far -- from then on the edit
     // looked unchanged, its draft was removed by the next keystroke that
     // left the field as it was, and "Unsaved edit" no longer protected it.
@@ -179,7 +179,7 @@ export default class extends Controller {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
       // No button to send with, no send: the form of a thread that is gone
-      // has its submit taken away (`admin--notes-live#gone`), and a note
+      // has its submit taken away (`admin--notes--live#gone`), and a note
       // marked "out" that nothing sends would leave its field read-only.
       if (event.repeat || this.out || !this.hasSubmitTarget) return
 
@@ -437,7 +437,7 @@ export default class extends Controller {
       option.id = `${this.fieldTarget.id}-person-${index}`
       option.dataset.id = person.id
       option.dataset.label = person.label
-      option.dataset.action = "mousedown->admin--note-composer#choose"
+      option.dataset.action = "mousedown->admin--notes--composer#choose"
       option.className = "flex cursor-pointer items-center gap-2 rounded-cs px-2 py-1.5 hover:bg-sunken aria-selected:bg-sunken"
       // The avatar is decoration, as everywhere (`Admin::NotesScreen::AvatarComponent`):
       // the first letters of the first two words of the name beside it.

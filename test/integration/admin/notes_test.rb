@@ -35,7 +35,7 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
       assert_select "[data-note-replies]", text: "1 reply"
       assert_select "[data-note-new]", text: "new"
     end
-    assert_select "span[data-admin--notes-target=counts]" do |nodes|
+    assert_select "span[data-admin--notes--drawer-target=counts]" do |nodes|
       assert_equal({ "total" => 1, "subjects" => { "ContentBlock-#{@block.id}" => 1 }, "unread" => [ "ContentBlock-#{@block.id}" ] }, JSON.parse(nodes.first["data-counts"]))
     end
     assert_select "#sidebar", count: 0 # a frame request gets the frame, not the shell
@@ -61,7 +61,7 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
       assert_select "#note-thread-#{@thread.id}-messages #note-message-#{@thread.first_message.id} [data-note-mention]", text: "@reader"
       assert_select "a[href='https://example.com']"
     end
-    assert_select "span[data-admin--notes-target=counts]"
+    assert_select "span[data-admin--notes--drawer-target=counts]"
   end
 
   test "a long thread folds its middle, and a thread started on another language tab says so" do

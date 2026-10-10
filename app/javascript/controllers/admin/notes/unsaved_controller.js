@@ -1,12 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
-import { draftKey } from "controllers/admin/note_composer_controller"
+import { draftKey } from "controllers/admin/notes/composer_controller"
 
 // "Unsaved edit" on a message (the handoff's decision 27), on the viewer's own
 // messages as `Admin::NotesScreen::MessageComponent` draws them.
 //
 // The text of an edit that is left without saving -- Edit or Delete on another
 // message, "All notes", the drawer closed, a reload -- stays in this tab as
-// the edit form's draft (`admin--note-composer`, under
+// the edit form's draft (`admin--notes--composer`, under
 // `cs-note-draft:<user id>:message-<id>`). While such a draft exists and the
 // message's edit form is closed, the message says so: the server draws the
 // words hidden (`note`), and this shows them when the draft is there. It is

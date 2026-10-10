@@ -62,10 +62,10 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     assert_selector ".admin-block-tile > .admin-block-tile__face"
     assert_selector ".admin-block-tile > *", count: 3, visible: :all
-    assert_selector ".admin-block-tile > div > [data-admin--notes-target=marker]", visible: :all
+    assert_selector ".admin-block-tile > div > [data-admin--notes--drawer-target=marker]", visible: :all
     assert_no_selector ".admin-block-tile__grip", visible: :all
     assert_equal [ "Add note" ], menu_items
-    assert_selector "[role=menu] button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all
+    assert_selector "[role=menu] button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes--drawer#open']", visible: :all
     assert_no_selector "[data-move]", visible: :all
     assert_no_selector "dialog", visible: :all
   end
@@ -103,8 +103,8 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     render_tile
     assert_selector "#notes-marker-ContentBlock-#{@block.id}"
-    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
-    assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
+    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes--drawer#open']", visible: :all, text: "Add note"
+    assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes--drawer-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
   end
 
   # The handoff's decision 6: at rest for nobody.

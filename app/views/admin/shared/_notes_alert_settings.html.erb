@@ -1,4 +1,4 @@
-<%# The signed-in person's two notes settings AS STORED, for `admin--notes-alert`
+<%# The signed-in person's two notes settings AS STORED, for `admin--notes--alert`
     on <body> (its `settings` target). <body> lives as long as the tab -- CS
     Studio moves between screens inside `#content` -- so the values written
     on it with the page went stale the moment the account screen saved new
@@ -7,4 +7,4 @@
     the controller takes the values from it as it connects and tells the
     person's other tabs. In the layout it says what <body> says. %>
 <%= tag.span id: "notes-alert-settings", hidden: true,
-      data: { "admin--notes-alert-target": "settings", sound: (Current.user&.notes_sound ? true : false), desktop: (Current.user&.notes_desktop ? true : false) } %>
+      data: { "admin--notes--alert-target": "settings", sound: (Current.user&.notes_sound ? true : false), desktop: (Current.user&.notes_desktop ? true : false) } %>

@@ -9,8 +9,8 @@ class Admin::NotesScreen::MarkerComponentTest < ViewComponent::TestCase
 
     render_inline(Admin::NotesScreen::MarkerComponent.new(subject: block, name: "Rich text"))
 
-    assert_selector "button#notes-marker-ContentBlock-#{block.id}[type=button][data-admin--notes-target=marker][data-notes-key='ContentBlock-#{block.id}'][aria-label='Add a note on Rich text']"
-    assert_selector "button[data-notes-name='Rich text']:not([aria-controls])[data-action='mousedown->admin--notes#hold admin--notes#open']"
+    assert_selector "button#notes-marker-ContentBlock-#{block.id}[type=button][data-admin--notes--drawer-target=marker][data-notes-key='ContentBlock-#{block.id}'][aria-label='Add a note on Rich text']"
+    assert_selector "button[data-notes-name='Rich text']:not([aria-controls])[data-action='mousedown->admin--notes--drawer#hold admin--notes--drawer#open']"
     assert_selector "button [data-notes-count]", visible: :all, text: ""
     assert_selector "button [data-notes-selection]", visible: :all, text: "Note on selection"
     # Nothing in it says how many: the script fills that from the counts.

@@ -62,8 +62,8 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     # The handoff's header, "NOTES · 1 OPEN": the number follows the counts
     # every answer of the frame brings, and the page has its own copy.
     assert_select "#media-notes h3", text: /\ANotes\s+·\s+1 open\z/
-    assert_select "#media-notes h3 [data-admin--notes-target=total]", text: "1"
-    assert_select "#media-notes #notes-counts[data-admin--notes-target=counts]"
+    assert_select "#media-notes h3 [data-admin--notes--drawer-target=total]", text: "1"
+    assert_select "#media-notes #notes-counts[data-admin--notes--drawer-target=counts]"
     # No drawer on this screen (the spec wins over the handoff's "Open in drawer").
     assert_select "aside#notes-drawer", count: 0
     # Asked of the frame's own answer: in the page above the frame is not loaded yet.
@@ -97,7 +97,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { selected: quiet.id }
 
-    assert_select "#media-notes h3 [data-admin--notes-target=total][hidden]"
+    assert_select "#media-notes h3 [data-admin--notes--drawer-target=total][hidden]"
     assert_select "#media-asset-#{quiet.id} [data-notes-chip]", count: 0
   end
 

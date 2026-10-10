@@ -30,7 +30,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     await_notes_live
     assert_selector "#notes-drawer [data-notes-view=thread]"
     # A link with `?notes=open` gives the thread the focus once its frame has
-    # loaded (`admin--notes#loaded`): a test that puts the focus somewhere
+    # loaded (`admin--notes--drawer#loaded`): a test that puts the focus somewhere
     # itself must not do it before that.
     assert_eventually(message: "the thread never took the focus") { focused?("#note-thread-#{@thread.id}") }
   end
@@ -188,7 +188,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     reply_field.send_keys("Half a thou")
     keep_reply_field
 
-    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__delivery = event.detail })")
+    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__delivery = event.detail })")
 
     # Addressed to the viewer, so that there IS a delivery the lines at the
     # end are about: without the mention this person, who never wrote in the
@@ -202,7 +202,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert focused?("#note-thread-#{@thread.id}-reply textarea[name=body]"), "the reply field lost the focus"
     assert_eventually(message: "the delivery was not marked read") { Notes::Delivery.where(user: users(:one)).pluck(:read_at).then { |read| read.any? && read.all? } }
     # The thread is open in this tab, which is visible and focused: the
-    # delivery is announced as shown (what `admin--notes-alert` hears), no
+    # delivery is announced as shown (what `admin--notes--alert` hears), no
     # toast is raised, and the delivery is read -- the badge does not stay up.
     await_js("Boolean(window.__delivery)", wait: LIVE)
     delivery = Notes::Delivery.find_by!(user: users(:one))
@@ -226,7 +226,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   test "a window that shows the thread without having the focus is refreshed like any other, with no toast" do
     open_thread
     page.execute_script("document.hasFocus = () => false")
-    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__shown = event.detail.shown })")
+    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__shown = event.detail.shown })")
 
     reply_as_dana("Are you there, @[#{users(:one).id}]?")
 
@@ -244,7 +244,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     open_thread
     hide_document
     watch_notes_fetches
-    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__shown = event.detail.shown })")
+    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__shown = event.detail.shown })")
 
     reply_as_dana("While you were away, @[#{users(:one).id}]")
 
@@ -698,7 +698,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/tags"
     await_notes_live
     hold_consumer
-    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__announced = (window.__announced || 0) + 1 })")
+    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__announced = (window.__announced || 0) + 1 })")
 
     page.execute_script(<<~JS)
       window.__visited = false
@@ -741,7 +741,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     JS
   end
 
-  def count_announcements = page.execute_script("window.__announced = []; document.addEventListener('admin--notes-live:delivery', (event) => { window.__announced.push(event.detail.id) })")
+  def count_announcements = page.execute_script("window.__announced = []; document.addEventListener('admin--notes--live:delivery', (event) => { window.__announced.push(event.detail.id) })")
 
   # The run that answers a signal is already out -- the sidebar's count is
   # being fetched -- when a visit replaces the controller that started it.

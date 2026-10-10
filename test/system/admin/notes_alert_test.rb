@@ -10,7 +10,7 @@ require "application_system_test_case"
 # `BroadcastChannel` is about.
 #
 # NO WAIT ON TIME. Every tab says when it has made up its mind about a
-# delivery (`admin--notes-alert:settled`), so "nothing chimed" is asserted
+# delivery (`admin--notes--alert:settled`), so "nothing chimed" is asserted
 # after every tab has said so, not after a pause; and a tab that has heard
 # another finish never alerts, so nothing can follow.
 #
@@ -35,7 +35,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     window.__notified = []
     window.__notifications = []
     window.__settled = []
-    document.addEventListener("admin--notes-alert:settled", (event) => window.__settled.push(event.detail))
+    document.addEventListener("admin--notes--alert:settled", (event) => window.__settled.push(event.detail))
     const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} })
     window.AudioContext = class {
       get currentTime() { return 0 }
@@ -170,7 +170,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   # A tab hears the signal in its own time. One whose copy has not come yet
   # is made here by keeping the delivery's announcement from the alert
   # controller altogether: what the tab IS must count on another tab's word.
-  def deafen = page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => event.stopImmediatePropagation(), true)")
+  def deafen = page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => event.stopImmediatePropagation(), true)")
 
   test "a tab in view counts before its own copy of the signal has come: it chimes, and nothing goes to the desktop" do
     users(:one).update!(notes_desktop: true)
@@ -283,7 +283,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   # The window of a burst, for the page in front of the test: both scripts
   # read it from this one value (the alert takes it from the delivery's
   # event), at the moment a delivery is announced.
-  def burst_window(milliseconds) = page.execute_script("document.body.setAttribute('data-admin--notes-live-burst-ms-value', '#{milliseconds}')")
+  def burst_window(milliseconds) = page.execute_script("document.body.setAttribute('data-admin--notes--live-burst-ms-value', '#{milliseconds}')")
 
   test "two notes at once are two named toasts and one chime; from the third one toast counts them, and the next burst starts over" do
     users(:one).update!(notes_desktop: true)
@@ -333,7 +333,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   # ends (NaN compares false with everything): the ten seconds stand in.
   test "a burst's window that is not a positive number is ten seconds" do
     stubbed_dashboard
-    page.execute_script("window.__windows = []; document.addEventListener('admin--notes-live:delivery', (event) => window.__windows.push(event.detail.burstMs))")
+    page.execute_script("window.__windows = []; document.addEventListener('admin--notes--live:delivery', (event) => window.__windows.push(event.detail.burstMs))")
 
     [ "soon", "0", "-5", "Infinity", "2500" ].each do |value|
       burst_window(value)
@@ -430,7 +430,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
 
   # --- the account screen ----------------------------------------------------------
 
-  def permission_row = "[data-controller='admin--notes-permission']"
+  def permission_row = "[data-controller='admin--notes--permission']"
 
   # The headless browser has its own answer about notifications; the page is
   # given one, and looks again as it does whenever its window is looked at.
@@ -454,7 +454,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_no_text "This browser has not been allowed"
 
     find("#notes_desktop").click
-    assert_selector "#{permission_row} [data-admin--notes-permission-target=ask][class~='bg-accent-tint']", text: "This browser has not been allowed to show notifications yet."
+    assert_selector "#{permission_row} [data-admin--notes--permission-target=ask][class~='bg-accent-tint']", text: "This browser has not been allowed to show notifications yet."
     assert_selector "#{permission_row} button", text: "Allow in this browser"
 
     find("#notes_desktop").click
@@ -465,7 +465,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_no_text "Blocked in this browser."
     find("#notes_desktop").click
     # Blocked is the one warn-toned line, and has no button.
-    assert_selector "#{permission_row} [data-admin--notes-permission-target=blocked][class~='bg-warn-tint'][class~='border-warn']", text: "Blocked in this browser."
+    assert_selector "#{permission_row} [data-admin--notes--permission-target=blocked][class~='bg-warn-tint'][class~='border-warn']", text: "Blocked in this browser."
     assert_no_selector "#{permission_row} button"
     assert_equal false, users(:one).reload.notes_desktop
   end
@@ -521,7 +521,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   end
 
   # What the alert on <body> holds: [ sound, desktop ].
-  def alert_values = page.evaluate_script("[ 'sound', 'desktop' ].map((name) => document.body.getAttribute(`data-admin--notes-alert-${name}-value`))")
+  def alert_values = page.evaluate_script("[ 'sound', 'desktop' ].map((name) => document.body.getAttribute(`data-admin--notes--alert-${name}-value`))")
 
   def save_switches(*ids)
     ids.each { |id| find(id).click }
@@ -643,12 +643,12 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     # The settings this tab acts on are the saved ones at once, with no
     # reload (they stood as the page drew them until the next full load,
     # which is what a mention then went by), and on the next page too.
-    assert_selector "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
+    assert_selector "body[data-admin--notes--alert-sound-value=false][data-admin--notes--alert-desktop-value=true]"
     # (The typed password is given up first, or leaving would ask about it.)
     fill_in "New password", with: ""
     fill_in "Confirm new password", with: ""
     assert_selector "#password-form .admin-save-bar", text: "No unsaved changes"
     visit "/cs-studio"
-    assert_selector "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
+    assert_selector "body[data-admin--notes--alert-sound-value=false][data-admin--notes--alert-desktop-value=true]"
   end
 end

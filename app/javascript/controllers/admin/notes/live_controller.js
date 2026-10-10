@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { cable } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
-import { forgetDrafts } from "controllers/admin/note_composer_controller"
+import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 
 // Live delivery of notes (notes spec §6). Lives on <body>. A signal over the
 // cable says only THAT something changed (`Notes::Signals`: a kind and ids);
@@ -17,7 +17,7 @@ import { forgetDrafts } from "controllers/admin/note_composer_controller"
 //   are fetched again; then that one delivery is FETCHED as data -- the
 //   signal may have reached someone who has since lost the right to read the
 //   record, and a refusal ends it there, with nothing said -- announced on
-//   `document` (`admin--notes-live:delivery`) and raised as a toast. No toast
+//   `document` (`admin--notes--live:delivery`) and raised as a toast. No toast
 //   when the person is LOOKING AT that thread (`watching`, the one predicate:
 //   it is the view of a notes frame of this tab, and the document is not
 //   hidden -- the window's focus is not asked for, so two windows side by
@@ -32,8 +32,8 @@ import { forgetDrafts } from "controllers/admin/note_composer_controller"
 //   stands for the burst, "You have 3 new notes", whose "Open" leads to the
 //   inbox; with each further one it is put up again with the new count, so
 //   its 8 seconds start over. Every delivery is still announced by itself
-//   (`admin--notes-live:delivery`), with `detail.burstMs`, the length of the
-//   window, so that `admin--notes-alert` counts its once-per-burst chime by
+//   (`admin--notes--live:delivery`), with `detail.burstMs`, the length of the
+//   window, so that `admin--notes--alert` counts its once-per-burst chime by
 //   the same clock. The burst is kept beside the controller (`burst`), like
 //   `pending`: it outlives a Turbo visit.
 // - `Notes::RecordChannel`, one per `record` target (an editor's drawer, the
@@ -76,7 +76,7 @@ import { forgetDrafts } from "controllers/admin/note_composer_controller"
 //   to a thread that is not there is switched off. Without typed text the
 //   frame goes to the list.
 // - A drawer that is closed gets its counts only (`data-notes-counts-url`,
-//   handed to `admin--notes#refreshCounts`): fetching a thread is what marks
+//   handed to `admin--notes--drawer#refreshCounts`): fetching a thread is what marks
 //   it read, and nobody is reading a closed drawer. It is remembered as
 //   stale and fetched when it is opened again. The same goes for a THREAD
 //   in a document that is hidden (another tab is in front, the window is
@@ -84,7 +84,7 @@ import { forgetDrafts } from "controllers/admin/note_composer_controller"
 //   gets the counts, the toast is raised, the delivery stays unread, and the
 //   thread is fetched when the document is visible again (`visible`). A
 //   list is fetched hidden or not: reading a list reads nothing. A part that
-//   draws itself (the graph's card) hears `admin--notes-live:changed` on its
+//   draws itself (the graph's card) hears `admin--notes--live:changed` on its
 //   element.
 // Signals in a burst are one fetch per part per 500 ms, and one request per
 // part is out at a time: a signal that comes while one is out leads to
@@ -413,8 +413,8 @@ export default class extends Controller {
     }
   }
 
-  // `admin--notes:opened`: a drawer that was closed while its record changed
-  // is fetched now. A task later, when `admin--notes#show` has either left
+  // `admin--notes--drawer:opened`: a drawer that was closed while its record changed
+  // is fetched now. A task later, when `admin--notes--drawer#show` has either left
   // the frame as it is or sent it somewhere (which `refresh` waits for, and
   // `fresh` then says is no longer stale).
   shown() {
@@ -495,7 +495,7 @@ export default class extends Controller {
   }
 
   async fetchPart(element, record, threadId) {
-    element.dispatchEvent(new CustomEvent("admin--notes-live:changed", { detail: { threadId } }))
+    element.dispatchEvent(new CustomEvent("admin--notes--live:changed", { detail: { threadId } }))
 
     const frame = element.querySelector("turbo-frame#notes")
     // A frame that was never asked for anything (a drawer never opened) has
@@ -696,7 +696,7 @@ export default class extends Controller {
   // and every way of sending are taken away -- each would be answered with
   // the list, over the text -- and the field says why.
   gone(frame, view, old, reply, busy, answer, url) {
-    const counts = answer.querySelector("[data-admin--notes-target~='counts']")?.dataset.counts
+    const counts = answer.querySelector("[data-admin--notes--drawer-target~='counts']")?.dataset.counts
     if (counts) this.notes?.refreshCounts(JSON.parse(counts))
     if (view.querySelector("[data-note-gone]")) return
 
@@ -727,7 +727,7 @@ export default class extends Controller {
     view.querySelectorAll("form").forEach((form) => form.addEventListener("submit", (event) => event.preventDefault()))
     view.querySelectorAll("button[type='submit']").forEach((button) => {
       // No longer the composer's to enable when the field has text.
-      button.removeAttribute("data-admin--note-composer-target")
+      button.removeAttribute("data-admin--notes--composer-target")
       button.disabled = true
     })
     this.give(view, held)
@@ -816,10 +816,10 @@ export default class extends Controller {
   }
 
   // The answer's own copy of the record's counts, in the place of the one
-  // the view had: `admin--notes` reads a counts element as it connects.
+  // the view had: `admin--notes--drawer` reads a counts element as it connects.
   takeCounts(view, answer) {
-    const counts = answer.querySelector(":scope > [data-admin--notes-target~='counts']")
-    const own = view.querySelector(":scope > [data-admin--notes-target~='counts']")
+    const counts = answer.querySelector(":scope > [data-admin--notes--drawer-target~='counts']")
+    const own = view.querySelector(":scope > [data-admin--notes--drawer-target~='counts']")
     if (counts && own) own.replaceWith(document.importNode(counts, true))
   }
 
@@ -940,9 +940,9 @@ export default class extends Controller {
     }
   }
 
-  // `admin--notes`, on the same element.
+  // `admin--notes--drawer`, on the same element.
   get notes() {
-    return this.application.getControllerForElementAndIdentifier(this.element, "admin--notes")
+    return this.application.getControllerForElementAndIdentifier(this.element, "admin--notes--drawer")
   }
 
   // --- the person's inbox -----------------------------------------------------------
@@ -1014,7 +1014,7 @@ export default class extends Controller {
 
     const shown = this.watching(row.thread_id)
     const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown, burstMs: this.burstWindow }
-    document.dispatchEvent(new CustomEvent("admin--notes-live:delivery", { detail }))
+    document.dispatchEvent(new CustomEvent("admin--notes--live:delivery", { detail }))
     if (shown) return
 
     // The first two of a burst by name; from the third, one toast for all.

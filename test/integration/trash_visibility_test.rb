@@ -825,7 +825,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     # The panel: a kept image's has its notes frame, a trashed image has no panel.
     get admin_media_path(selected: @kept_asset.id)
     assert_select "#media-panel #media-notes turbo-frame#notes[src='/cs-studio/notes/media/#{@kept_asset.id}?view=media']"
-    assert_select "#media-notes [data-admin--notes-target=total]", text: "1"
+    assert_select "#media-notes [data-admin--notes--drawer-target=total]", text: "1"
     get admin_media_path(selected: @gone_asset.id)
     assert_response :not_found
     assert_select "#media-notes", count: 0

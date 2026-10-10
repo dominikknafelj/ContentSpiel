@@ -37,7 +37,7 @@
           the header's shared secondary style, as Preview beside it (16px,
           `px-4 py-2`), with a 16px icon and its count in 12px mono. Four
           states: the word alone; with open threads their number
-          in mono; `data-unread` on the number (set by `admin--notes` from the
+          in mono; `data-unread` on the number (set by `admin--notes--drawer` from the
           counts) makes it the filled accent pill, accent meaning "unread for
           you" and nothing else; `aria-pressed` while the drawer is open. The
           id `notes-open` is this button's alone. %>
@@ -45,12 +45,12 @@
         <%= tag.button type: "button", id: "notes-open",
               class: "#{notes_button_class} items-center gap-2 focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
               aria: { controls: "notes-drawer", expanded: "false", pressed: "false", label: t(".notes_label", count: open_notes) },
-              data: { "admin--notes-target": "opener", action: "admin--notes#toggle" } do %>
+              data: { "admin--notes--drawer-target": "opener", action: "admin--notes--drawer#toggle" } do %>
           <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>
           <span><%= t(".notes") %></span>
           <%= tag.span open_notes, id: "notes-open-count", hidden: open_notes.zero?,
                 class: "font-cs-mono text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
-                data: { "admin--notes-target": "total" } %>
+                data: { "admin--notes--drawer-target": "total" } %>
         <% end %>
       <% end %>
 

@@ -17,7 +17,7 @@ import { Controller } from "@hotwired/stimulus"
 //
 // What is playing is said by the button (`data-playing`) and read from it,
 // not kept here: a live refresh moves the tile into the redrawn thread
-// (`admin--notes-live`), which connects this controller again, and a GIF
+// (`admin--notes--live`), which connects this controller again, and a GIF
 // someone set playing goes on playing.
 export default class extends Controller {
   static targets = [ "moving", "still", "button", "label", "icon" ]

@@ -304,7 +304,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "#notes-marker-ContentBlock-#{block.id}[data-notes-name='Rich text']"
 
     render_inline(Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true, placement: :panel))
-    assert_no_selector "[data-admin--notes-target=marker]"
+    assert_no_selector "[data-admin--notes--drawer-target=marker]"
 
     # A translation tab's group card has no tile to carry it, so it does.
     render_inline(Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de", editable: true, placement: :group))
@@ -317,8 +317,8 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_inline(Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
 
-    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
-    assert_selector "#delete-block-#{block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{block.id}']", visible: :all
+    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes--drawer#open']", visible: :all, text: "Add note"
+    assert_selector "#delete-block-#{block.id} p[hidden][data-admin--notes--drawer-target=warning][data-notes-within='content_block_#{block.id}']", visible: :all
   end
 
   # The handoff's decision 6, which replaces the ruling that showed the
@@ -330,7 +330,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
     # The card's own menu, in its header: a rich-text field has an Insert menu further down.
     items = -> { self.page.all(".admin-block-card > div:first-child [role=menu] > div", visible: :all).map { |item| item.text(:all).strip } }
-    add_note = "[role=menu] button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes#open']"
+    add_note = "[role=menu] button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes--drawer#open']"
 
     render_inline(Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: false))
     assert_selector "button[aria-haspopup=menu][aria-label='Block actions']", count: 1
@@ -363,6 +363,6 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     render_inline(Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
 
-    assert_selector "#delete-block-#{block.id} div[class='mt-2 text-ink'] > p[hidden][data-admin--notes-target=warning][data-notes-alone]", visible: :all
+    assert_selector "#delete-block-#{block.id} div[class='mt-2 text-ink'] > p[hidden][data-admin--notes--drawer-target=warning][data-notes-alone]", visible: :all
   end
 end

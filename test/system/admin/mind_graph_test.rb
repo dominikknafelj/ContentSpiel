@@ -1691,14 +1691,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # Live delivery (notes spec §6): the card's notes are a part that draws
-  # itself, so `admin--notes-live` only tells it that the post's notes changed.
+  # itself, so `admin--notes--live` only tells it that the post's notes changed.
   test "the card's notes follow a note started elsewhere, and the tab's own note is not fetched twice" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
     click_node(a.id)
-    assert_selector "[data-mind-graph-card-notes][data-admin--notes-live-target=record][data-notes-type=post][data-notes-id='#{a.id}'] textarea"
+    assert_selector "[data-mind-graph-card-notes][data-admin--notes--live-target=record][data-notes-type=post][data-notes-id='#{a.id}'] textarea"
     assert_no_selector "[data-mind-graph-card-notes] li[data-note-row]"
     await_notes_live
 

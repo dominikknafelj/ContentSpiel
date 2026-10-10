@@ -66,7 +66,7 @@ class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
   test "an emoji from the popover goes in at the caret" do
     open_notes
     field.send_keys("Good")
-    find("#notes-new [data-admin--note-composer-target=emoji] summary").click
+    find("#notes-new [data-admin--notes--composer-target=emoji] summary").click
     find("#notes-new button[data-emoji='👍']").click
 
     assert_equal "Good👍", field.value
@@ -187,7 +187,7 @@ class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
   test "the at-sign button opens the picker like a typed @, on its first row" do
     open_notes
     field.send_keys("Ask")
-    find("#notes-new [data-note-toolbar] button[data-action='admin--note-composer#mention']").click
+    find("#notes-new [data-note-toolbar] button[data-action='admin--notes--composer#mention']").click
 
     assert_equal "Ask @", field.value
     assert_selector "#notes-new [role=listbox] [role=option]", maximum: 6
@@ -199,11 +199,11 @@ class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
     # `set` on the field itself: `attach_file` called on an element looks for a file field INSIDE it.
     find("#notes-new input[type=file]", visible: :all).set([ file_fixture("tiny.png").to_s, file_fixture("small.gif").to_s ])
 
-    assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", count: 2
-    assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", text: /tiny\.png\s*PNG · 1 KB/
+    assert_selector "#notes-new [data-admin--notes--composer-target=chosen] li", count: 2
+    assert_selector "#notes-new [data-admin--notes--composer-target=chosen] li", text: /tiny\.png\s*PNG · 1 KB/
     # The remove button is an icon; its name is its `aria-label`, which `press` does not read.
-    find("#notes-new [data-admin--note-composer-target=chosen] button[aria-label='Remove small.gif']").click
-    assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", count: 1
+    find("#notes-new [data-admin--notes--composer-target=chosen] button[aria-label='Remove small.gif']").click
+    assert_selector "#notes-new [data-admin--notes--composer-target=chosen] li", count: 1
 
     field.send_keys("With a file")
     within("#notes-new") { press "Add note" }

@@ -45,7 +45,7 @@ module Admin
 
       # The Notes button (notes spec §4.3) is drawn for a screen that also
       # draws the drawer and hands over the record's open-thread count. Its
-      # number is the server's as the page loads; `admin--notes` keeps it
+      # number is the server's as the page loads; `admin--notes--drawer` keeps it
       # current from then on, and is what says "unread for you" (`data-unread`
       # on the number) and "the drawer is open" (`aria-pressed`).
       def notes? = !@open_notes.nil?

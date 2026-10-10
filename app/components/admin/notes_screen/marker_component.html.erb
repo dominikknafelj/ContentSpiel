@@ -1,9 +1,9 @@
 <%# `mousedown` first: what is selected is read before the press can move it
-    (`admin--notes#hold`). Two icons, one shown: the script only sets
+    (`admin--notes--drawer#hold`). Two icons, one shown: the script only sets
     `data-has-notes`, and the stylesheet picks. No `aria-controls`: the one
     button of a card that has it is the name, which collapses the card's body. %>
 <%= tag.button type: "button", id: "notes-marker-#{key}", class: "admin-notes-marker", aria: { label: t(".add", name: name) },
-      data: { "admin--notes-target": "marker", notes_key: key, notes_name: name, action: "mousedown->admin--notes#hold admin--notes#open" } do %>
+      data: { "admin--notes--drawer-target": "marker", notes_key: key, notes_name: name, action: "mousedown->admin--notes--drawer#hold admin--notes--drawer#open" } do %>
   <span class="admin-notes-marker__add"><%= helpers.render "admin/shared/icon", name: :message_square_plus, size: "size-4" %></span>
   <span class="admin-notes-marker__open"><%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %></span>
   <span data-notes-count hidden></span><span data-notes-selection hidden><%= t(".selection") %></span>

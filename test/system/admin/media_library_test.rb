@@ -411,7 +411,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     click_tile(asset)
 
     assert_selector "#media-panel #media-notes #notes-list"
-    assert_no_selector "#media-notes [data-admin--notes-target=total]"
+    assert_no_selector "#media-notes [data-admin--notes--drawer-target=total]"
     # A link inside the notes frame: never promoted to a visit, clicked plainly.
     find("#media-notes a[data-note-new-link]").click
     find("#media-notes #notes-new textarea[name=body]").send_keys("Crop the left edge")
