@@ -122,8 +122,11 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     # a caller's next `visit` fires. Without this, a caller moving straight
     # on to its own `visit` could race the still-in-flight sign-in POST,
     # navigate away before its `Set-Cookie` response ever arrives, and land
-    # right back on the sign-in page, unauthenticated.
-    assert_selector "nav[aria-label='Modules']"
+    # right back on the sign-in page, unauthenticated. A busy runner or
+    # laptop can take longer than Capybara's default to answer the sign-in
+    # POST, and every system test begins here, so this one wait is generous
+    # (seen on CI and locally, 2026-10-10).
+    assert_selector "nav[aria-label='Modules']", wait: 15
   end
 
   # Opens the editor header's ⋯ menu (Activity, Schedule…, Unpublish, Move to
