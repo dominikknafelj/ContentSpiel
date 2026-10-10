@@ -35,7 +35,9 @@ module Notes
     # picker and the mind graph's card all ask here. `User#display_name`,
     # which the rest of CS Studio uses, is not changed. A name set later
     # shows everywhere at once: a mention is a token with the person's id.
-    def name_of(user) = user.name.presence || user.email_address.to_s.split("@").first.presence || user.email_address
+    # The rule itself is `PersonName.of` (a value, so that presence, which
+    # does not know notes, names people the same way).
+    def name_of(user) = PersonName.of(user)
 
     # The record whose screen lists a thread on `subject`: a block's owner (a
     # page today), anything else itself. A block that moves between a
