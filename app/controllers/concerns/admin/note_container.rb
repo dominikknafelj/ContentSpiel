@@ -1,0 +1,160 @@
+module Admin
+  # What every notes controller shares: the container, found THROUGH THE READ
+  # SCOPE before anything else is looked at (notes spec §3.4). A page or post
+  # outside the viewer's scope, a trashed one and an id that names nothing are
+  # the same 404; the media library has no per-image right, so its gate is
+  # the module's own (`media.upload`, a 403 like `Admin::MediaController`'s).
+  # A thread, a message or a file is then looked up among `container_threads`
+  # only.
+  #
+  # The notes frame has two views under one id, `turbo-frame#notes`: the list
+  # (`render_list`) and one thread (`render_thread`), which replaces it.
+  module NoteContainer
+    extend ActiveSupport::Concern
+
+    included do
+      before_action :set_container
+      before_action :note_tab
+      # The three notes views ask which surface they are drawn for.
+      helper_method :note_view
+    end
+
+    private
+
+    def set_container
+      @container =
+        case params[:container_type]
+        when "page" then admin_scope(Page.all).find(params[:container_id])
+        when "post" then admin_scope(Post.all).find(params[:container_id])
+        else
+          return forbidden! unless can?("media.upload")
+
+          Media::Asset.kept.find(params[:container_id])
+        end
+    end
+
+    # Which tab this is (`X-Notes-Tab`, set by `admin--notes-live` on its
+    # notes requests): an id the tab made up, checked for shape
+    # (`Notes::Signals::TAB`) and used for nothing but being echoed in the
+    # record's signal, so the tab can tell its own change from someone
+    # else's. Anything else is dropped, not refused: the write is the
+    # person's either way.
+    def note_tab = Current.notes_tab = request.headers["X-Notes-Tab"].to_s[Notes::Signals::TAB]
+
+    def container_threads = Notes::Thread.where(container: @container)
+
+    # Which surface the frame is drawn on; it travels in every notes URL so
+    # an answer is drawn for the same surface, and a new thread records it.
+    def note_view = Notes::Thread::ORIGIN_VIEWS.include?(params[:view].to_s) ? params[:view].to_s : "editor"
+
+    def note_frame_params(**extra) = { view: (note_view unless note_view == "editor"), **admin_url_options, **extra }.compact
+
+    def notes_path(**extra) = admin_record_notes_path(params[:container_type], @container.id, **note_frame_params(**extra))
+
+    def thread_path(thread, **extra) = admin_record_note_thread_path(params[:container_type], @container.id, thread, **note_frame_params(**extra))
+
+    # The list: what `index` answers, and what a refused or failed new note
+    # answers with its own status, the typed text kept (`failed`).
+    def render_list(status: :ok, failed: nil, notice: nil)
+      @listing = Notes::Listing.new(@container, limit: params[:limit], viewer: Current.user, locale: admin_locale)
+      @failed = failed
+      @notice = notice
+      render "admin/notes/index", status: status, layout: turbo_frame_request? ? false : "admin"
+    end
+
+    # One thread, in the list's place: what `show` answers, and what a
+    # refused or failed write on that thread answers. `asked` names the one
+    # message whose edit form or delete question the view draws
+    # (`Admin::NoteThreadsController#asked`).
+    def render_thread(thread, status: :ok, failed: nil, asked: {})
+      @listing = Notes::Listing.new(@container, viewer: Current.user, locale: admin_locale)
+      @thread = @listing.find(thread.id) or raise ActiveRecord::RecordNotFound
+      @failed = failed
+      @asked = asked
+      render "admin/notes/thread", status: status, layout: turbo_frame_request? ? false : "admin"
+    end
+
+    # --- writing (the forms of the frame) ------------------------------------
+
+    # How many names of the picker's map are read. A message may mention 20
+    # people (`Notes::Mentions::MAX`); the map can hold a few more, for names
+    # picked and then deleted from the text again.
+    MAX_MENTION_NAMES = 50
+
+    # The typed body with the names the picker inserted turned into tokens
+    # (`Notes::Mentions.tokenize`). `mention_names` comes from the browser and
+    # is used for nothing else: whom a note may mention is the service's check
+    # on the ids that result.
+    def note_body = Notes::Mentions.tokenize(params[:body].to_s, mention_names)
+
+    # `{ "Dana Smith" => 7 }`, from the form's JSON. Anything that is not a
+    # name with an id is left out, so what a failed form is drawn with again
+    # is that shape and nothing else.
+    def mention_names
+      names = JSON.parse(params[:mention_names].to_s)
+      return {} unless names.is_a?(Hash)
+
+      names.first(MAX_MENTION_NAMES).select { |name, id| name.present? && id.to_s.match?(/\A\d{1,18}\z/) }.to_h
+    rescue JSON::ParserError
+      {}
+    end
+
+    # The files sent with a note (notes spec §3.6): the parts of the form's
+    # one file field, as one multipart post. Only what Rails itself made of
+    # an uploaded part is a file -- a string or a hash a request puts under
+    # the same name is not, and is dropped. What each file IS, and whether
+    # it may be attached, is the service's question (`Notes::Files`).
+    def note_files = Array(params[:files]).grep(ActionDispatch::Http::UploadedFile)
+
+    def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
+
+    # What a failed form gets back: its own key, what was typed, and why.
+    # Nothing here reads `result.record`: a notes service's failure has none
+    # ("This note is gone" for a record trashed or a thread removed a moment
+    # ago is a failure like any other). `files_lost`: the names of the files
+    # the form was sent with. The form drawn again cannot hold them -- a
+    # browser never gives a file field its files back -- so it names them and
+    # says to choose them again, whatever the note was refused for (the
+    # handoff's decision 33). They go into the page the person who chose
+    # them is looking at, and nowhere else.
+    def failed_form(key, result, **extra) = kept_form(key, result.errors, **extra)
+
+    def kept_form(key, errors, **extra)
+      { key: key, body: params[:body].to_s, names: mention_names, errors: errors, files_lost: note_files.map { |file| Notes::Files.stored_name(file.original_filename).truncate(Notes::Files::NAME_SHOWN) }, **extra }
+    end
+
+    # The thread (or what it was on) is no longer there: back to the list,
+    # which says so. Never a 404 inside the drawer.
+    def gone! = redirect_to(notes_path(notice: "gone"), status: :see_other)
+
+    # The thread a REPLY was sent to is no longer there, and the reply held
+    # text or files. `gone!`'s 303 lost them: the list was drawn over the
+    # field, and the composer took the redirect for a note that went through
+    # and forgot its draft. (The live refresh keeps typed text when a thread
+    # goes, but a reply can be sent before that signal has been acted on, or
+    # with the cable down.) So this answer is the list itself, with the
+    # sentence, and what was typed in the field for a NEW note on the record
+    # -- the one form the list has -- where the person can send it as one or
+    # copy it; the files are named to be chosen again, as after any refusal.
+    # Not a redirect, because a note's text never travels in a URL; and 422,
+    # so the composer keeps its draft and Turbo draws the answer. The field
+    # carries no error of its own: the sentence above it is the reason.
+    def reply_gone!
+      return gone! if params[:body].blank? && note_files.empty?
+
+      render_list(status: :unprocessable_entity, notice: "gone", failed: kept_form("new", [], subject: "", quote: ""))
+    end
+
+    # A refused or failed write on a thread (Review Focus 3). The thread is
+    # looked up again first: when the failure is that it went a moment ago
+    # (its block deleted, its last message deleted in another tab), there is
+    # no thread view left to draw the sentence in, and the list says it
+    # (`gone`: a reply's text is kept there, `reply_gone!`).
+    # Otherwise the thread again, with the reason in the form `key` names.
+    def answer_thread_failure(thread, result, key:, gone: :gone!, **extra)
+      return send(gone) unless container_threads.exists?(id: thread.id)
+
+      render_thread(thread, status: failure_status(result), failed: failed_form(key, result, **extra))
+    end
+  end
+end

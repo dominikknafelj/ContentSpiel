@@ -75,6 +75,20 @@ module Audit
       "ai.translated" => [ "asked the AI for translation suggestions for ", "" ]
     }.freeze
 
+    # A note's events (notes spec §3.5). Their subject is the CONTENT record
+    # the note is on -- a page, a post, an image, or a block, whose sentence
+    # names its page (`Targets#owner_target`) -- so they show in that record's
+    # Activity and are read-scoped like it. They carry no text, only ids.
+    # `Dashboard::Feed::NOT_A_CHANGE` reads these keys: a note is not a change
+    # to the record.
+    NOTE_VERBS = {
+      "note.started" => [ "started a note on ", "" ], "note.replied" => [ "replied to a note on ", "" ],
+      "note.edited" => [ "edited a note on ", "" ], "note.deleted" => [ "deleted a note on ", "" ],
+      "note.resolved" => [ "resolved a note on ", "" ], "note.reopened" => [ "reopened a note on ", "" ],
+      "note.pinned" => [ "pinned a note on ", "" ], "note.unpinned" => [ "unpinned a note on ", "" ],
+      "notes.removed" => [ "removed the notes on ", "" ]
+    }.freeze
+
     # Sentences with no subject or their own shape (`#special`).
     SPECIAL_ACTIONS = %w[
       starter_content.added trash.emptied user.owner_changed
@@ -84,7 +98,7 @@ module Audit
 
     ACTIONS = (
       CONTENT_ACTIONS.flat_map { |prefix, verbs| verbs.map { |verb| "#{prefix}.#{verb}" } } +
-      BLOCK_ACTIONS + OTHER_VERBS.keys + SPECIAL_ACTIONS
+      BLOCK_ACTIONS + OTHER_VERBS.keys + NOTE_VERBS.keys + SPECIAL_ACTIONS
     ).uniq.freeze
 
     SECURITY_ACTIONS = %w[session.failed access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted].freeze
@@ -175,6 +189,7 @@ module Audit
         # one) is the generic sentence, never a lookup that can raise.
         if BLOCK_ACTIONS.include?(@action) then block_parts(verb)
         elsif SPECIAL_ACTIONS.include?(@action) then special_parts
+        elsif NOTE_VERBS.key?(@action) then subject_parts(*NOTE_VERBS[@action])
         elsif OTHER_VERBS.key?(@action) then subject_parts(*OTHER_VERBS[@action])
         elsif CONTENT_ACTIONS[prefix]&.include?(verb) || derived_schedule?(prefix, verb) then content_parts(verb)
         else generic_parts

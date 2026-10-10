@@ -18,6 +18,18 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
   # Task 19's visual difference 9: the chip input's frame is a div, so the
   # sunken look of a disabled field missed it and it kept a white frame around
   # a sunken inner field.
+  # The notes handoff's decision 6: a view-only block has the "⋯" menu with
+  # "Add note" as its only item -- a note is not a change to the page -- and
+  # nothing of an editor's menu.
+  def assert_menus_hold_only_add_note(scope, count:)
+    within(scope) do
+      assert_selector "button[aria-label='Block actions']", count: count
+      # The menu a "Block actions" button opens: the one beside it (a section's layout menu is another).
+      assert_equal [ "Add note" ] * count, all("button[aria-label='Block actions'] + [role=menu] :is(button, a)", visible: :all).map { |item| item.text(:all).strip }
+      assert_no_selector "[data-move], form[action$='/duplicate']", visible: :all
+    end
+  end
+
   test "the tag chip input's frame is as sunken as the other disabled fields" do
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers
@@ -81,7 +93,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog[open]"
   end
 
-  test "a read-only user's page editor says why, shows no tools, and cannot type" do
+  test "a read-only user's page editor says why, shows no tools but Add note, and cannot type" do
     page_record = create_page(title: "Look only")
     page_record.content_blocks.create!(block_type: :rich_text, position: 0)
     visit "/cs-studio/pages/#{page_record.id}"
@@ -91,7 +103,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_selector "#editor-notice"
     assert_no_selector "[role=toolbar]"
     assert_no_selector ".admin-block-card__handle"
-    assert_no_selector "button[aria-label='Block actions'], summary[aria-label='Block actions']"
+    assert_menus_hold_only_add_note(".admin-content-blocks", count: 1)
     assert_no_text "Add block"
     assert_no_selector "[data-controller~='admin--autosave']"
     assert_selector ".admin-view-only"
@@ -112,7 +124,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_no_selector ".admin-block-tile__grip"
     assert_no_selector "[id^='block-picker-#{section.id}-']"
     assert_no_selector ".admin-section-card button[aria-label='Section actions']"
-    assert_no_selector ".admin-section-card button[aria-label='Block actions']"
+    assert_menus_hold_only_add_note(".admin-section-card", count: 1)
     assert_no_selector ".admin-section-card dialog", visible: :all
     find("##{ActionView::RecordIdentifier.dom_id(block)} .admin-block-tile__face").click
     assert_selector "#block-#{block.id}-panel fieldset[disabled]"
@@ -132,7 +144,8 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
       assert_selector ".admin-section-group .admin-translation-pair", text: "Original caption"
       assert find_field("block-#{block.id}-caption", disabled: true).disabled?
       assert_no_selector "[data-controller~='admin--autosave']", visible: :all
-      assert_no_selector ".admin-section-group button[aria-label='Block actions'], .admin-block-card__handle", visible: :all
+      assert_no_selector ".admin-block-card__handle", visible: :all
+      assert_menus_hold_only_add_note(".admin-section-group", count: 1)
       assert_no_selector ".admin-section-group dialog", visible: :all
     end
   end

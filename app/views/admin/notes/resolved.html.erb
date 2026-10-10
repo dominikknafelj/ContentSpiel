@@ -1,0 +1,10 @@
+<%# The resolved threads' rows, loaded when "Resolved" is opened (notes spec
+    §4.2). A row leads to its thread in the notes frame, not in this one. %>
+<turbo-frame id="notes-resolved">
+  <div class="flex flex-col border-t border-line">
+    <% @listing.resolved.each do |thread| %>
+      <%= render Admin::NotesScreen::ThreadRowComponent.new(thread: thread, listing: @listing, viewer: Current.user,
+            type: params[:container_type], view: note_view, show_subject: true) %>
+    <% end %>
+  </div>
+</turbo-frame>

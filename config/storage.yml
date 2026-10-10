@@ -6,6 +6,16 @@ local:
   service: Disk
   root: <%= Rails.root.join("storage") %>
 
+# The files of notes (notes spec D15, `Notes::Files::SERVICE`): a service of
+# their own in every environment, so that a blob says by its `service_name`
+# that it is a note's and Active Storage's public read routes can refuse it
+# (`config/initializers/active_storage_access.rb`). It is read only through
+# `Admin::NoteFilesController`. Under `storage/` like the rest, so the one
+# volume of `config/deploy.yml` keeps it.
+notes:
+  service: Disk
+  root: <%= Rails.root.join(Rails.env.test? ? "tmp/storage/notes" : "storage/notes") %>
+
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:
 #   service: S3

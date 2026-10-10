@@ -3,7 +3,7 @@ require "application_system_test_case"
 class PasswordFieldTest < ApplicationSystemTestCase
   test "the change-password form shows the meter, toggles visibility and blocks a short password" do
     sign_in_via_form users(:one)
-    visit admin_account_password_path
+    visit admin_account_path
     assert_text "Use at least 12 characters."
     fill_in "New password", with: "short"
     assert_text "Too short. Use 12 or more characters."

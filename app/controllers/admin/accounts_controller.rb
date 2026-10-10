@@ -1,4 +1,6 @@
 module Admin
+  # "Your account", the screen (the notes handoff's decision 25): the
+  # person's name and notes settings, and, as its third card,
   # "Change my password" (access-control design spec §3.3 "Any user may
   # change their own password", §5): open to every signed-in user, from the
   # account menu -- the Users module, where an admin changes *other*
@@ -17,10 +19,20 @@ module Admin
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
     rate_limit to: 10, within: 3.minutes, only: :update, with: -> {
-      redirect_to admin_account_password_path(**admin_url_options), status: :see_other, alert: "Try again later."
+      # The form's answer, said in its card like any other refusal of it.
+      flash[:password_answer] = "limited"
+      redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other
     }
 
     def edit
+    end
+
+    # The page's first address, `account/password` (the handoff's decision
+    # 38): moved for good to `account`, in the language it was asked in.
+    # Behind the sign-in like the page itself, so the old address tells
+    # someone signed out nothing new.
+    def moved
+      redirect_to admin_account_path(**admin_url_options), status: :moved_permanently
     end
 
     def update
@@ -29,31 +41,58 @@ module Admin
         password: params[:password], password_confirmation: params[:password_confirmation])
 
       if result.ok?
-        redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Password changed. Your other sessions were signed out."
+        # Back to the card the form is in (`#password`), and said IN it (the
+        # notes handoff's decisions 42 and 43): no toast, which would stand
+        # at the bottom of the screen, far from the card, and go away under
+        # the focus. The fragment in `Location` is for a client that follows
+        # it itself; Turbo drops it, so the page is told whose answer it is
+        # (`flash[:password_answer]`, a mark and no message) and draws the
+        # card's alert, which `admin--password-answer` brings into view.
+        flash[:password_answer] = "saved"
+        redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other
       else
         @errors = result.errors
         # By field too, so the current-password message can sit under its own
         # input as well as in the summary. A denied result carries no record
         # errors, only its sentence.
         @field_errors = result.record.errors.to_hash(true)
+        @password_answer = "refused"
         render :edit, status: :unprocessable_entity
       end
     end
 
-    # "Your name" (design pass spec §5.1): the one profile field. Not
-    # `Users::Save` -- that needs `users.manage`; `Users::UpdateProfile` is
-    # open to every user for their own account only.
+    # "Your name" (design pass spec §5.1) and the two Notes switches (notes
+    # spec §6.4, D18, D19): one form, one footer, one save (notes handoff,
+    # decision 13). Not `Users::Save` -- that needs `users.manage`;
+    # `Users::UpdateProfile` is open to every user for their own account
+    # only, and it is always `Current.user`: the request names nobody. A
+    # switch the request does not send is left as it is (the form always
+    # sends both, a hidden "0" ahead of each box).
     #
     # A success answers Turbo with a STREAM, not a redirect: the screen has a
     # second form (the password), and re-rendering the screen -- or the whole
     # shell, as the `_top` redirect did -- threw away whatever was typed into
     # it, after asking "Leave without saving?" about a save that had already
     # happened. The stream replaces the one thing a new name changes outside
-    # the field itself, the sidebar's account block, and says "Name saved.";
+    # the field itself, the sidebar's account block, and says "Settings saved";
     # the footer takes what it sent as its new baseline
     # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect.
+    #
+    # The stream carries a second thing a save changes outside the form: the
+    # two notes settings as the scripts hold them (`admin--notes-alert`, on
+    # <body>). <body> is not drawn again by this answer, nor by any move
+    # between screens inside `#content`, so its values stayed what they were
+    # when the tab was loaded: a desktop notification switched on here was
+    # not raised, in this tab or any other, until each was reloaded. The
+    # element the stream replaces hands the stored values to the controller,
+    # which tells the person's other tabs in this browser.
+    #
+    # A refusal draws the screen again with what was sent in the form
+    # (`@profile_values`) and the account as it is STORED everywhere else:
+    # the service leaves the refused values on the record, and the sidebar's
+    # name and <body>'s settings must not show what was never saved.
     def update_profile
-      result = Users::UpdateProfile.call(Current.user, name: params[:name])
+      result = Users::UpdateProfile.call(Current.user, name: params[:name], notes_sound: switch(:notes_sound), notes_desktop: switch(:notes_desktop))
       if result.ok?
         # Decided by "does the client take a stream", not `respond_to`: the
         # name is saved by now, and a client that accepts neither format must
@@ -61,16 +100,24 @@ module Admin
         # the redirect.
         if request.accepts.any? { |type| type.symbol == :turbo_stream }
           render turbo_stream: [
-            turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user)),
-            toast_stream("Name saved.")
+            turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user, url_options: admin_url_options)),
+            turbo_stream.replace("notes-alert-settings", partial: "admin/shared/notes_alert_settings"),
+            toast_stream(t("admin.accounts.saved"))
           ]
         else
-          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved."
+          redirect_to admin_account_path(**admin_url_options), status: :see_other, notice: t("admin.accounts.saved")
         end
       else
         @profile_errors = result.errors
+        @profile_values = Current.user.slice(:name, :notes_sound, :notes_desktop).symbolize_keys
+        Current.user.restore_attributes
         render :edit, status: :unprocessable_entity
       end
     end
+
+    private
+
+    # A switch as the form sends it: "1" on, anything else off, absent nil.
+    def switch(name) = params.key?(name) ? params[name] == "1" : nil
   end
 end

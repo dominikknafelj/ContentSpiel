@@ -143,6 +143,16 @@ class ContentBlocks::DuplicateTest < ActiveSupport::TestCase
     end
   end
 
+  test "a duplicate copies no notes" do
+    page = create_page(title: "Noted", published: false)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).record
+    as(users(:two)) { Notes::Start.call(block, body: "A note") }
+
+    assert ContentBlocks::Duplicate.call(block).ok?
+
+    assert_equal [ block.id ], Notes::Thread.pluck(:subject_id)
+  end
+
   private
 
   # May edit this draft page, may not choose images.

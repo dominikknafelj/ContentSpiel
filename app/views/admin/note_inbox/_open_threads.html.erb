@@ -1,0 +1,20 @@
+<%# "Open threads" (notes spec §5): the records the viewer may read that have
+    open threads, in a frame of its own that `GET notes/open_threads` answers
+    again by itself. Local: `open_threads`, a `Dashboard::OpenThreads`.
+
+    Nothing here is accent: these counts are everybody's open threads, not
+    what is unread for the viewer. No "→": there is no fuller list. %>
+<%= tag.turbo_frame id: "notes-open-threads", class: "contents" do %>
+  <%= render Admin::DashboardScreen::CardComponent.new(title: t("admin.note_inbox.open_threads.title"), id: "dashboard-open-threads",
+        empty: t("admin.note_inbox.open_threads.empty")) do |card| %>
+    <% if open_threads.rows.any? %>
+      <% card.with_badge do %>
+        <%= tag.span open_threads.total, class: "font-cs-mono text-label text-meta", role: "img",
+              aria: { label: t("admin.note_inbox.open_threads.total", count: open_threads.total) }, data: { notes_total: true } %>
+      <% end %>
+    <% end %>
+    <% open_threads.rows.each do |row| %>
+      <% card.with_row { render Admin::NotesScreen::OpenThreadRowComponent.new(row: row) } %>
+    <% end %>
+  <% end %>
+<% end %>

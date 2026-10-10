@@ -1,0 +1,18 @@
+<%# The notes drawer as this browser left it (`admin--notes` remembers "open"
+    in `localStorage`), said on <html> before anything is painted: from 1024px
+    an open drawer is a column of the editor, and the stylesheet lays the page
+    out with it from the first paint (`data-notes-open` in
+    content-spiel.tailwind.css) instead of narrowing the editor when the
+    script connects. A link with `?notes=open` asks for the same. It lays out
+    nothing on a screen without a drawer, and `admin--notes` corrects it the
+    moment the drawer connects. Guarded like the theme's
+    (`shared/_theme_head`): `localStorage` can throw. A partial of its own,
+    as that one is: script, with nothing in it a person reads. %>
+<%= javascript_tag nonce: true do %>
+  (function () {
+    var open = false;
+    try { open = localStorage.getItem("cs-notes-open") === "1"; } catch (e) {}
+    if (/[?&]notes=open(&|$)/.test(window.location.search)) open = true;
+    if (open) document.documentElement.setAttribute("data-notes-open", "");
+  })();
+<% end %>

@@ -83,7 +83,7 @@ module Admin
     # always UTC until now.
     around_action :use_site_time_zone
 
-    helper_method :admin_locale, :admin_url_options, :root_page, :pages_landing_path, :admin_modules, :trash_badge_count
+    helper_method :admin_locale, :admin_url_options, :root_page, :pages_landing_path, :admin_modules, :trash_badge_count, :notes_badge_count
 
     # A record outside the viewer's scope and a record that doesn't exist
     # answer identically (access-control design spec §3.3) -- now inside the
@@ -138,6 +138,17 @@ module Admin
 
       # (`Admin::TrashController#index` presets it from its tabs' counts.)
       @trash_badge_count ||= Admin::TrashController.badge_count(Current.actor)
+    end
+
+    # The Dashboard entry's count in the sidebar: the viewer's unread notes
+    # (notes spec §5), on records they may read now. The sidebar is on every
+    # CS Studio page, so this is paid on every page load: exactly one COUNT on
+    # `note_deliveries`, narrowed by the read scope as a subquery and served
+    # by the `(user_id, read_at)` index; none for an answer that renders no
+    # layout. Memoized, so a view that asks too (the dashboard's card, the
+    # inbox's "Mark all read") costs nothing more.
+    def notes_badge_count
+      @notes_badge_count ||= Current.user ? Dashboard::NotesForYou.new(actor: Current.actor).unread_count : 0
     end
 
     def holds_any?(keys) = Array(keys).any? { |key| can?(key) }

@@ -1,0 +1,143 @@
+<%= tag.div id: dom_id, tabindex: -1, class: "flex min-h-full flex-col focus:outline-none",
+      data: { notes_view: "thread", note_thread: thread.id, state: thread.state, notes_container: ::Notes.key(listing.container),
+              notes_subject: ::Notes.key(thread.subject_type, thread.subject_id) } do %>
+  <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
+  <div id="<%= dom_id %>-messages" data-note-part="messages" class="flex flex-1 flex-col">
+    <%# Rows 1 and 2 (the handoff's decisions 3, 11 and 17). Row 1: back to the
+        list with the number of open threads, then "Notify me" / "Stop
+        notifying me", then the way out of the notes: Close in the drawer
+        (from 1024px), "Back to page" in the sheet (below it; decision 21).
+        Row 2: what the thread is on, with
+        Pin on the right for someone who may pin. One grid of two rows, so
+        that the two settings of the thread -- one at the end of each row --
+        can stay the children of ONE element, `[data-note-actions]`
+        (`display: contents`: its children are the grid's items). They come
+        second in the document, so the Tab order is Back, Notify, Pin. All of
+        it is inside the part a refresh replaces: the buttons show a state
+        someone else can change.
+        THE ROWS STAY, THE MESSAGES SCROLL (the handoff's decision 35). In the
+        drawer and in the sheet the two rows (`[data-note-rows]`) are fixed
+        at the top and what follows them (`[data-note-scroll]`: the state,
+        the quote, the messages) is a scroller of its own, between the rows
+        and the composer; so "All notes" and Close are one press away
+        wherever the reader is. That is the stylesheet's, by where the frame
+        stands (`.admin-notes-drawer`, content-spiel.tailwind.css): in the
+        media panel and on a record's notes page the thread is in the flow
+        of whatever scrolls there. `admin--notes-live` asks which of the two
+        it is (`scroller`). %>
+    <div class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto]" data-note-rows>
+      <div class="col-start-1 row-start-1 flex items-center border-b border-line py-2.5 pl-3">
+        <%= link_to back_path, class: "inline-flex items-center gap-1.5 rounded-cs px-2 py-1 text-[13px] font-medium text-ink no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent",
+              data: { note_back: true, turbo_frame: "notes", turbo_prefetch: false } do %>
+          <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %>
+          <span><%= t(".back") %></span>
+          <% if listing.open_count.positive? %><span class="font-cs-mono text-[11px] text-meta"><%= listing.open_count %></span><% end %>
+        <% end %>
+      </div>
+      <div class="contents" data-note-actions>
+        <div class="col-start-2 row-start-1 flex items-center justify-end border-b border-line py-2.5 pl-2 pr-3">
+          <%= button_to t(following? ? ".unfollow" : ".follow"), change_path(following? ? "unfollow" : "follow"), class: FOLLOW_CLASS, form: frame_form %>
+          <%# Close, the end of row 1 (the handoff's decision 11): the drawer's own
+              header is hidden while a thread is open, so this is the drawer's
+              Close -- the same action, the focus given back the same way. Shown
+              only in the editors' drawer from 1024px (`.admin-note-close`). %>
+          <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { note_close: true, action: "admin--notes#close" },
+                class: "admin-note-close ml-2 size-7 shrink-0 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" do %>
+            <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+          <% end %>
+          <%# The sheet's way back to the editor (the handoff's decisions 17
+              and 21): below 1024px the sheet's header is hidden over a thread
+              too, so what its "Back to <title>" does is done from here, by a
+              text button that reads "Back to page" -- those words, no title
+              and no arrow, underlined like the Notify link beside it; the
+              same action, the focus and the editor's scroll given back the
+              same way. Shown only in the sheet (`.admin-note-leave`); not
+              drawn where the notes are no drawer at all (the media panel). %>
+          <% if leave? %>
+            <%= tag.button t(".leave"), type: "button", data: { note_leave: true, action: "admin--notes#close" }, class: "admin-note-leave ml-3 #{LEAVE_CLASS}" %>
+          <% end %>
+        </div>
+        <%# Always there, for the row's line; empty for someone who may not pin. %>
+        <div class="col-start-2 row-start-2 flex items-start justify-end border-b border-line py-2.5 pl-2 pr-3">
+          <% if pinnable? %>
+            <%= button_to change_path(thread.pinned ? "unpin" : "pin"), class: "#{PIN_CLASS} #{thread.pinned ? "bg-sunken text-ink" : "text-dim"}",
+                  title: t(thread.pinned ? ".unpin" : ".pin"), aria: { label: t(thread.pinned ? ".unpin" : ".pin") }, form: frame_form do %>
+              <%= helpers.render "admin/shared/icon", name: :pin, size: "size-4" %>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+      <div class="col-start-1 row-start-2 flex min-w-0 flex-col gap-0.5 border-b border-line py-2.5 pl-4">
+        <%= render subject_heading %>
+        <p class="text-[13px] text-dim"><%= summary %></p>
+      </div>
+    </div>
+    <%# A refusal of Pin or Notify (the handoff's decision 40): under the two
+        rows their buttons are in and, like them, not scrolled away; in the
+        warn alert (the classes of every warn alert in CS Studio: the delete
+        dialog's notes warning, the blocked permission line) at 13px, 8px in
+        from the drawer's edges, so it does not read as part of the thread;
+        with a control to close it. The person's next action in the thread
+        redraws this part and so clears it. When it says the note is gone,
+        `admin--note-refusal` takes the frame back to the list after four
+        seconds. A refused reply, Resolve or Reopen is said in the composer. %>
+    <% if button_failure %>
+      <%= tag.div role: "alert", class: "mx-2 my-2 flex shrink-0 items-start gap-2 #{REFUSAL_CLASS}",
+            data: { note_refusal: true, controller: "admin--note-refusal", "admin--note-refusal-gone-value": gone_refusal?, "admin--note-refusal-back-value": back_path } do %>
+        <ul class="min-w-0 flex-1"><% button_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
+        <%= tag.button type: "button", title: t(".dismiss"), aria: { label: t(".dismiss") }, data: { action: "admin--note-refusal#close" },
+              class: "-my-0.5 -mr-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-cs hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent" do %>
+          <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+        <% end %>
+      <% end %>
+    <% end %>
+    <%# The rows' own line is the first message's too: a message that comes
+        first draws none above itself. %>
+    <div class="flex flex-col [&>[data-note-message]:first-child]:border-t-0" data-note-scroll>
+    <%# What the thread's state is, in words; no line at all for a thread that
+        is neither pinned nor resolved. %>
+    <% if thread.pinned || thread.resolved? %>
+      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
+        <% if thread.pinned %><span data-note-badge="pinned"><%= t(".pinned") %></span><% end %>
+        <% if thread.resolved? %>
+          <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::NotesScreen::PersonNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>
+        <% end %>
+      </p>
+    <% end %>
+    <% if thread.quote.present? %>
+      <div class="px-4 py-3.5"><%= render Admin::NotesScreen::QuoteComponent.new(quote: thread.quote) %></div>
+    <% end %>
+    <% leading.each do |record| %><%= render message(record) %><% end %>
+    <% if folded.any? %>
+      <%= tag.details class: "border-t border-line", open: fold_open?, data: { note_fold: true } do %>
+        <summary class="cursor-pointer px-4 py-2.5 text-[13px] text-dim hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"><%= t(".show_more", count: folded.size) %></summary>
+        <% folded.each do |record| %><%= render message(record) %><% end %>
+      <% end %>
+    <% end %>
+    <% trailing.each do |record| %><%= render message(record) %><% end %>
+    </div>
+  </div>
+
+  <%# The reply, fixed at the bottom of the drawer (spec §4.2), with Resolve --
+      Reopen on a resolved thread -- in the composer's own bottom row, 8px to
+      the left of Send (the handoff's decision 3: it ends a conversation, so it
+      sits where one finishes writing). Its form is a form of its own BESIDE
+      the reply's, never inside it (forms can't nest), and empty: the button
+      stands in the composer and names it (`form=`). %>
+  <div id="<%= dom_id %>-reply" data-note-part="reply" class="sticky bottom-0 flex flex-col gap-2 border-t border-line bg-surface px-4 pb-4 pt-3">
+    <%= form_with url: change_path(thread.resolved? ? "reopen" : "resolve"), id: state_form_id, class: "hidden", data: { turbo_frame: "notes" } do %><% end %>
+    <%= render Admin::NotesScreen::ComposerComponent.new(url: reply_path, key: key, label: t(".reply"), submit: t(".send_reply"), mentions_url: mentions_path,
+          body: reply_failure&.dig(:body).to_s, names: reply_failure&.dig(:names) || {}, errors: reply_failure&.dig(:errors),
+          files_lost: reply_failure&.dig(:files_lost)) do |composer| %>
+      <% composer.with_secondary do %>
+        <%= tag.button type: "submit", form: state_form_id, class: action_class(:secondary), data: { note_state: thread.resolved? ? "reopen" : "resolve" } do %>
+          <% if thread.resolved? %>
+            <%= t(".reopen") %>
+          <% else %>
+            <%= helpers.render "admin/shared/icon", name: :check, size: "size-3" %><span><%= t(".resolve") %></span>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

@@ -1,0 +1,27 @@
+<%# The whole row is ONE link (handoff "Inbox row"): dot, avatar, three
+    lines, time, in a grid of `7px 24px 1fr auto`, `hover:bg-paper`. The
+    negative margins take it to the edges of the row that holds it -- the
+    dashboard card's and the full list's `<li>` alike (`px-4` on the list,
+    `py-2.5` on the item) -- so the hover fills the row, and `py-[11px]` is
+    the handoff's. Everything inside is a span: a link holds no block of its
+    own. No `turbo_prefetch: false` as on a thread's row: this link is the
+    EDITOR, whose GET reads nothing; the thread is fetched, and marked read,
+    only by the drawer once the page is open. The focus ring is the browser's
+    own, drawn inside the row (`-outline-offset-2`): nothing in a read row is
+    accent, which here means unread and for the viewer. %>
+<%= link_to path, class: "-mx-4 -my-2.5 grid min-w-0 flex-1 grid-cols-[7px_24px_1fr_auto] items-start gap-2.5 px-4 py-[11px] no-underline hover:bg-paper focus-visible:-outline-offset-2",
+      data: { delivery: row.id, unread: (true if row.unread), turbo_frame: "_top" } do %>
+  <span class="mt-[9px] size-[7px] rounded-full <%= "bg-accent" if row.unread %>" aria-hidden="true"></span>
+  <% if somebody? %>
+    <%= render Admin::NotesScreen::AvatarComponent.new(user: row.by, user_id: row.by_id, viewer: nil, size: :row) %>
+  <% else %>
+    <span class="flex size-6 items-center justify-center rounded-full border border-line-strong bg-sunken text-meta" aria-hidden="true"><%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %></span>
+  <% end %>
+  <span class="flex min-w-0 flex-col">
+    <span class="truncate text-[13px] <%= row.unread ? "text-ink" : "text-dim" %>" data-inbox-sentence><%= sentence %></span>
+    <% if row.unread %><span class="sr-only"><%= t(".unread") %></span><% end %>
+    <span class="truncate text-[13px] text-dim" data-inbox-excerpt><%= row.excerpt %></span>
+    <span class="truncate text-xs text-meta" data-inbox-where><%= where %></span>
+  </span>
+  <span class="mt-0.5 font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: row.at) %></span>
+<% end %>

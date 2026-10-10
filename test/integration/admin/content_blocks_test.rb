@@ -1396,4 +1396,17 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
     assert_includes response.body, "admin-block-tile"
   end
+
+  test "deleting a block answers with the page's fresh note counts" do
+    page = create_page(title: "Noted", published: false)
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    as(users(:two)) { [ page, block ].each { |subject| Notes::Start.call(subject, body: "A note") } }
+
+    delete "/cs-studio/pages/#{page.id}/content_blocks/#{block.id}", headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+    assert_response :ok
+    assert_select "turbo-stream[action=replace][target=notes-counts] template span#notes-counts" do |nodes|
+      assert_equal [ 1, { "Page-#{page.id}" => 1 } ], JSON.parse(nodes.first["data-counts"]).values_at("total", "subjects")
+    end
+  end
 end

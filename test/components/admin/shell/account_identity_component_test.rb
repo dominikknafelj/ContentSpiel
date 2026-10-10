@@ -19,4 +19,14 @@ class Admin::Shell::AccountIdentityComponentTest < ViewComponent::TestCase
     assert_selector "#account-identity span", text: user.email_address, count: 1
     assert_selector "#account-identity span", text: /\AOwner\z/
   end
+
+  # The handoff's decision 25: the block is a link to the account screen,
+  # with the address parameters of the page it is drawn on.
+  test "the block is a link to the account screen" do
+    render_inline(Admin::Shell::AccountIdentityComponent.new(user: users(:one)))
+    assert_selector "a#account-identity[href='/cs-studio/account']"
+
+    render_inline(Admin::Shell::AccountIdentityComponent.new(user: users(:one), url_options: { locale: "de" }))
+    assert_selector "a#account-identity[href='/cs-studio/account?locale=de']"
+  end
 end

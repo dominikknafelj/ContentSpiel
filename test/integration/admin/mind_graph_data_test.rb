@@ -32,6 +32,22 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     assert_nil data["focus"]
   end
 
+  # Notes spec §4.4: every post node says how many open notes its post has,
+  # and nothing about the viewer (the badge is neutral).
+  test "every node carries its post's open notes" do
+    a = create_post(title: "A")
+    b = create_post(title: "B")
+    PostRelation.create!(post: a, related_post: b)
+    as(users(:two)) { Notes::Start.call(a, body: "For @[#{users(:one).id}]") }
+    sign_in_as(users(:one))
+
+    get "/cs-studio/mind_graph/data"
+    assert_equal [ [ a.id, 1, false ], [ b.id, 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
+
+    get "/cs-studio/mind_graph/data", params: { post: b.id }
+    assert_equal [ [ a.id, 1, false ], [ b.id, 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
+  end
+
   test "post= and depth= answer that post's neighbourhood" do
     sign_in_as(users(:one))
     a = create_post(title: "A")

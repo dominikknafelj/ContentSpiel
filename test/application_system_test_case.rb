@@ -333,6 +333,19 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     record.update_columns(updated_at: record.updated_at - by)
   end
 
+  # Waits until the page's notes are live (notes spec §6): `admin--notes-live`
+  # is connected, the socket is up and EVERY subscription of the page -- the
+  # person's and one per record shown -- has been answered by the server. A
+  # signal the test causes after this is received; one caused a moment
+  # earlier, while a subscription was still on its way, would be lost with
+  # nothing to wait for. The cable needs no setting up for it: the suite's
+  # `test` adapter is the in-process `async` one with a record of what it
+  # sent, and the system test's server runs in this process.
+  def await_notes_live(wait: 8)
+    await_admin_controllers
+    await_js("document.body.dataset.notesLive === 'connected'", wait: wait)
+  end
+
   # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered
   # by the `admin` entry point (app/javascript/admin.js) through one dynamic
   # `import()` each, so they connect a moment *after* the page has loaded,

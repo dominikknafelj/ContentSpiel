@@ -1,0 +1,8 @@
+<%# One record's notes, the list view (notes spec §4.2). The frame is what the
+    editors' drawer and the media panel embed by its `src`; opened on its own
+    (no script) it is this same list inside the shell. %>
+<% content_for :title, t(".title") %>
+<turbo-frame id="notes">
+  <%= render Admin::NotesScreen::ListComponent.new(listing: @listing, viewer: Current.user, locale: admin_locale, view: note_view,
+        type: params[:container_type], compose: params[:compose], failed: @failed, notice: @notice) %>
+</turbo-frame>

@@ -23,7 +23,13 @@
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
-<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options) do |header| %>
+<%# The page's open notes (notes spec §4.3): two queries for the header's
+    number, every marker's and which of them hold something unread for the
+    viewer. Here in the view, because every way this screen is rendered needs
+    them. %>
+<% note_counts = Notes::Counts.for_container(@page, user: Current.user) %>
+
+<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4): only
         in a non-default language, for a viewer who may edit the page, with AI
@@ -94,3 +100,10 @@
     <%= render Admin::EditorScreen::MoveDialogComponent.new %>
   <% end %>
 </section>
+
+<%# The notes drawer (notes spec §4.1): once per screen, after everything
+    else and outside every form. `?notes=open` (a link from the inbox, the
+    posts list) opens it on load, at `?thread=` when there is one. %>
+<%= render Admin::NotesScreen::DrawerComponent.new(container: @page, counts: note_counts,
+      title: Locales.read(@page, :title, locale: admin_locale).presence || t("admin.components.notes_screen.drawer.untitled"),
+      open: params[:notes] == "open", thread: params[:thread], url_options: admin_url_options) %>

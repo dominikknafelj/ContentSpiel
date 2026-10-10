@@ -232,11 +232,19 @@ Rails.application.routes.draw do
     # `:show` -- the editor is the group's page.
     resources :groups, only: %i[index new create edit update destroy]
 
-    # "Change my password" (access-control design spec §5): the signed-in
-    # user's own account, open to every user -- unlike the Users module,
-    # which needs `users.manage`. Singular: it's always *your* account.
-    get "account/password", to: "accounts#edit", as: :account_password
-    patch "account/password", to: "accounts#update"
+    # "Your account" (access-control design spec §5; the notes handoff's
+    # decisions 25 and 38): the signed-in user's own account, open to every
+    # user -- unlike the Users module, which needs `users.manage`. Singular:
+    # it's always *your* account. The page is `account`. It began as "Change
+    # my password" at `account/password`, an address that named one of its
+    # three cards: a GET of that one now moves to the page for good (a 301,
+    # `accounts#moved`), and the Password card is `#password` there. The two
+    # forms post where they always did -- `account/password` (which keeps
+    # the name `admin_account_password_path`) and `account/profile` -- so a
+    # non-GET is never redirected.
+    get "account", to: "accounts#edit", as: :account
+    get "account/password", to: "accounts#moved", as: nil
+    patch "account/password", to: "accounts#update", as: :account_password
     patch "account/profile", to: "accounts#update_profile", as: :account_profile
 
     # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
@@ -274,11 +282,65 @@ Rails.application.routes.draw do
     # one POST, `StarterContents::Add`, idempotent.
     resources :starter_contents, only: :create
 
+    # A person's own inbox (notes spec §5): the full list, "Mark all read",
+    # and the three parts a page shows of it, each with its own GET so a tab
+    # can fetch that part again by itself (`turbo-frame#notes-for-you`,
+    # `turbo-frame#notes-open-threads`, the sidebar's `#sidebar-badge-dashboard`).
+    # None of these words can be taken for a record's notes below: that scope
+    # needs `page`, `post` or `media` and an id.
+    get "notes", to: "note_inbox#index", as: :notes
+    post "notes/read", to: "note_inbox#read", as: :read_notes
+    get "notes/card", to: "note_inbox#card", as: :notes_card
+    get "notes/open_threads", to: "note_inbox#open_threads", as: :open_note_threads
+    get "notes/unread", to: "note_inbox#unread", as: :unread_notes, defaults: { format: :json }
+    # One delivery of the viewer's own, as data (notes spec §6.1, §6.4): what
+    # a tab asks for when a signal names its id, before it says anything.
+    get "notes/deliveries/:id", to: "note_inbox#delivery", as: :note_delivery, constraints: { id: /\d+/ }, defaults: { format: :json }
+
     # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):
     # quick create, "Your drafts", "Going live next", "Needs translation"
     # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at
     # its own `/pages` (`resources :pages` above), no longer at the root.
     root to: "dashboard#show"
+    # Notes on content (notes spec §3.4, §4). Everything about one record's
+    # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
+    # `/notes/media/5` -- so a controller finds the container through the read
+    # scope first and a thread only among that container's: a thread is never
+    # found by its id alone. Each part of the notes UI has its own GET here
+    # (the list, one thread, the resolved ones, the counts), which is what a
+    # live signal asks the browser to fetch again.
+    scope "notes/:container_type/:container_id", constraints: { container_type: /page|post|media/, container_id: /\d+/ } do
+      get "", to: "notes#index", as: :record_notes
+      get "resolved", to: "notes#resolved", as: :resolved_record_notes
+      get "counts", to: "notes#counts", as: :record_note_counts, defaults: { format: :json }
+      get "threads/:id", to: "note_threads#show", as: :record_note_thread, constraints: { id: /\d+/ }
+      # The writes (notes spec §3.5), each an ordinary Turbo form inside
+      # `turbo-frame#notes`. A thread's six changes share one action: the
+      # segment is the whole request, so nothing about it is read from a
+      # parameter (`Admin::NoteThreadsController::CHANGES`).
+      get "mentions", to: "note_mentions#index", as: :record_note_mentions, defaults: { format: :json }
+      # The record's open threads as data, for the mind graph's card (notes
+      # spec §4.4). It shares its path with the POST below, which the card
+      # sends too, and has a name of its own because two routes can't share
+      # one: `admin_record_note_threads_data_path`.
+      get "threads", to: "note_threads#index", as: :record_note_threads_data, defaults: { format: :json }
+      post "threads", to: "note_threads#create", as: :record_note_threads
+      post "threads/:id/:change", to: "note_threads#change", as: :change_record_note_thread,
+        constraints: { id: /\d+/, change: /resolve|reopen|pin|unpin|follow|unfollow/ }
+      post "threads/:thread_id/messages", to: "note_messages#create", as: :record_note_messages, constraints: { thread_id: /\d+/ }
+      patch "threads/:thread_id/messages/:id", to: "note_messages#update", as: :record_note_message, constraints: { thread_id: /\d+/, id: /\d+/ }
+      delete "threads/:thread_id/messages/:id", to: "note_messages#destroy", constraints: { thread_id: /\d+/, id: /\d+/ }
+      # A reaction on one message: a toggle of the viewer's own (notes spec D10).
+      post "threads/:thread_id/messages/:id/reactions", to: "note_reactions#create", as: :record_note_message_reactions,
+        constraints: { thread_id: /\d+/, id: /\d+/ }
+      # A file of one message (notes spec D15, §3.6): the ONLY address a
+      # note's file has. Its id is an attachment's, looked up among that
+      # message's, of that thread, of this record -- never a blob's key or a
+      # signed id, and no Active Storage URL of one is ever rendered.
+      get "threads/:thread_id/messages/:message_id/files/:id", to: "note_files#show", as: :record_note_file,
+        constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
+    end
+
     # Quick draft (dashboard spec §4.1): a title and a content type, saved
     # through `Posts::Save` as an unpublished post, then opened in the
     # post editor.

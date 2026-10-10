@@ -461,6 +461,15 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ [ "page", @kept_page.id ], [ "post", @kept_post.id ] ].sort, response.parsed_body.map { |r| [ r["type"], r["id"] ] }.sort
 
     PostRelation.create!(post: @kept_post, related_post: @gone_post)
+    # The trashed post has an open note that mentions the viewer (notes spec
+    # §4.4): the graph counts it nowhere, and the
+    # card's own JSON does not find the post. `Notes::Start` refuses a record
+    # that is already in the trash (decision P6), so the note is written
+    # first and the post trashed again after it.
+    @gone_post.update!(trashed_at: nil)
+    as(users(:one)) { assert Notes::Start.call(@gone_post, body: "A note").ok? }
+    as(users(:two)) { assert Notes::Start.call(@gone_post, body: "For @[#{users(:one).id}]").ok? }
+    @gone_post.update!(trashed_at: Time.current)
     # The page holds no graph data (it is a frame); a trashed post is no focus
     # for it either. The global graph leaves out a post with no connection, and
     # a relation to a trashed post is none -- so the kept post is seen through
@@ -476,11 +485,24 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph/data"
     assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, @gone_post.id
+    assert(response.parsed_body["nodes"].none? { |node| node["id"] == @gone_post.id })
     assert_empty response.parsed_body["edges"]
     get "/cs-studio/mind_graph/data", params: { post: @gone_post.id }
     assert_response :not_found
+    get "/cs-studio/notes/post/#{@gone_post.id}/threads"
+    assert_response :not_found
+    assert_not_includes response.body, "A note"
     get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
     assert_equal [ @kept_post.id ], response.parsed_body["nodes"].map { |n| n["id"] }
+    # The kept post has no thread; the trashed one's are counted nowhere.
+    assert_equal [ 0 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }
+    # And a kept post's own note is counted, so the zero above is not the
+    # graph counting nothing at all.
+    as(users(:two)) { assert Notes::Start.call(@kept_post, body: "For @[#{users(:one).id}]").ok? }
+    get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
+    assert_equal [ 1 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }
+    get "/cs-studio/notes/post/#{@kept_post.id}/threads"
+    assert_equal [ 1, 1 ], [ response.parsed_body["open"], response.parsed_body["threads"].size ]
     get "/cs-studio/mind_graph/search", params: { q: "gone" }
     assert_empty response.parsed_body
   end
@@ -766,6 +788,120 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section .content-section__column:nth-child(2) img", 1
   end
 
+  # Notes follow their record into the trash (notes spec D12, §4.4): hidden
+  # with it, counted nowhere. The records are trashed AFTER their notes were
+  # written, as in life: `Notes::Start` refuses a record that is already in
+  # the trash (decision P6), so a note "on" the setup's trashed records would
+  # never exist and this test would pass with nothing hidden.
+  #
+  # `Notes::Counts.by_container` and `unread_among` hide nothing themselves:
+  # each list hands them the ids it is about to draw, which went through the
+  # read scope. The viewer is mentioned in every note, so a count that leaked
+  # would leak in accent too.
+  test "note counts in the posts list, the page tree and the media grid are for kept records only, and so are the media panel's notes" do
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: nil) }
+    as(users(:two)) do
+      [ @kept_post, @gone_post, @kept_page, @gone_page, @kept_asset, @gone_asset ].each do |subject|
+        assert Notes::Start.call(subject, body: "For @[#{users(:one).id}]").ok?
+      end
+    end
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: Time.current) }
+    assert_equal 6, Notes::Thread.count # the trashed records keep their threads
+    assert_equal 6, Notes::Delivery.unread.where(user: users(:one)).count
+    sign_in_as users(:one)
+
+    get admin_posts_path
+    assert_select "tr#post_#{@kept_post.id} [data-notes-count][data-unread]", text: "1"
+    assert_select "[data-notes-count]", count: 1
+
+    get admin_page_path(@kept_page)
+    assert_select "#tree-column li[data-page-id='#{@kept_page.id}'] [data-notes-marker][data-unread]", text: "1"
+    assert_select "#tree-column [data-notes-marker]", count: 1
+
+    get admin_media_path
+    assert_select "#media-asset-#{@kept_asset.id} [data-notes-chip][data-unread]", text: "1"
+    assert_select "[data-notes-chip]", count: 1
+
+    # The panel: a kept image's has its notes frame, a trashed image has no panel.
+    get admin_media_path(selected: @kept_asset.id)
+    assert_select "#media-panel #media-notes turbo-frame#notes[src='/cs-studio/notes/media/#{@kept_asset.id}?view=media']"
+    assert_select "#media-notes [data-admin--notes-target=total]", text: "1"
+    get admin_media_path(selected: @gone_asset.id)
+    assert_response :not_found
+    assert_select "#media-notes", count: 0
+
+    get "/cs-studio/notes/media/#{@kept_asset.id}", params: { view: "media" }
+    assert_response :success
+    get "/cs-studio/notes/media/#{@gone_asset.id}", params: { view: "media" }
+    assert_response :not_found
+    get "/cs-studio/notes/post/#{@gone_post.id}"
+    assert_response :not_found
+  end
+
+  # The inbox (notes spec §5): "Notes for you", its full list, "Open threads"
+  # and the sidebar's unread count all narrow through `Notes.readable_threads`.
+  # Trashed AFTER the note was written, as in life.
+  test "the inbox, Open threads and the sidebar's count show notes on kept records and never on trashed ones" do
+    kept = [ @kept_page, @kept_post, @kept_asset ].map { |subject| create_note_for_reader(subject) }
+    gone = [ create_page(title: "Later gone"), create_post(title: "Later gone post"), create_media_asset ].map { |subject| [ subject, create_note_for_reader(subject) ] }
+    gone.each { |subject, _thread| subject.update!(trashed_at: Time.current) }
+    sign_in_as users(:two)
+
+    get admin_root_path
+    assert_select "turbo-frame#notes-for-you [data-delivery]", count: 3
+    assert_select "turbo-frame#notes-open-threads li", count: 3
+    assert_select "turbo-frame#notes-open-threads [data-notes-total]", text: "3"
+    assert_select "#sidebar-badge-dashboard", text: "3"
+    assert_no_match "Later gone", response.body
+    get admin_notes_path
+    assert_select "[data-delivery]", count: 3
+    assert_no_match "Later gone", response.body
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 3 }, response.parsed_body)
+
+    rows = Dashboard::OpenThreads.new(actor: users(:two), channel: :admin).rows
+    assert_equal kept.map(&:container).map(&:id).sort, rows.map { |row| row.record.id }.sort
+    assert_equal kept.map(&:id).sort, Dashboard::NotesForYou.new(actor: users(:two), channel: :admin).rows(limit: 50).map(&:thread_id).sort
+    assert_equal 6, Notes::Delivery.unread.where(user: users(:two)).count # the trashed records keep theirs
+  end
+
+  # Through the services, not a column: what `Trash::Move` hides,
+  # `Trash::Restore` brings back, unread as it was left.
+  test "a trashed record's notes leave the inbox, the full list and the unread count, and are back when it is restored" do
+    records = [ create_page(title: "Comes back"), create_post(title: "Comes back post"), create_media_asset ]
+    threads = records.map { |subject| create_note_for_reader(subject) }
+    inbox = -> { Dashboard::NotesForYou.new(actor: users(:two), channel: :admin) }
+    sign_in_as users(:two)
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 3 }, response.parsed_body)
+
+    as(users(:one)) { records.each { |record| assert Trash::Move.call(record).ok? } }
+
+    get admin_root_path
+    assert_select "turbo-frame#notes-for-you [data-delivery]", count: 0
+    assert_select "turbo-frame#notes-open-threads li", count: 0
+    assert_select "#sidebar-badge-dashboard[hidden]"
+    assert_no_match "Comes back", response.body
+    get admin_notes_path
+    assert_select "[data-delivery]", count: 0
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 0 }, response.parsed_body)
+    assert_equal [ [], 0, 0 ], inbox.call.then { |query| [ query.rows, query.total, query.unread_count ] }
+    assert_equal 3, Notes::Delivery.unread.where(user: users(:two)).count
+
+    as(users(:one)) { records.each { |record| assert Trash::Restore.call(record.reload).ok? } }
+
+    get admin_root_path
+    assert_select "turbo-frame#notes-for-you [data-delivery][data-unread]", count: 3
+    assert_select "turbo-frame#notes-open-threads li", count: 3
+    assert_select "#sidebar-badge-dashboard:not([hidden])", text: "3"
+    get admin_notes_path
+    assert_select "[data-delivery][data-unread]", count: 3
+    get admin_unread_notes_path
+    assert_equal({ "unread" => 3 }, response.parsed_body)
+    assert_equal threads.map(&:id).sort, inbox.call.rows.map(&:thread_id).sort
+  end
+
   private
 
   def call_tool(raw_token, name, arguments = {})
@@ -782,4 +918,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   end
 
   def text_of(result) = result["content"].map { |item| item["text"] }.join("\n")
+
+  def create_note_for_reader(subject)
+    as(users(:one)) { Notes::Start.call(subject, body: "For @[#{users(:two).id}]") }.record
+  end
 end

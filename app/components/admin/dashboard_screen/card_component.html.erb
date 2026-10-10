@@ -1,8 +1,16 @@
 <section aria-labelledby="<%= id %>" class="flex flex-col rounded-cs border border-line bg-surface">
   <header class="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-    <h2 id="<%= id %>" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= title %></h2>
-    <% if link %>
-      <%= link_to "→", link.first, class: "text-sm text-ink hover:underline", aria: { label: link.last }, data: { turbo_frame: "_top" } %>
+    <div class="flex min-w-0 items-baseline gap-2">
+      <h2 id="<%= id %>" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= title %></h2>
+      <%= badge %>
+    </div>
+    <% if action? || link %>
+      <div class="flex shrink-0 items-center gap-3">
+        <%= action %>
+        <% if link %>
+          <%= link_to "→", link.first, class: "text-sm text-ink hover:underline", aria: { label: link.last }, data: { turbo_frame: "_top" } %>
+        <% end %>
+      </div>
     <% end %>
   </header>
   <% if rows.empty? %>
@@ -16,5 +24,8 @@
   <% end %>
   <% if hint %>
     <p class="px-4 pb-3 text-sm text-meta"><%= hint %></p>
+  <% end %>
+  <% if footer? %>
+    <footer class="mt-auto border-t border-line px-4 py-2.5 text-[13px]"><%= footer %></footer>
   <% end %>
 </section>

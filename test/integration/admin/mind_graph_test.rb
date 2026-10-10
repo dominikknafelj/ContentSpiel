@@ -42,6 +42,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "[data-controller='admin--mind-graph'][data-post-focus-url='/cs-studio/mind_graph?post=__ID__'][data-tag-focus-url='/cs-studio/mind_graph?tag=__ID__'][data-tag-posts-url='/cs-studio/posts?tag=__NAME__']"
+    # A post's notes for its card (notes spec §4.4): the route takes digits
+    # only, so the template is built for id 0 and the segment swapped.
+    assert_select "[data-controller='admin--mind-graph'][data-post-notes-url='/cs-studio/notes/post/__ID__/threads']"
     labels = JSON.parse(css_select("[data-controller='admin--mind-graph']").first["data-type-labels"])
     assert_equal({ "resume_entry" => ContentTypes.fetch("resume_entry").label }, labels)
     assert_select "[data-mind-graph-card][hidden]:empty"
@@ -76,7 +79,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "%{title}: post, %{count} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
     assert_equal "Posts · %{count}", messages["mind_graph.script.list.posts"]
     assert_equal "Showing the %{shown} nearest of %{total} posts around this one.", messages["mind_graph.script.capped_local"]
-    assert_equal %w[capped capped_local card.close card.focus card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
+    assert_equal "Open notes · %{count}", messages["mind_graph.script.card.notes.title"]
+    assert_equal %w[capped capped_local card.close card.focus card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more card.notes.replies card.notes.sending
+                    card.notes.title card.notes.unread card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only list.empty list.posts list.select_post list.select_tag list.tags load_failed loading no_connections
                     release_pinned retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
@@ -208,6 +213,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-legend='hollow']", text: /Draft or scheduled/
     assert_select "[data-legend='related']", text: /Related post/
     assert_select "[data-legend='tag-edge']", text: /Shares a tag/
+    assert_select "[data-legend='notes']", text: /Open notes/
     assert_select "[data-legend='retired']", count: 0
   end
 

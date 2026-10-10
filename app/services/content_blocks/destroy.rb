@@ -40,6 +40,12 @@ module ContentBlocks
   # in a section's column, and the one a section leaves at the top level,
   # are closed. A top-level block that isn't a section still leaves its gap,
   # as it always did.
+  #
+  # The notes on the block go with it, and those on the blocks deleted with a
+  # section (notes spec D12): `Notes::Remove`, in this transaction and under
+  # the page's row lock, which is the first lock every notes service takes --
+  # a note started beside the delete is removed here or finds its block gone.
+  # Blocks that are kept (lifted) keep their notes.
   class Destroy < ApplicationService
     include OwnerPermissions
     include Structure
@@ -80,6 +86,10 @@ module ContentBlocks
         # One refresh covers the blocks that went with a section too: a
         # block's state is its owner's, recomputed from the blocks left.
         Translations::StateIndex.refresh(@block)
+        # The block's threads, and those of the blocks deleted with a section
+        # (notes spec D12). Lifted blocks keep theirs: their container is the
+        # page, which has not changed.
+        Notes::Remove.call(@block, with: (@keep_blocks ? [] : inside), actor: actor).ok? || raise(ActiveRecord::Rollback)
         renumber(@block.owner.content_blocks.in_column(@block.section_id, @block.section_column)) if inside.any? || @block.section_id
         true
       end

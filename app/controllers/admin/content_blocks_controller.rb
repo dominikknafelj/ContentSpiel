@@ -178,7 +178,11 @@ module Admin
       result = ContentBlocks::Destroy.call(block, keep_blocks: keep_blocks)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
-      render turbo_stream: [ *removal_streams(block, kept_ids, section), *page_base_streams ]
+      # The notes on what was deleted are gone with it (`Notes::Remove`): the
+      # header's number, the markers and the next delete dialog's warning are
+      # told with the same answer, through the page's one copy of the counts.
+      render turbo_stream: [ *removal_streams(block, kept_ids, section), *page_base_streams,
+        turbo_stream.replace("notes-counts", Admin::NotesScreen::CountsComponent.new(counts: Notes::Counts.for_container(@page, user: Current.user), id: "notes-counts")) ]
     end
 
     # Drag reorder or Move up/down (spec §6.1): the client already knows

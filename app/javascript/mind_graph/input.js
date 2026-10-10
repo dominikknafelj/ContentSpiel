@@ -36,14 +36,15 @@
 // - `onZoom(x, y, factor)` is also the wheel (and a trackpad's pinch, which
 //   arrives as a wheel with ctrlKey), and + / - with the canvas focused,
 //   around its middle.
-// - Arrow keys pan; Escape is `onEscape()`. `onHover(x, y)` only with no
+// - Arrow keys pan; Escape is `onEscape()` and Enter `onEnter()` (the app
+//   opens the selected post). `onHover(x, y)` only with no
 //   pointer down.
 // Answers a function that removes every listener.
 const CLICK_SLOP = 5
 const KEY_PAN = 60
 const KEY_ZOOM = 1.25
 
-export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, onDoubleClick = () => {}, onZoom, onHover, onEscape }) {
+export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, onDoubleClick = () => {}, onZoom, onHover, onEscape, onEnter = () => {} }) {
   const at = (event) => {
     const box = canvas.getBoundingClientRect()
     return [ event.clientX - box.left, event.clientY - box.top ]
@@ -142,6 +143,7 @@ export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, o
     else if (event.key === "+" || event.key === "=") onZoom(box.width / 2, box.height / 2, KEY_ZOOM)
     else if (event.key === "-") onZoom(box.width / 2, box.height / 2, 1 / KEY_ZOOM)
     else if (event.key === "Escape") onEscape()
+    else if (event.key === "Enter") onEnter()
     else return
     event.preventDefault()
   }

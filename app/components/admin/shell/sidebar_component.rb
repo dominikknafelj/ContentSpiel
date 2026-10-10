@@ -14,12 +14,12 @@ module Admin
     # component (`Admin::TreeNodeComponent#path`, `Admin::LanguageTabsComponent`,
     # ...) that threads it through for its own links.
     class SidebarComponent < Admin::AdminComponent
-      def initialize(modules:, user:, current_path:, url_options:, trash_count: 0)
+      def initialize(modules:, user:, current_path:, url_options:, badges: {})
         @modules = modules
         @user = user
         @current_path = current_path.to_s
         @link_options = url_options
-        @trash_count = trash_count
+        @badges = badges
       end
 
       # What the account block says this user is (`AccountIdentityComponent`).
@@ -27,7 +27,7 @@ module Admin
 
       private
 
-      attr_reader :user, :current_path, :link_options, :trash_count
+      attr_reader :user, :current_path, :link_options, :badges
 
       # The non-empty groups, in the order `MODULE_GROUPS` declares, each
       # with its modules in `MODULES` order.
@@ -55,7 +55,30 @@ module Admin
         current?(entry) ? "#{base} bg-sunken font-medium text-ink" : "#{base} text-dim"
       end
 
-      def badge_for(entry) = entry[:path] == :admin_trash_path && trash_count.positive? ? trash_count : nil
+      # An entry's count (notes spec §5): Dashboard's and Trash's today,
+      # handed in by the layout as `badges`, keyed by the entry's path helper.
+      # Each has a stable id, because a tab fetches the numbers again by
+      # itself (`GET admin_unread_notes_path`) and writes them in by id.
+      #
+      # The Dashboard's element is ALWAYS in the page, `hidden` and empty at
+      # zero, because a live signal fills it; Trash's is drawn only when
+      # there is something to say, as it always was. An entry not named here
+      # has no badge, whatever is handed in.
+      BADGE_IDS = { admin_root_path: "sidebar-badge-dashboard", admin_trash_path: "sidebar-badge-trash" }.freeze
+      ALWAYS = %i[admin_root_path].freeze
+
+      def badge_count(entry) = badges[entry[:path]].to_i
+
+      def badge?(entry) = BADGE_IDS.key?(entry[:path]) && (badge_count(entry).positive? || ALWAYS.include?(entry[:path]))
+
+      # The Dashboard's is the one FILLED badge of the sidebar (handoff
+      # "Sidebar badge"): accent means "unread and addressed to you" and
+      # nothing else (notes spec §4.5). Trash's stays the plain mono number.
+      def badge_class(entry)
+        return "ml-auto rounded-full bg-accent px-1.5 font-cs-mono text-label leading-4 text-on-accent" if entry[:path] == :admin_root_path
+
+        "ml-auto font-cs-mono text-label text-meta"
+      end
     end
   end
 end

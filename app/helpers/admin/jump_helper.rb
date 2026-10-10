@@ -12,7 +12,7 @@ module Admin
   module JumpHelper
     JUMP_ROUTES = %i[
       admin_page_path admin_post_path admin_media_path admin_settings_path
-      new_admin_page_path new_admin_post_path admin_account_password_path
+      new_admin_page_path new_admin_post_path admin_account_path
       admin_root_path admin_pages_path admin_posts_path admin_translations_path admin_tags_path
       admin_mind_graph_path admin_trash_path admin_users_path admin_groups_path
       admin_api_tokens_path admin_system_status_path admin_audit_events_path

@@ -55,7 +55,10 @@ module Dashboard
       "page" => %w[created updated published unpublished moved trashed restored translation_confirmed],
       "post" => %w[created updated published unpublished scheduled trashed restored translation_confirmed],
       "media" => %w[uploaded updated trashed restored translation_confirmed],
-      "block" => %w[created updated reordered translation_confirmed]
+      "block" => %w[created updated reordered translation_confirmed],
+      # A note's start and its resolve only: replies are left out so they
+      # don't flood the feed.
+      "note" => %w[started resolved]
     }.flat_map { |prefix, verbs| verbs.map { |verb| "#{prefix}.#{verb}" } }.freeze
 
     # Data only, no markup and no view component: `sentence` is the

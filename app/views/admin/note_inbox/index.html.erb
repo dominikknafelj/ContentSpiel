@@ -1,0 +1,27 @@
+<%# "All notes for you" (notes spec §5): the inbox in full, 50 a page, the
+    same rows as the dashboard's card in the same order. "Mark all read" is
+    there while something is unread (`notes_badge_count`, the sidebar's own
+    number: asked once for both). %>
+<% content_for :title, t(".page_title") %>
+<div class="mb-4 flex max-w-[880px] flex-wrap items-center justify-between gap-3">
+  <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+  <% if notes_badge_count.positive? %>
+    <%= button_to t(".mark_all_read"), admin_read_notes_path(**admin_url_options), class: setup_secondary_link_class, form: { data: { turbo_frame: "_top" } } %>
+  <% end %>
+</div>
+<% if @pagination.out_of_range? %>
+  <div class="max-w-[880px]"><%= render "admin/shared/out_of_range_page", url: admin_notes_path(**admin_url_options) %></div>
+<% else %>
+  <div class="max-w-[880px] rounded-cs border border-line bg-surface">
+    <% if @rows.empty? %>
+      <%= render Admin::EmptyStateComponent.new(title: t(".empty")) %>
+    <% else %>
+      <ul class="px-4">
+        <% @rows.each do |row| %>
+          <li class="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0"><%= render Admin::NotesScreen::InboxRowComponent.new(row: row) %></li>
+        <% end %>
+      </ul>
+      <%= render Admin::PaginationComponent.new(pagination: @pagination, url: ->(page) { admin_notes_path(**admin_url_options, page: page) }) %>
+    <% end %>
+  </div>
+<% end %>

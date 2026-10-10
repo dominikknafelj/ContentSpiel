@@ -89,6 +89,21 @@
     <% end %>
   </div>
 
+  <%# Outside the panel's autosave form above: a note is no field of the
+      image. `-mx-4`: the frame's rows bring the drawer's own 16px gutter,
+      which here is the panel's padding. Nothing at zero: the "· N open"
+      hides with its number. %>
+  <%= tag.div id: "media-notes", class: "-mx-4 border-t border-line",
+        data: { "admin--notes-live-target": "record", notes_type: "media", notes_id: asset.id, notes_counts_url: helpers.admin_record_note_counts_path("media", asset.id) } do %>
+    <h3 class="px-4 pb-1.5 pt-3 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
+      <%= t(".notes") %> <span class="has-[[hidden]]:hidden"><%= notes_open %></span>
+    </h3>
+    <%= tag.turbo_frame id: "notes", src: notes_path, loading: "lazy", class: "block" do %>
+      <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".notes_loading") %></p>
+    <% end %>
+    <%= render Admin::NotesScreen::CountsComponent.new(counts: note_counts, id: "notes-counts") %>
+  <% end %>
+
   <% if can_delete? %>
     <div class="flex flex-col items-start gap-1.5 border-t border-line pt-4">
       <% if move_to_trash_disabled? %>

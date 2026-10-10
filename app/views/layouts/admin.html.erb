@@ -6,6 +6,9 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
+    <%# Says on <html>, before anything is painted, whether this browser
+        left the notes drawer open (`admin/shared/_notes_head`). %>
+    <%= render "admin/shared/notes_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags "admin" %>
     <%# Per-screen head tags: `turbo-cache-control: no-cache` on the API
@@ -29,6 +32,40 @@
       selector. `admin--drawer` joins `admin--dialog` on <body> -- both
       listen at the document level, and the existing dialog actions stay.
 
+      `admin--notes` is on <body> for the same reason as `admin--dialog`: the
+      editor header's Notes button, the markers on the block cards and the
+      notes drawer are far apart in the document. The two drawer controllers
+      tell each other when one opens (`admin--notes:opened`,
+      `admin--drawer:opened`), so the notes drawer and a shell drawer are
+      never open together -- but for the page tree folded beside the notes
+      column, which is opened from it (`admin--notes#shellOpened`).
+
+      `admin--notes-live` is the one thing in CS Studio that opens a socket
+      (notes spec §6): on <body>, so every screen has the person's stream --
+      the sidebar's count, the toast -- and so the parts that show one
+      record's notes (its `record` targets: an editor's drawer, the media
+      panel's notes, the mind graph's card) are found wherever they are
+      drawn. Its values are the addresses of the parts it fetches again when
+      a signal says something changed -- the delivery's is the address of
+      delivery 0, a placeholder the route accepts, whose last path segment
+      the script replaces with the id it was told (no text is searched for,
+      so no `ADMIN_PATH` can collide with it); `tag` writes this tab's id on
+      its notes writes; `person` is whose page this is, so that what one
+      page was told and had not said yet goes to the next page of the same
+      person only; and `shown`, `fresh` and `visible` tell it that a
+      drawer was opened, that the notes frame was loaded by Turbo itself and
+      that the document can be seen again.
+
+      `admin--notes-alert` hears what that controller announces (one delivery,
+      already read through the scoped endpoint) and, for a mention, lets one
+      tab of this person chime and, with no tab of theirs in view, one raise
+      a desktop notification (notes spec §6.4). Its values are the person's
+      two settings as they were when this page was drawn, kept current by
+      the element rendered first in <body> (`admin/shared/_notes_alert_settings`,
+      which the account screen's save replaces, and which the saving tab
+      passes on to the person's other tabs) -- and the person's id,
+      which only names the `BroadcastChannel` their tabs agree on.
+
       `data-admin-locale` carries the editing language onto <body> (rather
       than one data attribute per component) so any Stimulus controller can
       read it via `closest` without a server round trip.
@@ -38,9 +75,15 @@
       the pending-lock hint -- `Admin::MessagesHelper`,
       `app/javascript/i18n/messages.js`); a script that finds no nearer
       `data-messages` reads these. %>
-  <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
-        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded"
+  <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes admin--notes-live admin--notes-alert" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
+        data-admin--notes-live-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes-live-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
+        data-admin--notes-live-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
+        data-admin--notes-live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes-live-person-value="<%= Current.user&.id %>"
+        data-admin--notes-alert-sound-value="<%= Current.user&.notes_sound ? true : false %>" data-admin--notes-alert-desktop-value="<%= Current.user&.notes_desktop ? true : false %>"
+        data-admin--notes-alert-person-value="<%= Current.user&.id %>"
+        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:load@document->admin--notes#syncAddress turbo:before-fetch-request@document->admin--notes-live#tag turbo:before-fetch-request@document->admin--notes-live#asked turbo:before-frame-render@document->admin--notes-live#answered admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible admin--notes-live:delivery@document->admin--notes-alert#delivery"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+    <%= render "admin/shared/notes_alert_settings" %>
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
     <div class="admin-shell<%= " admin-shell--tree" if content_for?(:tree) %>">
       <%# `Admin::BaseController::MODULES`, narrowed to what this user can
@@ -48,10 +91,13 @@
           modules are shown only when `can?`) -- a module they lack is
           simply absent, not greyed out; opening its URL anyway gets the
           403 page. `admin_url_options` is threaded through by the component
-          (see its comment). %>
+          (see its comment). `badges` are the counts beside two entries, keyed
+          by the entry's path helper: the viewer's unread notes on Dashboard
+          (one COUNT, `notes_badge_count`) and what they could act on in
+          Trash. %>
       <div id="sidebar" class="admin-shell__sidebar" data-admin--drawer-target="panel" data-drawer="sidebar" tabindex="-1">
         <%= render Admin::Shell::SidebarComponent.new(modules: admin_modules, user: Current.user, current_path: request.path,
-              url_options: admin_url_options, trash_count: trash_badge_count) %>
+              url_options: admin_url_options, badges: { admin_root_path: notes_badge_count, admin_trash_path: trash_badge_count }) %>
       </div>
 
       <% if content_for?(:tree) %>
@@ -62,7 +108,7 @@
 
       <%# `p-6` stays on <main>: the save bar (`sticky bottom-0 -mx-6`) is
           sized against it. %>
-      <main class="min-w-0 p-6">
+      <main class="admin-shell__main min-w-0 p-6">
         <turbo-frame id="content" data-turbo-action="advance">
           <%# A frame request's response keeps only this frame, so the flash
               it carries is rendered here (as bare toasts that `admin--toast`
@@ -87,6 +133,18 @@
         component's own markup, so such a toast is the same toast; inert and
         outside `#toasts` while it is a `<template>`. %>
     <template id="toast-error-template"><%= render Admin::ToastComponent.new(message: t("admin.components.toast.save_failed"), kind: :error) %></template>
+
+    <%# The toast a note addressed to the viewer raises (notes spec §6.4; handoff
+        "Toast"): the existing inverted toast with the action "Open", 8 seconds
+        like Undo. `admin--notes-live` clones it and writes in the sentence,
+        the accent dot and where "Open" leads; inert here, like the template
+        above. "Open" is a GET, the one toast action that is: it opens a
+        record's notes and writes nothing. As drawn here it leads to the inbox,
+        which is where the one toast for several notes at once goes ("You have
+        3 new notes", the handoff's decision 18); a named toast gets its own
+        address written in. %>
+    <template id="toast-note-template"><%= render Admin::ToastComponent.new(message: t("admin.notes.script.toast.placeholder"), kind: :undo,
+          action: { label: t("admin.notes.script.toast.open"), url: admin_notes_path, method: :get }) %></template>
 
     <%# The pending-suggestion box `admin--translate` clones into a field's
         suggestion slot before each AI request (`Admin::TranslationScreen::

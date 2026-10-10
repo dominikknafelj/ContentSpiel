@@ -47,7 +47,12 @@
       `data-dot-classes` hand the script the classes of
       `Admin::ButtonComponent` (the card's actions) and of
       `Admin::ContentTypeDotComponent` (a type's dot in the card and the list,
-      slots 1-12 in order), so neither is copied into JavaScript. The message
+      slots 1-12 in order), so neither is copied into JavaScript.
+      `data-post-notes-url` is a fourth template: a post's open notes as JSON
+      for its card, and where the card posts a new one (notes spec §4.4). The
+      route takes digits only (`container_id: /\d+/`), so the helper refuses
+      `__ID__` (`ActionController::UrlGenerationError`): the path is built for
+      id 0 and that one segment swapped. The message
       keys are written out one by one: `test/lib/script_messages_test.rb`
       reads the literals to check that every key the script asks for is
       served. %>
@@ -61,11 +66,14 @@
                                      "mind_graph.script.card.related", "mind_graph.script.card.tags", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
                                      "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag", "mind_graph.script.card.pin", "mind_graph.script.card.unpin",
                                      "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
+                                     "mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.sending", "mind_graph.script.card.notes.replies",
+                                     "mind_graph.script.card.notes.more", "mind_graph.script.card.notes.deleted_user", "mind_graph.script.card.notes.unread", "mind_graph.script.card.notes.failed",
                                      "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag",
                                      "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.empty", "mind_graph.script.list.select_post", "mind_graph.script.list.select_tag") %>"
        data-post-focus-url="<%= admin_mind_graph_path(**admin_url_options, post: "__ID__") %>"
        data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
+       data-post-notes-url="<%= admin_record_note_threads_data_path("post", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
        data-type-labels="<%= @type_labels.to_json %>"
        data-button-classes="<%= { primary: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
        data-dot-classes="<%= (Admin::ContentTypeDotComponent::FILLED + Admin::ContentTypeDotComponent::RINGS).to_json %>"

@@ -115,6 +115,67 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (min-width: 1024px) { body:not(:has(.admin-shell__sidebar[data-open])) .admin-shell__scrim { display: none; } }
 @media (prefers-reduced-motion: reduce) { .admin-shell__sidebar, .admin-shell__tree { transition: none; } }
 
+/* The editors' notes drawer (`Admin::NotesScreen::DrawerComponent`, notes spec
+   §4.1 and the handoff's decision 1 of 2026-10-09). From 1024px it is a 400px
+   COLUMN to the right of the content and BELOW the editor's sticky header:
+   the header spans both, nothing of the editor is under the drawer, and the
+   drawer scrolls by itself while the content scrolls with the page. Below
+   1024px it is a sheet over the whole editor and none of this applies.
+
+   HOW THE COLUMN IS MADE. The shell's grid is not given a fourth track: the
+   drawer is rendered inside `#content` (a frame navigation replaces it with
+   its editor), and a grid item of `.admin-shell` it is not. Instead the room
+   is taken out of the content column -- `<main>` pads its right side by the
+   drawer's width -- the header's negative margin grows by the same amount so
+   it still reaches the window's edge, and the drawer is fixed in the room
+   that was made, from the header's bottom edge to the window's. The header
+   is stuck to `--admin-top-offset` at every scroll position, so its bottom
+   edge is that plus its height, which `admin--notes` measures and keeps
+   current (`--admin-editor-header-height`, on the drawer: a notice bar or a
+   wrapped row makes the header taller). No shadow: it is beside the content,
+   not over it.
+
+   WHAT SAYS "OPEN". `data-notes-open` on <html>, together with a drawer in
+   the page. On <html> and not read from the drawer's own `hidden`: the
+   layout's head script sets it before the first paint when this browser
+   remembers the drawer as open, so the page is laid out with the column from
+   the start and the editor does not change width when the script connects.
+   `admin--notes` owns it from then on (`setOpen`); a screen without a drawer
+   never matches.
+
+   THE PAGE TREE FOLDS while the column is there, at every width from 1024px,
+   the way it does below 1024px: the same element, the same `data-open`,
+   `admin--drawer` and the scrim -- these rules only add a second condition
+   to the ones above. What opens it is a "Pages ▾" button: from 1024px to
+   1279px the top bar's own, and from 1280px, where there is no top bar, the
+   one at the start of the page editor's breadcrumb row
+   (`.admin-editor-header__tree`, `Admin::EditorScreen::HeaderComponent`,
+   shown only then). From 1280px the drawer stands BESIDE the modules
+   sidebar, where the tree's column was (`left: 15rem`), and fades in rather
+   than slides: a slide would cross the sidebar. */
+:root { --admin-notes-width: 400px; }
+.admin-editor-header__tree { display: none; }
+@media (min-width: 1024px) {
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__main { padding-right: calc(1.5rem + var(--admin-notes-width)); }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header { margin-right: calc(-1.5rem - var(--admin-notes-width)); }
+  .admin-notes-drawer { top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); }
+
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { position: fixed; z-index: 40; top: var(--admin-top-offset); bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
+  /* The scrim of the folded tree: the two rules above hide it from 1024px
+     unless the modules sidebar is the open drawer, and at all from 1280px. */
+  :root[data-notes-open] body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }
+}
+@media (min-width: 1280px) {
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: 15rem minmax(0, 1fr); }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { left: 15rem; transform: none; opacity: 0; transition: opacity 0.15s var(--cs-ease), visibility 0s linear 0.15s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree[data-open] { opacity: 1; transition: opacity 0.15s var(--cs-ease), visibility 0s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header__tree { display: inline-block; }
+}
+@media (prefers-reduced-motion: reduce) { :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
+
 /* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */
 .admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }
@@ -339,6 +400,133 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-section-errors:not(:has(p)) { display: none; }
 .admin-block-tile { border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
 .admin-block-tile:has(> .admin-block-tile__face[aria-expanded="true"]) { border-color: var(--cs-accent); }
+/* The tile of the block whose thread is open in the notes drawer
+   (`admin--notes#markActive`). Here and not a utility on the tile: the tile's
+   border is set by the rule above, which a utility does not outweigh. */
+.admin-block-tile[data-notes-active] { border-color: var(--cs-accent); }
+
+/* A picture in a note (`Admin::NotesScreen::FilesComponent`; handoff "Inline
+   image and still GIF tile"). Its box is the picture's own size and shows
+   the placeholder gradient behind a picture that is partly transparent.
+   A GIF's Play / Pause is shown with reduced motion only (the component's
+   `motion-reduce:` classes): centred over the still, and in the corner while
+   the picture plays (`data-playing`), so it does not lie over what moves. */
+.admin-note-picture { background: linear-gradient(135deg, var(--cs-ph-a), var(--cs-ph-b)); }
+.admin-note-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.admin-note-gif-button[data-playing="true"] { top: auto; left: auto; right: 6px; bottom: 6px; transform: none; }
+
+/* A block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
+   handoff "Block card marker" and "Section tile marker"). Four states, set by
+   `admin--notes` as attributes:
+   - at rest without notes it is in its place and not shown (the system draws
+     no count at zero);
+   - while the pointer is over its card or tile, or the focus is inside it,
+     it is the add-note control: a 24px square holding the icon (18px on a
+     tile, with a 12px icon). Shown at rest for nobody (the handoff's
+     decision 6): every card and tile has "Add note" in its "⋯" menu, which
+     is the way that needs neither a hover nor a keyboard;
+   - `data-has-notes`: a pill with the icon and the count, always shown
+     (20px high on a card, 18px on a tile); also while text is selected in the
+     block, when it reads "Note on selection";
+   - `data-unread` beside it: the pill in accent, the one meaning accent has
+     for a count (unread and addressed to the viewer).
+   A section's card is a card too, so "its card" is asked of the tile first
+   and of a card that is no section: the pointer over a section shows no
+   tile's control but the one it is on. Not shown by `opacity` is still in the
+   Tab order, which is the keyboard's way to it; nothing here moves, so there
+   is nothing to turn off for reduced motion. */
+.admin-notes-marker {
+  display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px;
+  width: 24px; height: 24px; border: 1px solid transparent; border-radius: var(--cs-radius);
+  color: var(--cs-meta); font-family: var(--cs-mono); font-size: 11px; line-height: 1; white-space: nowrap;
+  cursor: pointer; opacity: 0;
+}
+.admin-notes-marker:hover { background: var(--cs-sunken); color: var(--cs-ink); }
+.admin-notes-marker:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.admin-notes-marker:focus-visible,
+.admin-notes-marker[data-has-notes],
+:is(.admin-block-tile, .admin-block-card:not(.admin-section-card)):is(:hover, :focus-within) .admin-notes-marker { opacity: 1; }
+.admin-notes-marker > span { display: inline-flex; align-items: center; }
+.admin-notes-marker > span[hidden],
+.admin-notes-marker:not([data-has-notes]) > .admin-notes-marker__open,
+.admin-notes-marker[data-has-notes] > .admin-notes-marker__add { display: none; }
+.admin-notes-marker[data-has-notes] { width: auto; height: 20px; padding: 0 7px; border-color: var(--cs-line-strong); border-radius: var(--cs-radius-pill); }
+.admin-notes-marker[data-has-notes][data-unread] { border-color: var(--cs-accent-tint); background: var(--cs-accent-tint); color: var(--cs-accent); }
+.admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: 10px; }
+.admin-block-tile .admin-notes-marker[data-has-notes] { width: auto; height: 18px; padding: 0 6px; }
+.admin-block-tile .admin-notes-marker__add > svg { width: 12px; height: 12px; }
+/* The same pill where a LIST shows a record's open notes (notes spec §4.4):
+   the posts list's cell, a row of the page tree, a tile of the media grid.
+   There the server draws it with its number and `data-has-notes` (and
+   `data-unread`), so every rule above applies as it stands; what follows is
+   only what differs. `--readonly` is a count that is no control (a `span`
+   in the tree's row and on a tile, whose own link is the way in): no
+   pointer, no hover. `--small` is the tile's 18px size outside a section
+   tile (the tree's row). `--on-image` is the media tile's chip, 6px from the
+   image's top right corner: it needs the surface behind it to stay readable
+   over a photo, and unread keeps the border for the same reason. */
+.admin-notes-marker--readonly { cursor: inherit; }
+.admin-notes-marker--readonly:hover { background: transparent; color: var(--cs-meta); }
+.admin-notes-marker--small[data-has-notes] { height: 18px; padding: 0 6px; font-size: 10px; }
+.admin-notes-marker--on-image { position: absolute; top: 6px; right: 6px; }
+.admin-notes-marker--on-image[data-has-notes],
+.admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }
+.admin-notes-marker--on-image[data-has-notes][data-unread] { border-color: var(--cs-line-strong); background: var(--cs-accent-tint); color: var(--cs-accent); }
+/* THE THREAD VIEW'S HEADER (the handoff's decision 11). While a thread is the
+   drawer's view the drawer's own header -- the title, the count, "New note"
+   and Close -- is not shown, and the thread's first row is the header: "←
+   All notes 4", the Notify link and a Close of its own
+   (`.admin-note-close`, `Admin::NotesScreen::ThreadComponent`), which does
+   what the drawer's does. "New note" comes back with the list. Asked of the
+   frame's view, so the two can't both show or both hide. AT EVERY WIDTH (the
+   handoff's decision 17): below 1024px the notes are a sheet whose header
+   holds "Back to <title>", the one way back to the editor, and that header
+   is hidden over a thread too -- so there the row ends in a "Back to
+   page" of its own (`.admin-note-leave`, a text button) where the
+   drawer's row has Close. One of the two, by the width; and neither is
+   shown anywhere but in the drawer: the same thread view in the media panel
+   and on a record's notes page has no drawer to close or leave. */
+.admin-note-close,
+.admin-note-leave { display: none; }
+.admin-notes-drawer:has([data-notes-view="thread"]) > header { display: none; }
+@media (min-width: 1024px) {
+  .admin-notes-drawer .admin-note-close { display: inline-flex; }
+}
+@media (max-width: 1023px) {
+  .admin-notes-drawer .admin-note-leave { display: inline-flex; }
+}
+/* A THREAD'S ROWS STAY, ITS MESSAGES SCROLL (the handoff's decision 35). In
+   the drawer and the sheet a thread fills the drawer's body exactly: its two
+   rows at the top, the composer at the bottom, and between them the one
+   thing that scrolls, `[data-note-scroll]` (the state, the quote, the
+   messages). The drawer's own scroller, which the list scrolls in, does not
+   scroll under a thread. By where the frame stands, like the rules around
+   this one: in the media panel and on a record's notes page the same thread
+   is in the flow of what scrolls there, and none of this applies.
+   `admin--notes-live#scroller` reads `overflow-y` to tell the two apart. */
+.admin-notes-drawer [data-notes-scroller]:has([data-notes-view="thread"]) { overflow: hidden; }
+.admin-notes-drawer turbo-frame#notes:has(> [data-notes-view="thread"]),
+.admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }
+.admin-notes-drawer [data-note-part="messages"] { min-height: 0; }
+.admin-notes-drawer [data-note-scroll] { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* ONE "New note" in the drawer (the handoff's decision 4): its header's
+   button is the way in, so the list's own link -- above the groups, and the
+   empty state's action -- is not shown there, with the element that only
+   holds it. The same list in the media panel and on the notes page of a
+   record keeps its link: neither has a header with the button. By where the
+   list stands and not by a parameter: the drawer's frame and that page ask
+   for the same view. */
+.admin-notes-drawer :is(p, div):has(> [data-note-new-link]) { display: none; }
+/* The media panel shows the notes frame in the flow of a column, not in a
+   drawer with a scroller of its own: a thread's reply stays under its
+   messages instead of sticking to the bottom of whatever scrolls. */
+#media-notes [data-note-part="reply"] { position: static; }
+/* A block's delete dialog keeps its notes warning in the confirm dialog's
+   details box, alone, hidden until the block has open notes: until then the
+   box takes no room. Asked of the warning's own mark (`data-notes-alone`,
+   `Admin::EditorScreen::DeleteBlockDialogComponent`), so no other dialog's
+   box is ever touched. */
+.admin-dialog div:has(> [data-notes-alone][hidden]) { display: none; }
 
 /* Drag pattern (handoff §9 A9), shared by the page tree and the block list
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
@@ -421,3 +609,4 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 .mg-key-retired { fill: none; stroke: var(--cs-meta); stroke-width: 1.5; }
 .mg-key-pinned-node { fill: none; stroke: var(--cs-meta); stroke-width: 1; }
 .mg-key-pin { fill: var(--cs-ink); stroke: var(--cs-surface); stroke-width: 1.5; }
+.mg-key-notes { fill: var(--cs-surface); stroke: var(--cs-line-strong); stroke-width: 1; }

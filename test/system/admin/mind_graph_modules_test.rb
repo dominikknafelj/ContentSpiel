@@ -735,6 +735,43 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ 1 ], hovered["ringWidths"]
   end
 
+  # Notes spec §4.4, handoff "Mind graph node badge": a post with open notes
+  # carries the count in a pill 14 px high on its mark's top-left corner,
+  # always neutral (surface, a line, ink). Its RIGHT edge is fixed, 4 px over
+  # the corner, and it grows to the left with its text. A tag has none, nor a
+  # post without notes; above ninety-nine it reads "99+". Read from what the
+  # renderer asks of a context that records.
+  test "renderer: a post with open notes carries its count in a neutral badge that grows leftwards from the top-left corner" do
+    drawn = notes_badges([ 3, 12, 120, 0, nil ], tags: [ 5 ], tag_notes: 4)
+
+    assert_equal [
+      [ "pill", 34.96, 37.96, 14, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "3", 41.96, 45.46, "ink", "count" ],
+      [ "pill", 128.96, 37.96, 20, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "12", 138.96, 45.46, "ink", "count" ],
+      [ "pill", 222.96, 37.96, 26, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "99+", 235.96, 45.46, "ink", "count" ]
+    ], drawn.reject { |entry| entry.first == "pin" }
+  end
+
+  # The pin's dot is at the top-right and the badge at the top-left, "so both
+  # can show" (handoff): on the smallest mark, at one digit, two digits and
+  # "99+", the badge's box (with its line) ends left of where the pin's dot
+  # (with its ring) begins. A pill centred on the corner covered half the dot
+  # at two digits and all of it at "99+".
+  test "renderer: a pinned node's notes badge never reaches its pin, whatever the count" do
+    drawn = notes_badges([ 1, 12, 120 ], pinned: [ 0, 1, 2 ])
+    pills = drawn.select { |entry| entry.first == "pill" }
+    pins = drawn.select { |entry| entry.first == "pin" }
+
+    assert_equal [ 3, 3 ], [ pills.size, pins.size ]
+    pills.zip(pins).each do |(_, left, _top, width, *), (_, x, _y, radius)|
+      badge_right = left + width + 0.5 # half its 1px line
+      pin_left = x - radius - 0.75     # half the dot's 1.5px ring
+      assert_operator badge_right, :<, pin_left, "the badge (to #{badge_right}) reaches the pin's dot (from #{pin_left})"
+    end
+    assert_equal [ 14, 20, 26 ], pills.map { |pill| pill[3] }
+    rights = pills.each_with_index.map { |pill, index| (pill[1] + pill[3] - index * 100).round(2) }
+    assert_equal [ 48.96 ] * 3, rights, "the badge's right edge moved with its width"
+  end
+
   test "renderer: a tag's ring is a square" do
     selected = renderer_calls(positions: [ 50, 50 ], edges: [], selected: 0, tags: [ 0 ])
 
@@ -881,6 +918,48 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       "nodeAlphas" => paths.select { |path| shape.call(path) == [ "arc", *shape.call(path)&.slice(1, 2), NODE_RADIUS ] }.map { |path| done.call(path, "fill")[1] },
       "ringWidths" => rings.map { |path| done.call(path, "stroke")[2] }
     }
+  end
+
+  # Draws posts of degree one (radius 7), 100 px apart from x = 50 at y = 50,
+  # with the given `open_notes` each (nil: the key is absent), then the tags
+  # of `tags` (indexes) with `tag_notes`. Answers, in order, each notes badge
+  # as ["pill", x, y, width, height, radius, fill], ["line", stroke, width]
+  # and ["text", label, x, y, fill, font], and each pin's dot as
+  # ["pin", x, y, radius]. The theme's values are their own names.
+  def notes_badges(counts, pinned: [], tags: [], tag_notes: nil)
+    drawn = page.evaluate_async_script(<<~JS, counts, pinned, tags, tag_notes)
+      const [counts, pinned, tags, tagNotes, done] = arguments
+      import("mind_graph/renderer").then(({ draw, radiusFor }) => {
+        const round = (value) => Math.round(value * 1000) / 1000
+        const log = []
+        const set = {}
+        let badge = null
+        const context = new Proxy({}, {
+          get: (_, name) => {
+            if (name === "beginPath") return () => { badge = null }
+            if (name === "roundRect") return (...box) => { badge = box.map(round) }
+            if (name === "arc") return (x, y, radius) => { if (radius === #{PIN_RADIUS}) log.push(["pin", round(x), round(y), radius]) }
+            if (name === "fill") return () => { if (badge) log.push(["pill", ...badge, set.fillStyle]) }
+            if (name === "stroke") return () => { if (badge) log.push(["line", set.strokeStyle, set.lineWidth]) }
+            if (name === "fillText") return (label, x, y) => { log.push(["text", label, round(x), round(y), set.fillStyle, set.font]) }
+            return () => {}
+          },
+          set: (_, name, value) => { set[name] = value; return true }
+        })
+        const nodes = counts.map((count, id) => ({ id, kind: "post", degree: 1, colour_index: 1, status: "live", label: "", ...(count == null ? {} : { open_notes: count }) }))
+        tags.forEach((id) => nodes.push({ id, kind: "tag", degree: 1, label: "", open_notes: tagNotes }))
+        draw(context, {
+          width: 100 * nodes.length, height: 100, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
+          theme: { ink: "ink", meta: "", surface: "surface", sunken: "", accent: "accent", line: "line", categories: Array(6).fill("hue"), font: "", strongFont: "", countFont: "count" },
+          nodes, edges: [], positions: Float32Array.from(nodes.flatMap((_, index) => [ 50 + index * 100, 50 ])),
+          radii: nodes.map(radiusFor), widths: nodes.map(() => 0), visibleNodes: nodes.map((_, index) => index), visibleEdges: [],
+          labels: [], selected: -1, neighbours: new Set(), focusIndex: -1, hovered: -1, pinned: new Set(pinned)
+        })
+        done(log)
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "renderer: #{drawn["error"]}" if drawn.is_a?(Hash)
+    drawn
   end
 
   # Imports a module of the page's import map and answers `expression`, in

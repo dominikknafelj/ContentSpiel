@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_08_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -175,6 +175,75 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_08_100000) do
     t.index ["owner_type", "owner_id"], name: "index_media_usages_on_owner"
   end
 
+  create_table "note_deliveries", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "message_id", null: false
+    t.bigint "thread_id", null: false
+    t.string "reason", null: false
+    t.datetime "read_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id"], name: "index_note_deliveries_on_message_id"
+    t.index ["thread_id"], name: "index_note_deliveries_on_thread_id"
+    t.index ["user_id", "message_id"], name: "index_note_deliveries_on_user_id_and_message_id", unique: true
+    t.index ["user_id", "read_at"], name: "index_note_deliveries_on_user_id_and_read_at"
+  end
+
+  create_table "note_follows", force: :cascade do |t|
+    t.bigint "thread_id", null: false
+    t.bigint "user_id", null: false
+    t.boolean "following", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["thread_id", "user_id"], name: "index_note_follows_on_thread_id_and_user_id", unique: true
+    t.index ["user_id"], name: "index_note_follows_on_user_id"
+  end
+
+  create_table "note_messages", force: :cascade do |t|
+    t.bigint "thread_id", null: false
+    t.bigint "author_id"
+    t.text "body", null: false
+    t.bigint "mentioned_user_ids", default: [], null: false, array: true
+    t.datetime "edited_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["author_id"], name: "index_note_messages_on_author_id"
+    t.index ["thread_id"], name: "index_note_messages_on_thread_id"
+  end
+
+  create_table "note_reactions", force: :cascade do |t|
+    t.bigint "message_id", null: false
+    t.bigint "user_id", null: false
+    t.string "emoji", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id", "user_id", "emoji"], name: "index_note_reactions_on_message_id_and_user_id_and_emoji", unique: true
+    t.index ["user_id"], name: "index_note_reactions_on_user_id"
+  end
+
+  create_table "note_threads", force: :cascade do |t|
+    t.string "subject_type", null: false
+    t.bigint "subject_id", null: false
+    t.string "container_type", null: false
+    t.bigint "container_id", null: false
+    t.string "state", default: "open", null: false
+    t.datetime "resolved_at"
+    t.bigint "resolved_by_id"
+    t.boolean "pinned", default: false, null: false
+    t.datetime "pinned_at"
+    t.bigint "pinned_by_id"
+    t.text "quote"
+    t.string "origin_view", default: "editor", null: false
+    t.string "origin_locale"
+    t.bigint "created_by_id"
+    t.datetime "last_message_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["container_type", "container_id", "state"], name: "idx_on_container_type_container_id_state_597734391c"
+    t.index ["subject_type", "subject_id"], name: "index_note_threads_on_subject_type_and_subject_id"
+    t.check_constraint "state::text = ANY (ARRAY['open'::character varying, 'resolved'::character varying]::text[])", name: "note_threads_state"
+  end
+
   create_table "page_hierarchies", id: false, force: :cascade do |t|
     t.bigint "ancestor_id", null: false
     t.bigint "descendant_id", null: false
@@ -330,6 +399,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_08_100000) do
     t.datetime "updated_at", null: false
     t.boolean "owner", default: false, null: false
     t.string "name"
+    t.boolean "notes_sound", default: true, null: false
+    t.boolean "notes_desktop", default: false, null: false
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
@@ -344,6 +415,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_08_100000) do
   add_foreign_key "content_blocks", "media_assets"
   add_foreign_key "media_assets", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "media_usages", "media_assets"
+  add_foreign_key "note_deliveries", "note_messages", column: "message_id", on_delete: :cascade
+  add_foreign_key "note_deliveries", "note_threads", column: "thread_id", on_delete: :cascade
+  add_foreign_key "note_deliveries", "users", on_delete: :cascade
+  add_foreign_key "note_follows", "note_threads", column: "thread_id", on_delete: :cascade
+  add_foreign_key "note_follows", "users", on_delete: :cascade
+  add_foreign_key "note_messages", "note_threads", column: "thread_id", on_delete: :cascade
+  add_foreign_key "note_messages", "users", column: "author_id", on_delete: :nullify
+  add_foreign_key "note_reactions", "note_messages", column: "message_id", on_delete: :cascade
+  add_foreign_key "note_reactions", "users", on_delete: :cascade
+  add_foreign_key "note_threads", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "note_threads", "users", column: "pinned_by_id", on_delete: :nullify
+  add_foreign_key "note_threads", "users", column: "resolved_by_id", on_delete: :nullify
   add_foreign_key "pages", "media_assets", column: "hero_media_asset_id"
   add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "pages", "pages", column: "trash_root_id", on_delete: :nullify

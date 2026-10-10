@@ -28,7 +28,10 @@ namespace :media do
   # (`image`), so it never shows up here while the variant exists.
   desc "List blobs with no attachments (media library cleanup); CONFIRM=1 purges them"
   task orphans: :environment do
-    orphans = ActiveStorage::Blob.where.missing(:attachments).order(:id)
+    # Not the notes' blobs (`Notes::Files::SERVICE`): a note's files are on a
+    # storage service of their own and are removed by the notes services;
+    # this is the media library's cleanup and never lists or purges one.
+    orphans = ActiveStorage::Blob.where.missing(:attachments).where.not(service_name: Notes::Files::SERVICE.to_s).order(:id)
     confirmed = ENV["CONFIRM"] == "1"
 
     count = 0

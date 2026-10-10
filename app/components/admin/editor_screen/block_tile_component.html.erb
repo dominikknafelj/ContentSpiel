@@ -10,11 +10,18 @@
     <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
     <%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %>
   </button>
+  <%# The notes marker (notes spec §4.3): beside the face, since a button cannot hold
+      a button, and outside the `editable?` block below, because a viewer who can only
+      read the page writes notes too. `data-notes-active` on the tile is
+      `admin--notes#markActive`'s. %>
+  <div class="flex shrink-0 items-center px-1"><%= render note_marker %></div>
   <% if editable? %>
     <%# Every move a drag makes, by name (see the component). Its `data-move` buttons are
         enabled and disabled by `admin--blocks#refreshMoveState`. %>
     <div class="flex shrink-0 items-center pr-1">
       <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+        <%# Always first: see the block card's menu. %>
+        <% menu.with_item { add_note_item } %>
         <% menu.with_item do %>
           <%= tag.button t(".move_up"), type: "button", class: menu_item_class, data: { move: "up", action: "click->admin--blocks#moveUp" } %>
         <% end %>
@@ -42,5 +49,13 @@
       <% end %>
     </div>
     <%= render delete_dialog %>
+  <% else %>
+    <%# A viewer who can only read the page: the "⋯" with "Add note" as its only item
+        (the handoff's decision 6), and nothing else of an editor's tile. %>
+    <div class="flex shrink-0 items-center pr-1">
+      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+        <% menu.with_item { add_note_item } %>
+      <% end %>
+    </div>
   <% end %>
 </div>

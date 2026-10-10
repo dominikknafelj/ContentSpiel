@@ -27,12 +27,17 @@ module Admin
     # sentences, the pending-lock hint, the toasts a failed drop raises --
     # written once on <body> (`layouts/admin`), where a script that finds no
     # nearer `data-messages` reads them. Keys are relative to `admin`.
+    # `notes.script.*` are `admin--notes`' and `admin--notes-live`'s: those
+    # controllers are on <body> itself, so <body> is the only place their
+    # messages can be.
     SCRIPT_MESSAGES = %w[
       components.save_status.saving components.save_status.saving_live components.save_status.retrying
       components.save_status.offline components.save_status.signed_out components.save_status.retry
       components.save_bar.changes components.save_bar.unsaved components.save_bar.no_changes components.save_bar.blocked
       components.toast.order_failed components.toast.dropped
       layout.leave_dialog.body layout.leave_dialog.body_with_count
+      notes.script.marker.add notes.script.marker.open notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning
+      notes.script.toast.on notes.script.toast.many notes.script.live.new_divider notes.script.live.new_messages notes.script.live.gone
     ].freeze
 
     def admin_script_messages = messages_data(*SCRIPT_MESSAGES)

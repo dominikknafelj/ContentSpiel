@@ -211,11 +211,22 @@ module Admin
     # not on this page), the segment counts (an alt text typed here moves
     # "Missing alt"), and the panel's own heading. The counts are for the same
     # search the grid is showing (`q` rides on the form's URL).
+    #
+    # The tile is drawn again whole, so it is told its open notes again too
+    # (the grid's two reads, for this one image, through the method the grid
+    # uses): without them the chip would go, and its accent with it, on the
+    # first keystroke in the panel. The image is the one `set_asset` found, a
+    # kept one. This action is NOT behind `media.upload` alone -- `media.manage`
+    # by itself passes its gate above -- while an image's notes are: the
+    # shared method reads nothing for a viewer without `media.upload`, so
+    # their tile comes back without a count.
     def grid_streams(asset)
       counts = media_counts
+      note_counts, note_unread = helpers.media_note_marks([ asset.id ])
       tile = Admin::MediaLibrary::TileComponent.new(
         asset: asset, selected: true, unused: !asset.used?,
-        url: admin_media_path(**list_query, **admin_url_options, selected: asset.id)
+        url: admin_media_path(**list_query, **admin_url_options, selected: asset.id),
+        open_notes: note_counts.fetch(asset.id, 0), notes_unread: note_unread.include?(asset.id)
       )
       [
         turbo_stream.replace(Admin::MediaLibrary::TileComponent.dom_id(asset), tile),

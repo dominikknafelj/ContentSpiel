@@ -6,7 +6,8 @@
 // `watchTheme` answers a function that stops watching. The theme changes when
 // `<html data-theme>` does (`theme_controller.js`) or, with no explicit
 // choice, when the system's scheme does.
-const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", surface: "--cs-surface", sunken: "--cs-sunken", accent: "--cs-accent" }
+// `line` is the border of the notes badge.
+const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", surface: "--cs-surface", sunken: "--cs-sunken", accent: "--cs-accent", line: "--cs-line-strong" }
 const CATEGORIES = 6
 
 export function readTheme(element) {
@@ -17,6 +18,9 @@ export function readTheme(element) {
   theme.font = `12px ${style.fontFamily}`
   // The selected node's label.
   theme.strongFont = `600 12px ${style.fontFamily}`
+  // The notes count on a node: the small mono label style, read from the
+  // mono token so the canvas and the page agree.
+  theme.countFont = `10px ${read("--cs-mono") || style.fontFamily}`
   return theme
 }
 

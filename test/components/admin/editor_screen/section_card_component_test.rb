@@ -52,6 +52,36 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_no_selector "[id^='block-picker-']", visible: :all
   end
 
+  # The notes handoff's decision 10: a section takes no notes of its own. Its
+  # card has no marker and its menu no "Add note", for an editor and for a
+  # viewer who can only read; the only markers and "Add note" items in it are
+  # its tiles'.
+  test "a section's card offers no way to add a note on the section itself, to an editor or to a view-only viewer" do
+    record = @page
+    [ users(:one), users(:reader) ].each do |viewer|
+      @page = record # the test helper's own `page` is kept in the same variable after a render
+      as(viewer, channel: :admin) { render_card }
+
+      assert_no_selector "#notes-marker-ContentBlock-#{@section.id}", visible: :all
+      assert_no_selector "[data-notes-key='ContentBlock-#{@section.id}']", visible: :all
+      assert_equal [ @text, @image ].map { |block| "ContentBlock-#{block.id}" }.sort,
+        page.all("[data-admin--notes-target=marker]", visible: :all).map { |marker| marker["data-notes-key"] }.sort
+      assert_equal [ @text, @image ].map { |block| "ContentBlock-#{block.id}" }.sort,
+        page.all("button[data-notes-compose]", visible: :all).map { |item| item["data-notes-key"] }.sort
+      assert_no_selector "button[aria-label='Section actions'] + [role=menu] button", text: "Add note", visible: :all
+    end
+    # A view-only viewer's section has no menu of its own at all.
+    assert_no_selector "button[aria-label='Section actions']", visible: :all
+  end
+
+  test "the section's delete dialog asks for the sentence that counts its blocks' notes, and Remove section, keep blocks has no dialog" do
+    as(users(:one), channel: :admin) { render_card }
+
+    assert_selector "#delete-section-#{@section.id} p[hidden][data-admin--notes-target=warning][data-notes-warning=section][data-notes-within='#{ActionView::RecordIdentifier.dom_id(@section)}']", visible: :all
+    assert_selector "dialog", visible: :all, count: 3 # the section's delete dialog and one per tile
+    assert_selector "form[data-controller='admin--queue-hold'] input[name=keep_blocks]", visible: :all
+  end
+
   # The header's count is drawn by the one method a stream redraws it with
   # (`Admin::ContentBlocksController#section_count_streams`).
   test "the summary a stream replaces is the one the card draws" do

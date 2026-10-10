@@ -161,7 +161,13 @@ module Audit
         # without sections that is the same list as before, by `position`.
         record.attributes.merge("content_block_ids" => BlockOutline.new(record.content_blocks.reorder(:position, :id)).reading_order.map(&:id))
       when User
-        { "id" => record.id, "email_address" => record.email_address, "name" => record.name, "owner" => record.owner, "group_ids" => record.group_ids.sort }
+        # Named fields. The two notes settings (notes spec D18, D19) are
+        # among them: neither is a secret, and an event that says a switch
+        # was turned should show the account as it then stood.
+        {
+          "id" => record.id, "email_address" => record.email_address, "name" => record.name, "owner" => record.owner, "group_ids" => record.group_ids.sort,
+          "notes_sound" => record.notes_sound, "notes_desktop" => record.notes_desktop
+        }
       when AccessControl::Group
         {
           "id" => record.id, "name" => record.name, "description" => record.description, "built_in" => record.built_in,

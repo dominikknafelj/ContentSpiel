@@ -1,0 +1,484 @@
+# Notes on content (docs/reference/i18n.md): everything a person reads about
+# notes. `admin.notes.errors` are the sentences the `Notes::` services answer
+# with; later tasks add `admin.notes.script` (what the scripts say),
+# `admin.notes.index` and `admin.note_inbox` (the views' own lazy-lookup
+# scopes) and `admin.components.notes_screen` (the components).
+#
+# Each shape of a sentence is a whole sentence of its own, one per kind of
+# record, never glued from a noun: a translator can reorder it.
+en:
+  admin:
+    notes:
+      index:
+        title: "Notes · CS Studio"
+      # What a thread is on when it is on the record itself: its group's
+      # heading in the list, and the heading of its thread view.
+      subject:
+        page: "Whole page"
+        post: "Whole post"
+        media: "This image"
+        # A block in a section's column: "Section › Column 2 · Rich text".
+        in_section: "%{section} › Column %{column} · %{type}"
+        # A block with no text and no image, by its place on the page.
+        block: "Block %{position}"
+      errors:
+        blank: "Write something first."
+        too_long: "A note can be at most 4,000 characters."
+        too_many_mentions: "A note can mention at most 20 people."
+        # Names nobody, and is the same for a user who doesn't exist: a
+        # mention can be typed by hand (`Notes::Authorization#mention_errors`).
+        mention_cannot_read:
+          page: "Someone you mentioned can't see this page."
+          post: "Someone you mentioned can't see this post."
+          image: "Someone you mentioned can't open the media library."
+        gone:
+          page: "This page is in the trash or was deleted."
+          post: "This post is in the trash or was deleted."
+          image: "This image is in the trash or was deleted."
+          block: "This block was deleted."
+          note: "This note is gone: it was deleted, or what it was on was."
+        not_yours: "Only the person who wrote a note can change it."
+        # An emoji that is not one of the offered set (`Notes::EMOJI`): only a
+        # forged request sends one.
+        emoji: "That reaction isn't available."
+        # A reaction sent to a resolved thread, whose chips are read-only:
+        # only a forged or a stale request gets here.
+        resolved: "This thread is resolved. Reopen it to react."
+        # A note's files (`Notes::Files`): one sentence per refused file,
+        # naming it, or the one about their number. Shown in the composer,
+        # under the text that was kept; never in a toast, a log or the audit log.
+        files:
+          too_many: "A note can carry at most %{count} files."
+          too_big: "%{name}: files can be at most %{size}."
+          type: "%{name}: this type of file can't be attached."
+          # An allowed kind of file under a name that is not that kind's:
+          # "report.docm: a DOCX file's name must end in .docx.", "notes.pdf:
+          # a text file's name must end in .txt, .md, .log or .csv." `text`
+          # is the kind's word for plain text and CSV; `or` joins the endings.
+          ending: "%{name}: a %{kind} file's name must end in %{endings}."
+          text: "text"
+          or: " or "
+          # Text by its name, in an encoding that is not UTF-8.
+          encoding: "%{name}: text and CSV files must be saved as UTF-8."
+          # The storage refused a file whose checks had passed.
+          not_stored: "The files could not be stored. Nothing was saved: try again."
+        delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
+        pin_resolved: "Reopen this note before pinning it."
+      # What the notes' scripts say. `mentions` is `admin--note-composer`'s
+      # (`messages_data` on the composer's form); the rest is `admin--notes`',
+      # which lives on <body>, so they are <body>'s
+      # (`Admin::MessagesHelper::SCRIPT_MESSAGES`): the header button's name,
+      # a marker's name in each of its three states, and the sentence a
+      # block's delete dialog adds, with a section's own.
+      script:
+        total:
+          one: "Notes, %{count} open"
+          other: "Notes, %{count} open"
+        marker:
+          add: "Add a note on %{name}"
+          open:
+            one: "%{count} open note on %{name}"
+            other: "%{count} open notes on %{name}"
+          selection: "Add a note on the selected text in %{name}"
+        delete_warning:
+          one: "This block has %{count} open note. It will be deleted with it."
+          other: "This block has %{count} open notes. They will be deleted with it."
+        # In the dialog of "Delete section and its blocks…": the open notes
+        # on the blocks inside it (a section takes none of its own).
+        delete_section_warning:
+          one: "This section and its blocks have %{count} open note. It will be deleted too."
+          other: "This section and its blocks have %{count} open notes. They will be deleted too."
+        mentions:
+          none: "Nobody by that name can see this."
+          count:
+            one: "%{count} person. Use the arrow keys and Enter."
+            other: "%{count} people. Use the arrow keys and Enter."
+        # The composer's chosen files (`admin--note-composer`): what is
+        # refused in place, before anything is sent, and the name of a row's
+        # remove button.
+        files:
+          too_many: "A note can carry at most %{count} files."
+          too_big: "%{name} is over %{size}."
+          remove: "Remove %{name}"
+          # The same line as `composer.files_lost`, for a draft that
+          # comes back: the script kept the names beside the text.
+          again: "Choose the files again: %{names}"
+        send_apple: "Send (⌘↵)"
+        # What the submit reads while its note is being sent, once that has
+        # taken longer than a moment (the handoff's decision 41).
+        sending: "Sending…"
+        # The toast a note addressed to the viewer raises (`admin--notes-live`):
+        # "Dana mentioned you on Pricing", with "Open". `placeholder` is what
+        # the layout's template holds until the script writes the sentence.
+        toast:
+          placeholder: "A note for you"
+          open: "Open"
+          # Quoted: a bare `on` is YAML's word for true.
+          "on": "%{sentence} on %{title}"
+          # From the third note of a burst (the handoff's decision 18): one
+          # toast for all of them, whose "Open" leads to the inbox. It
+          # starts at 3; `one` is there because a count needs both forms.
+          many:
+            one: "You have %{count} new note"
+            other: "You have %{count} new notes"
+        # What a live refresh writes into an open thread: the divider above
+        # the first message that arrived, the button that leads down to what
+        # arrived below the screen, and the line above a reply whose thread
+        # was deleted meanwhile.
+        live:
+          new_divider: "New"
+          new_messages:
+            one: "%{count} new message ↓"
+            other: "%{count} new messages ↓"
+          gone: "This thread was deleted"
+    # The account screen's "Notes" card (notes spec §6.4, handoff "Account
+    # switches"): two settings of the person's, and what this browser says
+    # about showing notifications. Read with full keys from
+    # `admin/accounts/edit.html.erb` and `Admin::AccountsController`. The
+    # card is one of two in the account screen's first form, "Your account"
+    # (the handoff's decisions 19 and 20): Profile, the name, and Notes, with
+    # one footer, whose button is "Save" and whose toast is the app's own
+    # "Settings saved" (no full stop, as on the Settings screen).
+    accounts:
+      # The screen's heading, its title in the browser's tab and the
+      # sidebar's entry that leads to it (the handoff's decision 25).
+      title: "Your account"
+      save: "Save"
+      saved: "Settings saved"
+      profile:
+        title: "Profile"
+        name: "Your name"
+      # The third card: the password form, with what a change does to the
+      # person's sessions under its title.
+      password:
+        title: "Password"
+        sessions: "You'll stay signed in here. Other sessions are signed out."
+        # The form's answer, said in the card (the handoff's decision 43).
+        changed: "Password changed. Your other sessions were signed out."
+        limited: "Try again later."
+      notes:
+        title: "Notes"
+        description: "What happens in this browser when someone mentions you in a note."
+        notes_sound: "Play a sound when I'm mentioned"
+        notes_desktop: "Show a desktop notification when I'm mentioned"
+        permission:
+          ask: "This browser has not been allowed to show notifications yet."
+          allow: "Allow in this browser"
+          blocked: "Blocked in this browser. Change it in the site settings of your browser."
+    # The inbox (notes spec §5): the full list at `<admin>/notes`
+    # (`index`, the view's own lazy-lookup scope) and the dashboard's two
+    # cards. `card.new` stands beside the card's title, in the small
+    # upper-case label style.
+    note_inbox:
+      index:
+        page_title: "Notes for you · CS Studio"
+        title: "Notes for you"
+        mark_all_read: "Mark all read"
+        empty: "No notes for you."
+      card:
+        title: "Notes for you"
+        empty: "No notes for you."
+        # The card's footer link; the arrow is decoration, hidden from a
+        # screen reader.
+        all_html: "All notes for you %{arrow}"
+        mark_all_read: "Mark all read"
+        new:
+          one: "%{count} new"
+          other: "%{count} new"
+      open_threads:
+        title: "Open threads"
+        empty: "No open threads."
+        # The name of the number beside the title, for a screen reader.
+        total:
+          one: "%{count} open thread in all"
+          other: "%{count} open threads in all"
+    # The mind graph's selection card (`mind_graph/card_notes.js`): a post's
+    # open notes and the field that starts one. Served by the Mind graph's own
+    # `messages_data` call, beside the card's other strings in
+    # `mind_graph.en.yml`. The title is drawn in the small upper-case label
+    # style.
+    mind_graph:
+      script:
+        card:
+          notes:
+            title: "Open notes · %{count}"
+            label: "Write a note on this post"
+            add: "Add note"
+            # The button while the note is being sent (decision 41).
+            sending: "Sending…"
+            replies:
+              one: "%{count} reply"
+              other: "%{count} replies"
+            more:
+              one: "+%{count} more"
+              other: "+%{count} more"
+            deleted_user: "a deleted user"
+            # Read out after a row that holds something the viewer has not
+            # read; on screen the row says it with ink and the accent dot.
+            unread: "new"
+            failed: "The notes couldn't be loaded or saved. Try again."
+    components:
+      # The legend's swatch for a node's notes badge.
+      mind_graph_legend:
+        notes: "Open notes"
+      # "Add note", first in the "⋯" menu of a block's card and of its tile in
+      # a section. Neither component's other strings live here
+      # (`components.en.yml` has the tile's; the card is not converted): these
+      # two merge into their scopes.
+      block_card:
+        add_note: "Add note"
+      editor_screen:
+        block_tile:
+          add_note: "Add note"
+        # The editor header's Notes button. `components.en.yml` holds nothing
+        # of the header's yet (it is not converted); these merge into its
+        # scope.
+        header:
+          notes: "Notes"
+          # The page tree's drawer, where the notes column has folded the
+          # tree away and there is no top bar (the top bar's own button
+          # reads the same).
+          tree: "Pages ▾"
+          tree_label: "Open page tree"
+          # The button's accessible name; `admin.notes.script.total` is the
+          # same sentence for the script that keeps it current.
+          notes_label:
+            one: "Notes, %{count} open"
+            other: "Notes, %{count} open"
+      # A record's open notes where it is listed (notes spec §4.4). None of
+      # these three components' other strings live here (they are not
+      # converted): these merge into their scopes.
+      media_library:
+        panel:
+          notes: "Notes"
+          # After "Notes": "· 2 open". `%{number}` is the element the script
+          # rewrites as the count changes, so the sentence has one form.
+          notes_open_html: "· %{number} open"
+          notes_loading: "Loading notes…"
+        tile:
+          open_notes:
+            one: "%{count} open note"
+            other: "%{count} open notes"
+      posts_screen:
+        table:
+          # The column's name, for a screen reader: its header shows an icon.
+          notes: "Notes"
+          open_notes_title: "Open notes"
+          open_notes:
+            one: "%{count} open note"
+            other: "%{count} open notes"
+      tree_node:
+        open_notes:
+          one: "%{count} open note"
+          other: "%{count} open notes"
+      notes_screen:
+        drawer:
+          title: "Notes"
+          # Beside the title: "4 open". `%{number}` is the element the script
+          # rewrites as the count changes, so the sentence has one form.
+          open_html: "%{number} open"
+          new: "New note"
+          close: "Close"
+          loading: "Loading notes…"
+          back: "Back to %{title}"
+          untitled: "(untitled)"
+        list:
+          pinned: "Pinned"
+          open:
+            one: "Open · %{count}"
+            other: "Open · %{count}"
+          none_open: "No open notes."
+          more: "Show more"
+          resolved:
+            one: "Resolved (%{count})"
+            other: "Resolved (%{count})"
+          new: "New note"
+          # The field for a new note (`#notes-new`).
+          new_label: "Write a note"
+          add: "Add note"
+          new_on:
+            page: "New note on this page"
+            post: "New note on this post"
+            media: "New note on this image"
+          new_on_block: "New note on %{block}"
+          empty_title: "No notes yet"
+          empty:
+            page: "Ask a question about this page or one of its blocks."
+            post: "Ask a question about this post."
+            media: "Ask a question about this image."
+          notices:
+            gone: "This note is gone: it was deleted, or what it was on was."
+        # The label above the passage a note quotes, in the list's new-note
+        # field and at the top of a thread.
+        quote:
+          quoted: "Quoted"
+        thread_row:
+          new: "new"
+          replies:
+            one: "%{count} reply"
+            other: "%{count} replies"
+        thread:
+          # The arrow before it is an icon (`:arrow_left`), not part of the text.
+          back: "All notes"
+          # Row 1's Close, the drawer's own while a thread is open.
+          close: "Close"
+          # The × of a refused Pin or Notify's alert, under the two rows.
+          dismiss: "Dismiss"
+          # Row 1's way back to the editor in the sheet (below 1024px), where
+          # the sheet's own header is hidden while a thread is open. These
+          # words for a page and a post alike, without the title (the
+          # handoff's decision 21).
+          leave: "Back to page"
+          # Under what the thread is on: "2 messages · started on DE".
+          messages:
+            one: "%{count} message"
+            other: "%{count} messages"
+          started_on: "started on %{language}"
+          pinned: "Pinned"
+          resolved_by: "Resolved by"
+          written_on: "Written on %{language}"
+          show_more:
+            one: "Show %{count} more"
+            other: "Show %{count} more"
+          resolve: "Resolve"
+          reopen: "Reopen"
+          pin: "Pin"
+          unpin: "Unpin"
+          follow: "Notify me"
+          unfollow: "Stop notifying me"
+          reply: "Reply"
+          send_reply: "Reply"
+        message:
+          edited: "edited"
+          # The name of the "⋯" menu, for a screen reader.
+          actions: "Note actions"
+          edit: "Edit"
+          edit_label: "Edit your note"
+          save: "Save"
+          cancel: "Cancel"
+          delete: "Delete"
+          delete_question: "Delete this note?"
+          delete_confirm: "Delete"
+          # The "⋯" menu's way to the emoji set, for touch (the add chip
+          # shows on hover or focus).
+          react: "React"
+          # In the meta line of a message whose edit was left without saving,
+          # and nowhere else: also while its edit form is open again with the
+          # text put back (the handoff's decisions 27 and 29).
+          unsaved: "Unsaved edit"
+        # A message's files (handoff "Attachment row", "Inline image and
+        # still GIF tile"). `file` is the kind of a file whose stored type is
+        # none of the allowed ones; `open` names an image's link, `download`
+        # a document's; `play` and `pause` are the control of a GIF with
+        # reduced motion; `gif` its label.
+        files:
+          file: "File"
+          open: "Open %{name} in a new tab"
+          download: "Download %{name}"
+          play: "Play"
+          pause: "Pause"
+          gif: "GIF · %{name}"
+        # A message's reaction chips. A chip's name for a screen reader says
+        # the emoji in words, how many, whether one is the viewer's, and who
+        # (its `title` shows the same names to a mouse). `add` names the chip
+        # that opens the set, `react_with` each emoji in it. `names` are the
+        # emoji of `Notes::EMOJI` in words, IN THAT ORDER, one for each
+        # (`test/components/admin/notes_screen/reactions_component_test.rb`).
+        reactions:
+          add: "Add a reaction"
+          react_with: "React with %{name}"
+          chip:
+            one: "%{name}, %{count} reaction, by %{people}"
+            other: "%{name}, %{count} reactions, by %{people}"
+          chip_mine:
+            one: "%{name}, %{count} reaction, yours"
+            other: "%{name}, %{count} reactions, yours among them, by %{people}"
+          names:
+            - "thumbs up"
+            - "thumbs down"
+            - "check mark"
+            - "cross mark"
+            - "red heart"
+            - "party popper"
+            - "folded hands"
+            - "eyes"
+            - "thinking face"
+            - "grinning face"
+            - "grinning face with sweat"
+            - "face with tears of joy"
+            - "smiling face with heart eyes"
+            - "face with open mouth"
+            - "crying face"
+            - "enraged face"
+            - "fire"
+            - "star"
+            - "light bulb"
+            - "question mark"
+            - "exclamation mark"
+            - "hourglass"
+            - "rocket"
+            - "pushpin"
+            - "memo"
+            - "link"
+            - "framed picture"
+            - "bug"
+            - "speech balloon"
+            - "waving hand"
+        # A block's marker as the server draws it, before the script has the
+        # counts: its name without notes, and what it reads while text is
+        # selected in the block (`admin.notes.script.marker` are its names
+        # in every state).
+        marker:
+          add: "Add a note on %{name}"
+          selection: "Note on selection"
+        composer:
+          people: "People you can mention"
+          emoji: "Emoji"
+          mention: "Mention someone"
+          attach: "Attach files"
+          attach_title: "Attach up to %{count} files, %{size} each"
+          chosen: "Files to attach"
+          # Above the field of a form that was drawn again without the
+          # files chosen in it (after a refusal): their names, comma-separated.
+          files_lost: "Choose the files again: %{names}"
+          # The submit button's tooltip: the send key. The script writes
+          # `script.send_apple` instead on an Apple platform.
+          send_title: "Send (Ctrl+Enter)"
+          # The field's placeholder, from its label: "Reply…", "Write a note…".
+          placeholder: "%{label}…"
+        # One line of the inbox. Each reason is a whole sentence in each of
+        # its three shapes: with a name (`%{name}` arrives as markup, the
+        # name in a heavier weight), for a person who has since been deleted,
+        # and with nobody to name (a reopen records no one).
+        inbox_row:
+          unread: "Unread"
+          untitled: "(untitled)"
+          mention:
+            somebody_html: "%{name} mentioned you"
+            deleted: "A deleted user mentioned you"
+            nobody: "You were mentioned"
+          reply:
+            somebody_html: "%{name} replied"
+            deleted: "A deleted user replied"
+            nobody: "Someone replied"
+          resolved:
+            somebody_html: "%{name} resolved a note"
+            deleted: "A deleted user resolved a note"
+            nobody: "A note was resolved"
+          reopened:
+            somebody_html: "%{name} reopened a note"
+            deleted: "A deleted user reopened a note"
+            nobody: "A note was reopened"
+          where:
+            page: "Page · %{title}"
+            post: "Post · %{title}"
+            media: "Image · %{title}"
+            block: "%{place} · %{block}"
+        open_thread_row:
+          untitled: "(untitled)"
+          kind:
+            page: "Page"
+            media: "Image"
+          open:
+            one: "%{count} open note"
+            other: "%{count} open notes"

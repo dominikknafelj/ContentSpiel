@@ -16,7 +16,9 @@
 #
 # Optional: `control_actor:` (a user to run the control as, for a service
 # with a User-only rule: the control then runs on the :admin channel) and `control_audit_only:` (a reason, for a call that
-# legitimately writes nothing but the audit log).
+# legitimately writes nothing but the audit log) and `control_unaudited:` (a
+# reason, for a service that says `# audit: none`: the control must then
+# record nothing).
 #
 # Two runs prove the call:
 #
@@ -48,7 +50,7 @@ module ServiceCalls
     "ApiTokens::Issue" => { manager_may: true, reason: "any signed-in user may issue a token for themselves; anyone else needs tokens.manage" },
     "ApiTokens::Revoke" => { manager_may: true, reason: "any signed-in user may revoke their own token; anyone else needs tokens.manage" },
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
-    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name; anyone else's goes through Users::Save" }
+    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" }
   }.freeze
 
   # The two bulk services answer with their own result (no `denied?`): an id
@@ -168,6 +170,14 @@ module ServiceCalls
     end
 
     def png_upload = Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")
+
+    # A thread on `subject` with its first message, written by `by` (a user
+    # who may read it): what the notes services act on.
+    def note_on(subject, by: users(:one), body: "A question")
+      result = as(by) { Notes::Start.call(subject, body: body) }
+      assert result.ok?, result.errors.to_sentence
+      result.record
+    end
   end
 
   FACTORIES = {
@@ -267,6 +277,90 @@ module ServiceCalls
     "Media::Upload" => lambda {
       file = png_upload
       { call: -> { Media::Upload.call(file: file) }, permission: "media.upload", on: Media::Asset }
+    },
+
+    # A message someone else wrote: deleting it is moderation, which the
+    # trusted actor may; the stranger is refused for the read right first.
+    "Notes::DeleteMessage" => lambda {
+      page = create_page(title: "Noted", published: false)
+      message = note_on(page).first_message
+      { call: -> { Notes::DeleteMessage.call(message) }, permission: "pages.read", on: page }
+    },
+
+    # Only its author may edit a message, so the control runs as the author.
+    "Notes::EditMessage" => lambda {
+      page = create_page(title: "Noted", published: false)
+      message = note_on(page, by: users(:one)).first_message
+      { call: -> { Notes::EditMessage.call(message, body: "Reworded") }, permission: "pages.read", on: page, control_actor: users(:one) }
+    },
+
+    # The actor's own inbox rows: the control runs as the person told.
+    "Notes::MarkRead" => lambda {
+      page = create_page(title: "Noted", published: false)
+      note_on(page, by: users(:one), body: "Look, @[#{users(:two).id}]")
+      { call: -> { Notes::MarkRead.call(container: page) }, permission: "pages.read", on: page, control_actor: users(:two),
+        control_unaudited: "a read mark is the reader's own bookkeeping, not a change to content" }
+    },
+
+    "Notes::Pin" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      { call: -> { Notes::Pin.call(thread) }, permission: "pages.edit", on: page }
+    },
+
+    # Whoever may read the record may react; the control is someone else's
+    # reaction to the owner's note.
+    "Notes::React" => lambda {
+      page = create_page(title: "Noted", published: false)
+      note = note_on(page).first_message
+      { call: -> { Notes::React.call(note, emoji: "👍", on: true) }, permission: "pages.read", on: page, control_actor: users(:two),
+        control_unaudited: "a reaction is an acknowledgement, not a change to content or to a note's text" }
+    },
+
+    "Notes::Remove" => lambda {
+      page = create_page(title: "Noted", published: false)
+      note_on(page)
+      trashed(page)
+      { call: -> { Notes::Remove.call(page) }, permission: "pages.delete", on: page }
+    },
+
+    "Notes::Reopen" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      assert Notes::Resolve.call(thread).ok?
+      { call: -> { Notes::Reopen.call(thread) }, permission: "pages.read", on: page }
+    },
+
+    "Notes::Reply" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      { call: -> { Notes::Reply.call(thread, body: "An answer") }, permission: "pages.read", on: page }
+    },
+
+    "Notes::Resolve" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      { call: -> { Notes::Resolve.call(thread) }, permission: "pages.read", on: page }
+    },
+
+    # A person's own follow row: the control runs as someone who never wrote in the thread.
+    "Notes::SetFollowing" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page, by: users(:one))
+      { call: -> { Notes::SetFollowing.call(thread, following: true) }, permission: "pages.read", on: page, control_actor: users(:two),
+        control_unaudited: "following a thread changes who is told, not the content or the thread" }
+    },
+
+    "Notes::Start" => lambda {
+      page = create_page(title: "Noted", published: false)
+      { call: -> { Notes::Start.call(page, body: "A question") }, permission: "pages.read", on: page }
+    },
+
+    "Notes::Unpin" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      assert Notes::Pin.call(thread).ok?
+      { call: -> { Notes::Unpin.call(thread) }, permission: "pages.edit", on: page }
     },
 
     "Pages::Move" => lambda {

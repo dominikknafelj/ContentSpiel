@@ -399,4 +399,18 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert(texts.none? { |text| text.html_safe? })
     assert_includes texts, "<b>Bold</b>"
   end
+
+  test "a note's events read as sentences about the record, a block's about its page" do
+    page = create_page(title: "Pricing")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    assert_equal "You started a note on “Pricing”", read(sentence_for(event("note.started", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+    assert_equal "You replied to a note on “Pricing”", read(sentence_for(event("note.replied", subject_type: "ContentBlock", subject_id: block.id, subject_label: "Rich text block ##{block.id}")))
+    assert_equal "You edited a note on “Pricing”", read(sentence_for(event("note.edited", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+    assert_equal "You deleted a note on “Pricing”", read(sentence_for(event("note.deleted", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+    assert_equal "You resolved a note on “Pricing”", read(sentence_for(event("note.resolved", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+    assert_equal "You pinned a note on “Pricing”", read(sentence_for(event("note.pinned", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+    assert_equal "You unpinned a note on “Pricing”", read(sentence_for(event("note.unpinned", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+    assert_equal "You removed the notes on “Pricing”", read(sentence_for(event("notes.removed", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+  end
 end

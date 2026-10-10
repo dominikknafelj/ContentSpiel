@@ -1,0 +1,66 @@
+<div id="notes-list" class="flex flex-col" data-notes-view="list" data-notes-container="<%= key %>">
+  <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
+
+  <% if notice %>
+    <p role="status" class="mx-4 mt-3 rounded-cs border border-line bg-sunken px-3 py-2 text-[13px] text-ink"><%= t(".notices.#{notice}") %></p>
+  <% end %>
+
+  <% if composing? %>
+    <section id="notes-new" aria-labelledby="notes-new-title" class="flex flex-col gap-2 border-b border-line px-4 pb-4 pt-3">
+      <h3 id="notes-new-title" class="font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= compose_title %></h3>
+      <%= render Admin::NotesScreen::QuoteComponent.new(quote: quote) %>
+      <%= render Admin::NotesScreen::ComposerComponent.new(url: threads_path, key: "new-#{key}-#{compose_key}", label: t(".new_label"), submit: t(".add"),
+            mentions_url: mentions_path, rows: 3, hidden: { subject: compose_key, quote: quote.to_s },
+            body: failed_new&.dig(:body).to_s, names: failed_new&.dig(:names) || {}, errors: failed_new&.dig(:errors), files_lost: failed_new&.dig(:files_lost)) %>
+    </section>
+  <% elsif !empty? %>
+    <%# Not shown inside the editors' drawer, whose header has the one "New
+        note" (`.admin-notes-drawer` in content-spiel.tailwind.css); the empty
+        state's action below follows the same rule. %>
+    <p class="px-4 pt-3"><%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes", turbo_prefetch: false } %></p>
+  <% end %>
+
+  <% if empty? && !composing? %>
+    <%= render Admin::EmptyStateComponent.new(title: t(".empty_title"), description: t(".empty.#{type}")) do |empty_state| %>
+      <% empty_state.with_action do %>
+        <%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes", turbo_prefetch: false } %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if listing.pinned.any? %>
+    <section id="notes-pinned" aria-labelledby="notes-pinned-title" class="flex flex-col">
+      <h3 id="notes-pinned-title" class="px-4 pb-1.5 pt-4 font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= t(".pinned") %></h3>
+      <% listing.pinned.each do |record| %><%= render row(record, show_subject: true) %><% end %>
+    </section>
+  <% end %>
+
+  <% unless empty? %>
+    <%# The section's name is for a screen reader: on screen each group's own
+        heading says what its rows are on, and the header says how many are
+        open (handoff "Group heading"). Its id is `notes-open-list`:
+        `#notes-open` is the editor header's button (the plan's stable ids). %>
+    <section id="notes-open-list" aria-labelledby="notes-open-list-title" class="flex flex-col">
+      <h3 id="notes-open-list-title" class="sr-only"><%= t(".open", count: listing.open_count) %></h3>
+      <% if listing.open_count.zero? %>
+        <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".none_open") %></p>
+      <% end %>
+      <% listing.groups.each do |group| %>
+        <section id="notes-group-<%= group.key %>" data-notes-group="<%= group.key %>" tabindex="-1" class="flex flex-col focus:outline-none">
+          <%= render group_heading(group) %>
+          <% group.threads.each do |record| %><%= render row(record) %><% end %>
+        </section>
+      <% end %>
+      <% if listing.more? %>
+        <p class="px-4 py-3.5"><%= link_to t(".more"), more_path, class: setup_secondary_link_class, data: { turbo_frame: "notes", turbo_prefetch: false } %></p>
+      <% end %>
+    </section>
+  <% end %>
+
+  <% if listing.resolved_count.positive? %>
+    <details id="notes-resolved-section">
+      <summary class="cursor-pointer px-4 py-3.5 text-[13px] text-dim hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"><%= t(".resolved", count: listing.resolved_count) %></summary>
+      <%= tag.turbo_frame id: "notes-resolved", src: resolved_path, loading: "lazy" %>
+    </details>
+  <% end %>
+</div>

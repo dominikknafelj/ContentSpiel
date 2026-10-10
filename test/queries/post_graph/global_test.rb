@@ -15,7 +15,8 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     node = graph[:nodes].find { |n| n[:id] == a.id }
 
     assert_equal({ id: a.id, title: "Alpha", type: "resume_entry", colour_index: ContentTypes.fetch("resume_entry").colour_index,
-                   status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1, related_count: 1, tag_count: 0 }, node)
+                   status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1, related_count: 1, tag_count: 0,
+                   open_notes: 0 }, node)
   end
 
   # The selection card says "N related · N tags": the two halves of `degree`,
@@ -186,5 +187,49 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     statements = capture_sql { graph }
 
     assert statements.none? { |sql| sql.include?('"posts".*') }, "a whole post row was loaded:\n#{statements.grep(/"posts"/).join("\n")}"
+  end
+
+  test "a node carries its post's open notes, and the count costs one statement whatever the number of threads" do
+    a = create_post(title: "A")
+    b = create_post(title: "B")
+    relate(a, b)
+    as(users(:two)) do
+      2.times { Notes::Start.call(a, body: "A note") }
+      Notes::Resolve.call(Notes::Start.call(b, body: "Done").record)
+    end
+
+    nodes = graph[:nodes].index_by { |node| node[:id] }
+    assert_equal [ 2, 0 ], [ nodes[a.id][:open_notes], nodes[b.id][:open_notes] ]
+
+    few = capture_sql { graph }.size
+    as(users(:two)) { 7.times { Notes::Start.call(b, body: "More") } }
+    assert_equal few, capture_sql { graph }.size
+  end
+
+  # The badge is neutral (handoff, "Mind graph node badge"): what is unread
+  # for the viewer is said on the card's rows, never on the node. So the
+  # graph's data says nothing about the viewer's deliveries, and reads none.
+  test "a node says nothing about what is unread for the viewer, and no delivery is read for the graph" do
+    a = create_post(title: "A")
+    relate(a, create_post(title: "B"))
+    as(users(:two)) { Notes::Start.call(a, body: "For @[#{users(:one).id}]") }
+    viewer = users(:one)
+
+    statements = capture_sql { assert(graph(actor: viewer)[:nodes].none? { |node| node.key?(:unread_notes) }) }
+
+    assert_equal 1, statements.count { |sql| sql.include?("note_threads") }
+    assert_empty statements.grep(/note_deliveries/)
+  end
+
+  # Five statements before notes (the readable ids, the relations, the tag
+  # links, the posts, the tags' names); the notes add ONE.
+  test "the global graph costs six statements" do
+    a = create_post(title: "A", tags: %w[shared])
+    relate(a, create_post(title: "B", tags: %w[shared]))
+    as(users(:two)) { Notes::Start.call(a, body: "A note") }
+
+    viewer = users(:one) # loaded here, so the fixture's own read is not counted
+
+    assert_equal 6, capture_sql { graph(actor: viewer) }.size
   end
 end

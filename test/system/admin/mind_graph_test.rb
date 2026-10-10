@@ -796,8 +796,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # In order (the design review of 2026-10-08): the type's dot, the type and
   # the status chip with Close at the end of the row; the title; the counts;
   # then the actions, which are CS Studio's buttons -- the primary one first --
-  # and not underlined links.
-  test "the card reads top to bottom: kind and status, the title, the two counts, then its actions as buttons" do
+  # and not underlined links. A post's notes stand under the title and its
+  # counts and the actions follow them, in the document as on screen (the
+  # notes handoff's decision 12).
+  test "the card reads top to bottom: kind and status, the title, the two counts, its notes, then its actions as buttons" do
     a = create_post(title: "Alpha", tags: %w[one two])
     b = create_post(title: "Beta", tags: %w[one two])
     PostRelation.create!(post: a, related_post: b)
@@ -810,21 +812,27 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     card = find("[data-mind-graph-card]")
     # Close is the last child, so Tab meets the actions before it; on screen
     # it stands in the card's top-right corner.
-    assert_equal %w[DIV H2 P DIV BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
+    assert_equal %w[DIV H2 P SECTION DIV BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
     within(card) do
       assert_selector ":scope > div:first-child span[aria-hidden='true'].rounded-full", count: 2 # the type's dot, the status chip's
       assert_selector ":scope > button:last-child[data-mind-graph-card-close][aria-label='Close']"
       assert_selector "h2", text: "Alpha"
       assert_text(/2 related\s*·\s*2 tags/i)
-      assert_equal [ "Open post", "Focus", "Pin" ], all(":scope > div:nth-child(4) > *").map(&:text)
-      assert_equal %w[A A BUTTON], all(":scope > div:nth-child(4) > *").map(&:tag_name).map(&:upcase)
+      assert_equal [ "Open post", "Focus", "Pin" ], all(":scope > div:nth-child(5) > *").map(&:text)
+      assert_equal %w[A A BUTTON], all(":scope > div:nth-child(5) > *").map(&:tag_name).map(&:upcase)
+      # No visual reordering: the row is drawn where it stands in the document.
+      assert_no_selector ":scope > [class~='order-1']"
     end
+    # On screen: the counts, the notes, the actions.
+    notes = element_box("[data-mind-graph-card] > section")
+    assert_operator element_box("[data-mind-graph-card] > p")["bottom"], :<=, notes["top"], "the notes are not under the counts"
+    assert_operator notes["bottom"], :<=, element_box("[data-mind-graph-card] > div:nth-child(5)")["top"], "the actions are not under the notes"
     close = element_box("[data-mind-graph-card-close]")
     box = element_box("[data-mind-graph-card]")
     assert_operator box["right"] - close["right"], :<, 12, "Close is not in the card's right corner"
     assert_operator close["top"] - box["top"], :<, 12, "Close is not in the card's top corner"
     styles = page.evaluate_script(<<~JS)
-      Array.from(document.querySelectorAll("[data-mind-graph-card] > div:nth-child(4) > *")).map((action) => {
+      Array.from(document.querySelectorAll("[data-mind-graph-card] > div:nth-child(5) > *")).map((action) => {
         const style = getComputedStyle(action)
         return { underlined: style.textDecorationLine !== "none", filled: style.backgroundColor, bordered: style.borderTopWidth }
       })
@@ -1248,7 +1256,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_node(a.id)
     assert_selector "[data-mind-graph-card]", visible: :visible
 
-    drag_node(a.id, by: [ 60, 90 ], release: false)
+    # Towards the card and over where it stands, in small steps as a hand
+    # moves: the first few pixels make the press a drag, which takes the card
+    # out of the way before the pointer gets there.
+    drag_node(a.id, by: [ 60, 90 ], release: false, steps: 12)
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal a.id.to_s, graph["data-selected"], "the drag cleared the selection"
     page.driver.browser.mouse.up
@@ -1646,6 +1657,302 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert page.evaluate_script("window.searchSignals.every((signal) => signal.aborted)"), "the request was left open after the screen was left"
   end
 
+  # --- notes (notes spec §4.4) ------------------------------------------------
+
+  test "a post with open notes shows them in its card, and a note is started from the card" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates, @[#{users(:one).id}]") }
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+
+    assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row][data-unread]", text: "Check the dates"
+    # The heading is in the small upper-case label style: matched whatever the case, as the card's counts are.
+    assert_selector "[data-mind-graph-card-notes] h3", text: /open notes · 1/i
+    # Unread is said in words too, for whoever does not see the ink and the dot.
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row][data-unread] .sr-only", text: "new", visible: :all
+    # The row leads into the post's editor with the drawer open at that thread.
+    thread = Notes::Thread.order(:id).last
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row] a[href$='/posts/#{a.id}?notes=open&thread=#{thread.id}']"
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("And the prices")
+      press "Add note"
+    end
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
+    assert_selector "[data-mind-graph-card-notes] h3", text: /open notes · 2/i
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]:not([data-unread])", count: 1
+    assert_selector "[data-mind-graph-card-notes] .sr-only", count: 1, visible: :all # the viewer's own note is not "new"
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+    assert_equal [ "mind_graph", a ], Notes::Thread.order(:id).last.then { |started| [ started.origin_view, started.subject ] }
+    # Listing a post's notes in the card read none of them (decision P10).
+    assert_equal 1, Notes::Delivery.unread.where(user: users(:one)).count
+  end
+
+  # Live delivery (notes spec §6): the card's notes are a part that draws
+  # itself, so `admin--notes-live` only tells it that the post's notes changed.
+  test "the card's notes follow a note started elsewhere, and the tab's own note is not fetched twice" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card-notes][data-admin--notes-live-target=record][data-notes-type=post][data-notes-id='#{a.id}'] textarea"
+    assert_no_selector "[data-mind-graph-card-notes] li[data-note-row]"
+    await_notes_live
+
+    as(users(:two)) { assert Notes::Start.call(a, body: "Started elsewhere").ok? }
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "Started elsewhere", wait: 8
+    assert_selector "[data-mind-graph-card-notes] h3", text: /open notes · 1/i
+
+    # The card's own note names this tab, so its signal is not answered with
+    # a second read of the list: one GET, the card's own after the save.
+    page.execute_script(<<~JS)
+      window.__noteReads = 0
+      const original = window.fetch
+      window.fetch = (...args) => {
+        if (String(args[0].url || args[0]).includes("/notes/post/") && !args[1]?.method) window.__noteReads += 1
+        return original(...args)
+      }
+    JS
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("From the graph")
+      press "Add note"
+    end
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "it was not fetched again" means anything
+    assert_equal 1, page.evaluate_script("window.__noteReads")
+
+    # The card closed: its subscription is let go, and the page stays live.
+    escape_on_canvas
+    assert_no_selector "[data-mind-graph-card-notes]"
+    await_js("document.body.dataset.notesLive === 'connected'")
+  end
+
+  test "three notes in the card, then a link to the rest; a post without notes has only the field" do
+    a = create_post(title: "Alpha")
+    b = create_post(title: "Beta")
+    PostRelation.create!(post: a, related_post: b)
+    as(users(:two)) { 5.times { |index| Notes::Start.call(a, body: "Note #{index}") } }
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 3
+    assert_selector "[data-mind-graph-card-notes] a[data-note-more][href$='/posts/#{a.id}?notes=open']", text: "+2 more"
+    # The notes arrive after the card was first measured: it is measured
+    # again, so it still stands whole inside the canvas.
+    card = element_box("[data-mind-graph-card]")
+    canvas = canvas_box
+    assert_operator card["bottom"], :<=, canvas[3] - 7, "the card with its notes reaches below the canvas"
+    assert_operator card["top"], :>=, canvas[1] + 7, "the card with its notes reaches above the canvas"
+
+    escape_on_canvas # the open card may stand over the other node
+    click_node(b.id)
+    assert_selector "[data-mind-graph-card-notes] textarea"
+    assert_no_selector "[data-mind-graph-card-notes] li"
+    assert_no_selector "[data-mind-graph-card-notes] h3" # zero threads: only the field (handoff)
+  end
+
+  # A note's text and its author's name are a person's: written as text.
+  test "a note with markup in it is text in the card, and so is its author's name" do
+    users(:two).update!(name: "<img src=x onerror='window.pwned = 1'>")
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "<img src=x onerror='window.pwned = 2'> see") }
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 2'> see"
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 1'>"
+    assert_no_selector "[data-mind-graph-card] img", visible: :all
+    assert_nil page.evaluate_script("window.pwned")
+  end
+
+  # A mention typed by hand of someone who may not read the post (Review
+  # Focus 2) is refused by the service; the card says why and keeps the text.
+  test "a note the server refuses is answered in the card, and what was typed stays in the field" do
+    stranger = User.create!(email_address: "stranger@example.com", password: "password-password", name: "Sam")
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("Ask @[#{stranger.id}]")
+      press "Add note"
+      assert_selector "[role=status]", text: "Someone you mentioned can't see this post."
+      assert_equal "Ask @[#{stranger.id}]", find("textarea").value
+      assert_no_selector "li"
+    end
+    assert_equal 0, Notes::Thread.count
+  end
+
+  # Escape in the field, a click on the canvas and another node all close the
+  # card, and the card is built anew each time: a half-typed note went with
+  # it. The field keeps a draft like the composers do, per person and per
+  # post (`cs-note-draft:<user id>:graph-Post-<id>`).
+  test "a note half typed in the card is back when that post's card opens again, is no other post's, and is gone once sent" do
+    a = create_post(title: "Alpha")
+    b = create_post(title: "Beta")
+    PostRelation.create!(post: a, related_post: b)
+    visit admin_mind_graph_path
+    await_graph
+    key = "cs-note-draft:#{users(:one).id}:graph-Post-#{a.id}"
+
+    click_node(a.id)
+    find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
+    assert_eventually { page.evaluate_script("JSON.parse(window.sessionStorage.getItem(#{key.to_json}) || '{}').body") == "Half a thought" }
+    find("[data-mind-graph-card-notes] textarea").send_keys(:escape)
+    assert_no_selector "[data-mind-graph-card]"
+
+    # By the list: a card may stand over the other node on the canvas.
+    find("#{LIST} button", text: "Beta").click
+    assert_selector "[data-mind-graph-card-notes][data-notes-id='#{b.id}']"
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+
+    find("#{LIST} button", text: "Alpha").click
+    assert_selector "[data-mind-graph-card-notes][data-notes-id='#{a.id}']"
+    assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
+
+    within("[data-mind-graph-card-notes]") { press "Add note" }
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "Half a thought"
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+    assert_nil page.evaluate_script("window.sessionStorage.getItem(#{key.to_json})")
+
+    # Emptied by hand, there is no draft either.
+    find("[data-mind-graph-card-notes] textarea").send_keys("x", :backspace)
+    assert_nil page.evaluate_script("window.sessionStorage.getItem(#{key.to_json})")
+  ensure
+    page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
+  end
+
+  # What is typed after "Add note", while the note is on its way, would be
+  # wiped with the field: the field is read-only for as long.
+  test "the card's field is read-only while its note is on the way" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    find("[data-mind-graph-card-notes] textarea").send_keys("On its way")
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.fetch = (...args) => {
+        if (String(args[1]?.method || "GET").toUpperCase() !== "POST" || window.__held) return original(...args)
+        window.__held = true
+        return new Promise((resolve) => { window.__release = () => resolve(original(...args)) })
+      }
+    JS
+
+    within("[data-mind-graph-card-notes]") { press "Add note" }
+    assert_eventually(message: "the note was never sent") { page.evaluate_script("window.__held === true && typeof window.__release === 'function'") }
+
+    field = find("[data-mind-graph-card-notes] textarea")
+    assert field.readonly?, "the card's field can be typed in while its note is on the wire"
+    assert_equal "On its way", field.value
+    # Still out after 300ms: it says so (the notes handoff's decision 41).
+    assert_selector "[data-mind-graph-card-notes] button[type=submit][aria-busy=true][disabled]", text: "Sending…"
+    assert page.evaluate_script("document.querySelector('[data-mind-graph-card-notes] textarea').classList.contains('text-dim')")
+    page.execute_script("window.__release()")
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "On its way"
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+    assert_not find("[data-mind-graph-card-notes] textarea").readonly?
+    assert_selector "[data-mind-graph-card-notes] button[type=submit]:not([aria-busy]):not([disabled])", text: "Add note"
+    assert_not page.evaluate_script("document.querySelector('[data-mind-graph-card-notes] textarea').classList.contains('text-dim')")
+  ensure
+    page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
+  end
+
+  # `roundRect` is newer than the rest of what the canvas draws. Without it
+  # the badge is a plain rectangle, and the graph is drawn all the same: a
+  # throw inside the draw took the whole canvas down (and fails this test,
+  # as any JavaScript error does).
+  test "a browser without roundRect still draws the graph, and a noted post's badge as a rectangle" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    bare = notes_badge_pixel(a)
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
+    script = page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument", source: "delete CanvasRenderingContext2D.prototype.roundRect")
+
+    visit admin_mind_graph_path
+    await_graph
+
+    assert_equal "undefined", page.evaluate_script("typeof CanvasRenderingContext2D.prototype.roundRect")
+    assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row]", text: "Check the dates"
+  ensure
+    page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
+  end
+
+  # The badge is canvas pixels: the corner opposite the pin's holds something
+  # else once the post has an open note.
+  test "a post with an open note carries a badge on its top-left corner" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    bare = notes_badge_pixel(a)
+
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
+    visit admin_mind_graph_path
+    await_graph
+
+    assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
+    assert_selector "[data-legend='notes']", text: "Open notes"
+  end
+
+  # A second click on the node the card is already about leaves the card as
+  # it is: the note being typed in it is not thrown away, and its notes are
+  # not fetched again.
+  test "clicking the selected node again keeps the card and what is typed in it" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 1
+    find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
+    page.execute_script("document.querySelector('[data-mind-graph-card-notes]').dataset.same = 'yes'; window.notesFetches = 0; window.realFetch = window.fetch; window.fetch = (...args) => { if (String(args[0]).includes('/notes/')) window.notesFetches += 1; return window.realFetch(...args) }")
+
+    click_node(a.id)
+    await_frames
+
+    assert_equal a.id.to_s, graph["data-selected"]
+    assert_selector "[data-mind-graph-card-notes][data-same='yes']"
+    assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
+    assert_equal 0, page.evaluate_script("window.notesFetches"), "the card's notes were fetched again"
+  ensure
+    page.execute_script("if (window.realFetch) { window.fetch = window.realFetch; delete window.realFetch }") # the window is shared with what follows
+  end
+
+  # A note started from the card is on the canvas at once: the node's badge
+  # is drawn from the count the card read back, with no reload.
+  test "a note started from the card puts the badge on its node" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    bare = notes_badge_pixel(a)
+    click_node(a.id)
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("Check the dates")
+      press "Add note"
+    end
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 1
+
+    assert_not_equal bare, notes_badge_pixel(a), "no notes badge after a note was started from the card"
+  end
+
   private
 
   # What the endpoint answers for a site over the cap, cut down to two nodes:
@@ -1831,9 +2138,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # The keyboard's whole way: a row is reached by Tab (it is a button), Enter
-  # selects its node and hands the focus to the card, whose first stop is
-  # "Open post"; Escape gives the focus back to the row.
-  test "the list is the keyboard path: Enter on a row opens the node's card and moves the focus to it" do
+  # selects its node and hands the focus to the card; Tab then walks the card
+  # as it reads -- the note's field before "Open post" (the notes handoff's
+  # decision 12) -- Enter on the card opens the post, and Escape gives the
+  # focus back to the row.
+  test "the list is the keyboard path: Enter on a row opens the node's card and moves the focus to it, and Enter there opens the post" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
@@ -1848,15 +2157,50 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal a.id.to_s, graph["data-selected"]
     assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the focus did not move to the card"
     assert_equal "mind-graph-card-title", find("[data-mind-graph-card]")["aria-labelledby"], "the card is not named by its title"
+    # Tab meets the card in its reading order: the notes' field, then the actions.
+    assert_selector "[data-mind-graph-card] textarea"
     page.driver.browser.keyboard.type(:Tab)
-    assert_equal "Open post", page.evaluate_script("document.activeElement.textContent")
+    assert_equal "TEXTAREA", page.evaluate_script("document.activeElement.tagName")
+    stops = page.evaluate_script("Array.from(document.querySelectorAll('[data-mind-graph-card] :is(a[href], button, textarea)')).filter((stop) => !stop.disabled && stop.getClientRects().length > 0).map((stop) => stop.tagName === 'TEXTAREA' ? 'field' : stop.textContent.trim())")
+    assert_operator stops.index("field"), :<, stops.index("Open post")
+    assert_equal [ "Open post", "Focus", "Pin", "×" ], stops.last(4)
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "Alpha", page.evaluate_script("document.activeElement.querySelector('span.truncate')?.textContent"), "the focus did not go back to the row"
 
+    # Enter on the row again, then Enter on the card: the post.
     page.driver.browser.keyboard.type(:Enter)
-    page.driver.browser.keyboard.type(:Tab)
+    assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')")
+    click_frame_link { page.driver.browser.keyboard.type(:Enter) }
+    assert_current_path admin_post_path(a)
+  end
+
+  # The notes handoff's decision 12: Enter on the selected node opens the post.
+  test "Enter on the canvas opens the selected post, does nothing with nothing selected, and stays a line break in the note's field" do
+    a = create_post(title: "Alpha", tags: %w[shared])
+    create_post(title: "Beta", tags: %w[shared])
+    visit admin_mind_graph_path
+    await_graph
+    canvas = CANVAS
+
+    # Nothing selected: nothing happens.
+    find(canvas).execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Enter)
+    await_frames
+    assert_current_path admin_mind_graph_path
+
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card] a", text: "Open post"
+    # In the note's field Enter is the field's own.
+    field = find("[data-mind-graph-card] textarea")
+    field.execute_script("this.focus()")
+    page.driver.browser.keyboard.type("One", :Enter, "Two")
+    await_frames
+    assert_equal "One\nTwo", field.value
+    assert_current_path admin_mind_graph_path
+
+    find(canvas).execute_script("this.focus()")
     click_frame_link { page.driver.browser.keyboard.type(:Enter) }
     assert_current_path admin_post_path(a)
   end
@@ -1936,7 +2280,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # drag: on a slow runner that was more than the two pixels allowed below,
   # and "the node is where it was dropped" timed out. A person presses where
   # the node is; a test can only press where it was.
-  def drag_node(id, by:, release: true)
+  def drag_node(id, by:, release: true, steps: 1)
     assert_selector "#{GRAPH}[data-settled]", wait: 15
     from = screen_position(id)
     assert from, "node #{id} is not on screen"
@@ -1944,8 +2288,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse = page.driver.browser.mouse
     mouse.move(x: from["x"], y: from["y"])
     mouse.down
-    mouse.move(x: from["x"] + (by[0] / 2), y: from["y"] + (by[1] / 2))
-    mouse.move(x: to["x"], y: to["y"])
+    mouse.move(x: from["x"] + (by[0] / 2), y: from["y"] + (by[1] / 2), steps: steps)
+    mouse.move(x: to["x"], y: to["y"], steps: steps)
     await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{id.to_json}); return Math.abs(p.x - #{to["x"]}) < 2 && Math.abs(p.y - #{to["y"]}) < 2 })()")
     mouse.up if release
     to
@@ -1989,6 +2333,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   def pin_pixel(post)
     point = screen_position(post.id)
     pixel_at(point["x"] + 5.04, point["y"] - 5.04)
+  end
+
+  # The canvas's colour where a node's notes badge is: up and to the LEFT of
+  # the centre of a 7 px dot (the pin's corner is up and to the right).
+  def notes_badge_pixel(post)
+    point = screen_position(post.id)
+    pixel_at(point["x"] - 5.04, point["y"] - 5.04)
   end
 
   # The browser says the person prefers reduced motion inside the block, and

@@ -152,7 +152,7 @@ export function mount(element) {
   const dotClasses = JSON.parse(element.dataset.dotClasses)
   const card = createCard(cardElement, {
     text,
-    urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl },
+    urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl, postNotes: element.dataset.postNotesUrl },
     typeLabels: JSON.parse(element.dataset.typeLabels),
     dotClasses,
     buttonClasses: JSON.parse(element.dataset.buttonClasses),
@@ -163,14 +163,29 @@ export function mount(element) {
       if (state.selected < 0) return
       if (state.pinned.has(state.selected)) unpin([ state.selected ])
       else pin(state.selected)
+    },
+    // The card's notes arrive after the card was measured, and a note started
+    // there changes the node's badge: the card is measured and placed again,
+    // and the canvas redrawn.
+    onChange: () => {
+      measureCard()
+      requestDraw()
     }
   })
   // Escape closes the card from inside it too, not only from the canvas
   // (`input.js` hears the canvas's keys alone).
+  // Enter opens the selected post while the focus is on the card ITSELF,
+  // where the list hands it: on a control inside the card Enter is that
+  // control's own (a link, a button, a line break in the note's field).
   const cardKeydown = (event) => {
-    if (event.key !== "Escape" || event.ctrlKey || event.metaKey || event.altKey) return
-    event.preventDefault()
-    closeCard()
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.key === "Enter" && event.target === cardElement) {
+      event.preventDefault()
+      card.open()
+    } else if (event.key === "Escape") {
+      event.preventDefault()
+      closeCard()
+    }
   }
   cardElement.addEventListener("keydown", cardKeydown)
 
@@ -375,6 +390,10 @@ export function mount(element) {
 
   function select(index) {
     openedFromRow = null
+    // The node the card already shows: a second click on it, or a filter
+    // change that keeps it, must not build the card again -- that would
+    // throw away a note half typed in it and fetch its notes once more.
+    const shown = index >= 0 && index === state.selected && cardElement.childElementCount > 0
     state.selected = index
     state.neighbours = new Set()
     if (index >= 0) {
@@ -388,7 +407,7 @@ export function mount(element) {
     element.dataset.neighbours = Array.from(state.neighbours, (neighbour) => state.nodes[neighbour].id).join(",")
     if (index >= 0) {
       // Without a layout there is nothing to pin (the worker failed).
-      card.show(state.nodes[index], { pinned: state.pinned.has(index), pinnable: Boolean(layout) })
+      if (!shown) card.show(state.nodes[index], { pinned: state.pinned.has(index), pinnable: Boolean(layout) })
       measureCard()
     } else {
       card.hide()
@@ -689,6 +708,8 @@ export function mount(element) {
       if (index >= 0) unpin([ index ])
     },
     onEscape: () => select(-1),
+    // Enter with a post selected opens it (the card's own "Open post").
+    onEnter: () => card.open(),
     onHover: hover,
     onPan: (dx, dy) => moveCamera(panBy(state.camera, dx, dy)),
     onZoom: (x, y, factor) => moveCamera(zoomAt(state.camera, x, y, factor))

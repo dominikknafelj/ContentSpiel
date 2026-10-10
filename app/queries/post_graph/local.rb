@@ -19,8 +19,9 @@
 # farther ones, and among equals the better connected.
 #
 # Cost: three queries per depth level (the relations touching the frontier,
-# the frontier posts' tags, the frontier tags' posts) plus five whatever the
-# size -- never one per node.
+# the frontier posts' tags, the frontier tags' posts) plus six whatever the
+# size (one of them the nodes' open notes, in the builder) -- never one per
+# node.
 module PostGraph
   class Local
     def self.call(...) = new(...).call

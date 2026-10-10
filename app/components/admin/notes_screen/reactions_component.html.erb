@@ -1,0 +1,37 @@
+<% set = capture do %>
+  <%= tag.details class: "relative #{AT_REST_HIDDEN if meta?}", name: ADD_GROUP,
+        data: { reaction_add: @place, "admin--note-reactions-target": "add", action: "toggle->admin--note-reactions#toggled keydown.esc->admin--note-reactions#escape" } do %>
+    <summary class="<%= add_class %>" aria-label="<%= t(".add") %>" title="<%= t(".add") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: add_icon_size %></summary>
+    <%= form_with url: path, method: :post, class: panel_class, data: { turbo_frame: "notes", "admin--note-reactions-target": "panel" } do %>
+      <%# The set gives; a chip takes back. %>
+      <%= hidden_field_tag "on", "true", id: nil %>
+      <% ::Notes::EMOJI.each do |emoji| %>
+        <button type="submit" name="emoji" value="<%= emoji %>" class="<%= emoji_class %>" aria-label="<%= t(".react_with", name: name_of(emoji)) %>" title="<%= name_of(emoji) %>"><%= emoji %></button>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+<% if meta? %>
+  <%= set %>
+<% else %>
+  <%= tag.div class: "flex flex-wrap items-center gap-1.5 #{"pointer-events-none opacity-50" if disabled?}", data: { note_reactions: @state } do %>
+    <% groups.each do |emoji, reactions| %>
+      <% mine = mine?(reactions) %>
+      <% if closed? %>
+        <%= tag.span class: chip_class(mine), role: "img", title: people(reactions), aria: { label: chip_name(emoji, reactions) }, data: { reaction: emoji, mine: (true if mine) } do %>
+          <span class="text-[13px]" aria-hidden="true"><%= emoji %></span><span class="<%= count_class(mine) %>" aria-hidden="true"><%= reactions.size %></span>
+        <% end %>
+      <% else %>
+        <%= button_to path, params: { emoji: emoji, on: !mine }, class: "#{chip_class(mine)} #{PRESSABLE}", disabled: disabled?, title: people(reactions),
+              aria: { pressed: mine, label: chip_name(emoji, reactions) }, data: { reaction: emoji, mine: (true if mine) }, form: { class: "inline-flex", data: { turbo_frame: "notes" } } do %>
+          <span class="text-[13px]" aria-hidden="true"><%= emoji %></span><span class="<%= count_class(mine) %>" aria-hidden="true"><%= reactions.size %></span>
+        <% end %>
+      <% end %>
+    <% end %>
+    <% if disabled? %>
+      <%= tag.button type: "button", disabled: true, class: ADD_CHIP, aria: { label: t(".add") }, data: { reaction_add: true } do %><%= helpers.render "admin/shared/icon", name: :smile, size: "size-3" %><% end %>
+    <% elsif !closed? %>
+      <%= set %>
+    <% end %>
+  <% end %>
+<% end %>

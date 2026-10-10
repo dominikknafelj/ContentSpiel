@@ -3,6 +3,19 @@
 <%= tag.header class: "admin-editor-header sticky top-(--admin-top-offset) z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
       data: { record_type: type, record_id: record.id } do %>
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <%# "Pages ▾" (the notes handoff's decision 9): the page tree's drawer while
+        the notes column has folded the tree away and there is no top bar to
+        hold the button, so from 1280px with notes open and at no other time
+        (`.admin-editor-header__tree` in content-spiel.tailwind.css). The same
+        drawer, panel and controller as the top bar's button
+        (`admin--drawer#toggle`, `aria-controls`). A page's editor only: a
+        post's screen has no tree. %>
+    <div class="flex min-w-0 items-center gap-1.5">
+    <% if page? %>
+      <%= tag.button t(".tree"), type: "button", class: "admin-editor-header__tree -ml-2 shrink-0 cursor-pointer rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken",
+            aria: { label: t(".tree_label"), controls: "tree-column", expanded: "false" },
+            data: { action: "admin--drawer#toggle", admin__drawer_name_param: "tree", admin__drawer_target: "trigger" } %>
+    <% end %>
     <nav aria-label="Breadcrumb" class="min-w-0 truncate text-[12px] text-meta">
       <% breadcrumb.each do |label, url| %>
         <% if url %>
@@ -13,9 +26,33 @@
         <span aria-hidden="true" class="px-0.5">/</span>
       <% end %>
     </nav>
+    </div>
 
     <div class="flex shrink-0 flex-wrap items-center gap-2">
       <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle, live: live?) %>
+
+      <%# Notes (notes spec §4.3, handoff "Notes header button" as its
+          decision 2 corrects it): a toggle for the drawer
+          `Admin::NotesScreen::DrawerComponent` draws beside the editor, in
+          the header's shared secondary style, as Preview beside it (16px,
+          `px-4 py-2`), with a 16px icon and its count in 12px mono. Four
+          states: the word alone; with open threads their number
+          in mono; `data-unread` on the number (set by `admin--notes` from the
+          counts) makes it the filled accent pill, accent meaning "unread for
+          you" and nothing else; `aria-pressed` while the drawer is open. The
+          id `notes-open` is this button's alone. %>
+      <% if notes? %>
+        <%= tag.button type: "button", id: "notes-open",
+              class: "#{notes_button_class} items-center gap-2 focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
+              aria: { controls: "notes-drawer", expanded: "false", pressed: "false", label: t(".notes_label", count: open_notes) },
+              data: { "admin--notes-target": "opener", action: "admin--notes#toggle" } do %>
+          <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>
+          <span><%= t(".notes") %></span>
+          <%= tag.span open_notes, id: "notes-open-count", hidden: open_notes.zero?,
+                class: "font-cs-mono text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
+                data: { "admin--notes-target": "total" } %>
+        <% end %>
+      <% end %>
 
       <%# A post nobody lists has no path, so nothing to preview: `link_to` a
           nil URL raises rather than rendering a dead link. %>

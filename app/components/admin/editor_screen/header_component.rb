@@ -34,13 +34,28 @@ module Admin
     class HeaderComponent < Admin::AdminComponent
       renders_one :suggest
 
-      def initialize(record:, locale:, url_options: {})
+      def initialize(record:, locale:, url_options: {}, open_notes: nil)
         raise ArgumentError, "the editor header is for a Page or a Post, not #{record.class}" unless record.is_a?(::Page) || record.is_a?(::Post)
 
         @record = record
         @locale = locale.to_s
         @url_options = url_options
+        @open_notes = open_notes
       end
+
+      # The Notes button (notes spec §4.3) is drawn for a screen that also
+      # draws the drawer and hands over the record's open-thread count. Its
+      # number is the server's as the page loads; `admin--notes` keeps it
+      # current from then on, and is what says "unread for you" (`data-unread`
+      # on the number) and "the drawer is open" (`aria-pressed`).
+      def notes? = !@open_notes.nil?
+
+      def open_notes = @open_notes.to_i
+
+      # The shared secondary style of the header (Preview's), as a flex row
+      # for the icon, the word and the count: the one class swapped is the
+      # display, which two utilities can't both set.
+      def notes_button_class = helpers.setup_secondary_link_class.sub("inline-block", "inline-flex")
 
       def page? = record.is_a?(::Page)
 

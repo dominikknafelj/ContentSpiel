@@ -50,7 +50,8 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
   EXPECTED_SERVICES = %w[
     AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Duplicate ContentBlocks::Reorder
     ContentBlocks::Save Groups::Destroy Groups::Save Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
-    Media::Upload Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Settings::Save
+    Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::MarkRead Notes::Pin Notes::React Notes::Remove Notes::Reopen Notes::Reply
+    Notes::Resolve Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Settings::Save
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
     Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile
   ].freeze
@@ -129,7 +130,14 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
     ActiveRecord::Base.transaction(requires_new: true) do
       result = Current.set(actor: actor, channel: actor ? :admin : :system) { built[:call].call }
       changed = before.reject { |table, digest| digest == digests[table] }.keys
-      assert_operator Audit::Event.count, :>, audit_before, "#{label} is allowed but recorded no audit event"
+      # A service that says `# audit: none` names its reason in the factory
+      # too (`control_unaudited:`); every other allowed call must be logged.
+      if built[:control_unaudited]
+        assert_operator built[:control_unaudited].length, :>, 20, "#{label}: control_unaudited needs its reason"
+        assert_equal audit_before, Audit::Event.count, "#{label} says it is not audited but recorded an event"
+      else
+        assert_operator Audit::Event.count, :>, audit_before, "#{label} is allowed but recorded no audit event"
+      end
       raise ActiveRecord::Rollback
     end
 

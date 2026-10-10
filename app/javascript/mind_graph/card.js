@@ -11,7 +11,16 @@
 // tag's "2 posts"); then the actions, which LOOK like CS Studio's buttons and are what
 // they do: "Open post", "Focus" and a tag's "Show posts with this tag" lead
 // somewhere, so they are links; Pin / Unpin changes the graph, so it is a
-// button.
+// button. A post's card also has its notes (`card_notes.js`; notes spec §4.4;
+// handoff, "Node card thread list"): "Open notes · N", the rows and the field
+// that starts a note. They stand under the title and its counts and the
+// actions follow them, ON SCREEN AND IN THE DOCUMENT alike (the notes
+// handoff's decision 12: the document order follows the screen), so the Tab
+// key walks the card as it reads. "Open post" is therefore no longer the
+// first stop, and has a key of its own instead: Enter on the selected node
+// -- on the canvas, or on the card as it takes the focus from the list --
+// opens the post (`open()` below, which presses the link, so it is the same
+// navigation). A tag has no notes, and no post to open.
 //
 // Built with `textContent` and `href` only: a title or a tag's name is the
 // editor's text, whatever it contains. A URL comes from a template the server
@@ -22,16 +31,21 @@
 // (`buttonClasses`, `dotClasses`), so neither is copied here.
 //
 // `createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses,
-// onClose, onPin })` answers `{ show(node, { pinned, pinnable }),
-// setPinned(pinned), hide() }` (`pinnable: false` leaves the Pin button out:
+// onClose, onPin, onChange })` answers `{ show(node, { pinned, pinnable }),
+// setPinned(pinned), open(), hide() }` (`pinnable: false` leaves the Pin button out:
 // with no layout there is nothing to hold). `text` is `messages(element)`,
-// `urls` the three templates (`postFocus`, `tagFocus`, `tagPosts`), `typeLabels` a content type's human
+// `urls` the four templates (`postFocus`, `tagFocus`, `tagPosts`, and
+// `postNotes`, a post's notes as JSON), `typeLabels` a content type's human
 // name by its stored name, `onClose` what the Close button does (the app
-// clears the selection, which hides the card) and `onPin` what Pin / Unpin
-// does (the app pins or releases the node and says which with `setPinned`).
+// clears the selection, which hides the card), `onPin` what Pin / Unpin
+// does (the app pins or releases the node and says which with `setPinned`)
+// and `onChange` what the notes call when they arrived or one was added: the
+// card's height changed, and the node's count may have.
 //
 // The status chip is `Admin::StatusChipComponent`'s, class for class: a dot in
 // the status's token colour AND the word, so the colour is never the only cue.
+import { cardNotes } from "mind_graph/card_notes"
+
 const STATUS_DOTS = { draft: "bg-meta", scheduled: "bg-warn", live: "bg-ok" }
 // A URL template filled with one value: a function as the replacement, because
 // a string would have its `$&` and `$1` read as patterns. (`encodeURIComponent`
@@ -46,7 +60,7 @@ export const dotClass = (dotClasses, node) =>
   `h-[7px] w-[7px] shrink-0 rounded-full ${node.colour_index == null ? "border border-meta" : dotClasses[(node.colour_index - 1) % dotClasses.length]}`
 export const TAG_MARK = "h-2 w-2 shrink-0 border border-meta bg-surface"
 
-export function createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin }) {
+export function createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange }) {
   let pin = null
 
   const element = (tag, className, content) => {
@@ -66,6 +80,12 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
     return anchor
   }
   const label = (content) => element("span", "font-cs-mono text-label uppercase tracking-mono text-meta", content)
+  // "Open post", marked so that Enter on the selected node can press it.
+  const openLink = (node) => {
+    const anchor = link(buttonClasses.primary, text.t("mind_graph.script.card.open_post"), node.url)
+    anchor.dataset.mindGraphCardOpen = ""
+    return anchor
+  }
 
   function statusChip(status) {
     const chip = element("span", "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5 text-xs text-ink")
@@ -127,8 +147,9 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       heading(mark(dotClass(dotClasses, node)), kind, ...(Object.hasOwn(STATUS_DOTS, node.status) ? [ statusChip(node.status) ] : [])),
       title(node),
       counts,
+      cardNotes(node, { text, url: fill(urls.postNotes, "__ID__", node.id), postUrl: node.url, onChange }),
       actions(
-        link(buttonClasses.primary, text.t("mind_graph.script.card.open_post"), node.url),
+        openLink(node),
         link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.postFocus, "__ID__", node.id))
       )
     ]
@@ -164,6 +185,12 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       container.hidden = false
     },
     setPinned,
+    // Enter on the selected node: the post's own "Open post", pressed. A
+    // link's click, so it is the navigation a pointer would start. A tag's
+    // card has no such link, and nothing happens.
+    open() {
+      if (!container.hidden) container.querySelector("a[data-mind-graph-card-open]")?.click()
+    },
     hide() {
       pin = null
       container.hidden = true

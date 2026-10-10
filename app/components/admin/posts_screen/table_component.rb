@@ -1,13 +1,20 @@
 module Admin
   module PostsScreen
     # The posts list's table (design pass round 2, Task 17, handoff §4.3):
-    # checkbox, Title and path, Type, Status, Translations, Updated, "⋯".
+    # checkbox, Title and path, Type, Status, Translations, Notes, Updated, "⋯".
     # Wrapped in the list's card; the footer slot is the pagination.
     #
     # It reads nothing it isn't handed, which is what keeps the list's cost
     # flat: `paths` (each post's current public path, one query for the page),
     # `translation_states` (`Translations::StateIndex.states_for`, one query)
     # and the posts themselves come from the controller (no tags are shown or preloaded).
+    # The same goes for the Notes column (notes spec §4.4): `note_counts`
+    # (`{ post id => open threads }`, `Notes::Counts.by_container`) and
+    # `note_unread` (the ids with something unread for the viewer,
+    # `Notes::Counts.unread_among`) are one query each for the page. A row with
+    # open threads shows their number as the notes pill, a link that opens the
+    # post with its drawer open (`?notes=open`); accent only while something
+    # there is unread and addressed to the viewer; nothing at zero.
     #
     # Selection is `admin--bulk-select`'s (on the wrapper around this and the
     # bulk bar): every row's checkbox is a `row` target, the header one is the
@@ -23,17 +30,23 @@ module Admin
     class TableComponent < Admin::AdminComponent
       renders_one :footer
 
-      def initialize(posts:, paths:, translation_states:, url_options: {}, locale: ::Locales.default)
+      def initialize(posts:, paths:, translation_states:, note_counts: {}, note_unread: Set.new, url_options: {}, locale: ::Locales.default)
         @posts = posts
         @paths = paths
         @translation_states = translation_states
+        @note_counts = note_counts
+        @note_unread = note_unread
         @url_options = url_options
         @locale = locale.to_s
       end
 
       private
 
-      attr_reader :posts, :paths, :translation_states, :url_options, :locale
+      attr_reader :posts, :paths, :translation_states, :note_counts, :note_unread, :url_options, :locale
+
+      def open_notes(post) = note_counts.fetch(post.id, 0)
+
+      def notes_unread?(post) = note_unread.include?(post.id)
 
       # The selection column is there only for someone who can act on a
       # selection: the bulk bar (`BulkBarComponent#render?`) offers Publish or

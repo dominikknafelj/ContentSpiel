@@ -1,5 +1,5 @@
 <div class="overflow-x-auto rounded-cs border border-line bg-surface">
-  <table class="admin-posts-table w-full min-w-[820px] border-collapse text-sm">
+  <table class="admin-posts-table w-full min-w-[880px] border-collapse text-sm">
     <thead>
       <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
         <% if selectable? %>
@@ -12,6 +12,12 @@
         <th scope="col" class="py-2 pr-4">Type</th>
         <th scope="col" class="py-2 pr-4">Status</th>
         <th scope="col" class="py-2 pr-4">Translations</th>
+        <%# A 56px column whose header is the icon alone (notes handoff,
+            "Posts-list count cell"): its name is there for a screen reader,
+            and the title says what the numbers under it count. %>
+        <th scope="col" class="w-14 py-2 pr-4" title="<%= t(".open_notes_title") %>">
+          <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %><span class="sr-only"><%= t(".notes") %></span>
+        </th>
         <%# The list is always newest-changed first: say so to a screen reader
             (`aria-sort`) and keep the arrow, which would be read out as "down
             arrow", out of the name. %>
@@ -47,6 +53,14 @@
                 <% end %>
               <% end %>
             </span>
+          </td>
+          <td class="py-2.5 pr-4">
+            <% if open_notes(post).positive? %>
+              <%# The notes pill without an icon; `no-underline`, it is a pill and not text. %>
+              <%= link_to open_notes(post), editor_path(post, notes: "open"), class: "admin-notes-marker no-underline",
+                    aria: { label: t(".open_notes", count: open_notes(post)) },
+                    data: { notes_count: true, has_notes: true, unread: (true if notes_unread?(post)) } %>
+            <% end %>
           </td>
           <td class="py-2.5 pr-4 text-meta"><%= render Admin::TimeAgoComponent.new(time: post.updated_at) %></td>
           <td class="py-2.5 pr-3 text-right">

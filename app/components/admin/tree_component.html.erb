@@ -37,7 +37,7 @@
 
   <% if root %>
     <ul class="admin-tree flex flex-col gap-0.5">
-      <%= render Admin::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, selected: selected, locale: locale, url_options: url_options, root: true) %>
+      <%= render Admin::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, note_counts: note_counts, note_unread: note_unread, selected: selected, locale: locale, url_options: url_options, root: true) %>
     </ul>
   <% else %>
     <%= render Admin::EmptyStateComponent.new(title: "No pages yet") %>

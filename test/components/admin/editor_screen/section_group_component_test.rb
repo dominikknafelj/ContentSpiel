@@ -36,13 +36,17 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     assert_equal [ @text.id, @late.id, @image.id ], cards
   end
 
-  test "nothing of the lanes is in it: no tile, no panel, no handle, no menu, and no card of its own to move" do
+  test "nothing of the lanes is in it: no tile, no panel, no handle, no menu but each card's Add note, and no card of its own to move" do
     as(users(:one), channel: :admin) { render_group }
 
     assert_no_selector ".admin-block-tile", visible: :all
     assert_no_selector "[data-admin--section-target]", visible: :all
     assert_no_selector ".admin-block-card__handle", visible: :all
-    assert_no_selector "button[aria-label='Block actions'], button[aria-label='Section actions']", visible: :all
+    assert_no_selector "button[aria-label='Section actions']", visible: :all
+    # Each block's card has the "⋯" with "Add note" as its only item (the
+    # notes handoff's decision 6), and nothing of the list's menu.
+    assert_selector "button[aria-label='Block actions']", count: 3
+    assert_equal [ "Add note" ] * 3, page.all(".admin-block-card > div:first-child [role=menu] > div", visible: :all).map { |item| item.text(:all).strip }
     assert_no_selector "[data-move]", visible: :all
     assert_no_selector "[data-admin--blocks-target='lane']", visible: :all
     assert_selector "[data-admin--blocks-target='card']", count: 1

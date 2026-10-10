@@ -190,6 +190,25 @@ module Admin
 
     def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
+    # The block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
+    # spec §4.3): on a card of the list and on a translation tab's group
+    # card, for every viewer. Not on a panel -- the block's tile carries it,
+    # and two markers of one block would be two elements with one id -- and
+    # not on an unavailable block's card, which has one action.
+    def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
+
+    def note_key = ::Notes.key(block)
+
+    # "Add note", in the card's "⋯" menu: the first item of an editor's, and
+    # the ONLY item of the menu a card gets where it had none -- a viewer who
+    # can only read the page, and a translation tab's group card (the
+    # handoff's decision 6). Who can read can write notes (decision D3), a
+    # touch screen has no hover, and the add-note control beside the name is
+    # shown at rest for nobody: the menu is the path that depends on neither.
+    def add_note_item
+      tag.button(t(".add_note"), type: "button", class: menu_item_class, data: { action: "admin--notes#open", notes_key: note_key, notes_compose: true })
+    end
+
     # A card of the list always has it (its menu opens it). A group card only
     # when the block is unavailable: the header's "Delete block…" is then the
     # one thing that opens it.

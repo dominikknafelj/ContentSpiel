@@ -9,7 +9,7 @@
     Cancel is a link into the content frame, which the leave guard asks about
     like any other (round 3) -- except this one: `data-save-bar-cancel` marks
     it as the way to discard, so it leaves without "Leave without saving?". %>
-<div data-admin--save-bar-target="bar" class="admin-save-bar sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3">
+<div data-admin--save-bar-target="bar" class="<%= bar_class %>">
   <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--save-bar-target": "save")) %>
   <%= link_to t(".cancel"), cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_secondary_link_class %>
   <span data-admin--save-bar-target="count" aria-live="polite" class="text-[13px] text-dim"></span>

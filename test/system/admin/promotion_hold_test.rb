@@ -110,7 +110,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   end
 
   test "a refused frame form is promoted to nothing, and the next navigator-level submission is not held" do
-    visit admin_account_password_path
+    visit admin_account_path
     await_admin_controllers
     fill_in "Current password", with: "not the password"
     fill_in "New password", with: "a-long-enough-password"
@@ -131,7 +131,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     JS
     within("#password-form") { press "Change password" }
 
-    assert_text "Name saved.", wait: 5
+    assert_text "Settings saved", wait: 5
     assert_equal false, page.evaluate_script("window.__heldAfterRefusal")
     assert_equal "Not held", users(:one).reload.name
   end

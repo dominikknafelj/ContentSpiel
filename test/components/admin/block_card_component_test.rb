@@ -4,6 +4,10 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
   include ContentHelper
   include TestTypes
 
+  # The items of the card's own "⋯" menu, in its header (a rich-text field
+  # has an Insert menu further down).
+  def page_menu_items = page.all(".admin-block-card > div:first-child [role=menu] > div", visible: :all).map { |item| item.text(:all).strip }
+
   test "renders the type label, schema fields and error slots for a registered type" do
     page = create_page(title: "Card test")
     block = page.content_blocks.create!(block_type: "post_list", position: 0, settings: { "limit" => 3 })
@@ -39,7 +43,7 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     render_card(block, page: page)
 
     items = Capybara.string(rendered_content).all(".admin-block-card > div:first-child [role=menu] [role=none]", visible: :all)
-    assert_equal [ "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
+    assert_equal [ "Add note", "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
     assert_selector "[role=menu] [role=separator]", visible: :all
     assert_selector "[role=menu] button.text-danger-ink", text: "Delete block…", visible: :all
     assert_selector "[role=menu] form[action$='/duplicate']", visible: :all
@@ -162,7 +166,7 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
 
   # Task 12's b5: a viewer who can't edit the page sees an unavailable card
   # with no action at all, and a post list with every field disabled.
-  test "a view-only unavailable card has no Delete, no handle and no menu; a view-only post list's fields are disabled" do
+  test "a view-only unavailable card has no Delete, no handle and no menu; a view-only post list's fields are disabled and its menu is Add note alone" do
     page = create_page(title: "View only")
     gone = page.content_blocks.create!(block_type: "rich_text", position: 0)
     gone.update_column(:block_type, "gone/thing")
@@ -174,7 +178,9 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     list = page.content_blocks.create!(block_type: "post_list", position: 1, settings: { "limit" => 3, "tag" => "news" })
     render_card(list, page: page, editable: false)
     assert_selector "fieldset[disabled].admin-view-only .admin-block-settings-row"
-    assert_no_selector ".admin-block-card__handle, [role=menu]", visible: :all
+    # Its menu holds "Add note" and nothing of an editor's (the handoff's decision 6).
+    assert_no_selector ".admin-block-card__handle, [data-move], form[action$='/duplicate'], dialog", visible: :all
+    assert_equal [ "Add note" ], page_menu_items
     assert_no_selector "form[data-controller~='admin--autosave']"
   end
 
@@ -268,7 +274,7 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "form[data-controller~='admin--autosave']", visible: :all
   end
 
-  test "as a group card it has the type's name and neither handle, menu nor targets" do
+  test "as a group card it has the type's name, a menu with Add note alone, and neither handle nor targets" do
     page = create_page(title: "Group")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
 
@@ -277,7 +283,9 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}", text: "Rich text"
     assert_selector "form[data-controller~='admin--autosave']"
     assert_no_selector ".admin-block-card__handle"
-    assert_no_selector "button[aria-label='Block actions']"
+    # The handoff's decision 6: the one item a group card's menu has.
+    assert_selector "button[aria-label='Block actions']", count: 1
+    assert_equal [ "Add note" ], page_menu_items
     assert_no_selector "[data-admin--blocks-target], [data-admin--section-target]"
   end
 
@@ -286,5 +294,75 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
 
     assert_raises(ArgumentError) { Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :tile) }
+  end
+
+  test "a card in the list carries a notes marker, for a viewer who can't edit too; an open panel carries none" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: false))
+    assert_selector "#notes-marker-ContentBlock-#{block.id}[data-notes-name='Rich text']"
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true, placement: :panel))
+    assert_no_selector "[data-admin--notes-target=marker]"
+
+    # A translation tab's group card has no tile to carry it, so it does.
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "de", editable: true, placement: :group))
+    assert_selector "#notes-marker-ContentBlock-#{block.id}"
+  end
+
+  test "Add note is the first item of the card's menu, and the delete dialog holds the warning the notes script fills" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
+
+    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
+    assert_selector "#delete-block-#{block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{block.id}']", visible: :all
+  end
+
+  # The handoff's decision 6, which replaces the ruling that showed the
+  # add-note control at rest where a card had no menu: who can read can write
+  # notes (D3), so a card without an editor's menu gets the "⋯" with "Add
+  # note" as its only item, and the control is at rest for nobody.
+  test "a view-only card and a translation tab's group card have a menu whose only item is Add note; an editor's is unchanged; nothing marks the control as shown at rest" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    # The card's own menu, in its header: a rich-text field has an Insert menu further down.
+    items = -> { self.page.all(".admin-block-card > div:first-child [role=menu] > div", visible: :all).map { |item| item.text(:all).strip } }
+    add_note = "[role=menu] button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes#open']"
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: false))
+    assert_selector "button[aria-haspopup=menu][aria-label='Block actions']", count: 1
+    assert_equal [ "Add note" ], items.call
+    assert_selector add_note, visible: :all
+    assert_no_selector ".admin-block-card__handle"
+    assert_no_selector "dialog", visible: :all
+    assert_no_selector "[data-notes-add]"
+
+    # A translation tab's group card, which had no menu for anyone.
+    [ true, false ].each do |editable|
+      render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "de", editable: editable, placement: :group))
+      assert_equal [ "Add note" ], items.call
+      assert_selector add_note, visible: :all
+      assert_no_selector "[data-notes-add]"
+    end
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
+    assert_equal [ "Add note", "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items.call
+    assert_no_selector "[data-notes-add]"
+
+    # An open form in a section has neither: its tile carries both.
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: false, placement: :panel))
+    assert_no_selector "[role=menu]", visible: :all
+  end
+
+  test "a block's delete dialog marks its notes warning as alone in its box, and the shared dialog's box is as it was" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
+
+    assert_selector "#delete-block-#{block.id} div[class='mt-2 text-ink'] > p[hidden][data-admin--notes-target=warning][data-notes-alone]", visible: :all
   end
 end

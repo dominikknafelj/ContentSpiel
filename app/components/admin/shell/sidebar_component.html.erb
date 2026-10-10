@@ -27,7 +27,10 @@
               <%= link_to module_path(entry), class: link_classes(entry), aria: { current: (current?(entry) ? "page" : nil) },
                     data: { turbo_prefetch: (false if entry[:path] == :admin_system_status_path) } do %>
                 <%= helpers.render "admin/shared/icon", name: entry[:icon] %><span><%= entry[:label] %></span>
-                <% if (badge = badge_for(entry)) %><span data-badge class="ml-auto font-cs-mono text-label text-meta"><%= badge %></span><% end %>
+                <% if badge?(entry) %>
+                  <%= tag.span (badge_count(entry) if badge_count(entry).positive?), id: BADGE_IDS.fetch(entry[:path]), hidden: !badge_count(entry).positive?,
+                        class: badge_class(entry), data: { badge: (true if badge_count(entry).positive?) } %>
+                <% end %>
               <% end %>
             </li>
           <% end %>
@@ -39,20 +42,25 @@
   <div class="flex flex-col gap-3 border-t border-line p-3">
     <%= render Admin::ThemeSwitchComponent.new %>
     <%# The account block: who is signed in (`AccountIdentityComponent`, its
-        own element so "Save name" can replace it by stream), then your own
-        password (open to every user, access-control design spec §5) and
-        sign out. %>
+        own element so the account screen's "Save" can replace it by stream, and a
+        link to that screen), then "Your account" -- the same screen: the
+        name, the notes settings and your own password (open to every user,
+        access-control design spec §5; the notes handoff's decision 25) --
+        and sign out. %>
     <div class="admin-account flex min-w-0 flex-col gap-0.5">
-      <%= render Admin::Shell::AccountIdentityComponent.new(user: user) %>
+      <%= render Admin::Shell::AccountIdentityComponent.new(user: user, url_options: link_options) %>
       <div class="mt-1 flex items-center gap-3 text-xs">
-        <%= link_to "Change password", admin_account_password_path(**link_options), class: "text-dim underline-offset-2 hover:text-ink hover:underline" %>
+        <%= link_to t("admin.accounts.title"), admin_account_path(**link_options), class: "text-dim underline-offset-2 hover:text-ink hover:underline" %>
         <%# A real navigation, not a Turbo submission (`data-turbo="false"`):
             signing out must end the DOCUMENT. Turbo would swap the body and
             keep every module's state -- the upload queue's failed tiles with
             their file names, focus notes -- for whoever signs in next on this
             tab. With unsaved work the browser's own "Leave site?" asks (the
-            footer's and the write queue's `beforeunload` guards). %>
-        <%= button_to "Sign out", admin_sign_out_path, method: :delete, form: { data: { turbo: false } }, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
+            footer's and the write queue's `beforeunload` guards). What the
+            tab's `sessionStorage` holds is not the document's and would
+            stay: the unsent note drafts are removed as the document goes
+            (`admin--notes-live#signingOut`). %>
+        <%= button_to "Sign out", admin_sign_out_path, method: :delete, form: { data: { turbo: false, action: "submit->admin--notes-live#signingOut" } }, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
       </div>
     </div>
   </div>

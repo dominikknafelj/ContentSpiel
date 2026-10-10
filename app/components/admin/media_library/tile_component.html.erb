@@ -1,6 +1,16 @@
 <% face = capture do %>
-  <span class="block aspect-[4/3] w-full overflow-hidden bg-sunken">
+  <span class="relative block aspect-[4/3] w-full overflow-hidden bg-sunken">
     <%= image_tag thumbnail_url, alt: "", loading: "lazy", class: "h-full w-full object-cover" %>
+    <%# Open notes (notes handoff, "Media tile chip"): on the image, where the
+        title's chips below never push it. Words for a screen reader, like
+        the chips: the number alone says nothing. %>
+    <% if open_notes.positive? %>
+      <%= tag.span data: { notes_chip: true, has_notes: true, unread: (true if notes_unread?) }, role: "img",
+            title: t(".open_notes", count: open_notes), aria: { label: t(".open_notes", count: open_notes) },
+            class: "admin-notes-marker admin-notes-marker--readonly admin-notes-marker--on-image" do %>
+        <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %><%= open_notes %>
+      <% end %>
+    <% end %>
   </span>
   <span class="flex flex-col gap-1 px-2.5 py-2">
     <span class="truncate text-sm font-medium text-ink"><%= asset.title %></span>
