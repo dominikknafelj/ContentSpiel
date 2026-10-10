@@ -59,11 +59,13 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
       assert_response :success
       preloads = modulepreloads
       assert preloads.any? { |href| href.include?("controllers/admin/mind_graph/graph_controller") }, "the thin controller is an admin controller like any other"
-      # "/assets/mind_graph/", not "mind_graph/": the thin controller's own file lives in
-      # controllers/admin/mind_graph/, and only the module folder app/javascript/mind_graph/
-      # (an asset path of its own, no "admin/" before it) is the one that stays unloaded.
-      %w[/assets/mind_graph/ d3-force].each do |name|
-        assert preloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on #{path}: #{preloads.grep(/#{Regexp.escape(name)}/).inspect}"
+      # The module folder app/javascript/mind_graph/ is the one that stays unloaded, whatever
+      # prefix the assets are served under; the thin controller's own file lives in
+      # controllers/admin/mind_graph/ and is preloaded like any admin controller. So the
+      # test is "mind_graph/ with no admin/ before it": it matches /assets/mind_graph/app-x.js
+      # and /any/prefix/mind_graph/layout_worker-x.js, and lets controllers/admin/mind_graph/ through.
+      [ %r{(?<!admin/)mind_graph/}, /d3-force/ ].each do |pattern|
+        assert preloads.none? { |href| href.match?(pattern) }, "#{pattern.inspect} is modulepreloaded on #{path}: #{preloads.grep(pattern).inspect}"
       end
       assert_not_includes entry_point_script, "mind_graph/"
       assert_not_includes entry_point_script, "d3-force"
@@ -87,8 +89,8 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "meta[name=action-cable-url]", count: 0
-    assert_select "[data-controller*='notes-live']", count: 0
-    assert_select "[data-controller*='notes-alert']", count: 0
+    assert_select "[data-controller*='notes--live']", count: 0
+    assert_select "[data-controller*='notes--alert']", count: 0
     assert_no_match "turbo-cable-stream-source", response.body
     assert modulepreloads.none? { |href| href.include?("notes/live_controller") }
     assert_not_includes entry_point_script, "notes/live"
