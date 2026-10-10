@@ -21,9 +21,24 @@ class SystemTestShardsTest < ActiveSupport::TestCase
     end
   end
 
-  test "the shards hold about the same number of tests" do
-    counts = SystemTestShard.shards(4, Rails.root.to_s).map { |files| files.sum { |path| SystemTestShard.tests_in(path, Rails.root.to_s) } }
-    assert_operator counts.max - counts.min, :<=, counts.sum / 10, "shard sizes: #{counts.inspect}"
+  # One file can be heavier than a fair share (the mind graph's is a third of
+  # the suite), and then its shard is that file alone: so the limit is the
+  # larger of that file and a fair share with some slack.
+  test "no shard is much heavier than a fair share" do
+    weights = SystemTestShard.weights(Rails.root.to_s)
+    loads = SystemTestShard.shards(4, Rails.root.to_s).map { |files| files.sum { |path| weights.fetch(path) } }
+    limit = [ weights.values.max, weights.values.sum / 4 * 1.15 ].max
+
+    assert_operator loads.max, :<=, limit, "shard seconds: #{loads.map(&:round).inspect}"
+  end
+
+  test "every measured file exists, and an unmeasured one still gets a weight" do
+    measured = SystemTestShard.measured(Rails.root.to_s)
+    gone = measured.keys.reject { |path| Rails.root.join(path).exist? }
+    assert_empty gone, "test/system_test_seconds.yml names files that are gone: #{gone.inspect}"
+
+    weights = SystemTestShard.weights(Rails.root.to_s)
+    assert weights.values.all?(&:positive?), "a file with no weight: #{weights.select { |_, weight| weight <= 0 }.keys.inspect}"
   end
 
   test "the workflow's shard list and its total agree" do

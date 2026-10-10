@@ -3,11 +3,15 @@
 # is the third of four. CI runs the browser suite as several jobs side by side
 # (.github/workflows/ci.yml), because a GitHub runner has two cores and the
 # suite on two processes takes half an hour. The files are dealt so the shards
-# hold about the same number of tests: largest file first, each to the shard
-# that has the fewest so far. Every file lands in exactly one shard
-# (test/lib/system_test_shards_test.rb).
+# take about the same TIME, not the same number of tests (a mind graph test
+# costs seven seconds, a toast test one): heaviest file first, each to the
+# shard that is lightest so far, by the seconds in test/system_test_seconds.yml.
+# Every file lands in exactly one shard (test/lib/system_test_shards_test.rb).
+require "yaml"
+
 module SystemTestShard
   PATTERN = "test/system/**/*_test.rb".freeze
+  SECONDS = "test/system_test_seconds.yml".freeze
 
   def self.files(root = File.expand_path("..", __dir__))
     Dir[File.join(root, PATTERN)].map { |path| path.delete_prefix("#{root}/") }.sort
@@ -17,14 +21,26 @@ module SystemTestShard
     File.read(File.join(root, path)).scan(/^\s*test\s+["']/).size
   end
 
+  def self.measured(root)
+    YAML.load_file(File.join(root, SECONDS)) || {}
+  end
+
+  # What each file weighs: its measured seconds, or, for a file nobody has
+  # measured yet, its number of tests at the average pace of those that were.
+  def self.weights(root = File.expand_path("..", __dir__))
+    measured = measured(root)
+    known = files(root).select { |path| measured.key?(path) }
+    pace = known.empty? ? 1.0 : known.sum { |path| measured[path] }.to_f / [ known.sum { |path| tests_in(path, root) }, 1 ].max
+    files(root).to_h { |path| [ path, (measured[path] || tests_in(path, root) * pace).to_f ] }
+  end
+
   def self.shards(total, root = File.expand_path("..", __dir__))
-    loads = Array.new(total, 0)
-    files(root).map { |path| [ path, tests_in(path, root) ] }.sort_by { |path, count| [ -count, path ] }
-      .each_with_object(Array.new(total) { [] }) do |(path, count), shards|
-        lightest = loads.each_with_index.min.last
-        shards[lightest] << path
-        loads[lightest] += count
-      end
+    loads = Array.new(total, 0.0)
+    weights(root).sort_by { |path, weight| [ -weight, path ] }.each_with_object(Array.new(total) { [] }) do |(path, weight), shards|
+      lightest = loads.each_with_index.min.last
+      shards[lightest] << path
+      loads[lightest] += weight
+    end
   end
 end
 
