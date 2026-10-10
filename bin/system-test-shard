@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# The system test files of one CI shard, one per line: `bin/system-test-shard 2 4`
+# is the third of four. CI runs the browser suite as several jobs side by side
+# (.github/workflows/ci.yml), because a GitHub runner has two cores and the
+# suite on two processes takes half an hour. The files are dealt so the shards
+# hold about the same number of tests: largest file first, each to the shard
+# that has the fewest so far. Every file lands in exactly one shard
+# (test/lib/system_test_shards_test.rb).
+module SystemTestShard
+  PATTERN = "test/system/**/*_test.rb".freeze
+
+  def self.files(root = File.expand_path("..", __dir__))
+    Dir[File.join(root, PATTERN)].map { |path| path.delete_prefix("#{root}/") }.sort
+  end
+
+  def self.tests_in(path, root)
+    File.read(File.join(root, path)).scan(/^\s*test\s+["']/).size
+  end
+
+  def self.shards(total, root = File.expand_path("..", __dir__))
+    loads = Array.new(total, 0)
+    files(root).map { |path| [ path, tests_in(path, root) ] }.sort_by { |path, count| [ -count, path ] }
+      .each_with_object(Array.new(total) { [] }) do |(path, count), shards|
+        lightest = loads.each_with_index.min.last
+        shards[lightest] << path
+        loads[lightest] += count
+      end
+  end
+end
+
+if $PROGRAM_NAME == __FILE__
+  index, total = ARGV.map { |arg| Integer(arg) }
+  abort "usage: bin/system-test-shard INDEX TOTAL (INDEX from 0)" unless index && total && total.positive? && (0...total).cover?(index)
+  puts SystemTestShard.shards(total).fetch(index).sort
+end

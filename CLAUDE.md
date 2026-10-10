@@ -27,6 +27,8 @@ A local run is quiet: what tests themselves print (the statements a migration te
 
 Coverage is on request: `COVERAGE=1 bin/rails test` (SimpleCov, line and branch) writes `coverage/index.html`, which `bundle exec simplecov open` shows; the parallel workers' results are merged into the one report. It is off by default, since a run of one file would report a meaningless few percent. CI turns it on for the unit suite and keeps the report as the `coverage` artifact. There is no minimum yet, so a drop doesn't fail a run.
 
+CI runs the browser suite as four jobs side by side (a runner has two cores): `bin/system-test-shard <index> <total>` deals the files so each job holds about the same number of tests, `test/lib/system_test_shards_test.rb` keeps every file in exactly one shard, and the one check `system-test` speaks for the four. A change that touches only `docs/` or a top-level `.md` file skips the browser suite; the unit suite always runs, because its guards read `CLAUDE.md` and `docs/reference`.
+
 **Lint/scan** (all run in CI, see `.github/workflows/ci.yml`):
 ```sh
 bin/rubocop            # style (rubocop-rails-omakase, config in .rubocop.yml)
