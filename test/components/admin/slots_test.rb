@@ -97,6 +97,15 @@ class Admin::SlotsTest < ViewComponent::TestCase
     assert_equal "FirstComponent:#{page.id}::nil:{locale: \"fixed\", size: :panel}", Capybara.string(rendered_content).find("i[data-probe]").text
   end
 
+  test "an option named like one of the slot's own arguments is refused" do
+    Admin::Slots.with("media.panel.header" => []) do
+      %i[record viewer data component].each do |name|
+        assert_raises(ArgumentError, name.to_s) { Admin::Slots.register("media.panel.header", FirstComponent, name => 1) }
+      end
+      assert_empty Admin::Slots.entries("media.panel.header")
+    end
+  end
+
   test "the same component and loader registered twice with different options are two entries, each loaded once" do
     page = create_page(title: "About")
     calls = 0

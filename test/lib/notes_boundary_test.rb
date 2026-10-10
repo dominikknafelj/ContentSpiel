@@ -102,10 +102,12 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/posts_screen/table_component.rb
   ].freeze
 
-  # "notes" at the start of a word or after an underscore, digit, colon or hyphen: `Admin::NotesScreen::X`,
-  # `open_notes`, `@open_notes`, `notes_path`, `notes_type`, `admin--notes--drawer`, a comment's "Notes". Not
-  # inside a word ("footnotes", "denotes").
-  NOTES_WORD = /(?<![a-z])notes/i
+  # "note" or "notes" at the start of a word or after an underscore, digit, colon or hyphen
+  # (`Admin::NotesScreen::X`, `open_notes`, `note_counts`, `@note_unread`, `notes_path`,
+  # `admin--notes--drawer`, a comment's "Notes"), or a capital `Note` inside a camelCase
+  # word (`NoteContainer`, `OpenNotesPill`, `hasNotes`, `unreadNotes`). Not inside a word
+  # ("footnotes", "denote", "annotate", "keynote") and not "notebook" or "noted".
+  NOTES_WORD = /(?i:(?<![a-z])note(?!book|d(?![a-z])))|(?<=[a-z])Note/
 
   # Notes-only places that stay direct: files outside `notes_screen` that name
   # notes on purpose, each with the trigger that would make it a slot. A slot
@@ -149,10 +151,11 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     assert_empty NAMED_EXCEPTIONS.keys.flatten & SLOT_HOSTS
   end
 
-  test "the slot pattern finds notes in every spelling, and not a word that only contains it" do
+  test "the slot pattern finds notes in every spelling, singular and camelCase too, and not a word that only contains it" do
     [ "# the Notes button", "open_notes(x)", "Admin::NotesScreen::HeaderButtonComponent", "open_notes: 3", "@open_notes", "notes_path",
-      "data: { notes_type: 1 }", "admin--notes--drawer", "data-notes-id" ].each { |text| assert_match NOTES_WORD, text, text }
-    [ "footnotes = 1", "denotes", "ReleaseNotes.latest" ].each { |text| assert_no_match NOTES_WORD, text, text }
+      "data: { notes_type: 1 }", "admin--notes--drawer", "data-notes-id",
+      "note_counts", "note_unread", "@note_unread", "NoteContainer", "OpenNotesPill", "hasNotes", "unreadNotes" ].each { |text| assert_match NOTES_WORD, text, text }
+    [ "footnotes = 1", "denotes", "notebook", "noted", "keynotes", "annotate", "denote", "footnote" ].each { |text| assert_no_match NOTES_WORD, text, text }
   end
 
   test "the pattern finds a reference and nothing that only looks like one" do

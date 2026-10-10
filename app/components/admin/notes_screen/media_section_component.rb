@@ -36,7 +36,7 @@ module Admin
       # newer copy. Read here and not left to the frame, because that
       # controller keeps the last counts it saw: the panel of the image chosen
       # next would show the last image's number until its own frame had loaded.
-      def note_counts = @note_counts ||= ::Notes::Counts.for_container(asset, user: viewer)
+      def note_counts = @note_counts ||= ::Notes::Counts.for_container(asset, user: ::Notes.user_of(viewer))
 
       # "Notes · 2 open" (in mono capitals, the handoff's header). The number
       # is an `admin--notes--drawer` `total`, like the one beside the drawer's title,

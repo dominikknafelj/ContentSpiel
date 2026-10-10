@@ -56,11 +56,18 @@ module Admin
       tree.row.markers posts.row.markers posts.row.title
     ].freeze
 
+    # The slot's own constructor arguments: an option of these names would replace
+    # them (`loader:` is `register`'s own keyword and never reaches `options`).
+    RESERVED_OPTIONS = %i[record viewer data component].freeze
+
     @registry = NAMES.to_h { |name| [ name, [] ] }
 
     class << self
       # Raises for a name no screen draws. Entries keep registration order.
       def register(name, component, loader: nil, **options)
+        reserved = options.keys & RESERVED_OPTIONS
+        raise ArgumentError, "#{reserved.map(&:inspect).to_sentence} would replace what the slot hands the component itself" if reserved.any?
+
         entries_for!(name) << Entry.new(component:, loader:, options:)
       end
 

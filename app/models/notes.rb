@@ -46,6 +46,10 @@ module Notes
     # Computed where asked, so a kind registered later is accepted.
     def subject_types = RecordKinds.all.map(&:type) + SUBJECT_ONLY_TYPES
 
+    # The person a count is "unread for": the actor, or an API token's user.
+    # THE ONE PLACE for it (the slot components and their loaders ask here).
+    def user_of(actor) = actor.is_a?(ApiToken) ? actor.user : actor
+
     def read_key(container) = kind_of!(container).read
 
     def moderate_key(container) = kind_of!(container).moderate
@@ -74,7 +78,7 @@ module Notes
       return true if AccessControl.allowed?(actor, moderate_key(container), container, channel:)
       return false unless container.is_a?(Media::Asset)
 
-      user = actor.is_a?(ApiToken) ? actor.user : actor
+      user = user_of(actor)
       user.present? && container.created_by_id == user.id && AccessControl.allowed?(actor, "media.upload", container, channel:)
     end
 

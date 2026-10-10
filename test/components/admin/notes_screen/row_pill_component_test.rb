@@ -51,6 +51,14 @@ class Admin::NotesScreen::RowPillComponentTest < ViewComponent::TestCase
     assert_equal "", rendered_content
   end
 
+  test "the person a count is unread for is the actor, or an API token's user" do
+    token = ApiToken.new(user: users(:two))
+
+    assert_equal users(:one), Notes.user_of(users(:one))
+    assert_equal users(:two), Notes.user_of(token)
+    assert_nil Notes.user_of(nil)
+  end
+
   test "the loader reads the counts once for all rows, with the viewer, for each record type" do
     one = create_page(title: "One")
     two = create_page(title: "Two")

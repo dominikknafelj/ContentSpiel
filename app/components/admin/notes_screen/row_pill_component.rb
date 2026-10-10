@@ -27,7 +27,7 @@ module Admin
         lambda do |records, viewer:|
           ids = records.map(&:id)
           counts = ::Notes::Counts.by_container(type, ids)
-          unread = ::Notes::Counts.unread_among(type, ids, viewer)
+          unread = ::Notes::Counts.unread_among(type, ids, ::Notes.user_of(viewer))
           records.to_h { |record| [ record.id, { open: counts.fetch(record.id, 0), unread: unread.include?(record.id) } ] }
         end
       end
