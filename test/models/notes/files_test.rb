@@ -152,6 +152,15 @@ class Notes::FilesTest < ActiveSupport::TestCase
     assert_equal "txt", Notes::Files.extension_of("a\0b.t\0xt")
     assert_equal "#{"n" * 251}.png", Notes::Files.stored_name("#{"n" * 400}\0.png")
 
+    # A byte that is not UTF-8 (a client sending Latin-1 names): `String#delete`
+    # raises on a broken string, so taking the NUL out made THAT name a 500
+    # where it had been accepted. It is scrubbed first, as Active Storage's
+    # own sanitising would have left it.
+    assert_equal ActiveStorage::Filename.new("a\xFFb.txt".dup.force_encoding("UTF-8")).sanitized, Notes::Files.stored_name("a\xFFb.txt".dup.force_encoding("UTF-8"))
+    assert_equal "txt", Notes::Files.extension_of("a\xFF\0b.txt".dup.force_encoding("UTF-8"))
+    broken = ActionDispatch::Http::UploadedFile.new(tempfile: note_upload("plain words\n", "notes.txt", "text/plain").tempfile, filename: "caf\xE9\0.txt".dup.force_encoding("UTF-8"), type: "text/plain")
+    assert_empty Notes::Files.errors_for([ broken ])
+
     # As a forged multipart part would name it.
     plain = note_upload("plain words\n", "notes.txt", "text/plain")
     upload = ActionDispatch::Http::UploadedFile.new(tempfile: plain.tempfile, filename: "no\0tes.txt", type: "text/plain")

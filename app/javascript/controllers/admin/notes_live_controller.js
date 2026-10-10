@@ -634,7 +634,8 @@ export default class extends Controller {
       // its own set of emoji is open.
       if (twin && !message.querySelector("details[data-reaction-add][open]")) this.takeReactions(message, twin, { disabled: Boolean(message.querySelector("form[data-note-composer]")) })
       if (twin) twin.replaceWith(message)
-      else next.append(message)
+      // At the end of the messages, which is inside what scrolls (decision 35).
+      else (next.querySelector(":scope > [data-note-scroll]") || next).append(message)
       message.closest("details")?.setAttribute("open", "")
     })
     // A message's files never change (they are fixed when it is written), so

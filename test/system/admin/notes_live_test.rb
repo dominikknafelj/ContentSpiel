@@ -352,6 +352,29 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_selector "#note-message-#{asked.id} [data-note-delete-question]", text: "Delete this note?"
   end
 
+  # The message under an open edit is deleted by someone else: the edit and
+  # its text are kept, at the end of the messages -- inside what scrolls, not
+  # beside it, where it would stand fixed between the messages and the
+  # composer (the handoff's decision 35).
+  test "an edit whose message was deleted elsewhere is kept at the end of the messages, inside their scroller" do
+    mine = as(users(:one)) { Notes::Reply.call(@thread, body: "Mine").record }
+    open_thread
+    within("#note-message-#{mine.id}") do
+      find("button[aria-label='Note actions']").click
+      press "Edit"
+    end
+    field = "#note-message-#{mine.id} form[data-note-composer='message-#{mine.id}'] textarea[name=body]"
+    find(field).send_keys(", changed")
+
+    as(users(:one)) { assert Notes::DeleteMessage.call(mine).ok? }
+    reply_as_dana("After the delete")
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "After the delete", wait: LIVE
+    assert_equal "Mine, changed", find(field).value
+    assert_selector "#note-thread-#{@thread.id}-messages > [data-note-scroll] > #note-message-#{mine.id}:last-child"
+    assert_no_selector "#note-thread-#{@thread.id}-messages > [data-note-message]"
+  end
+
   test "a thread resolved elsewhere under a typed reply: the button reads Reopen and works, and the reply is kept" do
     open_thread
     reply_field.send_keys("Before you close this")
