@@ -107,15 +107,109 @@ class SourceLayoutTest < ActiveSupport::TestCase
     end
   end
 
-  test "a component scope has keys in one locale file, except where an exception names it" do
+  test "a component scope has keys in one locale file, except where an exception names it, and names a folder" do
     holders = Hash.new { |hash, scope| hash[scope] = [] }
     Dir[ROOT.join("config/locales/admin/*.en.yml")].each do |path|
       name = File.basename(path, ".en.yml")
-      next if LOCALE_EXCEPTIONS.include?(name)
-      (YAML.load_file(path).dig("en", "admin", "components") || {}).each_key { |scope| holders[scope] << name }
+      (YAML.load_file(path).dig("en", "admin", "components") || {}).each_key { |scope| holders[scope] << "#{name}.en.yml" }
     end
-    assert_empty holders.select { |_, files| files.size > 1 }, "a scope's keys are in two files"
-    assert_empty holders.keys - Dir[ROOT.join("app/components/admin/*")].select { |p| File.directory?(p) }.map { |p| File.basename(p) },
-      "a locale file names a scope with no component folder"
+    # The exception files are left out of the duplicate check only: their scopes are merged
+    # with other files' on purpose.
+    twice = holders.map { |scope, files| [ scope, files - LOCALE_EXCEPTIONS.map { |name| "#{name}.en.yml" } ] }
+                   .select { |_, files| files.size > 1 }.map { |scope, files| "#{scope}: #{files.join(', ')}" }
+    assert_empty twice, "a scope's keys are in two files:\n#{twice.join("\n")}"
+    # Every file counts for this one, the exception included: a scope with no folder is dead.
+    folders = Dir[ROOT.join("app/components/admin/*")].select { |p| File.directory?(p) }.map { |p| File.basename(p) }
+    nameless = holders.reject { |scope, _| folders.include?(scope) }.map { |scope, files| "#{scope}: #{files.join(', ')}" }
+    assert_empty nameless, "a locale file names a scope with no component folder:\n#{nameless.join("\n")}"
+  end
+
+  # The names CS Studio's controllers had before the layout cleanup: 55 identifiers of
+  # one level, all loose in app/javascript/controllers/admin. Each one now has two levels
+  # (`admin--topic--name`), and a name left behind is a dead control that raises nothing.
+  ORIGINAL = %w[
+    admin--ai-settings admin--auto-submit admin--autosave admin--blocks admin--branch-picker
+    admin--bulk-select admin--busy admin--char-count admin--chip-input admin--clipboard
+    admin--command-palette admin--dialog admin--drawer admin--file-drop-guard admin--fragment-links
+    admin--group-hint admin--groups admin--media-drop admin--media-field admin--media-panel
+    admin--media-picker admin--media-select admin--media-upload admin--menu admin--mind-graph
+    admin--new-record admin--note-composer admin--note-gif admin--note-reactions admin--note-refusal
+    admin--note-unsaved admin--notes-alert admin--notes admin--notes-live admin--notes-permission
+    admin--override-field admin--password-answer admin--password-disclosure admin--pending-lock
+    admin--permission-matrix admin--queue-hold admin--quick-create admin--repeat-rows admin--rich-text
+    admin--rich-text-dialog admin--save-bar admin--section admin--settings-tabs admin--slug-preview
+    admin--sortable-rows admin--tag-dialogs admin--toast admin--token-reveal admin--translate
+    admin--tree
+  ].freeze
+
+  # Not scanned for old names: this file (it lists them), layout_tools_test.rb (the cleanup's
+  # tool test, deleted with the tool in the plan's last task) and admin_i18n_test.rb (made-up
+  # sample markup).
+  OLD_NAMES_LEFT_OUT = %w[
+    test/lib/source_layout_test.rb
+    test/lib/layout_tools_test.rb
+    test/lib/admin_i18n_test.rb
+  ].freeze
+
+  # Reads a data-controller value from markup or Ruby, as far as a regex honestly can:
+  # `data-controller="a b"`, `controller: "a b"`, `"data-controller" => "a b"`. A value built
+  # at run time (`<%` or `#{`) comes back in the first list (the second holds the rest), unread.
+  CONTROLLER_VALUE = /(?:data-controller=|(?<![-\w])controller:\s*|["']data-controller["']\s*(?:=>|:)\s*)(["'])(.*?)\1/m
+
+  def self.controller_values(text)
+    found = text.scan(CONTROLLER_VALUE).map(&:last)
+    found.partition { |value| value.match?(/<%|%>|\#\{/) }
+  end
+
+  test "nothing is loose in app/javascript/controllers/admin" do
+    assert_empty Dir[CONTROLLERS.join("admin/*.js")].map { |path| File.basename(path) }, "controllers loose in controllers/admin: move each into its topic's folder"
+  end
+
+  # The module folders under app/javascript hold what a topic's controllers import, so each is
+  # named after its topic. i18n and search are the two named exceptions.
+  SHARED_MODULE_FOLDERS = {
+    "i18n" => "the script messages every screen reads (messages(element).t), no one topic's",
+    "search" => "the title and tag search every picker shares, no one topic's"
+  }.freeze
+
+  test "a topic's plain modules are in the folder of the same name" do
+    topics = Dir[CONTROLLERS.join("admin/*/")].map { |path| File.basename(path) }
+    modules = Dir[ROOT.join("app/javascript/*/")].map { |path| File.basename(path) } - %w[controllers]
+    strangers = modules - topics - SHARED_MODULE_FOLDERS.keys
+    assert_empty strangers, "module folders with no topic of that name (#{SHARED_MODULE_FOLDERS.keys.join(' and ')} are shared helpers): #{strangers.inspect}"
+  end
+
+  test "no identifier of the old one-level form is left" do
+    identifiers = self.class.identifiers
+    known = ORIGINAL | identifiers
+    paths = SOURCES.flat_map { |dir| Dir[ROOT.join(dir, "**/*.{rb,erb,js,css}")] }
+    paths.reject! { |path| OLD_NAMES_LEFT_OUT.include?(Pathname(path).relative_path_from(ROOT).to_s) }
+    left = paths.flat_map do |path|
+      # Whole text, comments too: a comment that names a dead identifier misleads as much.
+      text = File.read(path)
+      tokens = text.scan(TOKEN) + text.scan(UNDERSCORE_TOKEN).map { |token| token.tr("_", "-") }
+      tokens.uniq.select { |token| ORIGINAL.include?(self.class.owner(token, known)) }.map { |token| "#{Pathname(path).relative_path_from(ROOT)}: #{token}" }
+    end
+    assert_empty left, "old one-level identifiers (see ORIGINAL):\n#{left.join("\n")}"
+  end
+
+  test "every data-controller value that names an admin controller names a controller file exactly" do
+    identifiers = self.class.identifiers
+    skipped = 0
+    wrong = %w[app/components app/views app/helpers].flat_map { |dir| Dir[ROOT.join(dir, "**/*.{rb,erb}")] }.flat_map do |path|
+      dynamic, static = self.class.controller_values(File.read(path))
+      skipped += dynamic.size
+      static.flat_map(&:split).select { |name| name.start_with?("admin--") && !identifiers.include?(name) }.map { |name| "#{Pathname(path).relative_path_from(ROOT)}: #{name}" }
+    end
+    assert_empty wrong, "data-controller names no controller file exactly (#{skipped} values built at run time were skipped):\n#{wrong.join("\n")}"
+  end
+
+  test "the data-controller reader sees markup and Ruby spellings, and sets run-time values aside" do
+    text = %(<div data-controller="admin--a admin--b" class="x"> <%= tag.div data: { controller: "admin--c" } %> ) +
+           %(h = { "data-controller" => "admin--d", controller: "admin/posts" } ) +
+           %(<i data-controller="admin--e <%= more %>"> x(controller: "admin--f-\#{kind}"))
+    dynamic, static = self.class.controller_values(text)
+    assert_equal [ "admin--a admin--b", "admin--c", "admin--d", "admin/posts" ], static
+    assert_equal 2, dynamic.size
   end
 end
