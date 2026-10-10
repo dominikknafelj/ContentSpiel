@@ -19,6 +19,7 @@ module Admin
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
     rate_limit to: 10, within: 3.minutes, only: :update, with: -> {
+      flash[:password_answer] = true
       redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other, alert: "Try again later."
     }
 
@@ -39,7 +40,12 @@ module Admin
         password: params[:password], password_confirmation: params[:password_confirmation])
 
       if result.ok?
-        # Back to the card the form is in (`#password`), not the top of the page.
+        # Back to the card the form is in (`#password`), not the top of the
+        # page (the notes handoff's decision 42). The fragment in `Location`
+        # is for a client that follows it itself; Turbo drops it, so the page
+        # is told it is this form's answer (`flash[:password_answer]`, a
+        # mark and no message) and `admin--password-answer` does the rest.
+        flash[:password_answer] = true
         redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other, notice: "Password changed. Your other sessions were signed out."
       else
         @errors = result.errors
@@ -47,6 +53,7 @@ module Admin
         # input as well as in the summary. A denied result carries no record
         # errors, only its sentence.
         @field_errors = result.record.errors.to_hash(true)
+        @password_answer = true
         render :edit, status: :unprocessable_entity
       end
     end

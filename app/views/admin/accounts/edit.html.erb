@@ -43,7 +43,7 @@
       password form's messages link to their fields; the service's own
       sentences stand when it left no per-field errors (a denial). %>
   <%= render Admin::ErrorSummaryComponent.new(errors: field_errors.presence || Array(@errors),
-        field_ids: { current_password: "current_password", password: "password", password_confirmation: "password_confirmation" }) %>
+        field_ids: { current_password: "current_password", password: "new_password", password_confirmation: "password_confirmation" }) %>
   <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
   <%# What the form shows: the account as stored, or, after a refusal, what
@@ -119,7 +119,11 @@
     <%# `#password` is the card's anchor (the handoff's decision 38): what a
         link to "change your password" names, and where the form's own
         answer comes back to. `scroll-mt`: clear of whatever is stuck to the top. %>
-    <section id="password" class="max-w-[560px] scroll-mt-6 rounded-cs border border-line bg-surface" aria-labelledby="account-password">
+    <%# Drawn as the password form's own answer, saved or refused (decision
+        42): `admin--password-answer` puts `#password` in the address, the
+        card in view and the focus on the message. %>
+    <section id="password" class="max-w-[560px] scroll-mt-6 rounded-cs border border-line bg-surface" aria-labelledby="account-password"
+             <%= tag.attributes(data: { controller: "admin--password-answer" }) if @password_answer || flash[:password_answer] %>>
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-password" class="text-base font-semibold text-ink"><%= t("admin.accounts.password.title") %></h3>
         <p class="text-[13px] text-dim"><%= t("admin.accounts.password.sessions") %></p>
@@ -131,7 +135,9 @@
         </div>
 
         <div class="mb-4">
-          <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, errors: field_errors[:password]) %>
+          <%# Its id is `new_password`: `password` is the card's, the page's anchor
+              (decision 38), and an id names one element. The field's name is unchanged. %>
+          <%= render Admin::PasswordFieldComponent.new(name: "password", id: "new_password", label: "New password", meter: true, errors: field_errors[:password]) %>
         </div>
 
         <div class="mb-4">

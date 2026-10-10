@@ -290,6 +290,10 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/account"
 
+    # One element of that id: the new-password field, whose name is
+    # `password`, has an id of its own.
+    assert_select "[id=password]", count: 1
+    assert_select "input#new_password[name=password]"
     assert_select "section#password[aria-labelledby=account-password]" do
       assert_select "h3#account-password", text: "Password"
       assert_select "input[name=current_password]"
@@ -305,5 +309,28 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_includes response.body, "/cs-studio/account"
     assert_not_includes response.body, "/cs-studio/account/password"
+  end
+
+  # The handoff's decision 42: the page drawn as the password form's answer
+  # says so on the Password card (the script then brings the page to it);
+  # drawn for any other reason it does not.
+  test "the Password card is marked as the form's answer after a save and after a refusal, and not otherwise" do
+    sign_in_as(users(:reader))
+    get "/cs-studio/account"
+    assert_select "section#password[data-controller]", count: 0
+
+    patch "/cs-studio/account/password", params: { current_password: "wrong", password: "new-password-1", password_confirmation: "new-password-1" }
+    assert_response :unprocessable_entity
+    assert_select "section#password[data-controller='admin--password-answer']"
+
+    patch "/cs-studio/account/profile", params: { name: "Ada" }
+    follow_redirect!
+    assert_select "section#password[data-controller]", count: 0
+
+    patch "/cs-studio/account/password", params: { current_password: "password", password: "new-password-1", password_confirmation: "new-password-1" }
+    follow_redirect!
+    assert_select "section#password[data-controller='admin--password-answer']"
+    get "/cs-studio/account"
+    assert_select "section#password[data-controller]", count: 0
   end
 end
