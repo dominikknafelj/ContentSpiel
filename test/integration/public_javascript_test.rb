@@ -106,6 +106,29 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     # so an inline import of it would contain it; modulepreload alone would not see an inline import.
     assert_not_includes entry_point_script, "notes/live"
     assert_not_includes entry_point_script, "notes/inbox"
+    # Nor presence's part (`admin--presence--record`, in
+    # `controllers/admin/presence/`), which subscribes for the record it is
+    # on. Both fragments are found on an editor by the test below.
+    assert_select "[data-controller*='presence--record']", count: 0
+    assert modulepreloads.none? { |href| href.include?("controllers/admin/presence/") }
+    assert_not_includes entry_point_script, "presence/record"
+  end
+
+  # The other half for presence: an editor carries the part, in its header,
+  # and its controller is preloaded like every admin controller.
+  test "an editor in CS Studio carries presence's part and preloads its controller" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    post = create_post(title: "Notes")
+
+    get "/cs-studio/posts/#{post.id}"
+
+    assert_response :success
+    assert_select "header [data-controller*='presence--record'][data-controller='admin--presence--record'] turbo-frame#presence-post-#{post.id}"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/presence/record_controller") }
+    # A screen that shows no record has no such part.
+    get "/cs-studio/tags"
+    assert_select "[data-controller*='presence--record']", count: 0
   end
 
   # The other half: CS Studio does load them, on every screen, on <body>: the

@@ -3,11 +3,17 @@
     and the base-updated-at field keep stable ids because the autosave answer
     (`Admin::MediaController#update`) addresses them. %>
 <section id="media-panel" class="admin-media-panel flex flex-col gap-4 focus:outline-none" aria-labelledby="media-panel-title" tabindex="-1" data-admin--media--panel-target="panel">
-  <div class="flex items-start justify-between gap-3">
-    <h2 id="media-panel-title" class="min-w-0 break-words text-lg font-semibold text-ink"><%= asset.title %></h2>
-    <%# What features register at `media.panel.header`: the right end of the file-name row, above the preview. %>
+  <%# The file-name row (presence handoff 13): the name takes the room that is
+      left and is cut on ONE line, the whole name its `title` (it is in full
+      in the fields below); what features register at `media.panel.header`
+      stands 8px after it and never gives way; the "×" is last, 12px after
+      that (`gap-2` and its own `ml-1`), which is also its distance from the
+      name while the slot draws nothing. The title's inside is
+      `PanelComponent.title_content`, which the autosave's answer draws again. %>
+  <div class="flex items-start gap-2">
+    <h2 id="media-panel-title" class="min-w-0 flex-1 truncate text-lg font-semibold text-ink"><%= self.class.title_content(asset, self) %></h2>
     <%= render Admin::Ui::SlotComponent.new(name: "media.panel.header", record: asset, viewer: viewer, **slot_context) %>
-    <%= link_to "×", close_path, aria: { label: "Close panel" }, title: "Close", class: "-mt-1 shrink-0 rounded-cs px-2 text-xl leading-none text-meta hover:text-ink",
+    <%= link_to "×", close_path, aria: { label: "Close panel" }, title: "Close", class: "-mt-1 ml-1 shrink-0 rounded-cs px-2 text-xl leading-none text-meta hover:text-ink",
           data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media--panel#close", "admin--media--panel-tile-id-param": asset.id } %>
   </div>
 

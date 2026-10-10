@@ -230,7 +230,7 @@ module Admin
       )
       [
         turbo_stream.replace(Admin::MediaLibrary::TileComponent.dom_id(asset), tile),
-        turbo_stream.update("media-panel-title", asset.title),
+        turbo_stream.update("media-panel-title", Admin::MediaLibrary::PanelComponent.title_content(asset, helpers)),
         *counts.map { |key, count| turbo_stream.update(Admin::MediaLibrary::ToolbarComponent.count_id(key), count.to_s) }
       ]
     end

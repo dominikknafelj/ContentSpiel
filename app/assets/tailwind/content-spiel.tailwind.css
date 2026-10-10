@@ -213,6 +213,20 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .admin-spinner { animation-duration: 2s; } }
 
+/* Presence (`Admin::PresenceScreen::PeopleComponent`, the presence handoff's
+   item 14): someone who arrives fades in and someone who leaves fades out,
+   150ms, opacity only -- nobody slides, the others snap to their places --
+   and not at all with reduced motion. `admin--presence--record` marks the
+   circle that is new in a drawing and the one that is in the next no more;
+   here to away is a redraw with neither mark, so it changes at once. */
+.admin-presence [data-presence-arriving] { animation: admin-presence-in 150ms var(--cs-ease); }
+.admin-presence [data-presence-leaving] { opacity: 0; transition: opacity 150ms var(--cs-ease); }
+@keyframes admin-presence-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-presence [data-presence-arriving] { animation: none; }
+  .admin-presence [data-presence-leaving] { transition: none; }
+}
+
 /* Styled native select (design pass spec §4). The chevron is two CSS
    gradients rather than an image so it takes the token colour in both
    themes. Size/width come from the utility classes beside it.

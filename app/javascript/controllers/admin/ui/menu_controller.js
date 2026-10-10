@@ -3,7 +3,8 @@ import { Controller } from "@hotwired/stimulus"
 // A popover menu (Admin::Ui::MenuComponent). The button toggles the panel;
 // opening focuses the first item, ArrowDown/ArrowUp move between the panel's
 // links and buttons, Escape closes and hands focus back to the button, and a
-// click anywhere outside closes it.
+// click anywhere outside closes it. A list panel also opens on hover and
+// focus (`leave`).
 export default class extends Controller {
   static targets = [ "button", "panel" ]
 
@@ -52,6 +53,16 @@ export default class extends Controller {
   select(event) {
     const item = event.target.closest("a, button")
     if (item && this.panelTarget.contains(item) && !item.disabled) this.close()
+  }
+
+  // A list panel (`list: true`), which hover and focus open: the pointer or
+  // the focus has left. It closes when NEITHER is on it any more -- a
+  // keyboard user's list does not go because the mouse moved, nor a mouse
+  // user's because the focus went elsewhere.
+  leave(event) {
+    const focused = event.type === "focusout" ? this.element.contains(event.relatedTarget) : this.element.contains(document.activeElement)
+    const hovered = event.type === "mouseleave" ? false : this.element.matches(":hover")
+    if (!focused && !hovered) this.close()
   }
 
   closeOutside(event) {

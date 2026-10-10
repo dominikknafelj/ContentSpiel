@@ -50,6 +50,42 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the people are drawn as the header draws them, or at the panel's size when asked, and the answer is kept by no cache" do
+    mark(@other, @page)
+    mark(@third, @page, arrived: 1.minute.ago)
+    mark(@third, @asset)
+    sign_in_as @viewer
+
+    get admin_record_presence_path("page", @page.id)
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_select "turbo-frame#presence-page-#{@page.id} [role=group][aria-label='Also open by 2 people'] > [data-presence-user] > span.size-6", count: 2
+    # The frame's place on a page is the slot's; the answer is the frame.
+    assert_select "[data-controller='admin--presence--record']", count: 0
+
+    get admin_record_presence_path("media", @asset.id, size: "panel")
+    assert_select "turbo-frame#presence-media-#{@asset.id} [data-presence-user] > span.size-5", count: 1
+    get admin_record_presence_path("media", @asset.id, size: "enormous")
+    assert_select "turbo-frame#presence-media-#{@asset.id} [data-presence-user] > span.size-6", count: 1
+  end
+
+  test "asked for as a frame, the answer is the frame alone, without the layout" do
+    mark(@other, @page)
+    sign_in_as @viewer
+
+    get admin_record_presence_path("page", @page.id), headers: { "Turbo-Frame" => "presence-page-#{@page.id}" }
+
+    assert_response :success
+    assert_no_match(/<html|<body|<nav/, response.body)
+    assert_select "turbo-frame#presence-page-#{@page.id} [data-presence-user='#{@other.id}']"
+    assert_equal "no-store", response.headers["Cache-Control"]
+  end
+
+  test "the list's counts are kept by no cache either" do
+    sign_in_as @viewer
+    here("page", [ @page.id ])
+    assert_equal "no-store", response.headers["Cache-Control"]
+  end
+
   test "an empty roster is an empty frame, and a post and an image have theirs" do
     sign_in_as @viewer
     get admin_record_presence_path("page", @page.id)

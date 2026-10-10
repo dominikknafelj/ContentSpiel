@@ -732,6 +732,8 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=update][target='media-count-missing_alt'] template", text: "0"
     assert_select "turbo-stream[action=update][target='media-count-all'] template", text: "1"
     assert_select "turbo-stream[action=update][target='media-panel-title'] template", text: "Renamed"
+    # The row cuts a long name on one line, so the whole name is its title too.
+    assert_select "turbo-stream[action=update][target='media-panel-title'] template > span[title='Renamed']", text: "Renamed"
     # The tile keeps the grid's state in its link.
     assert_select "turbo-stream[target='media-asset-#{asset.id}'] a[href*='filter=missing_alt'][href*='selected=#{asset.id}']"
   end

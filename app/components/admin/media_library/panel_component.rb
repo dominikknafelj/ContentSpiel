@@ -75,6 +75,12 @@ module Admin
       def uploader = asset.created_by
 
       # Who is looking, for the slots: the actor `can?` already asks about.
+      # What `#media-panel-title` holds: the name, and the name again as its
+      # `title`, because the row cuts a long one short. One place for it: the
+      # panel draws it and `Admin::MediaController`'s autosave answer updates
+      # the heading with it (`view`: whatever has the tag helpers).
+      def self.title_content(asset, view) = view.tag.span(asset.title, title: asset.title)
+
       def viewer = Current.actor
 
       # What every slot of the panel is handed beside the image and the viewer.

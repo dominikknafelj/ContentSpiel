@@ -1,0 +1,17 @@
+# The strings of `app/components/admin/presence_screen/` (presence handoff 7
+# and 8: the wording is the designer's).
+en:
+  admin:
+    components:
+      presence_screen:
+        people:
+          group:
+            one: "Also open by 1 person"
+            other: "Also open by %{count} people"
+          label: "%{name} · %{status}"
+          here: "here"
+          away:
+            one: "away %{count} min"
+            other: "away %{count} min"
+          away_long: "away over an hour"
+          more: "+%{count}"

@@ -1,6 +1,0 @@
-<%# Interim markup (presence plan, Task 9): the frame's id and the two data attributes are stable, the inside is replaced by a component. %>
-<%= turbo_frame_tag @frame_id do %>
-  <% @people.each do |person| %>
-    <span data-presence-user="<%= person.user.id %>" data-presence-state="<%= person.state %>"><%= person.user.display_name %></span>
-  <% end %>
-<% end %>

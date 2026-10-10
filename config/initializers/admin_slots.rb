@@ -5,6 +5,11 @@
 Rails.application.config.to_prepare do
   Admin::Slots.reset!
 
+  # Who else has the record open: first in an editor's action row, and at the
+  # right end of the image panel's file-name row, each at its own size.
+  Admin::Slots.register "editor.header.people", Admin::PresenceScreen::PeopleComponent, size: :header
+  Admin::Slots.register "media.panel.header", Admin::PresenceScreen::PeopleComponent, size: :panel
+
   Admin::Slots.register "editor.header.actions", Admin::NotesScreen::HeaderButtonComponent
   Admin::Slots.register "media.panel.sections", Admin::NotesScreen::MediaSectionComponent
 

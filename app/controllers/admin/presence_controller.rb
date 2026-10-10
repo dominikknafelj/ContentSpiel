@@ -9,19 +9,25 @@ module Admin
     # How many ids a list may ask about at once; the rest are ignored.
     MAX_IDS = 500
 
+    # Who is on a record changes from one second to the next: neither answer
+    # is kept by any cache, the browser's included (a fetch that was answered
+    # from one would show who was here a minute ago).
+    before_action { response.set_header("Cache-Control", "no-store") }
+
     # The people of one record, the viewer left out: `turbo-frame#presence-
-    # <kind>-<id>` holding one element per person, `data-presence-user` (the
-    # user's id) and `data-presence-state` ("here" or "away"). The inside is
-    # an interim list; the frame's id and those two attributes are what the
-    # screens' script and tests rely on. A record outside the scope or in the
-    # trash is a 404 (an image without `media.upload`, the 403 notes gives).
+    # <kind>-<id>` as `Admin::PresenceScreen::PeopleComponent` draws it, at
+    # the header's size or, with `size=panel`, the media panel's (anything
+    # else is the header's). The tab's script fetches it with a plain `fetch`
+    # that names the frame (`Turbo-Frame`), and is answered with the frame
+    # alone; asked for as a page, it is the frame in the layout. A record
+    # outside the scope or in the trash is a 404 (an image without
+    # `media.upload`, the 403 notes gives).
     def show
       @record = record_of_kind(params[:kind], params[:id])
       return if performed?
 
-      @frame_id = "presence-#{params[:kind]}-#{@record.id}"
-      @people = Presence::Roster.new(viewer: Current.user).on(@record)
-      render layout: turbo_frame_request? ? false : "admin"
+      people = Admin::PresenceScreen::PeopleComponent.new(record: @record, viewer: Current.user, size: params[:size] == "panel" ? :panel : :header, frame_only: true)
+      render people, layout: turbo_frame_request? ? false : "admin"
     end
 
     # `{ "<id>": <number of other people here> }` for those of the ids the

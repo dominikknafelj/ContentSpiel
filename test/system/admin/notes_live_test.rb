@@ -96,7 +96,10 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
 
   # The identifiers the tab's consumer is subscribed to, as [channel, type,
   # id], sorted: one entry per subscription, so a second subscription to the
-  # same thing shows.
+  # same thing shows. An editor's header also holds presence's subscription
+  # for its record (`admin--presence--record`), which follows a visit the
+  # same way: the record that was left is let go, the one that is here is
+  # listened to once.
   def subscriptions
     page.evaluate_script("window.__consumer.subscriptions.subscriptions.map((each) => JSON.parse(each.identifier)).map((id) => [ id.channel, id.type || '', id.id || '' ])").sort_by(&:to_s)
   end
@@ -699,13 +702,13 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     await_notes_live
     hold_consumer
     keep_person_subscription
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ] ], subscriptions
 
     turbo_visit "/cs-studio/pages/#{other.id}"
     assert_selector "h1", text: "About"
     await_notes_live
     assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: this was no Turbo visit"
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", other.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", other.id.to_s ], [ "Presence::Channel", "page", other.id.to_s ] ], subscriptions
     assert same_person_subscription?, "the person's stream was subscribed to again by the new page"
     assert_no_selector "#notes-open-count"
     watch_notes_fetches
@@ -734,7 +737,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Pricing"
     await_notes_live
     assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: Back was no Turbo restoration"
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ] ], subscriptions
     assert same_person_subscription?, "the person's stream was subscribed to again on the way"
     assert_selector "#notes-open-count", text: "1"
     watch_notes_fetches
