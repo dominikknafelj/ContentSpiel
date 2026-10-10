@@ -33,3 +33,16 @@ Claude Design's decisions for presence (project "Content Spiel design system", 2
 
 16. **Reuse:** the actor avatar, the paper-ring overlap, the menu panel, the shared tooltip, mono counts, `ease-cs`.
 17. **Never show yourself.** One person in several tabs counts once, here if any of their tabs is. Presence locks nothing and warns of nothing on save: conflicts stay with the existing save handling.
+
+## Decisions after the header and the panel were built (2026-10-10)
+
+Where these and the items above differ, these win.
+
+18. **The tooltip** (CS Studio had none; icon buttons use `title`). Keep the new shared tooltip component and give it the inverted toast's look: `bg-ink text-paper`, `rounded-cs`, 12px/1.4 sans, padding 4px × 8px, at most 240px wide, no shadow, no arrow. It stands 6px below its host, centred, unless that would cross an edge of the window: then it lines up with the host's edge that has room (a collision check, not a fixed side). 300ms delay on hover, none on keyboard focus; moving from one host to another while one shows switches at once. Escape dismisses it without moving focus. Existing icon buttons move from `title` to it later, in one sweep, not in this feature.
+19. **The "+N" menu's side** is fixed: left-aligned in the header, right-aligned in the media panel.
+20. **The "+N" circle** has no fill (`bg-paper`; `bg-surface` in the media panel) and `border-line-strong`, so it does not read as one more person who is here. 4px before it.
+21. **The menu's rows:** a 24px avatar, the name in 14px `text-ink`, the status line in 12px `text-meta`, row padding 6px × 8px. Rows are plain text, not focusable. The menu itself takes focus as one list a screen reader can read through; Escape returns focus to what opened it. The list is labelled "Everyone with this open".
+22. **"+N" for a screen reader:** "2 more people" / "1 more person".
+23. **Keyboard: the whole group is ONE Tab stop**, a button whose label is "Also open by 3 people: Dana Weiss, here; Jonas Lind, away 12 min…", which opens the same list as "+N". Each circle still shows its own tooltip on hover. The focus ring is a 2px accent outline with 2px offset, drawn around the group. (This replaces item 8's `role="group"` with per-avatar labels as the keyboard path; the circles are no longer Tab stops.)
+24. **The media panel:** circles are centred on the first line of the file name; their 2px ring is `bg-surface`; two and then "+N" at every width (the panel is a fixed-width column).
+25. **No fade out.** Someone leaving just disappears; arriving still fades in (this narrows item 14).
