@@ -114,7 +114,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
   test "a form that fails to load shows a message with Try again, never an empty dialog" do
     visit admin_page_path(@about)
     await_admin_controllers
-    good = page.evaluate_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').dataset['admin-NewRecordUrlValue'] || document.querySelector('[data-admin--editor--new-record-kind-value=page]').getAttribute('data-admin--editor--new-record-url-value')")
+    good = page.evaluate_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').getAttribute('data-admin--editor--new-record-url-value')")
     page.execute_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').setAttribute('data-admin--editor--new-record-url-value', '/cs-studio/pages/does-not-exist')")
 
     # Review C, M15: the alert is empty until the failure happens (text that is

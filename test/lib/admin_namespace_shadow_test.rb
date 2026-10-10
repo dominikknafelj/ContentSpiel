@@ -36,12 +36,12 @@ require "test_helper"
 class AdminNamespaceShadowTest < ActiveSupport::TestCase
   ROOTS = %w[app/models app/services app/queries app/values app/constraints].freeze
 
-  # Not domain names:
-  # - `concerns` is no namespace (Rails collapses it: `concerns/trashable.rb`
-  #   is `Trashable`);
-  # - `admin` is `Admin` itself (`app/models/admin/scheduling.rb` is
-  #   `Admin::Scheduling`).
-  SKIPPED_ENTRIES = %w[concerns admin].freeze
+  # Not a domain name: `concerns` is no namespace (Rails collapses it:
+  # `concerns/trashable.rb` is `Trashable`). There is no `admin` here on purpose:
+  # none of the roots has an `admin/` directory (the admin's classes are
+  # controllers, components and helpers), and a future one would be a domain
+  # named `Admin` that this guard should look at, not skip.
+  SKIPPED_ENTRIES = %w[concerns].freeze
 
   # A domain name that legitimately exists under `Admin`, with the reason it is
   # safe. EMPTY today, and it should stay that way: an entry here means every

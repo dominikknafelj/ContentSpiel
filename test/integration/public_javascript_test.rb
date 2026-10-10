@@ -67,6 +67,10 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
       [ %r{(?<!admin/)mind_graph/}, /d3-force/ ].each do |pattern|
         assert preloads.none? { |href| href.match?(pattern) }, "#{pattern.inspect} is modulepreloaded on #{path}: #{preloads.grep(pattern).inspect}"
       end
+      # Both are `preload: false`, so an inline `import "mind_graph/app"` in a layout would add no
+      # modulepreload link and pass the lines above; the entry-point script is where it would show.
+      assert_no_match(/(?<!admin\/)mind_graph\//, entry_point_script, "the entry-point script of #{path} imports the mind graph's modules")
+      assert_not_includes entry_point_script, "d3-force"
     end
 
     # The Mind graph names the worker and d3-force as plain asset URLs, for the
@@ -91,6 +95,9 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller*='notes--alert']", count: 0
     assert_no_match "turbo-cable-stream-source", response.body
     assert modulepreloads.none? { |href| href.include?("notes/live_controller") }
+    # "notes/live" is in every specifier of the controller (`controllers/admin/notes/live_controller`),
+    # so an inline import of it would contain it; modulepreload alone would not see an inline import.
+    assert_not_includes entry_point_script, "notes/live"
   end
 
   # The other half: CS Studio does load it, on every screen, on <body>.

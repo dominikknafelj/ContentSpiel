@@ -96,30 +96,46 @@ class SourceLayoutTest < ActiveSupport::TestCase
   # Rails; moving them into the screens' files would put notes' strings in core files.
   LOCALE_EXCEPTIONS = %w[notes].freeze
 
-  test "a locale file of admin components holds one folder's scope" do
-    Dir[ROOT.join("config/locales/admin/*.en.yml")].each do |path|
-      name = File.basename(path, ".en.yml")
+  # Every locale file of the folder, whatever its language: `<folder>.<locale>.yml` holds
+  # exactly `<locale>.admin.components.<folder>` (German will add `ui.de.yml` and the rest).
+  # Returns [folder name, locale, path] and checks the file's top-level key is its locale.
+  def self.locale_files
+    Dir[ROOT.join("config/locales/admin/*.yml")].map do |path|
+      name, locale = File.basename(path, ".yml").split(".", 2)
+      [ name, locale, path ]
+    end
+  end
+
+  def self.components_of(path, locale)
+    (YAML.load_file(path).dig(locale, "admin", "components") || {}).keys
+  end
+
+  test "a locale file of admin components holds one folder's scope, in its own language" do
+    files = self.class.locale_files
+    assert_includes files.map(&:second), "en"
+    files.each do |name, locale, path|
+      assert_equal [ locale ], YAML.load_file(path).keys, "#{File.basename(path)} must hold the top-level key #{locale.inspect} only"
       next if LOCALE_EXCEPTIONS.include?(name)
-      scopes = (YAML.load_file(path).dig("en", "admin", "components") || {}).keys
+      scopes = self.class.components_of(path, locale)
       next if scopes.empty?
       assert_equal [ name ], scopes, "#{File.basename(path)} holds #{scopes.inspect}"
     end
   end
 
-  test "a component scope has keys in one locale file, except where an exception names it, and names a folder" do
+  test "a component scope has keys in one locale file per language, except where an exception names it, and names a folder" do
     holders = Hash.new { |hash, scope| hash[scope] = [] }
-    Dir[ROOT.join("config/locales/admin/*.en.yml")].each do |path|
-      name = File.basename(path, ".en.yml")
-      (YAML.load_file(path).dig("en", "admin", "components") || {}).each_key { |scope| holders[scope] << "#{name}.en.yml" }
+    self.class.locale_files.each do |name, locale, path|
+      self.class.components_of(path, locale).each { |scope| holders[[ scope, locale ]] << "#{name}.#{locale}.yml" }
     end
     # The exception files are left out of the duplicate check only: their scopes are merged
     # with other files' on purpose.
-    twice = holders.map { |scope, files| [ scope, files - LOCALE_EXCEPTIONS.map { |name| "#{name}.en.yml" } ] }
-                   .select { |_, files| files.size > 1 }.map { |scope, files| "#{scope}: #{files.join(', ')}" }
+    exceptions = LOCALE_EXCEPTIONS.flat_map { |name| holders.keys.map(&:last).uniq.map { |locale| "#{name}.#{locale}.yml" } }
+    twice = holders.map { |key, files| [ key, files - exceptions ] }
+                   .select { |_, files| files.size > 1 }.map { |(scope, locale), files| "#{locale} #{scope}: #{files.join(', ')}" }
     assert_empty twice, "a scope's keys are in two files:\n#{twice.join("\n")}"
     # Every file counts for this one, the exception included: a scope with no folder is dead.
     folders = Dir[ROOT.join("app/components/admin/*")].select { |p| File.directory?(p) }.map { |p| File.basename(p) }
-    nameless = holders.reject { |scope, _| folders.include?(scope) }.map { |scope, files| "#{scope}: #{files.join(', ')}" }
+    nameless = holders.reject { |(scope, _), _| folders.include?(scope) }.map { |(scope, locale), files| "#{locale} #{scope}: #{files.join(', ')}" }
     assert_empty nameless, "a locale file names a scope with no component folder:\n#{nameless.join("\n")}"
   end
 
