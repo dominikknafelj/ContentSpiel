@@ -1,6 +1,6 @@
 # CS Studio design system
 
-> Describes: `app/components/admin/`, `app/views/admin/`, `app/views/layouts/`, `app/javascript/controllers/`, `app/assets/tailwind/`, `test/lib/admin_design_rules_test.rb`, `test/lib/inline_handlers_test.rb`.
+> Describes: `app/components/admin/ui/` (the shared building blocks; a screen's own components are in its screen folder and described by that screen's reference), `app/views/admin/`, `app/views/layouts/`, `app/javascript/controllers/admin/ui/` and `app/javascript/controllers/` (the site's own controllers), `app/assets/tailwind/`, `test/lib/admin_design_rules_test.rb`, `test/lib/inline_handlers_test.rb`.
 
 ## The design pass
 

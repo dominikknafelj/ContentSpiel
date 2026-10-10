@@ -1,6 +1,6 @@
 # Content blocks and content types
 
-> Describes: `app/models/content_block.rb`, `app/models/content_types/`, `app/models/block_types/`, `app/models/content_model/`, `app/values/block_outline.rb`, `app/services/content_blocks/`, `app/components/admin/block_*`, `app/components/admin/editor_screen/section_*` (and the tile, panel-title, move-dialog and delete-dialog components beside them), `app/components/blocks/section_component.rb`, `app/controllers/admin/content_blocks_controller.rb`, `app/javascript/controllers/admin/editor/blocks_controller.js`, `app/javascript/controllers/admin/editor/section_controller.js`, `app/assets/tailwind/themes/default/sections.css`.
+> Describes: `app/models/content_block.rb`, `app/models/content_types/`, `app/models/block_types/`, `app/models/content_model/`, `app/values/block_outline.rb`, `app/services/content_blocks/`, `app/components/admin/editor_screen/block_*` (the block card and the block picker), `app/components/admin/editor_screen/section_*` (and the tile, panel-title, move-dialog and delete-dialog components beside them), `app/components/blocks/section_component.rb`, `app/controllers/admin/content_blocks_controller.rb`, `app/javascript/controllers/admin/editor/blocks_controller.js`, `app/javascript/controllers/admin/editor/section_controller.js`, `app/assets/tailwind/themes/default/sections.css`.
 
 ## Content blocks
 
