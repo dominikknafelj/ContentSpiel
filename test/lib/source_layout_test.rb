@@ -81,9 +81,13 @@ class SourceLayoutTest < ActiveSupport::TestCase
     assert_empty missing, "keys read but not defined:\n#{missing.join("\n")}"
   end
 
-  test "nothing is loose in app/components/admin but the base class" do
+  # The base class, and the registry of screen slots: `Admin::Slots` holds component CLASSES, so it is
+  # not a model (a model never names a component) and no screen's or `Ui`'s part.
+  LOOSE_IN_COMPONENTS = %w[admin_component.rb slots.rb].freeze
+
+  test "nothing is loose in app/components/admin but the base class and the slot registry" do
     loose = Dir[ROOT.join("app/components/admin/*.{rb,erb}")].map { |path| File.basename(path) }
-    assert_equal %w[admin_component.rb], loose
+    assert_equal LOOSE_IN_COMPONENTS, loose.sort
   end
 
   # One locale file per component folder: `config/locales/admin/<folder>.en.yml`

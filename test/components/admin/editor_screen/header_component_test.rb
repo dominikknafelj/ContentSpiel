@@ -198,6 +198,42 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     end
   end
 
+  class PeopleProbeComponent < ViewComponent::Base
+    def initialize(**) = nil
+
+    def call = tag.b("people", data: { slot_probe: "people" })
+  end
+
+  class ActionsProbeComponent < ViewComponent::Base
+    cattr_accessor :seen
+
+    def initialize(record:, viewer:, data: nil, **context) = (self.class.seen = [ record, viewer, data, context ])
+
+    def call = tag.b("actions", data: { slot_probe: "actions" })
+  end
+
+  test "the people slot is the first thing of the action row and the actions slot stands between the save status and Preview" do
+    page = create_page(title: "About", published: false)
+
+    Admin::Slots.with("editor.header.people" => [ PeopleProbeComponent ], "editor.header.actions" => [ ActionsProbeComponent ]) { render_header(page) }
+
+    html = rendered_content
+    order = [ 'data-slot-probe="people"', 'id="page-save-status"', 'data-slot-probe="actions"', ">Preview<" ].map { |needle| html.index(needle) }
+    assert_not_includes order, nil
+    assert_equal order.sort, order
+  end
+
+  test "the slots are handed the record, the viewer, no data and the host's context, and an empty slot draws nothing" do
+    page = create_page(title: "About", published: false)
+
+    Admin::Slots.with("editor.header.people" => [], "editor.header.actions" => [ ActionsProbeComponent ]) do
+      as(users(:one), channel: :admin) { render_inline(Admin::EditorScreen::HeaderComponent.new(record: page, locale: "de", url_options: { locale: "de" }, slot_context: { extra: 1 })) }
+    end
+
+    assert_equal [ page, users(:one), nil, { locale: "de", url_options: { locale: "de" }, extra: 1 } ], ActionsProbeComponent.seen
+    assert_no_selector "[data-slot-probe=people]"
+  end
+
   private
 
   def without_public_host

@@ -26,6 +26,13 @@ module Admin
     # modal opened from within it would be clipped by it. Dialog forms still
     # cannot nest in the editor form -- the header is never inside one.
     #
+    # Slots (`Admin::Slots`): the action row draws what features register at
+    # `editor.header.people` (first, before the saved status) and
+    # `editor.header.actions` (after it, before Preview) -- features register
+    # what stands there in `config/initializers/admin_slots.rb`. Each is built
+    # with the record, the viewer and `slot_context`: what the screen has
+    # already read that a feature would read again, handed through untouched.
+    #
     # Slot: `suggest` is the right-aligned end of the language row (today
     # `TranslateAllComponent`, rendered by the caller). Under the rows the
     # header itself owns two things: the view-only hint, and the empty
@@ -34,28 +41,20 @@ module Admin
     class HeaderComponent < Admin::AdminComponent
       renders_one :suggest
 
-      def initialize(record:, locale:, url_options: {}, open_notes: nil)
+      def initialize(record:, locale:, url_options: {}, slot_context: {})
         raise ArgumentError, "the editor header is for a Page or a Post, not #{record.class}" unless record.is_a?(::Page) || record.is_a?(::Post)
 
         @record = record
         @locale = locale.to_s
         @url_options = url_options
-        @open_notes = open_notes
+        @slot_context = slot_context
       end
 
-      # The Notes button (notes spec §4.3) is drawn for a screen that also
-      # draws the drawer and hands over the record's open-thread count. Its
-      # number is the server's as the page loads; `admin--notes--drawer` keeps it
-      # current from then on, and is what says "unread for you" (`data-unread`
-      # on the number) and "the drawer is open" (`aria-pressed`).
-      def notes? = !@open_notes.nil?
+      # Who is looking, for the slots: the actor `can?` already asks about.
+      def viewer = Current.actor
 
-      def open_notes = @open_notes.to_i
-
-      # The shared secondary style of the header (Preview's), as a flex row
-      # for the icon, the word and the count: the one class swapped is the
-      # display, which two utilities can't both set.
-      def notes_button_class = helpers.setup_secondary_link_class.sub("inline-block", "inline-flex")
+      # What every slot of the header is handed beside the record and the viewer.
+      def slot_context = { locale: locale, url_options: url_options, **@slot_context }
 
       def page? = record.is_a?(::Page)
 

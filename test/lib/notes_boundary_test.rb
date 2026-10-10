@@ -10,6 +10,12 @@ require "test_helper"
 # `Notes::Remove`, because the reference is polymorphic and no foreign key
 # could. Those call sites are listed in ALLOWED with their reason, may name
 # nothing of `Notes::` but `Remove`, and an entry that matches nothing fails.
+#
+# The core SCREENS keep clear of notes the same way, one layer up: the editors'
+# header and the media library's panel draw whatever is registered at their
+# slots (`Admin::Slots`, `config/initializers/admin_slots.rb`) and do not say
+# the word, comments included. The places that still name notes directly are
+# listed with the trigger that would make each a slot.
 class NotesBoundaryTest < ActiveSupport::TestCase
   CONTENT_SOURCES = %w[
     app/models/page.rb app/models/page/**/*.rb app/models/post.rb app/models/post/**/*.rb app/models/content_block.rb
@@ -74,6 +80,69 @@ class NotesBoundaryTest < ActiveSupport::TestCase
       names = self.class.references(Rails.root.join(path).read).map(&:last)
       assert_includes names, "Remove", "#{path} no longer calls Notes::Remove: delete its ALLOWED entry"
     end
+  end
+
+  # Core components that host a slot: no word "notes" in code or comment.
+  SLOT_HOSTS = %w[
+    app/components/admin/editor_screen/header_component.rb
+    app/components/admin/editor_screen/header_component.html.erb
+    app/components/admin/editor_screen/post_form_component.rb
+    app/components/admin/editor_screen/post_form_component.html.erb
+    app/components/admin/media_library/panel_component.rb
+    app/components/admin/media_library/panel_component.html.erb
+  ].freeze
+
+  NOTES_WORD = /\bnotes\b/i
+
+  # Notes-only places that stay direct: files outside `notes_screen` that name
+  # notes on purpose, each with the trigger that would make it a slot. A slot
+  # is a seam for a SECOND feature; none of these has asked for one.
+  NAMED_EXCEPTIONS = {
+    %w[app/components/admin/editor_screen/block_card_component.rb app/components/admin/editor_screen/block_card_component.html.erb] =>
+      "the block card's Add note item and marker: a slot when a second feature puts something on a block",
+    %w[app/components/admin/editor_screen/block_tile_component.rb app/components/admin/editor_screen/block_tile_component.html.erb
+       app/components/admin/editor_screen/section_card_component.html.erb] =>
+      "the section tile's Add note item and marker: a slot with the block card's, when a second feature puts something on a block",
+    %w[app/components/admin/dashboard_screen/card_component.rb] =>
+      "the dashboard's notes cards: a slot when the dashboard offers cards to a second feature (presence on the dashboard is out of scope)",
+    %w[app/components/admin/shell/sidebar_component.rb app/components/admin/shell/sidebar_component.html.erb] =>
+      "the sidebar's unread badge: a slot when a second feature wants a badge on a sidebar entry",
+    %w[app/components/admin/mind_graph_screen/legend_component.rb app/components/admin/mind_graph_screen/legend_component.html.erb] =>
+      "the mind graph's open-notes legend and nodes: a slot when a second feature draws on the graph (presence there is out of scope)",
+    %w[app/components/admin/media_library/tile_component.rb app/components/admin/media_library/tile_component.html.erb
+       app/components/admin/media_library/grid_component.rb] =>
+      "the media tile's count chip and the grid's one read of the marks: a slot when a second feature marks a tile (presence in the grid is out of scope)",
+    %w[app/components/admin/pages_screen/tree_component.rb app/components/admin/pages_screen/tree_node_component.rb app/components/admin/pages_screen/tree_node_component.html.erb] =>
+      "the page tree's row marker: becomes the `tree.row.markers` slot when presence puts its own marker there",
+    %w[app/components/admin/posts_screen/table_component.rb app/components/admin/posts_screen/table_component.html.erb] =>
+      "the posts list's notes column: becomes the `posts.row.markers` slot when presence puts its own marker there"
+  }.freeze
+
+  test "the editors' header and the media panel do not name notes: they draw their slots" do
+    assert_equal 6, SLOT_HOSTS.size
+    offences = SLOT_HOSTS.flat_map do |path|
+      Rails.root.join(path).read.lines.each_with_index.filter_map { |line, index| "#{path}:#{index + 1}: #{line.strip}" if line.match?(NOTES_WORD) }
+    end
+
+    assert_empty offences, "A core screen draws what is registered at its slot (config/initializers/admin_slots.rb) and does not name the feature, " \
+                           "not even in a comment."
+  end
+
+  test "every place that still names notes directly is a named exception with its trigger, and still names them" do
+    NAMED_EXCEPTIONS.each do |paths, reason|
+      assert_operator reason.length, :>, 40, "#{paths.first} needs its reason and trigger written out"
+      assert_includes reason, "slot", "#{paths.first}: the reason names the slot that would replace it"
+      paths.each { |path| assert Rails.root.join(path).file?, "#{path} no longer exists: delete its exception" }
+      assert paths.any? { |path| Rails.root.join(path).read.match?(NOTES_WORD) }, "#{paths.first} no longer names notes: delete its exception"
+    end
+    assert_empty NAMED_EXCEPTIONS.keys.flatten & SLOT_HOSTS
+  end
+
+  test "the slot pattern finds the word in code and in a comment, and not a word that only contains it" do
+    assert_match NOTES_WORD, "# the Notes button"
+    assert_match NOTES_WORD, "open_threads(notes)"
+    assert_no_match NOTES_WORD, "footnotes = 1"
+    assert_no_match NOTES_WORD, "denotes"
   end
 
   test "the pattern finds a reference and nothing that only looks like one" do

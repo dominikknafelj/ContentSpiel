@@ -1,7 +1,7 @@
 <%# The header (breadcrumb, title, publish state, actions, language tabs) is
     `Admin::EditorScreen::HeaderComponent`, shared with the page editor. Its
     dialogs are siblings of it, so they sit outside this form. %>
-<%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options, open_notes: @open_notes) do |header| %>
+<%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options, slot_context: @slot_context) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4). %>
     <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: post, locale: locale, editable: editable?) %>

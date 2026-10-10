@@ -19,12 +19,14 @@
   <meta name="turbo-prefetch" content="false">
 <% end %>
 
-<%# The post's open notes (notes spec §4.3): two queries for the header's
-    number and whether it holds something unread for the viewer. Here in the
-    view, because every way this screen is rendered needs them. %>
+<%# The post's open notes (notes spec §4.3): two queries for the drawer's
+    counts and whether they hold something unread for the viewer. Here in the
+    view, because every way this screen is rendered needs them. The header's
+    Notes button is a slot component (`Admin::Slots`) and is handed the same
+    counts rather than reading them again. %>
 <% note_counts = Notes::Counts.for_container(@post, user: Current.user) %>
 
-<%= render Admin::EditorScreen::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) %>
+<%= render Admin::EditorScreen::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, slot_context: { counts: note_counts }) %>
 
 <%# The notes drawer (notes spec §4.1): once per screen, after everything
     else and outside every form -- the post's form above is closed. `?notes=open`

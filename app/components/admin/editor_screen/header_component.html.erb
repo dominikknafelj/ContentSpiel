@@ -3,9 +3,9 @@
 <%= tag.header class: "admin-editor-header sticky top-(--admin-top-offset) z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
       data: { record_type: type, record_id: record.id } do %>
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-    <%# "Pages ▾" (the notes handoff's decision 9): the page tree's drawer while
-        the notes column has folded the tree away and there is no top bar to
-        hold the button, so from 1280px with notes open and at no other time
+    <%# "Pages ▾" (the side-column handoff's decision 9): the page tree's drawer while
+        the editor's side column has folded the tree away and there is no top bar to
+        hold the button, so from 1280px with that column open and at no other time
         (`.admin-editor-header__tree` in content-spiel.tailwind.css). The same
         drawer, panel and controller as the top bar's button
         (`admin--shell--drawer#toggle`, `aria-controls`). A page's editor only: a
@@ -29,30 +29,15 @@
     </div>
 
     <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <%# What features register at `editor.header.people`: first in the row,
+          before the status that says what has happened. %>
+      <%= render Admin::Ui::SlotComponent.new(name: "editor.header.people", record: record, viewer: viewer, **slot_context) %>
+
       <%= render Admin::Ui::SaveStatusComponent.new(id: save_status_id, state: :idle, live: live?) %>
 
-      <%# Notes (notes spec §4.3, handoff "Notes header button" as its
-          decision 2 corrects it): a toggle for the drawer
-          `Admin::NotesScreen::DrawerComponent` draws beside the editor, in
-          the header's shared secondary style, as Preview beside it (16px,
-          `px-4 py-2`), with a 16px icon and its count in 12px mono. Four
-          states: the word alone; with open threads their number
-          in mono; `data-unread` on the number (set by `admin--notes--drawer` from the
-          counts) makes it the filled accent pill, accent meaning "unread for
-          you" and nothing else; `aria-pressed` while the drawer is open. The
-          id `notes-open` is this button's alone. %>
-      <% if notes? %>
-        <%= tag.button type: "button", id: "notes-open",
-              class: "#{notes_button_class} items-center gap-2 focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
-              aria: { controls: "notes-drawer", expanded: "false", pressed: "false", label: t(".notes_label", count: open_notes) },
-              data: { "admin--notes--drawer-target": "opener", action: "admin--notes--drawer#toggle" } do %>
-          <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>
-          <span><%= t(".notes") %></span>
-          <%= tag.span open_notes, id: "notes-open-count", hidden: open_notes.zero?,
-                class: "font-cs-mono text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
-                data: { "admin--notes--drawer-target": "total" } %>
-        <% end %>
-      <% end %>
+      <%# What features register at `editor.header.actions` (a feature's
+          button for a side panel, today): where the secondary actions stand, before Preview. %>
+      <%= render Admin::Ui::SlotComponent.new(name: "editor.header.actions", record: record, viewer: viewer, **slot_context) %>
 
       <%# A post nobody lists has no path, so nothing to preview: `link_to` a
           nil URL raises rather than rendering a dead link. %>

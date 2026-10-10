@@ -231,31 +231,17 @@ en:
           add_note: "Add note"
         block_tile:
           add_note: "Add note"
-        # The editor header's Notes button. `editor_screen.en.yml` holds nothing
-        # of the header's yet (it is not converted); these merge into its
-        # scope.
+        # The page tree's drawer in the editor header, where the notes column
+        # has folded the tree away and there is no top bar (the top bar's own
+        # button reads the same). `editor_screen.en.yml` holds nothing of the
+        # header's yet (it is not converted); these merge into its scope.
         header:
-          notes: "Notes"
-          # The page tree's drawer, where the notes column has folded the
-          # tree away and there is no top bar (the top bar's own button
-          # reads the same).
           tree: "Pages ▾"
           tree_label: "Open page tree"
-          # The button's accessible name; `admin.notes.script.total` is the
-          # same sentence for the script that keeps it current.
-          notes_label:
-            one: "Notes, %{count} open"
-            other: "Notes, %{count} open"
       # A record's open notes where it is listed (notes spec §4.4). None of
       # these three components' other strings live here (they are not
       # converted): these merge into their scopes.
       media_library:
-        panel:
-          notes: "Notes"
-          # After "Notes": "· 2 open". `%{number}` is the element the script
-          # rewrites as the count changes, so the sentence has one form.
-          notes_open_html: "· %{number} open"
-          notes_loading: "Loading notes…"
         tile:
           open_notes:
             one: "%{count} open note"
@@ -274,6 +260,21 @@ en:
             one: "%{count} open note"
             other: "%{count} open notes"
       notes_screen:
+        # The editor header's Notes button (`Admin::NotesScreen::HeaderButtonComponent`).
+        header_button:
+          notes: "Notes"
+          # The button's accessible name; `admin.notes.script.total` is the
+          # same sentence for the script that keeps it current.
+          notes_label:
+            one: "Notes, %{count} open"
+            other: "Notes, %{count} open"
+        # The image panel's notes section (`Admin::NotesScreen::MediaSectionComponent`).
+        media_section:
+          notes: "Notes"
+          # After "Notes": "· 2 open". `%{number}` is the element the script
+          # rewrites as the count changes, so the sentence has one form.
+          notes_open_html: "· %{number} open"
+          notes_loading: "Loading notes…"
         drawer:
           title: "Notes"
           # Beside the title: "4 open". `%{number}` is the element the script

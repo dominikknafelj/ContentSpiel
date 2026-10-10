@@ -171,6 +171,40 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_selector "#media-trash-help", text: "In use in 2 places. Remove it there first."
   end
 
+  class HeaderProbeComponent < ViewComponent::Base
+    def initialize(**) = nil
+
+    def call = tag.b("header", data: { slot_probe: "header" })
+  end
+
+  class SectionsProbeComponent < ViewComponent::Base
+    def initialize(**) = nil
+
+    def call = tag.b("sections", data: { slot_probe: "sections" })
+  end
+
+  test "the panel's slots stand at the right end of the file-name row and below Used on, and draw nothing while empty" do
+    asset = create_media_asset
+
+    Admin::Slots.with("media.panel.header" => [ HeaderProbeComponent ], "media.panel.sections" => [ SectionsProbeComponent ]) do
+      render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en")
+    end
+
+    html = rendered_content
+    order = [ "media-panel-title", 'data-slot-probe="header"', "<img", "Used on", 'data-slot-probe="sections"', "Move to trash" ].map { |needle| html.index(needle) }
+    assert_not_includes order, nil
+    assert_equal order.sort, order
+  end
+
+  test "with nothing registered at its slots the panel is the panel without the notes section" do
+    Admin::Slots.with("media.panel.header" => [], "media.panel.sections" => []) do
+      render_inline Admin::MediaLibrary::PanelComponent.new(asset: create_media_asset, locale: "en")
+    end
+
+    assert_selector "#media-panel"
+    assert_no_selector "#media-notes"
+  end
+
   private
 
   def media_only_viewer
