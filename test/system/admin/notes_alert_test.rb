@@ -504,8 +504,113 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_no_text "This browser has not been allowed"
   end
 
+  # --- a changed setting in open tabs ---------------------------------------------
+  #
+  # CS Studio moves between screens inside `#content`, so <body>, where the
+  # alert's two settings stand, lives as long as the tab: a setting saved on
+  # the account screen reached no open tab until it was loaded again, the
+  # saving tab included. Found by hand: the desktop switch on, a mention with
+  # the tab hidden, a chime and no notification.
+
+  # The account screen with the fakes in place and a click in the tab.
+  def stubbed_account
+    visit "/cs-studio/account"
+    await_notes_live
+    stub_alerts
+    find("h1").click
+  end
+
+  # What the alert on <body> holds: [ sound, desktop ].
+  def alert_values = page.evaluate_script("[ 'sound', 'desktop' ].map((name) => document.body.getAttribute(`data-admin--notes-alert-${name}-value`))")
+
+  def save_switches(*ids)
+    ids.each { |id| find(id).click }
+    within("#profile-form") { press "Save" }
+    assert_selector "#toasts .admin-toast", text: "Settings saved"
+  end
+
+  test "the desktop switch saved on reaches the tab that saved it at once: a mention with the tab hidden is put on the desktop, with no reload" do
+    stubbed_account
+    assert_equal %w[true false], alert_values
+
+    save_switches("#notes_desktop")
+
+    assert_eventually(message: "the tab still has the old setting: #{alert_values}") { alert_values == %w[true true] }
+    hide_document
+    delivery = mention_me
+    await_settled(delivery)
+    assert_equal [ { "title" => "Dana mentioned you", "body" => "Pricing\nOver to you, @one" } ], notified
+    assert_equal true, users(:one).reload.notes_desktop
+  end
+
+  test "a tab opened before the save learns the desktop setting without a reload, and raises the notification when it wins the agreement" do
+    stubbed_dashboard
+    first = page.current_window
+    second = open_new_window
+    within_window(second) do
+      stubbed_account
+      save_switches("#notes_desktop")
+      assert_eventually { alert_values == %w[true true] }
+      # Away from CS Studio's tabs' agreement: only the first tab can win.
+      visit "about:blank"
+    end
+
+    within_window(first) do
+      assert_eventually(message: "the other tab never heard of the setting") { alert_values == %w[true true] }
+      hide_document
+      delivery = mention_me
+      await_settled(delivery)
+      assert_equal [ { "title" => "Dana mentioned you", "body" => "Pricing\nOver to you, @one" } ], notified
+    end
+  ensure
+    second&.close
+  end
+
+  test "the sound switched off stops the chime in the saving tab and in a tab opened before, with no reload; switched on again it is back" do
+    stubbed_dashboard
+    first = page.current_window
+    second = open_new_window
+    within_window(second) do
+      stubbed_account
+      save_switches("#notes_sound")
+      assert_eventually { alert_values == %w[false false] }
+    end
+    within_window(first) { assert_eventually(message: "the other tab never heard that the sound is off") { alert_values == %w[false false] } }
+
+    delivery = mention_me
+    within_window(first) { await_settled(delivery) }
+    within_window(second) { await_settled(delivery) }
+    assert_equal 0, within_window(first) { tones } + within_window(second) { tones }
+
+    within_window(second) do
+      save_switches("#notes_sound")
+      assert_eventually { alert_values == %w[true false] }
+    end
+    within_window(first) { assert_eventually(message: "the other tab never heard that the sound is on again") { alert_values == %w[true false] } }
+    assert_equal false, users(:one).reload.notes_desktop
+    assert_equal true, users(:one).reload.notes_sound
+  ensure
+    second&.close
+  end
+
+  # A tab that never hears of it (another browser, a tab without the
+  # channel) is right after its next page load, as before.
+  test "a refused save leaves the tab's settings as they are stored" do
+    stubbed_account
+    refusal = ApplicationService::Result.failure(users(:one), [ "Name is too long." ])
+    original = Users::UpdateProfile.method(:call)
+    Users::UpdateProfile.define_singleton_method(:call) { |*, **| refusal }
+    find("#notes_desktop").click
+    within("#profile-form") { press "Save" }
+
+    assert_selector ".admin-error-summary", text: "Name is too long."
+    assert_equal %w[true false], alert_values
+  ensure
+    Users::UpdateProfile.define_singleton_method(:call, original) if original
+  end
+
   # The handoff's decision 13: the name and the switches are one form.
-  test "the name and the two switches are saved by one footer, keep what the password form holds, and reach the next page" do
+  test "the name and the two switches are saved by one footer, keep what the password form holds, and reach this page and the next" do
     visit "/cs-studio/account"
     await_admin_controllers
     assert_selector ".admin-save-bar", count: 2
@@ -535,12 +640,14 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_equal "a-new-long-password", find_field("New password").value
     assert_equal [ true, false ], [ find("#notes_desktop").checked?, find("#notes_sound").checked? ]
 
-    # The settings a tab acts on are those of the page it drew: the next one.
+    # The settings this tab acts on are the saved ones at once, with no
+    # reload (they stood as the page drew them until the next full load,
+    # which is what a mention then went by), and on the next page too.
+    assert_selector "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
     # (The typed password is given up first, or leaving would ask about it.)
     fill_in "New password", with: ""
     fill_in "Confirm new password", with: ""
     assert_selector "#password-form .admin-save-bar", text: "No unsaved changes"
-    assert_selector "body[data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false]"
     visit "/cs-studio"
     assert_selector "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
   end

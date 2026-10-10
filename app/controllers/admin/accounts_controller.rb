@@ -76,9 +76,16 @@ module Admin
     # happened. The stream replaces the one thing a new name changes outside
     # the field itself, the sidebar's account block, and says "Settings saved";
     # the footer takes what it sent as its new baseline
-    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect. The
-    # new settings reach the scripts (`admin--notes-alert`, on <body>) with
-    # the next page.
+    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect.
+    #
+    # The stream carries a second thing a save changes outside the form: the
+    # two notes settings as the scripts hold them (`admin--notes-alert`, on
+    # <body>). <body> is not drawn again by this answer, nor by any move
+    # between screens inside `#content`, so its values stayed what they were
+    # when the tab was loaded: a desktop notification switched on here was
+    # not raised, in this tab or any other, until each was reloaded. The
+    # element the stream replaces hands the stored values to the controller,
+    # which tells the person's other tabs in this browser.
     #
     # A refusal draws the screen again with what was sent in the form
     # (`@profile_values`) and the account as it is STORED everywhere else:
@@ -94,6 +101,7 @@ module Admin
         if request.accepts.any? { |type| type.symbol == :turbo_stream }
           render turbo_stream: [
             turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user, url_options: admin_url_options)),
+            turbo_stream.replace("notes-alert-settings", partial: "admin/shared/notes_alert_settings"),
             toast_stream(t("admin.accounts.saved"))
           ]
         else

@@ -60,10 +60,10 @@
       already read through the scoped endpoint) and, for a mention, lets one
       tab of this person chime and, with no tab of theirs in view, one raise
       a desktop notification (notes spec §6.4). Its values are the person's
-      two settings as they were when this page was drawn -- a change on the
-      account screen takes effect with the next page that is DRAWN: one that
-      Back brings out of Turbo's snapshot still carries the old ones until
-      it is loaded again -- and the person's id,
+      two settings as they were when this page was drawn, kept current by
+      the element rendered first in <body> (`admin/shared/_notes_alert_settings`,
+      which the account screen's save replaces, and which the saving tab
+      passes on to the person's other tabs) -- and the person's id,
       which only names the `BroadcastChannel` their tabs agree on.
 
       `data-admin-locale` carries the editing language onto <body> (rather
@@ -83,6 +83,7 @@
         data-admin--notes-alert-person-value="<%= Current.user&.id %>"
         data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:load@document->admin--notes#syncAddress turbo:before-fetch-request@document->admin--notes-live#tag turbo:before-fetch-request@document->admin--notes-live#asked turbo:before-frame-render@document->admin--notes-live#answered admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible admin--notes-live:delivery@document->admin--notes-alert#delivery"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+    <%= render "admin/shared/notes_alert_settings" %>
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
     <div class="admin-shell<%= " admin-shell--tree" if content_for?(:tree) %>">
       <%# `Admin::BaseController::MODULES`, narrowed to what this user can

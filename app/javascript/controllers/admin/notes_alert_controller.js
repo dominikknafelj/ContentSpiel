@@ -217,6 +217,7 @@ function notify(delivery) {
 }
 
 export default class extends Controller {
+  static targets = [ "settings" ]
   static values = { sound: Boolean, desktop: Boolean, person: String }
 
   initialize() {
@@ -233,6 +234,28 @@ export default class extends Controller {
     this.room?.leave(this.heard)
   }
 
+  // THE TWO SETTINGS, KEPT CURRENT. They stand on <body>, which lives as long
+  // as the tab (CS Studio moves between screens inside `#content`), so the
+  // values of the page load went stale when the account screen saved new
+  // ones. The server's word for them is the `settings` element: in the
+  // layout it says what <body> says; the account screen's save replaces it
+  // (a stream), and the one that connects then is taken -- by this tab, and
+  // passed to the person's other tabs over the room they already share, so
+  // none of them alerts, or wins the agreement, by an old setting. The room
+  // is this browser's, which is where the two settings act (the chime and
+  // the notification happen here); a tab in another browser has them with
+  // its next page load, as every tab had before.
+  settingsTargetConnected(element) {
+    this.take(element.dataset.sound === "true", element.dataset.desktop === "true", { tell: true })
+  }
+
+  take(sound, desktop, { tell = false } = {}) {
+    if (sound === this.soundValue && desktop === this.desktopValue) return
+    this.soundValue = sound
+    this.desktopValue = desktop
+    if (tell) this.say({ type: "settings", sound, desktop })
+  }
+
   // `admin--notes-live:delivery` on the document.
   delivery(event) {
     const delivery = event.detail
@@ -246,6 +269,8 @@ export default class extends Controller {
   }
 
   heard(message) {
+    // Another tab of this person saved the settings: two booleans, nothing else.
+    if (message?.type === "settings") return this.take(message.sound === true, message.desktop === true)
     if (message?.type === "done") {
       arrival()
       done.add(message.id)

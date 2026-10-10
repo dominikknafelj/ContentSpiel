@@ -162,6 +162,18 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "<i>L</i>"
   end
 
+  # <body> is not drawn again by that answer, so the two notes settings the
+  # scripts act on travel in it: the element the layout holds, as stored now.
+  test "the save's stream hands the stored notes settings to the tab, and the layout holds the same element" do
+    sign_in_as(users(:one))
+    get "/cs-studio/account"
+    assert_select "body > span#notes-alert-settings[hidden][data-admin--notes-alert-target=settings][data-sound=true][data-desktop=false]", count: 1
+
+    patch admin_account_profile_path, params: { name: "Ada", notes_sound: "0", notes_desktop: "1" }, as: :turbo_stream
+
+    assert_select "turbo-stream[action=replace][target=notes-alert-settings] template span#notes-alert-settings[data-admin--notes-alert-target=settings][data-sound=false][data-desktop=true]"
+  end
+
   # The format is decided without `respond_to`: the name is saved by then.
   test "a client that takes neither a stream nor HTML is redirected, never told 406 about a save that happened" do
     sign_in_as(users(:one))
