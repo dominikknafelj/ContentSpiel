@@ -92,8 +92,16 @@ export function open() {
 // Ends every subscription and the socket. It is how the socket is closed
 // when a Turbo visit leaves CS Studio: the last listener stopped, and the
 // last subscription was let go (`listen`). Called with subscriptions still
-// held, it ends those too; their listeners are told nothing, and a `stop`
-// that comes later finds nothing left to do.
+// held, it ends those too: their listeners are told `disconnected`, as they
+// are when the socket drops -- their subscription is not up any more, and
+// one that was told nothing would go on saying it is -- and a `stop` that
+// comes later finds nothing left to do.
+//
+// The socket is closed only if nobody listens by then. Ending the
+// subscriptions waits (for the consumer, for each subscription), and a
+// `listen` that comes in that wait has made a new subscription on this
+// socket: closed under it, it would never be confirmed, and nothing would
+// open the socket again before the next `open`.
 export async function close() {
   const entries = [ ...pool.values() ]
   pool.clear()
@@ -101,10 +109,13 @@ export async function close() {
     clearTimeout(entry.release)
     entry.closed = true
     entry.up = entry.settled = false
+    ;[ ...entry.listeners ].forEach((each) => each.disconnected?.())
   })
   for (const entry of entries) {
     const subscription = await entry.subscription
     if (!entry.rejected) subscription.unsubscribe()
   }
-  (await cable.getConsumer()).disconnect()
+  const consumer = await cable.getConsumer()
+  if (pool.size > 0) return
+  consumer.disconnect()
 }

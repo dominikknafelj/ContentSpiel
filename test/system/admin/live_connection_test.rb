@@ -103,18 +103,71 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
     assert live("(live) => live.connected()")
   end
 
-  test "close ends every subscription and the socket, and a listener's later stop does nothing more" do
+  # On a subscription the test alone holds: the page's own listener is on the
+  # person's, and a `stop` that leaves another listener behind returns before
+  # it has anything to let go.
+  test "close ends every subscription and the socket and tells the listeners, and a stop that comes later does not touch who listens since" do
+    record = { channel: "Notes::RecordChannel", type: "page", id: create_page(title: "Pricing").id.to_s }
     await_notes_live
-    live("(live, consumer, params) => { window.__stop = live.listen(params, () => {}) }", PERSON)
+    live(<<~JS, record)
+      (live, consumer, params) => {
+        window.__told = []
+        window.__stop = live.listen(params, Object.assign(() => {}, { connected: () => window.__told.push("connected"), disconnected: () => window.__told.push("disconnected") }))
+      }
+    JS
+    await_js("window.__told.length === 1", wait: 8)
 
     live("(live) => live.close()")
 
     assert_equal 0, live("(live, consumer) => consumer.subscriptions.subscriptions.length")
     assert_eventually(message: "the socket stayed open after close") { live("(live, consumer) => consumer.connection.isActive()") == false }
     assert_not live("(live) => live.connected()")
+    # Told, as when the socket drops: the test's listener, and the page's own,
+    # which no longer says that every subscription is answered.
+    assert_equal %w[connected disconnected], page.evaluate_script("window.__told")
+    assert_equal "connecting", page.evaluate_script("document.body.dataset.notesLive")
+    assert_equal false, page.evaluate_script("window.__stop.up")
 
+    # Someone listens again, with the same params: a new subscription under
+    # the key the closed one had, on a socket opened again for it.
+    live(<<~JS, record)
+      (live, consumer, params) => {
+        window.__again = []
+        window.__stopAgain = live.listen(params, Object.assign(() => {}, { connected: () => window.__again.push("connected") }))
+      }
+    JS
+    await_js("window.__again.length === 1", wait: 8)
+
+    # The closed one's `stop`, late. It is the last listener of an entry that
+    # is in the pool no more: letting go by its key would take the new
+    # subscription out of the pool, find the pool empty and close the socket.
     page.execute_script("window.__stop()")
     await_frames
-    assert_equal 0, live("(live, consumer) => consumer.subscriptions.subscriptions.length")
+
+    assert_equal 1, subscriptions("RecordChannel")
+    assert_equal true, live("(live, consumer) => consumer.connection.isActive()"), "the late stop closed the socket under the new listener"
+    assert_equal true, page.evaluate_script("window.__stopAgain.up")
+    assert live("(live) => live.connected()")
+  end
+
+  test "a listener that arrives while the connection is closing keeps the socket, and is answered" do
+    record = { channel: "Notes::RecordChannel", type: "page", id: create_page(title: "Pricing").id.to_s }
+    await_notes_live
+
+    # In one task: `close` has emptied the pool and waits for the page's own
+    # subscription to end; the listener comes in that wait.
+    live(<<~JS, record)
+      async (live, consumer, params) => {
+        window.__told = []
+        const closing = live.close()
+        window.__stop = live.listen(params, Object.assign(() => {}, { connected: () => window.__told.push("connected") }))
+        await closing
+      }
+    JS
+
+    await_js("window.__told.length === 1", wait: 8)
+    assert_equal true, live("(live, consumer) => consumer.connection.isActive()")
+    assert_equal 0, subscriptions("PersonChannel")
+    assert_equal 1, subscriptions("RecordChannel")
   end
 end
