@@ -95,6 +95,10 @@ module Admin
 
       def edit? = @edit
 
+      # `TOOL_CLASS`'s `disabled:` look, for the one tool that cannot be
+      # `disabled`: the emoji set's <summary>, which says `aria-disabled`.
+      TOOL_DISABLED_CLASS = "aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-dim".freeze
+
       # The submit button's data and what says the send key.
       def submit_attributes
         { title: t(".send_title"), aria: { keyshortcuts: "Control+Enter" }, data: { "admin--note-composer-target": "submit" } } # i18n-ok: a key combination in ARIA's own notation

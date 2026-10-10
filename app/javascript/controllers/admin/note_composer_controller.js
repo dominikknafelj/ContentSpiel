@@ -256,7 +256,9 @@ export default class extends Controller {
   // WHAT IT LOOKS LIKE (the handoff's decision 41), once the send has been
   // out for `SENDING_AFTER_MS`: the field's text dim, the submit reading
   // "Sending…" with `aria-busy` (it is disabled already, with the button's
-  // own disabled look), and the paperclip, emoji and at-sign disabled. No
+  // own disabled look), and the paperclip, emoji and at-sign disabled (the
+  // emoji set is a <details>: `inert`, its <summary> `aria-disabled` with
+  // the same look as the other two, decision 45). No
   // spinner. All of it is taken back in one place (`settled`), on every way
   // a send ends -- `turbo:submit-end` follows an answer of any status, a
   // network error and an aborted or stopped submission alike -- and when a
@@ -275,6 +277,7 @@ export default class extends Controller {
     this.toolTargets.forEach((tool) => { tool.disabled = true })
     this.emojiTarget.open = false
     this.emojiTarget.inert = true
+    this.emojiTarget.querySelector("summary")?.setAttribute("aria-disabled", "true")
     if (!this.hasSubmitTarget) return
     // The button's own words are kept on it, for whoever puts them back.
     this.submitTarget.dataset.label ??= this.submitTarget.textContent
@@ -292,6 +295,7 @@ export default class extends Controller {
     this.fieldTarget.classList.replace("text-dim", "text-ink")
     this.toolTargets.forEach((tool) => { tool.disabled = false })
     this.emojiTarget.inert = false
+    this.emojiTarget.querySelector("summary")?.removeAttribute("aria-disabled")
     if (this.hasSubmitTarget) {
       if (this.submitTarget.dataset.label != null) this.submitTarget.textContent = this.submitTarget.dataset.label
       delete this.submitTarget.dataset.label

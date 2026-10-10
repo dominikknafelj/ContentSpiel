@@ -223,13 +223,19 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
         return {
           label: submit.textContent.trim(), busy: submit.getAttribute("aria-busy"), disabled: submit.disabled, dim: field.classList.contains("text-dim"),
           attach: reply.querySelector("button[data-note-attach]").disabled, mention: reply.querySelector("button[aria-label='Mention someone']").disabled,
-          emoji: reply.querySelector("[data-admin--note-composer-target~='emoji']").inert, readonly: field.readOnly
+          emoji: reply.querySelector("[data-admin--note-composer-target~='emoji']").inert, readonly: field.readOnly,
+          // The emoji control is a <details>: `inert`, and its <summary> says so and looks it (decision 45).
+          emojiSays: reply.querySelector("[data-admin--note-composer-target~='emoji'] > summary").getAttribute("aria-disabled"),
+          emojiLook: [ "opacity", "cursor" ].map((name) => getComputedStyle(reply.querySelector("[data-admin--note-composer-target~='emoji'] > summary"))[name]).join(" "),
+          emojiBox: getComputedStyle(reply.querySelector("[data-admin--note-composer-target~='emoji']")).opacity,
+          attachLook: [ "opacity", "cursor" ].map((name) => getComputedStyle(reply.querySelector("button[data-note-attach]"))[name]).join(" ")
         }
       })()
     JS
   end
 
-  AT_REST = { "label" => "Reply", "busy" => nil, "dim" => false, "attach" => false, "mention" => false, "emoji" => false, "readonly" => false }.freeze
+  AT_REST = { "label" => "Reply", "busy" => nil, "dim" => false, "attach" => false, "mention" => false, "emoji" => false, "readonly" => false,
+              "emojiSays" => nil, "emojiLook" => "1 pointer", "emojiBox" => "1", "attachLook" => "1 pointer" }.freeze
 
   test "a reply that is still out after 300ms says Sending: dim text, a busy Send, the three controls disabled; the answer puts it all back" do
     open_in_drawer
@@ -240,7 +246,10 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     within("#note-thread-#{@thread.id}-reply") { press "Reply" }
 
     assert_selector "#note-thread-#{@thread.id}-reply button[aria-busy=true][disabled]", text: "Sending…"
-    assert_equal({ "label" => "Sending…", "busy" => "true", "disabled" => true, "dim" => true, "attach" => true, "mention" => true, "emoji" => true, "readonly" => true }, sending_look)
+    # The emoji control looks exactly as the paperclip does while disabled:
+    # the button's ordinary disabled look, no opacity of its own on top.
+    assert_equal({ "label" => "Sending…", "busy" => "true", "disabled" => true, "dim" => true, "attach" => true, "mention" => true, "emoji" => true, "readonly" => true,
+                   "emojiSays" => "true", "emojiLook" => "0.5 not-allowed", "emojiBox" => "1", "attachLook" => "0.5 not-allowed" }, sending_look)
     assert_equal page.evaluate_script("getComputedStyle(document.querySelector('[data-note-actions] form button')).color"),
       page.evaluate_script("getComputedStyle(document.querySelector('#note-thread-#{@thread.id}-reply textarea[name=body]')).color"), "the field's text is not the dim colour (the Notify link's)"
     # Not before the 300ms: a send that is answered sooner never shows it.
