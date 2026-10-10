@@ -27,16 +27,16 @@
       The sidebar and tree columns are *drawers* below 1280px / 1024px
       (`.admin-shell` in content-spiel.tailwind.css, handoff §9 A7): the same
       elements, slid off-screen until the top bar's buttons set `data-open`
-      (`admin--drawer`, which also owns the scrim and Escape). That is real
+      (`admin--shell--drawer`, which also owns the scrim and Escape). That is real
       CSS rather than utilities because the open state is an attribute
-      selector. `admin--drawer` joins `admin--ui--dialog` on <body> -- both
+      selector. `admin--shell--drawer` joins `admin--ui--dialog` on <body> -- both
       listen at the document level, and the existing dialog actions stay.
 
       `admin--notes` is on <body> for the same reason as `admin--ui--dialog`: the
       editor header's Notes button, the markers on the block cards and the
       notes drawer are far apart in the document. The two drawer controllers
       tell each other when one opens (`admin--notes:opened`,
-      `admin--drawer:opened`), so the notes drawer and a shell drawer are
+      `admin--shell--drawer:opened`), so the notes drawer and a shell drawer are
       never open together -- but for the page tree folded beside the notes
       column, which is opened from it (`admin--notes#shellOpened`).
 
@@ -75,13 +75,13 @@
       the pending-lock hint -- `Admin::MessagesHelper`,
       `app/javascript/i18n/messages.js`); a script that finds no nearer
       `data-messages` reads these. %>
-  <body data-controller="admin--ui--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes admin--notes-live admin--notes-alert" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
+  <body data-controller="admin--ui--dialog admin--shell--drawer admin--shell--command-palette admin--shell--fragment-links admin--shell--file-drop-guard admin--notes admin--notes-live admin--notes-alert" data-admin--shell--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
         data-admin--notes-live-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes-live-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
         data-admin--notes-live-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
         data-admin--notes-live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes-live-person-value="<%= Current.user&.id %>"
         data-admin--notes-alert-sound-value="<%= Current.user&.notes_sound ? true : false %>" data-admin--notes-alert-desktop-value="<%= Current.user&.notes_desktop ? true : false %>"
         data-admin--notes-alert-person-value="<%= Current.user&.id %>"
-        data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:load@document->admin--notes#syncAddress turbo:before-fetch-request@document->admin--notes-live#tag turbo:before-fetch-request@document->admin--notes-live#asked turbo:before-frame-render@document->admin--notes-live#answered admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible admin--notes-live:delivery@document->admin--notes-alert#delivery"
+        data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--shell--drawer#closeAll turbo:before-visit@document->admin--shell--drawer#visiting turbo:frame-load@document->admin--shell--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--shell--drawer#standAside admin--shell--drawer:opened->admin--notes#shellOpened turbo:load@document->admin--notes#syncAddress turbo:before-fetch-request@document->admin--notes-live#tag turbo:before-fetch-request@document->admin--notes-live#asked turbo:before-frame-render@document->admin--notes-live#answered admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible admin--notes-live:delivery@document->admin--notes-alert#delivery"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render "admin/shared/notes_alert_settings" %>
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
@@ -95,13 +95,13 @@
           by the entry's path helper: the viewer's unread notes on Dashboard
           (one COUNT, `notes_badge_count`) and what they could act on in
           Trash. %>
-      <div id="sidebar" class="admin-shell__sidebar" data-admin--drawer-target="panel" data-drawer="sidebar" tabindex="-1">
+      <div id="sidebar" class="admin-shell__sidebar" data-admin--shell--drawer-target="panel" data-drawer="sidebar" tabindex="-1">
         <%= render Admin::Shell::SidebarComponent.new(modules: admin_modules, user: Current.user, current_path: request.path,
               url_options: admin_url_options, badges: { admin_root_path: notes_badge_count, admin_trash_path: trash_badge_count }) %>
       </div>
 
       <% if content_for?(:tree) %>
-        <aside id="tree-column" class="admin-shell__tree" data-admin--drawer-target="panel" data-drawer="tree" tabindex="-1">
+        <aside id="tree-column" class="admin-shell__tree" data-admin--shell--drawer-target="panel" data-drawer="tree" tabindex="-1">
           <%= yield :tree %>
         </aside>
       <% end %>
@@ -120,7 +120,7 @@
       </main>
     </div>
 
-    <div class="admin-shell__scrim" data-action="click->admin--drawer#closeAll" data-admin--drawer-target="scrim" hidden></div>
+    <div class="admin-shell__scrim" data-action="click->admin--shell--drawer#closeAll" data-admin--shell--drawer-target="scrim" hidden></div>
 
     <%# The one toast region (handoff §10): outside `#content` so a frame
         navigation never wipes it, and a Turbo Stream's `toast_stream` has a
@@ -177,7 +177,7 @@
     <% end %>
 
     <%# The one ⌘K palette (design pass spec §5.6): here, outside `#content`
-        and every form, like every dialog. Opened by `admin--command-palette`
+        and every form, like every dialog. Opened by `admin--shell--command-palette`
         on <body>, which also owns the ⌘K / Ctrl+K shortcut. %>
     <%= render Admin::Shell::CommandPaletteComponent.new %>
 

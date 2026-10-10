@@ -5,17 +5,17 @@ import { Controller } from "@hotwired/stimulus"
 // page tree. Lives on <body>, because its triggers (the top bar) and its
 // panels (the grid's sidebar and tree columns) are siblings, not nested.
 //
-// A panel is any `[data-admin--drawer-target=panel]` carrying
+// A panel is any `[data-admin--shell--drawer-target=panel]` carrying
 // `data-drawer="<name>"` and an `id`; a trigger is a button with
-// `data-admin--drawer-target=trigger` and `aria-controls="<that id>"`,
-// passing the name as `data-admin--drawer-name-param`. "Open" is the
+// `data-admin--shell--drawer-target=trigger` and `aria-controls="<that id>"`,
+// passing the name as `data-admin--shell--drawer-name-param`. "Open" is the
 // `data-open` attribute on the panel -- the CSS does the sliding, and above
 // the breakpoint the attribute is simply never set (no drawer exists), so
 // nothing here has to know about widths. The scrim is shown while any panel
 // is open and closes them on click.
 //
 // The editors' notes drawer (`admin--notes`) is the one other drawer, on the
-// right: opening a panel here says so (`admin--drawer:opened`, with the
+// right: opening a panel here says so (`admin--shell--drawer:opened`, with the
 // panel's name) and that one closes; when that one opens, these stand aside
 // (`standAside`). While the notes are a column beside the editor the page
 // tree is folded into its drawer at widths where it otherwise is a column

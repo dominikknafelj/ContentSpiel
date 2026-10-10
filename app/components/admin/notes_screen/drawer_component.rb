@@ -31,7 +31,7 @@ module Admin
     # header is hidden over a thread as well: there the thread's first row
     # ends in "Back to page", the same action, in Close's place.
     #
-    # WHEN TO USE WHICH: the shell's left drawers (`admin--drawer`) are the
+    # WHEN TO USE WHICH: the shell's left drawers (`admin--shell--drawer`) are the
     # navigation at narrow widths, with a scrim; the media panel is a column
     # of its screen, in the flow; this is a companion to an editor that must
     # not take the editor away.

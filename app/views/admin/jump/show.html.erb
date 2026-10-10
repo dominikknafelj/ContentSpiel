@@ -4,7 +4,7 @@
     replacement closes the dialog. %>
 <%# `data-query` echoes the (trimmed, capped) query this fragment answers:
     Turbo copies a response's children, not its attributes, into the
-    palette's frame, so the marker is an inner element. `admin--command-palette`
+    palette's frame, so the marker is an inner element. `admin--shell--command-palette`
     compares it with the input to ignore a response that arrives after the
     viewer typed something else. %>
 <% query = @query.strip.first(Jump::Search::MAX_QUERY) %>
@@ -25,7 +25,7 @@
           <li role="option" id="jump-option-<%= group_index %>-<%= row_index %>" aria-selected="false" class="group">
             <%# A row with a `dialog` (New page, New post) closes the palette and opens that
                 dialog; its `href` stays for a viewer without JavaScript. %>
-            <% data = row[:dialog] ? { turbo_frame: "_top", action: "admin--command-palette#close admin--ui--dialog#open", "admin--ui--dialog-id-param": row[:dialog] } : { turbo_frame: "_top" } %>
+            <% data = row[:dialog] ? { turbo_frame: "_top", action: "admin--shell--command-palette#close admin--ui--dialog#open", "admin--ui--dialog-id-param": row[:dialog] } : { turbo_frame: "_top" } %>
             <%= link_to jump_row_path(row[:route]), data: data, class: "flex items-center gap-3 px-4 py-2 text-sm text-ink hover:bg-sunken" do %>
               <span class="min-w-0 flex-1 truncate"><%= row[:title] %></span>
               <% if row[:hint] %><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: row[:hint]) %><% end %>
@@ -43,7 +43,7 @@
     <div class="px-4 py-4 text-sm text-dim">
       <p>No results for “<%= query %>”.</p>
       <% if can?("posts.create") %>
-        <p class="pt-2"><%= link_to "New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "_top", action: "admin--command-palette#close admin--ui--dialog#open", "admin--ui--dialog-id-param": "new-post-dialog" }, class: "underline" %></p>
+        <p class="pt-2"><%= link_to "New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "_top", action: "admin--shell--command-palette#close admin--ui--dialog#open", "admin--ui--dialog-id-param": "new-post-dialog" }, class: "underline" %></p>
       <% end %>
     </div>
   <% end %>

@@ -61,7 +61,7 @@ export default class extends Controller {
     event.stopPropagation()
     event.detail.originalEvent?.preventDefault()
     if (!within.element) {
-      console.warn("admin--fragment-links: the link's target is not on this screen", link)
+      console.warn("admin--shell--fragment-links: the link's target is not on this screen", link)
       return
     }
     const dialog = link.closest("dialog[open]")

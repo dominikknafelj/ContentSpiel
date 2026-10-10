@@ -120,7 +120,7 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
 
   test "the Jump to button is wired for the command palette" do
     render_sidebar(labels: %w[Dashboard])
-    assert_selector "button[data-action='admin--command-palette#open']", text: "Jump to…"
+    assert_selector "button[data-action='admin--shell--command-palette#open']", text: "Jump to…"
   end
 
   # Signing out ends the document (ledger C-M2): never a Turbo submission,

@@ -62,7 +62,7 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:two))
 
     get "/cs-studio/pages/#{@page.id}"
-    assert_select "header.admin-editor-header button.admin-editor-header__tree[aria-controls=tree-column][aria-expanded=false][aria-label='Open page tree'][data-action='admin--drawer#toggle'][data-admin--drawer-name-param=tree][data-admin--drawer-target=trigger]", text: "Pages ▾", count: 1
+    assert_select "header.admin-editor-header button.admin-editor-header__tree[aria-controls=tree-column][aria-expanded=false][aria-label='Open page tree'][data-action='admin--shell--drawer#toggle'][data-admin--shell--drawer-name-param=tree][data-admin--shell--drawer-target=trigger]", text: "Pages ▾", count: 1
     assert_select "header.admin-editor-header button.admin-editor-header__tree + nav[aria-label=Breadcrumb]"
 
     get "/cs-studio/posts/#{@post.id}"

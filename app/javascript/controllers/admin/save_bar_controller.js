@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { targetWithinThePage } from "controllers/admin/fragment_links_controller"
+import { targetWithinThePage } from "controllers/admin/shell/fragment_links_controller"
 import { messages } from "i18n/messages"
 
 // The explicit-save pattern for configuration screens (design pass spec §4,
@@ -62,7 +62,7 @@ import { messages } from "i18n/messages"
 //    A `#field` link to the page itself (the error summary's) is no way out
 //    and is never asked about; while one of these forms is on the screen it
 //    is neither a frame navigation nor a history entry -- the focus is moved
-//    by hand (`admin--fragment-links`, for every such link in CS Studio).
+//    by hand (`admin--shell--fragment-links`, for every such link in CS Studio).
 //    NOT covered: a GET *form* submitted into `#content`, and a script setting
 //    the frame's `src`. No explicit-save screen has either.
 //
@@ -157,7 +157,7 @@ function onVisit(event) {
   promoted = null
   if (expected && expected === absolute(event.detail.url)) return
   // (A `_top` link to a section of this very screen never gets here:
-  // `admin--fragment-links` takes it at `turbo:click`.)
+  // `admin--shell--fragment-links` takes it at `turbo:click`.)
   if (event.defaultPrevented || !mustAsk()) return
   event.preventDefault()
   const url = event.detail.url

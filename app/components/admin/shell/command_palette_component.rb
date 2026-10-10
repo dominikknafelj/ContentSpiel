@@ -3,7 +3,7 @@ module Admin
     # The ⌘K "Jump to..." dialog (design pass spec §5.6, handoff §9): one
     # native modal <dialog> rendered once in the layout, outside `#content`
     # and every form, so its search input never feeds an autosave. The
-    # `admin--command-palette` controller on <body> opens it (⌘K / Ctrl+K,
+    # `admin--shell--command-palette` controller on <body> opens it (⌘K / Ctrl+K,
     # or the sidebar and top-bar buttons), reloads `#jump-results` as the
     # viewer types, and moves the selection with the arrow keys.
     #
@@ -19,7 +19,7 @@ module Admin
     class CommandPaletteComponent < Admin::AdminComponent
       ID = "command-palette".freeze
 
-      # No parameters: the results URL is `data-admin--command-palette-url-value`
+      # No parameters: the results URL is `data-admin--shell--command-palette-url-value`
       # on <body> (the controller's value), where it keeps the editing
       # language (`admin_url_options`) the layout already knows.
     end

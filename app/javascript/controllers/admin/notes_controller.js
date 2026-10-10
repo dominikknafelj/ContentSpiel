@@ -237,7 +237,7 @@ export default class extends Controller {
     return element.getClientRects().length > 0 && window.getComputedStyle(element).visibility !== "hidden"
   }
 
-  // A shell drawer opened (`admin--drawer:opened`): this one makes room, and
+  // A shell drawer opened (`admin--shell--drawer:opened`): this one makes room, and
   // the focus is the shell drawer's. Not a "Close": the choice stays
   // remembered. The exception is the page tree while the notes are a column:
   // the tree is a drawer there BECAUSE the notes are open (the stylesheet

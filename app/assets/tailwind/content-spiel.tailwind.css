@@ -63,7 +63,7 @@
 
 /* The shell (design pass spec §4, handoff §9 A7). Real CSS rather than
    utilities because the drawers' open state is the `data-open` attribute
-   `admin--drawer` toggles. Desktop: sidebar | [tree] | content in a grid.
+   `admin--shell--drawer` toggles. Desktop: sidebar | [tree] | content in a grid.
    Below 1280px the sidebar leaves the grid and becomes a fixed drawer behind
    the top bar; below 1024px the tree does too. A closed drawer is also
    `visibility: hidden` (after the slide), so its links leave the tab order. */
@@ -104,7 +104,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
 }
 @media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
-/* The scrim belongs to a drawer, and `admin--drawer` only un-hides it when
+/* The scrim belongs to a drawer, and `admin--shell--drawer` only un-hides it when
    one opens -- it knows nothing about widths. A drawer left open while the
    window is widened stops being a drawer (the rules above no longer apply),
    and its scrim would be left covering a page that has nothing over it. So
@@ -145,7 +145,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 
    THE PAGE TREE FOLDS while the column is there, at every width from 1024px,
    the way it does below 1024px: the same element, the same `data-open`,
-   `admin--drawer` and the scrim -- these rules only add a second condition
+   `admin--shell--drawer` and the scrim -- these rules only add a second condition
    to the ones above. What opens it is a "Pages ▾" button: from 1024px to
    1279px the top bar's own, and from 1280px, where there is no top bar, the
    one at the start of the page editor's breadcrumb row

@@ -8,13 +8,13 @@
         hold the button, so from 1280px with notes open and at no other time
         (`.admin-editor-header__tree` in content-spiel.tailwind.css). The same
         drawer, panel and controller as the top bar's button
-        (`admin--drawer#toggle`, `aria-controls`). A page's editor only: a
+        (`admin--shell--drawer#toggle`, `aria-controls`). A page's editor only: a
         post's screen has no tree. %>
     <div class="flex min-w-0 items-center gap-1.5">
     <% if page? %>
       <%= tag.button t(".tree"), type: "button", class: "admin-editor-header__tree -ml-2 shrink-0 cursor-pointer rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken",
             aria: { label: t(".tree_label"), controls: "tree-column", expanded: "false" },
-            data: { action: "admin--drawer#toggle", admin__drawer_name_param: "tree", admin__drawer_target: "trigger" } %>
+            data: { action: "admin--shell--drawer#toggle", admin__shell__drawer_name_param: "tree", admin__shell__drawer_target: "trigger" } %>
     <% end %>
     <nav aria-label="Breadcrumb" class="min-w-0 truncate text-[12px] text-meta">
       <% breadcrumb.each do |label, url| %>
