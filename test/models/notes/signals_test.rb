@@ -194,14 +194,17 @@ class Notes::SignalsTest < ActiveSupport::TestCase
   # broadcast at all: whatever is pushed goes through `Notes::Signals`, where
   # the payload is built.
   test "nothing in the app broadcasts but Live::Signals, and only a ...::Signals module calls it" do
-    pattern = /\.broadcast\b|broadcast_to|broadcasts?_(to|refresh|append|prepend|replace|update|remove|render|action)|turbo_stream_from/
-    found = Dir[Rails.root.join("app/**/*.{rb,erb}")].select do |file|
+    pattern = /\.broadcast\b|broadcast_to|broadcasts?_(to|refresh|append|prepend|replace|update|remove|render|action)|broadcast_stream|broadcaster|turbo_stream_from/
+    found = Dir[Rails.root.join("{app,lib}/**/*.{rb,erb}")].select do |file|
       File.readlines(file).any? { |line| !line.strip.start_with?("#") && line.match?(pattern) }
     end
 
     assert_equal [ "app/models/live/signals.rb" ], found.map { |file| Pathname(file).relative_path_from(Rails.root).to_s }
 
-    callers = Dir[Rails.root.join("app/**/*.rb")].select do |file|
+    # The name is the convention, not a lock (any file could define such a
+    # module): a domain's own `Signals` module says what the domain sends, and
+    # sends through `Live::Signals.later`.
+    callers = Dir[Rails.root.join("{app,lib}/**/*.rb")].select do |file|
       File.readlines(file).any? { |line| !line.strip.start_with?("#") && line.match?(/Live::Signals\.later\b/) }
     end
     callers.each do |file|

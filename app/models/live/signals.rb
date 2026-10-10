@@ -11,6 +11,7 @@ module Live
   # nothing. `later` therefore REFUSES, at the call, a payload that could
   # carry text:
   #
+  # - a `kind` is required;
   # - a key is `kind`, `reason`, `origin`, `record`, or ends in `_id`;
   # - `kind` and `reason` are one short lowercase word (`WORD`): the fixed
   #   sets the callers use ("threads", "mention", "resolved") fit, a sentence
@@ -18,6 +19,13 @@ module Live
   # - `origin` is the opaque id of a tab, in the shape `TAB` allows;
   # - a `*_id` is an Integer or nil;
   # - `record` is `[kind name, id]`: a name `RecordKinds` knows and an Integer.
+  #
+  # A nil `origin` or `reason` is refused, not skipped: a caller leaves a key
+  # out (`.compact`, as notes does) when it has nothing to say.
+  #
+  # The payload is copied, its keys made symbols, checked and frozen once, and
+  # the copy is what is sent: a caller that changes its hash afterwards changes
+  # nothing that leaves.
   #
   # `origin` is the id of the browser tab whose request made the change
   # (`Current.notes_tab`, from the header `X-Notes-Tab`), so that tab does not
@@ -57,7 +65,7 @@ module Live
     # Sends payload to stream after the outermost commit. Raises ArgumentError,
     # at the call, for a payload that holds anything but what the comment above allows.
     def later(stream, payload)
-      check!(payload)
+      payload = checked(payload)
       ActiveRecord.after_all_transactions_commit do
         ActionCable.server.broadcast(stream, payload)
       rescue StandardError => error
@@ -67,12 +75,20 @@ module Live
       nil
     end
 
-    def check!(payload)
+    def checked(payload)
       raise ArgumentError, "a signal's payload is a Hash" unless payload.is_a?(Hash)
 
-      payload.each do |key, value|
+      copy = payload.deep_dup.each_with_object({}) do |(key, value), keys|
+        raise ArgumentError, "a signal's keys are Strings or Symbols" unless key.is_a?(String) || key.is_a?(Symbol)
+        raise ArgumentError, "a signal names #{key.to_sym.inspect} twice" if keys.key?(key.to_sym)
+
         raise ArgumentError, "a signal may not carry #{key.inspect}" unless allowed?(key, value)
+
+        keys[key.to_sym] = value.freeze
       end
+      raise ArgumentError, "a signal has a kind" unless copy.key?(:kind)
+
+      copy.freeze
     end
 
     # The key only; a value is never echoed into the message.
@@ -92,6 +108,6 @@ module Live
       value.is_a?(Array) && value.size == 2 && value[0].is_a?(String) && RecordKinds.named(value[0]) && value[1].is_a?(Integer)
     end
 
-    private_class_method :check!, :allowed?, :word?, :record?
+    private_class_method :checked, :allowed?, :word?, :record?
   end
 end

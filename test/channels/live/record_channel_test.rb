@@ -7,13 +7,28 @@ class Live::RecordChannelTest < ActionCable::Channel::TestCase
   class ProbeChannel < Live::RecordChannel
     cattr_accessor :arrivals, default: []
 
-    def stream_for(record) = "probe:#{record.class.polymorphic_name}-#{record.id}"
+    private
+
+    def stream_name_for(record) = "probe:#{record.class.polymorphic_name}-#{record.id}"
 
     def arrived(record) = arrivals << record
   end
 
   class BareChannel < Live::RecordChannel
-    def stream_for(record) = "bare:#{record.id}"
+    private
+
+    def stream_name_for(record) = "bare:#{record.id}"
+  end
+
+  class ForgetfulChannel < Live::RecordChannel
+  end
+
+  class RaisingChannel < Live::RecordChannel
+    private
+
+    def stream_name_for(record) = "raising:#{record.id}"
+
+    def arrived(_record) = raise(IOError, "the row could not be written")
   end
 
   tests ProbeChannel
@@ -73,4 +88,91 @@ class Live::RecordChannelTest < ActionCable::Channel::TestCase
     subscribe type: "page", id: @page.id
     assert subscription.rejected?
   end
+
+  test "an image is rejected for a user without media.upload and found for one with it" do
+    asset = create_media_asset
+    self.class.tests Class.new(Live::RecordChannel) { private def stream_name_for(record) = "m:#{record.id}" }
+    connect_as users(:reader)
+    subscribe type: "media", id: asset.id
+    assert subscription.rejected?
+
+    connect_as users(:two)
+    subscribe type: "media", id: asset.id
+    assert subscription.confirmed?
+  ensure
+    self.class.tests ProbeChannel
+  end
+
+  test "a nil subscriber, a session that ended, is rejected" do
+    connected = User.find(users(:reader).id)
+    connect_as connected
+    Session.where(user_id: connected.id).destroy_all
+    subscribe type: "page", id: @page.id
+    assert subscription.rejected?
+    assert_empty ProbeChannel.arrivals
+  end
+
+  test "a hook is not an action: a client that performs it runs nothing" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id
+    ProbeChannel.arrivals = []
+
+    assert_not_includes ProbeChannel.action_methods, "arrived"
+    assert_not_includes ProbeChannel.action_methods, "stream_name_for"
+    perform :arrived, {}
+    perform :stream_name_for, {}
+    perform :stream_for, {}
+    assert_empty ProbeChannel.arrivals
+    assert_equal [ "probe:Page-#{@page.id}" ], streams_of(subscription)
+  end
+
+  test "no channel under app/channels that descends from Live::RecordChannel offers an action it does not mean to" do
+    Rails.application.eager_load!
+    meant = { "Notes::RecordChannel" => [] }
+    subclasses = Live::RecordChannel.descendants.reject { |klass| klass.name.nil? || klass.name.start_with?("Live::RecordChannelTest") }
+    assert_includes subclasses.map(&:name), "Notes::RecordChannel"
+    subclasses.each do |klass|
+      assert_equal meant.fetch(klass.name, []).sort, klass.action_methods.to_a.sort, "#{klass.name} offers a client an action it does not mean to"
+    end
+  end
+
+  test "the test subclasses make the guard able to fail: a public hook would be an action" do
+    leaky = Class.new(Live::RecordChannel) { def arrived(_record) = nil }
+    assert_includes leaky.action_methods, "arrived"
+  end
+
+  test "a hook that raises in arrived rejects cleanly with nothing opened" do
+    self.class.tests RaisingChannel
+    connect_as users(:reader)
+    assert_raises(IOError) { subscribe type: "page", id: @page.id }
+    assert_empty streams_of(subscription)
+    assert_not subscription.confirmed?
+  ensure
+    self.class.tests ProbeChannel
+  end
+
+  test "a subclass that forgot stream_name_for fails loudly, not with Rails' stream_for" do
+    self.class.tests ForgetfulChannel
+    connect_as users(:reader)
+    error = assert_raises(NotImplementedError) { subscribe type: "page", id: @page.id }
+    assert_match(/ForgetfulChannel must define a private stream_name_for/, error.message)
+  ensure
+    self.class.tests ProbeChannel
+  end
+
+  test "Notes::RecordChannel's hook is private too" do
+    assert_empty Notes::RecordChannel.action_methods
+    tests_notes = Notes::RecordChannel
+    self.class.tests tests_notes
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id
+    perform :stream_name_for, {}
+    assert_equal [ "notes:record:Page-#{@page.id}" ], streams_of(subscription)
+  ensure
+    self.class.tests ProbeChannel
+  end
+
+  private
+
+  def streams_of(subscription) = subscription.send(:streams).to_a
 end

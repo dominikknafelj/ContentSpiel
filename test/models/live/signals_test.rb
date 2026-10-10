@@ -30,7 +30,8 @@ class Live::SignalsTest < ActiveSupport::TestCase
       { kind: "A sentence of free text" }, { kind: "x", reason: "Please read this note" }, { kind: "x", reason: "x" * 33 },
       { kind: "x", origin: "A secret sentence" }, { kind: "x", origin: "<script>" }, { kind: "x", thread_id: 1.5 },
       { kind: "x", record: [ "page", "3" ] }, { kind: "x", record: [ "tag", 3 ] }, { kind: "x", record: "page" },
-      { kind: "x", record: [ "page", 3, "extra" ] }, { kind: "x", kind_id: [ 1 ] } ].each do |payload|
+      { kind: "x", record: [ "page", 3, "extra" ] }, { kind: "x", kind_id: [ 1 ] },
+      {}, { thread_id: 1 }, { kind: "x", origin: nil }, { kind: "x", reason: nil }, { "kind" => "x", kind: "y" }, { 1 => "x", kind: "x" } ].each do |payload|
       assert_raises(ArgumentError, payload.inspect) { Live::Signals.later(STREAM, payload) }
     end
     assert_equal 0, broadcasts(STREAM).size
@@ -72,5 +73,27 @@ class Live::SignalsTest < ActiveSupport::TestCase
   ensure
     Rails.error.unsubscribe(subscriber) if subscriber
     Rails.logger.stop_broadcasting_to(logger) if logger
+  end
+
+  test "string keys are sent, logged by kind, and the payload sent is a copy" do
+    log = StringIO.new
+    logger = ActiveSupport::Logger.new(log)
+    Rails.logger.broadcast_to(logger)
+    broken = Class.new(ActionCable::SubscriptionAdapter::Test) { def broadcast(*) = raise(IOError, "down") }
+    ActionCable.server.instance_variable_set(:@pubsub, broken.new(ActionCable.server))
+    Live::Signals.later(STREAM, { "kind" => "threads", "thread_id" => 4 })
+    assert_includes log.string, "Live signal not sent (threads): IOError"
+  ensure
+    Rails.logger.stop_broadcasting_to(logger) if logger
+  end
+
+  test "a hash changed after the call changes nothing that is sent" do
+    payload = { kind: "threads", thread_id: 4 }
+    ActiveRecord::Base.transaction do
+      Live::Signals.later(STREAM, payload)
+      payload[:title] = "About"
+      payload[:kind] = "changed"
+    end
+    assert_equal [ { "kind" => "threads", "thread_id" => 4 } ], broadcasts(STREAM).map { |p| ActiveSupport::JSON.decode(p) }
   end
 end

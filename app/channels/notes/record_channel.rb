@@ -5,6 +5,8 @@ module Notes
   # stream. A signal on it says nothing (`Notes::Signals`), and the fetch it
   # leads to is scoped.
   class RecordChannel < Live::RecordChannel
-    def stream_for(record) = Signals.record_stream(record.class.polymorphic_name, record.id)
+    private
+
+    def stream_name_for(record) = Signals.record_stream(record.class.polymorphic_name, record.id)
   end
 end
