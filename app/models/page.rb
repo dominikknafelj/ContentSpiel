@@ -223,16 +223,24 @@ class Page < ApplicationRecord
   after_save :forget_preloaded_branch
 
   # The settings form's autosave base (live-editing spec §3.3). Moved whenever a
-  # column of the page itself is about to change, and by nothing else: a `touch`
-  # (every block write touches its page) runs no save callbacks, and
-  # `update_columns` and `update_all` go around them on purpose
-  # (`Translations::Confirm`'s bookkeeping must not make an open form stale).
+  # column the settings form can change is about to change, and by nothing else:
+  # - a `touch` (every block write touches its page) runs no save callbacks, and
+  #   `update_columns` and `update_all` go around them on purpose
+  #   (`Translations::Confirm`'s bookkeeping must not make an open form stale);
+  # - a MOVE IN THE TREE is not a change of the page's settings (final review
+  #   I1): `Pages::Move` saves `parent_id` and `position`, neither of which the
+  #   form holds, so both are ignored below. Before that a colleague dragging
+  #   the page in the tree, which stands beside every page editor, refused the
+  #   next save of whoever held its settings form (a final 409), although
+  #   nothing they could edit had changed. The siblings a move renumbers are
+  #   written with `update_columns` (`Page::TreeRanking#place_among_siblings`),
+  #   and a page's path is `public_paths` rows, not a column of the page.
   # So someone in the settings is refused only when the SETTINGS changed.
   # `Trash::Move#trash_descendants` and `Trash::Restore#restore_branch_members`
   # move descendants with `update_all`, so a descendant's base does not move on
   # trash and restore while the branch root's does: harmless, no settings value
   # changes.
-  SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at].freeze
+  SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at parent_id position].freeze
   before_save { self.settings_changed_at = Time.current if new_record? || (changed - SETTINGS_BASE_IGNORES).any? }
 
   def reload(...)

@@ -23,7 +23,8 @@ import { freeze, textOf } from "editing/freeze"
 //   forms has anything left to send (`outstanding()`: a save on the wire, a
 //   follow-up, a retry), or the follow-up save would claim the block back and
 //   nothing would release it again; a new claim cancels a release that waits.
-//   A Turbo visit away releases at once (the visit was drained first). At
+//   A Turbo visit away releases at once (the visit was drained first), and so
+//   it does what was still waiting: leaving pays everything in `owed()`. At
 //   `pagehide` nothing can wait for a queue: that one release is a `fetch`
 //   with `keepalive`, the one write outside the queue. WHAT REMAINS: a save
 //   still on the wire at the instant of a reload can reach the server after
@@ -180,10 +181,10 @@ export default class extends Controller {
     document.removeEventListener("turbo:before-stream-render", this.beforeStream)
     this.timers.forEach((timer) => clearTimeout(timer))
     this.timers.clear()
-    this.releasing.clear()
     const url = this.hasReleaseUrlValue ? this.releaseUrlValue : null
     const timeout = this.timeoutValue
-    if (url) [ ...this.held.keys() ].forEach((subject) => this.release(subject, url, { wait: false, timeout }))
+    const owed = this.owed()
+    if (url) owed.forEach((subject) => enqueue(() => post(url, this.params(subject), { timeout })))
     // What this tab asked for and will not be there to receive is withdrawn,
     // behind the writes the visit waited for (the values are read now).
     if (this.hasWithdrawUrlValue) {
@@ -193,6 +194,21 @@ export default class extends Controller {
   }
 
   params(subject) { return subject === "record" ? {} : { block_id: subject.slice("block-".length) } }
+
+  // WHAT THIS TAB OWES THE SERVER ON LEAVING: a release for every subject it
+  // still holds there, each once. That is what is in `held` AND what is in
+  // `releasing`: `release()` takes a subject out of `held` at once and parks
+  // it while its form's last save is outstanding, and the first build walked
+  // only `held` here, so a form closed with a save on the wire and then left
+  // kept its hold for two minutes with nobody to release it (final review
+  // I4). Both collections are emptied, so a release that was parked finds its
+  // token gone and is not sent a second time.
+  owed() {
+    const subjects = new Set([ ...this.held.keys(), ...this.releasing.keys() ])
+    this.held.clear()
+    this.releasing.clear()
+    return subjects
+  }
 
   claim(subject) {
     if (!subject || !this.hasClaimUrlValue) return
@@ -240,12 +256,14 @@ export default class extends Controller {
   }
 
   // Lets go of a subject, once none of its forms has anything left to send
-  // (see the header). `wait: false`: the editor is being left, the forms are
-  // gone and the visit was drained.
-  release(subject, url = this.releaseUrlValue, { wait = true, timeout = this.timeoutValue } = {}) {
+  // (see the header). Until then the subject is in `releasing`, which leaving
+  // the editor pays like `held` (`owed`).
+  release(subject) {
     if (!this.held.delete(subject)) return
+    const url = this.releaseUrlValue
+    const timeout = this.timeoutValue
     const params = this.params(subject)
-    const forms = wait ? this.formsOf(subject).map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")).filter(Boolean) : []
+    const forms = this.formsOf(subject).map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")).filter(Boolean)
     const token = {}
     this.releasing.set(subject, token)
     const go = () => {
@@ -267,8 +285,7 @@ export default class extends Controller {
   }
 
   letGo() {
-    for (const subject of this.held.keys()) post(this.releaseUrlValue, this.params(subject), { keepalive: true })
-    this.held.clear()
+    for (const subject of this.owed()) post(this.releaseUrlValue, this.params(subject), { keepalive: true })
     if (this.hasWithdrawUrlValue) for (const [ subject, asking ] of this.asking) if (asking.requested) post(this.withdrawUrlValue, this.params(subject), { keepalive: true })
   }
 

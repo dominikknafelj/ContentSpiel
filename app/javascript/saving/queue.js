@@ -8,9 +8,10 @@
 // after "Use all"; or a block's answer still in flight on a slow connection
 // when the next form sends) would both carry the base the first answer is about
 // to replace, and the second would be refused against nothing but its own
-// editor. The page settings form's base is its own (`Page#settings_changed_at`)
-// and a block write no longer moves it, but the tree's move of the open page
-// still does (`X-Page-Base-Updated-At`, below).
+// editor. The page settings form's base is its own (`Page#settings_changed_at`):
+// neither a block write nor the tree's move of the open page moves it, so no
+// request forwards another form's base any more (`X-Page-Base-Updated-At` is
+// gone); each form's answer carries its own.
 //
 // WHAT. This queue makes a request be SENT only after the previous one's
 // answer has been received AND its base values written into the hidden fields
@@ -23,10 +24,9 @@
 // form (`enqueue`), block reorder (`enqueue`), Turbo's own block form
 // submissions -- add, duplicate, delete, the Undo toast (`holdTurboRequest`)
 // -- and, from outside the editor's forms, the page tree's move (`enqueue`)
-// and its Undo toast (`holdTurboRequest`). Only the tree's move sends
-// `X-Page-Base-Updated-At`: moving the page that is open moves its
-// `settings_changed_at` like any other save of its own columns
-// (`admin--pages--tree`).
+// and its Undo toast (`holdTurboRequest`). The tree's move is queued because it
+// is a write of the page, not for a base: a move does not move the open
+// settings form's `settings_changed_at` (`Page::SETTINGS_BASE_IGNORES`).
 //
 // THE RULE (fix round 3; final fix wave 1): nothing that REPLACES AN EDITOR
 // starts until the queue is empty. Three kinds of thing replace an editor:

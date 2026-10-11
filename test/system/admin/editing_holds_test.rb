@@ -901,6 +901,64 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert section
   end
 
+  # Final review I4. `release()` takes the subject out of `held` at once and
+  # parks it while the form's last save is outstanding; leaving walked only
+  # `held`, so that release was never sent and the hold stayed for two minutes
+  # with nobody there. Back is a restoration visit: nothing drains before it,
+  # so the editor is gone while the save is still on the wire.
+  test "a release that was waiting for its form's last save is sent when the editor is left by a Turbo visit, once, and the row is gone" do
+    _section, inside = section_with_block
+    visit "/cs-studio/posts"
+    await_admin_controllers
+    page.execute_script("window.Turbo.visit(#{"/cs-studio/pages/#{@page.id}".to_json})")
+    assert_selector "#editing"
+    await_notes_live
+    record_requests
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    delay_next("PATCH", "/content_blocks/#{inside.id}")
+    type_in(inside, "On the wire", within: panel(inside))
+    await_delayed
+    assert held_by(@me, inside)
+    within(panel(inside)) { click_button "Close" }
+    await_frames
+    assert_equal [], releases, "the release did not wait for the save on the wire"
+
+    page.go_back
+    assert_no_selector "#editing", wait: LIVE
+    assert_equal "/cs-studio/posts", page.current_path
+    send_delayed
+
+    assert_eventually(wait: LIVE, message: "the hold whose release was waiting stayed when the editor was left") { !Editing::Reservation.of(inside).exists? }
+    assert_writes_settled
+    assert_equal 1, releases.size, sent.inspect
+    assert_operator sent.index(patches.last), :<, sent.index(releases.first), sent.inspect
+    assert_includes body_of(inside), "On the wire"
+  end
+
+  # The same at `pagehide`, where nothing can wait for a queue. A real unload
+  # with a save on the wire raises the browser's own dialog, which the driver
+  # cannot answer reliably, so the event is dispatched (as
+  # `autosave_unload_test.rb` does for `beforeunload`). The page lives on here,
+  # which is what shows that the parked release is not sent a second time.
+  test "a release that was waiting for its form's last save is sent at pagehide, once, and the row is gone" do
+    _section, inside = section_with_block
+    open_page
+    record_requests
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    delay_next("PATCH", "/content_blocks/#{inside.id}")
+    type_in(inside, "On the wire", within: panel(inside))
+    await_delayed
+    assert held_by(@me, inside)
+    within(panel(inside)) { click_button "Close" }
+    await_frames
+    assert_equal [], releases, "the release did not wait for the save on the wire"
+
+    page.execute_script("window.dispatchEvent(new Event('pagehide'))")
+    assert_eventually(wait: LIVE, message: "the hold whose release was waiting stayed at pagehide") { !Editing::Reservation.of(inside).exists? }
+    assert_equal 1, releases.size, sent.inspect
+    assert_equal 0, hold_controller_js("hold.releasing.size + hold.held.size")
+  end
+
   test "typing for longer than half a hold without a pause renews the hold: one renewal per half hold, and it never lapses" do
     open_page
     record_requests

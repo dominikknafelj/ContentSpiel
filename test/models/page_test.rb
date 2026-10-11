@@ -603,6 +603,31 @@ class PageTest < ActiveSupport::TestCase
     end
   end
 
+  # Final review I1: a move is not a change of the page's settings. `Pages::Move`
+  # saves `parent_id` and `position` on the moved page, and `TreeRanking`
+  # renumbers its new siblings with `update_columns`; neither is a field of the
+  # settings form, so neither moves that form's base.
+  test "a move in the tree leaves the settings base of the moved page and of its new siblings where it was" do
+    old_parent = create_page(title: "Old parent")
+    new_parent = create_page(title: "New parent")
+    sibling = create_page(title: "Sibling", parent: new_parent)
+    page = create_page(title: "Pricing", parent: old_parent)
+    before = page.reload.settings_changed_at
+    siblings_before = sibling.reload.settings_changed_at
+
+    travel 1.minute do
+      assert Pages::Move.call(page, parent: new_parent, position: 0).ok?
+      assert_equal new_parent, page.reload.parent
+      assert_equal [ page.id, sibling.id ], new_parent.children.order(:position).pluck(:id), "the move did not renumber the sibling"
+      assert_equal before, page.settings_changed_at, "a move moved the settings base"
+      assert_operator page.updated_at, :>, before, "the move is still a write of the page"
+      assert_equal siblings_before, sibling.reload.settings_changed_at
+
+      assert Pages::Save.call(page, translations: { "en" => { subtitle: "New" } }).ok?
+      assert_operator page.reload.settings_changed_at, :>, before, "a settings change no longer moves the base"
+    end
+  end
+
   test "a block's save leaves its page's settings base where it was" do
     page = create_page(title: "Pricing")
     before = page.reload.settings_changed_at

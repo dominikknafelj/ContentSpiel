@@ -10,9 +10,12 @@ module Admin
   #
   # A move is a write to the moved page (`Pages::Move` saves it, so its
   # `updated_at` moves), made from OUTSIDE that page's editor forms -- and the
-  # page settings form of that very page may be open next to the tree,
-  # holding the old `settings_changed_at` as its autosave base. See
-  # `#page_base_streams` for how the answer keeps that form able to save.
+  # page settings form of that very page may be open next to the tree, in this
+  # tab or a colleague's. It keeps saving: a move is not a change of the page's
+  # settings, so it does not move that form's base (`Page::SETTINGS_BASE_IGNORES`,
+  # final review I1). The forwarding this controller had for the mover's own
+  # tab (the header `X-Page-Base-Updated-At` in, the hidden field's stream out)
+  # went with that ruling: it had nothing left to move.
   class TreeController < BaseController
     include AutosaveResponses
 
@@ -29,8 +32,6 @@ module Admin
       # Where the page stands *now*, read before the service runs: an Undo
       # is just this same move with these values (see `undo_toast`).
       before = placement(page)
-      # Before the write touches it -- see `#page_base_streams`.
-      settings_base_before_move = page.settings_changed_at
       result = Pages::Move.call(page, parent: parent, position: params[:position])
 
       status = if result.ok? then :ok
@@ -39,10 +40,7 @@ module Admin
       end
       message = result.ok? ? nil : result.errors.to_sentence
       streams = tree_stream(selected: page, message: message)
-      if result.ok?
-        streams.concat(Array(move_toast(page, before)))
-        streams.concat(page_base_streams(page, settings_base_before_move))
-      end
+      streams.concat(Array(move_toast(page, before))) if result.ok?
       render turbo_stream: streams, status: status
     rescue ActiveRecord::RecordNotFound
       # The dragged page or its drop target was deleted elsewhere (another
@@ -86,45 +84,6 @@ module Admin
         label: "Undo", method: :patch,
         url: admin_tree_path(page_id: page.id, parent_id: parent_id, position: position, undo: 1, **admin_url_options)
       })
-    end
-
-    # The page settings form's new base, when the form that is open is the
-    # MOVED page's and was current (final fix wave 1, reviews A I1 / B I1).
-    #
-    # Since a stale autosave base is refused (`Admin::AutosaveResponses
-    # #refuse_stale_autosave`), a move of the page one has open -- which is
-    # what the New page dialog tells an editor to do ("Drag it in the tree to
-    # move it") -- locked that page's own form: its next save was a final
-    # 409, "Changed elsewhere" against the editor's own move, the typed text
-    # not saved. So this answers with the form's new base:
-    # `admin--pages--tree` sends the open form's base as
-    # `X-Page-Base-Updated-At`, through the same queue as every other write on
-    # the screen, and the form's base is moved forward to the page's new
-    # `settings_changed_at`. This one stays, unlike the block side's (a block
-    # write no longer moves the settings base at all): `Pages::Move` saves the
-    # page's own columns, so the move DOES move `settings_changed_at`.
-    #
-    # Only when the sent base EQUALS the moved page's `settings_changed_at` as loaded
-    # for this request. That one test says both things that have to hold:
-    # - the open form is this page's. The client only sends the header when
-    #   it is, but the tree lists every page, and handing a form another
-    #   page's (newer) `updated_at` as its base would let a stale form pass
-    #   the staleness check and overwrite someone else's save. Hence `==`
-    #   here;
-    # - nobody saved the page since the form loaded it. If someone did, the
-    #   base is left alone and the form's next save is still, rightly,
-    #   refused.
-    # No header (the moved page is not the open one, or an older client) or
-    # an unparseable one: nothing to vouch for.
-    def page_base_streams(page, settings_base_before_move)
-      sent = request.headers["X-Page-Base-Updated-At"]
-      return [] unless sent.present? && Time.iso8601(sent) == settings_base_before_move
-
-      id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
-      [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
-        locals: { id: id, value: Page.where(id: page.id).pick(:settings_changed_at).iso8601(6) }) ]
-    rescue ArgumentError
-      []
     end
 
     def tree_stream(selected:, message: nil)

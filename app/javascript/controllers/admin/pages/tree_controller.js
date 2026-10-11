@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
-import { enqueue, holdTurboRequest, syncBases } from "saving/queue"
+import { enqueue, holdTurboRequest } from "saving/queue"
 import { orderErrorToast, sendOrder } from "saving/order_request"
 import { TAB_HEADER } from "editing/requests"
 import { TAB } from "live/connection"
@@ -23,26 +23,19 @@ import { TAB } from "live/connection"
 // rendered: the row is put back where it was and a toast says why (`save`).
 //
 // A MOVE IS A WRITE TO THE MOVED PAGE, made from outside its editor (final
-// fix wave 1, reviews A I1 / B I1). `Pages::Move` saves the page, so its
-// `updated_at` moves -- and when that page is the one open in the editor next
-// to the tree, its settings form holds the old value as its autosave base,
-// and a stale base is refused (409, final). The move used to go straight out
-// and tell that form nothing: the editor's next keystroke was "Changed
-// elsewhere" against their own move, the form dead until Reload. So a move is
-// treated exactly like a block write (`admin--editor--blocks`, `saving/queue.js`):
-// - it takes its turn in the page's write queue (`enqueue`), so it is never
-//   on the wire together with an autosave of the same page, and reads the
-//   base when it is SENT, after the previous answer's was written back;
-// - it carries the open form's base as `X-Page-Base-Updated-At` -- only when
-//   the moved page IS the open one (`pageBaseFor`); the tree lists every
-//   page, and another page's move says nothing about this form;
-// - its answer's `page-base-updated-at` is written into the hidden field
-//   synchronously (`syncBases`), before the next request goes. The server
-//   sends it only when the base was still current
-//   (`Admin::TreeController#page_base_streams`).
-// The toast's Undo is the same PATCH, sent by Turbo from `#toasts`: it is
-// caught by its URL and held in the same queue with the same header
-// (`holdUndo`, as `admin--editor--blocks#addPageBaseToUndo` does for a reorder).
+// fix wave 1, reviews A I1 / B I1), so it takes its turn in the page's write
+// queue (`enqueue`) like a block write (`admin--editor--blocks`,
+// `saving/queue.js`): it is never on the wire together with an autosave of
+// the same page. The toast's Undo is the same PATCH, sent by Turbo from
+// `#toasts`: it is caught by its URL and held in the same queue (`holdUndo`).
+//
+// IT SAYS NOTHING TO THE OPEN SETTINGS FORM. `Pages::Move` saves the page, so
+// its `updated_at` moves, but not the settings form's base: a move is not a
+// change of the page's settings (`Page::SETTINGS_BASE_IGNORES`, live editing's
+// final review I1). Until then a move carried the open form's base as
+// `X-Page-Base-Updated-At` and wrote the answer's new one into the hidden
+// field; that only ever helped the mover's own tab, and a colleague's move
+// still refused whoever held the form. Both went: no header, no base written.
 //
 // No generation is handed to `enqueue`: the tree column sits outside
 // `#content` and outlives a frame navigation, so "the page showing as the
@@ -51,9 +44,6 @@ export default class extends Controller {
   static targets = ["list", "announcer"]
   static values = { moveUrl: String }
 
-  // The page settings form's base field (`Admin::EditorScreen::PageSettingsFormComponent`).
-  static pageBaseId = "page-base-updated-at"
-
   connect() {
     this.holdUndo = (event) => {
       if (this.element.contains(event.target)) return
@@ -61,13 +51,7 @@ export default class extends Controller {
       const url = event.detail.url
       if (url?.pathname !== new URL(this.moveUrlValue, window.location.origin).pathname) return
 
-      holdTurboRequest(event, {
-        baseIds: [ this.constructor.pageBaseId ],
-        before: (request) => {
-          const pageBase = this.pageBaseFor(url.searchParams.get("page_id"))
-          if (pageBase) request.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
-        }
-      })
+      holdTurboRequest(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
     this.sortables = this.listTargets.map((list) =>
@@ -104,15 +88,6 @@ export default class extends Controller {
     document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
     this.sortables?.forEach((sortable) => sortable.destroy())
     this.sortables = []
-  }
-
-  // The open page settings form's base, when the page it edits is `pageId`
-  // (the editor header names its record); nothing otherwise -- another page
-  // is open, a post, a view-only page (no form), or no editor at all.
-  pageBaseFor(pageId) {
-    const open = document.querySelector("header.admin-editor-header[data-record-type='page']")?.dataset.recordId
-    if (!open || String(open) !== String(pageId)) return null
-    return document.getElementById(this.constructor.pageBaseId)?.value || null
   }
 
   // SortableJS's `onEnd`: where the dragged <li> landed (`event.to`, the
@@ -163,13 +138,11 @@ export default class extends Controller {
         "X-CSRF-Token": csrfToken,
         [TAB_HEADER]: TAB
       }
-      const pageBase = isCurrent() && this.pageBaseFor(pageId)
-      if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase
 
       const answer = await sendOrder(this.moveUrlValue, { headers, body })
       // The page was replaced while the move was on its way (a visit that
-      // gave up waiting, Back): the answer's tree, toast and base belong to
-      // a document that is gone.
+      // gave up waiting, Back): the answer's tree and toast belong to a
+      // document that is gone.
       if (!isCurrent()) return
 
       if (answer.outcome !== "answered") {
@@ -178,7 +151,6 @@ export default class extends Controller {
         return
       }
 
-      if (pageBase) syncBases(answer.text, [ this.constructor.pageBaseId ])
       // The tree's own re-render (success or 422 alike) is always a Turbo
       // Stream body -- rendering it is what actually undoes SortableJS's own
       // optimistic DOM move on a failed drop, by replacing the whole frame
