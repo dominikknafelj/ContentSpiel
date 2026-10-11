@@ -29,6 +29,22 @@ class Editing::ChannelTest < ActionCable::Channel::TestCase
     end
   end
 
+  test "a library image has no stream to subscribe to" do
+    connect_as users(:one)
+    subscribe type: "media", id: create_media_asset.id
+
+    assert subscription.rejected?
+  end
+
+  test "a post is accepted through the read scope" do
+    connect_as users(:reader)
+    post = create_post(title: "News")
+    subscribe type: "post", id: post.id
+
+    assert subscription.confirmed?
+    assert_has_stream "editing:record:Post-#{post.id}"
+  end
+
   test "the channel offers a client no action" do
     assert_empty Editing::Channel.action_methods.to_a
   end

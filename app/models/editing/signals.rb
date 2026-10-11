@@ -59,7 +59,10 @@ module Editing
 
     module_function
 
-    def record_stream(record) = "editing:record:#{record.class.polymorphic_name.delete(":")}-#{record.id}"
+    def record_stream(record) = stream_for(record.class.polymorphic_name, record.id)
+
+    # The one spelling of a record's stream, from its type name and id.
+    def stream_for(type, id) = "editing:record:#{type.to_s.delete(":")}-#{id}"
 
     # The audit notification's listener.
     def heard(event)
@@ -73,9 +76,13 @@ module Editing
       type, id, block_id = place(event)
       return unless type && id
 
-      block_id = nil unless reason == SAVED && !structural?(event)
-      reason = STRUCTURE if structural?(event)
-      send_to("editing:record:#{type}-#{id}", kind: "content", content_block_id: block_id, reason:)
+      structural = structural?(event)
+      block_id = nil unless reason == SAVED && !structural
+      reason = STRUCTURE if structural
+      send_to(stream_for(type, id), kind: "content", content_block_id: block_id, reason:)
+      # A trashed branch is ONE event on its root (`descendant_ids`): an editor
+      # open on a child page is told too.
+      descendants(event).each { |child_id| send_to(stream_for("Page", child_id), kind: "content", content_block_id: nil, reason:) }
     rescue StandardError => error
       Rails.logger.warn("Editing signal not sent (#{event&.action}): #{error.class}")
       Rails.error.report(error, handled: true)
@@ -107,10 +114,21 @@ module Editing
       owner_type == "Page" ? [ "Page", owner_id, event.subject_id ] : nil
     end
 
-    # A save that moved blocks between a section's columns (a fold) redraws the
-    # list, like a move. Its event is never coalesced, so its metadata is its own.
-    def structural?(event) = event.action == "block.updated" && event.metadata.to_h["folded_block_ids"].present?
+    def descendants(event)
+      return [] unless event.action == "page.trashed"
 
-    private_class_method :send_to, :place, :structural?
+      Array(event.metadata.to_h["descendant_ids"]).grep(Integer)
+    end
+
+    # A save that moved blocks between a section's columns (a fold) redraws the
+    # list, like a move. The fold's own row is never coalesced INTO (it is
+    # created with `coalesce: false`), but a later plain save of the same
+    # section extends that row, whose metadata still holds `folded_block_ids`:
+    # such a row has `occurrences` above 1, and this write was not the fold.
+    def structural?(event)
+      event.action == "block.updated" && event.occurrences.to_i <= 1 && event.metadata.to_h["folded_block_ids"].present?
+    end
+
+    private_class_method :send_to, :place, :structural?, :descendants, :stream_for
   end
 end

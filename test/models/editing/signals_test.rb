@@ -74,6 +74,20 @@ class Editing::SignalsTest < ActiveSupport::TestCase
     assert_equal %w[structure], signals.map { |signal| signal["reason"] }
   end
 
+  test "a plain save of a section after its fold is a save with the block's id, not a structure" do
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "three" } }).record
+    ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 3 })
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two" } }).ok?
+    signals = only_new { assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two", "background" => "tinted" } }).ok? }
+
+    assert_equal [ { "kind" => "content", "content_block_id" => section.id, "reason" => "saved" } ], signals
+  end
+
+  test "trashing a branch tells the editor of each child page too" do
+    child = create_page(title: "Child", parent: @page, published: false)
+    assert_equal %w[gone], only_new(Editing::Signals.record_stream(child)) { assert Trash::Move.call(@page).ok? }.map { |signal| signal["reason"] }
+  end
+
   test "the page's own save signals saved with no block, and a post's its post" do
     page_signals = only_new { assert Pages::Save.call(@page, translations: { "en" => { subtitle: "s" } }).ok? }
     post = create_post(title: "News", published: false)
@@ -110,7 +124,9 @@ class Editing::SignalsTest < ActiveSupport::TestCase
     assert_equal "kept", @block.reload.caption
   end
 
-  test "a note, a sign-in and a library image's save signal nothing on the page's stream" do
+  test "a note, a sign-in, a library image's save and a removal of notes signal nothing on the page's stream" do
+    assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "media.updated", subject_type: "Media::Asset", subject_id: @page.id)) }
+    assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "notes.removed", subject_type: "Page", subject_id: @page.id)) }
     assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "note.started", subject_type: "Page", subject_id: @page.id)) }
     assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "session.created")) }
   end

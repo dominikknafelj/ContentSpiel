@@ -77,7 +77,7 @@ module ContentBlocks
         end
         # `page_id`: the block's row is gone when the audit notification runs after
         # the commit, and whoever hears it (live refresh) could not find the page.
-        record_event("block.deleted", subject: @block, metadata: metadata.merge("page_id" => @block.owner_id))
+        record_event("block.deleted", subject: @block, metadata: (@block.owner_type == "Page" ? metadata.merge("page_id" => @block.owner_id) : metadata))
         @block.destroy || raise(ActiveRecord::Rollback)
         # Same owner bump as `ContentBlocks::Save` (final fix wave, I3).
         @block.owner.touch
