@@ -3,6 +3,8 @@ import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
 import { enqueue, holdTurboRequest, syncBases } from "saving/queue"
 import { orderErrorToast, sendOrder } from "saving/order_request"
+import { TAB_HEADER } from "editing/requests"
+import { TAB } from "live/connection"
 
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
 // children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
@@ -158,7 +160,8 @@ export default class extends Controller {
       const headers = {
         "Content-Type": "application/json",
         Accept: "text/vnd.turbo-stream.html",
-        "X-CSRF-Token": csrfToken
+        "X-CSRF-Token": csrfToken,
+        [TAB_HEADER]: TAB
       }
       const pageBase = isCurrent() && this.pageBaseFor(pageId)
       if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase

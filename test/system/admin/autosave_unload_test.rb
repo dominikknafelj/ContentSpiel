@@ -47,7 +47,7 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     backdate(@page, by: 5.seconds)
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
+    as_unheard(users(:two)) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
     fill_in "Subtitle", with: "My text"
     assert_selector "#page-save-status", text: "● CHANGED ELSEWHERE", wait: 5

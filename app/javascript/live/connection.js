@@ -12,7 +12,10 @@ import { cable } from "@hotwired/turbo-rails"
 // stream per record whose people are shown (`Presence::Channel`), on which
 // it also sends (`perform`), and its fourth is
 // `controllers/admin/presence/list_controller.js`, which listens to the
-// lists' one stream (`Presence::ListChannel`). All of them hear signals that say only THAT something
+// lists' one stream (`Presence::ListChannel`). Live editing's
+// `controllers/admin/editing/live_controller.js` is the fifth: one stream per
+// open page or post (`Editing::Channel`), and `editing/requests` puts `TAB` on
+// the writes of an editor (`X-Notes-Tab`). All of them hear signals that say only THAT something
 // changed (a kind and ids) and fetch the part again themselves; nothing
 // here knows what a signal means.
 //

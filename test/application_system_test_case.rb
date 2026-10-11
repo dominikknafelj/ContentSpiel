@@ -359,13 +359,25 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     await_js("document.body.dataset.notesLive === 'connected'", wait: wait)
   end
 
+  # `as` for a colleague whose save the open editor is NOT told of: the
+  # signal that makes an editor fetch what someone else saved
+  # (`Editing::Signals` -> `Live::Signals.later`) is dropped. For the tests of
+  # the stale machinery itself (a 409, "Changed elsewhere"): a save the editor
+  # heard of would be drawn into it (`admin--editing--live`) and its next save
+  # would no longer be stale. The server's own refusal is what they test, for
+  # a client that was offline, or a script that sends no signal-worthy tab.
+  def as_unheard(actor, channel: :admin, &block)
+    with_singleton_override(Live::Signals, :later, proc { |*| }) { as(actor, channel: channel, &block) }
+  end
+
   # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered
   # by the `admin` entry point (app/javascript/admin.js) through one dynamic
   # `import()` each, so they connect a moment *after* the page has loaded,
   # even though they're modulepreloaded. A test that types right after
   # `visit` can race them -- before `admin--saving--autosave` is connected its
   # `input` events go nowhere. So this waits until every `admin--*`
-  # controller named on the page is connected.
+  # controller named on the page is connected -- and, on an editor, until the
+  # live region has caught up (`data-live-part` is "answered").
   #
   # Cuprite needs no further wait before typing: its key events go to the
   # page through CDP rather than through a WebDriver input queue, so there
@@ -377,6 +389,11 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
       const ready = () => {
         const app = window.Stimulus
         if (!app) return false
+        // An open editor catches up once when its subscription is confirmed
+        // (`admin--editing--live`) and redraws what it fetched; a test that
+        // clicked before that would find its element replaced under it.
+        const live = document.getElementById("editing")
+        if (live?.hasAttribute("data-live-part") && live.getAttribute("data-live-part") !== "answered") return false
         return Array.from(document.querySelectorAll("[data-controller*='admin--']")).every((element) =>
           element.getAttribute("data-controller").split(" ").filter((name) => name.startsWith("admin--"))
             .every((name) => app.getControllerForElementAndIdentifier(element, name)))

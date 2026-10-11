@@ -202,7 +202,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
       }
     JS
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(second, translations: { "en" => { caption: "The other editor's caption" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(second, translations: { "en" => { caption: "The other editor's caption" } }) }
     end
 
     fill_in id: "block-#{second.id}-caption", with: "My caption"

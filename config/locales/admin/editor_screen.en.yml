@@ -150,3 +150,10 @@ en:
         # arrived (live-editing handoff 10).
         updated_mark:
           updated_by: "Updated by %{name}"
+        # Said in the header's notice area when the open record is in the
+        # trash, deleted or no longer the viewer's (`admin--editing--live#gone`).
+        live_region:
+          missing: "This page was moved to the trash or deleted, or you can no longer open it."
+          missing_post: "This post was moved to the trash or deleted, or you can no longer open it."
+          back: "Back to pages"
+          back_post: "Back to posts"

@@ -130,8 +130,11 @@ import "saving/promotion_hold"
 
 export { currentGeneration, isCurrentGeneration } from "saving/queue_state"
 export {
-  registerForm, unregisterForm, settled, busy, drained, acquire, enqueue, syncBases, holdTurboRequest
+  registerForm, unregisterForm, settled, busy, drained, quiet, acquire, enqueue, syncBases, holdTurboRequest
 } from "saving/queue_core"
+// `quiet` and `writeCount` are for `controllers/admin/editing/live_controller.js`:
+// a read that waits for this tab's writes and notes whether one was queued meanwhile.
+export { writeCount } from "saving/queue_state"
 
 // See "WHAT A GENERATION IS" (`queue_state.js`): the body Turbo is about to
 // replace is retired now, a moment before the swap.

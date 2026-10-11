@@ -1,1 +1,10 @@
-<%= tag.div id: "editing", data: region_data do %><%= content %><% end %>
+<%= tag.div id: "editing", data: region_data do %><%= content %>
+<%# What the live script puts in the header's notice area when the record is
+    gone (`admin--editing--live#gone`): the markup of the "Changed elsewhere"
+    bar, a warning and not an error. %>
+<template data-admin--editing--live-target="missing">
+  <div role="alert" data-editing-missing class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink">
+    <p class="min-w-0 flex-1"><%= t(@record.is_a?(::Page) ? ".missing" : ".missing_post") %></p>
+    <%= link_to t(@record.is_a?(::Page) ? ".back" : ".back_post"), (@record.is_a?(::Page) ? helpers.admin_pages_path(**@url_options) : helpers.admin_posts_path(**@url_options)), class: "shrink-0 font-semibold underline hover:text-ink", data: { turbo_frame: "_top" } %>
+  </div>
+</template><% end %>

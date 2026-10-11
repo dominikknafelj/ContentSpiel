@@ -4,6 +4,8 @@ import Sortable from "sortablejs"
 import { currentGeneration, enqueue, holdTurboRequest } from "saving/queue"
 import { errorToast, orderErrorToast, sendOrder, streamsApplied } from "saving/order_request"
 import { messages } from "i18n/messages"
+import { TAB_HEADER } from "editing/requests"
+import { TAB } from "live/connection"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
@@ -278,6 +280,7 @@ export default class extends Controller {
       // `event.from` is that container, and the item's parent the one it is
       // in now.
       onStart: () => {
+        this.sayMoving(true)
         this.makeCloneInert()
         this.dragSnapshot = this.snapshot()
       },
@@ -617,6 +620,22 @@ export default class extends Controller {
   // Turbo form). The page's own reorder draws a status line and a toast, and
   // releases its turn at once as before.
   async move(item, from, before = null, { focus = false } = {}) {
+    // Live refresh (`admin--editing--live`) does not draw the list while a
+    // block is held by a drag or the keyboard, nor before the move's answer
+    // has been drawn: `moving: false` is said when this resolves, on every
+    // path out (an early return included).
+    try {
+      await this.moveBlock(item, from, before, { focus })
+    } finally {
+      this.sayMoving(false)
+    }
+  }
+
+  sayMoving(moving) {
+    this.dispatch("moving", { detail: { moving } })
+  }
+
+  async moveBlock(item, from, before, { focus }) {
     this.refreshMoveState()
     const to = item ? item.parentElement : this.listTarget
     // An element that is in no container has no order to send: one the
@@ -799,7 +818,8 @@ export default class extends Controller {
       headers: {
         "Content-Type": "application/json",
         Accept: "text/vnd.turbo-stream.html",
-        "X-CSRF-Token": csrfToken
+        "X-CSRF-Token": csrfToken,
+        [TAB_HEADER]: TAB
       },
       body: JSON.stringify({
         ids: sent.map((element) => element.dataset.blockId),
@@ -1020,6 +1040,7 @@ export default class extends Controller {
 
   pickUp(card) {
     if (this.picked && this.picked !== card) this.cancel(this.picked, { refocus: false })
+    this.sayMoving(true)
     this.picked = card
     this.originNext = card.nextElementSibling
     this.orderBeforePick = this.itemsOf(this.listTarget)
@@ -1067,6 +1088,7 @@ export default class extends Controller {
     this.clearPicked(card)
     if (refocus) this.focusHandle(card)
     this.announce(`Cancelled. ${this.titleOf(card)} is back where it was.`)
+    this.sayMoving(false)
   }
 
   clearPicked(card) {

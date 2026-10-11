@@ -1,6 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
+import { TAB_HEADER } from "editing/requests"
+import { TAB } from "live/connection"
 import { currentGeneration, enqueue, isCurrentGeneration, registerForm, syncBases, unregisterForm } from "saving/queue"
 
 // Each autosave form's SAVE STATE, by form ELEMENT:
@@ -435,7 +437,8 @@ export default class extends Controller {
   requestHeaders() {
     const headers = {
       Accept: "text/vnd.turbo-stream.html",
-      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
+      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content,
+      [TAB_HEADER]: TAB
     }
     return headers
   }

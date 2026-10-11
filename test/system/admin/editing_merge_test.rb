@@ -53,7 +53,10 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
   def list_order = page.evaluate_script("Array.from(document.querySelectorAll('#content-blocks-list > [data-block-id]')).map((each) => Number(each.dataset.blockId))")
 
   # What a colleague does: the service, as another user, from outside the browser.
-  def colleague(&) = as(users(:two), channel: :admin, &)
+  # Unheard: these tests call the module by itself, "no controller of the live
+  # editor in between", and the live controller would otherwise draw the
+  # colleague's change into the page on its own while the test measures it.
+  def colleague(&) = as_unheard(users(:two), &)
 
   # Types into the block's rich-text field without letting the debounce send it: the autosave's debounce is
   # raised on the form first, so the form is unsaved for as long as the test needs.

@@ -25,7 +25,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
+    as_unheard(users(:two)) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
     # Count what this browser sends: "final" is a claim about the CLIENT (the
     # form stops sending), which the server's own refusal of every later save
@@ -444,7 +444,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_field "Title", with: "Other"
     await_admin_controllers
 
-    as(users(:two), channel: :admin) { Pages::Save.call(other, translations: { "en" => { subtitle: "The other editor's text" } }) }
+    as_unheard(users(:two)) { Pages::Save.call(other, translations: { "en" => { subtitle: "The other editor's text" } }) }
     fill_in "Subtitle", with: "Typed, then Back"
     page.go_back
 
