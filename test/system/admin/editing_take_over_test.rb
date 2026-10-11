@@ -352,6 +352,44 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # "Taken over by ..." is for the notice's time, and the strip that reads it
+  # is part of a card that is drawn again whenever anything about the block is
+  # heard: the new holder's first saved words, a second read. The first build
+  # showed it on the first strip only, so it was gone with that strip -- after
+  # a second, when the person who took over started typing.
+  test "the notice stays for its time when the card is drawn again meanwhile, and is not announced again" do
+    open_page
+    join(:dana, @dana) do
+      type_in(@block, "Mine for now")
+      assert_writes_settled
+      region_set("notice", 60000)
+      watch_announcements
+      listen_merged
+    end
+    assert_selector strip, text: "Dana Weiss is editing this block", wait: LIVE
+    within(card(@block)) { press "Take over" }
+    assert_selector "#{card(@block)} .ProseMirror[contenteditable=true]", wait: LIVE
+
+    using_session(:dana) do
+      assert_selector "#{strip} [data-editing-strip-text]", text: "Taken over by Olga Braun", wait: LIVE
+      assert_eventually(wait: LIVE, message: "the take-over was never announced") { said.any? }
+      await_announced
+      page.execute_script("window.__merged.length = 0; window.__strip = document.querySelector(#{strip.to_json})")
+    end
+
+    type_in(@block, " and now Olga's")
+    assert_writes_settled
+
+    using_session(:dana) do
+      await_merged
+      assert_selector "#{card(@block)} .ProseMirror", text: "Mine for now and now Olga's", wait: LIVE
+      assert_equal false, page.evaluate_script("window.__strip === document.querySelector(#{strip.to_json})"), "the card was not drawn again"
+      assert_selector "#{strip} [data-editing-strip-text]", text: "Taken over by Olga Braun"
+      await_announced
+      assert_equal [ "Olga Braun took over this block" ], said
+    end
+  end
+
   test "from a tab that does not answer: after the pass-over time the block is mine on what was saved" do
     held_by_nobody_listening
     open_page
@@ -384,6 +422,15 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       raise_debounce(card(@block))
       type_in(@block, "Typed while asleep. ")
       stop_hearing_taken
+      # Nor does it read. The `requested` signal it does hear asks for the card
+      # too, and that read waits for the tab's writes, the held hand-over among
+      # them: answered after the pass-over it draws the card as Olga's,
+      # read-only, which is right and is the test below. Whether it or the
+      # typing here came first was the machine's choice (CI, 2026-10-11: the
+      # read won, and there was no field left to type "Late." into), so the
+      # order is the test's: the typing first, the read after it.
+      hold_reads_of(@block)
+      listen_merged
       delay_next("POST", "/hand_over")
     end
     assert_selector strip, text: "Dana Weiss is editing this block", wait: LIVE
@@ -396,6 +443,8 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
 
     using_session(:dana) do
       await_delayed
+      # Locked since it was asked, and until its hand-over is answered.
+      assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]"
       send_delayed
       hear_taken
       # The hand-over was answered `nothing`: the lock comes off, and typing works again.
@@ -405,6 +454,12 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved.", wait: LIVE
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "Late."
       assert_selector "#{card(@block)} .ProseMirror", text: "Saved. Typed while asleep."
+
+      # And when it reads at last, the card stays the person's: their text and the notice.
+      release_reads
+      await_merged
+      assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved."
+      assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "Late."
     end
     assert_equal 1, taken_over_events.count
     assert_includes body_of(@block), "Typed while asleep."
@@ -422,15 +477,6 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     end
     assert_selector strip, wait: LIVE
     within(card(@block)) { press "Take over" }
-      # Nor does it read. The `requested` signal it does hear asks for the card
-      # too, and that read waits for the tab's writes, the held hand-over among
-      # them: answered after the pass-over it draws the card as Olga's,
-      # read-only, which is right and is the test below. Whether it or the
-      # typing here came first was the machine's choice (CI, 2026-10-11: the
-      # read won, and there was no field left to type "Late." into), so the
-      # order is the test's: the typing first, the read after it.
-      hold_reads_of(@block)
-      listen_merged
     assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
     due
     assert_selector "#{card(@block)} .ProseMirror[contenteditable=true]", wait: LIVE
@@ -443,8 +489,6 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_selector "#{card(@block)} [data-editing-kind=held]", text: "Olga Braun is editing this block", wait: LIVE
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "All saved."
       assert_no_selector "#{card(@block)} [data-editing-kind=lost]"
-      # Locked since it was asked, and until its hand-over is answered.
-      assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]"
     end
     assert_equal 1, taken_over_events.count
   end
@@ -454,12 +498,6 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       sign_in_via_form(@me)
       visit "/cs-studio/pages/#{@page.id}"
       await_notes_live
-
-      # And when it reads at last, the card stays the person's: their text and the notice.
-      release_reads
-      await_merged
-      assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved."
-      assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "Late."
       type_in(@block, "From the other tab. ")
       assert_writes_settled
       raise_debounce(card(@block))
@@ -930,27 +968,6 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "in a section: no Take over on the tile, the strip is in the panel, and taking over there clears the tile's avatar" do
-    section = add_block(block_type: "section", settings: { "layout" => "two" })
-    inside = add_block(section_id: section.id, section_column: 1)
-    open_page
-    join(:dana, @dana) do
-      find("#content_block_#{inside.id} .admin-block-tile__face").click
-      type_in(inside, "In a lane", within: panel(inside))
-      assert_writes_settled
-    end
-    assert_selector "#content_block_#{inside.id}[data-editing-held=true]", wait: LIVE
-    assert_no_selector "#content_block_#{inside.id} .admin-block-tile button", text: "Take over"
-    find("#content_block_#{inside.id} .admin-block-tile__face").click
-    assert_selector "#{panel(inside)} [data-editing-kind=held]", text: "Dana Weiss is editing this block"
-
-    within("#{panel(inside)} [data-editing-kind=held]") { press "Take over" }
-
-    assert_selector "#{panel(inside)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", text: "In a lane", wait: LIVE
-    assert_no_selector "#content_block_#{inside.id}[data-editing-held]", wait: LIVE
-    assert_equal 1, taken_over_events.count
-  end
-end
   # CI, 2026-10-11: the announcer stayed empty. The third person's tab asks for
   # the card when it hears `requested`, and on a slow machine that answer --
   # drawn by the server while Dana still held the block -- reaches the page
@@ -993,3 +1010,24 @@ end
     end
   end
 
+  test "in a section: no Take over on the tile, the strip is in the panel, and taking over there clears the tile's avatar" do
+    section = add_block(block_type: "section", settings: { "layout" => "two" })
+    inside = add_block(section_id: section.id, section_column: 1)
+    open_page
+    join(:dana, @dana) do
+      find("#content_block_#{inside.id} .admin-block-tile__face").click
+      type_in(inside, "In a lane", within: panel(inside))
+      assert_writes_settled
+    end
+    assert_selector "#content_block_#{inside.id}[data-editing-held=true]", wait: LIVE
+    assert_no_selector "#content_block_#{inside.id} .admin-block-tile button", text: "Take over"
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    assert_selector "#{panel(inside)} [data-editing-kind=held]", text: "Dana Weiss is editing this block"
+
+    within("#{panel(inside)} [data-editing-kind=held]") { press "Take over" }
+
+    assert_selector "#{panel(inside)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", text: "In a lane", wait: LIVE
+    assert_no_selector "#content_block_#{inside.id}[data-editing-held]", wait: LIVE
+    assert_equal 1, taken_over_events.count
+  end
+end

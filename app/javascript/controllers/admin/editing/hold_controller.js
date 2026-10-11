@@ -166,6 +166,8 @@ export default class extends Controller {
     this.handing = new Map()
     // subject => when this tab handed it over (the strip says "Taken over by ...")
     this.lost = new Map()
+    // subject => { holder, until }: its strip reads "Taken over by ..." until then
+    this.taken = new Map()
     // subject => whose strip (a user id, or null for none) this tab showed when
     // it heard `taken`, for a take-over that has not been said yet
     this.announcing = new Map()
@@ -324,6 +326,7 @@ export default class extends Controller {
     if (strip.dataset.editingKind !== "held") {
       this.asking.delete(subject)
       this.lost.delete(subject)
+      this.taken.delete(subject)
       return this.lose(subject)
     }
 
@@ -349,11 +352,21 @@ export default class extends Controller {
     // leaves the announcement to the strip that names the new holder.
     const heard = this.announcing.has(subject) && this.announcing.get(subject) !== holder
     if (heard) this.announcing.delete(subject)
-    if (handed) {
+    if (handed) this.taken.set(subject, { holder, until: Date.now() + this.noticeValue })
+    // The time is the SUBJECT's, not this strip's: a strip is part of a card
+    // that is drawn again whenever anything about the block is heard (the new
+    // holder's first saved words, a second read), and each strip of the same
+    // holder that connects before the time is up reads "Taken over by ..."
+    // for what is left of it. (The first build kept the time with the first
+    // strip, and the sentence was gone with it, a second after the take-over.)
+    const taken = this.taken.get(subject)
+    if (taken && taken.holder === holder && taken.until > Date.now()) {
       const text = strip.querySelector("[data-editing-strip-text]")
       const usual = text.textContent
       text.textContent = strip.dataset.editingTakenText
-      this.later(`notice:${subject}`, () => { if (text.isConnected) text.textContent = usual }, this.noticeValue)
+      this.later(`notice:${subject}`, () => { this.taken.delete(subject); if (text.isConnected) text.textContent = usual }, taken.until - Date.now())
+    } else {
+      this.taken.delete(subject)
     }
     // Handoff 19: a take-over is announced politely, on that card -- never a
     // release followed by a claim, which is no take-over.
