@@ -5,7 +5,7 @@ gem "rails", "~> 8.1.4"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
 # Use postgresql as the database for Active Record
-gem "pg", "~> 1.1"
+gem "pg", "~> 1.7"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 # Use JavaScript with ESM import maps [https://github.com/rails/importmap-rails]
@@ -117,14 +117,14 @@ gem "sitemap_generator", "~> 7.1"
 # (OTEL_EXPORTER_OTLP_ENDPOINT), not a new gem.
 gem "opentelemetry-sdk", "~> 1.13"
 
-gem "opentelemetry-instrumentation-all", "~> 0.97"
+gem "opentelemetry-instrumentation-all", "~> 0.98"
 
 gem "opentelemetry-exporter-otlp", "~> 0.37"
 
 
 # The official Ruby SDK for MCP servers (design spec section 10) --
 # [https://github.com/modelcontextprotocol/ruby-sdk].
-gem "mcp", "~> 1.6"
+gem "mcp", "~> 1.7"
 
 gem "rack-attack", "~> 6.8"
 
