@@ -12,31 +12,20 @@ module Admin
     # nothing; their hold in another tab draws their own avatar (`bg-ink
     # text-paper`, handoff 18).
     #
-    # WHERE THE HOLD COMES FROM. The editors have read the page's holds once
-    # (`Editing::Holds`) and hand them through as the slot's `holds:`; the
-    # component asks them, and `loader` then answers nothing, so the slot
-    # costs no statement. Only a host that has no holds lets the loader read
-    # them (one statement for every block, one for the users), and then
-    # `data` is the `Editing::Reservation`.
+    # WHERE THE HOLD COMES FROM. The host hands it: the editors have read the
+    # page's holds once for the screen (`Editing::Holds`) and pass them to the
+    # slot as `holds:`, like any other context. The component asks them and
+    # nothing else, so it costs no statement, reads no `Current` (whose tab a
+    # hold is "mine" in is the holds' own knowledge) and has no loader. A host
+    # that hands no holds draws no avatar.
     #
     # Decoration with its own words: the avatar is hidden from a screen
     # reader, the `sr-only` text is what it hears. Nothing here is a live
     # region; the announcement of a take-over is the panel's (`HoldStripComponent`).
     class HolderAvatarComponent < AdminComponent
-      # `{ block id => Editing::Reservation }`, live rows only; or `{}` when
-      # the host handed its `holds:` through.
-      def self.loader
-        lambda do |blocks, viewer:, holds: nil|
-          next {} if holds || !viewer.is_a?(::User) || blocks.none?
-
-          ::Editing::Reservation.live.where(subject_type: "ContentBlock", subject_id: blocks.map(&:id)).includes(:user).index_by(&:subject_id)
-        end
-      end
-
-      def initialize(record:, viewer:, data: nil, placement: nil, holds: nil, **)
+      def initialize(record:, viewer:, placement: nil, holds: nil, **)
         @block = record
         @viewer = viewer
-        @data = data
         @placement = placement
         @holds = holds
       end
@@ -51,11 +40,9 @@ module Admin
 
       private
 
-      def hold = @hold ||= @holds ? @holds.other(@block) : (@data unless mine?)
-
-      # The viewer's hold in this very tab. The tab is the request's: a tile
-      # is drawn for the tab that asked for it.
-      def mine? = @data.present? && @viewer.present? && @data.user_id == @viewer.id && Current.editing_tab.present? && @data.tab == Current.editing_tab
+      # The row that makes the block read-only for this viewer: someone
+      # else's, or the viewer's own in another tab (`Editing::Holds#other`).
+      def hold = @hold ||= @holds&.other(@block)
     end
   end
 end

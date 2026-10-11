@@ -12,6 +12,8 @@ module Admin
     # literal "post" (`ID_PREFIX`), matching `Admin::PostsController`'s own
     # `autosave_stream(error_prefix: "post", ...)` and `post_error_fields`.
     class PostFormComponent < AdminComponent
+      include HeldUnit
+
       ID_PREFIX = "post"
 
       # `slot_context` is the header's (`HeaderComponent`): what the screen has
@@ -48,23 +50,11 @@ module Admin
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(post))
 
       # The post is held as a whole (one subject, "record"); the strip stands
-      # in the header's notice area (`HoldStripComponent.slot_id`). A viewer
-      # who may only read sees it without "Take over" (handoff 26).
-      def holds = @holds ||= ::Editing::Holds.on(post, viewer: Current.user, tab: Current.editing_tab)
+      # in the header's notice area (`HoldStripComponent.slot_id`). What a hold
+      # does to the form is `HeldUnit`'s, asked for the post.
+      def held_subject = post
 
-      def hold = holds.other(post)
-
-      def held? = hold.present?
-
-      def read_only_hold? = held? && editable?
-
-      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: post, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
-
-      def editing_version = ::Editing.version(post, hold: hold, take_over: editable?)
-
-      def held_marks = held? ? { editing_held: true } : {}
-
-      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
+      def held_record = post
 
       # The form's `data-*`: the autosave wiring only when the post is
       # editable (see `editable?`) and nobody else holds it.

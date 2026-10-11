@@ -25,12 +25,14 @@ module Admin
     # can edit it (decision D3); a test presses the menu item or focuses the
     # marker, never waits for a hover.
     class MarkerComponent < Admin::AdminComponent
-      # A slot builds it as `record:, label:` (`editor.block.markers`); its
-      # other callers say `subject:, name:`. `viewer:`, `data:` and the rest of
-      # a slot's context are not its business.
-      def initialize(record: nil, subject: record, label: nil, name: label, viewer: nil, data: nil, **)
-        @subject = subject
-        @name = name
+      # A slot builds it (`editor.block.markers`): `record` is the block,
+      # `label` its name. `viewer:`, `data:` and the rest of a slot's context
+      # are not its business. It had a second name for each (`subject:`,
+      # `name:`), which no caller used and which made a mistyped keyword a nil
+      # subject, silently.
+      def initialize(record:, label:, **)
+        @subject = record
+        @name = label
       end
 
       private

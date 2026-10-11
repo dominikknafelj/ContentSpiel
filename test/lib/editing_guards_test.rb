@@ -14,8 +14,9 @@ class EditingGuardsTest < ActiveSupport::TestCase
   # A catch-up leaves a unit alone when its version equals the answer's, so a
   # version written by hand, or from a stamp of its own, is a unit that stays
   # as it is when it should have been redrawn (or is redrawn on every fetch).
-  # Every place that writes the attribute hands it a method of its own
-  # component, and that method's body calls `Editing.version`.
+  # Every place that writes the attribute hands it `editing_version`, which is
+  # `Admin::EditorScreen::HeldUnit`'s and calls `Editing.version`, or a method
+  # of its own component that is built from that one (a card adds its place).
   #
   # Not seen: a version built somewhere this does not look (a model, a
   # helper called by another name) and handed in through a variable.
@@ -25,12 +26,20 @@ class EditingGuardsTest < ActiveSupport::TestCase
     end
     assert_operator written.size, :>=, 5, "the pattern no longer finds where the versions are written"
 
+    held_unit = Rails.root.join("app/components/admin/editor_screen/held_unit.rb").read
+    assert_match(/def editing_version = ::Editing\.version\(/, held_unit, "HeldUnit#editing_version no longer calls Editing.version")
+    assert_equal 1, Dir[Rails.root.join("app/**/*.{rb,erb}")].sum { |path| File.read(path).lines.reject { |line| line.strip.start_with?("#") }.join.scan(/Editing\.version\(/).size },
+      "Editing.version is called in one place, HeldUnit#editing_version"
+
     offences = written.reject do |path, value|
       name = value[/\A(?:<%=\s*)?(\w+)(?:\s*%>)?\z/, 1]
       next false unless name
 
       component = path.sub(/\.html\.erb\z/, ".rb")
-      File.exist?(component) && File.read(component).match?(/def #{name}\b[^\n]*::Editing\.version\(/)
+      next false unless File.exist?(component)
+
+      source = File.read(component)
+      source.include?("include HeldUnit") && (name == "editing_version" || source.match?(/def #{name} = \[ editing_version\b/))
     end
     assert_empty offences.map { |path, value| "#{path.delete_prefix("#{Rails.root}/")}: #{value}" },
       "a unit's version is written from something other than a method that calls Editing.version"

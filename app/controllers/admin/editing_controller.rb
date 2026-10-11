@@ -86,6 +86,9 @@ module Admin
     def take_over = transfer(hand_over: false)
 
     # The holder's tab, having sent what it held, lets the requester have it.
+    # Answers `{ state: }`: handed, or nothing when no request stands or the
+    # row is no longer this tab's (`Editing::TakeOver`'s class comment has
+    # every combination).
     def hand_over = transfer(hand_over: true)
 
     # The asking tab leaves (a visit away, the page closing) or stops asking:

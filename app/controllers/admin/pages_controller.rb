@@ -176,14 +176,8 @@ module Admin
       # A save is a claim (`Admin::EditingClaims`): first, so a tab that does not
       # hold the settings is refused before the stale check, and a claim this
       # very request just took is given back when the save is refused as stale.
-      ids = { status_id: "page-save-status", error_prefix: "page" }
-      claim = claim_for(@page, record: @page)
-      return refuse_held(@page, **ids) if claim == :refused
-
-      if refuse_stale_autosave(@page, **ids, reload_url: admin_page_path(@page, **admin_url_options))
-        release_claim(@page, record: @page) if claim == :taken
-        return
-      end
+      claim = claim_before_save(@page, record: @page, status_id: "page-save-status", error_prefix: "page", reload_url: admin_page_path(@page, **admin_url_options))
+      return if performed?
 
       page_params = params.fetch(:page, ActionController::Parameters.new).permit(*TRANSLATED_FIELDS, *ATTRIBUTE_FIELDS)
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h

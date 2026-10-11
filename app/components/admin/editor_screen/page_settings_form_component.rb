@@ -16,6 +16,8 @@ module Admin
     # `Admin::PagesController#update` sees a nested `params[:page]` hash) have
     # to be two different strings rather than one.
     class PageSettingsFormComponent < AdminComponent
+      include HeldUnit
+
       ID_PREFIX = "page"
 
       # The soft lengths under SEO (handoff §9 B22): what search results show
@@ -115,25 +117,11 @@ module Admin
       # shows the "View only" badge above.
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(page))
 
-      # The settings are one subject (`Editing.key` "record"). A viewer who
-      # may only read sees the strip, without "Take over" (handoff 26).
-      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
+      # The settings are one subject (`Editing.key` "record"): what a hold does
+      # to them is `HeldUnit`'s, asked for the page.
+      def held_subject = page
 
-      def hold = holds.other(page)
-
-      def held? = hold.present?
-
-      def read_only_hold? = held? && editable?
-
-      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: page, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
-
-      def hold_slot_id = Admin::EditorScreen::HoldStripComponent.slot_id(page)
-
-      def editing_version = ::Editing.version(page, hold: hold, take_over: editable?)
-
-      def held_marks = held? ? { editing_held: true } : {}
-
-      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
+      def held_record = page
 
       def form_data
         return {} if !editable? || read_only_hold?

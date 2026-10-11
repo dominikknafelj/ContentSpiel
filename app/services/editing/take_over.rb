@@ -7,9 +7,11 @@ module Editing
   #    hold is still live: the row is passed over, on what was saved
   #    (`answered: false`), and audited;
   # 2. another tab holds the subject live: the request is written on its row
-  #    and that tab is told (`requested`). It drains its write queue and calls
-  #    this service with `hand_over: true`. If another tab's request stands
-  #    (the first requester keeps it) the answer is `pending`;
+  #    and that tab is told (`requested`). It locks that subject's forms
+  #    lightly, sends what they hold, waits for those forms alone (not for the
+  #    screen's whole write queue: a person typing elsewhere never left it
+  #    quiet) and calls this service with `hand_over: true`. If another tab's
+  #    request stands (the first requester keeps it) the answer is `pending`;
   # 3. nobody holds it live: the tab simply claims.
   #
   # THE HOLDER'S CALL (`hand_over: true`) passes the row to whoever asked

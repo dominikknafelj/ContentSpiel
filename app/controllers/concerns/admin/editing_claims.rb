@@ -17,6 +17,12 @@ module Admin
   # `live_record?` and Turbo's `turbo_stream`); the instant actions
   # (`held_elsewhere?`, `refuse_instant_redirect`) need neither.
   #
+  # THE ORDER IN AN AUTOSAVE ACTION is in two calls, and nowhere else:
+  # `claim_before_save` (claim, refusal, the stale check with its give-back)
+  # and then `saving_under` around the service. An action reads its parameters
+  # between the two and uses them after the save, which is why they are two
+  # methods and not one that takes the save as a block.
+  #
   # A CLAIM THIS REQUEST TOOK is given back when the save does not happen: a
   # stale refusal, a denied service, an exception (`saving_under`). A 422
   # keeps it (the person is still typing). A renewal is never given back.
@@ -30,8 +36,12 @@ module Admin
   # INSTANT ACTIONS (Publish, Unpublish, Schedule, "Still correct") are not
   # editing: they take no hold, and are refused only while ANOTHER tab holds
   # the subject they change (`held_elsewhere?`). Moving, adding, duplicating
-  # and deleting blocks and a section's layout ignore holds altogether
-  # (spec D4) and do not ask here.
+  # and deleting blocks ignore holds altogether (spec D4) and do not ask here.
+  # A section's layout is NOT among them, whatever D4 says: layout, background
+  # and width are the section block's own settings form, saved by
+  # `ContentBlocksController#update`, which claims the section like any block.
+  # The fold a narrower layout causes writes the other blocks with
+  # `update_columns`, so it moves no held block's base.
   module EditingClaims
     extend ActiveSupport::Concern
 
@@ -47,6 +57,23 @@ module Admin
       outcome = ::Editing::Reservation.claim(subject:, record:, user: Current.user, tab:)
       ::Editing::Signals.holder(record, subject, "claimed") if outcome == :taken
       outcome
+    end
+
+    # What an autosave action does before it reads its form, in the one order
+    # that is right (final review M5: these lines stood in three actions):
+    #   1. the claim: the tab takes the subject, renews it, or is refused;
+    #   2. the refusal, a 409, when another tab holds it, whatever the base is;
+    #   3. the stale check, which gives back a claim this very request took.
+    # Answers the claim for `saving_under`. When it has rendered a refusal the
+    # action is over: `return if performed?`.
+    def claim_before_save(subject, record:, status_id:, error_prefix:, reload_url:)
+      claim = claim_for(subject, record:)
+      if claim == :refused
+        refuse_held(subject, status_id:, error_prefix:)
+      elsif refuse_stale_autosave(subject, status_id:, error_prefix:, reload_url:)
+        release_claim(subject, record:) if claim == :taken
+      end
+      claim
     end
 
     def refuse_held(subject, status_id:, error_prefix:)

@@ -81,6 +81,10 @@ module Editing
       RETURNING (edit_reservations.xmax <> 0 AND COALESCE((SELECT user_id = :user_id AND tab = :tab AND changed_at > :cutoff FROM before), FALSE)) AS renewed
     SQL
 
+    # A fragment of `REQUEST` below (SQL text for the reason given there). It
+    # carries no marker of its own: `test/lib/sql_strings_test.rb` does not take
+    # a fragment in a plain constant for a SQL string, and refuses the marker
+    # on a line it does not.
     FREE = "(requested_by_id IS NULL OR requested_at IS NULL OR requested_at <= :stale_before OR (requested_by_id = :by_id AND requested_tab = :tab))".freeze
 
     # Someone asks for a subject another tab holds (see the class comment for

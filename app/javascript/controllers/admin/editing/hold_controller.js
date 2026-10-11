@@ -25,8 +25,10 @@ import { freeze, textOf } from "editing/freeze"
 //   nothing would release it again; a new claim cancels a release that waits.
 //   A Turbo visit away releases at once (the visit was drained first), and so
 //   it does what was still waiting: leaving pays everything in `owed()`. At
-//   `pagehide` nothing can wait for a queue: that one release is a `fetch`
-//   with `keepalive`, the one write outside the queue. WHAT REMAINS: a save
+//   `pagehide` nothing can wait for a queue: the release of each subject is
+//   a `fetch` with `keepalive`, and so is the withdrawal of a take-over
+//   request this tab made (below): the two writes outside the queue. WHAT
+//   REMAINS: a save
 //   still on the wire at the instant of a reload can reach the server after
 //   that release (the save was sent first, the release is processed first)
 //   and claim the block for the old tab id: the new page then reads "You're
@@ -59,7 +61,9 @@ import { freeze, textOf } from "editing/freeze"
 // - TAKING OVER (live-editing spec §4.4; the server side is
 //   `Editing::TakeOver`, whose class comment has every combination).
 //   REQUESTER: "Take over" posts `take_over` through the write queue and
-//   disables the button at once (a double click is one request: `asking`).
+//   disables the button a tick later (in the same tick the card's menu, which
+//   closes on a click that reached an enabled item, would stay open); a double
+//   click is one request all the same, because `asking` is set at once.
 //   `claimed`/`taken` -- nobody held it, or the holder was passed over -- and
 //   the `taken` SIGNAL of a hand-over all end in `arrive`: the unit is asked
 //   for (it comes back editable, from what the holder saved) and the focus

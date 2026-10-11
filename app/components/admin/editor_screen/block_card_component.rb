@@ -79,6 +79,8 @@ module Admin
     #   action is "Delete block…" wherever it is drawn (spec §6) and which has
     #   no tile here to hold the dialog for it.
     class BlockCardComponent < AdminComponent
+      include HeldUnit
+
       PLACEMENTS = %i[list panel group].freeze
 
       # `"block-<id>"` is public so `Admin::ContentBlocksController` can
@@ -161,33 +163,21 @@ module Admin
       # A panel (the form of a block in a section) also names its place: a move
       # along a section writes with `update_columns`, so the block's `updated_at`
       # does not say that its heading ("column 2") changed.
-      def held_marks = held? ? { editing_held: true } : {}
+      def card_version = [ editing_version, ("f" if list? && first?), ("l" if list? && last?), (panel? ? "s#{block.section_id}c#{block.section_column}" : nil) ].compact.join("-")
 
-      # The reservation that makes this card read-only for its viewer: someone
-      # else's, or the viewer's own in another tab (live-editing handoff 1).
-      # A viewer who may only read sees the strip too (handoff 26), without
-      # "Take over" and with the ordinary border, and their form is the
-      # view-only one it always was (`read_only_hold?` is false for them).
-      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
+      # What a hold does to this card is `HeldUnit`'s, asked for the block on
+      # its page. An unavailable block's card has one action and no form: no
+      # hold is drawn for it.
+      def held_subject = block
 
-      def hold = unavailable? ? nil : holds.other(block)
+      def held_record = page
 
-      def held? = hold.present?
+      def hold = unavailable? ? nil : super
 
-      # Held AND the viewer could otherwise edit: the form is drawn read-only,
-      # with no autosave controller.
-      def read_only_hold? = held? && editable?
-
-      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: block, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
-
-      def hold_slot_id = Admin::EditorScreen::HoldStripComponent.slot_id(block)
-
-      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(block) })
-
-      # The card's fields: as drawn, or rewritten once to read-only (`HeldFields`).
-      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
-
-      def card_version = [ ::Editing.version(block, hold: hold, take_over: editable?), ("f" if list? && first?), ("l" if list? && last?), (panel? ? "s#{block.section_id}c#{block.section_column}" : nil) ].compact.join("-")
+      # "Take over" as the first item of the held card's "⋯" menu, the keyboard
+      # and touch path to it (the words are this component's own key, which is
+      # why this one line is not in `HeldUnit`).
+      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(held_subject) })
 
       def updated_mark = Admin::EditorScreen::UpdatedMarkComponent.new(change: @updated_by)
 
@@ -232,15 +222,14 @@ module Admin
 
       def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
+      # IN THE TEMPLATE, with no method here any more (the slot loads nothing).
       # The block's markers (slot `editor.block.markers`: the notes marker, notes
       # spec §4.3): on a card of the list and on a translation tab's group
       # card, for every viewer. Not on a panel -- the block's tile carries it,
       # and two markers of one block would be two elements with one id -- and
-      # not on an unavailable block's card, which has one action.
-      #
-      # The page's holds are read already (`holds`), so the avatar's loader
-      # answers from them and costs no statement.
-      def slot_loaded = Admin::Slots.load("editor.block.markers", [ block ], viewer: Current.user, holds: holds)
+      # not on an unavailable block's card, which has one action. A slot for
+      # one block: nothing is loaded for it, and the page's holds, read
+      # already, go to it as context (`holds:`).
 
       def note_key = ::Notes.key(block)
 

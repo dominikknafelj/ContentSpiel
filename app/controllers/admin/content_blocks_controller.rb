@@ -114,14 +114,9 @@ module Admin
       # A save is a claim (`Admin::EditingClaims`): the tab holds the block or is
       # refused, before the stale check; a stale refusal gives back a claim
       # this very request just took.
-      ids = { status_id: Admin::EditorScreen::BlockCardComponent.status_id(block), error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block) }
-      claim = claim_for(block, record: @page)
-      return refuse_held(block, **ids) if claim == :refused
-
-      if refuse_stale_autosave(block, **ids, reload_url: admin_page_path(@page, **admin_url_options))
-        release_claim(block, record: @page) if claim == :taken
-        return
-      end
+      claim = claim_before_save(block, record: @page, status_id: Admin::EditorScreen::BlockCardComponent.status_id(block),
+        error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block), reload_url: admin_page_path(@page, **admin_url_options))
+      return if performed?
 
       attributes, translations = split_block_params(block)
       stored_asset_id = block.media_asset_id

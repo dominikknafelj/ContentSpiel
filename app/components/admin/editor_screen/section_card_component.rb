@@ -114,6 +114,8 @@ module Admin
     # `editable:` as on a block card: handed down by the page view, asked
     # here when left nil.
     class SectionCardComponent < AdminComponent
+      include HeldUnit
+
       def self.lanes_id(section) = "section-#{section.id}-lanes"
 
       def self.panels_id(section) = "section-#{section.id}-panels"
@@ -189,27 +191,18 @@ module Admin
       def form_url = helpers.admin_page_content_block_path(page, section, **url_options)
 
       # What a hold on the section's own settings does (it is the section's
-      # form that is held; the blocks in it have holds of their own): the same
-      # five questions as the block card's, answered for the section.
-      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
+      # form that is held; the blocks in it have holds of their own) is
+      # `HeldUnit`'s, asked for the section on its page.
+      def held_subject = section
 
-      def hold = unavailable? ? nil : holds.other(section)
+      def held_record = page
 
-      def held? = hold.present?
+      def hold = unavailable? ? nil : super
 
-      def read_only_hold? = held? && editable?
-
-      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: section, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
-
-      def hold_slot_id = Admin::EditorScreen::HoldStripComponent.slot_id(section)
-
-      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(section) })
-
-      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
-
-      def editing_version = ::Editing.version(section, hold: hold, take_over: editable?)
-
-      def held_marks = held? ? { editing_held: true } : {}
+      # "Take over" as the first item of the held section's "⋯" menu, the keyboard
+      # and touch path to it (the words are this component's own key, which is
+      # why this one line is not in `HeldUnit`).
+      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(held_subject) })
 
       def form_data = editable? && !read_only_hold? ? Admin::EditorScreen::BlockCardComponent.autosave_form_data(section) : {}
 

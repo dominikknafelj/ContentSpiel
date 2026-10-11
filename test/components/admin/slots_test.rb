@@ -123,19 +123,6 @@ class Admin::SlotsTest < ViewComponent::TestCase
     end
   end
 
-  test "load hands the host's context to a loader that names it or takes any, and to no other" do
-    seen = {}
-    plain = ->(records, viewer:) { seen[:plain] = :called; {} }
-    named = ->(records, viewer:, holds: nil) { seen[:named] = holds; {} }
-    open_ended = ->(records, viewer:, **context) { seen[:open] = context; {} }
-
-    Admin::Slots.with("editor.block.markers" => [ entry(FirstComponent, loader: plain), entry(SecondComponent, loader: named), entry(ProbeComponent, loader: open_ended) ]) do
-      Admin::Slots.load("editor.block.markers", [], viewer: nil, holds: :the_holds)
-    end
-
-    assert_equal({ plain: :called, named: :the_holds, open: { holds: :the_holds } }, seen)
-  end
-
   test "load calls each loader once with every record and the viewer, and skips entries without one" do
     pages = [ create_page(title: "A"), create_page(title: "B"), create_page(title: "C") ]
     calls = []

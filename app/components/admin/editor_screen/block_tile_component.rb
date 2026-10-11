@@ -63,6 +63,8 @@ module Admin
     # 6), and nothing else. For an editor "Add note" is the first item of
     # the tile's menu.
     class BlockTileComponent < AdminComponent
+      include HeldUnit
+
       def initialize(page:, block:, locale:, url_options: {}, editable:, open: false, holds: nil)
         @page = page
         @block = block
@@ -87,13 +89,11 @@ module Admin
       # someone else holds it: it says so in its version (a catch-up redraws
       # it when the hold comes or goes) and in `data-editing-held`. The avatar
       # of the holder stands in the slot `editor.block.markers`.
-      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
+      # `HeldUnit` answers for the block on its page; a tile uses its `held?`
+      # and its `editing_version` and draws no strip, no form and no menu item.
+      def held_subject = block
 
-      def hold = holds.other(block)
-
-      def held? = hold.present?
-
-      def version = ::Editing.version(block, hold: hold, take_over: editable?)
+      def held_record = page
 
       def unavailable? = block.definition.nil?
 
@@ -111,13 +111,11 @@ module Admin
 
       def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
+      # IN THE TEMPLATE, with no method here any more (the slot loads nothing).
       # The block's markers (slot `editor.block.markers`: the holder's avatar,
       # then the notes marker): on the tile, never on the block's form panel,
-      # and for every viewer.
-      #
-      # The page's holds are read already (`holds`), so the avatar's loader
-      # answers from them and costs no statement.
-      def slot_loaded = Admin::Slots.load("editor.block.markers", [ block ], viewer: Current.user, holds: holds)
+      # and for every viewer. A slot for one block: nothing is loaded for it,
+      # and the page's holds, read already, go to it as context (`holds:`).
 
       def note_key = ::Notes.key(block)
 

@@ -170,14 +170,8 @@ module Admin
     # something a debounced autosave should ever be able to trigger.
     def update
       # A save is a claim (`Admin::EditingClaims`), as in `Admin::PagesController#update`.
-      ids = { status_id: "post-save-status", error_prefix: "post" }
-      claim = claim_for(@post, record: @post)
-      return refuse_held(@post, **ids) if claim == :refused
-
-      if refuse_stale_autosave(@post, **ids, reload_url: admin_post_path(@post, **admin_url_options))
-        release_claim(@post, record: @post) if claim == :taken
-        return
-      end
+      claim = claim_before_save(@post, record: @post, status_id: "post-save-status", error_prefix: "post", reload_url: admin_post_path(@post, **admin_url_options))
+      return if performed?
 
       post_params = params.fetch(:post, ActionController::Parameters.new)
       translated = post_params.permit(*TRANSLATED_COLUMNS).to_h

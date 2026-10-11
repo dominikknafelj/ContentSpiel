@@ -213,6 +213,11 @@ en:
             settings: "%{name} is editing the page settings. Try again when they have finished."
             own_tab: "You're editing this in another tab. Do it there, or close that tab first."
             unknown: "Someone else is editing this. Try again when they have finished."
+          # Bulk publish leaves out the posts someone is editing and says how many
+          # (`Admin::BulkResponses#flash_bulk_result`).
+          bulk_skipped:
+            one: "%{count} post being edited by someone was skipped."
+            other: "%{count} posts being edited by someone were skipped."
           deleted:
             block: "%{name} deleted this block. Your changes weren't saved."
           deleted_unknown:

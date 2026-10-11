@@ -1,10 +1,12 @@
 require "application_system_test_case"
 
 # A page whose block and settings someone else holds is drawn read-only in a
-# real browser (live-editing Task 7): the strip says who, a text field cannot
-# be typed in, the rich-text field has no toolbar and no caret, and the form
-# sends no save. Nothing claims yet (Task 8), so the reservation is a row made
-# here. A full load carries no tab id, so every hold is somebody else's.
+# real browser: the strip says who, a text field cannot be typed in, the
+# rich-text field has no toolbar and no caret, and the form sends no save. The
+# reservation is a row made here, with a tab no browser has, so nobody answers
+# a take-over (claiming by typing is `editing_holds_test.rb`'s, taking over
+# `editing_take_over_test.rb`'s). A full load carries no tab id, so every hold
+# is somebody else's.
 class Admin::EditingHeldSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -50,7 +52,7 @@ class Admin::EditingHeldSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-controller~='admin--saving--autosave']"
   end
 
-  test "Take over in the strip does nothing yet: it neither submits nor navigates" do
+  test "Take over in the strip neither submits a form nor navigates: the strip stays while the holder is asked" do
     visit "/cs-studio/pages/#{@page.id}"
     await_notes_live
     url = page.current_url

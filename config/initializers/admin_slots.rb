@@ -25,8 +25,8 @@ Rails.application.config.to_prepare do
 
   # On a block: who is changing it, then its notes marker. The avatar draws on
   # a section's tile only (a card has the hold strip); it is first, so it
-  # stands before the marker (live-editing handoff 4). The editors hand the
-  # page's holds through, so its loader reads nothing there.
-  Admin::Slots.register "editor.block.markers", Admin::EditorScreen::HolderAvatarComponent, loader: Admin::EditorScreen::HolderAvatarComponent.loader
+  # stands before the marker (live-editing handoff 4). It has no loader: the
+  # editors hand the page's holds to the slot as `holds:`, and it asks those.
+  Admin::Slots.register "editor.block.markers", Admin::EditorScreen::HolderAvatarComponent
   Admin::Slots.register "editor.block.markers", Admin::NotesScreen::MarkerComponent
 end
