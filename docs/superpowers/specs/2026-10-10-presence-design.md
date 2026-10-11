@@ -140,7 +140,7 @@ Block-level presence; live refresh of blocks; presence on the dashboard, in the 
 
 ## 9. As built
 
-The look is `2026-10-10-presence-handoff.md`, items 1 to 31; this section does not repeat it. Where a point below and the text above differ, this section is what the code does.
+The look is `2026-10-10-presence-handoff.md`, items 1 to 35; this section does not repeat it. Where a point below and the text above differ, this section is what the code does.
 
 ### The data
 
@@ -169,6 +169,8 @@ The look is `2026-10-10-presence-handoff.md`, items 1 to 31; this section does n
 - **`data-notes-live`** is still the attribute `live/state.js` writes, and `await_notes_live` the test helper; both now cover presence too (a part says it on its own element with `data-live-part`) and want a rename (roadmap).
 - **Status texts are patched in place.** An away person's minutes ("away 12 min", three times in the answer) grew every minute and redrew the group under a reader every minute; only a real change redraws.
 - **A list's `here` answer** is `{ id: { count, names, label } }`, worded on the server (`RowMarkerComponent.words`), so the script holds no wording; `label` is the one text a screen reader hears and the tooltip shows (handoff 32). `Roster#here_counts` is removed: nothing called it once the markers named people.
+
+- **A row marker's tooltip shows on hover only (handoff item 12 said "hover and focus")**: a row marker is not a Tab stop, because in the posts list it stands inside the title link, where nothing interactive may be nested, and in the tree a second stop per row would double the tree's. The keyboard reaches the names as text: in a posts row they are part of the title link's accessible name, in a tree row the marker has its own accessible text (`row_marker_component.rb`).
 
 ### Other
 

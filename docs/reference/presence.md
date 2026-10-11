@@ -2,7 +2,7 @@
 
 > Describes: `app/models/presence.rb`, `app/models/presence/`, `app/queries/presence/`, `app/channels/presence/`, `app/jobs/presence/`, `app/controllers/admin/presence_controller.rb`, `app/controllers/concerns/admin/record_of_kind.rb`, `app/components/admin/presence_screen/`, `app/components/admin/ui/tooltip_component.rb`, `app/javascript/controllers/admin/presence/`, `app/javascript/controllers/admin/ui/tooltip_controller.js`, `app/javascript/live/`, `app/models/live.rb`, `app/models/live/`, `app/channels/live/`, `app/models/record_kinds.rb`, `app/components/admin/slots.rb`, `app/components/admin/ui/slot_component.rb`, `config/initializers/admin_slots.rb`, `app/values/person_name.rb`, `config/locales/admin/presence_screen.en.yml`.
 
-The spec is `docs/superpowers/specs/2026-10-10-presence-design.md` (its "As built" section at the end lists where the code left it), the look is `docs/superpowers/specs/2026-10-10-presence-handoff.md` (items 1 to 31). This file describes the code and the incidents behind its rules. Notes (`docs/reference/notes.md`) is the first user of the three seams below and presence the second; read this page before changing either.
+The spec is `docs/superpowers/specs/2026-10-10-presence-design.md` (its "As built" section at the end lists where the code left it), the look is `docs/superpowers/specs/2026-10-10-presence-handoff.md` (items 1 to 35). This file describes the code and the incidents behind its rules. Notes (`docs/reference/notes.md`) is the first user of the three seams below and presence the second; read this page before changing either.
 
 ## What presence is, and is not
 
@@ -28,7 +28,7 @@ Everyone who can open a record sees everyone on it, read-only viewers included; 
 
 **Why 150 seconds and not the spec's 60.** Browsers throttle the timers of a hidden tab; Chrome, after five minutes hidden, runs them about once a minute. A hidden tab is exactly an *away* person, whose 30-second beat then arrives every minute or so; with a 60-second limit the person flickered off and on. 150 is two throttled beats and some slack. The cost is that a crashed tab's person is shown for up to two and a half minutes instead of one. (`test/queries/presence/roster_test.rb`: "a row just past STALE_AFTER is not seen and one just inside it is".)
 
-**"Away N min"** is counted from `state_at`: for a person with several tabs, the *latest* `state_at` among their away rows (they have been away since the last of their tabs went away), and "here" is counted from the earliest `arrived_at` among their here rows. A keep-alive never moves `state_at`. Known: an arrival resets it, so a laptop that reconnects shows "away 0 min" again (roadmap).
+**"Away N min"** is counted from `state_at`: for a person with several tabs, the *latest* `state_at` among their away rows (they have been away since the last of their tabs went away), and "here" is counted from the earliest `arrived_at` among their here rows. A keep-alive never moves `state_at`. Known: an arrival resets it, so a laptop that reconnects shows "away just now" again (roadmap).
 
 ## The two streams, and why the list signal names nothing
 
@@ -99,7 +99,7 @@ The look is the handoff's; the tests cite its items. In short: the editor header
 
 **The name rule is a value.** A person's short name (their name, or for someone without one the part of the email address before the at sign; the whole address said more than an avatar needs to) was notes' rule (`Notes.name_of`). Presence needed the same rule and may not know notes, and notes may not know presence, so the rule moved to `PersonName` (`app/values/person_name.rb`, with the letters of a circle: `PersonName.initials`), which `Notes.name_of` and presence both call. `User#display_name`, which answers the whole address, is not changed and is not used for either (`test/values/person_name_test.rb`, `test/integration/admin/note_names_test.rb`).
 
-**The shared tooltip** (`Admin::Ui::TooltipComponent`, `admin--ui--tooltip`) is new: CS Studio had none, and the handoff forbids a `title` here because a keyboard does not reach it. It shows after 300ms on hover and at once on keyboard focus, lines up with its host's edge instead of crossing the window's or a clipping box's, goes on Escape and when its host is pressed, and shows nothing over a host whose button has its list open. Existing icon buttons still use `title`; the sweep to move them is later (roadmap), as is a vertical collision check.
+**The shared tooltip** (`Admin::Ui::TooltipComponent`, `admin--ui--tooltip`) is new: CS Studio had none, and the handoff forbids a `title` here because a keyboard does not reach it. It shows after 300ms on hover and at once on keyboard focus, lines up with its host's edge instead of crossing the window's or a clipping box's, goes on Escape and when its host is pressed, and shows nothing over a host whose button has its list open. A **row marker's** tooltip is built for hover only, not for focus (the handoff's item 12 says "hover and focus"): a row marker is not a Tab stop, because in the posts list it stands inside the title link, where nothing interactive may be nested, and in the tree a second stop per row would double the tree's. The keyboard's path to the names is the text: in a posts row the words are part of the title link's accessible name, in a tree row the marker has its own accessible text. Existing icon buttons still use `title`; the sweep to move them is later (roadmap), as is a vertical collision check.
 
 ## The exception to the service rule
 
@@ -157,7 +157,7 @@ A slot is a name at a place on a screen where a feature draws something of its o
 
 ## In tests
 
-Presence's system tests are two Capybara sessions (`using_session`); time is moved by `backdate` and the clock, not by waiting. `await_notes_live` waits for presence's subscriptions as well as notes' (its parts are in `live/state`). The system suite is sensitive to machine load: macOS background services (Software Update, Spotlight, photo analysis) at a load average of 80 to 110 made two whole runs worthless on 2026-10-10, with failures that were the machine's. Check `sysctl -n vm.loadavg` before a run; a run that takes twice its usual time is not a result.
+Presence's system tests are two Capybara sessions (`using_session`); time is **not** moved with `backdate` (it moves `updated_at`, which `presence_marks` does not have): a test writes a mark's `seen_at` or `state_at` with `update_columns`, shortens a script's intervals through the element's values, and where it must show that nothing happens it holds a `sleep` with its `# sleep: <reason>` (about ten of them, which the sleeps guard permits). `await_notes_live` waits for presence's subscriptions as well as notes' (its parts are in `live/state`). The system suite is sensitive to machine load: macOS background services (Software Update, Spotlight, photo analysis) at a load average of 80 to 110 made two whole runs worthless on 2026-10-10, with failures that were the machine's. Check `sysctl -n vm.loadavg` before a run; a run that takes twice its usual time is not a result.
 
 ## What is not built
 
