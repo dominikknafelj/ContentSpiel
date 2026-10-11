@@ -153,7 +153,7 @@ Where the build left the design above, and why. The body is not rewritten: it is
 
 The plan (`docs/superpowers/plans/2026-10-11-live-editing.md`, "Where the code disagrees with the design") checked the design against the code and built these the proposed way.
 
-1. **§3.3, the forwarding of the page's base.** "Removed, if nothing else reads it": something does. `Pages::Move` saves the page's own columns, so the tree's move of the open page moves `settings_changed_at`. The forwarding went from the block side only (`Admin::ContentBlocksController#page_base_streams`, the autosave script's `pageBaseId`, the header on the block requests); `admin--pages--tree` still sends `X-Page-Base-Updated-At` and `Admin::TreeController#page_base_streams` still answers, now comparing `settings_changed_at`.
+1. **§3.3, the forwarding of the page's base.** "Removed, if nothing else reads it": something does. `Pages::Move` saves the page's own columns, so the tree's move of the open page moves `settings_changed_at`. The forwarding went from the block side only (`Admin::ContentBlocksController#page_base_streams`, the autosave script's `pageBaseId`, the header on the block requests); `admin--pages--tree` still sent `X-Page-Base-Updated-At` and `Admin::TreeController#page_base_streams` still answered, comparing `settings_changed_at`. **Superseded by the final review** ("Rulings of the final review" below): a move no longer moves the base, and the tree's forwarding is gone as §3.3 intended.
 2. **§3.1, `origin`.** Not `Current.notes_tab`, which only the notes controllers set: with it on a content request, the tab that deleted a block would skip the refresh of its own notes drawer. The same header, `X-Notes-Tab`, is read by `Admin::BaseController` into a new `Current.editing_tab`, which only `Editing` reads.
 3. **§5, "the card and the tile stop naming notes".** They stop drawing the marker (it is in the slot), but both still name notes for the "Add note" item of their menus, so they stay named exceptions of `test/lib/notes_boundary_test.rb` with the reason narrowed, and a new test holds that neither draws a marker itself.
 4. **§3.2, "one block's card".** A section's card holds the forms of every block in it and cannot be fetched and replaced as one. The block's GET answers 204 for a section and the list is fetched instead, merged unit by unit; a block in a section is fetched as its tile and its panel. The unit of a section is its own settings form, not its card.
@@ -204,11 +204,21 @@ The plan (`docs/superpowers/plans/2026-10-11-live-editing.md`, "Where the code d
 
 **The slot (§5)**
 
-- No `markers:` argument was threaded through the section, lane and group components. The page's `Editing::Holds` goes through as the slot's context `holds:`, and `Admin::Slots.load` hands context to a loader that declares that keyword, which it finds by reading the loader's parameters.
+- No `markers:` argument was threaded through the section, lane and group components. The page's `Editing::Holds` goes through as the slot's context `holds:`. As first built, `Admin::Slots.load` also handed context to a loader that declared that keyword, which it found by reading the loader's parameters, and the avatar had such a loader for a host without holds. **Superseded by the final review** (below): the avatar has no loader and `Admin::Slots.load` is as it was before this work.
+
+### Rulings of the final review
+
+The whole-branch review found no path that loses a person's text; these are the rulings its fix round made.
+
+- **A move in the tree is not a change of the page's settings (§3.3).** `Pages::Move` saves `parent_id` and `position`, which moved `settings_changed_at`: a colleague dragging a page in the tree refused whoever held that page's settings form (a final 409), though nothing in that form had changed. Both columns are in `Page::SETTINGS_BASE_IGNORES` now. With nothing left to move, the tree's forwarding of the page base went too: no `X-Page-Base-Updated-At`, no `Admin::TreeController#page_base_streams`. The header no longer exists anywhere. A real change of the settings by a colleague still refuses.
+- **The slot's loader is gone (§5).** Both hosts of `editor.block.markers` hand `holds:` to the slot, so the loader served no host and made the component read `Current` for the viewer's tab. `HolderAvatarComponent` takes `holds:` from its context and nothing else; a host that hands none draws no avatar. `Admin::Slots.load(name, records, viewer:)` takes no context and reads no loader's parameters.
+- **Leaving releases what was still waiting to be released (§4.2).** A release waits for its form's last save; a form closed with a save on the wire and then left kept its hold for two minutes, because leaving walked only what the tab still counted as held. Leaving now pays both, each once (`owed()` in the hold script).
+- **The claim's order and the held unit's questions each have one place.** `Admin::EditingClaims#claim_before_save` is the claim, the refusal and the stale check with its give-back for the three autosave actions; `Admin::EditorScreen::HeldUnit` is what a reservation does to a card, a section, a tile, the settings form and a post's form.
+- **Three rules got a guard, with its limits said:** an id on every ancestor of a unit, every version through `Editing.version`, and who may call a reservation's statements (`docs/reference/live-editing.md` names the tests).
 
 ### Wording nobody designed
 
-Settled by analogy with the handoff's sentences while building, and **never asked of Claude Design**. Each is one locale key if it is wrong.
+Settled by analogy with the handoff's sentences while building, and **never asked of Claude Design**. Each is one locale key if it is wrong, with two exceptions that are literals in code like the other sentences of their kind: the two audit verbs (`Audit::Sentence`) and the service's failure sentence (`Editing::TakeOver`). The bulk sentence was a literal too and became a key (`hold_strip.bulk_skipped`, with a plural) in the final review.
 
 - "You're editing this in another tab. Your changes weren't saved." (a tie lost against one's own other tab)
 - "You deleted this block in another tab. Your changes weren't saved."
@@ -221,6 +231,8 @@ Settled by analogy with the handoff's sentences while building, and **never aske
 - "Couldn't copy. Select the text and copy it yourself." and "Couldn't load the block. Try again."
 - "This page was moved to the trash or deleted, or you can no longer open it." with "Back to pages", and the same for a post
 - "Dana Weiss took over this post", "… took over the page settings" and "Taken over by Dana Weiss · just now" for a post and the settings (handoff 13 and 19 word them for a block)
+- "Dana Weiss is editing this post. Your changes weren't saved." (`hold_strip.lost.post`) and "Dana Weiss is editing the page settings. Your changes weren't saved." (`hold_strip.lost.settings`): the handoff words the lost notice for a block only
+- "You're editing this in another tab" as the tooltip and the screen reader's words of the avatar on a tile (`holder_avatar.own_tab`): the handoff has the sentence for the strip, not for the avatar
 - In the audit log: "handed over editing" and "took over editing"
 - "Taking over needs a signed-in person and a browser tab." (the service's failure for a request with neither; a person does not see it in the editor)
 
@@ -228,4 +240,4 @@ Also decided without a design item: "Take over" and "Copy my text" are the small
 
 ### What is left open
 
-On the roadmap, under "Live editing": the gaps with their reasons (a save on the wire at `pagehide`; a holder typing in another block; no notice when every re-read after a hand-over fails; a colleague's publish not refreshing the header; tags; the caret of a clean rich-text field; MCP writes; no rate limit on claims; the tests that could not be written).
+On the roadmap, under "Live editing": the gaps with their reasons (a save on the wire at `pagehide`; a holder typing in another block; no notice when every re-read after a hand-over fails; a colleague's publish not refreshing the header; tags; the caret of a clean rich-text field; MCP writes; no rate limit on claims; the tests that could not be written; and what the final review left: the displaced unit shown in its old place without a notice, the short window in which a read caused by a request can replace a lightly locked clean card, and a top-level card that stays expanded being freed only by the lapse).
