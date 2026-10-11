@@ -106,6 +106,8 @@
     <%# Always there, empty unless the block is held: the live script puts the strip and its
         notices here (`HoldStripComponent.slot_id`). %>
     <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
+    <%# A change of holder is said here, politely (handoff 19); the sentence comes from the strip. %>
+    <span class="sr-only" aria-live="polite" data-editing-announcer></span>
   <% end %>
 
   <% unless unavailable? %>

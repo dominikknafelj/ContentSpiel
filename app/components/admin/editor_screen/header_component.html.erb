@@ -142,6 +142,8 @@
       held form sends no save, so only the first order is real). Task 9 owns
       the test. %>
   <div id="editor-notice"><%= render @hold_strip if @hold_strip %></div>
+  <%# A post's change of holder is said here (handoff 19), beside the area, outside what a merge replaces. %>
+  <span class="sr-only" aria-live="polite" data-editing-announcer></span>
 <% end %>
 
 <%# Dialogs: siblings of the header (see the class comment). %>

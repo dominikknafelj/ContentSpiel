@@ -140,7 +140,13 @@ export default class extends Controller {
 
   heard(signal) {
     if (signal.origin === TAB) return
-    if (signal.kind === "holder") return this.want(signal.content_block_id ? `block:${signal.content_block_id}` : "record")
+    if (signal.kind === "holder") {
+      // The hold script hears it first (a request to hand over, a block taken),
+      // then the part is fetched as before.
+      const subject = signal.content_block_id ? `block-${signal.content_block_id}` : "record"
+      this.dispatch("holder", { detail: { subject, reason: signal.reason } })
+      return this.want(signal.content_block_id ? `block:${signal.content_block_id}` : "record")
+    }
     if (signal.kind !== "content") return
     if (signal.reason === "gone") return this.want("record")
     if (signal.reason === "structure") return this.want(this.hasBlocksUrlValue ? "blocks" : "record")

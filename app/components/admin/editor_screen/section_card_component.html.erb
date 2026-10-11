@@ -100,6 +100,7 @@
   <%# Between the header and the body, as a block card's: always there, empty unless the
       section's own settings are held. %>
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
+  <span class="sr-only" aria-live="polite" data-editing-announcer></span>
   <% end %>
 
   <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 px-3 pb-3">

@@ -165,6 +165,11 @@ en:
         # is rendered here; `settings` is the page settings (handoff 23).
         hold_strip:
           take_over: "Take over"
+          # The status beside "Take over" (`admin--editing--hold#takeOver`): asked and waiting,
+          # someone else's request already stands, and a request that did not go through.
+          take_over_waiting: "Asking to take over…"
+          take_over_pending: "Someone else is already taking this over"
+          take_over_failed: "Couldn't take over. Try again."
           own_tab: "You're editing this in another tab"
           copy: "Copy my text"
           copied: "Copied"

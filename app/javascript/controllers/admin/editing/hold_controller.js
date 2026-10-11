@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
-import { enqueue } from "saving/queue"
+import { drained, enqueue } from "saving/queue"
 import { get, post } from "editing/requests"
 import { freeze, textOf } from "editing/freeze"
 
@@ -55,6 +55,39 @@ import { freeze, textOf } from "editing/freeze"
 //   same line with the same retries, and drawn from its `notice` event; a 404
 //   draws the plain sentence from the region's template.
 //
+// - TAKING OVER (live-editing spec §4.4; the server side is
+//   `Editing::TakeOver`, whose class comment has every combination).
+//   REQUESTER: "Take over" posts `take_over` through the write queue and
+//   disables the button at once (a double click is one request: `asking`).
+//   `claimed`/`taken` -- nobody held it, or the holder was passed over -- and
+//   the `taken` SIGNAL of a hand-over all end in `arrive`: the unit is asked
+//   for (it comes back editable, from what the holder saved) and the focus
+//   goes to its first field unless the person has moved on to another field
+//   meanwhile. `requested` shows the waiting status beside the button and,
+//   after the pass-over time, asks once more (the server answers `taken`);
+//   `pending` (another tab's request stands) says so and leaves the button
+//   ready; a refusal or a failure says it did not work and leaves the button
+//   ready. HOLDER: a `requested` signal for a subject in `held` makes this tab
+//   send what it has -- `drained()` in a loop, until the subject's forms hold
+//   nothing unsent, for at most the pass-over time -- and only then post
+//   `hand_over`. Nothing unsaved is handed over: a form that cannot save
+//   (paused by a 409, a failing save) or typing that never pauses long enough
+//   sends no hand-over, the requester passes over, this tab hears that `taken`
+//   signal (or its next save is refused) and the form is frozen as for any
+//   refused claim. While it waits, no claim renewal is sent for the subject
+//   (`handing`), and further typing is saved first. After `handed` this tab
+//   fetches the unit; a unit that still holds a keystroke typed after the last
+//   save is kept by the merge, so its text is sent once more -- and refused,
+//   which freezes it with the `lost` notice and "Copy my text" instead of the
+//   neutral "Taken over by ...". The holder's tab is not told by a signal (it
+//   is the hand-over's `origin`): its own answer tells it.
+// - A CHANGE OF HOLDER is said in the unit's polite live region, once: the
+//   strip carries the sentence (`data-editing-announce`); it is said when the
+//   strip's holder differs from the one this tab last saw, when a `taken`
+//   signal was heard, and in the tab that handed over. The requester hears
+//   nothing: it did it. It is said a moment after the strip appears, so that a
+//   card that was replaced has its region in the document before it changes.
+//
 // IT HOLDS NO WORDING AND NO ADDRESS: every sentence is in the markup the
 // server rendered and every URL (and the lists `editing/freeze` reads) is a
 // value.
@@ -76,10 +109,13 @@ import { freeze, textOf } from "editing/freeze"
 // keyed by the strip): Stimulus has no per-target state. (5) A release that
 // waits for other controllers' state is a polling loop of its own (25 ms),
 // because the autosave controller has no event for "nothing left to send".
+const LOST_FOR = 30000
+const ANNOUNCE_AFTER = 150
+
 export default class extends Controller {
   static targets = [ "strip", "deleted" ]
   static values = {
-    claimUrl: String, releaseUrl: String, blockUrl: String, hold: Number, passOver: Number, notice: Number,
+    claimUrl: String, releaseUrl: String, takeOverUrl: String, handOverUrl: String, blockUrl: String, hold: Number, passOver: Number, notice: Number,
     timeout: { type: Number, default: 10000 },
     rules: { type: Object, default: {} }
   }
@@ -91,6 +127,16 @@ export default class extends Controller {
     this.claiming = new Set()
     this.releasing = new Map()
     this.timers = new Map()
+    // subject => { from: the element pressed, requested: whether the holder was asked }
+    this.asking = new Map()
+    // subject => token of the hand-over that waits for the subject's forms
+    this.handing = new Map()
+    // subject => when this tab handed it over (the strip says "Taken over by ...")
+    this.lost = new Map()
+    // subject => the holder (user id) of the strip this tab last drew
+    this.holders = new Map()
+    // subjects whose `taken` signal was heard and not yet said
+    this.announcing = new Set()
   }
 
   connect() {
@@ -99,7 +145,8 @@ export default class extends Controller {
       [ "admin--editor--section:closed", (event) => this.release(`block-${event.detail.blockId}`) ],
       [ "admin--editor--blocks:toggled", (event) => { if (event.detail.hidden) this.collapsed(event.detail.blockId) } ],
       [ "admin--editing--live:deleted", (event) => this.deleted(event.detail) ],
-      [ "admin--editing--live:notice", (event) => this.notice(event.detail) ]
+      [ "admin--editing--live:notice", (event) => this.notice(event.detail) ],
+      [ "admin--editing--live:holder", (event) => this.heardHolder(event.detail) ]
     ]
     this.listeners.forEach(([ name, act ]) => this.element.addEventListener(name, act))
     this.leaving = () => this.letGo()
@@ -128,6 +175,9 @@ export default class extends Controller {
 
   claim(subject) {
     if (!subject || !this.hasClaimUrlValue) return
+    // The subject is being handed over: what is typed now is saved first, and a
+    // renewal would only tell the server this tab still wants it.
+    if (this.handing.has(subject)) return
     // A release that was waiting for this subject's last save is not wanted
     // any more: the person is typing again.
     this.releasing.delete(subject)
@@ -216,15 +266,57 @@ export default class extends Controller {
   stripTargetConnected(strip) {
     const subject = strip.dataset.editingSubject
     this.held.delete(subject)
-    if (strip.dataset.editingKind !== "held") return this.lose(subject)
+    if (strip.dataset.editingKind !== "held") {
+      this.asking.delete(subject)
+      this.lost.delete(subject)
+      return this.lose(subject)
+    }
 
     const lapse = Number(strip.dataset.editingExpiresIn)
     if (Number.isFinite(lapse)) this.later(strip, () => this.dispatch("refresh", { detail: { subject } }), lapse + 250)
+    // A strip drawn again while this tab is asking is still asking.
+    if (this.asking.has(subject)) this.showAsking(subject)
+
+    const holder = strip.dataset.editingHolder
+    const before = this.holders.get(subject)
+    this.holders.set(subject, holder)
+    const handedAt = this.lost.get(subject)
+    this.lost.delete(subject)
+    const handed = handedAt !== undefined && Date.now() - handedAt < LOST_FOR
+    const heard = this.announcing.delete(subject)
+    // Handoff 13: in the tab the subject was taken from, the strip reads
+    // "Taken over by ..." for `notice`, then what it always reads.
+    if (handed) {
+      const text = strip.querySelector("[data-editing-strip-text]")
+      const usual = text.textContent
+      text.textContent = strip.dataset.editingTakenText
+      this.later(`notice:${subject}`, () => { if (text.isConnected) text.textContent = usual }, this.noticeValue)
+    }
+    // Handoff 19: a change of holder is announced politely, on that card.
+    if (handed || heard || (before && before !== holder)) this.announce(subject, strip.dataset.editingAnnounce)
   }
 
   stripTargetDisconnected(strip) {
     clearTimeout(this.timers.get(strip))
     this.timers.delete(strip)
+    // No holder is known once the strip is gone and none replaced it in the same
+    // breath, so that the next holder is not taken for a change of this one.
+    const subject = strip.dataset.editingSubject
+    setTimeout(() => { if (!this.stripTargets.some((each) => each.dataset.editingSubject === subject)) this.holders.set(subject, null) }, 0)
+  }
+
+  // Said in the region beside the unit's strip slot, a moment after the strip
+  // appears: a region that was inserted with its text is not always read.
+  announce(subject, text) {
+    this.later(`announce:${subject}`, () => {
+      const strip = this.stripTargets.find((each) => each.dataset.editingSubject === subject)
+      if (strip) this.announcerFor(strip)?.replaceChildren(text)
+    }, ANNOUNCE_AFTER)
+  }
+
+  announcerFor(strip) {
+    const slot = strip.closest("[data-editing-strip-slot]")
+    return slot?.parentElement.querySelector(":scope > [data-editing-announcer]") || document.querySelector("#editor-notice ~ [data-editing-announcer]")
   }
 
   later(key, act, ms) {
@@ -323,9 +415,163 @@ export default class extends Controller {
     this.element.querySelectorAll(`#content_block_${CSS.escape(id)}, #block-${CSS.escape(id)}-panel`).forEach((each) => each.remove())
   }
 
-  // Task 11 gives this its body. Until then the strip's and the menu's "Take
-  // over" do nothing (Stimulus reports an action whose method is missing).
-  takeOver() {}
+  // "Take over" on a strip or in a card's menu (handoff 2). One request per
+  // press: the button is disabled at once, and a second press while this tab is
+  // asking is nothing. See the header for the answers.
+  takeOver(event) {
+    const subject = event.currentTarget.dataset.editingSubject
+    if (!subject || !this.hasTakeOverUrlValue || this.asking.has(subject)) return
+    this.asking.set(subject, { from: event.currentTarget, requested: false })
+    // Not in this tick: the card's menu closes itself on a click that reached it
+    // on an item that is not disabled, and an open menu keeps its unit from being drawn.
+    setTimeout(() => this.showAsking(subject), 0)
+    this.ask(subject)
+  }
+
+  ask(subject) {
+    const url = this.takeOverUrlValue
+    const params = this.params(subject)
+    const timeout = this.timeoutValue
+    return enqueue(async (isCurrent) => {
+      const answer = await post(url, params, { timeout })
+      if (!isCurrent() || !this.asking.has(subject)) return
+      let state = null
+      try { state = answer.status === 200 ? JSON.parse(answer.text).state : null } catch { /* not an answer of ours: a sign-in page */ }
+      if (state === "taken" || state === "claimed") this.arrive(subject)
+      else if (state === "requested") this.requested(subject)
+      else if (state === "pending") this.end(subject, "pending")
+      else this.end(subject, "failed")
+    })
+  }
+
+  // The holder's tab was asked. If it answers, the `taken` signal ends this; if
+  // not, this tab asks again once the pass-over time has gone and is passed through.
+  requested(subject) {
+    const asking = this.asking.get(subject)
+    asking.requested = true
+    this.showAsking(subject)
+    this.later(`ask:${subject}`, () => {
+      if (!this.asking.has(subject)) return
+      if (this.heldByOther(subject)) this.ask(subject)
+      else this.end(subject)
+    }, this.passOverValue + 100)
+  }
+
+  // The subject is this tab's: it is asked for, comes back editable, and the
+  // focus goes to its first field -- unless the person has put it somewhere
+  // else meanwhile.
+  async arrive(subject) {
+    const asking = this.asking.get(subject)
+    if (!asking) return
+    this.asking.delete(subject)
+    clearTimeout(this.timers.get(`ask:${subject}`))
+    this.timers.delete(`ask:${subject}`)
+    this.announcing.delete(subject)
+    this.held.set(subject, Date.now())
+    const waits = []
+    this.dispatch("refresh", { detail: { subject, waits } })
+    await Promise.all(waits)
+    this.focusFirstField(subject, asking.from)
+  }
+
+  // Not arrived: the status says why (or nothing), and the button is ready.
+  end(subject, status = null) {
+    this.asking.delete(subject)
+    clearTimeout(this.timers.get(`ask:${subject}`))
+    this.timers.delete(`ask:${subject}`)
+    this.takeOverButtons(subject).forEach((button) => { button.disabled = false })
+    this.setTakeOverStatus(subject, status)
+  }
+
+  takeOverButtons(subject) {
+    return [ ...this.element.querySelectorAll(`[data-action~='admin--editing--hold#takeOver'][data-editing-subject="${CSS.escape(subject)}"]`) ]
+  }
+
+  setTakeOverStatus(subject, key) {
+    const strip = this.stripTargets.find((each) => each.dataset.editingSubject === subject)
+    const status = strip?.querySelector("[data-editing-take-over-status]")
+    if (status) status.textContent = key ? status.dataset[key] : ""
+  }
+
+  showAsking(subject) {
+    if (!this.asking.has(subject)) return
+    this.takeOverButtons(subject).forEach((button) => { button.disabled = true })
+    this.setTakeOverStatus(subject, this.asking.get(subject)?.requested ? "waiting" : null)
+  }
+
+  heldByOther(subject) { return this.stripTargets.some((strip) => strip.dataset.editingSubject === subject && strip.dataset.editingKind === "held") }
+
+  // The focus goes to the unit's first field when it is where the person was
+  // left: nowhere, on the button that was pressed (or gone with it), or in the
+  // unit itself. A person who went on to another field is left there.
+  focusFirstField(subject, from, tries = 30) {
+    const units = this.unitsOf(subject)
+    const active = document.activeElement
+    if (active && active !== document.body && active !== from && active.isConnected && !units.some((unit) => unit.contains(active))) return
+    const visible = (field) => field.getClientRects().length > 0
+    const field = units.flatMap((unit) => [ ...unit.querySelectorAll("form input:not([type=hidden]):not([disabled]), form textarea:not([disabled]), form select:not([disabled]), form [contenteditable=true]") ]).find(visible)
+    if (field) return field.focus()
+    // The editors of the new unit are mounted a moment after it is drawn.
+    if (tries > 0 && !document.hidden) requestAnimationFrame(() => this.focusFirstField(subject, from, tries - 1))
+  }
+
+  // A holder signal, before the part is fetched (`admin--editing--live`).
+  heardHolder({ subject, reason }) {
+    if (reason === "requested") return this.handOver(subject)
+    if (reason !== "taken") return
+    if (this.asking.has(subject)) return this.arrive(subject)
+    this.announcing.add(subject)
+    this.later(`heard:${subject}`, () => this.announcing.delete(subject), 10000)
+    // This tab held it and was passed over: unsaved text is refused now, at
+    // once, rather than at the person's next change.
+    if (this.held.has(subject)) {
+      this.handing.delete(subject)
+      if (this.unsaved(subject)) { this.held.delete(subject); this.claim(subject) }
+    }
+  }
+
+  autosavesOf(subject) {
+    return this.formsOf(subject).map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")).filter(Boolean)
+  }
+
+  unsaved(subject) { return this.autosavesOf(subject).some((form) => !form.clean() || form.outstanding() || !form.unchanged()) }
+
+  // Someone asked for what this tab holds: everything typed is sent first, and
+  // the subject is let go only when nothing of it is left to send.
+  async handOver(subject) {
+    if (!this.held.has(subject) || this.handing.has(subject) || !this.hasHandOverUrlValue) return
+    const token = {}
+    this.handing.set(subject, token)
+    const url = this.handOverUrlValue
+    const params = this.params(subject)
+    const timeout = this.timeoutValue
+    const deadline = Date.now() + this.passOverValue
+    let sendable = false
+    try {
+      while (this.element.isConnected && this.handing.get(subject) === token) {
+        const result = await drained({ limit: Math.max(deadline - Date.now(), 100) })
+        const forms = this.autosavesOf(subject).filter((form) => form.element.isConnected)
+        if (result.timedOut || !forms.every((form) => form.clean())) break
+        if (forms.every((form) => !form.outstanding() && form.unchanged())) { sendable = true; break }
+        if (Date.now() >= deadline) break
+      }
+      if (!sendable || this.handing.get(subject) !== token) return
+      const answer = await enqueue(() => post(url, params, { timeout }))
+      let state = null
+      try { state = answer.status === 200 ? JSON.parse(answer.text).state : null } catch { /* not ours */ }
+      if (state !== "handed") return
+      this.held.delete(subject)
+      this.lost.set(subject, Date.now())
+    } finally {
+      if (this.handing.get(subject) === token) this.handing.delete(subject)
+    }
+    const waits = []
+    this.dispatch("refresh", { detail: { subject, waits } })
+    await Promise.all(waits)
+    // A keystroke after the last save keeps the unit as it is (the merge does not
+    // replace unsaved text): sent now, it is refused and frozen with the notice.
+    if (this.autosavesOf(subject).some((form) => form.element.isConnected && !form.unchanged())) await drained()
+  }
 
   // A block was deleted while its form holds unsaved text (the list merge
   // kept its unit): the server words the notice, with who deleted it, and the

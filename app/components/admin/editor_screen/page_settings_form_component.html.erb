@@ -3,6 +3,7 @@
   <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
   <%# Always there, empty unless the settings are held (`HoldStripComponent.slot_id`). %>
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
+  <span class="sr-only" aria-live="polite" data-editing-announcer></span>
 
   <%# `data-controller="admin--saving--autosave"` sits on this form directly (not a
       wrapping element) -- see that controller's own comment for why its

@@ -5,6 +5,10 @@
     <%= render Admin::Ui::AvatarComponent.new(initials: initials, size: :md, tone: own? ? :own : :other) %>
     <p class="min-w-0 flex-1 text-[13px] text-ink" data-editing-strip-text><%= sentence %></p>
     <% if take_over? %>
+      <%# What the hold script says beside the button while a take-over is asked, already
+          standing, or refused: a polite status, empty until then (the script holds no wording). %>
+      <span role="status" aria-live="polite" class="shrink-0 text-xs text-meta" data-editing-take-over-status
+            data-waiting="<%= t(".take_over_waiting") %>" data-pending="<%= t(".take_over_pending") %>" data-failed="<%= t(".take_over_failed") %>"></span>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".take_over"), variant: :secondary, size: :small,
             data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(@subject) }) %>
     <% end %>
