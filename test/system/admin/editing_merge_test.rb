@@ -69,6 +69,8 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
 
   # Raises the debounce, and stops the form sending when the focus leaves it (`focusout` -> `saveNow`): a test that
   # types into two forms one after the other would otherwise save the first. What the form holds stays unsaved.
+  SCRIPT_WAIT = 15
+
   def raise_debounce(form_selector)
     page.execute_script(<<~JS)
       const form = document.querySelector(#{form_selector.to_json})
@@ -83,14 +85,20 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
 
   # Runs `body` (JS) with `merge`, `list` (#content-blocks-list) and `fresh` (the answer of `path`) in scope; `body`
   # calls `done(value)` itself, so a test can read the screen in the same task as the merge.
+  # The driver cuts an async script at Capybara's wait time (2 s), which is not
+  # a statement about the merge: a body that samples 40 animation frames after
+  # two list merges takes longer than that on a slow machine (seen at twenty
+  # times CPU throttling). The script's own time is `SCRIPT_WAIT`.
   def run_merge(path, body)
-    page.evaluate_async_script(<<~JS, path)
-      const [ path, done ] = arguments
-      Promise.all([ window.__merge, window.__fresh(path) ]).then(([ merge, fresh ]) => {
-        const list = document.getElementById("content-blocks-list")
-        #{body}
-      })
-    JS
+    using_wait_time(SCRIPT_WAIT) do
+      page.evaluate_async_script(<<~JS, path)
+        const [ path, done ] = arguments
+        Promise.all([ window.__merge, window.__fresh(path) ]).then(([ merge, fresh ]) => {
+          const list = document.getElementById("content-blocks-list")
+          #{body}
+        })
+      JS
+    end
   end
 
   def merge_list(path = blocks_path, only_changed: false)
