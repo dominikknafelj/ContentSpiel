@@ -29,8 +29,8 @@ class Live::SignalsTest < ActiveSupport::TestCase
     [ { kind: "x", title: "About" }, { kind: "x", thread_id: "abc" }, { kind: "x", body: 1 },
       { kind: "A sentence of free text" }, { kind: "x", reason: "Please read this note" }, { kind: "x", reason: "x" * 33 },
       { kind: "x", origin: "A secret sentence" }, { kind: "x", origin: "<script>" }, { kind: "x", thread_id: 1.5 },
-      { kind: "x", record: [ "page", "3" ] }, { kind: "x", record: [ "tag", 3 ] }, { kind: "x", record: "page" },
-      { kind: "x", record: [ "page", 3, "extra" ] }, { kind: "x", kind_id: [ 1 ] },
+      { kind: "presence", record: [ "page", 3 ] }, { kind: "x", record: [ "page", "3" ] }, { kind: "x", record: "page" },
+      { kind: "x", kind_id: [ 1 ] },
       {}, { thread_id: 1 }, { kind: "x", origin: nil }, { kind: "x", reason: nil }, { "kind" => "x", kind: "y" }, { 1 => "x", kind: "x" } ].each do |payload|
       assert_raises(ArgumentError, payload.inspect) { Live::Signals.later(STREAM, payload) }
     end
@@ -44,9 +44,9 @@ class Live::SignalsTest < ActiveSupport::TestCase
     assert_equal 0, broadcasts(STREAM).size
   end
 
-  test "ids, nil ids, a record and a kind name pass" do
+  test "ids and nil ids pass" do
     Live::Signals.later(STREAM, { kind: "x", thread_id: nil })
-    Live::Signals.later(STREAM, { kind: "presence", record: [ "page", 3 ], user_id: 9, reason: "left_page" })
+    Live::Signals.later(STREAM, { kind: "presence", user_id: 9, reason: "left_page" })
     assert_equal 2, broadcasts(STREAM).size
   end
 

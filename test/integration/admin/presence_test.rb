@@ -205,7 +205,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
   # What a list's marker shows and says (handoff 9, 12, 27): the count, the
   # names in order of arrival through `PersonName.of`, and the two texts the
   # marker is given as they are -- the script holds no wording.
-  test "here answers the count, the names in order of arrival and the marker's two texts" do
+  test "here answers the count and the marker's two texts" do
     @other.update!(name: "Dana Weiss")
     @third.update!(name: nil)
     mark(@third, @page, arrived: 9.minutes.ago)
@@ -214,9 +214,9 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     sign_in_as @viewer
 
     here("page", [ @page.id ])
-    assert_equal({ @page.id.to_s => { "count" => 2, "names" => [ "reader", "Dana Weiss" ], "label" => "2 people here: reader, Dana Weiss" } }, response.parsed_body)
+    assert_equal({ @page.id.to_s => { "count" => 2, "label" => "2 people here: reader, Dana Weiss" } }, response.parsed_body)
     here("post", [ @post.id ])
-    assert_equal({ @post.id.to_s => { "count" => 1, "names" => [ "Dana Weiss" ], "label" => "Dana Weiss is here" } }, response.parsed_body)
+    assert_equal({ @post.id.to_s => { "count" => 1, "label" => "Dana Weiss is here" } }, response.parsed_body)
     assert_equal "no-store", response.headers["Cache-Control"]
   end
 
@@ -231,10 +231,9 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
 
     answer = response.parsed_body
     assert_equal 7, answer.dig(@page.id.to_s, "count")
-    assert_equal [ "Person 0", "Person 1", "Person 2", "Person 3", "Person 4" ], answer.dig(@page.id.to_s, "names")
     assert_equal "7 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", answer.dig(@page.id.to_s, "label")
     # One text, for the screen reader and the tooltip alike (handoff 32).
-    assert_equal %w[count label names], answer.fetch(@page.id.to_s).keys.sort
+    assert_equal %w[count label], answer.fetch(@page.id.to_s).keys.sort
     assert_equal "6 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 1 more", answer.dig(six.id.to_s, "label")
   end
 
@@ -248,7 +247,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     here("page", [ @page.id ])
 
     assert_equal "application/json", response.media_type
-    assert_equal [ %(<img src=x onerror="alert(1)">) ], response.parsed_body.dig(@page.id.to_s, "names")
+    assert_equal %(<img src=x onerror="alert(1)"> is here), response.parsed_body.dig(@page.id.to_s, "label")
   end
 
   # A PARTIAL scope: a branch grant on pages. Ids inside and outside it in

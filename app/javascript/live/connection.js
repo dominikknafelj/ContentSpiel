@@ -10,7 +10,9 @@ import { cable } from "@hotwired/turbo-rails"
 // shown (`Notes::RecordChannel`). Presence's
 // `controllers/admin/presence/record_controller.js` is its third user: one
 // stream per record whose people are shown (`Presence::Channel`), on which
-// it also sends (`perform`). All of them hear signals that say only THAT something
+// it also sends (`perform`), and its fourth is
+// `controllers/admin/presence/list_controller.js`, which listens to the
+// lists' one stream (`Presence::ListChannel`). All of them hear signals that say only THAT something
 // changed (a kind and ids) and fetch the part again themselves; nothing
 // here knows what a signal means.
 //
@@ -144,12 +146,6 @@ export function listen(params, listener) {
     up: { get: () => entry.up }, settled: { get: () => entry.settled }, rejected: { get: () => entry.rejected },
     perform: { value: perform }, suspend: { value: suspend }, resume: { value: resume }
   })
-}
-
-// Whether the socket is up, as far as the subscriptions know: one of them
-// is confirmed and has not dropped since.
-export function connected() {
-  return [ ...pool.values() ].some((entry) => entry.up)
 }
 
 // A socket the server closed for good (the session ended; someone has

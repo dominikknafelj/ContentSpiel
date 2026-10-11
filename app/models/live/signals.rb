@@ -12,13 +12,20 @@ module Live
   # carry text:
   #
   # - a `kind` is required;
-  # - a key is `kind`, `reason`, `origin`, `record`, or ends in `_id`;
+  # - a key is `kind`, `reason`, `origin`, or ends in `_id`;
   # - `kind` and `reason` are one short lowercase word (`WORD`): the fixed
   #   sets the callers use ("threads", "mention", "resolved") fit, a sentence
   #   does not;
   # - `origin` is the opaque id of a tab, in the shape `TAB` allows;
   # - a `*_id` is an Integer or nil;
-  # - `record` is `[kind name, id]`: a name `RecordKinds` knows and an Integer.
+  #
+  # NO `record` KEY. A signal on a stream that is not scope-checked per record
+  # (a list's site-wide stream is open to every signed-in person) may not name
+  # a record: whoever listens would learn that the record exists, and what it
+  # is, without the right to read it. Presence's list signal once carried
+  # `record: [kind, id]` and was withdrawn for exactly that; a list refetches
+  # through the read scope instead. A signal on a record's own stream needs no
+  # id of it: the stream is the record, and its subscription was scope-checked.
   #
   # A nil `origin` or `reason` is refused, not skipped: a caller leaves a key
   # out (`.compact`, as notes does) when it has nothing to say.
@@ -56,7 +63,7 @@ module Live
   module Signals
     TAB = /\A[a-z0-9-]{8,40}\z/
     WORD = /\A[a-z_]{1,32}\z/
-    KEYS = %i[kind reason origin].freeze # besides these, a key must end in _id or be :record
+    KEYS = %i[kind reason origin].freeze # besides these, a key must end in _id
 
     module_function
 
@@ -96,7 +103,6 @@ module Live
       case key.to_s
       when "kind", "reason" then word?(value)
       when "origin" then value.is_a?(String) && value.match?(TAB)
-      when "record" then record?(value)
       when /\A[a-z_]*_id\z/ then value.nil? || value.is_a?(Integer)
       else false
       end
@@ -104,10 +110,6 @@ module Live
 
     def word?(value) = (value.is_a?(String) || value.is_a?(Symbol)) && value.to_s.match?(WORD)
 
-    def record?(value)
-      value.is_a?(Array) && value.size == 2 && value[0].is_a?(String) && RecordKinds.named(value[0]) && value[1].is_a?(Integer)
-    end
-
-    private_class_method :checked, :allowed?, :word?, :record?
+    private_class_method :checked, :allowed?, :word?
   end
 end

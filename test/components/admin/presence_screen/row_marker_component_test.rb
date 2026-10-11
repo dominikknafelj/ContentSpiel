@@ -91,8 +91,8 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
   end
 
   test "the words: what the first drawing and the list's later answers both say" do
-    assert_equal({ count: 0, names: [], label: "" }, Admin::PresenceScreen::RowMarkerComponent.words(nil))
-    assert_equal({ count: 2, names: [ "reader", "Dana Weiss" ], label: "2 people here: reader, Dana Weiss" },
+    assert_equal({ count: 0, label: "" }, Admin::PresenceScreen::RowMarkerComponent.words(nil))
+    assert_equal({ count: 2, label: "2 people here: reader, Dana Weiss" },
       Admin::PresenceScreen::RowMarkerComponent.words(here(@reader, @dana)))
   end
 

@@ -28,15 +28,14 @@ module Admin
     end
 
     # What a list's markers show (`admin--presence--list` asks):
-    # `{ "<id>": { "count": 2, "names": ["Dana Weiss", "Jonas Lind"],
+    # `{ "<id>": { "count": 2,
     # "label": "2 people here: Dana Weiss, Jonas Lind" } }` for those of the
-    # ids the viewer may read and that have someone else here. `names` are
-    # the first five in order of arrival, and `count` says when there are
-    # more; `label` is the marker's one text, for a screen reader and the
+    # ids the viewer may read and that have someone else here. `label` names
+    # the first five in order of arrival and says how many more; it is the
+    # marker's one text, for a screen reader and the
     # tooltip alike (handoff 32), worded where the first drawing words it
     # (`Admin::PresenceScreen::RowMarkerComponent.words`), so the script
     # holds no wording and a marker reads the same before and after it.
-    # (`names` is what the label is made of; the script does not read it.)
     # A name is what a person typed: it is a JSON string here and text in
     # the page. An id the viewer may not read, a trashed one and one that
     # is not there are the same silence, and so is an unknown kind: `{}`.

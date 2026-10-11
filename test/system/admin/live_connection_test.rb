@@ -93,14 +93,14 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
     JS
     await_js("window.__told.length === 1", wait: 8)
     assert_equal 1, subscriptions("RecordChannel")
-    assert live("(live) => live.connected()"), "a confirmed subscription, and connected() says the socket is down"
+    assert_equal true, page.evaluate_script("window.__stop.up"), "a confirmed subscription is up"
 
     page.execute_script("window.__stop()")
     # Let go a task later (see the module's `pool`), so waited for.
     assert_eventually(message: "the subscription nobody listens to was kept") { subscriptions("RecordChannel").zero? }
     # The socket stays for whoever still listens: the page's own listener.
     assert_equal 1, subscriptions("PersonChannel")
-    assert live("(live) => live.connected()")
+    assert_equal true, live("(live, consumer) => consumer.connection.isActive()")
   end
 
   # On a subscription the test alone holds: the page's own listener is on the
@@ -122,7 +122,6 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
 
     assert_equal 0, live("(live, consumer) => consumer.subscriptions.subscriptions.length")
     assert_eventually(message: "the socket stayed open after close") { live("(live, consumer) => consumer.connection.isActive()") == false }
-    assert_not live("(live) => live.connected()")
     # Told, as when the socket drops: the test's listener, and the page's own,
     # which no longer says that every subscription is answered.
     assert_equal %w[connected disconnected], page.evaluate_script("window.__told")
@@ -154,7 +153,6 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
     assert_equal 1, subscriptions("RecordChannel")
     assert_equal true, live("(live, consumer) => consumer.connection.isActive()"), "the late stop closed the socket under the new listener"
     assert_equal true, page.evaluate_script("window.__stopAgain.up")
-    assert live("(live) => live.connected()")
   end
 
   test "a listener that arrives while the connection is closing keeps the socket, and is answered" do
@@ -280,6 +278,6 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
     await_frames
     assert_equal 0, subscriptions("Presence::Channel")
     assert_equal 1, subscriptions("PersonChannel")
-    assert live("(live) => live.connected()")
+    assert_equal true, live("(live, consumer) => consumer.connection.isActive()")
   end
 end

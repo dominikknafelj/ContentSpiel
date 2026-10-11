@@ -117,6 +117,11 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller*='presence--list']", count: 0
     assert_select "[data-presence-marker]", count: 0
     assert_not_includes entry_point_script, "presence/list"
+    # Nor the shared tooltip (`admin--ui--tooltip`), whose first users are
+    # presence's people and markers; an admin page below carries it.
+    assert_select "[data-controller~='admin--ui--tooltip']", count: 0
+    assert modulepreloads.none? { |href| href.include?("controllers/admin/ui/tooltip_controller") }
+    assert_not_includes entry_point_script, "ui/tooltip"
   end
 
   # The other half for the lists: the posts table and the page tree carry
@@ -131,6 +136,8 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "[data-controller*='presence--list'][data-controller='admin--presence--list'] tr#post_#{post.id} [data-presence-marker='post-#{post.id}']"
     assert modulepreloads.any? { |href| href.include?("controllers/admin/presence/list_controller") }
+    assert_select "tr#post_#{post.id} [data-presence-marker='post-#{post.id}'][data-controller~='admin--ui--tooltip']"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/ui/tooltip_controller") }
     get "/cs-studio/pages/#{root_page.id}"
     assert_select "turbo-frame#tree[data-controller~='admin--presence--list'] [data-presence-marker='page-#{root_page.id}']"
     get "/cs-studio/tags"

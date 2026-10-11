@@ -390,7 +390,7 @@ function jump(view, reply, count, t) {
 
 // The answer's own copy of the record's counts, in the place of the one
 // the view had: `admin--notes--drawer` reads a counts element as it connects.
-export function takeCounts(view, answer) {
+function takeCounts(view, answer) {
   const counts = answer.querySelector(":scope > [data-admin--notes--drawer-target~='counts']")
   const own = view.querySelector(":scope > [data-admin--notes--drawer-target~='counts']")
   if (counts && own) own.replaceWith(document.importNode(counts, true))
@@ -432,7 +432,7 @@ export function hold(root) {
 // Never left to fall to <body>: when nothing of the new markup is what had
 // the focus, the view takes it (or, for the list, what holds it: the
 // drawer).
-export function give(root, held) {
+function give(root, held) {
   if (!held || document.activeElement === held.element) return
 
   const message = held.message ? [ ...root.querySelectorAll("[data-note-message]") ].find((each) => each.dataset.noteMessage === held.message) : null
@@ -449,7 +449,7 @@ export function give(root, held) {
 }
 
 // Whether the focus is in a field of the view right now.
-export function typing(root) {
+function typing(root) {
   const active = document.activeElement
   return Boolean(active?.isConnected && root.contains(active) && active.matches("textarea, input:not([type=hidden]), select"))
 }
@@ -475,7 +475,7 @@ function reaction(message, emoji) {
 // the row at half opacity taking no pointer, every button `disabled`, the
 // add chip a disabled button in place of the <details>, and no control in
 // the meta line.
-export function takeReactions(message, twin, { disabled = false } = {}) {
+function takeReactions(message, twin, { disabled = false } = {}) {
   const row = twin.querySelector(":scope > [data-note-reactions]")
   const control = disabled ? null : twin.querySelector(":scope > div > details[data-reaction-add]")
   if (row && disabled) {

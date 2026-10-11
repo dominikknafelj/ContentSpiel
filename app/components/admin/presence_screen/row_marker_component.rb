@@ -53,18 +53,19 @@ module Admin
         end
       end
 
-      # `{ count:, names:, label: }` for a `Roster::Here` (nil: nobody).
-      # `names` through `PersonName.of`, as everywhere in presence and notes.
+      # `{ count:, label: }` for a `Roster::Here` (nil: nobody). The names in
+      # the label are made through `PersonName.of`, as everywhere in presence
+      # and notes.
       # `label` is the ONE text of a marker (handoff 32): a screen reader
       # hears it and the tooltip shows it, word for word.
       def self.words(here)
-        return { count: 0, names: [], label: "" } if here.nil? || here.count.zero?
+        return { count: 0, label: "" } if here.nil? || here.count.zero?
 
         names = here.users.map { |user| ::PersonName.of(user) }
         more = here.count - names.size
         list = names.join(I18n.t("#{WORDS}.separator"))
         list = I18n.t("#{WORDS}.and_more", names: list, count: more) if more.positive?
-        { count: here.count, names:, label: I18n.t("#{WORDS}.label", count: here.count, names: list) }
+        { count: here.count, label: I18n.t("#{WORDS}.label", count: here.count, names: list) }
       end
 
       def initialize(record:, viewer:, data: nil, joined: false, **)

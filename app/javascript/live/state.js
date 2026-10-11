@@ -19,7 +19,8 @@
 //
 // A THIRD KIND OF PART is an element of the page that holds a subscription
 // of its own and is not always there: presence's people in an editor's
-// header and in the media panel (`admin--presence--record`). Nobody on
+// header and in the media panel (`admin--presence--record`) and the lists'
+// (`admin--presence--list`, on the page tree and the posts table). Nobody on
 // <body> can speak for it, and a page without one must still be called
 // live, so such a part says how it stands ON ITS OWN ELEMENT:
 // `data-live-part="waiting"`, which the SERVER renders -- the part is
