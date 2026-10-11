@@ -99,7 +99,12 @@ export function listen(params, listener) {
   clearTimeout(entry.release)
   entry.listeners.add(listener)
 
+  // Idempotent: a second call does nothing (no second release, no second
+  // unsubscribe, and no dropping of a newer entry of the same key).
+  let stopped = false
   const stop = () => {
+    if (stopped) return
+    stopped = true
     entry.listeners.delete(listener)
     if (entry.listeners.size > 0) return
     entry.release = setTimeout(async () => {

@@ -103,6 +103,36 @@ class Admin::LiveConnectionSystemTest < ApplicationSystemTestCase
     assert_equal true, live("(live, consumer) => consumer.connection.isActive()")
   end
 
+  test "a stop called twice does nothing the second time: it neither unsubscribes again nor drops a newer subscription of the same key" do
+    record = { channel: "Notes::RecordChannel", type: "page", id: create_page(title: "Pricing").id.to_s }
+    await_notes_live
+    live(<<~JS, record)
+      (live, consumer, params) => {
+        window.__stop = live.listen(params, Object.assign(() => {}, { connected: () => {} }))
+      }
+    JS
+    await_js("window.__stop.up", wait: 8)
+    page.execute_script("window.__stop()")
+    assert_eventually(message: "the subscription nobody listens to was kept") { subscriptions("RecordChannel").zero? }
+
+    live(<<~JS, record)
+      (live, consumer, params) => {
+        window.__again = live.listen(params, Object.assign(() => {}, { connected: () => {} }))
+      }
+    JS
+    await_js("window.__again.up", wait: 8)
+    page.execute_script("window.__stop()")
+    page.evaluate_async_script("const done = arguments[arguments.length - 1]; setTimeout(() => setTimeout(done, 0), 0)")
+    await_frames
+
+    assert_equal true, page.evaluate_script("window.__again.up")
+    # The pool still knows the newer entry: a third listener shares it.
+    live(<<~JS, record)
+      (live, consumer, params) => { window.__third = live.listen(params, Object.assign(() => {}, { connected: () => {} })) }
+    JS
+    assert_equal 1, subscriptions("RecordChannel"), "the late second stop took the new entry out of the pool"
+  end
+
   # On a subscription the test alone holds: the page's own listener is on the
   # person's, and a `stop` that leaves another listener behind returns before
   # it has anything to let go.

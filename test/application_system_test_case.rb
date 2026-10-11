@@ -376,24 +376,34 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # even though they're modulepreloaded. A test that types right after
   # `visit` can race them -- before `admin--saving--autosave` is connected its
   # `input` events go nowhere. So this waits until every `admin--*`
-  # controller named on the page is connected -- and, on an editor, until the
-  # live region has caught up (`data-live-part` is "answered").
+  # controller named on the page is connected, and (on an editor) its live
+  # part has answered (`await_live_part`).
   #
   # Cuprite needs no further wait before typing: its key events go to the
   # page through CDP rather than through a WebDriver input queue, so there
   # is no separate "accepting native input" state to wait for (Selenium
   # needed an `await_native_input` handshake here, which is what flaked).
   def await_admin_controllers
+    await_controllers_connected
+    await_live_part
+  end
+
+  # An open editor catches up once when its subscription is confirmed
+  # (`admin--editing--live`): two reads, drawing only what differs, but the
+  # merge still reconciles the elements around what it keeps (attributes a
+  # test or a person has put on them). A test that touched the page before
+  # that would see it changed under it, so the wait is here, on its own, with
+  # its own message. A page with no editor has nothing to wait for.
+  def await_live_part(wait: 8)
+    await_js("(() => { const region = document.getElementById('editing'); return !region || !region.hasAttribute('data-live-part') || region.dataset.livePart === 'answered' })()", wait: wait)
+  end
+
+  def await_controllers_connected
     page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
       const ready = () => {
         const app = window.Stimulus
         if (!app) return false
-        // An open editor catches up once when its subscription is confirmed
-        // (`admin--editing--live`) and redraws what it fetched; a test that
-        // clicked before that would find its element replaced under it.
-        const live = document.getElementById("editing")
-        if (live?.hasAttribute("data-live-part") && live.getAttribute("data-live-part") !== "answered") return false
         return Array.from(document.querySelectorAll("[data-controller*='admin--']")).every((element) =>
           element.getAttribute("data-controller").split(" ").filter((name) => name.startsWith("admin--"))
             .every((name) => app.getControllerForElementAndIdentifier(element, name)))

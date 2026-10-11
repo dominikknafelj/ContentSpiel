@@ -5,7 +5,7 @@ import { TAB } from "live/connection"
 // THE TAB HEADER. The server reads `X-Notes-Tab` (the name it had when only
 // notes sent it) into `Current.editing_tab` for every CS Studio request: it
 // is the `origin` of a signal, so the tab that saved skips its own echo, and
-// it is who holds a reservation. A write sent without it is nobody's: it
+// it will be who holds a reservation (nothing reads it for that yet). A write sent without it is nobody's: it
 // claims nothing and its own tab would fetch what it has just drawn. Turbo's
 // requests get it here; the three hand-built ones (`admin--saving--autosave`,
 // `admin--editor--blocks`' reorder, `admin--pages--tree`'s move) add it
@@ -18,10 +18,11 @@ document.addEventListener("turbo:before-fetch-request", (event) => {
 })
 
 // A plain GET of one part. Not a Turbo request: the write queue neither
-// holds nor counts it, and nobody who listens to Turbo's events hears it.
-export async function get(url) {
+// holds nor counts it, and nobody who listens to Turbo's events hears it. It
+// gives up after `timeout` milliseconds (status 0, like any failure).
+export async function get(url, { timeout = 10000 } = {}) {
   try {
-    const response = await fetch(url, { headers: { Accept: "text/html", [TAB_HEADER]: TAB }, credentials: "same-origin" })
+    const response = await fetch(url, { headers: { Accept: "text/html", [TAB_HEADER]: TAB }, credentials: "same-origin", signal: AbortSignal.timeout(timeout) })
     if (response.redirected) return { status: 0, fragment: null, text: "" }
     const text = await response.text()
     const fragment = response.status === 200 ? new DOMParser().parseFromString(text, "text/html").body : null
@@ -35,7 +36,7 @@ export function headers() {
   return { "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content, [TAB_HEADER]: TAB, Accept: "text/vnd.turbo-stream.html, application/json" }
 }
 
-// A POST of a reservation's write. The CALLER puts it in the write queue.
+// A POST for the reservations to come (no caller yet). The CALLER puts it in the write queue.
 export async function post(url, params = {}, options = {}) {
   try {
     const response = await fetch(url, { method: "POST", headers: headers(), body: new URLSearchParams(params), credentials: "same-origin", ...options })

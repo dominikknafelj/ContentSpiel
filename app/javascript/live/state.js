@@ -26,7 +26,8 @@
 // `data-live-part="waiting"`, which the SERVER renders -- the part is
 // unanswered from the moment it is in the document, before its controller
 // has connected -- and `"answered"`, which its controller writes once its
-// subscription is confirmed or rejected. The answer here is read from the
+// subscription is confirmed or rejected (the editor's part, `admin--editing--live`,
+// also once its first catch-up read has been attempted). The answer here is read from the
 // document each time: no element, nothing to wait for; one that left the
 // page (a panel closed) no longer counts. Its controller calls `settle`
 // whenever its word changes, and when it connects and disconnects. What was

@@ -68,7 +68,8 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
   end
 
   # Counts every request to the editing GETs, passing each through. Installed
-  # for the page already open; `from_load: true` before the next load.
+  # for the page already open (`count_requests`) or before the next load
+  # (`count_requests_from_load`).
   COUNTER = <<~JS.freeze
     window.__seen = []
     const real = window.fetch
@@ -93,6 +94,41 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
   def blocks_requests = requests(%r{/editing/page/\d+/blocks(\?.*)?\z})
 
   def record_requests = requests(%r{/editing/page/\d+/record(\?.*)?\z})
+
+  # Holds the NEXT request of `method` whose URL matches `source` (a regexp's
+  # text): the real request is made at once, so what it reads is what the
+  # server holds NOW, and its answer reaches the page only at `release`
+  # (`window.__arrived[name]` says the server has answered). Every other
+  # request passes through untouched.
+  def hold_next(name, method, source)
+    page.execute_script(<<~JS, name, method, source)
+      const [ name, method, source ] = arguments
+      window.__release = window.__release || {}
+      window.__arrived = window.__arrived || {}
+      let spent = false
+      const real = window.fetch
+      window.fetch = function (input, init = {}) {
+        const url = typeof input === "string" ? input : input.url
+        const verb = String(init.method || input.method || "GET").toUpperCase()
+        if (!spent && verb === method && new RegExp(source).test(url)) {
+          spent = true
+          const answer = real.apply(this, arguments)
+          answer.then(() => { window.__arrived[name] = true })
+          return new Promise((resolve) => { window.__release[name] = () => answer.then(resolve) })
+        }
+        return real.apply(this, arguments)
+      }
+    JS
+  end
+
+  def held?(name) = page.evaluate_script("Boolean(window.__release && window.__release[#{name.to_json}])")
+
+  def release(name) = page.execute_script("window.__release[#{name.to_json}]()")
+
+  LIST_GET = '/editing/page/\\d+/blocks(\\?.*)?$'.freeze
+  BLOCK_GET = '/editing/page/\\d+/blocks/\\d+'.freeze
+
+  def live_controller_js = "window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--live')"
 
   def listen_merged = page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
 
@@ -142,20 +178,53 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     assert_no_selector "#toasts [role=status], #toasts [role=alert]"
   end
 
-  test "the mark goes after its time, and is gone at once with reduced motion" do
+  # The mark's life is recorded in the page (a MutationObserver stamps when it
+  # appeared, when the leaving class was set and when it was removed), so the
+  # test reads the times, not a screenshot of them.
+  def watch_mark
+    page.execute_script(<<~JS)
+      window.__mark = { added: null, leaving: null, removed: null }
+      const isMark = (node) => node.nodeType === 1 && (node.matches("[data-editing-mark]") || node.querySelector("[data-editing-mark]"))
+      new MutationObserver((records) => {
+        for (const record of records) {
+          const now = performance.now()
+          if (record.type === "attributes" && record.target.matches("[data-editing-mark].admin-editing-mark--leaving") && window.__mark.leaving === null) window.__mark.leaving = now
+          for (const node of record.addedNodes) if (isMark(node) && window.__mark.added === null) window.__mark.added = now
+          for (const node of record.removedNodes) if (node.nodeType === 1 && node.matches("[data-editing-mark]") && window.__mark.removed === null) window.__mark.removed = now
+        }
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: [ "class" ] })
+    JS
+  end
+
+  def mark_times = page.evaluate_script("window.__mark")
+
+  test "the mark stays for the notice and then fades over 200ms" do
     open_page
-    set_value("notice", 300)
+    set_value("notice", 900)
+    watch_mark
     dana_saves(@block, "Prices from May")
     assert_selector "#{card(@block)} [data-editing-mark]", text: "Updated by Dana Weiss", wait: LIVE
     assert_no_selector "[data-editing-mark]", wait: LIVE
 
+    times = mark_times
+    stay = times["leaving"] - times["added"]
+    fade = times["removed"] - times["leaving"]
+    assert_in_delta 900, stay, 450, "the mark stayed #{stay.round} ms, not the region's notice value"
+    assert_in_delta 200, fade, 150, "the mark faded over #{fade.round} ms, not 200"
+  end
+
+  test "with reduced motion the mark goes at once when its time is up, without fading" do
     page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
-    set_value("notice", 100)
-    listen_merged
-    dana_saves(@block, "Prices from June")
-    assert_selector "#{card(@block)} .ProseMirror", text: "Prices from June", wait: LIVE
+    open_page
+    set_value("notice", 900)
+    watch_mark
+    dana_saves(@block, "Prices from May")
+    assert_selector "#{card(@block)} [data-editing-mark]", wait: LIVE
     assert_no_selector "[data-editing-mark]", wait: LIVE
-    assert_no_selector ".admin-editing-mark--leaving", visible: :all
+
+    times = mark_times
+    assert_nil times["leaving"], "the mark faded although motion is reduced"
+    assert_in_delta 900, times["removed"] - times["added"], 450
   end
 
   test "my own save draws no mark and fetches nothing" do
@@ -167,6 +236,32 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
 
     assert_equal [], page.evaluate_script("window.__seen")
     assert_no_selector "[data-editing-mark]"
+  end
+
+  # Every write of an editor carries the tab header, or the server cannot say
+  # whose echo it is (`Current.editing_tab`): a reorder, which is a hand-built
+  # `fetch`, and a Turbo form, which gets it from `editing/requests`.
+  test "my own reorder and my own Turbo form fetch and draw nothing" do
+    second = add_block
+    third = add_block
+    open_page
+    count_requests
+    listen_merged
+
+    find("#{card(second)} button[aria-label='Block actions']").click
+    within(card(second)) { press "Move up" }
+    assert_writes_settled
+    assert_eventually(message: "the move was not saved") { server_order == [ second.id, @block.id, third.id ] }
+
+    find("#{card(third)} button[aria-label='Block actions']").click
+    within(card(third)) { press "Delete block…" }
+    within("dialog[open]") { press "Delete block" }
+    assert_no_selector card(third)
+    assert_writes_settled
+    await_frames
+
+    assert_equal [], page.evaluate_script("window.__seen"), "this tab fetched what it had written itself"
+    assert_equal [], page.evaluate_script("window.__merged"), "this tab drew what it had written itself"
   end
 
   test "the next save of a refreshed card is saved, not refused as stale" do
@@ -276,9 +371,8 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     dana_saves(@block, "First")
     dana_saves(@block, "Second")
     added = add_block(by: @dana)
-    # The document being hidden, there is nothing on the page to wait for: the
-    # signals are heard within the cable's round trip.
-    sleep 1 # sleep: nothing on a hidden page changes to wait on; shows that no request is made meanwhile
+    # Nothing on a hidden page changes to wait on but what it owes.
+    await_js("#{live_controller_js}.owed.has('blocks') && #{live_controller_js}.owed.has('record')", wait: LIVE)
     assert_equal [], page.evaluate_script("window.__seen")
 
     show_document
@@ -289,6 +383,7 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     await_frames
     assert_equal 1, blocks_requests.size
     assert_equal 1, record_requests.size
+    assert_equal [], requests(%r{/blocks/\d+}), "a block was fetched beside the list"
   end
 
   test "a confirmed subscription fetches the list and the record's form once" do
@@ -313,7 +408,27 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     await_js("document.body.dataset.notesLive === 'connected'", wait: LIVE)
   end
 
-  test "a structure signal that arrives during a drag is drawn after the drop, with the dropped block where it was dropped" do
+  test "a catch-up after a reconnect leaves a card that did not change as it is, with its menu open, and draws one that did" do
+    second = add_block
+    open_page
+    find("#{card(@block)} button[aria-label='Block actions']").click
+    assert_selector "#{card(@block)} [role=menu]"
+    page.execute_script("window.__card = document.querySelector(#{card(@block).to_json}); window.__other = document.querySelector(#{card(second).to_json})")
+    page.execute_script("import('@hotwired/turbo-rails').then((turbo) => turbo.cable.getConsumer()).then((consumer) => { window.__consumer = consumer })")
+    await_js("Boolean(window.__consumer)")
+    page.execute_script("window.__consumer.connection.close()")
+    await_js("document.body.dataset.notesLive !== 'connected'", wait: LIVE)
+    dana_saves(second, "While you were away")
+    page.execute_script("window.__consumer.connection.open()")
+
+    assert_selector "#{card(second)} .ProseMirror", text: "While you were away", wait: LIVE
+    await_js("document.body.dataset.notesLive === 'connected'", wait: LIVE)
+    assert_equal true, page.evaluate_script("window.__card === document.querySelector(#{card(@block).to_json})"), "a card that did not change was replaced by the catch-up"
+    assert_selector "#{card(@block)} [role=menu]"
+    assert_equal false, page.evaluate_script("window.__other === document.querySelector(#{card(second).to_json})")
+  end
+
+  test "a drop made while a colleague changed the list is refused as stale and the list is redrawn, and nothing was drawn during the drag" do
     second = add_block
     third = add_block
     open_page
@@ -378,12 +493,35 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     assert_equal [ second.id, @block.id, third.id ], server_order
   end
 
-  test "a page trashed under me says so and offers the way back" do
+  test "a page trashed under me says so and offers the way back, and the part has answered" do
     open_page
     as(@dana, channel: :admin) { assert Trash::Move.call(@page.reload).ok? }
 
     assert_selector "#editor-notice [data-editing-missing]", wait: LIVE
     assert_selector "#editor-notice a[href='#{admin_pages_path}']", text: "Back to pages"
+    assert_equal "answered", page.evaluate_script("document.getElementById('editing').dataset.livePart")
+  end
+
+  test "the missing bar is appended: a Changed elsewhere bar already in the notice area stays" do
+    open_page
+    page.execute_script("document.getElementById('editor-notice').innerHTML = '<div id=\\'changed-elsewhere\\' role=\\'alert\\'>Changed elsewhere</div>'")
+    as(@dana, channel: :admin) { assert Trash::Move.call(@page.reload).ok? }
+
+    assert_selector "#editor-notice [data-editing-missing]", wait: LIVE
+    assert_selector "#editor-notice #changed-elsewhere"
+  end
+
+  test "a subscription that is rejected fetches the record once, and its 404 says the page is gone" do
+    open_page
+    page.execute_script("import('@hotwired/turbo-rails').then((turbo) => turbo.cable.getConsumer()).then((consumer) => { window.__consumer = consumer })")
+    await_js("Boolean(window.__consumer)")
+    page.execute_script("window.__consumer.connection.close()")
+    await_js("document.body.dataset.notesLive !== 'connected'", wait: LIVE)
+    # Trashed with nobody told: only the refused subscription can say so.
+    as_unheard(@dana) { assert Trash::Move.call(@page.reload).ok? }
+    page.execute_script("window.__consumer.connection.open()")
+
+    assert_selector "#editor-notice [data-editing-missing]", wait: LIVE
   end
 
   test "a refreshed card keeps the count on its notes marker" do
@@ -410,5 +548,231 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     await_frames
 
     assert_equal 0, page.evaluate_script("window.__turbo")
+  end
+
+  # --- one line of reads ---------------------------------------------------------
+
+  test "a slow list answer and a newer block answer end with the newest content and the newest base on screen" do
+    open_page
+    hold_next("list", "GET", LIST_GET)
+    added = add_block(by: @dana)
+    await_js("window.__arrived && window.__arrived.list", wait: LIVE)
+    # The list was READ before this save; a block answer for it follows the list's, never precedes it.
+    dana_saves(@block, "Prices from May")
+    # The save has been heard: its read waits for the list's answer (one line of reads) -- or, where reads do not wait, is already drawn.
+    await_js("#{live_controller_js}.pending.has('block:#{@block.id}') || document.querySelector(#{card(@block).to_json}).textContent.includes('Prices from May')", wait: LIVE)
+    await_frames
+    release("list")
+
+    assert_selector "#{card(@block)} .ProseMirror", text: "Prices from May", wait: LIVE
+    assert_includes list_order, added.id
+    type_in(@block, " and June")
+    assert_writes_settled
+    assert_no_selector "#changed-elsewhere"
+    assert_eventually(message: "the block does not hold both texts") { ContentBlock.find(@block.id).body.to_json.then { |text| text.include?("Prices from May") && text.include?("and June") } }
+  end
+
+  test "a slow block answer and a newer list answer end with the newest content and the newest list" do
+    open_page
+    hold_next("block", "GET", BLOCK_GET)
+    dana_saves(@block, "First")
+    await_js("window.__arrived && window.__arrived.block", wait: LIVE)
+    dana_saves(@block, "Second")
+    added = add_block(by: @dana)
+    await_js("#{live_controller_js}.pending.size > 0 || document.querySelector(#{card(@block).to_json}).textContent.includes('Second')", wait: LIVE)
+    await_frames
+    release("block")
+
+    assert_selector "#{card(@block)} .ProseMirror", text: "Second", wait: LIVE
+    assert_no_selector "#{card(@block)} .ProseMirror", text: "First"
+    assert_list_current
+    assert_includes list_order, added.id
+    type_in(@block, " and mine")
+    assert_writes_settled
+    assert_no_selector "#changed-elsewhere"
+  end
+
+  # --- what is owed during a move is paid ----------------------------------------
+
+  test "what a colleague saved during a drag is drawn after an accepted drop" do
+    second = add_block
+    third = add_block
+    open_page
+    page.execute_script("document.querySelector(arguments[0]).scrollIntoView({ block: 'center' })", card(second))
+    centre = lambda do |selector|
+      page.evaluate_script("(() => { const r = document.querySelector(arguments[0]).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2] })()", selector)
+    end
+    from_x, from_y = centre.call("#{card(@block)} .admin-block-card__handle")
+    _, second_y = centre.call("#{card(second)} .admin-block-card__handle")
+    _, third_y = centre.call("#{card(third)} .admin-block-card__handle")
+
+    mouse = drag_pointer(from_x, from_y, (second_y + third_y) / 2)
+    assert_selector "body > .admin-drag-fallback"
+    dana_saves(third, "Saved during your drag")
+    await_js("#{live_controller_js}.owed.has('block:#{third.id}')", wait: LIVE)
+    await_frames
+    assert_no_selector "#{card(third)} .ProseMirror", text: "Saved during your drag"
+    await_drag_slot_after(second)
+    mouse.up
+
+    assert_writes_settled
+    assert_selector "#{card(third)} .ProseMirror", text: "Saved during your drag", wait: LIVE
+    assert_equal [ second.id, @block.id, third.id ], server_order
+  end
+
+  test "a keyboard pick-up that is put back says so: what was owed is drawn then, and not before" do
+    open_page
+    handle = "#{card(@block)} .admin-block-card__handle"
+    find(handle).send_keys(:space)
+    await_js("#{live_controller_js}.moving === true", wait: LIVE)
+    added = add_block(by: @dana)
+    await_js("#{live_controller_js}.owed.has('blocks')", wait: LIVE)
+    await_frames
+    assert_no_selector card(added)
+
+    find(handle).send_keys(:escape)
+    assert_selector card(added), wait: LIVE
+    assert_equal false, page.evaluate_script("#{live_controller_js}.moving")
+  end
+
+  test "a pick-up made before an earlier move was answered keeps the list from being redrawn under it" do
+    second = add_block
+    third = add_block
+    open_page
+    hold_next("move", "PATCH", "/reorder")
+    find("#{card(@block)} button[aria-label='Block actions']").click
+    within(card(@block)) { press "Move down" }
+    await_js("window.__release && window.__release.move", wait: LIVE)
+
+    find("#{card(third)} .admin-block-card__handle").send_keys(:space)
+    added = add_block(by: @dana)
+    await_js("#{live_controller_js}.owed.has('blocks')", wait: LIVE)
+    release("move")
+    assert_writes_settled
+    await_frames
+    # The first move is answered; the pick-up is still in the person's hand.
+    assert_equal true, page.evaluate_script("#{live_controller_js}.moving")
+    assert_no_selector card(added)
+
+    find("#{card(third)} .admin-block-card__handle").send_keys(:escape)
+    assert_selector card(added), wait: LIVE
+    assert_list_current
+  end
+
+  # --- a block someone else moved while I have unsent text in it -----------------
+
+  test "a block moved into a section while I have unsent text stays, and takes its place once, after my save" do
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    open_page
+    type_unsent(@block, "My draft")
+    count_requests
+    listen_merged
+    as(@dana, channel: :admin) do
+      assert ContentBlocks::Reorder.call(@page.reload, [ @block.id ], section: section.id, column: 1, moved_from: { @block.id => { section_id: "", column: "" } }).ok?
+    end
+    await_js("window.__merged.length > 0", wait: LIVE)
+    await_frames
+
+    assert_selector "#content-blocks-list > #{card(@block)}"
+    assert_selector "#{card(@block)} .ProseMirror", text: "My draft"
+    assert_equal 1, blocks_requests.size
+    # Unsaved still: the in-page check costs no request.
+    sleep 1.3 # sleep: the moved-block check runs once a second; shows it asks for nothing while the text is unsaved
+    assert_equal 1, blocks_requests.size
+
+    page.execute_script(<<~JS)
+      const form = document.querySelector(#{"#{card(@block)} form[data-controller~='admin--saving--autosave']".to_json})
+      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--saving--autosave").trigger()
+    JS
+    assert_no_selector "#content-blocks-list > #{card(@block)}", wait: LIVE
+    assert_eventually(message: "the saved text was lost") { ContentBlock.find(@block.id).body.to_json.include?("My draft") }
+    await_frames
+    assert_equal 2, blocks_requests.size, "the list was fetched #{blocks_requests.size} times, not once more"
+  end
+
+  # --- what is open is not taken from under the person ---------------------------
+
+  test "a card with the rich-text dialog open for it is kept while it is open, and refreshed when it closes" do
+    open_page
+    page.execute_script("window.__card = document.querySelector(#{card(@block).to_json})")
+    listen_merged
+    page.execute_script(<<~JS)
+      const opener = document.querySelector(#{"#{card(@block)} [data-controller~='admin--rich-text--editor']".to_json})
+      window.dispatchEvent(new CustomEvent("rich-text-dialog:open", { detail: { kind: "youtube", opener } }))
+    JS
+    assert_selector "dialog#rich-text-youtube-dialog[open]"
+
+    dana_saves(@block, "Theirs")
+    await_js("window.__merged.length > 0", wait: LIVE)
+    await_frames
+    assert_equal true, page.evaluate_script("window.__card === document.querySelector(#{card(@block).to_json})"), "the card was replaced under an open dialog"
+
+    page.execute_script("document.getElementById('rich-text-youtube-dialog').close()")
+    assert_selector "#{card(@block)} .ProseMirror", text: "Theirs", wait: LIVE
+    assert_equal false, page.evaluate_script("window.__card === document.querySelector(#{card(@block).to_json})")
+  end
+
+  test "a card whose menu is open is kept while it is open, and refreshed when it closes" do
+    open_page
+    find("#{card(@block)} button[aria-label='Block actions']").click
+    assert_selector "#{card(@block)} [role=menu]"
+    page.execute_script("window.__card = document.querySelector(#{card(@block).to_json})")
+    listen_merged
+
+    dana_saves(@block, "Theirs")
+    await_js("window.__merged.length > 0", wait: LIVE)
+    await_frames
+    assert_equal true, page.evaluate_script("window.__card === document.querySelector(#{card(@block).to_json})"), "the card was replaced under its open menu"
+    assert_selector "#{card(@block)} [role=menu]"
+
+    find("#{card(@block)} button[aria-label='Block actions']").click
+    assert_selector "#{card(@block)} .ProseMirror", text: "Theirs", wait: LIVE
+  end
+
+  # --- a read that does not come back --------------------------------------------
+
+  # Shortens the script's own waits on the next load, before its controller
+  # connects, and fails or hangs the first read of `source`.
+  def with_unreliable_reads(mode, source)
+    script = <<~JS
+      new MutationObserver((_, observer) => {
+        const region = document.getElementById("editing")
+        if (!region) return
+        region.setAttribute("data-admin--editing--live-timeout-value", "500")
+        region.setAttribute("data-admin--editing--live-retry-value", "200")
+        observer.disconnect()
+      }).observe(document, { childList: true, subtree: true })
+      window.__seen = []
+      let spent = false
+      const real = window.fetch
+      window.fetch = function (input, init = {}) {
+        const url = typeof input === "string" ? input : input.url
+        if (url.includes("/cs-studio/editing/")) window.__seen.push(url)
+        if (!spent && new RegExp(#{source.to_json}).test(url)) {
+          spent = true
+          if (#{mode.to_json} === "fail") return Promise.reject(new TypeError("offline"))
+          return new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(new DOMException("timed out", "TimeoutError"))))
+        }
+        return real.apply(this, arguments)
+      }
+    JS
+    id = page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument", source: script)["identifier"]
+    yield
+  ensure
+    page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: id) if id
+  end
+
+  test "a read that fails is asked again, and the part has answered meanwhile" do
+    with_unreliable_reads("fail", "/editing/page/\\d+/record") do
+      open_page
+      assert_eventually(wait: LIVE, message: "the failed read was never asked again") { record_requests.size >= 2 }
+    end
+  end
+
+  test "a read that never comes back times out, the part answers, and it is asked again" do
+    with_unreliable_reads("hang", "/editing/page/\\d+/blocks(\\?.*)?$") do
+      open_page
+      assert_eventually(wait: LIVE, message: "the timed out read was never asked again") { blocks_requests.size >= 2 }
+    end
   end
 end

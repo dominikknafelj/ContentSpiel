@@ -165,6 +165,9 @@ export default class extends Controller {
   laneTargetDisconnected(lane) {
     if (lane.isConnected) return
 
+    // A lane destroyed under a drag that began in it: SortableJS calls no
+    // `onEnd` for `destroy()`, so the hold is let go here.
+    if (this.dragging && Sortable.active?.el === lane) { this.dragging = false; this.sayMoving() }
     this.laneSortables.get(lane)?.destroy()
     this.laneSortables.delete(lane)
   }
@@ -280,11 +283,15 @@ export default class extends Controller {
       // `event.from` is that container, and the item's parent the one it is
       // in now.
       onStart: () => {
-        this.sayMoving(true)
+        this.dragging = true
+        this.sayMoving()
         this.makeCloneInert()
         this.dragSnapshot = this.snapshot()
       },
-      onEnd: (event) => this.move(event.item, event.from, this.dragSnapshot)
+      onEnd: (event) => {
+        this.dragging = false
+        return this.move(event.item, event.from, this.dragSnapshot)
+      }
     }
   }
 
@@ -338,6 +345,10 @@ export default class extends Controller {
     this.element.removeEventListener("turbo:submit-end", this.duplicated)
     clearTimeout(this.copyTimer)
     this.moveStateObserver.disconnect()
+    this.dragging = false
+    this.picked = null
+    this.moveHolds = 0
+    this.sayMoving()
     this.sortable?.destroy()
     // The lanes are told to go after this (`laneTargetDisconnected`), which
     // would keep the Sortable of one that is still in a document.
@@ -620,18 +631,31 @@ export default class extends Controller {
   // Turbo form). The page's own reorder draws a status line and a toast, and
   // releases its turn at once as before.
   async move(item, from, before = null, { focus = false } = {}) {
-    // Live refresh (`admin--editing--live`) does not draw the list while a
-    // block is held by a drag or the keyboard, nor before the move's answer
-    // has been drawn: `moving: false` is said when this resolves, on every
-    // path out (an early return included).
+    // Whether a block is in someone's hand is `sayMoving`'s to judge, and it
+    // is judged again on every path out of here (an early return included).
     try {
       await this.moveBlock(item, from, before, { focus })
     } finally {
-      this.sayMoving(false)
+      this.sayMoving()
     }
   }
 
-  sayMoving(moving) {
+  // LIVE REFRESH (`admin--editing--live`) does not draw the list while a block
+  // is in someone's hand or its move has not been answered and drawn. That is
+  // not an edge to relay but a state to judge, because holds overlap (a
+  // second drag begins before the first move is answered): true while ANY of
+  // a drag (`dragging`), a keyboard pick-up (`picked`) or a move in the queue
+  // (`moveHolds`, counted in `queueMove`) is open, false only when none is;
+  // the event is sent when the answer changes. Every place one of the three
+  // ends calls this: `onEnd`, `clearPicked`, `move`'s end, the end of a
+  // queued move, a lane destroyed under a drag (SortableJS does not call
+  // `onEnd` for `destroy()`), `disconnect`.
+  sayMoving() {
+    // A card picked up and then taken out of the document by a redraw is not in anyone's hand.
+    if (this.picked && !this.picked.isConnected) this.picked = null
+    const moving = Boolean(this.dragging || this.picked || this.moveHolds > 0)
+    if (moving === Boolean(this.saidMoving)) return
+    this.saidMoving = moving
     this.dispatch("moving", { detail: { moving } })
   }
 
@@ -692,8 +716,10 @@ export default class extends Controller {
   // and nothing is swallowed: an error is reported where the system tests'
   // collector and a developer's console see it.
   queueMove(move) {
+    this.moveHolds = (this.moveHolds || 0) + 1
     return enqueue((isCurrent) => this.sendMove(move, isCurrent), { generation: this.generation })
       .catch((error) => console.error(error))
+      .finally(() => { this.moveHolds -= 1; this.sayMoving() })
   }
 
   // One move's turn in the queue, and its bookkeeping: unless the move has
@@ -1040,8 +1066,8 @@ export default class extends Controller {
 
   pickUp(card) {
     if (this.picked && this.picked !== card) this.cancel(this.picked, { refocus: false })
-    this.sayMoving(true)
     this.picked = card
+    this.sayMoving()
     this.originNext = card.nextElementSibling
     this.orderBeforePick = this.itemsOf(this.listTarget)
     card.dataset.picked = "true"
@@ -1066,7 +1092,8 @@ export default class extends Controller {
   }
 
   drop(card) {
-    this.clearPicked(card)
+    // Not said yet: the move that follows holds on (no false in between).
+    this.clearPicked(card, { say: false })
     this.announce(`Dropped ${this.titleOf(card)}. ${this.positionOf(card)}`)
     return this.reorder(this.orderBeforePick)
   }
@@ -1088,13 +1115,13 @@ export default class extends Controller {
     this.clearPicked(card)
     if (refocus) this.focusHandle(card)
     this.announce(`Cancelled. ${this.titleOf(card)} is back where it was.`)
-    this.sayMoving(false)
   }
 
-  clearPicked(card) {
+  clearPicked(card, { say = true } = {}) {
     delete card.dataset.picked
     card.classList.remove("admin-drag-chosen")
     this.picked = null
+    if (say) this.sayMoving()
   }
 
   focusHandle(card) {
