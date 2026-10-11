@@ -35,10 +35,11 @@ export function createSuggestions({ url, params = () => ({}), getQuery, onRows, 
   let timer = null
   let aborter = null
   let sequence = 0
-  const state = { inFlight: false }
+  const state = { inFlight: false, pending: false }
 
   async function fetchNow() {
     clearTimeout(timer)
+    state.pending = false
     aborter?.abort()
     aborter = new AbortController()
     const mine = ++sequence
@@ -70,19 +71,24 @@ export function createSuggestions({ url, params = () => ({}), getQuery, onRows, 
 
   return {
     get inFlight() { return state.inFlight },
+    // The debounce timer is running: a search is scheduled and not yet sent.
+    get pending() { return state.pending },
     fetchNow,
     schedule() {
       clearTimeout(timer)
+      state.pending = true
       timer = setTimeout(fetchNow, delay)
     },
     // Only the debounce timer: a request already on its way still answers
     // (and is dropped if the text has moved on).
     unschedule() {
       clearTimeout(timer)
+      state.pending = false
     },
     // Whatever is pending or in flight is void: it will not answer.
     cancel() {
       clearTimeout(timer)
+      state.pending = false
       aborter?.abort()
       sequence += 1
       state.inFlight = false

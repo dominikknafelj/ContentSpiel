@@ -228,6 +228,41 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     assert_selector "#post-tag_names[aria-expanded='false']"
   end
 
+  test "Escape before the debounce has fired cancels the search, and no list opens" do
+    open_editor
+    page.execute_script(<<~JS)
+      window.__searches = 0
+      window.__timerPassed = false
+      const real = window.fetch
+      // Only the tag search is counted; the editor's live parts (presence, notes) fetch too and take the real one.
+      window.fetch = (input, init) => {
+        if (new URL(input.url || input, location.origin).searchParams.has("q")) window.__searches++
+        return real(input, init)
+      }
+      // Timers run in order, so this one fires after the 150 ms debounce would have.
+      setTimeout(() => { window.__timerPassed = true }, 600)
+    JS
+
+    tag_field.send_keys("l", :escape) # one command: the Escape lands well inside the 150 ms debounce
+    await_js("window.__timerPassed === true", wait: 5)
+
+    assert_equal 0, page.evaluate_script("window.__searches")
+    assert_selector "#post-tag_names[aria-expanded='false']"
+  end
+
+  test "Escape in an idle field is not consumed, so it can still close what the field is in" do
+    open_editor
+    page.execute_script(<<~JS)
+      window.__escape = null
+      document.addEventListener("keydown", (event) => { if (event.key === "Escape") window.__escape = { prevented: event.defaultPrevented } })
+    JS
+
+    tag_field.send_keys(:escape)
+
+    assert_eventually { page.evaluate_script("window.__escape !== null") }
+    assert_equal false, page.evaluate_script("window.__escape.prevented")
+  end
+
   test "the post itself is not offered as a related post" do
     create_post(title: "Chips sibling")
     open_editor

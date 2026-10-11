@@ -23,7 +23,7 @@ import { messages } from "i18n/messages"
 // Keyboard: ArrowDown opens the list / moves down, ArrowUp moves up, Enter
 // picks the highlighted suggestion (or, where `create` is on, commits the
 // typed text), a comma commits the typed text (`create` only), Escape closes
-// the list, Backspace in an empty field removes the last chip, ArrowLeft at
+// the list and cancels a search not yet sent or still on its way, Backspace in an empty field removes the last chip, ArrowLeft at
 // the start of the field moves onto the last chip's remove button, and
 // from there ArrowLeft/ArrowRight walk the chips (ArrowRight past the last
 // returns to the field) and Backspace/Delete/Enter/Space remove one. After a
@@ -244,9 +244,13 @@ export default class extends Controller {
         if (this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query), typed: true })
         break
       case "Escape":
-        // Also while a search is still on its way: it is cancelled, and
-        // won't reopen the list when it answers.
-        if (this.listboxTarget.hidden && !this.suggestions.inFlight) return
+        // Also while a search has not been sent yet (inside its 150 ms
+        // debounce) or is on its way: it is cancelled (`close`), and won't open
+        // the list the person just dismissed. Either counts as something this
+        // Escape dealt with, so it is consumed like a close of the open list;
+        // with nothing open, pending or in flight it falls through untouched
+        // (it may close a dialog the field is in).
+        if (this.listboxTarget.hidden && !this.suggestions.inFlight && !this.suggestions.pending) return
         event.preventDefault()
         event.stopPropagation()
         this.close()
