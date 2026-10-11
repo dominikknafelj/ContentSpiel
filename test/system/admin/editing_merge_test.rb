@@ -155,6 +155,59 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     assert_equal [], ids
   end
 
+  test "after a catch-up a panel's heading names the column the block is in now, although only its place changed" do
+    colleague do
+      assert ContentBlocks::Reorder.call(@page.reload, [ @inside.id ], section: @section.id, column: 2, moved_from: { @inside.id => { section_id: @section.id, column: 1 } }).ok?
+    end
+
+    merge_list(only_changed: true)
+
+    assert_match(/column 2/i, page.evaluate_script("document.getElementById('block-#{@inside.id}-panel').textContent"))
+  end
+
+  test "a clean element of the same version under a level the answer lacks is removed with it, never marked gone" do
+    result = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      window.__merge.then((merge) => {
+        const root = document.createElement("div")
+        root.innerHTML = '<div id="outer"><div id="inner"><div id="x" data-editing-unit data-editing-subject="block-9" data-editing-version="1"></div></div></div>'
+        document.body.append(root)
+        const fresh = document.createElement("div")
+        fresh.innerHTML = '<div id="inner"><div id="x" data-editing-unit data-editing-subject="block-9" data-editing-version="1"></div></div>'
+        const x = root.querySelector("#x")
+        const out = merge.mergeList(root, fresh, { unsaved: () => false, onlyChanged: true })
+        done({ gone: out.gone.length, marked: x.hasAttribute("data-editing-gone"), connected: x.isConnected })
+        root.remove()
+      })
+    JS
+
+    assert_equal 0, result["gone"]
+    assert_equal false, result["marked"]
+  end
+
+  test "a part the caller holds is left as it is, and the part is not marked gone" do
+    result = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      window.__merge.then((merge) => {
+        const root = document.createElement("div")
+        root.innerHTML = '<div id="t" data-editing-part data-editing-subject="block-9" data-editing-version="1"><span id="menu">open</span></div>'
+        document.body.append(root)
+        const fresh = document.createElement("div")
+        fresh.innerHTML = '<div id="t" data-editing-part data-editing-subject="block-9" data-editing-version="2"><span id="menu">new</span></div>'
+        const tile = root.querySelector("#t")
+        const held = merge.mergeList(root, fresh.cloneNode(true), { unsaved: () => false, hold: () => true })
+        const same = root.querySelector("#t") === tile
+        merge.mergeList(root, fresh, { unsaved: () => false })
+        done({ same, replacedAfter: root.querySelector("#t") !== tile, kept: held.kept.length })
+        root.remove()
+      })
+    JS
+
+    assert_equal true, result["same"]
+    assert_equal true, result["replacedAfter"]
+    assert_equal 1, result["kept"]
+  end
+
   test "without the option every clean card is replaced, as before" do
     page.execute_script("window.__a = document.querySelector(#{card(@first).to_json})")
 

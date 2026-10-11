@@ -48,6 +48,9 @@ module Editing
   # leaves a clean unit alone when the answer's version is the same. EVERY
   # version is written through this method, so that what else a unit's look
   # depends on (a reservation's state, later) is added in one place.
+  # It does NOT cover what a unit shows of other records or of the viewer
+  # (their rights, a library image's file, a tag's name, an ancestor's slug):
+  # a catch-up leaves those as they are until the next signal or a reload.
   def self.version(subject)
     stamp = subject.is_a?(Page) ? subject.settings_changed_at : subject.updated_at
     stamp && (stamp.to_r * 1_000_000).to_i.to_s

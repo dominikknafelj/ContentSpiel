@@ -120,17 +120,20 @@ export function holds(unit, unsaved) {
   return forms.some((form) => unsaved(form))
 }
 
-export function mergeList(list, fresh, { unsaved, onlyChanged = false }) {
+export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = null }) {
   const keep = new Set([ ...list.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
   const moved = displace(list, fresh, keep)
   const same = onlyChanged ? unchanged(list, fresh, keep, { containers: true }) : []
+  // Parts the caller holds (`hold`: a tile whose menu or dialog is open) stay
+  // as they are, like `same` ones: left in place, never marked gone.
+  const held = hold ? [ ...list.querySelectorAll("[data-editing-part]") ].filter((part) => !keep.has(part) && reachable(part, list) && hold(part)) : []
   const gone = []
   withState(list, () => {
-    reconcile(list, [ ...fresh.children ], new Set([ ...keep, ...same ]), new Set(moved), gone)
+    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone, new Set([ ...same, ...held ]))
     for (const unit of keep) if (!gone.includes(unit)) unit.removeAttribute("data-editing-gone")
     for (const unit of keep) if (unit.matches(PANEL) && unit.hidden && !tileOf(list, unit)) unit.hidden = false
   })
-  return { kept: [ ...keep ], gone, moved, same }
+  return { kept: [ ...keep, ...held ], gone, moved, same }
 }
 
 // Whether every ancestor of `element` up to `root` has an id: the merge
@@ -162,7 +165,7 @@ function unchanged(root, fresh, keep, { containers }) {
 // the list); so is a part that holds a kept unit, which cannot be replaced
 // without taking the unit away and is not (the list merge reconciles around
 // it).
-export function mergeUnits(root, fresh, { unsaved, onlyChanged = false }) {
+export function mergeUnits(root, fresh, { unsaved, onlyChanged = false, hold = null }) {
   const result = { replaced: [], kept: [], missing: false, moved: [], same: [] }
   withState(root, () => {
     const keep = new Set([ ...root.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
@@ -171,6 +174,7 @@ export function mergeUnits(root, fresh, { unsaved, onlyChanged = false }) {
       const live = twin.id ? document.getElementById(twin.id) : null
       if (!live || !root.contains(live) || live === root || live.matches(UNIT) !== twin.matches(UNIT)) { result.missing = true; continue }
       if (keep.has(live)) { result.kept.push(live); continue }
+      if (!live.matches(UNIT) && hold?.(live)) { result.kept.push(live); continue }
       if (onlyChanged && live.dataset.editingVersion && live.dataset.editingVersion === twin.dataset.editingVersion) { result.same.push(live); continue }
       // A notice the person has not dealt with ("Changed elsewhere", lost
       // work) is theirs to dismiss: a part that shows one is not replaced.
@@ -238,7 +242,7 @@ export function anchored(root, draw) {
   return result
 }
 
-const carries = (element, keep) => keep.has(element) || [ ...keep ].some((unit) => element.contains(unit))
+const carries = (element, keep, extra) => [ keep, extra ].some((set) => set.has(element) || [ ...set ].some((unit) => element.contains(unit)))
 
 const tileOf = (root, panel) => root.querySelector(`[data-editing-part][data-block-id="${panel.dataset.blockId}"]`)
 
@@ -266,7 +270,11 @@ function displace(root, fresh, keep, { containers = true } = {}) {
 }
 
 // Makes `container`'s children those of `fresh`, in that order, around what stays.
-function reconcile(container, fresh, keep, moved, gone) {
+// `keep` are the units that hold unsaved text: only those can be gone. `extra`
+// are what stays for another reason (same version, held by the caller): a clean
+// element is never marked gone, an answer that lacks its level removes it only
+// through its ancestors being removed.
+function reconcile(container, fresh, keep, moved, gone, extra = new Set()) {
   const wanted = new Set(fresh.map((each) => each.id).filter(Boolean))
   // What stays although the answer has no such element, each with the id of
   // the nearest sibling before it that the answer does have (null: first).
@@ -274,7 +282,9 @@ function reconcile(container, fresh, keep, moved, gone) {
   let anchor = null
   for (const child of [ ...container.children ]) {
     const survives = Boolean(child.id) && wanted.has(child.id)
-    if (!carries(child, keep)) {
+    // Gone from the answer, and nothing in it holds unsaved text: removed,
+    // although a clean element of `extra` is in it.
+    if (!carries(child, keep, extra) || (!survives && !carries(child, keep, new Set()))) {
       child.remove()
       if (survives) anchor = child.id
     } else if (survives) {
@@ -290,9 +300,9 @@ function reconcile(container, fresh, keep, moved, gone) {
   const order = stays.filter((stay) => stay.anchor === null).map((stay) => stay.element)
   for (const twin of fresh) {
     const live = twin.id ? [ ...container.children ].find((child) => child.id === twin.id) : null
-    if (live && !keep.has(live)) {
+    if (live && !keep.has(live) && !extra.has(live)) {
       syncAttributes(live, twin)
-      reconcile(live, [ ...twin.children ], keep, moved, gone)
+      reconcile(live, [ ...twin.children ], keep, moved, gone, extra)
     }
     order.push(live || twin)
     if (twin.id) for (const stay of stays) if (stay.anchor === twin.id) order.push(stay.element)

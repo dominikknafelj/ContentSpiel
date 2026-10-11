@@ -26,8 +26,9 @@ import { anchored, holds, mergeList, mergeUnits } from "editing/merge"
 // next save of that card would be refused.
 //
 // AN ANSWER IS DRAWN ONLY IF IT IS THE NEWEST THING THIS TAB KNOWS:
-// - not if something newer was asked for that content while it was on its
-//   way (its part, or the list for a block): it is dropped, the newer ask
+// - a read that has not been sent yet is skipped when something newer was
+//   asked for the same content (its part, or the list for a block); one on
+//   the wire is drawn -- it is newer than the screen -- and the newer ask
 //   goes out next;
 // - a read waits until this tab's write queue is quiet (`quiet()`), and an
 //   answer during whose flight this tab queued a write (`writeCount()`) is
@@ -54,6 +55,9 @@ import { anchored, holds, mergeList, mergeUnits } from "editing/merge"
 // (nothing came back, a 5xx) is owed and asked again after `retry`, three
 // times and growing; after that it waits for the next signal, connect or
 // `visibilitychange`.
+//
+// The "Updated by" mark comes with a block's own read (`mark=1`). A block ask
+// folded into a list ask is fetched with the mark after the list is drawn.
 //
 // WHAT IS NOT REPLACED: a form that holds unsaved changes (the write queue's
 // own question) and a unit whose block has a menu or a dialog open (`busy`:
@@ -120,7 +124,7 @@ export default class extends Controller {
     this.element.removeEventListener("admin--editor--blocks:moving", this.moved)
     this.element.removeEventListener("admin--editing--hold:refresh", this.asked_for)
     this.timers.forEach(clearTimeout)
-    this.watchers.forEach((stop) => stop())
+    this.watchers.forEach((watcher) => watcher.stop())
     this.watchers.clear()
     settle(document.body)
   }
@@ -177,17 +181,25 @@ export default class extends Controller {
   ask(part, options, waiters) {
     const entry = { options, waiters }
     if (part.startsWith("block:") && this.pending.has("blocks")) {
-      this.join("blocks", entry, { keepMark: false })
+      this.join("blocks", this.folded(part, entry))
     } else if (part === "blocks") {
       for (const key of [ ...this.pending.keys() ].filter((each) => each.startsWith("block:"))) {
-        this.join("blocks", this.pending.get(key), { keepMark: false })
+        this.join("blocks", this.folded(key, this.pending.get(key)))
         this.pending.delete(key)
       }
-      this.join("blocks", entry, { keepMark: false })
+      this.join("blocks", entry)
     } else {
       this.join(part, entry)
     }
     this.pump()
+  }
+
+  // A block's ask folded into the list's. The list answer carries no "Updated
+  // by" mark, so a block that was to be marked is remembered (`marked`) and
+  // fetched with `mark=1` after the list is drawn.
+  folded(part, entry) {
+    const marked = entry.options.mark ? [ part.slice("block:".length) ] : []
+    return { ...entry, options: { ...entry.options, mark: false, marked } }
   }
 
   join(part, entry) {
@@ -200,7 +212,7 @@ export default class extends Controller {
     const a = first.options || first
     const b = second.options
     return {
-      options: { onlyChanged: Boolean(a.onlyChanged && b.onlyChanged), mark: Boolean(a.mark || b.mark) },
+      options: { onlyChanged: Boolean(a.onlyChanged && b.onlyChanged), mark: Boolean(a.mark || b.mark), marked: [ ...new Set([ ...(a.marked || []), ...(b.marked || []) ]) ] },
       waiters: [ ...(first.waiters || []), ...(second.waiters || []) ]
     }
   }
@@ -225,8 +237,8 @@ export default class extends Controller {
   }
 
   handOn(part, entry) {
-    const target = part.startsWith("block:") && this.pending.has("blocks") ? "blocks" : part
-    this.join(target, entry)
+    if (part.startsWith("block:") && this.pending.has("blocks")) this.join("blocks", this.folded(part, entry))
+    else this.join(part, entry)
   }
 
   settled(entry) {
@@ -242,8 +254,11 @@ export default class extends Controller {
     const writes = writeCount()
     const answer = await get(this.urlFor(part, entry.options), { timeout: this.timeoutValue })
     if (!this.element.isConnected) return
-    if (this.covered(part)) return this.handOn(part, entry)
-    if (writeCount() !== writes) { this.join(part, entry); return }
+    // An answer on the wire is NOT dropped because its part was asked again
+    // meanwhile: in a single line it is newer than the screen, and the newer
+    // ask goes out next. (A colleague saving every second would otherwise
+    // starve the block.) Only this tab's own write makes it too old.
+    if (writeCount() !== writes) { this.handOn(part, entry); return }
     if (document.hidden || (this.moving && part !== "record")) { this.owe(part, entry.options); return this.settled(entry) }
     if (answer.status === 0 || answer.status >= 500 || (answer.status >= 400 && answer.status !== 404 && answer.status !== 410)) {
       this.failed(part, entry.options)
@@ -255,6 +270,8 @@ export default class extends Controller {
     } catch (error) {
       console.error(error)
     }
+    // What a folded ask wanted marked.
+    ;(entry.options.marked || []).forEach((id) => this.want(`block:${id}`, { mark: true }))
     this.settled(entry)
   }
 
@@ -290,7 +307,8 @@ export default class extends Controller {
     try {
       this.drawFragment(part, answer, onlyChanged)
     } finally {
-      this.watchKept(this.kept)
+      this.pruneWatchers()
+      this.watchKept(this.kept, this.busy)
       this.busy = null
       this.kept = null
     }
@@ -301,14 +319,14 @@ export default class extends Controller {
       if (!answer.fragment) return
       const list = this.element.querySelector("#content-blocks-list")
       const before = new Set(list.querySelectorAll("[data-editing-gone]"))
-      const result = anchored(list, () => mergeList(list, answer.fragment, { unsaved: this.unsaved, onlyChanged }))
+      const result = anchored(list, () => mergeList(list, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart }))
       result.gone.filter((unit) => !before.has(unit)).forEach((unit) => this.dispatch("deleted", { detail: { blockId: unit.dataset.blockId, unit } }))
       if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
       return this.dispatch("merged", { detail: { part, replaced: [], ...result } })
     }
     if (part === "record") {
       if (!answer.fragment) return
-      const result = mergeUnits(this.element, answer.fragment, { unsaved: this.unsaved, onlyChanged })
+      const result = mergeUnits(this.element, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart })
       if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
       if (result.missing && this.hasBlocksUrlValue) this.want("blocks")
       return this.dispatch("merged", { detail: { part, gone: [], ...result } })
@@ -317,7 +335,7 @@ export default class extends Controller {
     // deleted since. Either way the list says what is true now.
     if (answer.status === 204 || answer.status === 410) return this.want("blocks")
     if (!answer.fragment) return
-    const result = anchored(this.element, () => mergeUnits(this.element, answer.fragment, { unsaved: this.unsaved, onlyChanged }))
+    const result = anchored(this.element, () => mergeUnits(this.element, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart }))
     if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
     if (result.missing) this.want("blocks")
     result.replaced.forEach((unit) => this.fade(unit.querySelector("[data-editing-mark]")))
@@ -357,6 +375,17 @@ export default class extends Controller {
     return false
   }
 
+  // A PART (a section's tile) is replaced like anything that holds no unsaved
+  // form -- except while its own menu or delete dialog is open (`busy`): the
+  // merge's `hold` option, the smallest change to how a part is judged. It is
+  // refreshed when that closes, like a unit.
+  holdPart = (part) => {
+    const subject = part.dataset.editingSubject
+    const busy = this.busy || this.busySubjects()
+    if (subject && busy.has(subject)) { this.kept?.add(subject); return true }
+    return false
+  }
+
   // The blocks (by subject) that have something open that the merge must not
   // take from under the person: a menu panel shown, a dialog open inside the
   // editor (a tile's menu and its delete dialog belong to the block the tile
@@ -384,19 +413,24 @@ export default class extends Controller {
   }
 
   // A unit kept ONLY because a menu or dialog was open is fetched again when
-  // that closes (a listener on the element, not polling).
-  watchKept(subjects) {
+  // the last of them closes, however many follow one another (the media
+  // picker closes and the alt-text dialog opens): a listener on each element
+  // that holds it, no polling. A watcher is on elements in the document; one
+  // whose elements have left it is ended at once and the block fetched again
+  // (`pruneWatchers`, after every drawing).
+  watchKept(subjects, busy) {
     for (const subject of subjects) {
       if (this.watchers.has(subject)) continue
-      const elements = this.busy?.get(subject) || []
+      const elements = busy.get(subject) || []
       const done = () => {
-        this.watchers.get(subject)?.()
+        this.watchers.get(subject)?.stop()
         this.watchers.delete(subject)
         // A moment later: the dialog's own `close` handlers apply what the person did first.
         const timer = setTimeout(() => {
           this.timers.delete(timer)
-          if (this.busySubjects().has(subject)) return this.watchKept(new Set([ subject ]))
-          this.want(subject === "record" ? "record" : `block:${subject.replace("block-", "")}`)
+          const now = this.busySubjects()
+          if (now.has(subject)) return this.watchKept(new Set([ subject ]), now)
+          this.want(this.partOf(subject))
         }, 0)
         this.timers.add(timer)
       }
@@ -409,7 +443,22 @@ export default class extends Controller {
         observer.observe(element, { attributes: true, attributeFilter: [ "hidden" ] })
         return () => observer.disconnect()
       })
-      this.watchers.set(subject, () => cleanups.forEach((stop) => stop()))
+      this.watchers.set(subject, { elements, stop: () => cleanups.forEach((stop) => stop()) })
+    }
+  }
+
+  partOf(subject) {
+    return subject === "record" ? "record" : `block:${subject.replace("block-", "")}`
+  }
+
+  // A watcher whose elements have all left the document can never hear them
+  // close: ended, and the block fetched again.
+  pruneWatchers() {
+    for (const [ subject, watcher ] of [ ...this.watchers ]) {
+      if (watcher.elements.some((element) => element.isConnected)) continue
+      watcher.stop()
+      this.watchers.delete(subject)
+      this.want(this.partOf(subject))
     }
   }
 
@@ -426,8 +475,8 @@ export default class extends Controller {
   }
 
   // The record is in the trash, deleted or no longer this viewer's: said once,
-  // in the header's notice area, with the way back; nothing is asked again and
-  // the part answers. `#editor-notice` is shared with the 409's "Changed
+  // in the header's notice area, with the way back; the stream is let go, what
+  // was waiting is dropped, and the part answers. `#editor-notice` is shared with the 409's "Changed
   // elsewhere" bar: this APPENDS to it. (A later 409 replaces the area's
   // content, but a record that is gone refuses a save with a 404, not a 409.)
   gone() {

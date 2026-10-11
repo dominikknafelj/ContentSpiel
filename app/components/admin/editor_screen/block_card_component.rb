@@ -157,7 +157,10 @@ module Admin
       # The block's version, and -- for a card of the list -- whether it is the
       # first or the last, which decides whether its Move up / Move down start
       # disabled: a block that only changed places must not look unchanged.
-      def card_version = [ ::Editing.version(block), ("f" if list? && first?), ("l" if list? && last?) ].compact.join("-")
+      # A panel (the form of a block in a section) also names its place: a move
+      # along a section writes with `update_columns`, so the block's `updated_at`
+      # does not say that its heading ("column 2") changed.
+      def card_version = [ ::Editing.version(block), ("f" if list? && first?), ("l" if list? && last?), (panel? ? "s#{block.section_id}c#{block.section_column}" : nil) ].compact.join("-")
 
       def updated_mark = Admin::EditorScreen::UpdatedMarkComponent.new(change: @updated_by)
 

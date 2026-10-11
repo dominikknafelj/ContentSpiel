@@ -719,7 +719,7 @@ export default class extends Controller {
     this.moveHolds = (this.moveHolds || 0) + 1
     return enqueue((isCurrent) => this.sendMove(move, isCurrent), { generation: this.generation })
       .catch((error) => console.error(error))
-      .finally(() => { this.moveHolds -= 1; this.sayMoving() })
+      .finally(() => { this.moveHolds = Math.max(0, this.moveHolds - 1); this.sayMoving() })
   }
 
   // One move's turn in the queue, and its bookkeeping: unless the move has

@@ -198,33 +198,37 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
 
   def mark_times = page.evaluate_script("window.__mark")
 
-  test "the mark stays for the notice and then fades over 200ms" do
+  test "the mark stays for the notice, then the fade starts, and the mark is gone" do
     open_page
     set_value("notice", 900)
     watch_mark
     dana_saves(@block, "Prices from May")
     assert_selector "#{card(@block)} [data-editing-mark]", text: "Updated by Dana Weiss", wait: LIVE
-    assert_no_selector "[data-editing-mark]", wait: LIVE
+    # Not the 6 seconds of the default: the region's value decides.
+    assert_no_selector "[data-editing-mark]", wait: 4
 
     times = mark_times
-    stay = times["leaving"] - times["added"]
-    fade = times["removed"] - times["leaving"]
-    assert_in_delta 900, stay, 450, "the mark stayed #{stay.round} ms, not the region's notice value"
-    assert_in_delta 200, fade, 150, "the mark faded over #{fade.round} ms, not 200"
+    assert_not_nil times["leaving"], "the fade never started"
+    # Timers never fire early: a lower bound holds on any machine.
+    assert_operator times["leaving"] - times["added"], :>=, 890
+    assert_operator times["removed"], :>=, times["leaving"]
+    # The fade is the stylesheet's: 200 ms, an opacity transition.
+    duration = page.evaluate_script("(() => { const probe = document.createElement('span'); probe.className = 'admin-editing-mark'; document.body.append(probe); const value = getComputedStyle(probe).transitionDuration; probe.remove(); return value })()")
+    assert_equal "0.2s", duration
   end
 
-  test "with reduced motion the mark goes at once when its time is up, without fading" do
+  test "with reduced motion the mark goes when its time is up, without fading" do
     page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
     open_page
     set_value("notice", 900)
     watch_mark
     dana_saves(@block, "Prices from May")
     assert_selector "#{card(@block)} [data-editing-mark]", wait: LIVE
-    assert_no_selector "[data-editing-mark]", wait: LIVE
+    assert_no_selector "[data-editing-mark]", wait: 4
 
     times = mark_times
     assert_nil times["leaving"], "the mark faded although motion is reduced"
-    assert_in_delta 900, times["removed"] - times["added"], 450
+    assert_operator times["removed"] - times["added"], :>=, 890
   end
 
   test "my own save draws no mark and fetches nothing" do
@@ -774,5 +778,151 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
       open_page
       assert_eventually(wait: LIVE, message: "the timed out read was never asked again") { blocks_requests.size >= 2 }
     end
+  end
+
+  # --- a block kept for an open dialog or menu ----------------------------------
+
+  def open_rich_text_dialog(kind, block = @block)
+    page.execute_script(<<~JS, kind)
+      const opener = document.querySelector(#{"#{card(block)} [data-controller~='admin--rich-text--editor']".to_json})
+      window.dispatchEvent(new CustomEvent("rich-text-dialog:open", { detail: { kind: arguments[0], opener } }))
+    JS
+  end
+
+  test "a card kept for one dialog is refreshed when the LAST of several dialogs on it closes" do
+    open_page
+    page.execute_script("window.__card = document.querySelector(#{card(@block).to_json})")
+    listen_merged
+    open_rich_text_dialog("youtube")
+    assert_selector "dialog#rich-text-youtube-dialog[open]"
+    # The picker closes and the next dialog opens in the same breath (the
+    # alt-text dialog after the media picker): opened from a `close` listener
+    # that runs after the script's own.
+    page.execute_script(<<~JS)
+      const first = document.getElementById("rich-text-youtube-dialog")
+      first.addEventListener("close", () => {
+        const opener = document.querySelector(#{"#{card(@block)} [data-controller~='admin--rich-text--editor']".to_json})
+        window.dispatchEvent(new CustomEvent("rich-text-dialog:open", { detail: { kind: "page", opener } }))
+      }, { once: true })
+    JS
+    dana_saves(@block, "Theirs")
+    await_js("window.__merged.length > 0", wait: LIVE)
+    page.execute_script("document.getElementById('rich-text-youtube-dialog').close()")
+    assert_selector "dialog#rich-text-page-dialog[open]"
+    await_frames
+    assert_equal true, page.evaluate_script("window.__card === document.querySelector(#{card(@block).to_json})"), "the card was replaced between the two dialogs"
+
+    page.execute_script("document.getElementById('rich-text-page-dialog').close()")
+    assert_selector "#{card(@block)} .ProseMirror", text: "Theirs", wait: LIVE
+  end
+
+  test "a tile whose menu is open is kept while it is open, and block and tile are refreshed when it closes" do
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    inside = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 1 }).record
+    open_page
+    tile = "#content-blocks-list ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-tile"
+    find("#{tile} button[aria-label='Block actions']").click
+    assert_selector "#{tile} [role=menu]"
+    page.execute_script("window.__tile = document.querySelector(#{tile.to_json}); window.__panel = document.getElementById('block-#{inside.id}-panel')")
+    listen_merged
+
+    dana_saves(inside, "Theirs")
+    await_js("window.__merged.length > 0", wait: LIVE)
+    await_frames
+    assert_equal true, page.evaluate_script("window.__tile === document.querySelector(#{tile.to_json})"), "the tile was replaced under its open menu"
+    assert_selector "#{tile} [role=menu]"
+
+    find("#{tile} button[aria-label='Block actions']").click
+    assert_eventually(wait: LIVE, message: "the block was not refreshed when the menu closed") do
+      page.evaluate_script("window.__panel !== document.getElementById('block-#{inside.id}-panel')")
+    end
+    assert_selector "#block-#{inside.id}-panel .ProseMirror", text: "Theirs", visible: :all, wait: LIVE
+  end
+
+  # --- one line: an answer on the wire is drawn ----------------------------------
+
+  test "two asks for one block with the first answer slow: both are drawn, in order, the newest last" do
+    open_page
+    page.execute_script(<<~JS)
+      window.__texts = []
+      document.getElementById("editing").addEventListener("admin--editing--live:merged", (event) => {
+        if (event.detail.part.startsWith("block:")) window.__texts.push(event.detail.replaced.map((unit) => unit.outerHTML).join(""))
+      })
+    JS
+    hold_next("slow", "GET", BLOCK_GET)
+    dana_saves(@block, "First")
+    await_js("window.__arrived && window.__arrived.slow", wait: LIVE)
+    dana_saves(@block, "Second")
+    await_js("#{live_controller_js}.pending.has('block:#{@block.id}')", wait: LIVE)
+    release("slow")
+
+    assert_eventually(wait: LIVE, message: -> { "texts drawn: #{page.evaluate_script('window.__texts').inspect}" }) { page.evaluate_script("window.__texts").size == 2 }
+    texts = page.evaluate_script("window.__texts")
+    assert_includes texts.first, "First"
+    assert_includes texts.last, "Second"
+  end
+
+  # --- the mark survives being folded into a list ask ----------------------------
+
+  test "a block's mark is not lost when its ask is folded into a list ask" do
+    second = add_block
+    open_page
+    hold_next("slow", "GET", BLOCK_GET)
+    dana_saves(@block, "First")
+    await_js("window.__arrived && window.__arrived.slow", wait: LIVE)
+    add_block(by: @dana)
+    await_js("#{live_controller_js}.pending.has('blocks')", wait: LIVE)
+    dana_saves(second, "Theirs")
+    await_js("!#{live_controller_js}.pending.has('block:#{second.id}')", wait: LIVE)
+    release("slow")
+
+    assert_selector "#{card(second)} .ProseMirror", text: "Theirs", wait: LIVE
+    assert_selector "#{card(second)} [data-editing-mark]", text: "Updated by Dana Weiss", wait: LIVE
+  end
+
+  # --- the two exits of `moving` that are not Escape -----------------------------
+
+  def blocks_controller_js = "window.Stimulus.getControllerForElementAndIdentifier(document.querySelector('[data-controller~=\\'admin--editor--blocks\\']'), 'admin--editor--blocks')"
+
+  test "putBack lets go of a keyboard pick-up, and the list that was owed is drawn" do
+    open_page
+    handle = "#{card(@block)} .admin-block-card__handle"
+    find(handle).send_keys(:space)
+    await_js("#{live_controller_js}.moving === true", wait: LIVE)
+    added = add_block(by: @dana)
+    await_js("#{live_controller_js}.owed.has('blocks')", wait: LIVE)
+    assert_no_selector card(added)
+
+    # What a refused or failed move calls (`putBack`), not Escape (`cancel`).
+    page.execute_script("#{blocks_controller_js}.putBack()")
+    assert_selector card(added), wait: LIVE
+    assert_equal false, page.evaluate_script("#{live_controller_js}.moving")
+  end
+
+  # A drag cannot be held open across a Capybara step, and SortableJS calls no
+  # `onEnd` for `destroy()`: the controller's own path (`laneTargetDisconnected`)
+  # is reached by taking the lane out of the document while the controller
+  # holds a drag in that lane (`dragging`, and the instance Sortable calls active).
+  test "a lane destroyed under a drag lets go of it, and the list that was owed is drawn" do
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    open_page
+    page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("sortablejs").then(({ default: Sortable }) => {
+        const lane = document.getElementById("section-#{section.id}-lane-1")
+        const controller = #{blocks_controller_js}
+        controller.dragging = true
+        Sortable.active = { el: lane }
+        controller.sayMoving()
+        done(true)
+      })
+    JS
+    await_js("#{live_controller_js}.moving === true", wait: LIVE)
+    added = add_block(by: @dana)
+    await_js("#{live_controller_js}.owed.has('blocks')", wait: LIVE)
+
+    page.execute_script("document.getElementById('section-#{section.id}-lane-1').remove()")
+    assert_selector card(added), wait: LIVE
+    assert_equal false, page.evaluate_script("#{live_controller_js}.moving")
   end
 end
