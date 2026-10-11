@@ -48,6 +48,9 @@ module Editing
       "media.translation_confirmed" => "library images are not live in this step (spec section 9)",
       "settings.translation_confirmed" => "site settings are saved explicitly and have no live editor",
       "settings.updated" => "site settings are saved explicitly and have no live editor",
+      "page.taken_over" => "a take-over sends its own holder signal (Editing::TakeOver)",
+      "post.taken_over" => "a take-over sends its own holder signal (Editing::TakeOver)",
+      "block.taken_over" => "a take-over sends its own holder signal (Editing::TakeOver)",
       "tag.renamed" => "it touches the posts that carry the tag; their open forms are refused as stale, as before (roadmap)",
       "tag.deleted" => "it touches the posts that carry the tag; their open forms are refused as stale, as before (roadmap)",
       "tag.merged" => "it touches the posts that carry the tag; their open forms are refused as stale, as before (roadmap)"

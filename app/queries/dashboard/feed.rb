@@ -33,7 +33,7 @@ module Dashboard
     # events have the page, post or block as their subject too, and are no
     # change to it either (notes spec §3.5): "Mine" and "Changed by"
     # (`Audit::ChangeSince` reads this list) ignore them.
-    NOT_A_CHANGE = (%w[access.denied] + Audit::Sentence::NOTE_VERBS.keys).freeze
+    NOT_A_CHANGE = (%w[access.denied page.taken_over post.taken_over block.taken_over] + Audit::Sentence::NOTE_VERBS.keys).freeze
 
     # The LATERAL subquery `#with_newest_event` joins, as a table to read its
     # columns from: `newest.newest_user_id`, `newest.newest_at`.

@@ -81,7 +81,23 @@ module Admin
       head :no_content
     end
 
+    # Someone asks for what another tab holds (spec §4.4), or asks again after
+    # the pass-over time. Answers `{ state: }`: requested, pending, taken or claimed.
+    def take_over = transfer(hand_over: false)
+
+    # The holder's tab, having sent what it held, lets the requester have it.
+    def hand_over = transfer(hand_over: true)
+
     private
+
+    def transfer(hand_over:)
+      service = ::Editing::TakeOver.new(subject!, record: @record, tab: Current.editing_tab, hand_over:)
+      result = service.call
+      return forbidden!(result.errors.to_sentence) if result.denied?
+      return head(:unprocessable_entity) unless result.ok?
+
+      render json: { state: service.outcome }
+    end
 
     # The block `block_id` names, or the record itself; a block that is not
     # this record's is not found. (A full `def`: `or raise` after an endless one

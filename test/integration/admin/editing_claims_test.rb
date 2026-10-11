@@ -575,4 +575,63 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     assert_not held.reload.live?
     assert_match(/Nothing was changed\. 1 post being edited by someone was skipped\./, flash[:notice])
   end
+
+  def take_over(kind: "page", record: @page, block: nil, tab: nil, action: :take_over)
+    path = action == :take_over ? admin_editing_take_over_path(kind:, id: record.id) : admin_editing_hand_over_path(kind:, id: record.id)
+    post path, params: { block_id: block&.id }.compact, headers: { "X-Notes-Tab" => tab }.compact, as: :json
+  end
+
+  test "take over and hand over answer their state as JSON, and the row moves only on the hand-over" do
+    sign_in_as users(:one)
+    claim(block: @block, tab: TAB_A)
+
+    sign_in_as users(:two)
+    take_over(block: @block, tab: TAB_B)
+    assert_response :ok
+    assert_equal({ "state" => "requested" }, response.parsed_body)
+    assert_equal "requested", holder_signals.last["reason"]
+
+    sign_in_as users(:reader)
+    take_over(block: @block, tab: "tab-cccccccc")
+    assert_response :forbidden
+
+    sign_in_as users(:one)
+    take_over(block: @block, tab: TAB_A, action: :hand_over)
+    assert_equal({ "state" => "handed" }, response.parsed_body)
+    assert_equal [ users(:two).id, TAB_B ], Editing::Reservation.sole.values_at(:user_id, :tab)
+    assert_equal "taken", holder_signals.last["reason"]
+    assert_equal 1, Audit::Event.where(action: "block.taken_over").count
+
+    take_over(block: @block, tab: TAB_A, action: :hand_over)
+    assert_equal({ "state" => "nothing" }, response.parsed_body)
+  end
+
+  test "take over answers pending to a second asker, claimed when nobody holds it, and works for the settings" do
+    sign_in_as users(:one)
+    claim(block: @block, tab: TAB_A)
+    sign_in_as users(:two)
+    take_over(block: @block, tab: TAB_B)
+    sign_in_as users(:one)
+    take_over(block: @block, tab: "tab-cccccccc")
+    # Olga's other tab asks for her own tab's block: allowed, and it is pending behind Dana's request.
+    assert_equal({ "state" => "pending" }, response.parsed_body)
+
+    take_over(tab: TAB_A)
+    assert_equal({ "state" => "claimed" }, response.parsed_body)
+  end
+
+  test "take over and hand over: 404 out of scope, for another page's block and a missing record, and 422 without a tab id" do
+    other = create_page(title: "Other", published: false)
+    other_block = ContentBlocks::Save.call(ContentBlock.new(owner: other), attributes: { block_type: "image" }).record
+    sign_in_as users(:one)
+
+    %i[take_over hand_over].each do |action|
+      take_over(block: other_block, tab: TAB_A, action:)
+      assert_response :not_found
+      post admin_editing_take_over_path(kind: "page", id: 0), headers: { "X-Notes-Tab" => TAB_A }
+      assert_response :not_found
+      take_over(block: @block, action:)
+      assert_response :unprocessable_entity
+    end
+  end
 end
