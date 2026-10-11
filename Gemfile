@@ -117,7 +117,7 @@ gem "sitemap_generator", "~> 7.1"
 # (OTEL_EXPORTER_OTLP_ENDPOINT), not a new gem.
 gem "opentelemetry-sdk", "~> 1.13"
 
-gem "opentelemetry-instrumentation-all", "~> 0.97"
+gem "opentelemetry-instrumentation-all", "~> 0.98"
 
 gem "opentelemetry-exporter-otlp", "~> 0.37"
 
