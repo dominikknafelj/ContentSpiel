@@ -133,10 +133,7 @@ export default class extends Controller {
     this.editorTarget.replaceChildren()
   }
 
-  // The hidden input's JSON, or nothing for an empty/absent document (an
-  // empty `doc` isn't valid ProseMirror content -- a doc needs at least one
-  // block -- and would otherwise trip the content check below).
-  // A form that turned read-only in place (`editing/freeze`): the document
+  // A form that turned read-only in place (Task 9's `editing/freeze`; nothing calls this yet): the document
   // stays as typed, for copying, and nothing more is written into it.
   lock() {
     this.readOnly = true
@@ -144,6 +141,9 @@ export default class extends Controller {
     this.element.querySelector("[role=toolbar]")?.setAttribute("hidden", "")
   }
 
+  // The hidden input's JSON, or nothing for an empty/absent document (an
+  // empty `doc` isn't valid ProseMirror content -- a doc needs at least one
+  // block -- and would otherwise trip the content check below).
   initialContent() {
     try {
       const document = JSON.parse(this.inputTarget.value || "null")

@@ -13,7 +13,7 @@ module Admin
     # and the held form cannot drift apart (the component tests compare every
     # control's name and value, and everything else of its markup). The
     # browser's counterpart, for the one form that turns read-only in place,
-    # is `editing/freeze.js`: the same lists.
+    # will be Task 9's `editing/freeze`: the same lists.
     #
     # WHAT THE PARSE KEEPS AND WHAT IT DOES NOT. Parsed with the HTML5
     # parser and written out again, the markup keeps its entities, its
@@ -25,18 +25,32 @@ module Admin
     # value that began with a newline would lose it in the browser. That is
     # put back here before writing.
     #
-    # NEUTRALISED: besides `readonly` and `disabled`, the actions that would
-    # write something are taken off (`NEUTRALISED`): adding and removing a
-    # chip, choosing or removing a library image, resetting an override,
-    # asking for a translation and inserting a picked image or an accepted
-    # suggestion into the editor, adding and removing a group, choosing a
-    # section layout. A control that only READS (a `details`, a link, the
-    # "Copy my text" button of the strip, which is outside the form) is not
-    # touched.
+    # ACTIONS ARE AN ALLOW-LIST. Every `data-action` token on every element
+    # of a held form (a `div` or a `ul` as much as a control, with a
+    # `@window` or `@document` target, with `:stop` or `:once` options or a
+    # key filter on the event) is removed unless the controller action it
+    # names is in `ALLOWED_ACTIONS`: the ones that only read or only move
+    # focus. A writing action added to a field next year is therefore dead in
+    # a held form from the day it is written, and `held_fields_test.rb`
+    # keeps its OWN list of what may survive, so a new survivor fails it until
+    # someone decides. A control that only READS (a `details`, a link) has no
+    # action to lose. The strip's "Copy my text" is outside the form.
+    #
+    # CONTROL KINDS (`READONLY_TYPES`, `HIDDEN_TYPES`): a text control
+    # takes `readonly`; `hidden` is left alone; EVERYTHING ELSE (checkbox,
+    # radio, file, range, color, every kind of button, an `input` of a type
+    # this list has never heard of, a select) is `disabled`.
     module HeldFields
-      TEXT = "input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=button]):not([type=submit]), textarea".freeze
-      OTHER = "select, input[type=checkbox], input[type=radio], input[type=file], button".freeze
-      NEUTRALISED = %r{\A(?:[\w:.-]+->)?(?:admin--ui--chip-input#|admin--media--field#|admin--ui--override-field#|admin--translation--translate#|admin--editor--groups#|admin--editor--section#chooseLayout\z|admin--rich-text--editor#(?:picked|applySuggestion)\z)}
+      # Input types `readonly` applies to (HTML's list), and a missing type, which is text.
+      READONLY_TYPES = %w[text search tel url email password number date datetime-local month week time].freeze
+      HIDDEN_TYPES = %w[hidden].freeze
+      # `identifier#method` of the actions that survive: reading, or moving focus.
+      ALLOWED_ACTIONS = %w[
+        admin--editor--slug-preview#update
+        admin--rich-text--editor#containFocus
+        admin--ui--menu#select
+        admin--ui--menu#close
+      ].freeze
       GUARD = '<button type="submit" disabled hidden tabindex="-1" data-held-guard></button>'.freeze
       NEWLINE_FIRST = "textarea, pre, listing".freeze
 
@@ -48,15 +62,32 @@ module Admin
       # field and no button would. The held form has no autosave to catch it.
       def call(html, guard: false)
         fragment = Nokogiri::HTML5.fragment("#{GUARD if guard}#{html}")
-        fragment.css(TEXT).each { |field| field["readonly"] = "readonly" }
-        fragment.css(OTHER).each { |field| field["disabled"] = "disabled" }
-        fragment.css("[data-action]").each { |element| neutralise(element) }
+        fragment.css("textarea").each { |field| field["readonly"] = "readonly" }
+        fragment.css("input").each { |field| restrict_input(field) }
+        fragment.css("select, button").each { |field| field["disabled"] = "disabled" }
+        fragment.css("[data-action]").each { |element| keep_allowed_actions(element) }
         fragment.css(NEWLINE_FIRST).each { |element| keep_first_newline(element) }
         fragment.to_html.html_safe # rubocop:disable Rails/OutputSafety -- markup this app has just rendered, parsed and written out again
       end
 
-      def neutralise(element)
-        kept = element["data-action"].split.grep_v(NEUTRALISED)
+      def restrict_input(field)
+        type = (field["type"] || "text").strip.downcase
+        if HIDDEN_TYPES.include?(type) then nil
+        elsif READONLY_TYPES.include?(type) then field["readonly"] = "readonly"
+        else field["disabled"] = "disabled"
+        end
+      end
+
+      # `click:stop->admin--x#go:once@window` is `admin--x#go`: the event with
+      # its filters and options before the arrow, the action's own options and
+      # the target after the method.
+      def action_of(token)
+        body = token.sub(/\A[^>]*->/, "")
+        body.sub(/@\w+\z/, "").sub(/(?::!?\w+)+\z/, "")
+      end
+
+      def keep_allowed_actions(element)
+        kept = element["data-action"].split.select { |token| ALLOWED_ACTIONS.include?(action_of(token)) }
         kept.empty? ? element.remove_attribute("data-action") : element["data-action"] = kept.join(" ")
       end
 

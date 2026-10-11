@@ -57,9 +57,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   # viewer who can only read; the only markers and "Add note" items in it are
   # its tiles'.
   test "a section's card offers no way to add a note on the section itself, to an editor or to a view-only viewer" do
-    record = @editor_page
     [ users(:one), users(:reader) ].each do |viewer|
-      @editor_page = record # the test helper's own `page` is kept in the same variable after a render
       as(viewer, channel: :admin) { render_card }
 
       assert_no_selector "#notes-marker-ContentBlock-#{@section.id}", visible: :all
@@ -107,15 +105,14 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   test "the header has the block list's drag handle and a collapse button for the body, and a view-only viewer gets no handle" do
-    site_page = @editor_page # `render_inline` takes `@editor_page` for its own Capybara node
     render_card
 
     assert_selector ".admin-section-card > div:first-child .admin-block-card__handle[aria-label='Move section'][aria-describedby='block-drag-help']"
     assert_selector "button[aria-expanded='true'][aria-controls='section-#{@section.id}-body'][data-action$='admin--editor--blocks#toggle']", text: "Section"
     assert_selector ".admin-section-card > #section-#{@section.id}-body[data-block-body]"
 
-    outline = BlockOutline.new(site_page.content_blocks.reload)
-    render_inline Admin::EditorScreen::SectionCardComponent.new(page: site_page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
 
     assert_no_selector ".admin-block-card__handle"
     assert_selector "#block-#{@text.id}-panel fieldset[disabled]", visible: :all
@@ -203,12 +200,10 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   test "the delete dialog counts one block in the singular and says nothing of blocks for an empty section" do
-    site_page = @editor_page # `render_inline` takes `@editor_page` for its own Capybara node
     @image.destroy!
     render_card
     assert_selector "#section-#{@section.id}-delete-count", text: "This also deletes the 1 block in it.", exact_text: true, visible: :all
 
-    @editor_page = site_page
     @text.destroy!
     render_card
     assert_selector "p#section-#{@section.id}-delete-count", text: "", exact_text: true, visible: :all

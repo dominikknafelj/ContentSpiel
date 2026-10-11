@@ -527,8 +527,14 @@ function emptyFields() {
 // header's bulk run, Use all, Discard all and its counts act on what is on
 // screen, i.e. the language being looked at -- never on a language whose panel
 // is hidden. The editors have no such panel, so for them everything counts.
+//
+// Nor on a field someone else holds (live editing): a unit that says
+// `data-editing-held`, or a form frozen as `fieldset.admin-held`, is read-only
+// and was never saved from here. Its empty fields are not counted or asked
+// for, and a suggestion that reached it is neither counted nor applied by
+// Use all nor discarded by Discard all.
 function onScreen(element) {
-  return !element.closest("[data-language-panel][hidden]")
+  return !element.closest("[data-language-panel][hidden], [data-editing-held], fieldset.admin-held")
 }
 
 // A field's Translate wrapper, as the request needs it.

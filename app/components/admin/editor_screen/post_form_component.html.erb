@@ -5,7 +5,7 @@
 <%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options, slot_context: @slot_context, hold_strip: (hold_strip if held?)) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4). %>
-    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: post, locale: locale, editable: editable?) %>
+    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: post, locale: locale, editable: editable? && !read_only_hold?) %>
   <% end %>
 <% end %>
 <% end %>

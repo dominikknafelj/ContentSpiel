@@ -61,4 +61,26 @@ class Admin::EditingHeldSystemTest < ApplicationSystemTestCase
     assert_equal url, page.current_url
     assert_selector "#block-#{@text.id}-hold [data-editing-kind=held]"
   end
+
+  def resource_requests = page.evaluate_script("performance.getEntriesByType('resource').map((entry) => entry.name).filter((name) => name.includes('/content_blocks/') || name.includes('/pages/'))")
+
+  test "Enter in a held form's text field and in its read-only rich text sends no request and navigates nowhere" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+    page.execute_script("window.__marker = 'same document'")
+    url = page.current_url
+    before = resource_requests
+
+    find("#block-#{@list.id}-limit").send_keys(:enter)
+    find("#page-title").send_keys(:enter)
+    find("#content_block_#{@text.id} .ProseMirror").click
+    find("#content_block_#{@text.id} .ProseMirror").send_keys(:enter)
+    await_frames
+
+    assert_equal "same document", page.evaluate_script("window.__marker")
+    assert_equal url, page.current_url
+    assert_equal before, resource_requests
+    assert_writes_settled
+    assert_equal 3, @list.reload.settings["limit"].to_i
+  end
 end

@@ -40,19 +40,41 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     assert_same_markup html, held(html)
   end
 
-  test "an action that would write is taken off, one that only reads stays" do
-    html = %(<button type="button" data-action="click->admin--ui--chip-input#remove keydown->admin--ui--chip-input#chipKeydown">x</button>
-             <button type="button" data-action="admin--media--field#choose">choose</button>
-             <div data-action="focusout->admin--rich-text--editor#containFocus media-picker:picked->admin--rich-text--editor#picked translate:use->admin--rich-text--editor#applySuggestion"></div>
-             <button type="button" data-action="click->admin--editor--blocks#toggle">expand</button>
-             <button type="button" data-action="admin--editing--hold#copy">copy</button>)
+  test "every action not on the allow-list is removed, from any element, with any target, option or key filter" do
+    html = %(<div data-action="click->admin--editor--groups#add">a</div><ul data-action="keydown.enter->admin--editor--groups#add">b</ul><a href="/x" data-action="click->admin--editor--groups#add:stop">c</a>
+             <summary data-action="media-picker:picked@window->admin--editor--groups#add:once">d</summary>
+             <span data-action="admin--editor--groups#add@document admin--rich-text--editor#containFocus">e</span>
+             <span data-action="focusout->admin--rich-text--editor#containFocus">f</span>
+             <span data-action="focusout->admin--rich-text--editor#containFocus:stop@window">g</span>
+             <button type="button" data-action="click->admin--editor--blocks#toggle">expand</button>)
 
-    page = Capybara.string(held(html))
+    page = Nokogiri::HTML5.fragment(held(html))
 
-    assert page.has_no_css?("[data-action*='chip-input'], [data-action*='media--field'], [data-action*='#picked'], [data-action*='applySuggestion']", visible: :all)
-    assert page.has_css?("[data-action='focusout->admin--rich-text--editor#containFocus']", visible: :all)
-    assert page.has_css?("[data-action='click->admin--editor--blocks#toggle']", visible: :all)
-    assert page.has_css?("[data-action='admin--editing--hold#copy']", visible: :all)
+    assert_equal [ "admin--rich-text--editor#containFocus", "focusout->admin--rich-text--editor#containFocus", "focusout->admin--rich-text--editor#containFocus:stop@window" ],
+      page.css("[data-action]").map { |node| node["data-action"] }
+    assert_empty page.css("[data-action*='groups'], [data-action*='toggle']")
+  end
+
+  # The control table. Each type is decided here, on purpose.
+  CONTROLS = {
+    "text" => :readonly, "search" => :readonly, "tel" => :readonly, "url" => :readonly, "email" => :readonly, "password" => :readonly,
+    "number" => :readonly, "date" => :readonly, "datetime-local" => :readonly, "month" => :readonly, "week" => :readonly, "time" => :readonly,
+    "checkbox" => :disabled, "radio" => :disabled, "file" => :disabled, "range" => :disabled, "color" => :disabled,
+    "submit" => :disabled, "button" => :disabled, "reset" => :disabled, "image" => :disabled, "hypothetical" => :disabled,
+    "hidden" => :untouched
+  }.freeze
+
+  test "each input type is made read-only the way it can be: readonly, disabled or left alone; an unknown type is disabled" do
+    CONTROLS.each do |type, expected|
+      field = Nokogiri::HTML5.fragment(held(%(<input type="#{type}" name="x" value="v">))).at_css("input")
+
+      assert_equal expected == :readonly, field.key?("readonly"), "#{type} readonly"
+      assert_equal expected == :disabled, field.key?("disabled"), "#{type} disabled"
+    end
+    assert Nokogiri::HTML5.fragment(held(%(<input name="x">))).at_css("input").key?("readonly"), "no type is text"
+    assert Nokogiri::HTML5.fragment(held(%(<input type="TEXT" name="x">))).at_css("input").key?("readonly"), "the type is case-insensitive"
+    assert Nokogiri::HTML5.fragment(held(%(<select name="x"></select><button>b</button><textarea name="t"></textarea>))).css("select, button").all? { |node| node.key?("disabled") }
+    assert Nokogiri::HTML5.fragment(held(%(<textarea name="t"></textarea>))).at_css("textarea").key?("readonly")
   end
 
   test "the guard is a disabled submit button first in the form, so Enter in a field submits nothing" do
@@ -78,19 +100,26 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     end
   end
 
+  # data-action is compared by the allow-list tests below, with their own list; here it is left out.
   def comparable(node, ignore)
-    attributes = node.attributes.transform_values(&:value).except(*ignore)
-    if attributes["data-action"]
-      kept = attributes["data-action"].split.grep_v(Admin::EditorScreen::HeldFields::NEUTRALISED)
-      kept.empty? ? attributes.delete("data-action") : attributes["data-action"] = kept.join(" ")
-    end
-    attributes.sort.to_h
+    node.attributes.transform_values(&:value).except(*ignore, "data-action").sort.to_h
   end
 
   # Whether each of the eight field components survives the parse and the rewrite: a real
   # form, rendered editable, rewritten, compared control by control.
+  # The actions that may live on in a held form, decided HERE and not read from the implementation:
+  # a new one fails every test that calls `assert_survives` until someone classifies it.
+  ALLOWED = [
+    "input->admin--editor--slug-preview#update",
+    "focusout->admin--rich-text--editor#containFocus",
+    "click->admin--ui--menu#select",
+    "click->admin--ui--menu#close"
+  ].freeze
+
   def assert_survives(html)
     rewritten = held(html)
+    left = Nokogiri::HTML5.fragment(rewritten).css("[data-action]").flat_map { |node| node["data-action"].split }
+    assert_empty left.uniq - ALLOWED, "an action survives in a held form that nobody has classified as read-only"
     # The original's actions minus the neutralised ones are what is left; everything else is identical.
     assert_same_markup(html, rewritten)
     reparsed = Nokogiri::HTML5.fragment(rewritten)

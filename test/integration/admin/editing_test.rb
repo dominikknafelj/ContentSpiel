@@ -268,6 +268,33 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     assert_equal three, thirty
   end
 
+  test "the editor page reads the reservations in the same few statements for 3 blocks as for 30, some held" do
+    get admin_page_path(@page), headers: tab(B)
+    hold!(@block, users(:two), A)
+    few = capture_sql { get admin_page_path(@page), headers: tab(B) }.grep(/edit_reservations/).size
+    27.times do |i|
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text" }).record
+      hold!(block, users(:two), "tab-#{i.to_s.rjust(8, "0")}") if i.even?
+    end
+    many = capture_sql { get admin_page_path(@page), headers: tab(B) }.grep(/edit_reservations/).size
+
+    assert_equal few, many
+    assert_operator few, :>, 0, "the page's reservations are read"
+    assert_operator many, :<=, 3
+  end
+
+  test "the actions that draw cards (a duplicate) read the reservations in the same few statements, however many blocks" do
+    hold!(@block, users(:two), A)
+    post duplicate_admin_page_content_block_path(@page, @block), headers: tab(B)
+    few = capture_sql { post duplicate_admin_page_content_block_path(@page, @block), headers: tab(B) }.grep(/edit_reservations/).size
+    20.times { |i| hold!(ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text" }).record, users(:two), "tab-#{i.to_s.rjust(8, "0")}") }
+    many = capture_sql { post duplicate_admin_page_content_block_path(@page, @block), headers: tab(B) }.grep(/edit_reservations/).size
+
+    assert_equal few, many
+    assert_operator few, :>, 0, "the reservations are read once for the cards the action draws"
+    assert_operator many, :<=, 3
+  end
+
   test "the live region carries the addresses the scripts need, and nothing for blocks on a post" do
     get admin_page_path(@page)
     assert_select "#editing[data-controller='admin--editing--live'][data-live-part=waiting]" \

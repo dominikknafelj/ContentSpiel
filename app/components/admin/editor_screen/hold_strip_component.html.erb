@@ -5,7 +5,7 @@
     <%= render Admin::Ui::AvatarComponent.new(initials: initials, size: :md, tone: own? ? :own : :other) %>
     <p class="min-w-0 flex-1 text-[13px] text-ink" data-editing-strip-text><%= sentence %></p>
     <% if take_over? %>
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".take_over"), size: :small,
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".take_over"), variant: :secondary, size: :small,
             data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(@subject) }) %>
     <% end %>
   <% end %>
@@ -15,7 +15,7 @@
   <%= tag.div role: "alert", class: "flex flex-wrap items-center gap-2 border border-warn bg-warn-tint px-3.5 py-2 text-[13px] text-warn-ink", data: strip_data do %>
     <p class="min-w-0 flex-1"><%= sentence %></p>
     <span role="status" aria-live="polite" class="shrink-0 text-xs text-ok-ink" data-editing-copied data-copied="<%= t(".copied") %>" data-copy-failed="<%= t(".copy_failed") %>"></span>
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".copy"), size: :small,
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".copy"), variant: :secondary, size: :small,
           data: { action: "admin--editing--hold#copy", editing_subject: ::Editing.key(@subject) }) %>
     <%= render Admin::Ui::ButtonComponent.new(label: last_action.first, variant: :ghost, size: :small,
           data: { action: last_action.last, editing_subject: ::Editing.key(@subject) }) %>

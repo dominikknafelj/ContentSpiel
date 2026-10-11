@@ -16,6 +16,12 @@ module Admin
     # the strip, which explains why the content may change while they read,
     # without the button.
     #
+    # `data-editing-held` on a unit that carries this strip means "someone else
+    # holds this", for a reader as for an editor (the strip is shown to both);
+    # whether the form is FROZEN is a separate fact: `fieldset.admin-held`
+    # (and, for a form frozen in place, `data-editing-frozen`, Task 9). A
+    # script that asks "can this form be typed in" asks those, not this.
+    #
     # A name is drawn as text (`PersonName.of`), never as markup.
     class HoldStripComponent < AdminComponent
       KINDS = %i[held lost deleted].freeze
@@ -44,7 +50,9 @@ module Admin
 
       def held? = @kind == :held
 
-      def own? = @own
+      # Your own other tab: said by the caller (`own:`), or read from the
+      # viewer, whose hold it is. That is what `viewer:` is for.
+      def own? = @own || (@viewer.present? && @hold.present? && @hold.user_id == @viewer.id)
 
       def take_over? = @take_over
 

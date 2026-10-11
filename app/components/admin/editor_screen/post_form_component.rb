@@ -47,8 +47,6 @@ module Admin
       # (Review Focus 4).
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(post))
 
-      # The form's `data-*`: the autosave wiring only when the post is
-      # editable (see `editable?`).
       # The post is held as a whole (one subject, "record"); the strip stands
       # in the header's notice area (`HoldStripComponent.slot_id`). A viewer
       # who may only read sees it without "Take over" (handoff 26).
@@ -68,6 +66,8 @@ module Admin
 
       def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
 
+      # The form's `data-*`: the autosave wiring only when the post is
+      # editable (see `editable?`) and nobody else holds it.
       def form_data
         return {} if !editable? || read_only_hold?
 

@@ -117,7 +117,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   end
 
   test "a tile's version and mark say that its block is held, and differ from the free tile's, for the viewer who is not the holder" do
-    free = render_tile
+    render_tile
     free_version = Capybara.string(rendered_content).find("#content_block_#{@block.id}")["data-editing-version"]
     assert_no_selector "[data-editing-held]"
 
@@ -125,9 +125,9 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_tile }
 
     assert_selector "#content_block_#{@block.id}[data-editing-held=true]"
+    assert_match(/data-editing-version="[^"]*"\s+data-editing-held="true"/, rendered_content, "the two attributes are separated by whitespace")
     assert_not_equal free_version, Capybara.string(rendered_content).find("#content_block_#{@block.id}")["data-editing-version"]
     assert_selector "[role=menu] button", text: "Move up", visible: :all
     assert_no_selector "button", text: "Take over", visible: :all
-    assert free
   end
 end
