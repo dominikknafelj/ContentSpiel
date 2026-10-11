@@ -190,7 +190,7 @@ module Admin
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
 
       stored_hero_id = @page.hero_media_asset_id
-      result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
+      result = saving_under(claim, @page, record: @page) { Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated }) }
 
       streams = autosave_stream(
         record: result.record,

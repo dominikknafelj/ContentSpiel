@@ -183,6 +183,8 @@ en:
             block: "%{name} took over this block"
             post: "%{name} took over this post"
             settings: "%{name} took over the page settings"
+          # The viewer's own other tab holds it: one sentence for all three things.
+          lost_own_tab: "You're editing this in another tab. Your changes weren't saved."
           lost:
             block: "%{name} is editing this block. Your changes weren't saved."
             post: "%{name} is editing this post. Your changes weren't saved."

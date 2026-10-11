@@ -46,6 +46,15 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     Editing::Reservation.update_all(changed_at: 3.minutes.ago) # version: none (a test moves a reservation's clock)
   end
 
+  # `ContentBlocks::Save.call` answers `outcome` (a Result, or a callable that raises) for the block.
+  def with_save(outcome)
+    original = ContentBlocks::Save.method(:call)
+    ContentBlocks::Save.define_singleton_method(:call) { |*, **| outcome.respond_to?(:call) ? outcome.call : outcome }
+    yield
+  ensure
+    ContentBlocks::Save.define_singleton_method(:call, original)
+  end
+
   def limited_editor(*keys)
     keys.each { |key| AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: {}) }
     users(:editor_branch)
@@ -58,7 +67,7 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     assert_equal [ users(:one).id, TAB_A ], Editing::Reservation.sole.values_at(:user_id, :tab)
     events = Audit::Event.count
     stamp = @block.reload.updated_at
-    signals = holder_signals.size
+    signals = broadcasts(@stream).size
 
     sign_in_as users(:two)
     autosave(@block, "theirs", tab: TAB_B)
@@ -67,7 +76,7 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     assert_equal "mine", @block.reload.caption
     assert_equal stamp, @block.updated_at
     assert_equal events, Audit::Event.count, "a refused save is not audited"
-    assert_equal signals, holder_signals.size, "a refused save signals nothing"
+    assert_equal signals, broadcasts(@stream).size, "a refused save signals nothing: no holder signal and no content signal"
     assert_select "turbo-stream[action=update][target='block-#{@block.id}-hold'] template [role=alert]", text: /is editing this block\. Your changes weren't saved\./
     assert_select "turbo-stream[target='block-#{@block.id}-save-status'] template", text: /Not saved/i
     assert_select "turbo-stream[target='block-#{@block.id}-save-status'] template", text: /IS EDITING/
@@ -83,6 +92,8 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
 
     assert_response :conflict
     assert_select "turbo-stream[target='block-#{@block.id}-save-status'] template", text: "● NOT SAVED · OPEN IN YOUR OTHER TAB"
+    assert_select "turbo-stream[target='block-#{@block.id}-hold'] template [role=alert]", text: /You're editing this in another tab\. Your changes weren't saved\./
+    assert_no_match(/Dana Weiss is editing/, response.body)
 
     sign_in_as users(:two)
     autosave(@block, "theirs", tab: TAB_B)
@@ -221,7 +232,6 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     assert_response :conflict
     assert_equal "elsewhere", @block.reload.caption
     assert_equal 0, Editing::Reservation.count, "a refused form saves nothing more and must not hold the block"
-    assert_equal %w[released], holder_signals.map { |signal| signal["reason"] }.last(1).presence || %w[released], "the claim it took was announced and given back"
     assert_equal %w[claimed released], holder_signals.map { |signal| signal["reason"] }
 
     autosave(@block, "mine", tab: TAB_A)
@@ -359,7 +369,11 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     delete admin_page_content_block_path(@page, @block), as: :turbo_stream, headers: headers
     assert_response :success
     assert_nil ContentBlock.find_by(id: @block.id)
-    assert_equal row.except("subject_id").keys, Editing::Reservation.sole.attributes.except("subject_id").keys
+    # Deleting a held block leaves its row until it expires or is swept:
+    # `ContentBlocks::Destroy` does not name `Editing` (ruling), and nothing
+    # asks for the row of a deleted block again.
+    assert_equal [ users(:one).id, TAB_A ], Editing::Reservation.sole.values_at(:user_id, :tab)
+    assert_equal row["changed_at"], Editing::Reservation.sole.changed_at, "none of the four touched the hold"
   end
 
   test "publish, unpublish and schedule are refused while another tab holds the post, and proceed, taking no hold, while it is free" do
@@ -462,5 +476,103 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     assert_equal "from mcp", @block.reload.caption
     assert_equal before, Editing::Reservation.count
     assert_equal [ users(:one).id, TAB_A ], Editing::Reservation.sole.values_at(:user_id, :tab)
+  end
+
+  test "a second person sending the holder's exact tab id is refused like anyone else, and their release deletes nothing" do
+    sign_in_as users(:one)
+    autosave(@block, "mine", tab: TAB_A)
+
+    sign_in_as users(:two)
+    autosave(@block, "theirs", tab: TAB_A)
+    assert_response :conflict
+    claim(block: @block, tab: TAB_A)
+    assert_response :conflict
+    release(block: @block, tab: TAB_A)
+    assert_response :no_content
+    assert_equal [ users(:one).id, TAB_A ], Editing::Reservation.sole.values_at(:user_id, :tab)
+    assert_equal "mine", @block.reload.caption
+  end
+
+  test "claim and release work for a post, and a block id on a post is a 404" do
+    post_record = create_post(title: "Hello", published: false)
+    sign_in_as users(:one)
+    claim(kind: "post", record: post_record, tab: TAB_A)
+    assert_response :no_content
+    assert_equal [ "Post", post_record.id ], Editing::Reservation.sole.values_at(:subject_type, :subject_id)
+
+    sign_in_as users(:two)
+    claim(kind: "post", record: post_record, tab: TAB_B)
+    assert_response :conflict
+    assert_select "turbo-stream[target=editor-notice] template [role=alert]", text: /is editing this post/
+    claim(kind: "post", record: post_record, block: @block, tab: TAB_B)
+    assert_response :not_found
+
+    sign_in_as users(:one)
+    release(kind: "post", record: post_record, tab: TAB_A)
+    assert_response :no_content
+    assert_equal 0, Editing::Reservation.count
+  end
+
+  test "a holder's name with markup characters is escaped in the status line" do
+    users(:one).update!(name: "<b>Eve</b> & Co")
+    sign_in_as users(:one)
+    autosave(@block, "mine", tab: TAB_A)
+    sign_in_as users(:two)
+    autosave(@block, "theirs", tab: TAB_B)
+
+    assert_response :conflict
+    assert_no_match(/<b>Eve/i, response.body)
+    assert_match(%r{&lt;B&gt;EVE&lt;/B&gt; &amp; CO IS EDITING}, response.body)
+  end
+
+  test "a claim this request took is given back when the service denies the save, and kept when it answers 422" do
+    sign_in_as users(:one)
+    denied = ApplicationService::Result.new(record: @block, errors: [ "no" ], denied: true)
+    with_save(denied) { autosave(@block, "x", tab: TAB_A) }
+    assert_response :forbidden
+    assert_equal 0, Editing::Reservation.count
+
+    invalid = ApplicationService::Result.failure(@block, [ "bad" ])
+    with_save(invalid) { autosave(@block, "x", tab: TAB_A) }
+    assert_response :unprocessable_entity
+    assert_equal 1, Editing::Reservation.count
+
+    with_save(denied) { autosave(@block, "x", tab: TAB_A) }
+    assert_equal 1, Editing::Reservation.count, "a renewal is not given back"
+  end
+
+  test "a claim is given back when the service raises" do
+    sign_in_as users(:one)
+    with_save(-> { raise "boom" }) { assert_raises(RuntimeError) { autosave(@block, "x", tab: TAB_A) } }
+    assert_equal 0, Editing::Reservation.count
+  end
+
+  test "bulk publish skips a post someone is editing and says so; a free post is published and an expired hold does not skip" do
+    held = create_post(title: "Held", published: false)
+    free = create_post(title: "Free", published: false)
+    lapsed = create_post(title: "Lapsed", published: false)
+    sign_in_as users(:one)
+    save_post(held, "Held by A", tab: TAB_A)
+    save_post(lapsed, "Lapsed by A", tab: TAB_A)
+    Editing::Reservation.of(lapsed).update_all(changed_at: 3.minutes.ago) # version: none (a test moves a reservation's clock)
+
+    sign_in_as users(:two)
+    post admin_posts_bulk_path, params: { bulk_action: "publish", ids: [ held.id, free.id, lapsed.id ] }
+
+    assert_not held.reload.live?
+    assert free.reload.live?
+    assert lapsed.reload.live?
+    assert_match(/Published 2 posts\./, flash[:notice])
+    assert_match(/1 post being edited by someone was skipped\./, flash[:notice])
+  end
+
+  test "bulk publish of only held posts changes nothing and says why" do
+    held = create_post(title: "Held", published: false)
+    sign_in_as users(:one)
+    save_post(held, "Held by A", tab: TAB_A)
+    post admin_posts_bulk_path, params: { bulk_action: "publish", ids: [ held.id ] }
+
+    assert_not held.reload.live?
+    assert_match(/Nothing was changed\. 1 post being edited by someone was skipped\./, flash[:notice])
   end
 end

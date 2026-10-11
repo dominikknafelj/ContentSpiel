@@ -127,7 +127,7 @@ module Admin
       stored_asset_id = block.media_asset_id
       layout_before = stored_layout(block)
       columns_before = block.column_count
-      result = ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
+      result = saving_under(claim, block, record: @page) { ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations }) }
 
       streams = autosave_stream(
         record: result.record,

@@ -12,6 +12,15 @@ module Admin
   # with its 403, and a person who can only read can never hold a block
   # against the people who can edit it.
   #
+  # A controller that includes this must also include
+  # `Admin::AutosaveResponses` where it calls `refuse_held` (it uses
+  # `live_record?` and Turbo's `turbo_stream`); the instant actions
+  # (`held_elsewhere?`, `refuse_instant_redirect`) need neither.
+  #
+  # A CLAIM THIS REQUEST TOOK is given back when the save does not happen: a
+  # stale refusal, a denied service, an exception (`saving_under`). A 422
+  # keeps it (the person is still typing). A renewal is never given back.
+  #
   # The check and the save are not one transaction, like the stale check
   # beside it: two saves within one request's length can both pass, and the
   # stale check stays underneath. Every call here is one statement made
@@ -50,6 +59,17 @@ module Admin
       ]
     end
 
+    # Runs the save, and gives back a claim this request `:taken` when the
+    # service answers denied or raises. Returns the service's result.
+    def saving_under(claim, subject, record:)
+      result = yield
+      release_claim(subject, record:) if claim == :taken && result.denied?
+      result
+    rescue StandardError
+      release_claim(subject, record:) if claim == :taken
+      raise
+    end
+
     def release_claim(subject, record:)
       tab = Current.editing_tab
       return unless tab && Current.user
@@ -61,6 +81,13 @@ module Admin
     # or the signed-in person's own other tab), for an instant action. Nil
     # when the request names no tab (it neither claims nor is refused), when
     # nothing holds the subject, and when the holder is this very tab.
+    #
+    # It is asked BEFORE the service's own `authorize!`, so a forged Publish by
+    # someone in the read scope but without the right gets "is editing" and no
+    # `access.denied` event while a hold exists. Accepted: they are in the read
+    # scope and see the very strip that names the holder, so nothing new is
+    # disclosed, and asking the right here would need a second copy of each
+    # action's rule (a publish-only person is refused too).
     def held_elsewhere?(subject)
       tab = Current.editing_tab
       return unless tab && Current.user

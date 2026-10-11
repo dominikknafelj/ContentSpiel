@@ -26,6 +26,9 @@ module Admin
     class HoldStripComponent < AdminComponent
       KINDS = %i[held lost deleted].freeze
 
+      # A post's strip stands in `#editor-notice`, the slot the "Changed
+      # elsewhere" bar also uses: whichever is drawn later replaces the other.
+      # Task 9 decides, and tests, which of the two should win.
       def self.slot_id(subject)
         case subject
         when ::ContentBlock then "block-#{subject.id}-hold"
@@ -73,6 +76,7 @@ module Admin
 
       def sentence
         return t(".own_tab") if held? && own?
+        return t(".lost_own_tab") if @kind == :lost && own?
         return t(".#{@kind}.#{noun}", name: name) if name
 
         t(".#{@kind}_unknown.#{noun}")

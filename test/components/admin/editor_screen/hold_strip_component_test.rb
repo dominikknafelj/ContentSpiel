@@ -167,4 +167,15 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
   test "an unknown kind is refused" do
     assert_raises(ArgumentError) { Admin::EditorScreen::HoldStripComponent.new(subject: @block, hold: nil, viewer: @olga, kind: :nope) }
   end
+
+  test "a lost strip for the viewer's own other tab says so in one sentence, for a block, a post and the settings" do
+    [ @block, @post, @page ].each do |subject|
+      strip(subject: subject, hold: hold_by(@olga), viewer: @olga, kind: :lost)
+      assert_selector "[role=alert]", text: "You're editing this in another tab. Your changes weren't saved."
+      assert_no_text "Olga Braun is editing"
+    end
+
+    strip(kind: :lost)
+    assert_selector "[role=alert]", text: "Dana Weiss is editing this block. Your changes weren't saved."
+  end
 end

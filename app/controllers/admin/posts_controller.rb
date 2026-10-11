@@ -71,6 +71,14 @@ module Admin
       ids = bulk_ids
       return redirect_to(posts_list_path, alert: "Select at least one post.", status: :see_other) if ids.empty?
 
+      # A post someone is editing is left alone, and counted (spec §4.2): publishing it
+      # would move its `updated_at` under their open form. One read of the live
+      # reservations, here and not in the service, so it is outside the
+      # per-post savepoints. From a list every hold is someone else's, tab id or
+      # not, and a skip is not a refusal. Trashing is not held back (as a single trash).
+      held = action == "publish" ? held_post_ids(ids) : []
+      ids = ids.reject { |id| held.include?(Integer(id, 10, exception: false)) }
+
       begin
         result = Posts::Bulk.call(action:, ids:)
       rescue ArgumentError
@@ -90,7 +98,7 @@ module Admin
         undo_url = url if undo_offered?(url)
       end
       flash_bulk_result(done: result.done, refused: result.refused, failed: result.failed, reasons: result.reasons,
-        already_live: result.already_live, skipped_scheduled: result.skipped_scheduled, not_found: result.not_found,
+        already_live: result.already_live, skipped_scheduled: result.skipped_scheduled, held: held.size, not_found: result.not_found,
         verb: trashing ? "Moved" : "Published", suffix: trashing ? " to the trash" : "",
         failed_phrase: trashing ? "moved to the trash" : "published", undo_url:, undo_dropped: trashing && result.done.any? && undo_url.nil?)
       redirect_to posts_list_path, status: :see_other
@@ -195,7 +203,7 @@ module Admin
       # picker's blank sentinel alone (`[""]`) clears them.
       attributes[:related_post_ids] = Array(post_params.permit(related_post_ids: [])[:related_post_ids]) if post_params.key?(:related_post_ids)
 
-      result = Posts::Save.call(@post, attributes: attributes, translations: { admin_locale => translated })
+      result = saving_under(claim, @post, record: @post) { Posts::Save.call(@post, attributes: attributes, translations: { admin_locale => translated }) }
 
       streams = autosave_stream(
         record: result.record,
@@ -272,6 +280,14 @@ module Admin
     # Through the read scope (design spec §3.3): someone else's post an
     # author may not read is a 404 -- for show, autosave, publish and delete
     # alike -- not a 403 that would confirm it exists (Review Focus 2).
+    # The ids among `ids` that have a live reservation.
+    def held_post_ids(ids)
+      numeric = ::Posts::Bulk.normalize_ids(ids).grep(Integer)
+      return [] if numeric.empty?
+
+      ::Editing::Reservation.live.where(subject_type: Post.polymorphic_name, subject_id: numeric).pluck(:subject_id)
+    end
+
     def set_post
       @post = admin_scope(Post.all).find(params[:id])
     end

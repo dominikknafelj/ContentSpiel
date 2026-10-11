@@ -45,10 +45,11 @@ module Admin
     # `failed_phrase` completes "couldn't be ..." ("published", "moved to the
     # trash", "restored").
     def flash_bulk_result(done:, verb:, failed_phrase:, refused: [], failed: [], reasons: {}, already_live: [], skipped_scheduled: [],
-                          not_found: 0, suffix: "", undo_url: nil, undo_dropped: false)
+                          held: 0, not_found: 0, suffix: "", undo_url: nil, undo_dropped: false)
       sentences = [ done.any? ? "#{verb} #{helpers.pluralize(done.size, "post")}#{suffix}." : "Nothing was changed." ]
       sentences << "#{counted(already_live.size, "was", "were")} already live." if already_live.any?
       sentences << "#{helpers.pluralize(skipped_scheduled.size, "scheduled post")} #{skipped_scheduled.size == 1 ? "was" : "were"} left as scheduled." if skipped_scheduled.any?
+      sentences << "#{helpers.pluralize(held, "post")} being edited by someone #{held == 1 ? "was" : "were"} skipped." if held.positive?
       sentences << "#{counted(refused.size, "was", "were")} refused: #{names(refused)}." if refused.any?
       if failed.any?
         reason = reasons[failed.first.id].to_s.truncate(REASON_LENGTH)
