@@ -1053,6 +1053,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.__writes = []
       window.fetch = (url, options = {}) => {
         if ((options.method || "GET").toUpperCase() === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the save this test fails
         window.__writes.push(String(url.url || url))
         return /reorder/.test(String(url.url || url)) ? originalFetch(url, options) : Promise.reject(new TypeError("Failed to fetch"))
       }
@@ -1068,6 +1069,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_field caption(@left), with: "Typed while offline"
     assert_equal @section.id, @left.reload.section_id
     assert_empty page.evaluate_script("window.__writes").grep(/reorder/), "the move was sent"
+    assert_equal [ "/cs-studio/pages/#{@page.id}/content_blocks/#{@left.id}" ], page.evaluate_script("window.__writes").map { |url| URI.parse(url).path }.uniq, "only the block's own save was failed"
   end
 
   # Review Focus 4, for a card: its form is in the card, and it is the same rule.

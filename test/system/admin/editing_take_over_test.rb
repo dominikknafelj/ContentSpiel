@@ -827,9 +827,17 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     using_session(:reader) do
       assert_selector "#{strip}", text: "Olga Braun is editing this block", wait: LIVE
       assert_selector "#{card(@block)} [data-editing-announcer]", text: "Olga Braun took over this block", visible: :all, wait: LIVE
-      # Another fetch of the same card (a catch-up) says nothing more.
+      # Another fetch of the same card says nothing more. The fetch is a plain
+      # GET outside the write queue, so it is the merge of its answer that is
+      # waited for (final review I7), and then that no announcement is still
+      # waiting out its 150 ms: the strip that came with the card is a new
+      # element, and a second announcement would have been armed when it connected.
+      page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
+      page.execute_script("window.__strip = document.querySelector(#{strip.to_json})")
       page.execute_script("document.getElementById('editing').dispatchEvent(new CustomEvent('admin--editing--hold:refresh', { detail: { subject: 'block-#{@block.id}' } }))")
-      assert_writes_settled
+      await_js("window.__merged.includes('block:#{@block.id}')", wait: LIVE)
+      assert_equal false, page.evaluate_script("window.__strip === document.querySelector(#{strip.to_json})"), "the second fetch did not draw the card again"
+      await_js("!window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--hold').timers.has('announce:block-#{@block.id}')", wait: LIVE)
       await_frames
       assert_equal [ "Olga Braun took over this block" ], said
       assert_no_selector "[data-editing-kind=lost], [data-editing-kind=deleted]"

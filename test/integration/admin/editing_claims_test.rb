@@ -688,5 +688,73 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     sign_in_as users(:reader)
     withdraw(block: @block, tab: TAB_A)
     assert_response :forbidden
+
+    # Out of scope in the sense the title means (final review I10): asked by
+    # someone whose read scope does not hold the page. 404, never 403.
+    outside = create_page(title: "Outside", published: false)
+    sign_in_as scoped_to(@page)
+    withdraw(record: outside, tab: TAB_A)
+    assert_response :not_found
+    withdraw(tab: TAB_A)
+    assert_response :no_content
+  end
+
+  # Someone who may edit `page` and whose read scope holds nothing else.
+  def scoped_to(page)
+    editor = limited_editor("pages.edit")
+    AccessControl::Grant.where(group: access_control_groups(:branch_editors), permission: "pages.edit").destroy_all
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: { "page_ids" => [ page.id ] })
+    editor
+  end
+
+  POSTS = {
+    claim: :admin_editing_claim_path, release: :admin_editing_release_path, take_over: :admin_editing_take_over_path,
+    hand_over: :admin_editing_hand_over_path, withdraw: :admin_editing_withdraw_path
+  }.freeze
+
+  def post_to(action, kind:, record:, block: nil)
+    post public_send(POSTS.fetch(action), kind:, id: record.id), params: { block_id: block&.id }.compact, headers: { "X-Notes-Tab" => TAB_A }, as: :json
+  end
+
+  # Final review I10: all five share `set_record`, and only `claim`, `take_over`
+  # and `hand_over` had a case asked from outside the scope, and only `claim` a
+  # trashed record. One table, so a route that finds its record another way
+  # fails here.
+  test "each of the five POSTs is a 404, never a 403, outside the read scope, for a trashed page, for a block of one and for a trashed post" do
+    outside = create_page(title: "Outside", published: false)
+    outside_block = ContentBlocks::Save.call(ContentBlock.new(owner: outside), attributes: { block_type: "image" }).record
+    sign_in_as scoped_to(@page)
+    POSTS.each_key do |action|
+      post_to(action, kind: "page", record: outside)
+      assert_response :not_found, "#{action}, a page outside the scope"
+      post_to(action, kind: "page", record: outside, block: outside_block)
+      assert_response :not_found, "#{action}, a block of a page outside the scope"
+    end
+    post_to(:release, kind: "page", record: @page)
+    assert_response :no_content, "inside the scope the same person is answered"
+
+    sign_in_as users(:one)
+    news = create_post(title: "News", published: false)
+    POSTS.each_key do |action|
+      post_to(action, kind: "page", record: @page, block: @block)
+      assert_includes [ 200, 204 ], response.status, "#{action}, before the page is trashed"
+      post_to(action, kind: "post", record: news)
+      assert_includes [ 200, 204 ], response.status, "#{action}, before the post is trashed"
+    end
+    assert Trash::Move.call(@page).ok?
+    assert Trash::Move.call(news).ok?
+    rows = Editing::Reservation.count
+    signals = broadcasts(@stream).size
+
+    POSTS.each_key do |action|
+      post_to(action, kind: "page", record: @page)
+      assert_response :not_found, "#{action}, a trashed page"
+      post_to(action, kind: "page", record: @page, block: @block)
+      assert_response :not_found, "#{action}, a block of a trashed page"
+      post_to(action, kind: "post", record: news)
+      assert_response :not_found, "#{action}, a trashed post"
+    end
+    assert_equal rows, Editing::Reservation.count, "a refused request wrote or deleted a reservation"
+    assert_equal signals, broadcasts(@stream).size, "a refused request signalled"
   end
 end

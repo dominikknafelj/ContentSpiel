@@ -21,8 +21,9 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
   end
 
   teardown do
-    page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
+    # First: the script below can raise, and the browser is shared with the tests that follow.
     page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "no-preference" } ])
+    page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
   end
 
   def open_page(path = "/cs-studio/pages/#{@page.id}")
@@ -241,6 +242,13 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
 
     assert_equal [], page.evaluate_script("window.__seen")
     assert_no_selector "[data-editing-mark]"
+
+    # "Nothing" above is only as good as the cable was quick: a colleague's
+    # save, which IS heard, follows, and its read is the only one ever made.
+    dana_saves(@block, "Theirs")
+    await_js("window.__seen.length > 0", wait: LIVE)
+    assert_selector "#{card(@block)} .ProseMirror", text: "Theirs", wait: LIVE
+    assert_equal 1, page.evaluate_script("window.__seen").size, "this tab also fetched its own save: #{page.evaluate_script("window.__seen").inspect}"
   end
 
   # Every write of an editor carries the tab header, or the server cannot say
@@ -267,6 +275,12 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
 
     assert_equal [], page.evaluate_script("window.__seen"), "this tab fetched what it had written itself"
     assert_equal [], page.evaluate_script("window.__merged"), "this tab drew what it had written itself"
+
+    # As above: a colleague's save, which is heard, is the only read ever made.
+    dana_saves(second, "Theirs")
+    await_js("window.__merged.length > 0", wait: LIVE)
+    assert_equal 1, page.evaluate_script("window.__seen").size, "this tab also fetched what it had written itself: #{page.evaluate_script("window.__seen").inspect}"
+    assert_equal [ "block:#{second.id}" ], page.evaluate_script("window.__merged")
   end
 
   test "the next save of a refreshed card is saved, not refused as stale" do

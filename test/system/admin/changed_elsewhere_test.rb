@@ -74,9 +74,12 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
       const originalFetch = window.fetch
       window.__inFlight = 0
       window.__maxInFlight = 0
+      window.__saves = []
       window.fetch = async (url, options = {}) => {
-        const write = (options.method || "GET").toUpperCase() !== "GET"
-        if (write) { window.__inFlight += 1; window.__maxInFlight = Math.max(window.__maxInFlight, window.__inFlight) }
+        // The saves of the three forms are what is counted; a claim (a POST to
+        // `/cs-studio/editing/`) and every read take the real fetch uncounted.
+        const write = (options.method || "GET").toUpperCase() === "PATCH"
+        if (write) { window.__saves.push(new URL(String(url.url || url), location.href).pathname); window.__inFlight += 1; window.__maxInFlight = Math.max(window.__maxInFlight, window.__inFlight) }
         try { return await originalFetch(url, options) } finally { if (write) window.__inFlight -= 1 }
       }
     JS
@@ -91,6 +94,9 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_eventually { @page.reload.subtitle == "Second" }
     assert_no_text "CHANGED ELSEWHERE"
     assert_equal 1, page.evaluate_script("window.__maxInFlight"), "two writes were on the wire at once"
+    saves = page.evaluate_script("window.__saves")
+    assert_equal [ "/cs-studio/pages/#{@page.id}", *blocks.map { |block| "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}" } ].sort, saves.uniq.sort, "the saves that were counted are the three forms' own"
+    assert_equal "/cs-studio/pages/#{@page.id}", saves.last, "the page form's second save came last"
   end
 
   # Add and Delete block are plain Turbo form submissions that also touch the
@@ -133,14 +139,17 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
 
   # Counts the writes on the wire and keeps every write's answer status. It
   # lives on `window`, which a Turbo render keeps, so it still reports after
-  # the page was replaced.
+  # the page was replaced. A request to `/cs-studio/editing/` (a claim, a
+  # release) is not one of the writes these tests are about: it takes the real
+  # fetch uncounted, so a 409 in `__statuses` is a stale save's and never a
+  # refused claim's.
   WATCH_WRITES = <<~JS
     const watchedFetch = window.fetch
     window.__inFlight = 0
     window.__statuses = []
     window.__renders = 0
     window.fetch = async (url, options = {}) => {
-      const write = (options.method || "GET").toUpperCase() !== "GET"
+      const write = (options.method || "GET").toUpperCase() !== "GET" && !String(url.url || url).includes("/cs-studio/editing/")
       if (write) window.__inFlight += 1
       try {
         const response = await watchedFetch(url, options)

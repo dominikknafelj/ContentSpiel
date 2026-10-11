@@ -204,10 +204,56 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_not held_by(@me)
   end
 
+  # Takes the write queue's turn with a write of the test's own and keeps it
+  # until `free_queue`: whatever is sent through the queue meanwhile waits.
+  def occupy_queue
+    page.execute_script(<<~JS)
+      window.__occupied = false
+      import("saving/queue").then(({ enqueue }) => enqueue(() => { window.__occupied = true; return new Promise((resolve) => { window.__free = resolve }) }))
+    JS
+    await_js "window.__occupied === true"
+  end
+
+  def free_queue = page.execute_script("window.__free()")
+
+  # A JS expression about the autosave controller of the form in `within`.
+  def autosave_js_of(within, expression)
+    "(() => { const form = document.querySelector(#{autosave_form(within).to_json}); const autosave = form && window.Stimulus.getControllerForElementAndIdentifier(form, 'admin--saving--autosave'); return Boolean(autosave && (#{expression})) })()"
+  end
+
+  HOLD_JS = "window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--hold')".freeze
+
+  # No pause will save: the form's own debounce value is put out of reach, so
+  # "nothing was saved" does not depend on how fast the keys arrive.
+  def raise_debounce(within, ms = 600000)
+    page.execute_script("document.querySelector(#{autosave_form(within).to_json}).setAttribute('data-admin--saving--autosave-debounce-value', #{ms})")
+  end
+
+  # The hold script's own clock for a subject, put back past half a hold: what
+  # "this tab claimed it long ago" is, without waiting the time out.
+  def age_claim(block = @block)
+    page.execute_script("(() => { const hold = #{HOLD_JS}; hold.held.set('block-#{block.id}', Date.now() - hold.holdValue) })()")
+  end
+
+  def await_claims(count)
+    assert_eventually(wait: LIVE, message: "expected #{count} claims: #{sent.inspect}") { claims.size == count }
+    await_js "!#{HOLD_JS}.claiming.has('block-#{@block.id}')", wait: LIVE
+  end
+
   test "the claim is sent through the write queue, ahead of the block's first save, and once for three bursts of typing" do
     open_page
     record_requests
+    # THROUGH THE QUEUE, not only first (final review I8: a bare `fetch` at the
+    # first change would also come before a save that waits out its debounce).
+    # A write of the test's own has the queue's turn: the claim is made, and
+    # is not sent until that write is answered.
+    occupy_queue
     type_in(@block, "One")
+    await_js "#{HOLD_JS}.claiming.has('block-#{@block.id}')"
+    await_frames
+    assert_equal [], sent, "the claim was sent beside the write queue, while another write had its turn"
+    free_queue
+    assert_eventually(wait: LIVE, message: "the claim was never sent once the queue was free") { claims.size == 1 }
     assert_writes_settled
     type_in(@block, " two")
     assert_writes_settled
@@ -438,12 +484,13 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
   test "a hold that this tab claimed long ago is claimed again on the first change, and refused when it was taken meanwhile" do
     open_page
     record_requests
-    region_set("hold", 1000)
     type_in(@block, "First")
     assert_writes_settled
     assert_equal 1, claims.size
-    page.execute_script("window.__t0 = Date.now()")
-    await_js "Date.now() - window.__t0 > 650"
+    # "Long ago" is the script's own clock for this subject, put back, not a
+    # time waited out (final review I9: the wait was a sleep by another name,
+    # and five keys slower than half the shortened hold claimed twice).
+    age_claim
     expire
     Editing::Reservation.claim(subject: @block, record: @page, user: @dana, tab: "tab-dddddddd")
     type_in(@block, " later")
@@ -833,6 +880,12 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     type_in(inside, "Quick", within: panel(inside))
     await_delayed
     within(panel(inside)) { click_button "Close" }
+    # The claim on the wire HAS THE QUEUE'S TURN (final review I8): the form's
+    # save has been handed to the queue and is not sent while the claim is
+    # unanswered. Beside the queue, the save would be on the wire by now.
+    await_js "#{autosave_js_of(panel(inside), "autosave.busy")} || window.__sent.some((each) => each.startsWith('PATCH'))", wait: LIVE
+    await_frames
+    assert_equal [], sent, "a save was sent while the claim ahead of it in the queue was unanswered"
     send_delayed
     assert_eventually(wait: LIVE, message: "the block was not released") { sent.grep(%r{/release\z}).any? }
     assert_writes_settled
@@ -959,20 +1012,40 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_equal 0, hold_controller_js("hold.releasing.size + hold.held.size")
   end
 
+  # Final review I9: this typed fourteen keys 150 ms apart against a hold
+  # shortened to a second and asserted that nothing had been saved inside a
+  # one-second debounce, so one stalled round failed it. Now no pause can save
+  # (the form's debounce is out of reach) and "half a hold later" is the
+  # script's clock put back (`age_claim`); every step waits on a condition.
   test "typing for longer than half a hold without a pause renews the hold: one renewal per half hold, and it never lapses" do
     open_page
     record_requests
-    region_set("hold", 1000)
-    find("#{card(@block)} .ProseMirror").click
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    14.times do
-      find("#{card(@block)} .ProseMirror").send_keys("x")
-      sleep 0.15 # sleep: typing without the one-second pause that would save; the hold's renewal is what this measures
-    end
-    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    raise_debounce(card(@block))
+    editor = find("#{card(@block)} .ProseMirror")
+    editor.click
+    editor.send_keys("x")
+    await_claims(1)
+    claimed_at = Editing::Reservation.of(@block).pick(:changed_at)
 
-    assert_operator claims.size, :>=, 2, "typing across half a hold renewed nothing: #{sent.inspect}"
-    assert_operator claims.size, :<=, 1 + (elapsed / 0.5).floor, "more than one renewal per half hold (#{elapsed.round(2)} s): #{sent.inspect}"
+    # Within half a hold: typing on claims nothing more.
+    3.times { editor.send_keys("x") }
+    await_frames
+    assert_equal 1, claims.size, "a change within half a hold of the last claim claimed again: #{sent.inspect}"
+
+    # Half a hold later the next change renews, once, however many keys follow.
+    age_claim
+    3.times { editor.send_keys("x") }
+    await_claims(2)
+    3.times { editor.send_keys("x") }
+    await_frames
+    assert_equal 2, claims.size, "more than one renewal per half hold: #{sent.inspect}"
+    assert_operator Editing::Reservation.of(@block).pick(:changed_at), :>, claimed_at, "the renewal did not move the hold on the server"
+
+    # And again half a hold after that.
+    age_claim
+    editor.send_keys("x")
+    await_claims(3)
+
     assert_equal [], patches, "no pause, so no save yet"
     assert held_by(@me)
     assert_no_selector "[data-editing-kind=lost]"
@@ -1023,12 +1096,17 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     send_delayed
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost]", text: "Dana Weiss is editing this block", wait: LIVE
 
+    # The winner's second save is a section's, so its block answers 204 and
+    # the LIST is fetched and merged: that merge is what this waits for. (It
+    # used to wait for the region to say `answered`, which it had said since
+    # its first catch-up, so the two assertions ran before the merge was drawn
+    # and guarded nothing: final review I2.)
+    page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
     using_session(:dana) do
       find("#content_block_#{section.id} select[name='block[settings][width]']").all("option").last.select_option
       assert_writes_settled
     end
-    await_live_part
-    assert_eventually(wait: LIVE, message: "the winner's second save was never merged") { page.evaluate_script("document.getElementById('editing').dataset.livePart") == "answered" }
+    await_js("window.__merged.includes('blocks')", wait: LIVE)
     await_frames
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Copy my text"
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Discard"

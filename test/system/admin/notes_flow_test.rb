@@ -323,8 +323,13 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     # Unsaved content on the same screen does ask, with the note still there.
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
+      // Only the page's own save is held: the claim ahead of it takes the real fetch.
+      window.__held = []
       window.fetch = (url, options = {}) => {
-        if ((options.method || "GET").toUpperCase() === "GET" || window.__released) return originalFetch(url, options)
+        const path = new URL(String(url.url || url), location.href).pathname
+        const save = (options.method || "GET").toUpperCase() === "PATCH" && path === #{"/cs-studio/pages/#{@page.id}".to_json}
+        if (!save || window.__released) return originalFetch(url, options)
+        window.__held.push(path)
         return new Promise((resolve) => { window.__release = () => { window.__released = true; resolve(originalFetch(url, options)) } })
       }
     JS
@@ -333,6 +338,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     await_js("typeof window.__release === 'function'", wait: LIVE)
     page.execute_script("window.__release()")
     assert_writes_settled
+    assert_equal [ "/cs-studio/pages/#{@page.id}" ], page.evaluate_script("window.__held"), "the one save this test held"
     assert_equal "Typed, not saved yet", @page.reload.subtitle
     assert_not asks_before_unload?, "a saved editor with a half-typed note still asked"
 

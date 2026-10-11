@@ -91,12 +91,81 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     get "/cs-studio/editing/post/#{post.id}/blocks"
     assert_response :not_found
 
+    parts = [ admin_editing_blocks_path(kind: "page", id: @page.id), admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id),
+      admin_editing_record_path(kind: "page", id: @page.id) ]
     sign_in_as @stranger
-    [ admin_editing_blocks_path(kind: "page", id: @page.id), admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id),
-      admin_editing_record_path(kind: "page", id: @page.id) ].each do |path|
+    parts.each do |path|
       get path
       assert_response :not_found, path
     end
+
+    # In the trash (final review I10: the title said so and nothing was trashed).
+    sign_in_as users(:one)
+    post_record = admin_editing_record_path(kind: "post", id: post.id)
+    [ *parts, post_record ].each do |path|
+      get path
+      assert_response :ok, "#{path}, before it is trashed"
+    end
+    assert Trash::Move.call(@page).ok?
+    assert Trash::Move.call(post).ok?
+    [ *parts, post_record ].each do |path|
+      get path
+      assert_response :not_found, "#{path}, in the trash"
+    end
+  end
+
+  # The merge reconciles the list level by level and matches by id
+  # (`app/javascript/editing/merge.js`, `reconcile`): an ancestor of a unit
+  # that has no id is "not in the answer", so it is kept and the unit inside
+  # is marked `data-editing-gone`, and a person is led into the "deleted
+  # block" flow for a block that exists. Nothing raises. This holds the
+  # markup of every shape of unit and part, as the editor's own page and as
+  # each fetched fragment draws it (final review I6).
+  def ancestors_without_id(body, root_selector)
+    document = Nokogiri::HTML5.parse(body)
+    roots = document.css(root_selector)
+    scope = roots.any? ? roots : [ document.at_css("body") ]
+    scope.flat_map do |root|
+      root.css("[data-editing-unit], [data-editing-part]").flat_map do |element|
+        between = element.ancestors.take_while { |up| up != root }
+        between.select { |up| up["id"].blank? }.map { |up| "#{element["id"] || element.name} under <#{up.name} class=#{up["class"].inspect}>" }
+      end
+    end.uniq
+  end
+
+  def units_in(body) = Nokogiri::HTML5.parse(body).css("[data-editing-unit], [data-editing-part]").size
+
+  test "every ancestor of every unit and part up to the block list, and of the record's form up to the region, has an id" do
+    with_locales(%w[en de], default: "en")
+    news = create_post(title: "News", published: false)
+    hold!(@inside, users(:two), A)
+
+    [ admin_page_path(@page), admin_page_path(@page, locale: "de") ].each do |path|
+      get path, headers: tab(B)
+      assert_response :ok
+      assert_operator Nokogiri::HTML5.parse(response.body).css("#content-blocks-list [data-editing-unit]").size, :>=, 2, "#{path} draws the card and the block in the section"
+      assert_empty ancestors_without_id(response.body, "#content-blocks-list"), path
+      assert_select "#editing #page-settings[data-editing-unit]"
+      assert_empty ancestors_without_id(response.body, "#editing").grep(/\Apage-settings /), "#{path}, the settings"
+    end
+    get admin_page_path(@page), headers: tab(B)
+    assert_select "#content-blocks-list #content_block_#{@block.id}[data-editing-unit]", 1, "a top-level card"
+    assert_select "#content-blocks-list #content_block_#{@section.id} form[data-editing-unit]", 1, "a section's own form"
+    assert_select "#content-blocks-list #content_block_#{@inside.id}[data-editing-part]", 1, "a tile"
+    assert_select "#content-blocks-list #block-#{@inside.id}-panel[data-editing-unit]", 1, "a panel"
+    get admin_page_path(@page, locale: "de"), headers: tab(B)
+    assert_select "#content-blocks-list #content_block_#{@section.id} [data-editing-unit][data-editing-subject='block-#{@inside.id}']", 1, "a card of a section's group on a translation tab"
+
+    get admin_post_path(news), headers: tab(B)
+    assert_select "#editing #post-form[data-editing-unit]", 1
+    assert_empty ancestors_without_id(response.body, "#editing"), "a post"
+
+    # The fragments are merged level by level too: the list's children as they are, a block's elements at their top.
+    get admin_editing_blocks_path(kind: "page", id: @page.id), headers: tab(B)
+    assert_operator units_in(response.body), :>=, 4
+    assert_empty ancestors_without_id(response.body, "#content-blocks-list"), "the fetched list"
+    get admin_editing_blocks_path(kind: "page", id: @page.id, locale: "de"), headers: tab(B)
+    assert_empty ancestors_without_id(response.body, "#content-blocks-list"), "the fetched list of a translation tab"
   end
 
   test "a block deleted since is gone, not missing, and the answer is the notice naming who deleted it" do

@@ -115,7 +115,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
   test "a card that holds unsaved text is the same element with its text after a list merge, and a clean one is replaced" do
     type_unsaved(@first, "half a sentence")
     page.execute_script("window.__a = document.querySelector(#{card(@first).to_json}); window.__b = document.querySelector(#{card(@second).to_json})")
-    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(@second, translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
+    colleague { assert ContentBlocks::Save.call(@second, translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
 
     result = merge_list
 

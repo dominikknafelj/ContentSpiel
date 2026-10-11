@@ -366,6 +366,11 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # heard of would be drawn into it (`admin--editing--live`) and its next save
   # would no longer be stale. The server's own refusal is what they test, for
   # a client that was offline, or a script that sends no signal-worthy tab.
+  #
+  # It replaces `Live::Signals.later` for the WHOLE PROCESS while the block
+  # runs, and the system test's server is this process: a notes or presence
+  # signal a browser request causes in that window is dropped too. Keep the
+  # block to the colleague's one service call (it is put back in an `ensure`).
   def as_unheard(actor, channel: :admin, &block)
     with_singleton_override(Live::Signals, :later, proc { |*| }) { as(actor, channel: channel, &block) }
   end
