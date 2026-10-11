@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-11-live-editing-design.md` (binding). The look: `docs/superpowers/specs/2026-10-11-live-editing-handoff.md` (items 1 to 22, binding for every size, token, place and wording; where it and the spec differ on look, it wins). Read both before any task.
 
+> **Settled after this plan was drafted (handoff items 23 to 26, 2026-10-11):** the page settings strip reads "… is editing the page settings"; "Copied" is the status text beside the button (12px `text-ok-ink`, 2 seconds, polite); a save refused by a hold reads "● NOT SAVED · DANA WEISS IS EDITING" (own other tab: "● NOT SAVED · OPEN IN YOUR OTHER TAB"); a reader sees the strip without "Take over" and with the card's ordinary border. Where a task's wording differs, the handoff wins, and open points 1 to 3 below are closed.
+
 ## Where the code disagrees with the design
 
 Each was checked in the code; the plan builds the proposed way.

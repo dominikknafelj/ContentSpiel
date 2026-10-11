@@ -49,3 +49,12 @@ All three stand in the strip's place with its layout.
 ## Not shown
 
 22. No live cursors and no typing indicators (a reservation already means one person types in a block); no "Updated" mark for one's own saves; no count of held blocks in the header; no toast for a take-over, a save or a block change (everything shows on the card); nothing in the page tree or the posts list (presence covers who is on a record).
+
+## Decisions while the plan was written (2026-10-11)
+
+Where these and the items above differ, these win.
+
+23. **The page settings panel's strip** reads "Dana Weiss is editing the page settings" ("these" does not say what is meant). A post is held as a whole, so its label stays item 8's, "Dana Weiss is editing this post".
+24. **"Copied"** (this replaces item 17's toast, which CS Studio does not have): the existing status text beside the button, 12px `text-ok-ink`, gone after 2 seconds, announced politely as the clipboard button's is.
+25. **A save refused by a hold** shows in the form's status line: "● NOT SAVED · DANA WEISS IS EDITING", with the person's name, in the token of "CHANGED ELSEWHERE". For the person's own other tab: "● NOT SAVED · OPEN IN YOUR OTHER TAB".
+26. **Someone who may only read** sees the strip without "Take over" (it explains why the content may change while they read; they see presence already). For them the card's border stays `border-line`: nothing is locked for someone who cannot edit anyway.
