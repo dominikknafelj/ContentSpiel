@@ -10,12 +10,14 @@ module Audit
   # that base can be what made it stale. Without the bound the newest event by
   # someone else could be a change the form had already loaded ("Changed by B
   # 6 minutes ago" when the real change was this same user's save in a second
-  # tab). Events are the record's own plus, for a page or post, those of blocks
-  # it owns (editing a block is editing its owner), ignoring `access.denied` --
+  # tab). Events are the record's own plus, for a post, those of blocks it owns
+  # (editing a block is editing its owner); a page's are its own only, because
+  # its form's base is the settings base, which its blocks' saves leave alone.
+  # Ignoring `access.denied` --
   # the dashboard's "by" rule (`Dashboard::Feed::NOT_A_CHANGE`).
   #
   # Among those, a change by someone else is preferred, and the newest one is
-  # the answer (`own: false`): a block this editor just saved touches the page
+  # the answer (`own: false`): a block this editor just saved touches a post
   # too, and "Changed by <you>" would explain nothing. When the only later
   # change is the viewer's own (a second tab or window) that one is the answer,
   # `own: true`; with no event after the base at all, nil -- a change saved
@@ -55,7 +57,11 @@ module Audit
         .where.not(SqlNodes.like(Audit::Event.arel_table[:action], "session.%"))
       events = events.where(Audit::Event.arel_table[:last_occurred_at].gt(since + SLACK)) if since
       own = events.where(subject_type: record.class.base_class.name, subject_id: record.id)
-      scope = if record.is_a?(::Page) || record.is_a?(::Post)
+      # A PAGE is refused on its settings base (`Page#settings_changed_at`), which
+      # a block's save does not move: only events about the page itself can be
+      # what made that base stale. Counting its blocks' events named a block
+      # editor ("Changed by C") for a settings change B had made.
+      scope = if record.is_a?(::Post)
         via_blocks = events.where(subject_type: ContentBlock.base_class.name,
           subject_id: ContentBlock.where(owner_type: record.class.base_class.name, owner_id: record.id).select(:id))
         own.or(via_blocks)

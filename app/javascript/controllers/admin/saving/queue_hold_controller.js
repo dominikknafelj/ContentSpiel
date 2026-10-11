@@ -38,8 +38,8 @@ import { drained, settled } from "saving/queue"
 // `submit` is taken here first and nothing of Turbo's has started; after a
 // clean drain the form is submitted for real, ONCE (`passing`); only then
 // does Turbo build the request, whose `turbo:before-fetch-request` bubbles
-// to `admin--editor--blocks`, which takes its turn in the -- now empty -- queue and
-// adds the page base (`holdTurboRequest`), exactly as for an unheld delete.
+// to `admin--editor--blocks`, which takes its turn in the -- now empty -- queue
+// (`holdTurboRequest`), exactly as for an unheld delete.
 // After an unclean drain no request is ever built. `holdTurboRequest` alone
 // was not enough: it waits for the queue's slot, so the delete went ahead of
 // the follow-up of a save still on the wire, and it never asks whether a

@@ -228,6 +228,10 @@ class Page < ApplicationRecord
   # `update_columns` and `update_all` go around them on purpose
   # (`Translations::Confirm`'s bookkeeping must not make an open form stale).
   # So someone in the settings is refused only when the SETTINGS changed.
+  # `Trash::Move#trash_descendants` and `Trash::Restore#restore_branch_members`
+  # move descendants with `update_all`, so a descendant's base does not move on
+  # trash and restore while the branch root's does: harmless, no settings value
+  # changes.
   SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at].freeze
   before_save { self.settings_changed_at = Time.current if new_record? || (changed - SETTINGS_BASE_IGNORES).any? }
 

@@ -334,7 +334,10 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # on the far side of it without waiting a second for it.
   #
   # A page's settings form holds `settings_changed_at` as its base
-  # (`Admin::AutosaveResponses#autosave_base`), so a page is backdated in both.
+  # (`Admin::AutosaveResponses#autosave_base`), not `updated_at`, and that base
+  # is what the SLACK window above is measured from: a page is backdated in both
+  # columns, or a settings change made at once after the form loads falls inside
+  # the window and the notice cannot name who made it.
   def backdate(record, by: 5.seconds)
     columns = { updated_at: record.updated_at - by }
     columns[:settings_changed_at] = record.settings_changed_at - by if record.is_a?(Page)

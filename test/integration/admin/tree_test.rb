@@ -95,7 +95,7 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   # open page's own would let a stale form overwrite someone else's save.
   test "moving another page than the open one streams no base, whatever base was sent" do
     travel 1.minute
-    @a.touch
+    as(users(:two), channel: :admin) { assert Pages::Save.call(@a, translations: { "en" => { subtitle: "Newer settings" } }).ok? }
     patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, headers: page_base_header(@a.settings_changed_at), as: :turbo_stream
     assert_response :success
     assert_nil streamed_page_base_stream

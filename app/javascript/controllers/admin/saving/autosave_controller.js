@@ -63,10 +63,9 @@ const saveStates = new WeakMap()
 // every other autosaving form on the screen and with block add/duplicate/
 // delete/reorder: one request is on the wire at a time, and each reads its
 // body and bases when it is SENT, after the previous answer's bases were
-// written into the hidden fields. Without it, forms that debounce on the same
-// tick ("Use all") send the same page base together, one write makes the
-// other's base stale, and the page settings form is left holding a base
-// nobody else made stale -- now a final 409. See the queue's own comment.
+// written into the hidden fields. Without it, two forms that debounce on the
+// same tick ("Use all") would send together, and a base one answer is about to
+// replace would ride on the other request. See the queue's own comment.
 //
 // Two rules keep a save from being sent, or drawn, where it does not belong
 // (fix round 4):

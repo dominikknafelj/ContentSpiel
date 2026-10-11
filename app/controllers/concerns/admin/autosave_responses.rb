@@ -87,13 +87,6 @@ module Admin
       turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: message, kind: kind, action: action, id: id))
     end
 
-    # The time a record's autosave form holds as its base: what a save is compared
-    # against and what an answer hands back. A page's SETTINGS form holds
-    # `settings_changed_at` (live-editing spec §3.3): `updated_at` also moves with
-    # every block write, which would refuse someone in the settings for a
-    # colleague's block. Everything else holds `updated_at`.
-    def autosave_base(record) = record.is_a?(Page) ? record.settings_changed_at : record.updated_at
-
     # Optimistic locking for the three record editors (the page settings
     # form, a block card, the post form). Each form carries the record's
     # `updated_at` as it loaded it (`base_updated_at`, iso8601 with
@@ -164,6 +157,13 @@ module Admin
     end
 
     private
+
+    # The time a record's autosave form holds as its base: what a save is compared
+    # against and what an answer hands back. A page's SETTINGS form holds
+    # `settings_changed_at` (live-editing spec §3.3): `updated_at` also moves with
+    # every block write, which would refuse someone in the settings for a
+    # colleague's block. Everything else holds `updated_at`.
+    def autosave_base(record) = record.is_a?(Page) ? record.settings_changed_at : record.updated_at
 
     # Whether an edit to `record` goes straight to the site: a live page or
     # post, and a content block whose owner page/post is live (a block is

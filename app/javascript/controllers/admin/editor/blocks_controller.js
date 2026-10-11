@@ -538,9 +538,7 @@ export default class extends Controller {
   //
   // Queued with every other write on the screen (`saving/queue.js`): the
   // order is read when the request is sent (a Move up/down made while an
-  // autosave was in flight still sends the final order), and the page base
-  // it carries is the freshest one. The answer's page base is written into
-  // the hidden field before the next request goes.
+  // autosave was in flight still sends the final order).
   //
   // WHAT IS SENT is the complete order of ONE container -- the one the item
   // is in now (`to`) -- and, when the server has the item in another one,

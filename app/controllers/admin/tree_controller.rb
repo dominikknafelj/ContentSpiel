@@ -30,7 +30,7 @@ module Admin
       # is just this same move with these values (see `undo_toast`).
       before = placement(page)
       # Before the write touches it -- see `#page_base_streams`.
-      updated_at_before_move = page.settings_changed_at
+      settings_base_before_move = page.settings_changed_at
       result = Pages::Move.call(page, parent: parent, position: params[:position])
 
       status = if result.ok? then :ok
@@ -41,7 +41,7 @@ module Admin
       streams = tree_stream(selected: page, message: message)
       if result.ok?
         streams.concat(Array(move_toast(page, before)))
-        streams.concat(page_base_streams(page, updated_at_before_move))
+        streams.concat(page_base_streams(page, settings_base_before_move))
       end
       render turbo_stream: streams, status: status
     rescue ActiveRecord::RecordNotFound
@@ -116,9 +116,9 @@ module Admin
     #   refused.
     # No header (the moved page is not the open one, or an older client) or
     # an unparseable one: nothing to vouch for.
-    def page_base_streams(page, updated_at_before_move)
+    def page_base_streams(page, settings_base_before_move)
       sent = request.headers["X-Page-Base-Updated-At"]
-      return [] unless sent.present? && Time.iso8601(sent) == updated_at_before_move
+      return [] unless sent.present? && Time.iso8601(sent) == settings_base_before_move
 
       id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
       [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
