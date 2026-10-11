@@ -1,6 +1,8 @@
 # Presence, and the seams notes and presence share
 
-Status: design, 2026-10-10. Step 2 of "Collaboration on content" on the roadmap. It opens, as agreed on 2026-10-09, with the extension seams, extracted only where notes and presence both need them.
+Status: built (2026-10-10, branch `presence`); where the code left this design, the section "As built" at the end says so, with the reason. The rest of the document is the design as it was approved. `docs/reference/presence.md` describes the code.
+
+Design, 2026-10-10. Step 2 of "Collaboration on content" on the roadmap. It opens, as agreed on 2026-10-09, with the extension seams, extracted only where notes and presence both need them.
 
 ## 1. What it is for
 
@@ -135,3 +137,43 @@ Block-level presence; live refresh of blocks; presence on the dashboard, in the 
 - The script split touches the file that produced most of notes' defects. It goes first and alone.
 - Slots are an interface drawn from two users. They are kept as small as those two need: a name, a component, a loader.
 - Idle and hidden-tab detection differ between browsers; the tests run in Chrome.
+
+## 9. As built
+
+The look is `2026-10-10-presence-handoff.md`, items 1 to 31; this section does not repeat it. Where a point below and the text above differ, this section is what the code does.
+
+### The data
+
+- **The table is an ordinary table (D5).** Rails' schema dumper does not record `UNLOGGED`, so `db:schema:load`, which builds the test database and every new machine, would have made a logged table behind the migration's back. It is in the main database as D5 said. Its columns are §5.3's plus `token` (below) and `state_at`, beside `seen_at` and `arrived_at`: "away for 12 minutes" is counted from `state_at`, which a keep-alive never moves, (the first build counted it from `seen_at`, which every keep-alive moves, so an away person never showed more than 30 seconds).
+- **Stale after 150 seconds, not 60 (§5.2 item 5).** Browsers throttle a hidden tab's timers to about once a minute, and a hidden tab is exactly an away person: with 60 seconds an away person flickered off and on between throttled keep-alives. The cost is that a crashed tab's person is shown for up to two and a half minutes. The sweep is as designed (rows older than 5 minutes, every 5 minutes, in every environment).
+- **Timers.** A keep-alive every 30 seconds carries the tab's state; away after 5 minutes without input or when the tab is hidden; a list re-fetches at most once every 5 seconds; and both the record's part and the lists also re-fetch every 60 seconds while the document is visible, so a crashed tab's person ages out of a screen that hears no signal.
+- **A subscription owns its row by a token.** The first build let a reconnect's late `leave` delete the row the new subscription had written, after which the person was invisible; now `leave` deletes only its own, `report` and `beat` write a missing row again, and a subscription that has left writes nothing. The tab reports its state on every `connected`. Two narrow races remain and are on the roadmap.
+
+### Signals and channels
+
+- **The list signal names no record (replaces §5.2 item 6).** It is `{ kind: "presence" }` on `presence:list`: a signal naming a record told users without access to it that the record exists and is being worked on. A list re-fetches all its markers on any signal, at most once every 5 seconds. The record's own stream is as designed.
+- **A channel's hooks, `subscribed` and `unsubscribed` are private.** Action Cable exposes a subclass's own public methods as actions a client may call, and a public `arrived` writes a row. `Presence::Channel` offers exactly `report` and `beat`. The hook that names the stream is `stream_name_for`, not Rails' own `stream_for`.
+- **`Live::Signals.later` refuses more than §4.2 said**: a payload without a `kind`, free text in `kind` or `reason`, a nil `origin`, anything but ids and `record: [kind, id]`. The payload is copied and frozen. `Notes::Signals` keeps its own methods and sends through it, as designed; the guard is `test/models/notes/signals_test.rb`, "nothing in the app broadcasts but Live::Signals, and only a ...::Signals module calls it".
+
+### The seams
+
+- **`RecordKinds::Kind` has `scoped` and one `readable(user, channel:)` relation** (§4.3 had a finder). Rights per record (pages, posts) mean not found outside them; an unscoped kind (the library image, one right for every image) answers 403 when the read right is missing. `find` and `readable_ids` are derived from `readable` so they cannot drift. `Notes::SUBJECT_TYPES` and its key tables are gone (`Notes.subject_types`), and `Admin::RecordOfKind` is a concern shared by the notes and presence controllers.
+- **Slots as built (§4.1).** `Admin::Slots` is at `app/components/admin/slots.rb`, a named exception in the layout guard. The names are `editor.header.people`, `editor.header.actions`, `media.panel.header`, `media.panel.sections`, `tree.row.markers`, `posts.row.markers` and `posts.row.title` (§4.1 and §5.1 said `editor.header.status`, and presence in `media.panel.sections`; the people stand first in the action row and between the file name and the "×", so they have places of their own). A registration may carry options (`size: :panel`, `joined: true`), and the reserved names `record`, `viewer`, `data` and `component` are refused. The hosts pass a generic `slot_context:` (the editors pass the drawer's counts they have already read, so the Notes button costs no statement); a slot component accepts `**`. A list slot's loader runs once for all rows; the 3-against-30 statement tests pin it for the tree and the posts list. The posts table's Notes column *header* stays in the table, a named exception in `test/lib/notes_boundary_test.rb`, since a header mechanism is a second slot kind that two features do not justify. The boundary test's pattern finds the word in every spelling (`note_counts`, `NoteContainer`, `hasNotes`), and covers eleven files.
+- **Not extracted**, each with its trigger. Deletion hooks: `Notes::Remove` stays a direct call from `Trash::Purge` and `ContentBlocks::Destroy` (trigger: edit reservations). A "session ended" event (§4.4). The block card's marker and menu item and the section tile's (trigger: block-level presence, step 3). The dashboard's cards, the sidebar's badge, the mind graph's count and nodes, the media tile's chip and the grid's read. A column mechanism for lists.
+
+### The scripts
+
+- **The script split (§3)** went as designed and in the order designed: `live/connection.js`, `notes/merge.js`, `controllers/admin/notes/inbox_controller.js` and the shortened `live_controller.js`, plus two small modules the split asked for, `notes/json.js` and `live/state.js`. The question "is the person watching this thread?" that the inbox controller needs of the live controller is asked by a synchronous event, `admin--notes--inbox:watching`, answered in the event's `detail`; the inbox announces a delivery as `admin--notes--inbox:delivery` (it was `admin--notes--live:delivery`). Neither controller holds the other.
+- **`live/connection` gained** `perform(action, data)` (sent only while the subscription is up), a `rejected` state, and `suspend()` and `resume()`.
+- **The record's part is filled by a plain `fetch`, not a Turbo request**: the write queue holds Turbo's requests while a save is out and its frame events are heard by everyone. The same for the lists. **`suspend()` and `resume()` run on `pagehide` and `pageshow`**: a page left by a full load may be kept for the Back button with its socket open, and the person would stay on the record until the row went stale.
+- **`data-notes-live`** is still the attribute `live/state.js` writes, and `await_notes_live` the test helper; both now cover presence too (a part says it on its own element with `data-live-part`) and want a rename (roadmap).
+- **Status texts are patched in place.** An away person's minutes ("away 12 min", three times in the answer) grew every minute and redrew the group under a reader every minute; only a real change redraws.
+- **A list's `here` answer** is `{ id: { count, names, label, tip } }`, worded on the server (`RowMarkerComponent.words`), so the script holds no wording. `Roster#here_counts` has no caller now.
+
+### Other
+
+- **A person's short name is `PersonName`** (`app/values/`), used by notes (`Notes.name_of`) and presence (§5.1 said "as in notes"; presence may not know notes).
+- **A new shared tooltip, `Admin::Ui::TooltipComponent`** with `admin--ui--tooltip` (handoff 18, 30): CS Studio had none. Existing icon buttons still use `title`, and move in a later sweep.
+- **The sign-in step's wait (§6)** was lengthened to 15 seconds as the first task, as designed.
+- **Not tested by a machine**, by hand or not at all: Safari; idle detection on a second real machine; reduced motion; a real back/forward-cache restoration; a throttled hidden tab's keep-alives. The roadmap lists what the build leaves open.
+
