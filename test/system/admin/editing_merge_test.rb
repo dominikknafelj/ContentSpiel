@@ -711,4 +711,115 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     assert same?("__a", panel(@inside))
     assert_includes text_of(panel(@inside)), "typed while offline"
   end
+
+  # What scrolls the list, found the way the module finds it.
+  SCROLLER_JS = <<~JS.freeze
+    (() => {
+      for (let each = document.getElementById("content-blocks-list").parentElement; each; each = each.parentElement) {
+        const overflow = getComputedStyle(each).overflowY
+        if ((overflow === "auto" || overflow === "scroll") && each.scrollHeight > each.clientHeight) return each
+      }
+      return document.scrollingElement
+    })()
+  JS
+
+  def scroll_top = page.evaluate_script("#{SCROLLER_JS}.scrollTop")
+
+  def prepare_scroll
+    8.times { add_block }
+    open_editor
+    page.execute_script("document.querySelector(#{card(@section).to_json}).scrollIntoView({ block: 'start' })")
+    added = colleague { 3.times.map { add_block } }
+    colleague { assert ContentBlocks::Reorder.call(@page, added.map(&:id) + (server_order - added.map(&:id))).ok? }
+  end
+
+  test "a one-block answer displaces nothing, whatever the root it is merged into" do
+    type_unsaved(@first, "my words")
+    hidden_panel_with(@inside, "panel words")
+    keep(card(@first), "__a")
+    keep(panel(@inside), "__p")
+    keep(card(@inside), "__tile")
+    colleague do
+      assert ContentBlocks::Save.call(@first, translations: { "en" => { body: rich_doc("Theirs") } }).ok?
+      assert ContentBlocks::Save.call(ContentBlock.find(@inside.id), translations: { "en" => { body: rich_doc("Theirs too") } }).ok?
+    end
+
+    result = merge_units(blocks_path(@first), "editing")
+
+    assert_equal [], result["moved"]
+    assert_equal [ "content_block_#{@first.id}" ], result["kept"]
+    assert_not result["missing"]
+    assert same?("__a", card(@first))
+    assert_equal 1, forms_of(@first)
+
+    result = merge_units(blocks_path(@inside), "editing")
+
+    assert_equal [], result["moved"]
+    assert_equal [ "block-#{@inside.id}-panel" ], result["kept"]
+    assert_equal [ "content_block_#{@inside.id}" ], result["replaced"]
+    assert same?("__p", panel(@inside))
+    assert_not same?("__tile", card(@inside))
+    assert_equal 1, forms_of(@inside)
+  end
+
+  test "a panel shown because its tile is gone stays shown when another tile is pressed, and closing the other leaves it" do
+    @other = add_block(section_id: @section.id, section_column: 2)
+    open_editor
+    hidden_panel_with(@inside, "panel words")
+    colleague { assert ContentBlocks::Destroy.call(ContentBlock.find(@inside.id)).ok? }
+    merge_list
+    assert_selector panel(@inside), visible: :visible
+
+    find("#{card(@other)} .admin-block-tile__face").click
+
+    assert_selector panel(@other), visible: :visible
+    assert_selector panel(@inside), visible: :visible
+    assert_includes text_of(panel(@inside)), "panel words"
+
+    find("#{card(@other)} .admin-block-tile__face").click
+
+    assert_no_selector panel(@other), visible: :visible
+    assert_selector panel(@inside), visible: :visible
+
+    # Its own Close button closes it, and only it.
+    find("#{card(@other)} .admin-block-tile__face").click
+    assert_selector panel(@other), visible: :visible
+    within(panel(@inside)) { click_button "Close" }
+    assert_no_selector panel(@inside), visible: :visible
+    assert_selector panel(@other), visible: :visible
+  end
+
+  test "a scroll made by anything else while the correction runs is not undone" do
+    prepare_scroll
+    merge_list
+    page.execute_script("#{SCROLLER_JS}.scrollTop += 300")
+    set = scroll_top
+    await_frames
+    await_frames
+
+    assert_in_delta set, scroll_top, 1
+  end
+
+  test "two merges in a row leave one correction, and the block ends where the second found it" do
+    prepare_scroll
+    result = run_merge(blocks_path, <<~JS)
+      const scroller = #{SCROLLER_JS}
+      const card = () => document.getElementById(#{"content_block_#{@section.id}".to_json})
+      const unsaved = window.__unsaved
+      merge.anchored(list, () => merge.mergeList(list, fresh.cloneNode(true), { unsaved }))
+      // A little up, so the section's card is still the first one wholly in view for the second merge.
+      scroller.scrollTop -= 30
+      const before = card().getBoundingClientRect().top
+      merge.anchored(list, () => merge.mergeList(list, fresh.cloneNode(true), { unsaved }))
+      const samples = []
+      let frames = 0
+      const sample = () => {
+        samples.push(card().getBoundingClientRect().top - before)
+        if (++frames < 40) requestAnimationFrame(sample); else done(samples)
+      }
+      requestAnimationFrame(sample)
+    JS
+
+    assert result.all? { |off| off.abs < 2 }, "the block moved against the second merge's place: #{result.map(&:round)}"
+  end
 end

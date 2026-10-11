@@ -43,8 +43,8 @@
 //   - the answer has its subject in the same place (same id, a unit, in a
 //     container of the same id): it is KEPT, and the answer's copy is dropped;
 //   - the answer has its subject somewhere else (another container: a card
-//     moved into a section or out of one, a panel moved to another section or
-//     lane) or in another shape (card <-> tile and panel): it is DISPLACED
+//     moved into a section or out of one, a panel moved to another section;
+//     a panel moved to another lane of its section is home and simply kept) or in another shape (card <-> tile and panel): it is DISPLACED
 //     (`moved`, and also in `kept`). It stays where it is and is not marked
 //     gone, and EVERY element of that subject is removed from the answer
 //     before drawing, so nothing of the block is drawn in its new place: no
@@ -56,6 +56,11 @@
 //     their order. A hidden panel of a kept unit whose tile is no longer on
 //     screen (gone or displaced) is shown (`hidden = false`), or nothing on
 //     screen would lead to the form that holds the person's text.
+// `moved` is a subset of `kept` and never overlaps `gone`. `mergeUnits` sees
+// only one block's answer, which names no container, so it reports a unit as
+// moved only when the answer has the block in another SHAPE (card <-> tile and
+// panel) and never for a change of container: that is the list fetch's to
+// find.
 // CONTRACT FOR THE CALLER: a displaced unit is not an error and needs no
 // notice. The caller fetches the list again once that unit's form is no
 // longer unsaved; the unit is then replaced like any clean one and the block
@@ -72,9 +77,14 @@
 // presses somewhere else), and for an `input` or `textarea` the selection is
 // put back too. In a rich-text field the caret and the selection are lost.
 //
-// `anchored` keeps the block the person is reading where it is on screen,
-// until the cards redrawn above it have mounted their editors. It sets the
-// scroll position of what scrolls the list, which is outside the list.
+// `anchored(root, draw)` keeps the block the person is reading where it is on
+// screen. It returns at once with what `draw` returned and goes on adjusting
+// the scroll position for up to ANCHOR_WAIT (1.5 s), while the cards redrawn
+// above it mount their editors and grow. The adjusting ends for good as soon
+// as the scroller is anywhere but where it last put it (a key, the wheel, the
+// browser following the caret, any script), when the time is up, or when
+// `anchored` is called again: one adjusting at a time. It sets the scroll
+// position of what scrolls the list, which is outside the list.
 // Otherwise this module touches the document only inside the element it is
 // handed, opens no connection, fetches nothing, raises no toast and knows no
 // controller. Its tests are `test/system/admin/editing_merge_test.rb`.
@@ -88,6 +98,8 @@ const RUNTIME = [ "inert", "data-picked", "data-notes-active", "data-editing-gon
 const FOCUS_WAIT = 3000
 // How long the block being read is held in place while the cards above it grow.
 const ANCHOR_WAIT = 1500
+// The correction loop that is running, if any: one at a time.
+let running = null
 
 // Whether one of the unit's own forms is unsaved. A section's settings form
 // is itself the unit; a card's forms are those not inside a nested unit.
@@ -117,7 +129,7 @@ export function mergeUnits(root, fresh, { unsaved }) {
   const result = { replaced: [], kept: [], missing: false, moved: [] }
   withState(root, () => {
     const keep = new Set([ ...root.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
-    for (const unit of displace(root, fresh, keep)) { result.moved.push(unit); result.kept.push(unit) }
+    for (const unit of displace(root, fresh, keep, { containers: false })) { result.moved.push(unit); result.kept.push(unit) }
     for (const twin of [ ...fresh.children ]) {
       const live = twin.id ? document.getElementById(twin.id) : null
       if (!live || !root.contains(live) || live === root || live.matches(UNIT) !== twin.matches(UNIT)) { result.missing = true; continue }
@@ -140,6 +152,7 @@ export function mergeUnits(root, fresh, { unsaved }) {
 // time is up. The anchor is looked up again by id each time, and the next one
 // in view stands in for one that was removed.
 export function anchored(root, draw) {
+  running = null
   const scroller = scrollerOf(root)
   const view = viewOf(scroller)
   const inFocus = document.activeElement?.closest?.("[data-block-id], [data-editing-unit]")
@@ -169,23 +182,18 @@ export function anchored(root, draw) {
   }
   correct()
 
-  let stopped = false
-  const stop = () => { stopped = true }
-  const keys = (event) => { if ([ "PageUp", "PageDown", "Home", "End" ].includes(event.key)) stopped = true }
+  // The loop writes the scroll position only while the scroller is where the
+  // loop itself last put it: anything else that moved it (a key, a wheel, the
+  // browser following the caret, a script) ends the loop for good. A new call
+  // ends the one before it.
+  const mine = { ended: false }
+  running = mine
+  let last = scroller.scrollTop
   const until = performance.now() + ANCHOR_WAIT
-  addEventListener("wheel", stop, { passive: true, capture: true })
-  addEventListener("touchstart", stop, { passive: true, capture: true })
-  addEventListener("pointerdown", stop, { passive: true, capture: true })
-  addEventListener("keydown", keys, { capture: true })
   const step = () => {
-    if (stopped || performance.now() > until) {
-      removeEventListener("wheel", stop, { capture: true })
-      removeEventListener("touchstart", stop, { capture: true })
-      removeEventListener("pointerdown", stop, { capture: true })
-      removeEventListener("keydown", keys, { capture: true })
-      return
-    }
+    if (mine.ended || running !== mine || performance.now() > until || scroller.scrollTop !== last) return
     correct()
+    last = scroller.scrollTop
     requestAnimationFrame(step)
   }
   requestAnimationFrame(step)
@@ -200,16 +208,18 @@ const tileOf = (root, panel) => root.querySelector(`[data-editing-part][data-blo
 const containerKey = (element, root) => element.parentElement === root ? "" : (element.parentElement?.id || "")
 
 // The kept units whose subject the answer has somewhere other than where the
-// unit is. Every element of that subject is taken out of the answer, so the
+// unit is (`containers`: a list answer has its containers, so a change of
+// container is seen; a one-block answer has none and only the id and the shape
+// are compared). Every element of that subject is taken out of the answer, so the
 // block is not drawn in its new place while this one has unsaved text.
-function displace(root, fresh, keep) {
+function displace(root, fresh, keep, { containers = true } = {}) {
   const moved = []
   for (const unit of keep) {
     const subject = unit.dataset.editingSubject
     if (!subject) continue
     const copies = [ ...fresh.querySelectorAll(`[data-editing-subject="${subject}"]`) ]
     if (!copies.length) continue
-    const home = copies.some((copy) => copy.id === unit.id && copy.matches(UNIT) && containerKey(copy, fresh) === containerKey(unit, root))
+    const home = copies.some((copy) => copy.id === unit.id && copy.matches(UNIT) && (!containers || containerKey(copy, fresh) === containerKey(unit, root)))
     if (home) continue
     copies.forEach((copy) => copy.remove())
     moved.push(unit)
