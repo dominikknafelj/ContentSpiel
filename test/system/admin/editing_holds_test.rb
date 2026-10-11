@@ -263,6 +263,39 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "a held block in a section shows its holder's avatar on the tile, and opening the tile shows the strip" do
+    section = add_block(block_type: "section", settings: { "layout" => "two" })
+    inside = add_block(section_id: section.id, section_column: 1)
+    tile = "#content_block_#{inside.id}"
+    join(:dana, @dana)
+    open_page
+    find("#{tile} .admin-block-tile__face").click
+    type_in(inside, "In a lane", within: panel(inside))
+    assert_writes_settled
+    assert held_by(@me, inside)
+
+    using_session(:dana) do
+      # The tile is drawn for her by the signal, not by a reload; the avatar is
+      # a hover-only tooltip's host, so its words are read from the DOM.
+      assert_selector "#{tile}[data-editing-held=true] [data-holder-avatar]", wait: LIVE
+      assert_equal "OB", find("#{tile} [data-holder-avatar]").find("span[aria-hidden=true]:not([data-tooltip])", match: :first).text
+      assert_selector "#{tile} [data-holder-avatar] .sr-only", text: "Olga Braun is editing this block", visible: :all
+      assert_selector "#{tile} [data-holder-avatar] [data-tooltip]", text: "Olga Braun is editing this block", visible: :all
+      assert_operator evaluate_script("(() => { const t = document.querySelector(#{tile.to_json}); return t.querySelector('[data-holder-avatar]').compareDocumentPosition(t.querySelector('.admin-notes-marker')) & Node.DOCUMENT_POSITION_FOLLOWING })()"), :>, 0
+      assert_no_selector "#{tile} button", text: "Take over", visible: :all
+      assert_no_selector "#{tile} [aria-live]", visible: :all
+
+      find("#{tile} .admin-block-tile__face").click
+      assert_selector "#{panel(inside)} [data-editing-kind=held]", text: "Olga Braun is editing this block"
+    end
+
+    within(panel(inside)) { click_button "Close" }
+    assert_eventually(wait: LIVE, message: "the block was not released") { !Editing::Reservation.of(inside).exists? }
+    using_session(:dana) do
+      assert_no_selector "#{tile} [data-holder-avatar]", wait: LIVE
+    end
+  end
+
   test "collapsing a card releases it" do
     join(:dana, @dana)
     open_page

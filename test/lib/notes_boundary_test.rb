@@ -114,10 +114,10 @@ class NotesBoundaryTest < ActiveSupport::TestCase
   # is a seam for a SECOND feature; none of these has asked for one.
   NAMED_EXCEPTIONS = {
     %w[app/components/admin/editor_screen/block_card_component.rb app/components/admin/editor_screen/block_card_component.html.erb] =>
-      "the block card's Add note item and marker: a slot when a second feature puts something on a block",
+      "the block card's Add note menu item: a slot when a second feature puts an item into a block's menu (the marker is in the slot editor.block.markers)",
     %w[app/components/admin/editor_screen/block_tile_component.rb app/components/admin/editor_screen/block_tile_component.html.erb
        app/components/admin/editor_screen/section_card_component.html.erb] =>
-      "the section tile's Add note item and marker: a slot with the block card's, when a second feature puts something on a block",
+      "the section tile's Add note menu item: a slot with the block card's, when a second feature puts an item into a block's menu (the marker is in the slot editor.block.markers)",
     %w[app/components/admin/dashboard_screen/card_component.rb] =>
       "the dashboard's notes cards: a slot when the dashboard offers cards to a second feature (presence on the dashboard is out of scope)",
     %w[app/components/admin/shell/sidebar_component.rb app/components/admin/shell/sidebar_component.html.erb] =>
@@ -139,6 +139,21 @@ class NotesBoundaryTest < ActiveSupport::TestCase
 
     assert_empty offences, "A core screen draws what is registered at its slot (config/initializers/admin_slots.rb) and does not name the feature, " \
                            "not even in a comment."
+  end
+
+  # The marker on a block is a slot's (`editor.block.markers`); what is left in
+  # these files is the menu's "Add note" item, a named exception above.
+  BLOCK_MARKER_HOSTS = %w[
+    app/components/admin/editor_screen/block_card_component.rb app/components/admin/editor_screen/block_card_component.html.erb
+    app/components/admin/editor_screen/block_tile_component.rb app/components/admin/editor_screen/block_tile_component.html.erb
+  ].freeze
+
+  test "the block card and the tile draw no marker themselves: they draw the slot" do
+    BLOCK_MARKER_HOSTS.each do |path|
+      source = Rails.root.join(path).read
+      assert_no_match(/MarkerComponent|note_marker/, source, "#{path} names a marker: it belongs to the slot editor.block.markers")
+    end
+    assert BLOCK_MARKER_HOSTS.select { |path| path.end_with?(".erb") }.all? { |path| Rails.root.join(path).read.include?("editor.block.markers") }
   end
 
   test "every place that still names notes directly is a named exception with its trigger, and still names them" do

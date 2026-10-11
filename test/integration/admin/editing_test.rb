@@ -250,6 +250,11 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     editor = Nokogiri::HTML5.parse(response.body)
     squash = ->(nodes) { nodes.map { |node| node.to_html.gsub(/\s+/, " ").strip } }
 
+    # The held block in the section shows its holder's avatar on its tile, before the notes marker.
+    tile = editor.at_css("#content_block_#{@inside.id}")
+    assert_includes tile.css("[data-holder-avatar]").map(&:text).join, "is editing this block"
+    assert_operator tile.to_html.index("data-holder-avatar"), :<, tile.to_html.index("notes-marker-ContentBlock-#{@inside.id}")
+
     get admin_editing_blocks_path(kind: "page", id: @page.id), headers: tab(B)
     assert_equal squash.(editor.css("#content-blocks-list > *")), squash.(Nokogiri::HTML5.fragment(response.body).children.select(&:element?))
 
@@ -312,6 +317,25 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     assert_equal few, many
     assert_operator few, :>, 0, "the page's reservations are read"
     assert_operator many, :<=, 3
+  end
+
+  test "the page editor costs the same statements for 3 blocks as for 30 with both features on every block, and the avatar's slot costs none" do
+    hold!(@inside, users(:two), A)
+    total = -> { capture_sql { get admin_page_path(@page), headers: tab(B) }.size }
+    get admin_page_path(@page), headers: tab(B)
+    three = total.call
+    with_avatar = three
+    without_avatar = Admin::Slots.with("editor.block.markers" => [ Admin::NotesScreen::MarkerComponent ]) { total.call }
+
+    27.times do |i|
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text", section_id: @section.id, section_column: i.even? ? 1 : 2 }).record
+      hold!(block, users(:two), "tab-#{i.to_s.rjust(8, "0")}")
+    end
+    thirty = total.call
+
+    assert_equal three, thirty, "a block's markers cost no statement of their own"
+    assert_equal without_avatar, with_avatar, "the avatar reads from the page's holds, not from a statement of its own"
+    assert_operator Nokogiri::HTML5.parse(response.body).css("[data-holder-avatar]").size, :>=, 28
   end
 
   test "the actions that draw cards (a duplicate) read the reservations in the same few statements, however many blocks" do

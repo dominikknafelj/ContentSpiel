@@ -54,6 +54,7 @@ module Admin
       editor.header.people editor.header.actions
       media.panel.header media.panel.sections
       tree.row.markers posts.row.markers posts.row.title
+      editor.block.markers
     ].freeze
 
     # The slot's own constructor arguments: an option of these names would replace
@@ -76,9 +77,14 @@ module Admin
       # `{ entry => { record id => data } }` for the entries of a LIST slot
       # that have a loader, each called once with every record. An entry
       # without one is not in the hash: its components get `data: nil`.
-      def load(name, records, viewer:)
+      #
+      # `context` is what the host has already read (`holds:` on a block): it
+      # goes to a loader that declares a keyword of that name (or `**`), so a
+      # loader can answer from it without a statement of its own, and to no
+      # other (`->(records, viewer:)` stays valid).
+      def load(name, records, viewer:, **context)
         records = records.to_a
-        entries(name).select(&:loader).to_h { |entry| [ entry, entry.loader.call(records, viewer: viewer) ] }
+        entries(name).select(&:loader).to_h { |entry| [ entry, entry.loader.call(records, viewer: viewer, **context_for(entry.loader, context)) ] }
       end
 
       # Empties every slot, or sets them to `to` (`{ name => [entries] }`).
@@ -104,6 +110,13 @@ module Admin
 
       def entries_for!(name)
         @registry.fetch(name.to_s) { raise ArgumentError, "no slot is named #{name.inspect}; the names are #{NAMES.join(", ")}" }
+      end
+
+      def context_for(loader, context)
+        parameters = loader.parameters
+        return context if parameters.any? { |kind, _| kind == :keyrest }
+
+        context.slice(*parameters.filter_map { |kind, key| key if kind == :key || kind == :keyreq })
       end
 
       def entry_of(entry) = entry.is_a?(Entry) ? entry : Entry.new(component: entry, loader: nil, options: {})

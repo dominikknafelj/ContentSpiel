@@ -29,7 +29,7 @@ class Admin::SlotsTest < ViewComponent::TestCase
   def entry(component, loader: nil, **options) = Admin::Slots::Entry.new(component:, loader:, options:)
 
   test "the names a screen may put a slot at" do
-    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title], Admin::Slots::NAMES
+    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title editor.block.markers], Admin::Slots::NAMES
   end
 
   test "an unknown name is refused at registration" do
@@ -121,6 +121,19 @@ class Admin::SlotsTest < ViewComponent::TestCase
       assert_equal 2, calls
       assert_equal [ { size: :header }, { size: :panel } ], loaded.keys.map(&:options)
     end
+  end
+
+  test "load hands the host's context to a loader that names it or takes any, and to no other" do
+    seen = {}
+    plain = ->(records, viewer:) { seen[:plain] = :called; {} }
+    named = ->(records, viewer:, holds: nil) { seen[:named] = holds; {} }
+    open_ended = ->(records, viewer:, **context) { seen[:open] = context; {} }
+
+    Admin::Slots.with("editor.block.markers" => [ entry(FirstComponent, loader: plain), entry(SecondComponent, loader: named), entry(ProbeComponent, loader: open_ended) ]) do
+      Admin::Slots.load("editor.block.markers", [], viewer: nil, holds: :the_holds)
+    end
+
+    assert_equal({ plain: :called, named: :the_holds, open: { holds: :the_holds } }, seen)
   end
 
   test "load calls each loader once with every record and the viewer, and skips entries without one" do

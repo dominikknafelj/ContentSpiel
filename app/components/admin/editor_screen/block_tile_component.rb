@@ -86,7 +86,7 @@ module Admin
       # The tile stands for a block the panel of which is read-only while
       # someone else holds it: it says so in its version (a catch-up redraws
       # it when the hold comes or goes) and in `data-editing-held`. The avatar
-      # in its place is Task 12's, beside the notes marker.
+      # of the holder stands in the slot `editor.block.markers`.
       def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
 
       def hold = holds.other(block)
@@ -111,9 +111,13 @@ module Admin
 
       def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
-      # The block's notes marker (`Admin::NotesScreen::MarkerComponent`): on
-      # the tile, never on the block's form panel, and for every viewer.
-      def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
+      # The block's markers (slot `editor.block.markers`: the holder's avatar,
+      # then the notes marker): on the tile, never on the block's form panel,
+      # and for every viewer.
+      #
+      # The page's holds are read already (`holds`), so the avatar's loader
+      # answers from them and costs no statement.
+      def slot_loaded = Admin::Slots.load("editor.block.markers", [ block ], viewer: Current.user, holds: holds)
 
       def note_key = ::Notes.key(block)
 

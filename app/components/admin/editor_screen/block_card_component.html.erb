@@ -29,7 +29,7 @@
       <%# The notes marker stands directly after the name, on the left, where the notes
           drawer cannot cover it; the spacer after it takes the rest of the row. %>
       <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
-      <%= render note_marker %>
+      <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, loaded: slot_loaded, label: label, placement: :card, holds: holds) %>
       <span data-editing-mark-slot><%= render updated_mark %></span>
       <span class="flex-1"></span>
       <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
@@ -45,7 +45,7 @@
                 aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--editor--blocks#toggle">
           <%= label %>
         </button>
-        <%= render note_marker %>
+        <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, loaded: slot_loaded, label: label, placement: :card, holds: holds) %>
         <span data-editing-mark-slot><%= render updated_mark %></span>
       </div>
 

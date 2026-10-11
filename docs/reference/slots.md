@@ -70,6 +70,10 @@ def initialize(record:, viewer:, data: nil, joined: false, **)
 
 Its own `render?` decides whether it draws anything.
 
+## What exists
+
+The names are `Admin::Slots::NAMES`, and `presence.md` has the table of where each is drawn and what stands in it: `editor.header.people` and `editor.header.actions`, `media.panel.header` and `media.panel.sections`, `tree.row.markers`, `posts.row.markers` and `posts.row.title`, and `editor.block.markers`, drawn by a block's card and by a section's tile: the holder's avatar (on a tile only) and the notes marker, in that order.
+
 ## Lists: the loader
 
 A tree of 200 pages that asked "who is on this page?" once per row would run 200 queries. So an entry for a list slot carries a **loader**, a lambda that is called once with all the rows:
@@ -100,7 +104,7 @@ The header's template holds no line that says "presence".
 
 ## Benefits
 
-- **A new feature costs one line, not an edit per screen.** Notes edited about ten core components to make room for itself; the next feature that wants one of the seven places edits none of them.
+- **A new feature costs one line, not an edit per screen.** Notes edited about ten core components to make room for itself; the next feature that wants one of the eight places edits none of them.
 - **Core templates stay about the core.** The editors' header knows pages and posts. It does not grow a list of the features that exist, and a feature can be changed or removed without opening it.
 - **The boundary can be tested.** Because a host has no reason to name a feature, a test can refuse it when it does (`test/lib/notes_boundary_test.rb`). Without slots that rule could only be a wish.
 - **One place answers "what is on this screen from features?"**: the initializer, in drawing order.

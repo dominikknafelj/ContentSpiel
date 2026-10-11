@@ -232,12 +232,15 @@ module Admin
 
       def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
-      # The block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
+      # The block's markers (slot `editor.block.markers`: the notes marker, notes
       # spec §4.3): on a card of the list and on a translation tab's group
       # card, for every viewer. Not on a panel -- the block's tile carries it,
       # and two markers of one block would be two elements with one id -- and
       # not on an unavailable block's card, which has one action.
-      def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
+      #
+      # The page's holds are read already (`holds`), so the avatar's loader
+      # answers from them and costs no statement.
+      def slot_loaded = Admin::Slots.load("editor.block.markers", [ block ], viewer: Current.user, holds: holds)
 
       def note_key = ::Notes.key(block)
 

@@ -148,6 +148,11 @@ en:
         section_group:
           heading: "Section"
           unavailable: "Unavailable type — %{type}"
+        # The tile's avatar of whoever is changing the block (handoff 4): its
+        # tooltip and its text for a screen reader.
+        holder_avatar:
+          held: "%{name} is editing this block"
+          own_tab: "You're editing this in another tab"
         # The mark a card carries for a few seconds after a colleague's save
         # arrived (live-editing handoff 10).
         updated_mark:
