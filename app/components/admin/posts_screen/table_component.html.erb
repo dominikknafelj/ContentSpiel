@@ -42,17 +42,21 @@
           </td>
           <% end %>
           <th scope="row" class="w-2/5 max-w-0 py-2.5 pr-4 text-left font-normal<%= " pl-3.5" unless selectable? %>">
-            <%= link_to editor_path(post), class: "flex min-w-0 flex-col gap-0.5 text-ink no-underline hover:underline" do %>
+            <%= link_to editor_path(post), class: "group/title flex min-w-0 flex-col gap-0.5 text-ink no-underline" do %>
               <%# The title's line is a row (presence handoff 27): the title, cut
                   with an ellipsis before anything after it is, then what
                   features register at `posts.row.title`, 6px after it and
                   INSIDE the link -- so nothing registered there may be
-                  interactive. %>
+                  interactive. The hover underline is the title's and the
+                  path's own, each asked of the link (`group/title`): on the
+                  link itself it was drawn through everything in it, a
+                  marker's count included, and a child of a flex row cannot
+                  refuse its parent's underline. %>
               <span class="flex min-w-0 items-center gap-1.5">
-                <span class="min-w-0 truncate font-medium"><%= title_of(post) %></span>
+                <span class="min-w-0 truncate font-medium group-hover/title:underline"><%= title_of(post) %></span>
                 <%= render Admin::Ui::SlotComponent.new(name: "posts.row.title", record: post, viewer: Current.actor, loaded: title_loaded, locale: locale, url_options: url_options) %>
               </span>
-              <span class="truncate font-cs-mono text-[11px] text-meta"><%= path_of(post) || "Not listed" %></span>
+              <span class="truncate font-cs-mono text-[11px] text-meta group-hover/title:underline"><%= path_of(post) || "Not listed" %></span>
             <% end %>
           </th>
           <td class="py-2.5 pr-4 text-dim"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: post.content_type) %></td>

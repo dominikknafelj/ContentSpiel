@@ -13,7 +13,7 @@ module Presence
   # Everything else is private because Action Cable lets a client call any
   # public method of the class (`test/channels/live/record_channel_test.rb`).
   #
-  # THE TAB'S CONTRACT (the script of the next task):
+  # THE TAB'S CONTRACT (`controllers/admin/presence/record_controller.js`):
   # - it REPORTS ITS STATE ON EVERY `connected`, the first time and after every
   #   reconnect: an arrival says "here", and a hidden or idle tab that
   #   reconnects would otherwise be shown as here until its next change;

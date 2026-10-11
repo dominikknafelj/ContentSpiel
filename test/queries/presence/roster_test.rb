@@ -18,7 +18,7 @@ class Presence::RosterTest < ActiveSupport::TestCase
     Presence::Mark.insert!({ user_id: user.id, record_type: record.class.polymorphic_name, record_id: record.id, tab:, token: SecureRandom.hex(8), state:, seen_at: seen, arrived_at: arrived, state_at: }) # version: none (a test of presence)
   end
 
-  def counts(records, kind: @page_kind) = @roster.here_counts(kind, records.map(&:id))
+  def counts(records, kind: @page_kind) = @roster.here_people(kind, records.map(&:id)).transform_values(&:count)
 
   test "nobody else is nobody" do
     travel_to(@now) do
@@ -118,46 +118,6 @@ class Presence::RosterTest < ActiveSupport::TestCase
     end
   end
 
-  test "here_counts counts users, not rows; leaves out away-only records and the viewer" do
-    travel_to(@now) do
-      busy = create_page(title: "Busy")
-      quiet = create_page(title: "Quiet")
-      mine = create_page(title: "Mine")
-      mark(@other, busy)
-      mark(@other, busy)
-      mark(@third, busy)
-      mark(@third, busy, state: "away")
-      mark(@other, quiet, state: "away")
-      mark(@viewer, mine)
-      assert_equal({ busy.id => 2 }, counts([ busy, quiet, mine, @page ]))
-      assert_equal({}, counts([]))
-    end
-  end
-
-  test "here_counts takes ids or a relation, and is one statement for 3 records and for 30, loading none" do
-    travel_to(@now) do
-      pages = Array.new(30) { |i| create_page(title: "Page #{i}") }
-      pages.each { |page| mark(@other, page) }
-      assert_equal 1, capture_sql { counts(pages.first(3)) }.size
-      assert_equal 1, capture_sql { assert_equal 30, counts(pages).size }.size
-      relation = Page.where(id: pages.first(5).map(&:id)).select(:id)
-      statements = capture_sql { assert_equal 5, @roster.here_counts(@page_kind, relation).size }
-      assert_equal 1, statements.size
-      assert_not_includes statements.first, "SELECT \"pages\".* "
-    end
-  end
-
-  test "here_counts for an image does not mix with a page of the same id" do
-    travel_to(@now) do
-      asset = create_media_asset
-      media = RecordKinds.named("media")
-      mark(@other, Media::Asset.new(id: @page.id))
-      assert_equal({}, counts([ @page ]))
-      assert_equal({ @page.id => 1 }, counts([ Media::Asset.new(id: @page.id) ], kind: media))
-      assert_equal({}, counts([ asset ], kind: media))
-    end
-  end
-
   # --- here_people: who is here on each of a list's records ------------------
 
   def people(records, kind: @page_kind) = @roster.here_people(kind, records.map(&:id))
@@ -221,6 +181,53 @@ class Presence::RosterTest < ActiveSupport::TestCase
       statements = capture_sql { assert_equal 5, @roster.here_people(@page_kind, relation).size }
       assert_equal 2, statements.size
       assert statements.none? { |statement| statement.include?("SELECT \"pages\".* ") }
+    end
+  end
+
+  test "here_people counts users, not rows" do
+    travel_to(@now) do
+      mark(@other)
+      mark(@other)
+      mark(@third)
+      mark(@third, state: "away")
+      assert_equal({ @page.id => 2 }, counts([ @page ]))
+    end
+  end
+
+  # Names are read from three columns; a password digest has no business in
+  # the rows a marker is worded from.
+  test "here_people loads only what a name is made of" do
+    travel_to(@now) do
+      mark(@other)
+      statements = capture_sql { people([ @page ]) }
+      assert_match(/SELECT "users"\."id", "users"\."name", "users"\."email_address" FROM "users"/, statements.last)
+      assert_no_match(/password/, statements.last)
+    end
+  end
+
+  # A user deleted between the two statements: the foreign key's cascade
+  # takes their marks with them, so the state cannot be made in the tables;
+  # the second statement is answered here as if they had just gone. Nobody
+  # is counted who cannot be named: no " is here" without a name, no wrong
+  # "and N more".
+  test "here_people neither counts nor names a user who is gone by the second statement" do
+    travel_to(@now) do
+      alone = create_page(title: "Alone")
+      mark(@other, arrived: @now - 5.minutes)
+      mark(@third, arrived: @now - 1.minute)
+      mark(@other, alone)
+      seven = Array.new(7) { |i| User.create!(name: "Person #{i}", email_address: "person#{i}@example.com", password: "a-long-password-1") }
+      crowd = create_page(title: "Crowd")
+      seven.each_with_index { |user, index| mark(user, crowd, arrived: @now - (20 - index).minutes) }
+
+      remaining = User.where.not(id: [ @other.id, seven.first.id ])
+      answer = with_singleton_override(User, :where, ->(*) { remaining }) { people([ @page, alone, crowd ]) }
+
+      assert_equal [ crowd.id, @page.id ].sort, answer.keys.sort
+      assert_equal 1, answer[@page.id].count
+      assert_equal [ @third ], answer[@page.id].users
+      assert_equal 6, answer[crowd.id].count
+      assert_equal seven[1..4], answer[crowd.id].users
     end
   end
 

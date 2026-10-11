@@ -32,16 +32,17 @@ module Admin
 
     # What a list's markers show (`admin--presence--list` asks):
     # `{ "<id>": { "count": 2, "names": ["Dana Weiss", "Jonas Lind"],
-    # "label": "2 people here: Dana Weiss, Jonas Lind", "tip": "Dana Weiss,
-    # Jonas Lind" } }` for those of the ids the viewer may read and that have
-    # someone else here. `names` are the first five in order of arrival, and
-    # `count` says when there are more; `label` and `tip` are the marker's
-    # two texts, worded where the first drawing words them
+    # "label": "2 people here: Dana Weiss, Jonas Lind" } }` for those of the
+    # ids the viewer may read and that have someone else here. `names` are
+    # the first five in order of arrival, and `count` says when there are
+    # more; `label` is the marker's one text, for a screen reader and the
+    # tooltip alike (handoff 32), worded where the first drawing words it
     # (`Admin::PresenceScreen::RowMarkerComponent.words`), so the script
-    # holds no wording and a marker reads the same before and after it. A
-    # name is what a person typed: it is a JSON string here and text in the
-    # page. An id the viewer may not read, a trashed one and one that is not
-    # there are the same silence, and so is an unknown kind: `{}`.
+    # holds no wording and a marker reads the same before and after it.
+    # (`names` is what the label is made of; the script does not read it.)
+    # A name is what a person typed: it is a JSON string here and text in
+    # the page. An id the viewer may not read, a trashed one and one that
+    # is not there are the same silence, and so is an unknown kind: `{}`.
     def here
       kind = RecordKinds.named(params[:kind])
       ids = Array.wrap(params[:ids]).grep(String).grep(/\A\d{1,18}\z/).uniq.first(MAX_IDS)

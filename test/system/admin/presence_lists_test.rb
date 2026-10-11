@@ -142,7 +142,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector shown(tree_marker), wait: LIVE
     # Handoff 9 and 10: the icon at 12px in meta, alone for one person, last
     # of the row's markers and 6px after what stands before it.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss" }, look(tree_marker))
+    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(tree_marker))
     # Nobody marks themselves: Dana's own tree marks where I am, not her page.
     using_session(:dana) do
       assert_selector shown(tree_marker(@elsewhere)), wait: LIVE
@@ -157,7 +157,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     # From two the count, in 10px mono, 4px after the icon; the names in
     # order of arrival.
     assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => { "text" => "2", "size" => "10px", "mono" => true, "gap" => 4 },
-                   "label" => "2 people here: Dana Weiss, reader", "tip" => "Dana Weiss, reader" }, look(tree_marker))
+                   "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker))
 
     leave(:dana)
     assert_selector "#{shown(tree_marker)} [data-presence-marker-label]", text: "reader is here", exact_text: true, visible: :all, wait: LIVE
@@ -181,7 +181,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector shown(post_marker), wait: LIVE
     # Handoff 27: right after the title text, 6px after it, on the title's
     # line; the path line under it is where it was.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => ", Dana Weiss is here", "tip" => "Dana Weiss" }, look(post_marker))
+    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => ", Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(post_marker))
     lines = page.evaluate_script(<<~JS)
       (() => {
         const link = document.querySelector("tr#post_#{@post.id} th[scope=row] a")
@@ -247,9 +247,11 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-editor-header h1", text: "Translating Everything With Mobility"
   end
 
-  # Handoff 12: the shared tooltip lists the names, for the pointer; a name
-  # is put in the page as the text it is.
-  test "hovering a marker shows the names in the shared tooltip, in the tree and in the posts list, and a name is text" do
+  # Handoff 12 and 32: the shared tooltip says the marker's words, the same
+  # a screen reader hears, for the pointer; a name is put in the page as the
+  # text it is. Handoff 35: where the tree is a column a long bubble may
+  # reach past the column, inside the window and on top of the content.
+  test "hovering a marker shows its words in the shared tooltip, in the tree and in the posts list, whole and on top, and a name is text" do
     @reader.update!(name: %(<img src=x onerror="window.__owned = true">))
     open_tree
     set_timing("interval", 600)
@@ -259,7 +261,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     assert_no_selector "#{tree_marker} [data-tooltip]"
     find(shown(tree_marker)).hover
-    assert_selector "#{tree_marker} [data-tooltip]", text: %(Dana Weiss, <img src=x onerror="window.__owned = true">), exact_text: true
+    assert_selector "#{tree_marker} [data-tooltip]", text: %(2 people here: Dana Weiss, <img src=x onerror="window.__owned = true">), exact_text: true
     assert_no_selector "#tree [data-presence-marker] img", visible: :all
     assert_nil page.evaluate_script("window.__owned")
     assert_no_selector "#tree [title*='Dana']", visible: :all
@@ -267,6 +269,23 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     # at this width, so it may reach over the column's edge; handoff 18, 30).
     whole = page.evaluate_script("(() => { const tip = document.querySelector(#{tree_marker.to_json} + ' [data-tooltip]').getBoundingClientRect(); return tip.left >= 0 && tip.right <= document.documentElement.clientWidth && tip.width <= 240 })()")
     assert_equal true, whole
+    # The tree is a column here (not a drawer), the bubble reaches past it
+    # over the content, and it is the bubble that is on top there. The
+    # bubble lets the pointer through (`pointer-events: none`), and
+    # `elementFromPoint` skips such an element: switched on for the question.
+    top = page.evaluate_script(<<~JS)
+      (() => {
+        const tip = document.querySelector(#{tree_marker.to_json} + " [data-tooltip]")
+        const [ box, column ] = [ tip.getBoundingClientRect(), document.querySelector("#tree-column").getBoundingClientRect() ]
+        tip.style.pointerEvents = "auto"
+        const point = (x) => document.elementFromPoint(x, box.top + box.height / 2) === tip
+        const answer = { column: getComputedStyle(document.querySelector("#tree-column")).position !== "fixed", past: box.right > column.right,
+                         centre: point(box.left + box.width / 2), overContent: point(box.right - 2), viewport: box.top >= 0 && box.bottom <= document.documentElement.clientHeight }
+        tip.style.pointerEvents = ""
+        return answer
+      })()
+    JS
+    assert_equal({ "column" => true, "past" => true, "centre" => true, "overContent" => true, "viewport" => true }, top)
     find("main h1").hover
     assert_no_selector "#{tree_marker} [data-tooltip]"
 
@@ -278,7 +297,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     join(:dana, @dana, path: "/cs-studio/posts/#{@post.id}")
     assert_selector shown(post_marker), wait: LIVE
     find(shown(post_marker)).hover
-    assert_selector "#{post_marker} [data-tooltip]", text: "Dana Weiss", exact_text: true
+    assert_selector "#{post_marker} [data-tooltip]", text: "Dana Weiss is here", exact_text: true
     # In the table's scrolling box the bubble is not cut and makes no scroll bar.
     box = page.evaluate_script(<<~JS)
       (() => {
@@ -475,5 +494,111 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     assert_operator fetches, :>=, 1
     assert_equal [], page.evaluate_script("window.__turbo")
+    # The positive control: the collector does hear Turbo. One real visit,
+    # and the same list is no longer empty -- so empty meant "none happened".
+    # (A made-up event would not do: Turbo's own listeners read its detail.)
+    click_link "Tags"
+    assert_selector "main h1", text: "Tags"
+    heard = page.evaluate_script("window.__turbo")
+    assert_includes heard, "turbo:before-fetch-request"
+    assert_includes heard, "turbo:visit"
+  end
+
+  # The `here` address answers for at most 500 ids, and the tree has no
+  # limit: a longer list asks in several requests, one after the other, and
+  # draws when all have answered. The size of a part is shortened here.
+  test "a list longer than one request may ask about is asked in parts, one after the other, and every marker is drawn" do
+    third = create_page(title: "Third")
+    open_tree
+    set_timing("interval", 600)
+    set_timing("chunk", 2)
+    page.execute_script(<<~JS)
+      window.__parts = []
+      window.__open = 0
+      window.__fetch = window.fetch
+      window.fetch = async (...args) => {
+        if (!String(args[0]).includes("/presence/here")) return window.__fetch(...args)
+        const part = { ids: new URL(String(args[0]), location.href).searchParams.getAll("ids[]"), alone: window.__open === 0 }
+        window.__parts.push(part)
+        window.__open += 1
+        try { return await window.__fetch(...args) } finally { window.__open -= 1 }
+      }
+    JS
+    before = reads
+
+    join(:dana, @dana)
+    join(:reader, @reader, path: "/cs-studio/pages/#{third.id}")
+    assert_selector shown(tree_marker), wait: LIVE
+    assert_selector shown(tree_marker(third)), wait: LIVE
+    await_read(before + 1)
+
+    parts = page.evaluate_script("window.__parts")
+    ids = Page.kept.pluck(:id).map(&:to_s)
+    assert_operator ids.size, :>=, 4
+    reading = parts.first((ids.size / 2.0).ceil)
+    assert_equal ids.sort, reading.flat_map { |part| part["ids"] }.sort, "one reading did not ask about every marker exactly once"
+    assert reading.all? { |part| part["ids"].size <= 2 }
+    assert parts.all? { |part| part["alone"] }, "two parts were out at the same time"
+  end
+
+  # An answer that is an error leaves the markers as they are, and the next
+  # tick asks again.
+  test "a failed reading leaves the markers as they are, and the next one draws" do
+    open_tree
+    join(:dana, @dana)
+    assert_selector shown(tree_marker), wait: LIVE
+    page.execute_script(<<~JS)
+      window.__failed = 0
+      window.__fail = true
+      window.__fetch = window.fetch
+      window.fetch = (...args) => {
+        if (!window.__fail || !String(args[0]).includes("/presence/here")) return window.__fetch(...args)
+        window.__failed += 1
+        return Promise.resolve(new Response("{}", { status: 500, headers: { "Content-Type": "application/json" } }))
+      }
+    JS
+    set_timing("interval", 300)
+    set_timing("refresh", 400)
+
+    leave(:dana)
+    await_js("window.__failed >= 2", wait: LIVE)
+    assert_selector shown(tree_marker)
+    assert_selector "#{tree_marker} [data-presence-marker-label]", text: "Dana Weiss is here", exact_text: true, visible: :all
+
+    page.execute_script("window.__fail = false")
+    assert_selector "#{tree_marker}[hidden]", visible: :all, wait: LIVE
+  end
+
+  # An older answer never overwrites a newer one: a reading that is still
+  # out when the next begins is ended, and what it brings later is dropped.
+  test "an answer that arrives after a newer one was drawn changes nothing" do
+    open_tree
+    set_timing("interval", 300)
+    page.execute_script(<<~JS)
+      window.__held = null
+      window.__hold = true
+      window.__fetch = window.fetch
+      window.fetch = (...args) => {
+        if (!window.__hold || !String(args[0]).includes("/presence/here")) return window.__fetch(...args)
+        window.__hold = false
+        // The first reading from now on is kept back, and will answer
+        // "nobody anywhere" whatever is true by then; it does not honour the abort.
+        return new Promise((resolve) => { window.__held = () => resolve(new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } })) })
+      }
+    JS
+    before = reads
+
+    signal
+    await_js("window.__held !== null", wait: LIVE)
+    join(:dana, @dana)
+    assert_selector shown(tree_marker), wait: LIVE
+    drawn = reads
+    assert_operator drawn, :>, before
+
+    page.execute_script("window.__held()")
+    await_frames
+    await_frames
+    assert_selector shown(tree_marker)
+    assert_equal drawn, reads
   end
 end

@@ -17,12 +17,14 @@ module Admin
     # script (`admin--presence--list`) changes it in place and never redraws
     # a row: `span[data-presence-marker="<kind>-<id>"]`, with the record's id
     # (`data-presence-id`) and the count it shows (`data-presence-count`).
-    # The script writes three texts and two `hidden`s, all of them as text.
+    # The script writes the count and the one text (twice) and two `hidden`s,
+    # all of them as text.
     #
-    # WHO IT NAMES. For a screen reader a visually hidden text: "Dana Weiss
-    # is here", "2 people here: Dana Weiss, Jonas Lind", and past five names
-    # "… and 2 more". For the pointer the shared tooltip
-    # (`Admin::Ui::TooltipComponent`) lists the names. The marker is NO Tab
+    # WHAT IT SAYS (handoff 32). One text: "Dana Weiss is here", "2 people
+    # here: Dana Weiss, Jonas Lind", and past five names "… and 2 more". A
+    # screen reader has it as a visually hidden text; the pointer has the
+    # same words in the shared tooltip (`Admin::Ui::TooltipComponent`), not
+    # the bare names, which would not say what they mean. The marker is NO Tab
     # stop: in the posts list it stands inside a link, where nothing
     # interactive may be nested, and in the tree a stop per row would double
     # the tree's; the keyboard's path to the names is the text. Nothing is
@@ -51,16 +53,18 @@ module Admin
         end
       end
 
-      # `{ count:, names:, label:, tip: }` for a `Roster::Here` (nil: nobody).
+      # `{ count:, names:, label: }` for a `Roster::Here` (nil: nobody).
       # `names` through `PersonName.of`, as everywhere in presence and notes.
+      # `label` is the ONE text of a marker (handoff 32): a screen reader
+      # hears it and the tooltip shows it, word for word.
       def self.words(here)
-        return { count: 0, names: [], label: "", tip: "" } if here.nil? || here.count.zero?
+        return { count: 0, names: [], label: "" } if here.nil? || here.count.zero?
 
         names = here.users.map { |user| ::PersonName.of(user) }
         more = here.count - names.size
         list = names.join(I18n.t("#{WORDS}.separator"))
         list = I18n.t("#{WORDS}.and_more", names: list, count: more) if more.positive?
-        { count: here.count, names:, label: I18n.t("#{WORDS}.label", count: here.count, names: list), tip: list }
+        { count: here.count, names:, label: I18n.t("#{WORDS}.label", count: here.count, names: list) }
       end
 
       def initialize(record:, viewer:, data: nil, joined: false, **)

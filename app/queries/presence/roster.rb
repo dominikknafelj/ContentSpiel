@@ -43,16 +43,6 @@ module Presence
         .map(&:first)
     end
 
-    # { record id => number of other users here } for the records of `kind`
-    # (a `RecordKinds::Kind`) among `ids` -- an Array, or a relation selecting
-    # ids, which becomes a subquery -- leaving out those with nobody here. One
-    # statement and no record loaded, for any number of ids. Like `on`, it
-    # trusts its caller to have narrowed `ids` through the read scope.
-    def here_counts(kind, ids)
-      Mark.fresh.where(record_type: kind.type, record_id: ids, state: "here")
-        .where.not(user_id: @viewer.id).group(:record_id).distinct.count(:user_id)
-    end
-
     # Who is HERE on each of a list's records, for its markers:
     # `{ record id => Here }` for the records of `kind` among `ids` (an Array,
     # or a relation selecting ids, which becomes a subquery), leaving out
@@ -60,10 +50,13 @@ module Presence
     # the first `NAMED` of them, in the order `on` shows people in -- by the
     # earliest `arrived_at` over ALL their fresh rows, here or away, so a
     # reload does not send someone to the end, then by id. One statement for
-    # the marks and, only when someone is here, one for the users, whatever
-    # the number of ids; no record is loaded. A user deleted between the two
-    # is counted and not named. Like `on`, it trusts its caller to have
-    # narrowed `ids` through the read scope.
+    # the marks and, only when someone is here, one for the users (the three
+    # columns a name is made of, nothing else of the row), whatever the
+    # number of ids; no record is loaded. A user deleted between the two
+    # statements is neither named NOR counted: a marker never says " is
+    # here" of nobody, nor "and 2 more" of people who are not there; a
+    # record whose only person went that way is left out. Like `on`, it
+    # trusts its caller to have narrowed `ids` through the read scope.
     def here_people(kind, ids)
       rows = Mark.fresh.where(record_type: kind.type, record_id: ids).where.not(user_id: @viewer.id)
         .pluck(:record_id, :user_id, :state, :arrived_at)
@@ -74,8 +67,13 @@ module Presence
       end
       return {} if here.empty?
 
-      users = User.where(id: here.flat_map { |_, user_ids| user_ids.first(NAMED) }.uniq).index_by(&:id)
-      here.to_h { |record_id, user_ids| [ record_id, Here.new(count: user_ids.size, users: users.values_at(*user_ids.first(NAMED)).compact) ] }
+      users = User.where(id: here.flat_map { |_, user_ids| user_ids.first(NAMED) }.uniq).select(:id, :name, :email_address).index_by(&:id)
+      here.filter_map do |record_id, user_ids|
+        named = user_ids.first(NAMED)
+        found = users.values_at(*named).compact
+        count = user_ids.size - (named.size - found.size)
+        [ record_id, Here.new(count:, users: found) ] if count.positive?
+      end.to_h
     end
 
     private

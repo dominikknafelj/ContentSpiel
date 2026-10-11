@@ -152,6 +152,9 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_equal (others + [ @dana ]).map { |user| user.id.to_s }, rows.map { |each| each["data-presence-listed"] }
     assert_equal [ "Ann One", "Bob Two", "Cy Three", "Dana Weiss" ], rows.map { |each| each.find("[data-presence-name]", visible: :all).text(:all) }
     assert_equal [ "here", "here", "here", "away over an hour" ], rows.map { |each| each.find("[data-presence-status]", visible: :all).text(:all) }
+    # How each row's person is, for the script's comparison of two drawings:
+    # someone behind "+N" has no circle to say it.
+    assert_equal %w[here here here away], rows.map { |each| each["data-presence-state"] }
     assert_equal %w[AO BT CT DW], rows.map { |each| each.find("[aria-hidden=true]", visible: :all).text(:all) }
     # A row: a 24px avatar, the name in 14px ink, the status in 12px meta, 6px
     # by 8px; plain text, nothing in it takes the focus.

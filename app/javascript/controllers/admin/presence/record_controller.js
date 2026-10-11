@@ -396,12 +396,14 @@ export default class extends Controller {
 }
 
 // What a drawing is made of, apart from its words: who is shown as a circle,
-// in which order, how they are and with which initials; who is listed; and
+// in which order, how they are and with which initials; who is listed, how
+// they are and with which initials (someone behind "+N" has no circle, and
+// their row's look is all that says they turned away or were renamed); and
 // what "+N" says at each width.
 function shape(root) {
   return JSON.stringify([
     [ ...root.querySelectorAll("[data-presence-user]") ].map((each) => [ each.dataset.presenceUser, each.dataset.presenceState, each.firstElementChild?.textContent ]),
-    [ ...root.querySelectorAll("[data-presence-listed]") ].map((each) => each.dataset.presenceListed),
+    [ ...root.querySelectorAll("[data-presence-listed]") ].map((each) => [ each.dataset.presenceListed, each.dataset.presenceState, each.firstElementChild?.textContent ]),
     [ ...root.querySelectorAll("[data-presence-more]") ].map((each) => [ each.dataset.presenceMore, each.textContent ])
   ])
 }

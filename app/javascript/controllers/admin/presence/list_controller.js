@@ -25,12 +25,12 @@ import { settle } from "live/state"
 // 3. Says on its element whether its subscription has been answered
 //    (`data-live-part`, `live/state`), which the system tests wait for.
 //
-// IT TOUCHES NOTHING BUT ITS MARKERS: of each, the `hidden`, the count, the
-// words for a screen reader and the tooltip's names, and only where they
+// IT TOUCHES NOTHING BUT ITS MARKERS: of each, the `hidden`, the count and
+// the one text (for a screen reader and in the tooltip), and only where they
 // differ from what is shown, so a reading that finds nothing new changes
 // nothing and no row is ever redrawn. Everything is put in as TEXT
 // (`textContent`): a name is what a person typed. The words come from the
-// server ready-made (`label`, `tip`), the same that worded the first
+// server ready-made (`label`), the same that worded the first
 // drawing; this script holds none.
 //
 // THE MARKERS ARE STIMULUS TARGETS, read from the document each time: the
@@ -77,7 +77,6 @@ import { settle } from "live/state"
 // `data-presence-reads` on the element counts the readings that were
 // drawn, for a test that has to know one is over.
 const SETTLE = 500
-const MAX_IDS = 500
 
 // What a list whose element was replaced leaves for the one that takes its
 // place: when it last read, and whether a reading is owed.
@@ -87,7 +86,11 @@ export default class extends Controller {
   static targets = [ "marker" ]
   static values = {
     kind: String, url: String,
-    interval: { type: Number, default: 5000 }, refresh: { type: Number, default: 60000 }
+    interval: { type: Number, default: 5000 }, refresh: { type: Number, default: 60000 },
+    // How many ids one request asks about: what the `here` address answers
+    // for (`Admin::PresenceController::MAX_IDS`). A value so that a test can
+    // see a long list asked in parts without drawing 501 rows.
+    chunk: { type: Number, default: 500 }
   }
 
   connect() {
@@ -190,9 +193,10 @@ export default class extends Controller {
     const request = this.request = new AbortController()
     const here = {}
     try {
-      for (let from = 0; from < ids.length; from += MAX_IDS) {
+      const chunk = Math.max(1, this.chunkValue)
+      for (let from = 0; from < ids.length; from += chunk) {
         const url = new URL(this.urlValue, document.baseURI)
-        ids.slice(from, from + MAX_IDS).forEach((id) => url.searchParams.append("ids[]", id))
+        ids.slice(from, from + chunk).forEach((id) => url.searchParams.append("ids[]", id))
         const response = await fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin", signal: request.signal })
         if (!response.ok || response.redirected) return
         Object.assign(here, await response.json())
@@ -216,13 +220,13 @@ export default class extends Controller {
       const id = marker.dataset.presenceId
       if (!asked.has(id)) return
       const answer = here[id]
-      show(marker, Number(answer?.count) || 0, String(answer?.label || ""), String(answer?.tip || ""))
+      show(marker, Number(answer?.count) || 0, String(answer?.label || ""))
     })
   }
 }
 
 // One marker, as answered: nothing is written that is already there.
-function show(marker, count, label, tip) {
+function show(marker, count, label) {
   const parts = {
     count: marker.querySelector("[data-presence-marker-count]"),
     label: marker.querySelector("[data-presence-marker-label]"),
@@ -231,7 +235,7 @@ function show(marker, count, label, tip) {
   const said = count > 0 && label ? `${parts.label?.dataset.presenceLead || ""}${label}` : ""
   put(parts.count, count > 1 ? String(count) : "")
   put(parts.label, said)
-  put(parts.tip, count > 0 ? tip : "")
+  put(parts.tip, count > 0 ? label : "")
   if (parts.count && parts.count.hidden !== count < 2) parts.count.hidden = count < 2
   if (marker.dataset.presenceCount !== String(count)) marker.dataset.presenceCount = String(count)
   if (marker.hidden !== (count === 0)) marker.hidden = count === 0

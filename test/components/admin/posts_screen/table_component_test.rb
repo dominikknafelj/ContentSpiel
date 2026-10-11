@@ -80,7 +80,7 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
 
     assert_selector "div[data-controller='admin--presence--list'][data-live-part=waiting][data-admin--presence--list-kind-value=post]" \
                     "[data-admin--presence--list-url-value='/cs-studio/presence/here?kind=post'] > table"
-    link = "tr#post_#{busy.id} th[scope=row] > a.flex.min-w-0.flex-col.gap-0\\.5.text-ink.no-underline.hover\\:underline"
+    link = "tr#post_#{busy.id} th[scope=row] > a.group\\/title.flex.min-w-0.flex-col.gap-0\\.5.text-ink.no-underline"
     assert_selector "#{link} > span", count: 2
     line = "#{link} > span:first-child"
     assert_equal %w[flex gap-1.5 items-center min-w-0], page.find(line)[:class].split.sort
@@ -88,6 +88,13 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_selector "#{line} > span.truncate + span[data-presence-marker='post-#{busy.id}'].flex-none.text-meta:not([hidden])[data-presence-count='2']"
     assert_selector "#{line} > [data-presence-marker] > span.sr-only", text: ", 2 people here: Dana Weiss, reader", exact_text: true
     assert_selector "#{link} > span.truncate.font-cs-mono.text-\\[11px\\].text-meta:last-child", text: "/blog/translating", exact_text: true
+    # The hover underline is the title's and the path's own (review finding
+    # 4): on the link it was drawn through everything in it, the marker's
+    # count included, and a child cannot refuse a parent's underline.
+    assert_no_selector "th[scope=row] > a.hover\\:underline"
+    assert_selector "#{line} > span.truncate.group-hover\\/title\\:underline:first-child"
+    assert_selector "#{link} > span.group-hover\\/title\\:underline:last-child"
+    assert_no_selector "[data-presence-marker].group-hover\\/title\\:underline, [data-presence-marker] .group-hover\\/title\\:underline", visible: :all
     # Nothing interactive inside the link, and no Tab stop per row.
     assert_no_selector "th[scope=row] a a, th[scope=row] a button, th[scope=row] a [tabindex]", visible: :all
     # Nobody there: the marker's element, hidden, and nothing said.

@@ -168,7 +168,7 @@ The look is `2026-10-10-presence-handoff.md`, items 1 to 31; this section does n
 - **The record's part is filled by a plain `fetch`, not a Turbo request**: the write queue holds Turbo's requests while a save is out and its frame events are heard by everyone. The same for the lists. **`suspend()` and `resume()` run on `pagehide` and `pageshow`**: a page left by a full load may be kept for the Back button with its socket open, and the person would stay on the record until the row went stale.
 - **`data-notes-live`** is still the attribute `live/state.js` writes, and `await_notes_live` the test helper; both now cover presence too (a part says it on its own element with `data-live-part`) and want a rename (roadmap).
 - **Status texts are patched in place.** An away person's minutes ("away 12 min", three times in the answer) grew every minute and redrew the group under a reader every minute; only a real change redraws.
-- **A list's `here` answer** is `{ id: { count, names, label, tip } }`, worded on the server (`RowMarkerComponent.words`), so the script holds no wording. `Roster#here_counts` has no caller now.
+- **A list's `here` answer** is `{ id: { count, names, label } }`, worded on the server (`RowMarkerComponent.words`), so the script holds no wording; `label` is the one text a screen reader hears and the tooltip shows (handoff 32). `Roster#here_counts` is removed: nothing called it once the markers named people.
 
 ### Other
 

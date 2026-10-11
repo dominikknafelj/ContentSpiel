@@ -214,9 +214,9 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     sign_in_as @viewer
 
     here("page", [ @page.id ])
-    assert_equal({ @page.id.to_s => { "count" => 2, "names" => [ "reader", "Dana Weiss" ], "label" => "2 people here: reader, Dana Weiss", "tip" => "reader, Dana Weiss" } }, response.parsed_body)
+    assert_equal({ @page.id.to_s => { "count" => 2, "names" => [ "reader", "Dana Weiss" ], "label" => "2 people here: reader, Dana Weiss" } }, response.parsed_body)
     here("post", [ @post.id ])
-    assert_equal({ @post.id.to_s => { "count" => 1, "names" => [ "Dana Weiss" ], "label" => "Dana Weiss is here", "tip" => "Dana Weiss" } }, response.parsed_body)
+    assert_equal({ @post.id.to_s => { "count" => 1, "names" => [ "Dana Weiss" ], "label" => "Dana Weiss is here" } }, response.parsed_body)
     assert_equal "no-store", response.headers["Cache-Control"]
   end
 
@@ -233,7 +233,8 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     assert_equal 7, answer.dig(@page.id.to_s, "count")
     assert_equal [ "Person 0", "Person 1", "Person 2", "Person 3", "Person 4" ], answer.dig(@page.id.to_s, "names")
     assert_equal "7 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", answer.dig(@page.id.to_s, "label")
-    assert_equal "Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", answer.dig(@page.id.to_s, "tip")
+    # One text, for the screen reader and the tooltip alike (handoff 32).
+    assert_equal %w[count label names], answer.fetch(@page.id.to_s).keys.sort
     assert_equal "6 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 1 more", answer.dig(six.id.to_s, "label")
   end
 
@@ -248,6 +249,30 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
 
     assert_equal "application/json", response.media_type
     assert_equal [ %(<img src=x onerror="alert(1)">) ], response.parsed_body.dig(@page.id.to_s, "names")
+  end
+
+  # A PARTIAL scope: a branch grant on pages. Ids inside and outside it in
+  # one request are answered for the inside ones only, and a post is nothing
+  # to someone with no grant on posts.
+  test "here for someone with a branch grant answers the ids inside the branch and is silent about those outside, and about posts" do
+    inside = create_page(title: "Inside")
+    below = create_page(title: "Below", parent: inside)
+    outside = create_page(title: "Outside")
+    [ inside, below, outside ].each { |page| mark(@other, page) }
+    mark(@other, @post)
+    access_control_groups(:branch_editors).grants.create!(permission: "pages.read", scope: { "page_ids" => [ inside.id ] })
+    sign_in_as users(:editor_branch)
+
+    here("page", [ outside.id, inside.id, below.id, @page.id ])
+    assert_response :success
+    assert_equal({ inside.id.to_s => 1, below.id.to_s => 1 }, counts)
+    assert_not_includes response.body, %("#{outside.id}")
+    here("page", [ outside.id ])
+    assert_equal({}, response.parsed_body)
+
+    here("post", [ @post.id ])
+    assert_response :success
+    assert_equal({}, response.parsed_body)
   end
 
   test "here costs the same number of statements at 3 ids and at 30" do

@@ -32,7 +32,7 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
     assert_selector "#{marker} > [data-tooltip][hidden]", text: "", exact_text: true, visible: :all
   end
 
-  test "one person here: the icon alone at 12px in meta, named for them, with their name as the tooltip (9, 12)" do
+  test "one person here: the icon alone at 12px in meta, named for them, and the tooltip says the same words (9, 12, 32)" do
     render_marker(here(@dana))
 
     assert_selector "#{marker}:not([hidden])[data-presence-count='1']"
@@ -40,7 +40,7 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
     assert_selector "#{marker} > svg.size-3[aria-hidden=true]", count: 1
     assert_selector "#{marker} > [data-presence-marker-count][hidden]", text: "", exact_text: true, visible: :all
     assert_selector "#{marker} > span.sr-only[data-presence-marker-label]", text: "Dana Weiss is here", exact_text: true
-    assert_selector "#{marker} > [data-tooltip][hidden][aria-hidden=true]", text: "Dana Weiss", exact_text: true, visible: :all
+    assert_selector "#{marker} > [data-tooltip][hidden][aria-hidden=true]", text: "Dana Weiss is here", exact_text: true, visible: :all
     # The shared tooltip's host, for the pointer; no Tab stop of its own, no
     # `title`, nothing announced.
     assert_equal "admin--ui--tooltip", page.find(marker)["data-controller"]
@@ -53,7 +53,7 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
     assert_selector "#{marker}.gap-1[data-presence-count='2']"
     assert_selector "#{marker} > [data-presence-marker-count]:not([hidden]).font-cs-mono.text-\\[10px\\][aria-hidden=true]", text: "2", exact_text: true
     assert_selector "#{marker} [data-presence-marker-label]", text: "2 people here: reader, Dana Weiss", exact_text: true
-    assert_selector "#{marker} > [data-tooltip]", text: "reader, Dana Weiss", exact_text: true, visible: :all
+    assert_selector "#{marker} > [data-tooltip]", text: "2 people here: reader, Dana Weiss", exact_text: true, visible: :all
   end
 
   test "more people than are named: the count is everyone's, and the texts say how many more" do
@@ -63,7 +63,7 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
 
     assert_selector "#{marker} > [data-presence-marker-count]", text: "7", exact_text: true
     assert_selector "#{marker} [data-presence-marker-label]", text: "7 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", exact_text: true
-    assert_selector "#{marker} > [data-tooltip]", text: "Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", exact_text: true, visible: :all
+    assert_selector "#{marker} > [data-tooltip]", text: "7 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", exact_text: true, visible: :all
   end
 
   test "inside a link the marker's words follow the link's own after a comma (27)" do
@@ -72,6 +72,8 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
     render_marker(here(@reader, @dana), record: post_record, joined: true)
 
     assert_selector "span[data-presence-marker='post-#{post_record.id}'] > span.sr-only[data-presence-marker-label][data-presence-lead=', ']", text: ", 2 people here: reader, Dana Weiss", exact_text: true
+    # The tooltip is no part of the link's name: it has the words without the comma.
+    assert_selector "span[data-presence-marker='post-#{post_record.id}'] > [data-tooltip]", text: "2 people here: reader, Dana Weiss", exact_text: true, visible: :all
     # Nobody: the comma is not said either.
     render_marker(nil, record: post_record, joined: true)
     assert_selector "span[data-presence-marker='post-#{post_record.id}'] > [data-presence-marker-label][data-presence-lead=', ']", text: "", exact_text: true, visible: :all
@@ -89,8 +91,8 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
   end
 
   test "the words: what the first drawing and the list's later answers both say" do
-    assert_equal({ count: 0, names: [], label: "", tip: "" }, Admin::PresenceScreen::RowMarkerComponent.words(nil))
-    assert_equal({ count: 2, names: [ "reader", "Dana Weiss" ], label: "2 people here: reader, Dana Weiss", tip: "reader, Dana Weiss" },
+    assert_equal({ count: 0, names: [], label: "" }, Admin::PresenceScreen::RowMarkerComponent.words(nil))
+    assert_equal({ count: 2, names: [ "reader", "Dana Weiss" ], label: "2 people here: reader, Dana Weiss" },
       Admin::PresenceScreen::RowMarkerComponent.words(here(@reader, @dana)))
   end
 

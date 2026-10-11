@@ -371,6 +371,35 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_equal false, page.evaluate_script("window.__button.isConnected")
   end
 
+  # The review's first finding: someone behind "+N" has no circle, so the
+  # comparison that decides "only the words differ" has to look at the rows
+  # too -- how each person is, and their initials. Four others, written as
+  # rows (no browsers needed): the fourth is behind "+1".
+  test "someone behind +N who turns away, or is renamed, is drawn anew: their row shows it" do
+    open_page
+    now = Time.current
+    others = Array.new(4) { |i| User.create!(name: "Person #{i}", email_address: "person#{i}@example.com", password: "a-long-password-1") }
+    others.each_with_index do |user, index|
+      Presence::Mark.insert!({ user_id: user.id, record_type: "Page", record_id: @page.id, tab: "tab-#{user.id}-1234567", token: SecureRandom.hex(8), state: "here", seen_at: now, arrived_at: now - (20 - index).minutes, state_at: now - (20 - index).minutes }) # version: none (a test of presence)
+    end
+    hidden = others.last
+    row = "#{list} [data-presence-listed='#{hidden.id}']"
+    set_timing("refresh", 150)
+    assert_selector "#{group} [data-presence-more=wide]", text: "+1", exact_text: true, wait: LIVE
+    assert_no_selector circle(hidden), visible: :all
+    assert_selector "#{row}[data-presence-state=here] > span.bg-sunken", text: "P3", exact_text: true, visible: :all
+
+    Presence::Mark.where(user_id: hidden.id).update_all(state: "away", state_at: Time.current, seen_at: Time.current) # version: none (a test of presence)
+    assert_selector "#{row}[data-presence-state=away] [data-presence-status]", text: "away just now", exact_text: true, visible: :all, wait: LIVE
+    # The away look, not only the away words.
+    assert_selector "#{row} > span.bg-paper.text-meta", text: "P3", exact_text: true, visible: :all
+    assert_no_selector "#{row} > span.bg-sunken", visible: :all
+
+    hidden.update!(name: "Zed Young")
+    assert_selector "#{row} [data-presence-name]", text: "Zed Young", exact_text: true, visible: :all, wait: LIVE
+    assert_selector "#{row} > span.bg-paper", text: "ZY", exact_text: true, visible: :all, wait: LIVE
+  end
+
   # A drawing replaces the group, and with it the element that knew the list
   # had been entered: the list someone reads is open and read again in the
   # new one, and the next press of the button closes it (the re-review's
@@ -710,6 +739,16 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     fill_in "Title", with: "Pricing, still"
     assert_eventually(message: "the edit after presence's comings and goings was not saved") { @page.reload.title(locale: :en) == "Pricing, still" }
     assert_no_selector "#editor-notice *"
+    # The positive control for the empty list above: the same collector
+    # hears a real Turbo request and visit (a made-up event would not do:
+    # Turbo's own listeners read its detail).
+    assert_writes_settled
+    page.execute_script("window.__turbo = []")
+    click_link "Tags"
+    assert_selector "main h1", text: "Tags"
+    heard = page.evaluate_script("window.__turbo")
+    assert_includes heard, "turbo:before-fetch-request"
+    assert_includes heard, "turbo:visit"
   end
 
   test "typing does not make the tab report: a key only notes the time, and a pointer move is looked at once a second" do

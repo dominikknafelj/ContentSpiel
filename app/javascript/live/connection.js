@@ -25,7 +25,7 @@ import { cable } from "@hotwired/turbo-rails"
 // `reconnect: false`, and it stops there, silently (`open`).
 
 // This tab, for as long as its document lives: the shape the server echoes
-// (`Notes::Signals::TAB`, lower-case letters, digits and dashes, 8 to 40).
+// (`Live::Signals::TAB`, lower-case letters, digits and dashes, 8 to 40).
 // It is what a notes write sends as `X-Notes-Tab`.
 export const TAB = `tab-${Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("")}`
 
