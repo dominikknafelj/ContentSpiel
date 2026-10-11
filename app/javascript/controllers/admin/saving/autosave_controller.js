@@ -164,14 +164,23 @@ export default class extends Controller {
     this.timer = setTimeout(() => this.trigger(), this.debounceValue)
   }
 
-  // THE FIRST CHANGE OF A CLEAN FORM (live-editing spec §4.2): said once per
-  // burst of typing, before the debounce is even started, so whoever claims
-  // the record for this tab (`admin--editing--hold`) queues its claim ahead
-  // of the save. A form with a save pending or on the wire has said it. The
-  // detail is the form's unit (`data-editing-subject`); a form outside an
-  // editor has none and nobody listens.
+  // A CHANGE (live-editing spec §4.2), said before the debounce is even
+  // started, so whoever claims the record for this tab (`admin--editing--hold`)
+  // queues its claim ahead of the save: the first change of a clean form, and
+  // -- the hold's lifetime is two minutes from the last claim or save, and a
+  // person can type for longer than that without a pause that saves -- every
+  // later change, which the hold script answers with a renewal only when its
+  // own last claim is older than half a hold. The detail is the form's unit
+  // (`data-editing-subject`); a form outside an editor has none and nobody
+  // listens.
+  //
+  // A form whose text is exactly what is on the wire now has nothing new to
+  // say (the `focusout` of a card that was just collapsed is not typing: its
+  // text is on its way, and a claim after the release would hold the block
+  // again).
   announce() {
-    if (this.timer || this.busy || this.pending || this.unchanged()) return
+    if (this.unchanged()) return
+    if (this.busy && this.signature(new FormData(this.element)) === this.inFlight) return
     this.dispatch("dirty", { detail: { subject: this.element.closest("[data-editing-subject]")?.dataset.editingSubject } })
   }
 
@@ -184,8 +193,17 @@ export default class extends Controller {
     this.failed = true
     this.pending = false
     if (this.timer) clearTimeout(this.timer)
-    if (this.retryTimer) clearTimeout(this.retryTimer)
-    this.timer = this.retryTimer = null
+    this.timer = null
+    // A retry waiting out its backoff is the only thing that would ever clear
+    // `busy` again: with it cancelled, `busy` is cleared here, or the form
+    // would count as outstanding for good and every read and every visit
+    // would wait for a save that is never coming.
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer)
+      this.retryTimer = null
+      this.busy = false
+      this.retryCount = 0
+    }
   }
 
   // Called by `drained()` (`saving/queue.js`) before a header action or a
@@ -252,6 +270,9 @@ export default class extends Controller {
 
     this.busy = true
     this.pending = false
+    // What this save will carry (it is read again when the request is sent):
+    // `announce` does not take it for a new change.
+    this.inFlight = this.signature(new FormData(this.element))
     this.attempt()
   }
 
@@ -345,6 +366,7 @@ export default class extends Controller {
   async send(isCurrent) {
     const body = new FormData(this.element)
     const sent = this.signature(body)
+    this.inFlight = sent
     let response
     try {
       response = await fetch(this.element.action, {

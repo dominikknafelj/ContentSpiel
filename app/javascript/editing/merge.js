@@ -128,8 +128,13 @@ export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = nu
   // as they are, like `same` ones: left in place, never marked gone.
   const held = hold ? [ ...list.querySelectorAll("[data-editing-part]") ].filter((part) => !keep.has(part) && reachable(part, list) && hold(part)) : []
   const gone = []
+  // A notice slot that shows an alert (a lost claim, a deleted block) stays
+  // as it is, wherever it stands: a section's own slot is outside its unit,
+  // and the answer's empty or "held" one must not take away what the person
+  // has still to copy or discard.
+  const notices = [ ...list.querySelectorAll("[data-editing-strip-slot]") ].filter((slot) => slot.querySelector("[role=alert]:not(:empty)") && reachable(slot, list))
   withState(list, () => {
-    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone, new Set([ ...same, ...held ]))
+    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone, new Set([ ...same, ...held, ...notices ]))
     for (const unit of keep) if (!gone.includes(unit)) unit.removeAttribute("data-editing-gone")
     for (const unit of keep) if (unit.matches(PANEL) && unit.hidden && !tileOf(list, unit)) unit.hidden = false
   })

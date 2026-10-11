@@ -27,8 +27,8 @@ module Admin
       KINDS = %i[held lost deleted].freeze
 
       # A post's strip stands in `#editor-notice`, the slot the "Changed
-      # elsewhere" bar also uses: whichever is drawn later replaces the other.
-      # Task 9 decides, and tests, which of the two should win.
+      # elsewhere" bar also uses. While that bar shows it stays (the hold script,
+      # `keepStaleBar`): its form is dead until a reload.
       def self.slot_id(subject)
         case subject
         when ::ContentBlock then "block-#{subject.id}-hold"
@@ -76,6 +76,8 @@ module Admin
 
       def sentence
         return t(".own_tab") if held? && own?
+        # The viewer's own other tab deleted it: this tab still holds the text.
+        return t(".deleted_own_tab") if @kind == :deleted && @actor && @viewer && @actor.id == @viewer.id
         return t(".lost_own_tab") if @kind == :lost && own?
         return t(".#{@kind}.#{noun}", name: name) if name
 

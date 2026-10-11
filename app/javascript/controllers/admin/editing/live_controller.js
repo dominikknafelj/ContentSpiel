@@ -156,14 +156,23 @@ export default class extends Controller {
   // tile's panel and its card) are marked, and their version is cleared, so
   // that no catch-up (`onlyChanged`, which an ask made while the document was
   // hidden has become) can find them "unchanged" and keep the refused text.
-  refresh({ subject, discard = false }) {
+  //
+  // `notice` asks for a deleted block's notice instead (`notice:<id>`, drawn
+  // by `admin--editing--hold` from the `notice` event): it goes through the
+  // same line, with the same retries, and while the document is hidden it is
+  // owed. `waits`, when given, gets the promise of the ask, so that the
+  // hold script can tell when it has been dealt with.
+  refresh({ subject, discard = false, notice = false, waits = null }) {
     if (discard) {
       for (const unit of this.element.querySelectorAll(`[data-editing-unit][data-editing-subject="${CSS.escape(subject)}"]`)) {
         unit.setAttribute("data-editing-discard", "true")
         unit.removeAttribute("data-editing-version")
       }
     }
-    this.want(subject === "record" ? "record" : `block:${subject.replace("block-", "")}`)
+    const id = subject.replace("block-", "")
+    const asked = this.want(notice ? `notice:${id}` : (subject === "record" ? "record" : `block:${id}`))
+    waits?.push(asked)
+    return asked
   }
 
   // The list and the record's form, drawing only what differs.
@@ -175,7 +184,11 @@ export default class extends Controller {
   // dealt with: drawn, dropped for a newer one, owed or failed.
   want(part, options = {}) {
     if (part === "blocks" && !this.hasBlocksUrlValue) part = "record"
-    if (document.hidden) { this.owe("blocks", { onlyChanged: true }); this.owe("record", { onlyChanged: true }); return Promise.resolve() }
+    if (document.hidden) {
+      this.owe("blocks", { onlyChanged: true }); this.owe("record", { onlyChanged: true })
+      if (part.startsWith("notice:")) this.owe(part, options)
+      return Promise.resolve()
+    }
     if (this.moving && part !== "record") { this.owe(part, options); return Promise.resolve() }
     return new Promise((resolve) => this.ask(part, options, [ resolve ]))
   }
@@ -311,12 +324,14 @@ export default class extends Controller {
   urlFor(part, { mark = false } = {}) {
     if (part === "blocks") return this.blocksUrlValue
     if (part === "record") return this.recordUrlValue
-    const url = new URL(this.blockUrlValue.replace(":block_id", part.slice("block:".length)), window.location.origin)
+    const url = new URL(this.blockUrlValue.replace(":block_id", part.slice(part.indexOf(":") + 1)), window.location.origin)
     if (mark) url.searchParams.set("mark", "1")
     return url.toString()
   }
 
   draw(part, answer, { onlyChanged = false } = {}) {
+    // A deleted block's notice is the answer's body, drawn by the hold script.
+    if (part.startsWith("notice:")) return this.dispatch("notice", { detail: { blockId: part.slice("notice:".length), status: answer.status, text: answer.text } })
     if (answer.status === 404) return part.startsWith("block:") ? this.want("blocks") : this.gone()
     this.busy = this.busySubjects()
     this.kept = new Set()

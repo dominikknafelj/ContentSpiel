@@ -9,28 +9,51 @@ import { freeze, textOf } from "editing/freeze"
 // beside `admin--editing--live`; it hears the forms of the screen through
 // events and owns no form.
 //
-// - CLAIMS a subject when a clean form gets its first change
-//   (`admin--saving--autosave:dirty`), through the write queue, so the claim
-//   is answered before that form's save is sent. A save renews the hold on
-//   the server, so a subject this tab claimed less than half a hold ago is
-//   not claimed again; one claimed longer ago is claimed again on the next
-//   first change, and if somebody took it meanwhile that claim is refused.
+// - CLAIMS a subject when a form changes (`admin--saving--autosave:dirty`),
+//   through the write queue, so the claim is answered before that form's save
+//   is sent. A save renews the hold on the server, but a person can type for
+//   longer than a hold without a pause that saves: a subject this tab claimed
+//   less than half a hold ago is not claimed again, one claimed longer ago is
+//   claimed again on the next change (a renewal while typing, at most one per
+//   half hold, and never two on the way at once). If somebody took the
+//   subject meanwhile that claim is refused.
 // - RELEASES it when a block's form is closed (a section's panel, a collapsed
-//   card) and when the editor is left, through the queue and so after the
-//   form's last save. At `pagehide` nothing can wait for a queue: that one
-//   release is a `fetch` with `keepalive`, the one write outside the queue
-//   (a reload makes a new tab id; without it the block you were typing in
-//   would read "editing this in another tab" until the old hold lapsed).
+//   card, a collapsed section's panels) and when the editor is left. The
+//   release is sent through the queue, but only once none of the subject's
+//   forms has anything left to send (`outstanding()`: a save on the wire, a
+//   follow-up, a retry), or the follow-up save would claim the block back and
+//   nothing would release it again; a new claim cancels a release that waits.
+//   A Turbo visit away releases at once (the visit was drained first). At
+//   `pagehide` nothing can wait for a queue: that one release is a `fetch`
+//   with `keepalive`, the one write outside the queue. WHAT REMAINS: a save
+//   still on the wire at the instant of a reload can reach the server after
+//   that release (the save was sent first, the release is processed first)
+//   and claim the block for the old tab id: the new page then reads "You're
+//   editing this in another tab" until that hold lapses (`Editing::HOLD`).
+//   Nothing in a page that is going away orders the two; the way out is Take
+//   over (Task 11).
 // - A REFUSED CLAIM OR SAVE (a 409 whose streams put the `lost` notice into
 //   the card) turns that form read-only in place (`editing/freeze`) and
-//   pauses its autosave: the text stays to be copied. "Discard" asks the live
-//   script for the card as the server has it; "Remove" takes a deleted
-//   block's card away.
+//   pauses its autosave: the text stays to be copied. A claim that fails for
+//   the network, a timeout or a 5xx is not a refusal: the save behind it
+//   claims on the server, so the subject stays in `held` (with time 0, "claim
+//   again on the next change") and is released like any other. "Discard" asks
+//   the live script for the card as the server has it, and keeps the notice
+//   until that read has succeeded; "Remove" takes a deleted block's card away.
+//   A notice must be seen: a panel that is hidden or a card that is collapsed
+//   is opened where its form is frozen or its notice drawn.
+// - A `claimed` SIGNAL for a unit in which this tab has unsaved text shows
+//   nothing at once (the merge keeps the unit as it is): the person learns at
+//   their next change or save, by the 409. With the renewal above that is the
+//   narrow case of a tab that was offline or asleep.
 // - A STRIP THAT SAYS SOMEONE ELSE HOLDS a subject says in how long the hold
 //   lapses (`data-editing-expires-in`, from the server's `Editing::HOLD`). A
 //   renewal sends no signal, and neither does a lapse, so at that time the
 //   part is asked for again, through the live script's one line of reads: it
 //   comes back editable, or held again with a new time. One timer per strip.
+// - A DELETED BLOCK'S NOTICE (who deleted it) is asked of the live script, the
+//   same line with the same retries, and drawn from its `notice` event; a 404
+//   draws the plain sentence from the region's template.
 //
 // IT HOLDS NO WORDING AND NO ADDRESS: every sentence is in the markup the
 // server rendered and every URL (and the lists `editing/freeze` reads) is a
@@ -50,11 +73,14 @@ import { freeze, textOf } from "editing/freeze"
 // answer put a notice somewhere" -- a hook for a stream's effect that Turbo
 // does not give; a stream rendered for a strip outside the region (none
 // today) would be missed. (4) A timer per element is kept by hand (`timers`,
-// keyed by the strip): Stimulus has no per-target state.
+// keyed by the strip): Stimulus has no per-target state. (5) A release that
+// waits for other controllers' state is a polling loop of its own (25 ms),
+// because the autosave controller has no event for "nothing left to send".
 export default class extends Controller {
-  static targets = [ "strip" ]
+  static targets = [ "strip", "deleted" ]
   static values = {
     claimUrl: String, releaseUrl: String, blockUrl: String, hold: Number, passOver: Number, notice: Number,
+    timeout: { type: Number, default: 10000 },
     rules: { type: Object, default: {} }
   }
 
@@ -62,6 +88,8 @@ export default class extends Controller {
   // already in its element BEFORE it connects.
   initialize() {
     this.held = new Map()
+    this.claiming = new Set()
+    this.releasing = new Map()
     this.timers = new Map()
   }
 
@@ -69,8 +97,9 @@ export default class extends Controller {
     this.listeners = [
       [ "admin--saving--autosave:dirty", (event) => this.claim(event.detail.subject) ],
       [ "admin--editor--section:closed", (event) => this.release(`block-${event.detail.blockId}`) ],
-      [ "admin--editor--blocks:toggled", (event) => { if (event.detail.hidden) this.release(`block-${event.detail.blockId}`) } ],
-      [ "admin--editing--live:deleted", (event) => this.deleted(event.detail) ]
+      [ "admin--editor--blocks:toggled", (event) => { if (event.detail.hidden) this.collapsed(event.detail.blockId) } ],
+      [ "admin--editing--live:deleted", (event) => this.deleted(event.detail) ],
+      [ "admin--editing--live:notice", (event) => this.notice(event.detail) ]
     ]
     this.listeners.forEach(([ name, act ]) => this.element.addEventListener(name, act))
     this.leaving = () => this.letGo()
@@ -89,39 +118,81 @@ export default class extends Controller {
     document.removeEventListener("turbo:before-stream-render", this.beforeStream)
     this.timers.forEach((timer) => clearTimeout(timer))
     this.timers.clear()
+    this.releasing.clear()
     const url = this.hasReleaseUrlValue ? this.releaseUrlValue : null
-    if (url) [ ...this.held.keys() ].forEach((subject) => this.release(subject, url))
+    const timeout = this.timeoutValue
+    if (url) [ ...this.held.keys() ].forEach((subject) => this.release(subject, url, { wait: false, timeout }))
   }
 
   params(subject) { return subject === "record" ? {} : { block_id: subject.slice("block-".length) } }
 
   claim(subject) {
     if (!subject || !this.hasClaimUrlValue) return
+    // A release that was waiting for this subject's last save is not wanted
+    // any more: the person is typing again.
+    this.releasing.delete(subject)
     const last = this.held.get(subject)
     if (last && Date.now() - last < this.holdValue / 2) return
+    if (this.claiming.has(subject)) return
 
+    this.claiming.add(subject)
     this.held.set(subject, Date.now())
     const url = this.claimUrlValue
     const params = this.params(subject)
-    enqueue(async () => {
-      const answer = await post(url, params)
-      if (answer.status === 204) return
-      this.held.delete(subject)
-      // Held by another tab: the answer's streams put the notice into the
-      // card, and `stripTargetConnected` freezes the form when it appears --
-      // but a save queued behind this claim must not find an editable form in
-      // the meantime, so the form is stopped now.
-      if (answer.status === 409) {
-        this.lose(subject)
-        Turbo.renderStreamMessage(answer.text)
+    const timeout = this.timeoutValue
+    enqueue(async (isCurrent) => {
+      try {
+        const answer = await post(url, params, { timeout })
+        // The page this was asked on is gone: its answer is nobody's.
+        if (!isCurrent()) return
+        if (answer.status === 204) return
+        if (answer.status === 409) {
+          this.held.delete(subject)
+          // Held by another tab: the answer's streams put the notice into the
+          // card, and `stripTargetConnected` freezes the form when it appears --
+          // but a save queued behind this claim must not find an editable form
+          // in the meantime, so the form is stopped now.
+          this.lose(subject)
+          Turbo.renderStreamMessage(answer.text)
+        } else if (answer.status === 0 || answer.status >= 500) {
+          // The network, a timeout or the server failed, not a refusal: the
+          // save behind this claim claims on the server. Kept as held (time 0:
+          // the next change claims again), so that closing or leaving releases.
+          this.held.set(subject, 0)
+        } else {
+          this.held.delete(subject)
+        }
+      } finally {
+        this.claiming.delete(subject)
       }
     })
   }
 
-  release(subject, url = this.releaseUrlValue) {
+  // Lets go of a subject, once none of its forms has anything left to send
+  // (see the header). `wait: false`: the editor is being left, the forms are
+  // gone and the visit was drained.
+  release(subject, url = this.releaseUrlValue, { wait = true, timeout = this.timeoutValue } = {}) {
     if (!this.held.delete(subject)) return
     const params = this.params(subject)
-    enqueue(() => post(url, params))
+    const forms = wait ? this.formsOf(subject).map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")).filter(Boolean) : []
+    const token = {}
+    this.releasing.set(subject, token)
+    const go = () => {
+      if (this.releasing.get(subject) !== token) return
+      if (forms.some((form) => form.element.isConnected && form.outstanding())) { setTimeout(go, 25); return }
+      this.releasing.delete(subject)
+      enqueue(() => post(url, params, { timeout }))
+    }
+    go()
+  }
+
+  // A card collapsed: the block's form is closed, and so are those of the
+  // blocks in it when it is a section.
+  collapsed(blockId) {
+    const subjects = new Set([ `block-${blockId}` ])
+    this.element.querySelector(`#content_block_${CSS.escape(blockId)}`)?.querySelectorAll("[data-editing-unit][data-editing-subject]")
+      .forEach((unit) => subjects.add(unit.dataset.editingSubject))
+    subjects.forEach((subject) => this.release(subject))
   }
 
   letGo() {
@@ -170,15 +241,34 @@ export default class extends Controller {
   }
 
   // This tab's text was not saved and will not be: the form stays as typed,
-  // read-only, and sends nothing more.
+  // read-only, and sends nothing more -- and it is where the person can see
+  // it (a notice nobody sees is text lost without their knowing).
   lose(subject) {
     for (const form of this.formsOf(subject)) {
       this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.pause()
       freeze(form, { rules: this.rulesValue, lock: (editor) => this.application.getControllerForElementAndIdentifier(editor, "admin--rich-text--editor")?.lock() })
     }
+    this.reveal(subject)
     // The translation header counts empty fields on screen, and a frozen
     // form's are not among them any more: it works its label out again.
     document.dispatchEvent(new CustomEvent("translate:changed"))
+  }
+
+  // Shows what holds the subject's notice: a section's panel that is hidden is
+  // opened through the section's own `open` (so its tile says so), and a card
+  // that is collapsed is expanded.
+  reveal(subject) {
+    for (const unit of this.unitsOf(subject)) {
+      if (unit.hidden && unit.matches("[data-admin--editor--section-target~='panel']")) {
+        const host = unit.closest("[data-controller~='admin--editor--section']")
+        if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.open(unit.dataset.blockId)
+      }
+      const body = unit.querySelector("[data-block-body].hidden")
+      if (body) {
+        body.classList.remove("hidden")
+        unit.querySelector(`[aria-controls="${CSS.escape(body.id)}"]`)?.setAttribute("aria-expanded", "true")
+      }
+    }
   }
 
   async copy(event) {
@@ -186,8 +276,11 @@ export default class extends Controller {
     const status = event.currentTarget.closest("[data-editing-kind]").querySelector("[data-editing-copied]")
     const forms = this.formsOf(subject)
     const form = forms.find((each) => each.dataset.editingFrozen === "true") || forms[0]
+    const text = form ? textOf(form) : ""
     try {
-      await navigator.clipboard.writeText(form ? textOf(form) : "")
+      // "Copied" is said only for text that was copied.
+      if (!text) throw new Error("nothing to copy")
+      await navigator.clipboard.writeText(text)
       status.textContent = status.dataset.copied
     } catch {
       status.textContent = status.dataset.copyFailed
@@ -198,13 +291,30 @@ export default class extends Controller {
 
   // The refused text is given up: the unit may be replaced although its form
   // is not clean, and it is replaced even if its version is the server's
-  // (`admin--editing--live#refresh`). The notice goes at once: for a post it
-  // stands outside the unit, and for the others the unit's replacement
-  // would take it anyway.
-  discard(event) {
+  // (`admin--editing--live#refresh`). The notice is taken away for the read
+  // (for a post it stands outside the unit, and a part that shows an alert is
+  // not replaced) and comes back, saying so, if the read did not succeed. The
+  // status line of a record's header, which a refused save wrote and the
+  // redrawn form does not own, is cleared once the form is drawn.
+  async discard(event) {
     const subject = event.currentTarget.dataset.editingSubject
-    event.currentTarget.closest("[data-editing-kind]")?.remove()
-    this.dispatch("refresh", { detail: { subject, discard: true } })
+    const strip = event.currentTarget.closest("[data-editing-kind]")
+    const slot = strip.parentElement
+    const units = this.unitsOf(subject)
+    const statusId = this.formsOf(subject)[0]?.getAttribute("data-admin--saving--autosave-status-id-value")
+    strip.remove()
+    const waits = []
+    this.dispatch("refresh", { detail: { subject, discard: true, waits } })
+    await Promise.all(waits)
+    // Owed until the document is seen: the notice stays away, the read is coming.
+    if (document.hidden) return
+    if (units.some((unit) => unit.isConnected) && slot.isConnected) {
+      const failed = strip.querySelector("[data-editing-copied]")
+      if (failed) failed.textContent = failed.dataset.discardFailed
+      slot.replaceChildren(strip)
+      return
+    }
+    if (statusId) { const status = document.getElementById(statusId); if (status) status.textContent = "" }
   }
 
   // A deleted block's card, its tile and its panel go.
@@ -218,11 +328,20 @@ export default class extends Controller {
   takeOver() {}
 
   // A block was deleted while its form holds unsaved text (the list merge
-  // kept its unit): the server words the notice, with who deleted it.
-  async deleted({ blockId, unit }) {
-    const answer = await get(this.blockUrlValue.replace(":block_id", blockId))
-    const slot = unit.querySelector("[data-editing-strip-slot]") || document.getElementById(`block-${blockId}-hold`)
-    if (answer.status !== 410 || !slot || !answer.text) return
-    slot.replaceChildren(...new DOMParser().parseFromString(answer.text, "text/html").body.children)
+  // kept its unit): the server words the notice, with who deleted it, and the
+  // live script fetches it through its own line (`notice`).
+  deleted({ blockId }) {
+    this.dispatch("refresh", { detail: { subject: `block-${blockId}`, notice: true } })
+  }
+
+  // The answer of that read: the notice (410), or, for a block no event
+  // names, the plain sentence from the region's template (404).
+  notice({ blockId, status, text }) {
+    const slot = this.element.querySelector(`#block-${CSS.escape(blockId)}-hold`)
+    if (!slot) return
+    let html = null
+    if (status === 410 && text) html = text
+    else if (status === 404 && this.hasDeletedTarget) html = this.deletedTarget.innerHTML.replaceAll("block-0", `block-${blockId}`)
+    if (html) slot.replaceChildren(...new DOMParser().parseFromString(html, "text/html").body.children)
   }
 }

@@ -107,7 +107,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
   test "lost: the warn alert, role alert, the sentence, Copy my text and Discard (handoff 14, 20, 24)" do
     strip(kind: :lost)
 
-    assert_selector "div.bg-warn-tint.text-warn-ink.border.border-warn[role=alert][data-editing-kind=lost]"
+    assert_selector "div.bg-warn-tint.text-warn-ink.border.border-warn[data-editing-kind=lost] > p[role=alert]"
     assert_selector "p", text: "Dana Weiss is editing this block. Your changes weren't saved."
     assert_selector "button[data-action='admin--editing--hold#copy']", text: "Copy my text"
     assert_selector "button[data-action='admin--editing--hold#discard']", text: "Discard"
@@ -132,6 +132,21 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     strip(kind: :deleted, hold: nil)
 
     assert_selector "[role=alert]", text: "This block was deleted. Your changes weren't saved."
+  end
+
+  test "deleted by the viewer's own other tab: 'You deleted this block in another tab. …'" do
+    strip(kind: :deleted, hold: nil, actor: users(:one))
+
+    assert_selector "[role=alert]", text: "You deleted this block in another tab. Your changes weren't saved."
+  end
+
+  test "the alert is the sentence alone: the polite 'Copied' status is not inside it (handoff 24)" do
+    strip(kind: :lost)
+
+    assert_selector "[data-editing-kind=lost] > p[role=alert]"
+    assert_no_selector "[role=alert] [role=status]", visible: :all
+    assert_selector "[data-editing-kind=lost] > span[role=status]", visible: :all
+    assert_selector "span[data-discard-failed='Couldn\\'t load the block. Try again.']", visible: :all
   end
 
   test "a name is text, whatever was typed as one" do

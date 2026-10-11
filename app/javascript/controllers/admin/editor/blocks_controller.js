@@ -415,8 +415,16 @@ export default class extends Controller {
     if (hidden === undefined) return
 
     event.currentTarget.setAttribute("aria-expanded", String(!hidden))
-    // A collapsed card's form is closed: whoever holds the block for this tab
-    // lets it go (`admin--editing--hold`), behind the form's last save.
+    // A collapsed card's form is closed: what it holds is sent now (not left
+    // to the `focusout` the click usually causes), and then whoever holds the
+    // block for this tab lets it go (`admin--editing--hold`), which waits
+    // until none of the card's forms -- a section's panels included -- has a
+    // save left to send.
+    if (hidden) {
+      for (const form of card.querySelectorAll("form[data-controller~='admin--saving--autosave']")) {
+        this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
+      }
+    }
     this.dispatch("toggled", { detail: { blockId: card.dataset.blockId, hidden } })
   }
 

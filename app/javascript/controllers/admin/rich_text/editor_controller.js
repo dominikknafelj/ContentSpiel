@@ -133,7 +133,7 @@ export default class extends Controller {
     this.editorTarget.replaceChildren()
   }
 
-  // A form that turned read-only in place (Task 9's `editing/freeze`; nothing calls this yet): the document
+  // A form that turned read-only in place (`editing/freeze`, through `admin--editing--hold`): the document
   // stays as typed, for copying, and nothing more is written into it.
   lock() {
     this.readOnly = true

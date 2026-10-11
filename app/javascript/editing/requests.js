@@ -5,7 +5,7 @@ import { TAB } from "live/connection"
 // THE TAB HEADER. The server reads `X-Notes-Tab` (the name it had when only
 // notes sent it) into `Current.editing_tab` for every CS Studio request: it
 // is the `origin` of a signal, so the tab that saved skips its own echo, and
-// it will be who holds a reservation (nothing reads it for that yet). A write sent without it is nobody's: it
+// it is who holds a reservation (`admin--editing--hold`). A write sent without it is nobody's: it
 // claims nothing and its own tab would fetch what it has just drawn. Turbo's
 // requests get it here; the three hand-built ones (`admin--saving--autosave`,
 // `admin--editor--blocks`' reorder, `admin--pages--tree`'s move) add it
@@ -36,10 +36,15 @@ export function headers() {
   return { "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content, [TAB_HEADER]: TAB, Accept: "text/vnd.turbo-stream.html, application/json" }
 }
 
-// A POST for the reservations to come (no caller yet). The CALLER puts it in the write queue.
-export async function post(url, params = {}, options = {}) {
+// A POST of the reservations (a claim, a release). The CALLER puts it in the
+// write queue, where a request that never answers would hold every save of
+// the screen: it gives up after `timeout` milliseconds (status 0, like any
+// failure), except the `keepalive` release of a page that is going away,
+// which has no queue to hold and no time to wait.
+export async function post(url, params = {}, { timeout = 10000, ...options } = {}) {
   try {
-    const response = await fetch(url, { method: "POST", headers: headers(), body: new URLSearchParams(params), credentials: "same-origin", ...options })
+    const signal = options.keepalive ? undefined : AbortSignal.timeout(timeout)
+    const response = await fetch(url, { method: "POST", headers: headers(), body: new URLSearchParams(params), credentials: "same-origin", signal, ...options })
     return { status: response.redirected ? 0 : response.status, text: await response.text() }
   } catch {
     return { status: 0, text: "" }

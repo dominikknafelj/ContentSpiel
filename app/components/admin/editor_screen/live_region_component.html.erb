@@ -7,4 +7,9 @@
     <p class="min-w-0 flex-1"><%= t(@record.is_a?(::Page) ? ".missing" : ".missing_post") %></p>
     <%= link_to t(@record.is_a?(::Page) ? ".back" : ".back_post"), (@record.is_a?(::Page) ? helpers.admin_pages_path(**@url_options) : helpers.admin_posts_path(**@url_options)), class: "shrink-0 font-semibold underline hover:text-ink", data: { turbo_frame: "_top" } %>
   </div>
-</template><% end %>
+</template>
+<%# The notice of a deleted block whose own answer could not name who deleted it (a read that
+    says 404, or none): the plain sentence, for the id 0 the script puts the block's id in. %>
+<% if @record.is_a?(::Page) %>
+  <template data-admin--editing--hold-target="deleted"><%= render Admin::EditorScreen::HoldStripComponent.new(subject: ::ContentBlock.new(id: 0), hold: nil, viewer: nil, kind: :deleted, actor: nil) %></template>
+<% end %><% end %>

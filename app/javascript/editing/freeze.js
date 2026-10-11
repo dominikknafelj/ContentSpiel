@@ -32,7 +32,17 @@ export function actionOf(token) {
   return token.replace(/^[^>]*->/, "").replace(/@\w+$/, "").replace(/(?::!?\w+)+$/, "")
 }
 
-export function freeze(form, { lock = () => {}, rules } = {}) {
+// The shared rule as the page carries it (the region renders `HeldFields.rules`),
+// so that `freeze(form, { lock })` is the same freeze as the server's.
+export function sharedRules() {
+  try {
+    return JSON.parse(document.getElementById("editing")?.getAttribute("data-admin--editing--hold-rules-value") || "null")
+  } catch {
+    return null
+  }
+}
+
+export function freeze(form, { lock = () => {}, rules = sharedRules() } = {}) {
   if (!form || form.dataset.editingFrozen === "true") return
   const allowed = new Set(rules?.allowed_actions || [])
   const readonly = new Set(rules?.readonly_types || [])

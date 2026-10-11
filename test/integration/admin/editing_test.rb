@@ -107,7 +107,7 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     get admin_editing_block_path(kind: "page", id: @page.id, block_id: id)
 
     assert_response :gone
-    assert_select "[role=alert][data-editing-kind=deleted][data-editing-subject='block-#{id}']", text: /Dana Weiss deleted this block\. Your changes weren't saved\./
+    assert_select "[data-editing-kind=deleted][data-editing-subject='block-#{id}'] > p[role=alert]", text: /Dana Weiss deleted this block\. Your changes weren't saved\./
     assert_select "button", text: "Copy my text"
     assert_select "button", text: "Remove"
   end
@@ -120,7 +120,7 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     get admin_editing_block_path(kind: "page", id: @page.id, block_id: id)
 
     assert_response :gone
-    assert_select "[role=alert][data-editing-kind=deleted]", text: /Dana Weiss deleted this block\./
+    assert_select "[data-editing-kind=deleted] > p[role=alert]", text: /Dana Weiss deleted this block\./
   end
 
   test "a block kept when its section was removed is not gone, and a block of another page or never made is a 404" do

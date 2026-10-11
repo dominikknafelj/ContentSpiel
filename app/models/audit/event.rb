@@ -30,10 +30,16 @@ module Audit
     # The `block.deleted` events that took a block away: its own, and the
     # section's that deleted it WITH the section (`deleted_block_ids`, the one
     # event `ContentBlocks::Destroy` records for them all), on this page.
-    scope :deleting_block, ->(block_id, page_id) {
+    #
+    # Bounded: only the events of the last `since` (a week: an editor open
+    # longer than that is told the plain sentence), which is what
+    # `index_audit_events_on_action_and_occurred_at` serves, so the scan does
+    # not grow with the log (and is no more for a block id of no page: anyone
+    # in the read scope can ask for one). One statement, from Arel nodes.
+    scope :deleting_block, ->(block_id, page_id, since: 7.days.ago) {
       own = where(subject_type: "ContentBlock", subject_id: block_id)
       with_section = where(SqlNodes.json_array_contains(arel_table[:metadata], :deleted_block_ids, block_id))
-      where(action: "block.deleted").merge(own.or(with_section)).where(SqlNodes.json_text(arel_table[:metadata], :page_id).eq(page_id.to_s))
+      where(action: "block.deleted").where(occurred_at: since..).merge(own.or(with_section)).where(SqlNodes.json_text(arel_table[:metadata], :page_id).eq(page_id.to_s))
     }
 
     # The events on either side of `event` in the log's own order

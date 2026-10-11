@@ -205,3 +205,8 @@ en:
             block: "%{name} deleted this block. Your changes weren't saved."
           deleted_unknown:
             block: "This block was deleted. Your changes weren't saved."
+          # The viewer's own other tab deleted it.
+          deleted_own_tab: "You deleted this block in another tab. Your changes weren't saved."
+          # The status beside "Copy my text" when the read of the card to show after
+          # "Discard" failed: the notice stays.
+          discard_failed: "Couldn't load the block. Try again."

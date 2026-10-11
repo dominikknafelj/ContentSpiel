@@ -255,7 +255,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     within(panel(inside)) { click_button "Close" }
     assert_eventually(wait: LIVE, message: "the block was not released") { !Editing::Reservation.of(inside).exists? }
 
-    assert_equal %w[POST PATCH POST].zip(%w[claim content_blocks release]).map { |verb, part| sent.find { |each| each.start_with?(verb) && each.include?(part) } }.compact.size, 3
+    assert_equal 3, %w[POST PATCH POST].zip(%w[claim content_blocks release]).map { |verb, part| sent.find { |each| each.start_with?(verb) && each.include?(part) } }.compact.size
     assert_operator sent.index(patches.last), :<, sent.index(releases.last), sent.inspect
     using_session(:dana) do
       assert_no_selector "#content_block_#{inside.id}[data-editing-held]", wait: LIVE
@@ -319,12 +319,15 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
         const real = window.fetch
         window.fetch = function (input) { const url = typeof input === "string" ? input : input.url; if (url.includes("/cs-studio/editing/")) window.__gets.push(url); return real.apply(this, arguments) }
       JS
+      page.execute_script("window.__due = 0; document.getElementById('editing').addEventListener('admin--editing--hold:refresh', () => { window.__due += 1 })")
       hide_document
       expire
       shorten("#{card(@block)} [data-editing-kind=held]", 200)
-      await_js "true"
-      assert_no_selector "#{card(@block)} form[data-controller~='admin--saving--autosave']", wait: 1.5
+      # The timer has fired while the document was hidden: the part was asked for, and nothing was fetched.
+      await_js "window.__due >= 1"
+      await_frames
       assert_equal [], page.evaluate_script("window.__gets")
+      assert_no_selector "#{card(@block)} form[data-controller~='admin--saving--autosave']"
       show_document
       assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave']", wait: LIVE
     end
@@ -396,7 +399,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_includes body_of(@block), "First"
     assert_not_includes body_of(@block), "second"
     assert_selector "#block-#{@block.id}-save-status", text: /NOT SAVED/i
-    assert_selector "[role=alert][data-editing-kind]", count: 1
+    assert_selector "[data-editing-kind=lost]", count: 1
   end
 
   test "a hold that this tab claimed long ago is claimed again on the first change, and refused when it was taken meanwhile" do
@@ -462,7 +465,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
 
     using_session(:other) do
       assert_selector "#{card(@block)}[data-editing-held=true] [data-editing-kind=held]", text: "You're editing this in another tab", wait: LIVE
-      assert_selector "#{card(@block)} [data-editing-kind=held] [data-avatar-tone], #{card(@block)} [data-editing-kind=held] .bg-ink", wait: 0
+      assert_selector "#{card(@block)} [data-editing-kind=held] span.bg-ink.text-paper[aria-hidden=true]", wait: LIVE
       assert_equal 0, page.all("#editor-notice > *").size
     end
   end
@@ -551,7 +554,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     Editing::Reservation.claim(subject: post, record: post, user: @dana, tab: "tab-dddddddd")
     send_delayed
 
-    assert_selector "#editor-notice [role=alert][data-editing-kind=lost]", text: "Dana Weiss is editing this post. Your changes weren't saved.", wait: LIVE
+    assert_selector "#editor-notice [data-editing-kind=lost] [role=alert]", text: "Dana Weiss is editing this post. Your changes weren't saved.", wait: LIVE
     assert_selector "input[name='post[title]'][readonly]"
     assert_equal [], patches
   end
@@ -735,12 +738,19 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
         holder.innerHTML = html
         document.body.append(holder)
         freeze(holder.querySelector("form"), { rules })
+        // Without `rules`: the page's own, the same freeze.
+        const second = holder.cloneNode(true)
+        second.id = "sample-default"
+        document.body.append(second)
+        freeze(second.querySelector("form"))
         done(true)
       })
     JS
     browser = Nokogiri::HTML5.fragment(page.evaluate_script("document.getElementById('sample').innerHTML")).css("input, textarea, select, button, div, ul")
 
     assert_equal signature_of(server), signature_of(browser)
+    by_default = Nokogiri::HTML5.fragment(page.evaluate_script("document.getElementById('sample-default').innerHTML")).css("input, textarea, select, button, div, ul")
+    assert_equal signature_of(server), signature_of(by_default), "freeze(form, { lock }) without rules is the shared rule"
     assert_equal "true", page.evaluate_script("document.querySelector('#sample form').dataset.editingFrozen")
     assert page.evaluate_script("document.querySelector('#sample [data-held-guard]').disabled")
   end
@@ -798,5 +808,313 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_operator claim_at, :<, sent.index { |each| each.start_with?("PATCH") }
     assert_operator sent.index { |each| each.start_with?("PATCH") }, :<, sent.index { |each| each.end_with?("/release") }
     assert_not Editing::Reservation.of(inside).exists?
+  end
+
+  # --- fix round 1 -------------------------------------------------------------
+
+  # The NEXT request of `verb` whose URL matches `source` is answered by
+  # `answer` (a JS expression: a Response, or a promise of one) instead of
+  # going out; `window.__real` is the page's own fetch.
+  def answer_next(verb, source, answer, times: 1)
+    page.execute_script(<<~JS, verb, source, times)
+      const [ verb, source, times ] = arguments
+      let left = times
+      window.__real = window.__real || window.fetch
+      const before = window.fetch
+      window.fetch = function (input, init = {}) {
+        const url = typeof input === "string" ? input : input.url
+        const method = String(init.method || "GET").toUpperCase()
+        if (left > 0 && method === verb && new RegExp(source).test(url)) {
+          left -= 1
+          const signal = init.signal
+          return (#{answer})
+        }
+        return before.apply(this, arguments)
+      }
+    JS
+  end
+
+  HANG = 'new Promise((resolve, reject) => { signal && signal.addEventListener("abort", () => reject(new DOMException("aborted", "TimeoutError"))) })'.freeze
+
+  def hold_controller_js(expression)
+    page.evaluate_script("(() => { const hold = window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--hold'); return #{expression} })()")
+  end
+
+  def section_with_block
+    section = add_block(block_type: "section", settings: { "layout" => "two" })
+    [ section, add_block(section_id: section.id, section_column: 1) ]
+  end
+
+  test "a release waits for the form's follow-up save: the order on the wire is save, save, release, and nothing holds the block afterwards" do
+    section, inside = section_with_block
+    open_page
+    record_requests
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    delay_next("PATCH", "/content_blocks/#{inside.id}")
+    type_in(inside, "First", within: panel(inside))
+    await_delayed
+    type_in(inside, " second", within: panel(inside))
+    within(panel(inside)) { click_button "Close" }
+    await_frames
+    assert_equal [], releases, "the release was sent while a save was still to come"
+    send_delayed
+
+    assert_eventually(wait: LIVE, message: "the block was never released") { releases.size == 1 }
+    assert_writes_settled
+    assert_equal 2, patches.size
+    assert_operator sent.rindex(patches.last), :<, sent.index(releases.first), sent.inspect
+    assert_not Editing::Reservation.of(inside).exists?
+    assert_includes body_of(inside), "First second"
+    assert section
+  end
+
+  test "typing for longer than half a hold without a pause renews the hold: one renewal per half hold, and it never lapses" do
+    open_page
+    record_requests
+    region_set("hold", 1000)
+    find("#{card(@block)} .ProseMirror").click
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    14.times do
+      find("#{card(@block)} .ProseMirror").send_keys("x")
+      sleep 0.15 # sleep: typing without the one-second pause that would save; the hold's renewal is what this measures
+    end
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+    assert_operator claims.size, :>=, 2, "typing across half a hold renewed nothing: #{sent.inspect}"
+    assert_operator claims.size, :<=, 1 + (elapsed / 0.5).floor, "more than one renewal per half hold (#{elapsed.round(2)} s): #{sent.inspect}"
+    assert_equal [], patches, "no pause, so no save yet"
+    assert held_by(@me)
+    assert_no_selector "[data-editing-kind=lost]"
+  end
+
+  test "a claim that never answers gives up, and the save behind it goes: the subject stays held, to be released" do
+    open_page
+    record_requests
+    region_set("timeout", 500)
+    answer_next("POST", CLAIM, HANG)
+    type_in(@block, "Saved anyway")
+
+    assert_eventually(wait: LIVE, message: "the save behind a claim that never answered was never sent") { patches.size == 1 }
+    assert_writes_settled
+    assert_includes body_of(@block), "Saved anyway"
+    assert_equal 0, hold_controller_js("hold.held.get('block-#{@block.id}')")
+  end
+
+  test "a claim answered with a 500 is not a refusal: held with time 0, claimed again on the next change, and released on close" do
+    open_page
+    record_requests
+    answer_next("POST", CLAIM, 'Promise.resolve(new Response("", { status: 500 }))')
+    type_in(@block, "O")
+    assert_writes_settled
+    assert_equal 0, hold_controller_js("hold.held.get('block-#{@block.id}')")
+    assert_no_selector "[data-editing-kind=lost]"
+
+    type_in(@block, "n")
+    assert_writes_settled
+    assert_equal 1, claims.size, "the next change claims again (the first, answered by the stub, never reached the recorder behind it)"
+    find("#{card(@block)} [data-action*='admin--editor--blocks#toggle']", match: :first).click
+    assert_eventually(wait: LIVE, message: "the block was not released") { releases.size == 1 }
+    assert_not Editing::Reservation.of(@block).exists?
+  end
+
+  test "a tie on a section's own settings: the notice with Copy and Discard survives the winner's signals and the list merge" do
+    section, = section_with_block
+    join(:dana, @dana)
+    open_page
+    delay_next("POST", CLAIM)
+    background = "#content_block_#{section.id} select[name='block[settings][background]']"
+    find(background).find("option[value=tinted]").select_option
+    await_delayed
+    using_session(:dana) do
+      find(background).find("option[value=tinted]").select_option
+      assert_writes_settled
+    end
+    send_delayed
+    assert_selector "#block-#{section.id}-hold [data-editing-kind=lost]", text: "Dana Weiss is editing this block", wait: LIVE
+
+    using_session(:dana) do
+      find("#content_block_#{section.id} select[name='block[settings][width]']").all("option").last.select_option
+      assert_writes_settled
+    end
+    await_live_part
+    assert_eventually(wait: LIVE, message: "the winner's second save was never merged") { page.evaluate_script("document.getElementById('editing').dataset.livePart") == "answered" }
+    await_frames
+    assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Copy my text"
+    assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Discard"
+  end
+
+  test "pause() during a retry's backoff leaves nothing outstanding: the queue is quiet at once" do
+    open_page
+    answer_next("PATCH", "/content_blocks/#{@block.id}", 'Promise.resolve(new Response("", { status: 500 }))', times: 50)
+    type_in(@block, "Failing")
+    form = autosave_form(card(@block))
+    await_js "(() => { const a = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector(#{form.to_json}), 'admin--saving--autosave'); return Boolean(a.retryTimer) })()"
+    page.execute_script("window.Stimulus.getControllerForElementAndIdentifier(document.querySelector(#{form.to_json}), 'admin--saving--autosave').pause()")
+
+    assert_equal false, page.evaluate_script("window.Stimulus.getControllerForElementAndIdentifier(document.querySelector(#{form.to_json}), 'admin--saving--autosave').outstanding()")
+    quiet = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("saving/queue").then(({ quiet }) => Promise.race([ quiet().then(() => true), new Promise((resolve) => setTimeout(() => resolve(false), 2000)) ])).then(done)
+    JS
+    assert quiet, "quiet() never resolved: the paused form still counts as outstanding"
+  end
+
+  test "Discard on the page settings clears the status line that said the save was refused, and the form is editable again" do
+    open_page
+    delay_next("POST", CLAIM)
+    find("#page-title").send_keys(" 2")
+    await_delayed
+    Editing::Reservation.claim(subject: @page, record: @page, user: @dana, tab: "tab-dddddddd")
+    send_delayed
+    assert_selector "#page-hold [data-editing-kind=lost]", wait: LIVE
+    assert_selector "#page-save-status", text: /NOT SAVED · DANA WEISS IS EDITING/i
+    Editing::Reservation.of(@page).delete_all # version: none (a system test lets the holder go)
+
+    within("#page-hold [data-editing-kind=lost]") { click_button "Discard" }
+    assert_no_selector "#page-title[readonly]", wait: LIVE
+    assert_selector "#page-save-status", text: "", exact_text: true, wait: LIVE
+    assert_selector "#page-settings form[data-controller~='admin--saving--autosave']"
+  end
+
+  test "Discard on a post clears the status line that said the save was refused" do
+    post = create_post(title: "Hello", published: false)
+    visit "/cs-studio/posts/#{post.id}"
+    await_notes_live
+    delay_next("POST", CLAIM)
+    find("input[name='post[title]']").send_keys(" 2")
+    await_delayed
+    Editing::Reservation.claim(subject: post, record: post, user: @dana, tab: "tab-dddddddd")
+    send_delayed
+    assert_selector "#editor-notice [data-editing-kind=lost]", wait: LIVE
+    assert_selector "#post-save-status", text: /NOT SAVED · DANA WEISS IS EDITING/i
+    Editing::Reservation.of(post).delete_all # version: none (a system test lets the holder go)
+
+    within("#editor-notice [data-editing-kind=lost]") { click_button "Discard" }
+    assert_no_selector "input[name='post[title]'][readonly]", wait: LIVE
+    assert_selector "#post-save-status", text: "", exact_text: true, wait: LIVE
+  end
+
+  test "a block deleted by my own other tab: 'You deleted this block in another tab. Your changes weren't saved.'" do
+    open_page
+    type_unsent(@block, "Unsaved words")
+    as(@me, channel: :admin) { ContentBlocks::Destroy.call(@block) }
+
+    assert_selector "#{card(@block)} [role=alert]", text: "You deleted this block in another tab. Your changes weren't saved.", wait: LIVE
+  end
+
+  test "a deleted block's notice is read again when the first read fails, and is the plain sentence when no event names it" do
+    open_page
+    type_unsent(@block, "Unsaved words")
+    answer_next("GET", "/editing/page/\\d+/blocks/#{@block.id}\\?*$", 'Promise.resolve(new Response("", { status: 500 }))')
+    as(@dana, channel: :admin) { ContentBlocks::Destroy.call(@block) }
+    assert_selector "#{card(@block)} [role=alert]", text: "Dana Weiss deleted this block. Your changes weren't saved.", wait: 12
+
+    other = add_block
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+    type_unsent(other, "Other words")
+    answer_next("GET", "/editing/page/\\d+/blocks/#{other.id}", 'Promise.resolve(new Response("", { status: 404 }))', times: 5)
+    as(@dana, channel: :admin) { ContentBlocks::Destroy.call(other) }
+    assert_selector "#{card(other)} [role=alert]", text: "This block was deleted. Your changes weren't saved.", wait: LIVE
+  end
+
+  test "a lost notice in a hidden section panel opens the panel, and in a collapsed card expands it" do
+    section, inside = section_with_block
+    open_page
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    delay_next("POST", CLAIM)
+    type_in(inside, "Hidden soon", within: panel(inside))
+    await_delayed
+    within(panel(inside)) { click_button "Close" }
+    assert_no_selector panel(inside), wait: 1
+    Editing::Reservation.claim(subject: inside, record: @page, user: @dana, tab: "tab-dddddddd")
+    send_delayed
+
+    assert_selector "#{panel(inside)} [data-editing-kind=lost]", text: "Dana Weiss is editing this block", wait: LIVE
+    assert_selector "#content_block_#{inside.id} .admin-block-tile__face[aria-expanded=true]"
+    assert section
+
+    delay_next("POST", CLAIM)
+    type_in(@block, "Collapsing")
+    await_delayed
+    find("#{card(@block)} [data-action*='admin--editor--blocks#toggle']", match: :first).click
+    assert_no_selector "#{card(@block)} [data-block-body]:not(.hidden)", wait: 1
+    Editing::Reservation.claim(subject: @block, record: @page, user: @dana, tab: "tab-dddddddd")
+    send_delayed
+
+    assert_selector "#{card(@block)} [data-editing-kind=lost]", wait: LIVE
+    assert_selector "#{card(@block)} [data-block-body]:not(.hidden)"
+    assert_selector "#{card(@block)} [data-action*='admin--editor--blocks#toggle'][aria-expanded=true]"
+  end
+
+  test "collapsing a section's card releases the holds of the blocks in its panels too" do
+    section, inside = section_with_block
+    open_page
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    type_in(inside, "In a lane", within: panel(inside))
+    assert_writes_settled
+    assert held_by(@me, inside)
+
+    find("#content_block_#{section.id} [data-action*='admin--editor--blocks#toggle']", match: :first).click
+    assert_eventually(wait: LIVE, message: "the panel's block was not released with its card") { !Editing::Reservation.of(inside).exists? }
+  end
+
+  test "collapsing a card sends what the form holds itself, then releases, without a blur" do
+    open_page
+    record_requests
+    type_in(@block, "No blur")
+    # A scripted click: no focusout reaches the field before it.
+    page.execute_script("document.querySelector(#{"#{card(@block)} [data-action*='admin--editor--blocks#toggle']".to_json}).click()")
+    assert_eventually(wait: LIVE, message: -> { "the block was not released: #{sent.inspect} #{hold_controller_js("JSON.stringify({ releasing: hold.releasing.size, held: [...hold.held.keys()], out: hold.formsOf('block-#{@block.id}').map((f) => { const a = window.Stimulus.getControllerForElementAndIdentifier(f, 'admin--saving--autosave'); return [a.timer, a.busy, a.pending] }) })")}" }) { releases.size == 1 }
+
+    assert_includes body_of(@block), "No blur"
+    assert_operator sent.index(patches.last), :<, sent.index(releases.last), sent.inspect
+    assert_not Editing::Reservation.of(@block).exists?
+  end
+
+  test "Discard keeps the notice, and says so, when the card could not be read; the next try draws it" do
+    lose_a_tie
+    assert_selector "#{card(@block)} [data-editing-kind=lost]", wait: LIVE
+    answer_next("GET", "/editing/page/\\d+/blocks/#{@block.id}", 'Promise.resolve(new Response("", { status: 500 }))')
+    within("#{card(@block)} [data-editing-kind=lost]") { click_button "Discard" }
+
+    assert_selector "#{card(@block)} [data-editing-kind=lost] [data-editing-copied]", text: "Couldn't load the block. Try again.", wait: LIVE
+    assert_selector "#{card(@block)} .ProseMirror", text: "My words"
+    within("#{card(@block)} [data-editing-kind=lost]") { click_button "Discard" }
+    assert_selector "#{card(@block)}[data-editing-held=true] [data-editing-kind=held]", wait: LIVE
+    assert_no_text "My words"
+  end
+
+  test "Copy my text does not say Copied when there is nothing to copy" do
+    open_page
+    delay_next("POST", CLAIM)
+    find("#{card(@block)} .ProseMirror").click
+    find("#{card(@block)} .ProseMirror").send_keys("x", :backspace)
+    await_delayed
+    Editing::Reservation.claim(subject: @block, record: @page, user: @dana, tab: "tab-dddddddd")
+    send_delayed
+    assert_selector "#{card(@block)} [data-editing-kind=lost]", wait: LIVE
+    stub_clipboard
+    within("#{card(@block)} [data-editing-kind=lost]") { click_button "Copy my text" }
+
+    assert_selector "#{card(@block)} [data-editing-copied]", text: "Couldn't copy. Select the text and copy it yourself.", wait: LIVE
+    assert_nil copied
+  end
+
+  test "a tie against my own other tab reads 'You're editing this in another tab. Your changes weren't saved.'" do
+    open_page
+    delay_next("POST", CLAIM)
+    type_in(@block, "Mine")
+    await_delayed
+    using_session(:other) do
+      sign_in_via_form(@me)
+      visit "/cs-studio/pages/#{@page.id}"
+      await_notes_live
+      type_in(@block, "Theirs")
+      assert_writes_settled
+    end
+    send_delayed
+
+    assert_selector "#{card(@block)} [role=alert]", text: "You're editing this in another tab. Your changes weren't saved.", wait: LIVE
   end
 end

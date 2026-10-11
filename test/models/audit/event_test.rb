@@ -155,5 +155,6 @@ class Audit::EventTest < ActiveSupport::TestCase
     assert_equal section.id, Audit::Event.deleting_block(inside.id, page.id).first.subject_id
     assert_empty Audit::Event.deleting_block(kept.id, page.id)
     assert_empty Audit::Event.deleting_block(block.id, other.id), "another page's block of the same id is not this one's"
+    assert_empty Audit::Event.deleting_block(block.id, page.id, since: 1.minute.from_now), "the scan is bounded by a time window"
   end
 end
