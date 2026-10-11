@@ -2,6 +2,8 @@
 
 Design, 2026-10-11. Step 3 of "Collaboration on content" on the roadmap, after notes (step 1) and presence (step 2). The look is `2026-10-11-live-editing-handoff.md`.
 
+**Status: built** (2026-10-11, branch `editing`). Sections 1 to 9 are the design as it was approved and are left as they were written; where the code left them is section 10, "As built", at the end. The code is described in `docs/reference/live-editing.md`.
+
 ## 1. What it is for
 
 Two people can open the same page or post. Today the one who saves second is refused ("Changed by Dana 2 min ago. Your text is still here so you can copy it"), nothing warned them beforehand, and nothing on their screen changes until they reload.
@@ -142,3 +144,88 @@ As the handoff has it. In structure:
 ## 9. Not in this step
 
 Library images in the media panel (they keep "saved, also changed elsewhere"). Reservations for writes through the MCP server: they hold nothing and are not refused by a hold; they appear through live refresh, and one that lands on a block someone is changing makes that person's next save stale, as today. Co-editing. Anything on the dashboard, in the lists or in the mind graph. A rate limit on claims.
+
+## 10. As built
+
+Where the build left the design above, and why. The body is not rewritten: it is the record of what was approved. `docs/reference/live-editing.md` describes the code as it is, with the test behind each rule.
+
+### The seven points the plan found before building
+
+The plan (`docs/superpowers/plans/2026-10-11-live-editing.md`, "Where the code disagrees with the design") checked the design against the code and built these the proposed way.
+
+1. **§3.3, the forwarding of the page's base.** "Removed, if nothing else reads it": something does. `Pages::Move` saves the page's own columns, so the tree's move of the open page moves `settings_changed_at`. The forwarding went from the block side only (`Admin::ContentBlocksController#page_base_streams`, the autosave script's `pageBaseId`, the header on the block requests); `admin--pages--tree` still sends `X-Page-Base-Updated-At` and `Admin::TreeController#page_base_streams` still answers, now comparing `settings_changed_at`.
+2. **§3.1, `origin`.** Not `Current.notes_tab`, which only the notes controllers set: with it on a content request, the tab that deleted a block would skip the refresh of its own notes drawer. The same header, `X-Notes-Tab`, is read by `Admin::BaseController` into a new `Current.editing_tab`, which only `Editing` reads.
+3. **§5, "the card and the tile stop naming notes".** They stop drawing the marker (it is in the slot), but both still name notes for the "Add note" item of their menus, so they stay named exceptions of `test/lib/notes_boundary_test.rb` with the reason narrowed, and a new test holds that neither draws a marker itself.
+4. **§3.2, "one block's card".** A section's card holds the forms of every block in it and cannot be fetched and replaced as one. The block's GET answers 204 for a section and the list is fetched instead, merged unit by unit; a block in a section is fetched as its tile and its panel. The unit of a section is its own settings form, not its card.
+5. **§4.3, "fields that are `readonly`".** No field component took a read-only option. The held form's fields are drawn as they are and rewritten once by `Admin::EditorScreen::HeldFields`; the browser's counterpart for the one form that turns read-only in place is `editing/freeze.js`, which reads the same lists from the page. It was built with the read-only rendering (Task 7), not with the claims as the plan's text said.
+6. **Handoff 17, the "Copied" toast.** There is none in CS Studio. "Copied" is a polite status text beside the button, gone after 2 seconds (settled as handoff 24).
+7. **§4.2 against §7, the release when the page is left.** A page that is unloading cannot wait for a queue. Every claim, release, withdrawal, request and hand-over goes through the queue except at `pagehide`, where the release of what the tab holds, and the withdrawal of a request it made, are each a `fetch` with `keepalive` (not a beacon: it carries the tab header and the CSRF token).
+
+### Rulings made while building
+
+**Live refresh**
+
+- **A catch-up draws only what differs (§3.2).** Every unit and part carries `data-editing-version` (`Editing.version`), and the fetch made when a subscription is confirmed leaves a clean unit of the same version as the element it is. Without it, the first connect replaced every clean card after every page load. Cost: a unit whose look depends on something its version does not cover is missed by a catch-up, never by a signal.
+- **One GET at a time (§3.2, "an older answer is never drawn over a newer one").** Counting "newest" per part let an older list answer be drawn over a newer block answer. The live script has one read on its way, and what is asked meanwhile is owed and coalesced. An answer on the wire is drawn unless this tab queued a write meanwhile.
+- **Displaced units (§3.2).** A block someone else moved to another container while this tab holds unsaved text in it stays where it is, is not marked gone, and nothing of it is drawn in its new place; the list is fetched again once the form is saved. The design had no word for this; the first build drew two forms of one block.
+- **A gone unit keeps its place, a hidden panel that is gone is shown, and the focused unit is never the one moved.** A clean form that has the focus *is* replaced (a hold must be able to make it read-only): the focus and, for an `input` or `textarea`, the selection come back; a rich-text caret is lost.
+- **The scroll is corrected for up to 1.5 seconds** (§3.2, handoff 12), while the cards redrawn above mount their editors, and stops the moment anything else scrolls.
+- **A unit whose block has a menu or a dialog open is kept** and fetched again when it closes. Not in the design.
+- **A drop made while a colleague changed the list is refused** (the existing stale reorder) and the list redrawn: the drop does not win. D4's "the existing refusal covers the rare clash" was taken at its word. Cost: a person's drop snaps back when a colleague changed the list in that second.
+- **A rejected subscription fetches the record once**, so that its 404 says the access ended. A read has a timeout and three retries, and the editor's live part says "answered" only once its first read was attempted.
+- **A trashed branch signals `gone` on each descendant's stream** (§3.1), since it is one event on its root. **A section's fold is `structure`**, but a later plain save coalesced into that audit row is not. **The channel takes a page or a post only**; a library image is rejected.
+- **"Updated by …": the newest change decides.** If it was the viewer's own or made without a user, nobody is named.
+- **A block deleted with its section gets notice (c) too.** The plan expected a 404 and no notice; the section's `block.deleted` event lists the blocks it took (`deleted_block_ids`), so the answer is the 410 naming who deleted it.
+
+**The settings base (§3.3)**
+
+- **For a page, "Changed by …" counts only the page's own events** (`Audit::ChangeSince`): only those move the settings base. Cost: a notice that could have named someone says "Changed elsewhere."
+- A tag merge touches a page without changing it, so it no longer makes an open settings form stale.
+
+**Reservations (§4.1, §4.2)**
+
+- **D3, "2 minutes after their last saved change": a hold is renewed while typing.** A person can type for longer than a hold without a pause that saves, so a change claims again when the tab's last claim is older than half a hold. `changed_at` is the last saved change *or claim*.
+- **D4, a section's layout is not an instant action.** It is saved by the section's own settings form, an autosave, so it claims the section's block and is refused while another tab holds that form. Moving, adding, duplicating and deleting blocks ignore a hold as designed.
+- **Publish, Unpublish, Schedule and "Still correct" are refused while another tab holds the subject** (for a page: its settings), and take no hold. Not in the design: a publish would move the record's `updated_at` under the holder's open form. **Bulk publish skips a held post** and says how many it skipped; a bulk trash is not held back.
+- **A claim a request took is given back** when the save is then refused as stale, denied or raises; a 422 keeps it.
+- **The rule for who may claim moved to `AccessControl::OwnerRule`**, so the services and `Editing::Rights` ask the same one. Someone with `publish` but not `edit` can make a publish-only save as before, and can neither claim, take over nor hand over.
+- **The first requester keeps the request (§4.4).** `request` answers `requested`, `pending` or `none`; a second person asking while a request younger than twice the pass-over time stands is told "pending". Two requesters could otherwise postpone each other. `requested_by_id` alone says whether a request exists.
+- **A row exactly `HOLD` old is not live**: the read and the claim share one cutoff.
+- **A deleted block's row stays until it expires**; no deletion hook was needed. A person whose right to edit is removed keeps a hold until it lapses or is taken over.
+
+**Taking over (§4.4)**
+
+- **The outcome `pending`**, above, and **`withdraw`**: a request ends with its asker (a visit away, a closed page, the unit going), through a statement and a route of their own, so the holder does not hand the subject to a tab that is gone.
+- **§4.2 says no statement takes a row lock; the service does.** `Editing::TakeOver` runs its statements in one short transaction with the subject's reservation row locked first, so that what it audits is the row it changed. It locks no content row.
+- **The audit sentence has two verbs.** The event's actor is whoever called the service: "handed over editing" when the holder answered, "took over editing" when the requester passed over. The first build logged a hand-over as the holder having taken over. Both ids are in the metadata, as designed; no name is.
+- **§4.4 step 2, "waits until its write queue is drained", became a light, reversible lock.** A person typing without a pause never let the screen-wide drain finish, so they were passed over and their last words frozen although they were answering. The holder's tab now makes that subject's fields read-only at the moment it sends them, waits on those forms alone, and hands over; the lock is taken back if the save fails. After the hand-over the fields stay read-only until the unit is redrawn.
+- **A holder passed over while awake with nothing unsaved** reads "Taken over by …" (notice (a)) like one who handed over.
+- **A `released` signal while waiting** makes the asker claim at once; **a third person's claim** ends the waiting and asks nobody.
+
+**The slot (§5)**
+
+- No `markers:` argument was threaded through the section, lane and group components. The page's `Editing::Holds` goes through as the slot's context `holds:`, and `Admin::Slots.load` hands context to a loader that declares that keyword, which it finds by reading the loader's parameters.
+
+### Wording nobody designed
+
+Settled by analogy with the handoff's sentences while building, and **never asked of Claude Design**. Each is one locale key if it is wrong.
+
+- "You're editing this in another tab. Your changes weren't saved." (a tie lost against one's own other tab)
+- "You deleted this block in another tab. Your changes weren't saved."
+- "Asking to take over…", "Someone else is already taking this over", "Couldn't take over. Try again.", "Someone else is editing this now" (the status beside "Take over")
+- "● NOT SAVED · SOMEONE ELSE IS EDITING" (the hold lapsed between the refusal and its answer)
+- "Someone else changed this block. Your changes weren't saved.", and the same for "this post" and "the page settings"
+- "This block was deleted. Your changes weren't saved." (no event names who deleted it)
+- "Dana Weiss is editing this block. Try again when they have finished.", the same for "this post" and "the page settings", "You're editing this in another tab. Do it there, or close that tab first." and "Someone else is editing this. Try again when they have finished." (an instant action refused)
+- "1 post being edited by someone was skipped." (bulk publish)
+- "Couldn't copy. Select the text and copy it yourself." and "Couldn't load the block. Try again."
+- "This page was moved to the trash or deleted, or you can no longer open it." with "Back to pages", and the same for a post
+- "Dana Weiss took over this post", "… took over the page settings" and "Taken over by Dana Weiss · just now" for a post and the settings (handoff 13 and 19 word them for a block)
+- In the audit log: "handed over editing" and "took over editing"
+- "Taking over needs a signed-in person and a browser tab." (the service's failure for a request with neither; a person does not see it in the editor)
+
+Also decided without a design item: "Take over" and "Copy my text" are the small *secondary* button (the handoff says "the shared small default button", and the design system's default is secondary), "Discard" and "Remove" the small ghost one; notice (a) keeps its "Take over" button.
+
+### What is left open
+
+On the roadmap, under "Live editing": the gaps with their reasons (a save on the wire at `pagehide`; a holder typing in another block; no notice when every re-read after a hand-over fails; a colleague's publish not refreshing the header; tags; the caret of a clean rich-text field; MCP writes; no rate limit on claims; the tests that could not be written).
