@@ -27,7 +27,7 @@
 <% note_counts = Notes::Counts.for_container(@post, user: Current.user) %>
 
 <%= render Admin::EditorScreen::LiveRegionComponent.new(record: @post, locale: admin_locale, url_options: admin_url_options) do %>
-  <%= render Admin::EditorScreen::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, slot_context: { counts: note_counts }) %>
+  <%= render Admin::EditorScreen::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, slot_context: { counts: note_counts }, holds: Editing::Holds.on(@post, viewer: Current.user, tab: Current.editing_tab)) %>
 <% end %>
 
 <%# The notes drawer (notes spec §4.1): once per screen, after everything

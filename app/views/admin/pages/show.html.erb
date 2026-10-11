@@ -43,7 +43,11 @@
 <%# The element the live editing scripts stand on (`Admin::EditorScreen::LiveRegionComponent`):
     the settings and the blocks, not the header or the notes drawer. %>
 <%= render Admin::EditorScreen::LiveRegionComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options) do %>
-<%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+<%# One read of the page's reservations for the whole screen (`Editing::Holds`): every card,
+    tile and form below asks this object, so the editor costs the same statements for 3
+    blocks as for 30. %>
+<% holds = Editing::Holds.on(@page, viewer: Current.user, tab: Current.editing_tab) %>
+<%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, holds: holds) %>
 
 <%# The one slot a block action with nothing left to replace on the page
     (a stale PATCH/DELETE against an already-deleted block, spec §5.1's 410;
@@ -90,9 +94,9 @@
     <% blocks = outline.top_level %>
     <% blocks.each_with_index do |block, index| %>
       <% if Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline) %>
-        <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+        <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable, holds: holds) %>
       <% else %>
-        <%= render Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+        <%= render Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable, holds: holds) %>
       <% end %>
     <% end %>
   </div>

@@ -7,13 +7,13 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   setup do
-    @page = create_page(title: "Tile")
-    @section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
-    @block = @page.content_blocks.create!(block_type: "image", section: @section, section_column: 1, position: 0)
+    @editor_page = create_page(title: "Tile")
+    @section = @editor_page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    @block = @editor_page.content_blocks.create!(block_type: "image", section: @section, section_column: 1, position: 0)
   end
 
   def render_tile(block = @block, editable: true)
-    render_inline Admin::EditorScreen::BlockTileComponent.new(page: @page, block: block, locale: "en", editable: editable)
+    render_inline Admin::EditorScreen::BlockTileComponent.new(page: @editor_page, block: block, locale: "en", editable: editable)
   end
 
   def menu_items = Capybara.string(rendered_content).all("[role=menu] [role=none]", visible: :all).map { |item| item.text(:all).strip }
@@ -114,5 +114,20 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     render_tile
     assert_no_selector "[data-notes-add]"
+  end
+
+  test "a tile's version and mark say that its block is held, and differ from the free tile's, for the viewer who is not the holder" do
+    free = render_tile
+    free_version = Capybara.string(rendered_content).find("#content_block_#{@block.id}")["data-editing-version"]
+    assert_no_selector "[data-editing-held]"
+
+    reserve(@block, @editor_page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_tile }
+
+    assert_selector "#content_block_#{@block.id}[data-editing-held=true]"
+    assert_not_equal free_version, Capybara.string(rendered_content).find("#content_block_#{@block.id}")["data-editing-version"]
+    assert_selector "[role=menu] button", text: "Move up", visible: :all
+    assert_no_selector "button", text: "Take over", visible: :all
+    assert free
   end
 end

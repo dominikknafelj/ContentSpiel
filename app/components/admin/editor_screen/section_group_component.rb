@@ -36,13 +36,14 @@ module Admin
     # hands both components the same options); with no Move up or Move down
     # here they say nothing.
     class SectionGroupComponent < AdminComponent
-      def initialize(page:, section:, outline:, locale:, url_options: {}, editable: nil, **)
+      def initialize(page:, section:, outline:, locale:, url_options: {}, editable: nil, holds: nil, **)
         @page = page
         @section = section
         @outline = outline
         @locale = locale
         @url_options = url_options
         @editable = editable
+        @holds = holds
       end
 
       def dom_id = ActionView::RecordIdentifier.dom_id(section)
@@ -56,8 +57,10 @@ module Admin
       def blocks = outline.blocks_in(section)
 
       def card(block)
-        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :group)
+        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :group, holds: holds)
       end
+
+      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
 
       private
 

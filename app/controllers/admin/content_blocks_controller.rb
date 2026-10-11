@@ -389,11 +389,11 @@ module Admin
     end
 
     def panel_component(block, open: false)
-      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
+      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open, holds: holds)
     end
 
     def tile_component(block, open: false)
-      Admin::EditorScreen::BlockTileComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, open: open)
+      Admin::EditorScreen::BlockTileComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, open: open, holds: holds)
     end
 
     # Each block a saved reorder moved between containers, in its new shape
@@ -525,7 +525,7 @@ module Admin
       return [] unless fresh&.container?
 
       blocks = outline.blocks_in(fresh)
-      lanes = Admin::EditorScreen::SectionLanesComponent.new(page: @page, section: fresh, outline: outline, locale: admin_locale, url_options: admin_url_options, editable: true)
+      lanes = Admin::EditorScreen::SectionLanesComponent.new(page: @page, section: fresh, outline: outline, locale: admin_locale, url_options: admin_url_options, editable: true, holds: holds)
       titles = blocks.map do |inner|
         turbo_stream.update(Admin::EditorScreen::BlockCardComponent.panel_title_id(inner), Admin::EditorScreen::PanelTitleComponent.new(block: inner))
       end
@@ -617,7 +617,7 @@ module Admin
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
     def block_card_component(block, first: false, last: false)
-      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last)
+      Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last, holds: holds)
     end
 
     # The card of a top-level block, as the page view draws it: for a block
@@ -633,8 +633,14 @@ module Admin
       return block_card_component(block, first: first, last: last) unless Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline)
 
       Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline,
-        locale: admin_locale, url_options: admin_url_options, first: first, last: last)
+        locale: admin_locale, url_options: admin_url_options, first: first, last: last, holds: holds)
     end
+
+    # The reservations of this page as this viewer's tab sees them, read ONCE
+    # per request and handed to every component this action draws (after the
+    # action's write: the first card drawn asks). A card held by someone else
+    # is drawn read-only, with the strip, however it came to be drawn.
+    def holds = @holds ||= ::Editing::Holds.on(@page, viewer: Current.user, tab: Current.editing_tab)
 
     # The page's blocks as they are now: `reset` drops what the association
     # loaded before the action's service wrote.

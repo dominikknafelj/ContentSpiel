@@ -13,6 +13,7 @@ en:
         block_card:
           close: "Close"
           move_into: "Move into section…"
+          take_over: "Take over"
 
         # The "+" at the end of a section's lane (sections spec §4.2): the
         # name of a button whose label is the glyph.
@@ -93,6 +94,7 @@ en:
           duplicate: "Duplicate"
           remove_keep: "Remove section, keep blocks"
           delete: "Delete section and its blocks…"
+          take_over: "Take over"
           delete_title: "Delete this section?"
           delete_body: "Blocks don’t go to the trash. This can’t be undone."
           delete_confirm: "Delete section"
@@ -157,3 +159,39 @@ en:
           missing_post: "This post was moved to the trash or deleted, or you can no longer open it."
           back: "Back to pages"
           back_post: "Back to posts"
+        # What stands between a card's header and its form while someone else
+        # holds the block, and the notices that take its place (live-editing
+        # handoff 1, 13 to 20, 23). Every sentence the hold script shows later
+        # is rendered here; `settings` is the page settings (handoff 23).
+        hold_strip:
+          take_over: "Take over"
+          own_tab: "You're editing this in another tab"
+          copy: "Copy my text"
+          copied: "Copied"
+          copy_failed: "Couldn't copy. Select the text and copy it yourself."
+          discard: "Discard"
+          remove: "Remove"
+          held:
+            block: "%{name} is editing this block"
+            post: "%{name} is editing this post"
+            settings: "%{name} is editing the page settings"
+          taken:
+            block: "Taken over by %{name} · just now"
+            post: "Taken over by %{name} · just now"
+            settings: "Taken over by %{name} · just now"
+          announce:
+            block: "%{name} took over this block"
+            post: "%{name} took over this post"
+            settings: "%{name} took over the page settings"
+          lost:
+            block: "%{name} is editing this block. Your changes weren't saved."
+            post: "%{name} is editing this post. Your changes weren't saved."
+            settings: "%{name} is editing the page settings. Your changes weren't saved."
+          lost_unknown:
+            block: "Someone else changed this block. Your changes weren't saved."
+            post: "Someone else changed this post. Your changes weren't saved."
+            settings: "Someone else changed the page settings. Your changes weren't saved."
+          deleted:
+            block: "%{name} deleted this block. Your changes weren't saved."
+          deleted_unknown:
+            block: "This block was deleted. Your changes weren't saved."

@@ -16,12 +16,13 @@ module Admin
 
       # `slot_context` is the header's (`HeaderComponent`): what the screen has
       # already read that a feature at the header's slots would read again.
-      def initialize(post:, locale:, url_options: {}, slot_context: {}, form_only: false)
+      def initialize(post:, locale:, url_options: {}, slot_context: {}, form_only: false, holds: nil)
         @post = post
         @locale = locale
         @url_options = url_options
         @slot_context = slot_context
         @form_only = form_only
+        @holds = holds
       end
 
       # The answer to `Admin::EditingController#record`: the form alone, without
@@ -48,8 +49,27 @@ module Admin
 
       # The form's `data-*`: the autosave wiring only when the post is
       # editable (see `editable?`).
+      # The post is held as a whole (one subject, "record"); the strip stands
+      # in the header's notice area (`HoldStripComponent.slot_id`). A viewer
+      # who may only read sees it without "Take over" (handoff 26).
+      def holds = @holds ||= ::Editing::Holds.on(post, viewer: Current.user, tab: Current.editing_tab)
+
+      def hold = holds.other(post)
+
+      def held? = hold.present?
+
+      def read_only_hold? = held? && editable?
+
+      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: post, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
+
+      def editing_version = ::Editing.version(post, hold: hold, take_over: editable?)
+
+      def held_marks = held? ? { editing_held: true } : {}
+
+      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
+
       def form_data
-        return {} unless editable?
+        return {} if !editable? || read_only_hold?
 
         {
           controller: "admin--saving--autosave",
@@ -59,7 +79,7 @@ module Admin
       end
 
       # See `Admin::EditorScreen::PageSettingsFormComponent#translation`.
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(post, field, locale: locale, confirmable: editable?)
+      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(post, field, locale: locale, confirmable: editable? && !read_only_hold?)
 
       def field_id(name) = "#{ID_PREFIX}-#{name}"
 

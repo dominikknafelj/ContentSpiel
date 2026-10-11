@@ -56,4 +56,52 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     assert_selector "[data-admin--ui--override-field-target='library']:not([hidden])", text: "A dog on a beach"
     assert_selector "button[data-action='admin--ui--override-field#reset']", text: "Reset"
   end
+
+  # ----- Held (live-editing Task 7; handoff 9, 23) -----
+
+  def render_for(viewer, tab, page)
+    as_viewer(viewer, tab: tab) { render_inline Admin::EditorScreen::PageSettingsFormComponent.new(page: page, locale: "en") }
+  end
+
+  def controls = form_controls
+
+  test "held by someone else: the strip 'is editing the page settings' at the top, the unit says held, no autosave controller, the same controls read-only" do
+    page = create_page(title: "Held settings")
+    dana = users(:two)
+    dana.update!(name: "Dana Weiss")
+    render_for(users(:one), "tab-aaaaaaaa", page)
+    editable_controls = controls
+    assert_selector "form[data-controller~='admin--saving--autosave']"
+
+    reserve(page, page, dana, "tab-bbbbbbbb")
+    render_for(users(:one), "tab-aaaaaaaa", page)
+
+    assert_selector "details#page-settings[data-editing-held=true] > summary + #page-hold[data-editing-strip-slot] [data-editing-kind=held]", text: "Dana Weiss is editing the page settings"
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
+    assert_equal editable_controls, controls
+    assert_selector "fieldset.admin-held input[name='page[title]'][readonly]"
+    assert_selector "fieldset.admin-held select[name='page[page_type]'][disabled]"
+    assert_selector "button[data-action='admin--editing--hold#takeOver']", text: "Take over"
+  end
+
+  test "held by the viewer in this tab it is drawn as ever, and held by nobody the slot is empty" do
+    page = create_page(title: "Own settings")
+    render_for(users(:one), "tab-aaaaaaaa", page)
+    assert_selector "#page-hold[data-editing-strip-slot]:empty"
+
+    reserve(page, page, users(:one), "tab-aaaaaaaa")
+    render_for(users(:one), "tab-aaaaaaaa", page)
+    assert_selector "form[data-controller~='admin--saving--autosave']"
+    assert_no_selector "[data-editing-held]"
+  end
+
+  test "someone who may only read sees the strip without Take over" do
+    page = create_page(title: "Read settings")
+    reserve(page, page, users(:two), "tab-bbbbbbbb")
+
+    render_for(users(:reader), "tab-aaaaaaaa", page)
+
+    assert_selector "#page-hold [data-editing-kind=held]"
+    assert_no_selector "button", text: "Take over"
+  end
 end

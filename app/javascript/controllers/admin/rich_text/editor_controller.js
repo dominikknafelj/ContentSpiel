@@ -52,7 +52,8 @@ export default class extends Controller {
     linkTargetsUrl: String,
     locale: String,
     assets: Object,
-    linkTitles: Object
+    linkTitles: Object,
+    readOnly: Boolean
   }
 
   static texts = {
@@ -72,8 +73,10 @@ export default class extends Controller {
     // control -- the toolbar buttons and the hidden input included -- but
     // not a contenteditable, so the editor itself is mounted read-only to
     // match. Nothing is ever written back, and there's no autosave on the
-    // form to send it anyway.
-    this.readOnly = this.element.closest("fieldset[disabled]") !== null
+    // form to send it anyway. A field someone else holds is read-only
+    // without a disabled fieldset (its fields are `readonly`, not
+    // disabled): the column says so with `readOnly`.
+    this.readOnly = this.readOnlyValue || this.element.closest("fieldset[disabled]") !== null
     // A popover left behind in a Turbo cache snapshot (the page was cached
     // with one open) is dead DOM -- its listeners belonged to the previous
     // connection. Same "start from a clean slate" rule as the mount point.
@@ -133,6 +136,14 @@ export default class extends Controller {
   // The hidden input's JSON, or nothing for an empty/absent document (an
   // empty `doc` isn't valid ProseMirror content -- a doc needs at least one
   // block -- and would otherwise trip the content check below).
+  // A form that turned read-only in place (`editing/freeze`): the document
+  // stays as typed, for copying, and nothing more is written into it.
+  lock() {
+    this.readOnly = true
+    this.editor?.setEditable(false)
+    this.element.querySelector("[role=toolbar]")?.setAttribute("hidden", "")
+  }
+
   initialContent() {
     try {
       const document = JSON.parse(this.inputTarget.value || "null")

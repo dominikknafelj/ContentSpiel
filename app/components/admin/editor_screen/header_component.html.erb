@@ -135,7 +135,7 @@
   <%# Always present, empty: a 409 autosave answer puts the "Changed
       elsewhere" bar here (`Admin::AutosaveResponses#stale_streams`). Nothing
       but the tag inside it, so `:empty` holds until a stream fills it. %>
-  <div id="editor-notice"></div>
+  <div id="editor-notice"><%= render @hold_strip if @hold_strip %></div>
 <% end %>
 
 <%# Dialogs: siblings of the header (see the class comment). %>

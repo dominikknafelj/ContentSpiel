@@ -167,6 +167,107 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     assert_equal html_of.(editor, "#post-form"), html_of.(fragment, "#post-form")
   end
 
+  A = "tab-aaaaaaaa".freeze
+  B = "tab-bbbbbbbb".freeze
+
+  def hold!(subject, user, tab) = Editing::Reservation.claim(subject:, record: @page, user:, tab:, now: Time.current)
+
+  def tab(name) = { "X-Notes-Tab" => name }
+
+  # Live-editing Review Focus 4 and handoff 1, 18: a held card is read-only for everyone but the tab that holds it.
+  test "the fetched card is editable for the tab that holds it and read-only for everyone else, the holder's other tab included" do
+    hold!(@block, users(:one), A)
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id), headers: tab(A)
+    assert_select "#content_block_#{@block.id} form[data-controller~='admin--saving--autosave']"
+    assert_select "#content_block_#{@block.id} [data-editing-held]", false
+    assert_select "#block-#{@block.id}-hold[data-editing-strip-slot]:empty"
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id), headers: tab(B)
+    assert_select "#content_block_#{@block.id}[data-editing-held=true]"
+    assert_select "#content_block_#{@block.id} form[data-controller~='admin--saving--autosave']", false
+    assert_select "#block-#{@block.id}-hold [data-editing-kind=held]", text: /editing this in another tab/
+
+    sign_in_as users(:two)
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id), headers: tab(B)
+    assert_select "#content_block_#{@block.id}[data-editing-held=true]"
+    assert_select "#content_block_#{@block.id} form[data-controller~='admin--saving--autosave']", false
+    assert_select "#block-#{@block.id}-hold [data-editing-kind=held]", text: /is editing this block/
+  end
+
+  test "a block in a section, held by someone else: its panel is read-only with the strip, and its tile and the version say so" do
+    free = nil
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @inside.id), headers: tab(B)
+    free = Nokogiri::HTML5.fragment(response.body).css("[data-editing-version]").map { |node| node["data-editing-version"] }
+    hold!(@inside, users(:two), A)
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @inside.id), headers: tab(B)
+    assert_select "#block-#{@inside.id}-panel[hidden][data-editing-held=true] form[data-controller~='admin--saving--autosave']", false
+    assert_select "#block-#{@inside.id}-panel #block-#{@inside.id}-hold [data-editing-kind=held]"
+    assert_select "#block-#{@inside.id}-panel .admin-held"
+    assert_select "#content_block_#{@inside.id}[data-editing-held=true]"
+    held = Nokogiri::HTML5.fragment(response.body).css("[data-editing-version]").map { |node| node["data-editing-version"] }
+    assert_not_equal free, held
+  end
+
+  test "the same fragment is the element the editor's own page draws when a block, a section's block and the settings are held" do
+    freeze_time # the strip counts down to the hold's end: two requests are the same only at the same instant
+    hold!(@block, users(:two), A)
+    hold!(@inside, users(:two), A)
+    hold!(@page, users(:two), A)
+    get admin_page_path(@page), headers: tab(B)
+    editor = Nokogiri::HTML5.parse(response.body)
+    squash = ->(nodes) { nodes.map { |node| node.to_html.gsub(/\s+/, " ").strip } }
+
+    get admin_editing_blocks_path(kind: "page", id: @page.id), headers: tab(B)
+    assert_equal squash.(editor.css("#content-blocks-list > *")), squash.(Nokogiri::HTML5.fragment(response.body).children.select(&:element?))
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id), headers: tab(B)
+    assert_equal squash.(editor.css("#content_block_#{@block.id}")), squash.(Nokogiri::HTML5.fragment(response.body).css("#content_block_#{@block.id}"))
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @inside.id), headers: tab(B)
+    parts = Nokogiri::HTML5.fragment(response.body)
+    assert_equal squash.(editor.css("#content_block_#{@inside.id}")), squash.(parts.css("#content_block_#{@inside.id}"))
+    assert_equal squash.(editor.css("#block-#{@inside.id}-panel")), squash.(parts.css("#block-#{@inside.id}-panel"))
+
+    get admin_editing_record_path(kind: "page", id: @page.id), headers: tab(B)
+    assert_equal squash.(editor.css("#page-settings")), squash.(Nokogiri::HTML5.fragment(response.body).css("#page-settings"))
+    assert_select "#page-settings[data-editing-held=true] #page-hold [data-editing-kind=held]", text: /is editing the page settings/
+
+    post = create_post(title: "News", published: false)
+    Editing::Reservation.claim(subject: post, record: post, user: users(:two), tab: A, now: Time.current)
+    get admin_post_path(post), headers: tab(B)
+    page_editor = Nokogiri::HTML5.parse(response.body)
+    get admin_editing_record_path(kind: "post", id: post.id), headers: tab(B)
+    fragment = Nokogiri::HTML5.fragment(response.body)
+    assert_equal squash.(page_editor.css("#post-form")), squash.(fragment.css("#post-form"))
+    assert_equal squash.(page_editor.css("#editor-notice")), squash.(fragment.css("#editor-notice"))
+  end
+
+  test "a post's record answer carries the notice area, with the strip when someone else holds the post and empty when nobody does" do
+    post = create_post(title: "News", published: false)
+
+    get admin_editing_record_path(kind: "post", id: post.id), headers: tab(B)
+    assert_select "#editor-notice:empty"
+
+    Editing::Reservation.claim(subject: post, record: post, user: users(:two), tab: A, now: Time.current)
+    get admin_editing_record_path(kind: "post", id: post.id), headers: tab(B)
+    assert_select "#editor-notice [data-editing-kind=held]", text: /is editing this post/
+    assert_select "#post-form[data-editing-held=true] .admin-held"
+    assert_select "#post-form[data-controller~='admin--saving--autosave']", false
+  end
+
+  test "the list costs the same statements with a hold on every block, for 3 blocks as for 30" do
+    get admin_editing_blocks_path(kind: "page", id: @page.id), headers: tab(B)
+    hold!(@block, users(:two), A)
+    hold!(@inside, users(:two), A)
+    three = capture_sql { get admin_editing_blocks_path(kind: "page", id: @page.id), headers: tab(B) }.size
+    27.times { |i| hold!(ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text" }).record, users(:two), "tab-#{i.to_s.rjust(8, "0")}") }
+    thirty = capture_sql { get admin_editing_blocks_path(kind: "page", id: @page.id), headers: tab(B) }.size
+
+    assert_equal three, thirty
+  end
+
   test "the live region carries the addresses the scripts need, and nothing for blocks on a post" do
     get admin_page_path(@page)
     assert_select "#editing[data-controller='admin--editing--live'][data-live-part=waiting]" \

@@ -365,4 +365,167 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     assert_selector "#delete-block-#{block.id} div[class='mt-2 text-ink'] > p[hidden][data-admin--notes--drawer-target=warning][data-notes-alone]", visible: :all
   end
+
+  # ----- Held by someone else (live-editing Task 7; handoff 1 to 7, 18, 26) -----
+
+  A = "tab-aaaaaaaa".freeze
+  B = "tab-bbbbbbbb".freeze
+
+  def controls = form_controls
+
+  def held_setup(type: "post_list", **attributes)
+    @held_page = create_page(title: "Held")
+    @held_block = @held_page.content_blocks.create!(block_type: type, position: 0, settings: { "limit" => 3 }, **attributes)
+    @dana = users(:two)
+    @dana.update!(name: "Dana Weiss")
+  end
+
+  def render_for(viewer, tab, **options)
+    as_viewer(viewer, tab: tab) { render_inline Admin::EditorScreen::BlockCardComponent.new(page: @held_page, block: @held_block, locale: "en", **options) }
+  end
+
+  test "held by someone else: the strip is in its slot, the unit says held, the form has no autosave controller, every control is readonly or disabled and holds the same name and value as the editable form's" do
+    held_setup
+    render_for(users(:one), A)
+    editable_controls = controls
+    assert_selector "form[data-controller~='admin--saving--autosave']"
+
+    reserve(@held_block, @held_page, @dana, B)
+    render_for(users(:one), A)
+
+    assert_selector "#content_block_#{@held_block.id}[data-editing-unit][data-editing-held=true]"
+    assert_selector "#block-#{@held_block.id}-hold[data-editing-strip-slot] [data-editing-kind=held]", text: "Dana Weiss is editing this block"
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
+    assert_equal editable_controls, controls
+    assert_selector "fieldset.admin-held"
+    Capybara.string(rendered_content).all("fieldset.admin-held input, fieldset.admin-held textarea, fieldset.admin-held select, fieldset.admin-held button", visible: :all).each do |node|
+      next if node["type"] == "hidden"
+
+      assert node["readonly"] || node["disabled"], "#{node.tag_name} #{node['name']} must be read-only"
+    end
+  end
+
+  test "held by the viewer in this tab: drawn as ever" do
+    held_setup
+    reserve(@held_block, @held_page, users(:one), A)
+
+    render_for(users(:one), A)
+
+    assert_selector "form[data-controller~='admin--saving--autosave']"
+    assert_no_selector "[data-editing-held]"
+    assert_selector "#block-#{@held_block.id}-hold[data-editing-strip-slot]:empty"
+    assert_no_selector "fieldset.admin-held"
+  end
+
+  test "held by the viewer in another tab: read-only, with the own-tab strip" do
+    held_setup
+    reserve(@held_block, @held_page, users(:one), B)
+
+    render_for(users(:one), A)
+
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
+    assert_selector "#block-#{@held_block.id}-hold", text: "You're editing this in another tab"
+  end
+
+  test "held by nobody: the slot is there and empty" do
+    held_setup
+
+    render_for(users(:one), A)
+
+    assert_selector "#block-#{@held_block.id}-hold[data-editing-strip-slot]:empty"
+  end
+
+  test "the card's border is line-strong and its menu has Take over first (handoff 2, 3)" do
+    held_setup
+    reserve(@held_block, @held_page, @dana, B)
+
+    render_for(users(:one), A)
+
+    assert_selector "#content_block_#{@held_block.id}.border-line-strong"
+    assert_no_selector "#content_block_#{@held_block.id}.border-line"
+    items = Capybara.string(rendered_content).all(".admin-block-card > div:first-child [role=menu] [role=none]", visible: :all).map { |item| item.text(:all).strip }
+    assert_equal [ "Take over", "Add note", "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items
+    assert_selector "[role=menu] button[type=button][data-action='admin--editing--hold#takeOver']", text: "Take over", visible: :all
+    assert_selector "[role=menu] button[data-move='up']:not([disabled]), [role=menu] form[action$='/duplicate']", visible: :all
+  end
+
+  test "someone who may only read sees the strip without Take over and the ordinary border (handoff 26)" do
+    held_setup
+    reserve(@held_block, @held_page, @dana, B)
+
+    render_for(users(:reader), A, editable: false)
+
+    assert_selector "#block-#{@held_block.id}-hold", text: "Dana Weiss is editing this block"
+    assert_no_selector "#block-#{@held_block.id}-hold button"
+    assert_no_selector "button", text: "Take over", visible: :all
+    assert_selector "#content_block_#{@held_block.id}.border-line"
+    assert_no_selector "#content_block_#{@held_block.id}.border-line-strong"
+  end
+
+  test "the rich-text field of a held card has no toolbar and says read-only (handoff 7)" do
+    held_setup(type: "rich_text", body: rich_doc("Words"))
+    render_for(users(:one), A)
+    assert_selector "[role=toolbar]"
+    assert_selector "[data-controller~='admin--rich-text--editor'][data-admin--rich-text--editor-read-only-value=false]"
+
+    reserve(@held_block, @held_page, @dana, B)
+    render_for(users(:one), A)
+
+    assert_no_selector "[role=toolbar]", visible: :all
+    assert_selector "[data-controller~='admin--rich-text--editor'][data-admin--rich-text--editor-read-only-value=true]"
+  end
+
+  test "the card's buttons outside its form keep working while it is held: move, duplicate, delete" do
+    held_setup
+    reserve(@held_block, @held_page, @dana, B)
+
+    render_for(users(:one), A)
+
+    assert_selector "[role=menu] button[data-action='click->admin--editor--blocks#moveDown']:not([disabled])", visible: :all
+    assert_selector "[role=menu] form[action$='/duplicate'] button:not([disabled])", visible: :all
+    assert_selector "[role=menu] button[data-action*='dialog']:not([disabled]), [role=menu] button.text-danger-ink:not([disabled])", visible: :all
+    assert_selector ".admin-block-card__handle:not([disabled])"
+  end
+
+  test "the card's version differs between free, held by another and held by the viewer's other tab, and a hold of the viewer in this tab is the free one" do
+    held_setup
+    version = lambda do |viewer, tab|
+      render_for(viewer, tab)
+      Capybara.string(rendered_content).find("#content_block_#{@held_block.id}", visible: :all)["data-editing-version"]
+    end
+    free = version.(users(:one), A)
+
+    reserve(@held_block, @held_page, users(:one), A)
+    assert_equal free, version.(users(:one), A), "held by the viewer in this tab renders as the free card does"
+    other_tab = version.(users(:one), B)
+
+    Editing::Reservation.where(subject: @held_block).delete_all # version: none (a test clears a reservation)
+    reserve(@held_block, @held_page, @dana, B)
+    by_other = version.(users(:one), A)
+
+    assert_equal 3, [ free, other_tab, by_other ].uniq.size
+  end
+
+  test "a block in a section, held by someone else: its hidden panel is read-only with the strip in its slot (Review Focus 4)" do
+    held_setup(type: "rich_text", body: rich_doc("Words"))
+    section = @held_page.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "two" })
+    @held_block.update!(section: section, section_column: 1)
+    reserve(@held_block, @held_page, @dana, B)
+
+    render_for(users(:one), A, placement: :panel)
+
+    assert_selector "#block-#{@held_block.id}-panel[hidden][data-editing-held=true]", visible: :all
+    assert_selector "#block-#{@held_block.id}-panel #block-#{@held_block.id}-hold [data-editing-kind=held]", visible: :all
+    assert_no_selector "[data-controller~='admin--saving--autosave']", visible: :all
+    assert_selector "#block-#{@held_block.id}-panel fieldset.admin-held", visible: :all
+  end
+
+  test "one read of the holds serves the card: a Holds handed over is the only query for it" do
+    held_setup
+    holds = as_viewer(users(:one), tab: A) { Editing::Holds.on(@held_page, viewer: Current.user, tab: A) }
+
+    statements = capture_sql { render_for(users(:one), A, holds: holds) }.grep(/edit_reservations/)
+
+    assert_empty statements
+  end
 end

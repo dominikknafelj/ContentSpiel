@@ -1,5 +1,8 @@
-<details id="page-settings" data-editing-unit data-editing-subject="record" data-editing-version="<%= ::Editing.version(page) %>" open class="admin-page-settings rounded-cs border border-line bg-surface p-4">
+<%= tag.details id: "page-settings", open: true, class: "admin-page-settings rounded-cs border border-line bg-surface p-4",
+      data: { editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks } do %>
   <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
+  <%# Always there, empty unless the settings are held (`HoldStripComponent.slot_id`). %>
+  <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
 
   <%# `data-controller="admin--saving--autosave"` sits on this form directly (not a
       wrapping element) -- see that controller's own comment for why its
@@ -8,7 +11,8 @@
       (`form_data`); the `contents` fieldset disables every field of a
       view-only one without touching the layout. %>
   <%= form_with url: form_url, method: :patch, class: "admin-translation-form mt-4 flex flex-col gap-4", data: form_data do %>
-  <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
+  <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
+  <%= fields do %>
 
     <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
@@ -87,4 +91,5 @@
     </details>
   <% end %>
   <% end %>
-</details>
+  <% end %>
+<% end %>

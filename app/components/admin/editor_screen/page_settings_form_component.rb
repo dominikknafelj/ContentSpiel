@@ -24,8 +24,9 @@ module Admin
       META_TITLE_LIMIT = 60
       META_DESCRIPTION_LIMIT = 160
 
-      def initialize(page:, locale:, url_options: {})
+      def initialize(page:, locale:, url_options: {}, holds: nil)
         @page = page
+        @holds = holds
         @locale = locale
         @url_options = url_options
       end
@@ -87,7 +88,7 @@ module Admin
       # The "Original changed" note's options for a translated field
       # (translation helpers spec §4) -- see `Admin::EditorScreen
       # ::ReferenceCardComponent.options_for`.
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(page, field, locale: locale, confirmable: editable?)
+      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(page, field, locale: locale, confirmable: editable? && !read_only_hold?)
 
       # The homepage has no slug of its own (`Page#generates_slugs?`) -- its
       # path is "/" by design, so there's nothing here for an editor to type.
@@ -114,8 +115,28 @@ module Admin
       # shows the "View only" badge above.
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(page))
 
+      # The settings are one subject (`Editing.key` "record"). A viewer who
+      # may only read sees the strip, without "Take over" (handoff 26).
+      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
+
+      def hold = holds.other(page)
+
+      def held? = hold.present?
+
+      def read_only_hold? = held? && editable?
+
+      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: page, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
+
+      def hold_slot_id = Admin::EditorScreen::HoldStripComponent.slot_id(page)
+
+      def editing_version = ::Editing.version(page, hold: hold, take_over: editable?)
+
+      def held_marks = held? ? { editing_held: true } : {}
+
+      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
+
       def form_data
-        return {} unless editable?
+        return {} if !editable? || read_only_hold?
 
         {
           controller: "admin--saving--autosave",

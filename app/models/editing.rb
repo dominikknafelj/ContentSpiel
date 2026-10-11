@@ -47,12 +47,24 @@ module Editing
   # `updated_at`, in microseconds. A catch-up (`editing/merge`, `onlyChanged`)
   # leaves a clean unit alone when the answer's version is the same. EVERY
   # version is written through this method, so that what else a unit's look
-  # depends on (a reservation's state, later) is added in one place.
+  # depends on is added in one place.
+  #
+  # `hold` is the reservation that makes the unit read-only for THIS viewer
+  # (`Holds#other`: someone else's, or the viewer's own in another tab), nil
+  # when the unit is free or the viewer's own in this tab (which renders
+  # editable, exactly as a free one). Who holds it, in which tab and since
+  # when (the strip counts down to it), and whether the viewer may take it
+  # over (`take_over`: the strip's button) all change what is drawn, so all
+  # three are in the version: without them a catch-up would leave a card
+  # editable that is held now, or read-only that is free again.
   # It does NOT cover what a unit shows of other records or of the viewer
   # (their rights, a library image's file, a tag's name, an ancestor's slug):
   # a catch-up leaves those as they are until the next signal or a reload.
-  def self.version(subject)
+  def self.version(subject, hold: nil, take_over: false)
     stamp = subject.is_a?(Page) ? subject.settings_changed_at : subject.updated_at
-    stamp && (stamp.to_r * 1_000_000).to_i.to_s
+    base = stamp && (stamp.to_r * 1_000_000).to_i.to_s
+    return base unless hold
+
+    "#{base}~#{hold.user_id}.#{hold.tab}.#{(hold.changed_at.to_r * 1000).to_i}#{take_over ? "t" : "r"}"
   end
 end

@@ -577,6 +577,16 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    it: sunken too, or it keeps a white frame around a sunken inner field. */
 .admin-view-only .admin-chip-field { background: var(--cs-sunken); }
 
+/* A form someone else holds (live-editing handoff 5 to 7): read-only, not disabled-looking.
+   `readonly` text stays selectable and keeps full contrast; a control that can only be
+   `disabled` (a select, a checkbox, a button) is drawn at full contrast too, and the
+   rich-text area has the same fill with no toolbar and no caret. No lock, no tint. */
+.admin-held :is(input, textarea)[readonly],
+.admin-held :is(select, input, button):disabled,
+.admin-held .admin-rich-text-editor,
+.admin-held .admin-chip-field { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+.admin-held :is(select, input, button):disabled { cursor: default; }
+
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
    main form's unsaved changes, round 3 decision D10): it can't be `disabled`
    like a button, so it is dimmed the way a disabled button is. The controller

@@ -153,7 +153,7 @@ module Admin
         component.new(page: page, section: section, outline: outline, locale: locale, **options)
       end
 
-      def initialize(page:, section:, outline:, locale:, url_options: {}, first: false, last: false, editable: nil)
+      def initialize(page:, section:, outline:, locale:, url_options: {}, first: false, last: false, editable: nil, holds: nil)
         @page = page
         @section = section
         @outline = outline
@@ -162,6 +162,7 @@ module Admin
         @first = first
         @last = last
         @editable = editable
+        @holds = holds
       end
 
       def dom_id = ActionView::RecordIdentifier.dom_id(section)
@@ -187,7 +188,30 @@ module Admin
 
       def form_url = helpers.admin_page_content_block_path(page, section, **url_options)
 
-      def form_data = editable? ? Admin::EditorScreen::BlockCardComponent.autosave_form_data(section) : {}
+      # What a hold on the section's own settings does (it is the section's
+      # form that is held; the blocks in it have holds of their own): the same
+      # five questions as the block card's, answered for the section.
+      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
+
+      def hold = unavailable? ? nil : holds.other(section)
+
+      def held? = hold.present?
+
+      def read_only_hold? = held? && editable?
+
+      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: section, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
+
+      def hold_slot_id = Admin::EditorScreen::HoldStripComponent.slot_id(section)
+
+      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(section) })
+
+      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
+
+      def editing_version = ::Editing.version(section, hold: hold, take_over: editable?)
+
+      def held_marks = held? ? { editing_held: true } : {}
+
+      def form_data = editable? && !read_only_hold? ? Admin::EditorScreen::BlockCardComponent.autosave_form_data(section) : {}
 
       def error_prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(section)
 
@@ -234,11 +258,11 @@ module Admin
       def blocks = outline.blocks_in(section)
 
       def lanes
-        Admin::EditorScreen::SectionLanesComponent.new(page: page, section: section, outline: outline, locale: locale, url_options: url_options, editable: editable?)
+        Admin::EditorScreen::SectionLanesComponent.new(page: page, section: section, outline: outline, locale: locale, url_options: url_options, editable: editable?, holds: holds)
       end
 
       def panel(block)
-        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel)
+        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel, holds: holds)
       end
 
       private

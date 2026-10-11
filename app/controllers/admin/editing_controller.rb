@@ -50,14 +50,18 @@ module Admin
     # The record's own form: a page's settings, a post's form.
     def record
       form = if @record.is_a?(Page)
-        Admin::EditorScreen::PageSettingsFormComponent.new(page: @record, locale: admin_locale, url_options: admin_url_options)
+        Admin::EditorScreen::PageSettingsFormComponent.new(page: @record, locale: admin_locale, url_options: admin_url_options, holds:)
       else
-        Admin::EditorScreen::PostFormComponent.new(post: @record, locale: admin_locale, url_options: admin_url_options, slot_context: {}, form_only: true)
+        Admin::EditorScreen::PostFormComponent.new(post: @record, locale: admin_locale, url_options: admin_url_options, slot_context: {}, form_only: true, holds:)
       end
       render form, layout: false
     end
 
     private
+
+    # The reservations of this record as this viewer's tab sees them, read once
+    # for everything this answer draws, as `pages/show.html.erb` does for the page.
+    def holds = @holds ||= ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab)
 
     # The record through the read scope, and for a page what its editor reads
     # up front (`Admin::PagesController#show`): the branch once, the hero and
@@ -89,7 +93,7 @@ module Admin
 
     # The card of a top-level block as `pages/show.html.erb` draws it.
     def card_for(block, outline:, editable:, first:, last:)
-      common = { page: @record, locale: admin_locale, url_options: admin_url_options, first:, last:, editable: }
+      common = { page: @record, locale: admin_locale, url_options: admin_url_options, first:, last:, editable:, holds: }
       if Admin::EditorScreen::SectionCardComponent.draws?(block, outline:)
         Admin::EditorScreen::SectionCardComponent.for(section: block, outline:, **common)
       else
@@ -101,7 +105,7 @@ module Admin
     # default tab, its tile and its panel (on a translation tab a block in a
     # section is a card of its section's group).
     def parts_of(block, outline:, editable:, change:)
-      common = { page: @record, block:, locale: admin_locale, url_options: admin_url_options, editable: }
+      common = { page: @record, block:, locale: admin_locale, url_options: admin_url_options, editable:, holds: }
       if block.section_id.nil?
         top = outline.top_level
         [ Admin::EditorScreen::BlockCardComponent.new(**common, first: top.first == block, last: top.last == block, updated_by: change) ]

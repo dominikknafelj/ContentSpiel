@@ -116,12 +116,13 @@ module Admin
       # padding, hover); a disabled one dims and drops the hover fill.
       MENU_ITEM_CLASS = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent".freeze
 
-      def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false, updated_by: nil)
+      def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false, updated_by: nil, holds: nil)
         raise ArgumentError, "unknown block card placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
 
         @placement = placement
         @open = open
         @updated_by = updated_by
+        @holds = holds
         @editable = editable
         @page = page
         @block = block
@@ -143,9 +144,9 @@ module Admin
       # card of the list is a `card` (dragged, moved, counted for Move up and
       # Move down); only a panel is hidden, and it is its section's to show.
       def wrapper_attributes
-        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **editing_marks, **(@open ? { open: true } : {}) } } if panel?
+        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **editing_marks, **held_marks, **(@open ? { open: true } : {}) } } if panel?
 
-        { data: { block_id: block.id, **editing_marks, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
+        { data: { block_id: block.id, **editing_marks, **held_marks, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
       end
 
       # The panel is the region its tile's `aria-controls` points at, named by
@@ -160,7 +161,33 @@ module Admin
       # A panel (the form of a block in a section) also names its place: a move
       # along a section writes with `update_columns`, so the block's `updated_at`
       # does not say that its heading ("column 2") changed.
-      def card_version = [ ::Editing.version(block), ("f" if list? && first?), ("l" if list? && last?), (panel? ? "s#{block.section_id}c#{block.section_column}" : nil) ].compact.join("-")
+      def held_marks = held? ? { editing_held: true } : {}
+
+      # The reservation that makes this card read-only for its viewer: someone
+      # else's, or the viewer's own in another tab (live-editing handoff 1).
+      # A viewer who may only read sees the strip too (handoff 26), without
+      # "Take over" and with the ordinary border, and their form is the
+      # view-only one it always was (`read_only_hold?` is false for them).
+      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
+
+      def hold = unavailable? ? nil : holds.other(block)
+
+      def held? = hold.present?
+
+      # Held AND the viewer could otherwise edit: the form is drawn read-only,
+      # with no autosave controller.
+      def read_only_hold? = held? && editable?
+
+      def hold_strip = Admin::EditorScreen::HoldStripComponent.new(subject: block, hold: hold, viewer: Current.user, own: holds.own_user?(hold), take_over: editable?)
+
+      def hold_slot_id = Admin::EditorScreen::HoldStripComponent.slot_id(block)
+
+      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(block) })
+
+      # The card's fields: as drawn, or rewritten once to read-only (`HeldFields`).
+      def fields(&content) = read_only_hold? ? Admin::EditorScreen::HeldFields.call(capture(&content), guard: true) : capture(&content)
+
+      def card_version = [ ::Editing.version(block, hold: hold, take_over: editable?), ("f" if list? && first?), ("l" if list? && last?), (panel? ? "s#{block.section_id}c#{block.section_column}" : nil) ].compact.join("-")
 
       def updated_mark = Admin::EditorScreen::UpdatedMarkComponent.new(change: @updated_by)
 
@@ -184,7 +211,7 @@ module Admin
 
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
 
-      def form_data = editable? ? self.class.autosave_form_data(block) : {}
+      def form_data = editable? && !read_only_hold? ? self.class.autosave_form_data(block) : {}
 
       def error_prefix = self.class.error_prefix(block)
 
@@ -343,7 +370,7 @@ module Admin
       # See `Admin::EditorScreen::PageSettingsFormComponent#translation` -- a block's own
       # fields, confirmed on the block (`block.translation_confirmed`), with
       # the page's edit right (`editable?`, blocks follow their page).
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(block, field, locale: locale, confirmable: editable?)
+      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(block, field, locale: locale, confirmable: editable? && !read_only_hold?)
 
       # The caption/alt fields are this block's per-use overrides of its
       # image's own defaults (media library design spec §6): blank, the

@@ -1,6 +1,6 @@
 <%# `data-notes-active` is set by `admin--notes--drawer#markActive` while a thread on this
     block is the one open in the drawer (notes handoff, "Block card marker"). %>
-<%= tag.div id: wrapper_id, class: [ "admin-block-card rounded-cs border bg-surface data-[notes-active]:border-accent", (unavailable? ? "border-danger" : "border-line") ], **wrapper_attributes do %>
+<%= tag.div id: wrapper_id, class: [ "admin-block-card rounded-cs border bg-surface data-[notes-active]:border-accent", (unavailable? ? "border-danger" : (read_only_hold? ? "border-line-strong" : "border-line")) ], **wrapper_attributes do %>
   <div class="flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">
     <%# Not for an unavailable card: it has no body, no menu with Move up / Move
         down, and a handle that only moves a card nobody can read would be the one
@@ -53,6 +53,8 @@
           `refreshMoveState` finds them to enable or disable them after a reorder, add or delete. %>
       <% if editable? %>
         <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+          <%# The keyboard and touch path to the strip's button (handoff 2): first while held. %>
+          <% menu.with_item { take_over_item } if read_only_hold? %>
           <%# Always first, and always there: the marker of a block without notes shows only
               on hover or focus, and neither touch nor a test depends on that (notes spec §4.3). %>
           <% menu.with_item { add_note_item } %>
@@ -100,6 +102,10 @@
 
   <% if unavailable? %>
     <p class="px-3 pb-3 text-xs text-meta">Its content is kept but can’t be shown or edited.</p>
+  <% else %>
+    <%# Always there, empty unless the block is held: the live script puts the strip and its
+        notices here (`HoldStripComponent.slot_id`). %>
+    <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
   <% end %>
 
   <% unless unavailable? %>
@@ -107,7 +113,8 @@
       <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
 
       <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4", data: form_data do %>
-      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
+      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
+      <%= fields do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
         <% if settings_row? %>
@@ -150,7 +157,7 @@
             <%= render Admin::Columns::RichTextColumnComponent.new(
                   name: "body", id: field_id("body"), html_name: field_html_name("body"),
                   value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale,
-                  editable: editable?, **translation("body")
+                  editable: editable? && !read_only_hold?, **translation("body")
                 ) %>
           <% when "caption" %>
             <%= render Admin::Columns::PlainColumnComponent.new(
@@ -174,6 +181,7 @@
             <%= render self.class.image_field(block: block, asset: column_value("image"), locale: locale, errors: column_errors("image")) %>
           <% end %>
         <% end %>
+      <% end %>
       <% end %>
       <% end %>
     </div>

@@ -48,13 +48,14 @@ module Admin
     class SectionLanesComponent < AdminComponent
       def self.lane_id(section, column) = "section-#{section.id}-lane-#{column}"
 
-      def initialize(page:, section:, outline:, locale:, url_options: {}, editable:)
+      def initialize(page:, section:, outline:, locale:, url_options: {}, editable:, holds: nil)
         @page = page
         @section = section
         @outline = outline
         @locale = locale
         @url_options = url_options
         @editable = editable
+        @holds = holds
       end
 
       def lanes_id = Admin::EditorScreen::SectionCardComponent.lanes_id(section)
@@ -78,12 +79,14 @@ module Admin
       def column_label(column) = t(".column", number: column)
 
       def tile(block)
-        Admin::EditorScreen::BlockTileComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable)
+        Admin::EditorScreen::BlockTileComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable, holds: holds)
       end
 
       def picker(column)
         Admin::EditorScreen::BlockPickerComponent.new(page: page, locale: locale, url_options: url_options, section: section, column: column)
       end
+
+      def holds = @holds ||= ::Editing::Holds.on(page, viewer: Current.user, tab: Current.editing_tab)
 
       private
 

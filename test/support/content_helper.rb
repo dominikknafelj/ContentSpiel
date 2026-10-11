@@ -18,6 +18,26 @@ module ContentHelper
     true
   end
 
+  # The editor as `user` sees it from the browser tab `tab`: the session
+  # (`Current.user`, which the reservations are read for), the actor (`can_edit?`)
+  # and the tab (`Current.editing_tab`, from the `X-Notes-Tab` header).
+  def as_viewer(user, tab: nil, &block)
+    Current.set(session: user.sessions.create!, editing_tab: tab) { Current.set(actor: user, channel: :admin, &block) }
+  end
+
+  # Every field of the rendered markup as [name, value], read the way a browser reads it
+  # (the HTML5 parse drops the newline a textarea starts with, as the browser does).
+  def form_controls(within: nil)
+    root = Nokogiri::HTML5.fragment(rendered_content)
+    root = root.at_css(within) if within
+    root.css("input, textarea, select").map { |node| [ node["name"], node.name == "textarea" ? node.text : node["value"] ] }
+  end
+
+  # `subject` held by `user` in `tab`, as of now.
+  def reserve(subject, record, user, tab)
+    Editing::Reservation.claim(subject: subject, record: record, user: user, tab: tab, now: Time.current)
+  end
+
   def create_page(title:, parent: root_page, published: true, translations: {})
     result = Pages::Save.call(attributes: { parent: parent, published: published },
       translations: { Locales.default => { title: title } }.merge(translations))
