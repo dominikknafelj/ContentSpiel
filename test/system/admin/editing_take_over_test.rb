@@ -449,8 +449,12 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       hear_taken
       # The hand-over was answered `nothing`: the lock comes off, and typing works again.
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=true]", wait: LIVE
+      # The debounce is still out of reach while the text goes in, and short
+      # only for its last key: the save that is refused freezes the field, and
+      # with a short debounce all along a slow machine saves between two keys.
+      find("#{card(@block)} .ProseMirror").send_keys("Late")
       raise_debounce(card(@block), 50)
-      find("#{card(@block)} .ProseMirror").send_keys("Late.")
+      find("#{card(@block)} .ProseMirror").send_keys(".")
       assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved.", wait: LIVE
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "Late."
       assert_selector "#{card(@block)} .ProseMirror", text: "Saved. Typed while asleep."
@@ -816,8 +820,10 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
 
     using_session(:dana) do
       hear_taken
+      # As above: the debounce is short for the last key only.
+      find("#{card(@block)} .ProseMirror").send_keys(" More")
       raise_debounce(card(@block), 50)
-      find("#{card(@block)} .ProseMirror").send_keys(" More.")
+      find("#{card(@block)} .ProseMirror").send_keys(".")
       assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved.", wait: LIVE
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "Rejected."
     end

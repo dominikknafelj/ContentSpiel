@@ -493,7 +493,14 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     age_claim
     expire
     Editing::Reservation.claim(subject: @block, record: @page, user: @dana, tab: "tab-dddddddd")
+    # The first key sends the claim, and its refusal freezes the field: keys
+    # that arrive after it do not go in, which is right, and how many do is the
+    # machine's choice (CI, 2026-10-11: "First lat"). So the claim is held, as
+    # in every tie here, until the whole text is in the field.
+    delay_next("POST", CLAIM)
     type_in(@block, " later")
+    await_delayed
+    send_delayed
 
     assert_selector "#{card(@block)} [role=alert]", text: "Dana Weiss is editing this block. Your changes weren't saved.", wait: LIVE
     assert_equal 2, claims.size
