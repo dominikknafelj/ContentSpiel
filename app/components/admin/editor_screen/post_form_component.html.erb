@@ -17,7 +17,7 @@
     it) -- and only on an editable post (`form_data`). The `<fieldset>`
     (`contents`, so it doesn't affect the form's layout) disables every
     field at once for a view-only one. %>
-<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data.merge(editing_unit: "", editing_subject: "record") do %>
+<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: ::Editing.version(post)) do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>

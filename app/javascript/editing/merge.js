@@ -85,6 +85,18 @@
 // browser following the caret, any script), when the time is up, or when
 // `anchored` is called again: one adjusting at a time. It sets the scroll
 // position of what scrolls the list, which is outside the list.
+// `onlyChanged: true` (a CATCH-UP: first connect, reconnect, a document seen
+// again) leaves alone what has not changed: a unit or part on screen that
+// holds no unsaved text and carries the same `data-editing-version` as the
+// answer's element of its id (same container, for a list) is the same element
+// afterwards (if every element above it up to the root has an id) -- its open
+// menu stays open, its editor is not mounted again --
+// and is reported in `same`, not in `replaced` or `kept`. If the answer puts it
+// somewhere else among its siblings it is still moved there. Without the
+// option (a fetch a signal caused) everything is replaced as before. The
+// version is the server's (`Editing.version`); an element with none is
+// always replaced.
+//
 // Otherwise this module touches the document only inside the element it is
 // handed, opens no connection, fetches nothing, raises no toast and knows no
 // controller. Its tests are `test/system/admin/editing_merge_test.rb`.
@@ -108,16 +120,41 @@ export function holds(unit, unsaved) {
   return forms.some((form) => unsaved(form))
 }
 
-export function mergeList(list, fresh, { unsaved }) {
+export function mergeList(list, fresh, { unsaved, onlyChanged = false }) {
   const keep = new Set([ ...list.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
   const moved = displace(list, fresh, keep)
+  const same = onlyChanged ? unchanged(list, fresh, keep, { containers: true }) : []
   const gone = []
   withState(list, () => {
-    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone)
+    reconcile(list, [ ...fresh.children ], new Set([ ...keep, ...same ]), new Set(moved), gone)
     for (const unit of keep) if (!gone.includes(unit)) unit.removeAttribute("data-editing-gone")
     for (const unit of keep) if (unit.matches(PANEL) && unit.hidden && !tileOf(list, unit)) unit.hidden = false
   })
-  return { kept: [ ...keep ], gone, moved }
+  return { kept: [ ...keep ], gone, moved, same }
+}
+
+// Whether every ancestor of `element` up to `root` has an id: the merge
+// reconciles level by level and matches by id, so something is left in place
+// only where the levels above it can be matched (a unit's are, by design; a
+// part such as a tile may sit under a wrapper with none, and is then replaced).
+const reachable = (element, root) => {
+  for (let up = element.parentElement; up && up !== root; up = up.parentElement) if (!up.id) return false
+  return true
+}
+
+// The units and parts on screen, outside `keep`, whose version is that of the
+// answer's element of the same id and shape (and container, for a list).
+function unchanged(root, fresh, keep, { containers }) {
+  const versions = new Map()
+  for (const twin of fresh.querySelectorAll("[data-editing-version]")) {
+    if (twin.id) versions.set(`${twin.id}|${twin.matches(UNIT)}`, twin)
+  }
+  return [ ...root.querySelectorAll("[data-editing-version]") ].filter((live) => {
+    if (keep.has(live) || !live.id || !reachable(live, root)) return false
+    const twin = versions.get(`${live.id}|${live.matches(UNIT)}`)
+    return Boolean(twin) && twin.dataset.editingVersion === live.dataset.editingVersion &&
+      (!containers || containerKey(twin, fresh) === containerKey(live, root))
+  })
 }
 
 // `fresh`'s children are the answer for some parts of `root`. A child with
@@ -125,8 +162,8 @@ export function mergeList(list, fresh, { unsaved }) {
 // the list); so is a part that holds a kept unit, which cannot be replaced
 // without taking the unit away and is not (the list merge reconciles around
 // it).
-export function mergeUnits(root, fresh, { unsaved }) {
-  const result = { replaced: [], kept: [], missing: false, moved: [] }
+export function mergeUnits(root, fresh, { unsaved, onlyChanged = false }) {
+  const result = { replaced: [], kept: [], missing: false, moved: [], same: [] }
   withState(root, () => {
     const keep = new Set([ ...root.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
     for (const unit of displace(root, fresh, keep, { containers: false })) { result.moved.push(unit); result.kept.push(unit) }
@@ -134,6 +171,7 @@ export function mergeUnits(root, fresh, { unsaved }) {
       const live = twin.id ? document.getElementById(twin.id) : null
       if (!live || !root.contains(live) || live === root || live.matches(UNIT) !== twin.matches(UNIT)) { result.missing = true; continue }
       if (keep.has(live)) { result.kept.push(live); continue }
+      if (onlyChanged && live.dataset.editingVersion && live.dataset.editingVersion === twin.dataset.editingVersion) { result.same.push(live); continue }
       // A notice the person has not dealt with ("Changed elsewhere", lost
       // work) is theirs to dismiss: a part that shows one is not replaced.
       if (!live.matches(UNIT) && live.querySelector("[role=alert]:not(:empty)")) { result.kept.push(live); continue }

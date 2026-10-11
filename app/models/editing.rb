@@ -40,4 +40,16 @@ module Editing
 
   # The subject's name in the page (`data-editing-subject`) and in a request.
   def self.key(subject) = subject.is_a?(ContentBlock) ? "block-#{subject.id}" : "record"
+
+  # What a unit or part of an editor says about the content it shows
+  # (`data-editing-version`): a block's `updated_at`, a page's
+  # `settings_changed_at` (the settings form's own base), a post's
+  # `updated_at`, in microseconds. A catch-up (`editing/merge`, `onlyChanged`)
+  # leaves a clean unit alone when the answer's version is the same. EVERY
+  # version is written through this method, so that what else a unit's look
+  # depends on (a reservation's state, later) is added in one place.
+  def self.version(subject)
+    stamp = subject.is_a?(Page) ? subject.settings_changed_at : subject.updated_at
+    stamp && (stamp.to_r * 1_000_000).to_i.to_s
+  end
 end

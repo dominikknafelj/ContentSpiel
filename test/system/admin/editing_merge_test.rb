@@ -93,10 +93,10 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     JS
   end
 
-  def merge_list(path = blocks_path)
+  def merge_list(path = blocks_path, only_changed: false)
     run_merge(path, <<~JS)
-      const result = merge.anchored(list, () => merge.mergeList(list, fresh, { unsaved: window.__unsaved }))
-      done({ kept: result.kept.map((each) => each.id), gone: result.gone.map((each) => each.id), moved: result.moved.map((each) => each.id) })
+      const result = merge.anchored(list, () => merge.mergeList(list, fresh, { unsaved: window.__unsaved, onlyChanged: #{only_changed} }))
+      done({ kept: result.kept.map((each) => each.id), gone: result.gone.map((each) => each.id), moved: result.moved.map((each) => each.id), same: result.same.map((each) => each.id) })
     JS
   end
 
@@ -128,6 +128,53 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     # The editor inside the kept card is the one that was there: it still takes typing, and the caret is where it was.
     find("#{card(@first)} .ProseMirror").send_keys(" and more")
     assert_selector "#{card(@first)} .ProseMirror", text: "half a sentence and more"
+  end
+
+  # CATCH-UP (`onlyChanged`): what has not changed is left alone.
+  test "a catch-up leaves a card of the same version as it is, with its menu open, and replaces one that changed" do
+    colleague { assert ContentBlocks::Save.call(@second, translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
+    find("#{card(@first)} button[aria-label='Block actions']").click
+    assert_selector "#{card(@first)} [role=menu]"
+    page.execute_script("window.__a = document.querySelector(#{card(@first).to_json}); window.__b = document.querySelector(#{card(@second).to_json})")
+
+    result = merge_list(only_changed: true)
+
+    assert_includes result["same"], "content_block_#{@first.id}"
+    assert_not_includes result["same"], "content_block_#{@second.id}"
+    assert page.evaluate_script("window.__a === document.querySelector(#{card(@first).to_json})"), "an unchanged card was replaced"
+    assert_selector "#{card(@first)} [role=menu]"
+    assert_not page.evaluate_script("window.__b === document.querySelector(#{card(@second).to_json})"), "a changed card was not replaced"
+    assert_selector "#{card(@second)} .ProseMirror", text: "Theirs"
+  end
+
+  test "a catch-up of a page with a section leaves no id on the page twice, whatever it kept" do
+    result = merge_list(only_changed: true)
+
+    assert_includes result["same"], "content_block_#{@inside.id}", "a section's tile is left in place by a catch-up"
+    ids = page.evaluate_script("(() => { const seen = {}; document.querySelectorAll('[id]').forEach((each) => { seen[each.id] = (seen[each.id] || 0) + 1 }); return Object.entries(seen).filter(([ id, count ]) => count > 1).map(([ id ]) => id) })()")
+    assert_equal [], ids
+  end
+
+  test "without the option every clean card is replaced, as before" do
+    page.execute_script("window.__a = document.querySelector(#{card(@first).to_json})")
+
+    result = merge_list
+
+    assert_equal [], result["same"]
+    assert_not page.evaluate_script("window.__a === document.querySelector(#{card(@first).to_json})")
+  end
+
+  test "a catch-up puts a card of the same version in its new place among its siblings, and does not replace it" do
+    fourth = add_block
+    open_editor
+    page.execute_script("window.__a = document.querySelector(#{card(@second).to_json})")
+    colleague { assert ContentBlocks::Reorder.call(@page.reload, [ @first.id, @section.id, @second.id, fourth.id ]).ok? }
+
+    result = merge_list(only_changed: true)
+
+    assert_includes result["same"], "content_block_#{@second.id}"
+    assert page.evaluate_script("window.__a === document.querySelector(#{card(@second).to_json})")
+    assert_equal server_order, list_order
   end
 
   test "a replaced card carries the base its next save needs" do

@@ -152,7 +152,12 @@ module Admin
       # its own heading -- which an unavailable block's panel doesn't have.
       # What the editor's merge reads (`editing/merge`): this wrapper is one unit,
       # replaced or kept whole, and says whose it is.
-      def editing_marks = { editing_unit: "", editing_subject: ::Editing.key(block) }
+      def editing_marks = { editing_unit: "", editing_subject: ::Editing.key(block), editing_version: card_version }
+
+      # The block's version, and -- for a card of the list -- whether it is the
+      # first or the last, which decides whether its Move up / Move down start
+      # disabled: a block that only changed places must not look unchanged.
+      def card_version = [ ::Editing.version(block), ("f" if list? && first?), ("l" if list? && last?) ].compact.join("-")
 
       def updated_mark = Admin::EditorScreen::UpdatedMarkComponent.new(change: @updated_by)
 
