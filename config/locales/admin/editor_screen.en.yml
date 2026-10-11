@@ -191,6 +191,14 @@ en:
             block: "Someone else changed this block. Your changes weren't saved."
             post: "Someone else changed this post. Your changes weren't saved."
             settings: "Someone else changed the page settings. Your changes weren't saved."
+          # An instant action (Publish, Schedule, "Still correct") refused while
+          # another tab holds the subject (`Admin::EditingClaims#held_elsewhere?`).
+          refused:
+            block: "%{name} is editing this block. Try again when they have finished."
+            post: "%{name} is editing this post. Try again when they have finished."
+            settings: "%{name} is editing the page settings. Try again when they have finished."
+            own_tab: "You're editing this in another tab. Do it there, or close that tab first."
+            unknown: "Someone else is editing this. Try again when they have finished."
           deleted:
             block: "%{name} deleted this block. Your changes weren't saved."
           deleted_unknown:

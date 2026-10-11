@@ -9,6 +9,7 @@ module Admin
   # from PATCHing a block that belongs to a page they don't have open.
   class ContentBlocksController < BaseController
     include AutosaveResponses
+    include EditingClaims
     include MediaFields
 
     # Which schema-declared settings fields and `uses_columns` a save
@@ -110,9 +111,17 @@ module Admin
       # The block's own base (its `updated_at`), not the page's: the page
       # settings form has a base of its own (`Page#settings_changed_at`), which
       # a block write never moves -- see `AutosaveResponses#refuse_stale_autosave`.
-      return if refuse_stale_autosave(block, status_id: Admin::EditorScreen::BlockCardComponent.error_prefix(block) + "-save-status",
-        error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block),
-        reload_url: admin_page_path(@page, **admin_url_options))
+      # A save is a claim (`Admin::EditingClaims`): the tab holds the block or is
+      # refused, before the stale check; a stale refusal gives back a claim
+      # this very request just took.
+      ids = { status_id: Admin::EditorScreen::BlockCardComponent.status_id(block), error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block) }
+      claim = claim_for(block, record: @page)
+      return refuse_held(block, **ids) if claim == :refused
+
+      if refuse_stale_autosave(block, **ids, reload_url: admin_page_path(@page, **admin_url_options))
+        release_claim(block, record: @page) if claim == :taken
+        return
+      end
 
       attributes, translations = split_block_params(block)
       stored_asset_id = block.media_asset_id

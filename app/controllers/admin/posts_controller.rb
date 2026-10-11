@@ -9,6 +9,7 @@ module Admin
   # to disambiguate against either).
   class PostsController < BaseController
     include AutosaveResponses
+    include EditingClaims
     include Scheduling
     include BulkResponses
 
@@ -160,7 +161,15 @@ module Admin
     # own one-shot `publish`/`unpublish`/`schedule` actions below, not
     # something a debounced autosave should ever be able to trigger.
     def update
-      return if refuse_stale_autosave(@post, status_id: "post-save-status", error_prefix: "post", reload_url: admin_post_path(@post, **admin_url_options))
+      # A save is a claim (`Admin::EditingClaims`), as in `Admin::PagesController#update`.
+      ids = { status_id: "post-save-status", error_prefix: "post" }
+      claim = claim_for(@post, record: @post)
+      return refuse_held(@post, **ids) if claim == :refused
+
+      if refuse_stale_autosave(@post, **ids, reload_url: admin_post_path(@post, **admin_url_options))
+        release_claim(@post, record: @post) if claim == :taken
+        return
+      end
 
       post_params = params.fetch(:post, ActionController::Parameters.new)
       translated = post_params.permit(*TRANSLATED_COLUMNS).to_h
@@ -218,15 +227,20 @@ module Admin
     end
 
     def publish
+      return if refuse_instant_redirect(@post, to: admin_post_path(@post, **admin_url_options))
+
       redirect_after Posts::Save.call(@post, attributes: { published: true }), success: "Published"
     end
 
     def unpublish
+      return if refuse_instant_redirect(@post, to: admin_post_path(@post, **admin_url_options))
+
       redirect_after Posts::Save.call(@post, attributes: { published: false }), success: "Unpublished"
     end
 
     def schedule
       editor = admin_post_path(@post, **admin_url_options)
+      return if refuse_instant_redirect(@post, to: editor)
 
       if params[:remove] == "1"
         # "Remove schedule" is only offered for a scheduled record; for any

@@ -37,6 +37,17 @@ class Admin::Ui::SaveStatusComponentTest < ViewComponent::TestCase
     assert_text "● CHANGED ELSEWHERE"
     assert_selector "p.text-warn-ink"
 
+    # A save refused by a hold names who holds it, in capitals, in the stale token (handoff 25).
+    dana = User.new(id: 9_001, email_address: "dana@example.com", name: "Dana Weiss")
+    hold = Struct.new(:user, :user_id).new(dana, dana.id)
+    render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :held, holder: hold, viewer: users(:one))
+    assert_text "● NOT SAVED · DANA WEISS IS EDITING"
+    assert_selector "p.text-warn-ink"
+    render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :held, holder: hold, viewer: dana)
+    assert_text "● NOT SAVED · OPEN IN YOUR OTHER TAB"
+    render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :held)
+    assert_text "● NOT SAVED · SOMEONE ELSE IS EDITING"
+
     render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :saved_over)
     assert_text "SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST"
     assert_no_text "● CHANGED ELSEWHERE"

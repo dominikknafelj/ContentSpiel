@@ -319,6 +319,11 @@ Rails.application.routes.draw do
       get "blocks", to: "editing#blocks", as: :editing_blocks
       get "blocks/:block_id", to: "editing#block", as: :editing_block, constraints: { block_id: /\d+/ }
       get "record", to: "editing#record", as: :editing_record
+      # A save is a claim (live-editing spec §4.2): the tab takes a subject ahead
+      # of its first save, and lets it go. `block_id` is optional (absent: the
+      # record itself); a block that is not this record's is a 404.
+      post "claim", to: "editing#claim", as: :editing_claim
+      post "release", to: "editing#release", as: :editing_release
     end
     # Notes on content (notes spec §3.4, §4). Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,

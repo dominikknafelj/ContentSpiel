@@ -19,7 +19,9 @@ class Admin::EditingSignalsTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  def sent = broadcasts(@stream).map { |payload| ActiveSupport::JSON.decode(payload) }
+  # The content signals only: a save with a tab id also claims the block, which
+  # says `holder` / `claimed` (`test/integration/admin/editing_claims_test.rb`).
+  def sent = broadcasts(@stream).map { |payload| ActiveSupport::JSON.decode(payload) }.select { |signal| signal["kind"] == "content" }
 
   test "a well-formed tab id is the origin of the signal a save causes, and a malformed one gives none" do
     save_block("3", { "X-Notes-Tab" => "0f8fad5b-d9cb-469f-a165-70867728950e" })

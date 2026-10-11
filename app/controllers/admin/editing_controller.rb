@@ -15,6 +15,8 @@ module Admin
   # (`data-editing-unit`, `-subject`, `-part`) have to be the page's own.
   class EditingController < BaseController
     include RecordOfKind
+    include AutosaveResponses
+    include EditingClaims
 
     before_action { response.set_header("Cache-Control", "no-store") }
     before_action :set_record
@@ -57,7 +59,44 @@ module Admin
       render form, layout: false
     end
 
+    # The tab claims a subject ahead of its first save (spec §4.2): sent through
+    # the write queue when a clean form gets its first change. 204 when the tab
+    # holds the subject now (or sent no tab id: nothing was claimed), 409 with
+    # the refusal's streams when another tab holds it.
+    def claim
+      subject = subject!
+      return forbidden! if ::Editing::Rights.missing(Current.actor, @record)
+      return refuse_held(subject, **status_ids(subject)) if claim_for(subject, record: @record) == :refused
+
+      head :no_content
+    end
+
+    # The tab lets go: a block's form was closed, or the page was left. Deletes
+    # only this tab's own row; 204 always for someone who may edit.
+    def release
+      subject = subject!
+      return forbidden! if ::Editing::Rights.missing(Current.actor, @record)
+
+      release_claim(subject, record: @record)
+      head :no_content
+    end
+
     private
+
+    # The block `block_id` names, or the record itself; a block that is not
+    # this record's is not found. (A full `def`: `or raise` after an endless one
+    # would bind to the definition, not to its body.)
+    def subject!
+      ::Editing.subject_of(@record, params[:block_id]) or raise ActiveRecord::RecordNotFound
+    end
+
+    def status_ids(subject)
+      case subject
+      when ContentBlock then { status_id: Admin::EditorScreen::BlockCardComponent.status_id(subject), error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(subject) }
+      when Page then { status_id: "page-save-status", error_prefix: "page" }
+      else { status_id: "post-save-status", error_prefix: "post" }
+      end
+    end
 
     # The reservations of this record as this viewer's tab sees them, read once
     # for everything this answer draws, as `pages/show.html.erb` does for the page.
