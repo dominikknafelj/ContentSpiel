@@ -118,6 +118,35 @@ What comes after the admin; code comments and `CLAUDE.md` call it "Phase 3". Gro
 | Release management: bundle changes to several pages and posts, preview the whole site with the release applied, shareable preview links, publish atomically | Should | A release is a set of pending revisions |
 | Approval chains for releases: steps that specific groups must approve, defined in the admin by authorised groups, recorded in the audit log | Should | Needs releases |
 
+#### Release management: what drafts of live content settled for it, and what it left to it (2026-10-11)
+
+The first learning, in the owner's words (2026-10-11): "we need to remember what good ux is and releasing when people draft or 'doodle' is not good UX". Autosave wrote the live record from 2026-09-27 on; it was written down as interim in the design, on the roadmap and in the editor's own header, and it still stood for two weeks, because it was weighed as a technical trade-off and not from the seat of the person typing. For everything below, and for release management as a whole: what a person does while working (typing, trying, rearranging) and what the public sees are separate, and the step between them is theirs to take, on purpose, with a view of what will change. An interim behaviour that breaks that is not acceptable as interim.
+
+What a release is made of, now that the pieces exist:
+- A release is a set of published copies, one per page or post (`published_versions`), that become current together. A copy already carries the time it goes live (`live_at`) and is picked at read time by the clock, so "publish atomically" is several copies sharing one `live_at`; no job has to fire. Today there is at most one future copy per record, and nothing names a group of them: a release is that name, with a way to cancel or move the whole group.
+- The overview in the "Publish changes…" dialog (`Publishing::Changes`: blocks changed, added, removed, moved; the record's own fields; languages) is one record's part of a release's contents. A release's screen is that overview across its records.
+- Every publish keeps its copy, so "what did the site look like before this release" and rolling a release back are reads of copies that exist. A history screen and restore are not built.
+
+Decisions deferred to release management, each with the reason it was deferred:
+- **Who prepares and who approves.** Rights were left as they are (whoever may change a live record may publish its changes; editing a live record still needs the right to publish). The split belongs here: an author prepares, someone with the publish right reviews the overview and approves. The staff review of 2026-10-04 suggests one `AccessControl.edit_keys(record)` to drop the publish-to-edit rule. The guide's writers found the cost of today's rule: the seeded Author can read every post and cannot touch one once it is live.
+- **Slug, place in the tree, and whether a record is published at all** stayed immediate actions. In a release they are pending changes like any other: a page moved, renamed or first published together with the pages that link to it. That needs addresses (`public_paths`) derived from copies, redirects for the old address, and the menu and sitemap following the release.
+- **Per language.** A record is published in every language at once and missing optional fields fall back silently ("missing" counts required fields only). A release could carry one language of a record, or refuse to go out while a language it names is incomplete.
+- **Several records that depend on each other.** A post list's settings are part of the PAGE's copy and a post's tags are part of the POST's copy, so the two can be published at different times and disagree for a while (a list filtered by a tag the post does not publicly have yet). A release publishes both together; so does a tag rename or merge, which today acts at once and can empty a list.
+- **Preview of the whole site with the release applied, and a shareable link to it.** Preview shows one record's working rows today; its lists show published posts only.
+
+What step 3 (live editing) adds to it:
+- Publishing changes while a colleague holds unsaved text publishes what was saved and says so; discarding is refused while someone holds part of the record. A release should show, per record, who is still editing it, and decide whether it waits for them.
+- Bulk publish in the posts list is a small release without a name: it already skips posts someone is editing and reports them.
+
+For the interface to other programs:
+- The MCP server's `update_post` leaves a live post with unpublished changes unless called with `publish_changes`; a release needs tools of its own (list what is pending, publish a set).
+
+Costs seen while building drafts that a release will meet again:
+- Discarding brings a deleted block back as a new block, without the notes that were on it. Rolling back a release has the same limit unless deletion becomes pending too.
+- About 200 tests name publish, live or scheduled; the ones that pinned "an edit of a live record is public at once" were rewritten. A release will touch the same set.
+- No test may assert a duration (four did in step 3 and failed on CI); scheduled copies are tested by moving the clock.
+
+
 ### SEO, navigation and the public site
 
 | Item | Priority | Notes |
