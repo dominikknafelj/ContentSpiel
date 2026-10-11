@@ -324,6 +324,115 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_equal true, page.evaluate_script("document.activeElement === document.body")
   end
 
+  # The re-review's M1: "away 12 min" is in the answer three times and grows
+  # about once a refresh, so with an away person on screen nearly every read
+  # differs from the one shown. Only its texts do: they are changed where
+  # they stand, and nothing is replaced under whoever is reading.
+  def away_since(minutes)
+    Presence::Mark.where(user_id: @dana.id).update_all(state_at: minutes.minutes.ago - 5.seconds) # version: none (a test of presence)
+  end
+
+  test "an away person's growing minutes change the texts in place: the same button keeps the focus, an open list stays read, a showing tooltip stays shown" do
+    open_page
+    join(:dana, @dana) { hide_document }
+    assert_selector circle(@dana, "away"), wait: LIVE
+    await_drawn
+    assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, away just now']", wait: LIVE
+    page.execute_script("window.__button = document.querySelector(#{group.to_json}); window.__circle = document.querySelector(#{circle(@dana).to_json}); window.__button.focus()")
+    set_timing("refresh", 150)
+
+    # The focus on the group's button.
+    away_since(12)
+    assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, away 12 min']", wait: LIVE
+    assert_equal [ true, true, true ], page.evaluate_script("[ window.__button === document.querySelector(#{group.to_json}), window.__circle.isConnected, document.activeElement === window.__button ]")
+
+    # The list open and being read.
+    find(group).send_keys(:enter)
+    assert_eventually(message: "the list did not take the focus") { page.evaluate_script("document.activeElement === document.querySelector(#{list.to_json})") }
+    page.execute_script("window.__list = document.querySelector(#{list.to_json})")
+    away_since(13)
+    assert_selector "#{list} [data-presence-listed='#{@dana.id}'] [data-presence-status]", text: "away 13 min", exact_text: true, wait: LIVE
+    assert_equal [ true, true, true ], page.evaluate_script("[ window.__list === document.querySelector(#{list.to_json}), document.activeElement === window.__list, window.__button.isConnected ]")
+    assert_selector "#{group}[aria-expanded=true]"
+    find(list).send_keys(:escape)
+    assert_no_selector list
+
+    # A tooltip that is showing.
+    find(circle(@dana)).hover
+    assert_selector tip(@dana), text: "Dana Weiss · away 13 min", exact_text: true
+    page.execute_script("window.__tip = document.querySelector(#{tip(@dana).to_json})")
+    away_since(14)
+    assert_selector tip(@dana), text: "Dana Weiss · away 14 min", exact_text: true, wait: LIVE
+    assert_equal true, page.evaluate_script("window.__tip === document.querySelector(#{tip(@dana).to_json}) && !window.__tip.hidden")
+
+    # A real change is still drawn anew: she is back.
+    using_session(:dana) { show_document }
+    assert_selector circle(@dana, "here"), wait: LIVE
+    assert_equal false, page.evaluate_script("window.__button.isConnected")
+  end
+
+  # A drawing replaces the group, and with it the element that knew the list
+  # had been entered: the list someone reads is open and read again in the
+  # new one, and the next press of the button closes it (the re-review's
+  # second item; the `reading` branch of the script's `put`).
+  test "a list being read survives a real redraw, and the next press of the button closes it" do
+    open_page
+    join(:dana, @dana)
+    assert_selector circle(@dana), wait: LIVE
+    await_drawn
+    page.execute_script("document.querySelector(#{group.to_json}).focus()")
+    find(group).send_keys(:enter)
+    assert_eventually(message: "the list did not take the focus") { page.evaluate_script("document.activeElement === document.querySelector(#{list.to_json})") }
+    page.execute_script("window.__list = document.querySelector(#{list.to_json})")
+
+    join(:reader, @reader)
+    assert_selector "#{list} [role=listitem]", count: 2, wait: LIVE
+    assert_equal [ false, true ], page.evaluate_script("[ window.__list.isConnected, document.activeElement === document.querySelector(#{list.to_json}) ]")
+    assert_selector "#{group}[aria-expanded=true]"
+
+    find(group).click
+    assert_no_selector list
+    assert_selector "#{group}[aria-expanded=false]"
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{group.to_json})")
+  end
+
+  # Two small things about the list and the pointer (the re-review's third
+  # item), at a width where the header shows "+N".
+  test "a list shown by hovering +N closes when the pointer leaves even with the focus on the button, and no tooltip shows over an open list" do
+    original = page.current_window.size
+    page.current_window.resize_to(900, 900)
+    open_page
+    join(:dana, @dana)
+    join(:reader, @reader)
+    assert_selector "#{group} [data-presence-more=narrow]", text: "+1", exact_text: true, wait: LIVE
+    await_drawn
+
+    # Opened and closed by a press: the focus is on the button now.
+    find(group).click
+    assert_selector list
+    find(group).click
+    assert_no_selector list
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{group.to_json})")
+    find(".admin-editor-header h1").hover
+
+    find("#{group} [data-presence-more=narrow]").hover
+    assert_selector "#{list} [role=listitem]", count: 2
+    # The pointer on a circle, under the open list: its tooltip would lie
+    # over the list.
+    find(circle(@dana)).hover
+    sleep 0.6 # sleep: twice the tooltip's 300ms wait, to see that none shows while the list is open
+    assert_no_selector tip(@dana)
+    assert_selector list
+    find(".admin-editor-header h1").hover
+    assert_no_selector list
+    assert_selector "#{group}[aria-expanded=false]"
+    # With the list closed the tooltip is back.
+    find(circle(@dana)).hover
+    assert_selector tip(@dana)
+  ensure
+    page.current_window.resize_to(*original)
+  end
+
   test "the media panel shows who has the image open, between the name and the close, and nobody once they close it" do
     asset = create_media_asset
     asset.update_columns(title: "a-very-long-file-name-that-would-have-wrapped-over-several-lines-of-the-panel.png") # version: none (a system test's own image)
@@ -850,5 +959,33 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     sleep 1 # sleep: the shortened timer would have asked six times in a second; "asks no more" needs that time to pass
     assert_equal asked, page.evaluate_script("performance.getEntriesByType('resource').filter((each) => each.name.includes('/presence/page/')).length")
     assert_equal "connected", page.evaluate_script("document.body.dataset.notesLive")
+  end
+
+  # The other way a record is gone: the server refuses the subscription (a
+  # record the viewer may not read, or one that is not there). A part for a
+  # page that does not exist, put beside the real one.
+  test "a refused subscription stops the part: nobody is shown, its timers are gone and it asks nothing" do
+    open_page
+    page.execute_script(<<~JS)
+      const real = document.querySelector(".admin-editor-header [data-controller~='admin--presence--record']")
+      const part = real.cloneNode(true)
+      part.id = "refused"
+      part.setAttribute("data-live-part", "waiting")
+      part.setAttribute("data-admin--presence--record-id-value", "0")
+      part.setAttribute("data-admin--presence--record-url-value", "/cs-studio/presence/page/0")
+      part.setAttribute("data-admin--presence--record-refresh-value", "150")
+      part.querySelector("turbo-frame").id = "presence-page-0"
+      part.querySelector("turbo-frame").append(Object.assign(document.createElement("span"), { id: "stale-person", textContent: "someone" }))
+      real.after(part)
+    JS
+
+    assert_selector "#refused[data-presence-gone=true][data-live-part=answered]", visible: :all, wait: LIVE
+    assert_no_selector "#stale-person", visible: :all
+    await_notes_live
+    sleep 1 # sleep: the shortened timer would have asked six times in a second; "asks nothing" needs that time to pass
+    assert_equal 0, page.evaluate_script("performance.getEntriesByType('resource').filter((each) => each.name.includes('/presence/page/0')).length")
+    assert_equal 0, Presence::Mark.where(record_type: "Page", record_id: 0).count
+    # The real part beside it is untouched.
+    assert_selector ".admin-editor-header [data-controller~='admin--presence--record']:not(#refused)[data-live-part=answered]:not([data-presence-gone])", visible: :all
   end
 end

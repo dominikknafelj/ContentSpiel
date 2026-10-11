@@ -78,13 +78,23 @@ import { settle } from "live/state"
 // away is redrawn at once. The first drawing after connecting fades nobody
 // in: those people did not arrive, the viewer did.
 //
-// A DRAWING REPLACES what the frame holds, so it is made only when the
-// answer differs from the one shown: the read once a minute that finds
-// nothing new touches nothing, and a screen reader is not told the group
-// again. When it does differ, what a person was doing in the frame is put
-// back: an open list is open again, and the focus, which can only have been
-// on the group's button or in its list, is there again (on the button when
-// the list is gone; nowhere when nobody is left).
+// A DRAWING REPLACES what the frame holds, so it is made only when it has
+// to be. An answer that is the one shown touches nothing. An answer that
+// differs ONLY IN ITS WORDS has its words put where they stand
+// (`sameShape`, `patch`): "away 12 min" is in the answer three times -- the
+// button's name, the list's row, the circle's tooltip -- and grows by one
+// about every read, so with an away person on screen nearly every read
+// differs; replacing the group each time took the list from under someone
+// reading it, hid a tooltip that was showing and told a screen reader the
+// button again. Whether only words differ is asked of the STRUCTURE, never
+// of the HTML's text: the same circles in the same order with the same
+// state and initials, the same rows, the same "+N".
+// Anything else -- someone came, went, turned away or came back, the order
+// or "+N" changed -- is drawn anew, and what a person was doing in the
+// frame is put back: an open list is open again and known to have been
+// entered (so the next press of the button closes it), and the focus, which
+// can only have been on the group's button or in its list, is there again
+// (on the button when the list is gone; nowhere when nobody is left).
 //
 // A TAB THAT IS GOING SAYS SO. Leaving by a Turbo visit disconnects this
 // controller, which stops listening. Leaving by a full load (an address
@@ -326,7 +336,16 @@ export default class extends Controller {
 
     const fresh = answer === null ? null : new DOMParser().parseFromString(answer, "text/html").getElementById(this.frameTarget.id)
     this.shown = fresh ? answer : null
+    if (fresh && sameShape(this.frameTarget, fresh) && patch(this.frameTarget, fresh)) return this.own()
     this.put(fresh ? [ ...fresh.childNodes ] : [])
+  }
+
+  // What is shown is this connection's own reading from now on: the next
+  // drawing is a change. Said on the element, for whoever has to know (a
+  // test, before it counts fades).
+  own() {
+    this.drawn = true
+    this.element.setAttribute("data-presence-drawn", "true")
   }
 
   // Puts an answer in the frame, and puts back what the person was doing
@@ -342,10 +361,7 @@ export default class extends Controller {
     frame.replaceChildren(...nodes.map((node) => document.importNode(node, true)))
 
     if (this.drawn) this.circles.filter((each) => !before.has(each.dataset.presenceUser)).forEach((each) => each.setAttribute("data-presence-arriving", ""))
-    this.drawn = true
-    // Said on the element, for whoever has to know that the people shown
-    // are this connection's own reading (a test, before it counts fades).
-    this.element.setAttribute("data-presence-drawn", "true")
+    this.own()
     const button = frame.querySelector("[data-admin--ui--menu-target='button']")
     const list = frame.querySelector(panel)
     // The list, open again: for someone reading it, or for the pointer that
@@ -358,6 +374,11 @@ export default class extends Controller {
       list.removeAttribute("hidden")
       button.setAttribute("aria-expanded", "true")
       if (!reading) frame.addEventListener("mouseleave", this.left, { once: true })
+      // The element that knew the list had been entered went with the old
+      // drawing; the new one is told (`admin--ui--menu` reads it there), so
+      // the next press of the button closes the list instead of entering it
+      // a second time.
+      if (reading) button.closest("[data-controller~='admin--ui--menu']")?.setAttribute("data-entered", "")
     }
     if (focused) (reading && open && list ? list : button)?.focus()
   }
@@ -372,6 +393,35 @@ export default class extends Controller {
   }
 
   get circles() { return [ ...this.frameTarget.querySelectorAll("[data-presence-user]") ] }
+}
+
+// What a drawing is made of, apart from its words: who is shown as a circle,
+// in which order, how they are and with which initials; who is listed; and
+// what "+N" says at each width.
+function shape(root) {
+  return JSON.stringify([
+    [ ...root.querySelectorAll("[data-presence-user]") ].map((each) => [ each.dataset.presenceUser, each.dataset.presenceState, each.firstElementChild?.textContent ]),
+    [ ...root.querySelectorAll("[data-presence-listed]") ].map((each) => each.dataset.presenceListed),
+    [ ...root.querySelectorAll("[data-presence-more]") ].map((each) => [ each.dataset.presenceMore, each.textContent ])
+  ])
+}
+
+function sameShape(shown, fresh) { return shape(shown) === shape(fresh) }
+
+// The words of a drawing: a row's name and status line, a circle's tooltip,
+// and (below) the button's name.
+const WORDS = "[data-presence-name], [data-presence-status], [data-presence-user] [data-tooltip]"
+
+// Puts the fresh drawing's words where the shown one's stand, and says
+// whether it could: the two hold the same words in the same places.
+function patch(shown, fresh) {
+  const [ old, now ] = [ [ ...shown.querySelectorAll(WORDS) ], [ ...fresh.querySelectorAll(WORDS) ] ]
+  const [ button, named ] = [ shown.querySelector("button"), fresh.querySelector("button") ]
+  if (old.length !== now.length || Boolean(button) !== Boolean(named)) return false
+  old.forEach((each, index) => { if (each.textContent !== now[index].textContent) each.textContent = now[index].textContent })
+  const name = named?.getAttribute("aria-label")
+  if (button && name !== null && button.getAttribute("aria-label") !== name) button.setAttribute("aria-label", name)
+  return true
 }
 
 // The ids of everyone a drawing names: the circles and the "+N" list's rows.

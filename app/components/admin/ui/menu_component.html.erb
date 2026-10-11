@@ -1,7 +1,7 @@
 <%= tag.div class: "relative inline-block", data: { controller: "admin--ui--menu", action: actions } do %>
-  <%= tag.button label, type: "button", aria: { haspopup: popup, expanded: "false", label: aria_label }, class: button_classes,
+  <%= tag.button label, type: "button", aria: { haspopup: popup, expanded: "false", label: aria_label, controls: panel_id }, class: button_classes,
         data: { "admin--ui--menu-target": "button", action: button_action } %>
-  <%= tag.div role: panel_role, hidden: true, class: panel_classes, data: { "admin--ui--menu-target": "panel", **panel_data }, **panel_options do %>
+  <%= tag.div id: panel_id, role: panel_role, hidden: true, class: panel_classes, data: { "admin--ui--menu-target": "panel", **panel_data }, **panel_options do %>
     <% items.each do |item| %>
       <div role="<%= item_role %>"><%= item %></div>
     <% end %>

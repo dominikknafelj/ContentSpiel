@@ -19,6 +19,10 @@ import { Controller } from "@hotwired/stimulus"
 //   (the media panel scrolls, and a bubble hanging out of it would be cut
 //   and give it a scroll bar). Asked each time it is shown.
 // - ONE AT A TIME: showing one hides the other.
+// - NOT OVER WHAT ITS HOST'S CONTROL HAS OPENED: a host inside a button that
+//   has its popup open (`aria-expanded="true"`: presence's circles, with
+//   the list of everyone open under them) shows nothing; the bubble would
+//   lie over the list, which says the same and more.
 //
 // A bubble Turbo kept open in a snapshot is hidden again on connect.
 const DELAY = 300
@@ -68,6 +72,7 @@ export default class extends Controller {
 
   show() {
     clearTimeout(this.timer)
+    if (this.element.closest("[aria-expanded='true']")) return
     if (showing && showing !== this) showing.hide()
     this.bubbleTarget.hidden = false
     this.place()

@@ -35,6 +35,14 @@ export default class extends Controller {
 
   get open() { return !this.panelTarget.hidden }
 
+  // Whether a list panel was entered by a press of its button. Kept on the
+  // element and not in this object: whoever replaces the menu under an open
+  // list someone is reading (presence's people are redrawn when they
+  // change) says so on the new element, and the next press then closes the
+  // list as it would have.
+  get entered() { return this.element.hasAttribute("data-entered") }
+  set entered(value) { this.element.toggleAttribute("data-entered", value) }
+
   toggle() { this.open ? this.close() : this.show() }
 
   show() {
@@ -78,9 +86,12 @@ export default class extends Controller {
 
   // A list panel: the pointer or the focus has left. It closes when NEITHER is on it any more -- a
   // keyboard user's list does not go because the mouse moved, nor a mouse
-  // user's because the focus went elsewhere.
+  // user's because the focus went elsewhere. When the pointer leaves, the
+  // focus counts only INSIDE THE LIST: on the button it says nothing about
+  // the list (it stays there after a press that closed one), and a list
+  // shown by hover would never close again.
   leave(event) {
-    const focused = event.type === "focusout" ? this.element.contains(event.relatedTarget) : this.element.contains(document.activeElement)
+    const focused = event.type === "focusout" ? this.element.contains(event.relatedTarget) : this.panelTarget.contains(document.activeElement)
     const hovered = event.type === "mouseleave" ? false : this.element.matches(":hover")
     if (!focused && !hovered) this.close()
   }

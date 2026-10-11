@@ -11,7 +11,7 @@
           <%= tag.span more_label, class: more_class, aria: { hidden: true }, data: { action: "mouseenter->admin--ui--menu#reveal" } %>
         <% end %>
       <% end %>
-      <%= render Admin::Ui::MenuComponent.new(label: group, aria_label: group_label, list: true, list_label: list_label, align: hang, button_class: group_class) do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: group, aria_label: group_label, list: true, list_label: list_label, panel_id: "#{frame_id}-list", align: hang, button_class: group_class) do |menu| %>
         <% people.each do |person| %>
           <% menu.with_item do %>
             <%= tag.div class: "flex items-center gap-2 px-2 py-1.5", data: { presence_listed: person.user.id } do %>

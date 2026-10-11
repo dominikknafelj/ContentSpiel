@@ -36,11 +36,22 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
       menu.with_item { "Bob" }
     end
 
-    assert_selector "[data-controller='admin--ui--menu'] button[aria-haspopup=true][aria-expanded=false][data-action='admin--ui--menu#enter']", text: "+2"
+    assert_selector "[data-controller='admin--ui--menu'] button[aria-expanded=false][data-action='admin--ui--menu#enter']", text: "+2"
+    # What opens is a list, not a menu of actions: the button does not say
+    # "menu" (`aria-haspopup="true"` means that), only that it is collapsed.
+    assert_no_selector "button[aria-haspopup]"
+    assert_no_selector "button[aria-controls]"
     assert_selector "[role=list][hidden][tabindex='-1'][aria-label='Everyone with this open'] > [role=listitem]", count: 2, visible: :all
     assert_no_selector "[role=menu], [role=none]", visible: :all
     assert_equal %w[click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave],
       page.find("[data-controller='admin--ui--menu']")["data-action"].split
+  end
+
+  test "a list panel with an id is what its button says it controls" do
+    render_inline(Admin::Ui::MenuComponent.new(label: "+2", list: true, list_label: "Everyone", panel_id: "people-list")) { |menu| menu.with_item { "Ann" } }
+
+    assert_selector "button[aria-controls=people-list][aria-expanded=false]:not([aria-haspopup])"
+    assert_selector "[role=list]#people-list", visible: :all
   end
 
   test "an ordinary menu has none of the hover and focus actions" do

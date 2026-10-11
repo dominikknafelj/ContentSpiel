@@ -70,6 +70,9 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     # One Tab stop, nothing interactive inside it.
     assert_selector "button, a, [tabindex='0']", count: 1, visible: :all
     assert_no_selector "button button, button a, button [tabindex]", visible: :all
+    # The button says what it opens by pointing at it: a list, not a menu.
+    assert_selector "#{group}[aria-controls='presence-page-#{@record.id}-list']:not([aria-haspopup])"
+    assert_selector "[role=list]#presence-page-#{@record.id}-list", visible: :all
     # No "+N", and still a list: of one.
     assert_no_selector "[data-presence-more]", visible: :all
     assert_selector "[role=list][tabindex='-1'][aria-label='Everyone with this open'][hidden] [role=listitem]", count: 1, visible: :all

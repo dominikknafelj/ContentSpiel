@@ -2,7 +2,8 @@ require "test_helper"
 
 # The bubble shown while its host is hovered or holds the keyboard's focus
 # (presence handoff 18): never a `title`, which a keyboard does not reach.
-# What moves is `admin--ui--tooltip`'s (`test/system/admin/tooltip_test.rb`).
+# What moves is `admin--ui--tooltip`'s, tested on its first hosts, presence's
+# circles (`test/system/admin/presence_test.rb`, "a circle's tooltip…").
 class Admin::Ui::TooltipComponentTest < ViewComponent::TestCase
   test "a hidden bubble with the inverted toast's look, 6px under its host and centred" do
     render_inline(Admin::Ui::TooltipComponent.new(text: "Dana Weiss · here"))

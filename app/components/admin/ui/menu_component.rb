@@ -26,7 +26,8 @@ module Admin
     # button may also show it on hover without moving the focus
     # (`mouseenter->admin--ui--menu#reveal`, presence's "+N"). It closes when
     # neither the pointer nor the focus is on it any more
-    # (`admin--ui--menu#leave`), and on a click outside.
+    # (`admin--ui--menu#leave`), and on a click outside. `panel_id` gives the
+    # panel an id and the button its `aria-controls`.
     #
     # `align` is the edge the panel hangs from (`:right` is the right edge of
     # the button, for a menu at the end of a row); `button_class` replaces the
@@ -34,7 +35,7 @@ module Admin
     class MenuComponent < AdminComponent
       renders_many :items
 
-      def initialize(label:, align: :right, button_class: nil, aria_label: nil, close_on_select: false, list: false, list_label: nil)
+      def initialize(label:, align: :right, button_class: nil, aria_label: nil, close_on_select: false, list: false, list_label: nil, panel_id: nil)
         raise ArgumentError, "unknown menu alignment #{align.inspect}" unless %i[left right].include?(align)
 
         @label = label
@@ -44,11 +45,12 @@ module Admin
         @close_on_select = close_on_select
         @list = list
         @list_label = list_label
+        @panel_id = panel_id
       end
 
       private
 
-      attr_reader :label, :align, :button_class, :aria_label, :close_on_select, :list, :list_label
+      attr_reader :label, :align, :button_class, :aria_label, :close_on_select, :list, :list_label, :panel_id
 
       ACTIONS = "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown".freeze
       LIST_ACTIONS = "mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave".freeze
@@ -57,8 +59,11 @@ module Admin
 
       def button_action = list ? "admin--ui--menu#enter" : "admin--ui--menu#toggle"
 
-      # What the button says it opens: a menu, or (a list) some popup.
-      def popup = list ? "true" : "menu"
+      # What the button says it opens: a menu. A list's button says nothing
+      # of the kind -- `aria-haspopup="true"` MEANS "menu", and what opens
+      # is no menu of actions -- only that it is expanded or not, and, given
+      # `panel_id`, which element that is (`aria-controls`).
+      def popup = list ? nil : "menu"
 
       def panel_role = list ? "list" : "menu"
 
