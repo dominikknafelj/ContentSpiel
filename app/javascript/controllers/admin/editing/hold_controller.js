@@ -106,7 +106,18 @@ import { freeze, textOf } from "editing/freeze"
 //   over. The requester hears nothing: it did it. A release followed by a
 //   claim is no take-over and is not said. It is said a moment after the
 //   strip appears, so that a card that was replaced has its region in the
-//   document before it changes.
+//   document before it changes. THE STRIP THAT SAYS IT IS THE NEW HOLDER'S: a
+//   read that was on its way when `taken` was heard (the one the `requested`
+//   signal caused, a moment before) can have been drawn by the server while
+//   the old holder still held the subject, and reaches the page after the
+//   signal. Its strip names the person the subject was taken FROM, so it is
+//   not the news: the tab remembers whose strip it showed when it heard the
+//   signal (`announcing`) and says the sentence of the first strip that names
+//   someone else. (The first build said it for the first strip to connect:
+//   on a slow machine a third person heard the old holder's name, or -- that
+//   strip replaced before its moment was up -- nothing at all.) So a third
+//   person hears nothing when someone takes over from their OWN other tab:
+//   the strip names the same person before and after.
 //
 // IT HOLDS NO WORDING AND NO ADDRESS: every sentence is in the markup the
 // server rendered and every URL (and the lists `editing/freeze` reads) is a
@@ -155,8 +166,9 @@ export default class extends Controller {
     this.handing = new Map()
     // subject => when this tab handed it over (the strip says "Taken over by ...")
     this.lost = new Map()
-    // subjects whose `taken` signal was heard and not yet said
-    this.announcing = new Set()
+    // subject => whose strip (a user id, or null for none) this tab showed when
+    // it heard `taken`, for a take-over that has not been said yet
+    this.announcing = new Map()
   }
 
   connect() {
@@ -332,7 +344,11 @@ export default class extends Controller {
     // This tab handed it over, or was passed over while awake (ruling): "Taken
     // over by ..." for `notice`, then what the strip always reads (handoff 13).
     const handed = handedAt !== undefined && Date.now() - handedAt < LOST_FOR
-    const heard = this.announcing.delete(subject)
+    // A strip that still names whoever held it when the signal was heard is a
+    // read from before the take-over (see the header): it says nothing and
+    // leaves the announcement to the strip that names the new holder.
+    const heard = this.announcing.has(subject) && this.announcing.get(subject) !== holder
+    if (heard) this.announcing.delete(subject)
     if (handed) {
       const text = strip.querySelector("[data-editing-strip-text]")
       const usual = text.textContent
@@ -574,6 +590,11 @@ export default class extends Controller {
     this.setTakeOverStatus(subject, this.asking.get(subject)?.requested ? "waiting" : null)
   }
 
+  // Whose `held` strip the subject shows now: a user id, or null without one.
+  holderShown(subject) {
+    return this.stripTargets.find((strip) => strip.dataset.editingSubject === subject && strip.dataset.editingKind === "held")?.dataset.editingHolder ?? null
+  }
+
   heldByOther(subject) { return this.stripTargets.some((strip) => strip.dataset.editingSubject === subject && strip.dataset.editingKind === "held") }
 
   // The focus goes to the unit's first field when it is where the person was
@@ -609,7 +630,7 @@ export default class extends Controller {
     }
     if (reason !== "taken") return
     if (asking) return this.arrive(subject)
-    this.announcing.add(subject)
+    this.announcing.set(subject, this.holderShown(subject))
     this.later(`heard:${subject}`, () => this.announcing.delete(subject), 10000)
     // This tab held it and was passed over: it reads "Taken over by ..." (awake
     // with nothing unsaved is as much a hand-over as an answered one), and
