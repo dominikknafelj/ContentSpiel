@@ -327,6 +327,8 @@ Rails.application.routes.draw do
       # Taking over (spec §4.4): the requester asks, the holder's tab hands over.
       post "take_over", to: "editing#take_over", as: :editing_take_over
       post "hand_over", to: "editing#hand_over", as: :editing_hand_over
+      # The asking tab leaves, or stops asking: its own request goes.
+      post "withdraw", to: "editing#withdraw", as: :editing_withdraw
     end
     # Notes on content (notes spec §3.4, §4). Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,

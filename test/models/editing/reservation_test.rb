@@ -79,6 +79,22 @@ class Editing::ReservationTest < ActiveSupport::TestCase
     assert Editing::Reservation.pass_over(subject: @block, by: @dana, tab: B, now: @now + Editing::PASS_OVER), "the first requester can still pass over"
   end
 
+  test "a withdrawal clears this tab's own request and only that: another tab's request stands, and so does the row" do
+    claim(@olga, A)
+    reader = users(:reader)
+    Editing::Reservation.request(subject: @block, by: @dana, tab: B, now: @now)
+
+    assert_not Editing::Reservation.withdraw(subject: @block, by: @dana, tab: "tab-cccccccc"), "another tab of the same person has no request here"
+    assert_not Editing::Reservation.withdraw(subject: @block, by: reader, tab: B), "another person's tab of the same name asked nothing"
+    assert_equal [ @dana.id, B ], Editing::Reservation.sole.values_at(:requested_by_id, :requested_tab)
+
+    assert Editing::Reservation.withdraw(subject: @block, by: @dana, tab: B)
+    assert_equal [ nil, nil, nil ], Editing::Reservation.sole.values_at(:requested_by_id, :requested_tab, :requested_at)
+    assert_equal [ @olga.id, A ], Editing::Reservation.sole.values_at(:user_id, :tab)
+    assert_not Editing::Reservation.withdraw(subject: @block, by: @dana, tab: B), "nothing left to withdraw"
+    assert_not Editing::Reservation.hand_over(subject: @block, user: @olga, tab: A), "with no request the holder has nothing to hand over"
+  end
+
   test "a request older than twice PASS_OVER that nobody passed over may be replaced, by another tab or starts afresh by the same tab" do
     claim(@olga, A)
     reader = users(:reader)

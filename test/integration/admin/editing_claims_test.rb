@@ -649,4 +649,44 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     take_over(tab: TAB_A)
     assert_response :ok
   end
+
+  def withdraw(block: nil, tab: nil, kind: "page", record: @page)
+    post admin_editing_withdraw_path(kind:, id: record.id), params: { block_id: block&.id }.compact, headers: { "X-Notes-Tab" => tab }.compact, as: :json
+  end
+
+  test "withdraw clears the asking tab's request, answers 204, and the holder's hand-over then finds nothing" do
+    sign_in_as users(:one)
+    claim(block: @block, tab: TAB_A)
+    sign_in_as users(:two)
+    take_over(block: @block, tab: TAB_B)
+
+    withdraw(block: @block, tab: "tab-cccccccc")
+    assert_response :no_content
+    assert_equal TAB_B, Editing::Reservation.sole.requested_tab, "another tab's withdrawal leaves the request"
+
+    withdraw(block: @block, tab: TAB_B)
+    assert_response :no_content
+    assert_nil Editing::Reservation.sole.requested_tab
+
+    sign_in_as users(:one)
+    take_over(block: @block, tab: TAB_A, action: :hand_over)
+    assert_equal({ "state" => "nothing" }, response.parsed_body)
+    assert_equal 0, Audit::Event.where(action: "block.taken_over").count
+  end
+
+  test "withdraw: 403 without the right, 404 out of scope, 422 without a tab id" do
+    other = create_page(title: "Other", published: false)
+    other_block = ContentBlocks::Save.call(ContentBlock.new(owner: other), attributes: { block_type: "image" }).record
+    sign_in_as users(:one)
+    withdraw(block: other_block, tab: TAB_A)
+    assert_response :not_found
+    post admin_editing_withdraw_path(kind: "page", id: 0), headers: { "X-Notes-Tab" => TAB_A }
+    assert_response :not_found
+    withdraw(block: @block)
+    assert_response :unprocessable_entity
+
+    sign_in_as users(:reader)
+    withdraw(block: @block, tab: TAB_A)
+    assert_response :forbidden
+  end
 end

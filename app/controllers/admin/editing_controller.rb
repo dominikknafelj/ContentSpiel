@@ -88,6 +88,19 @@ module Admin
     # The holder's tab, having sent what it held, lets the requester have it.
     def hand_over = transfer(hand_over: true)
 
+    # The asking tab leaves (a visit away, the page closing) or stops asking:
+    # its own request is cleared, so that the holder's tab does not hand the
+    # subject to a tab that is gone. 204 whether or not one stood; the holder
+    # is not told and finds `nothing` at its hand-over.
+    def withdraw
+      subject = subject!
+      return forbidden! if ::Editing::Rights.missing(Current.actor, @record)
+      return head(:unprocessable_entity) unless Current.editing_tab && Current.user
+
+      ::Editing::Reservation.withdraw(subject:, by: Current.user, tab: Current.editing_tab)
+      head :no_content
+    end
+
     private
 
     def transfer(hand_over:)

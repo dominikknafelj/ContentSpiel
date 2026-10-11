@@ -20,6 +20,8 @@ module Editing
   # itself, which is how every caller must use these (the one exception is `Editing::TakeOver`'s short transaction, which locks this very row first). NEVER call one inside a
   # long transaction, or the row stays locked for everyone else's claim.
   #
+  # `withdraw` is one more statement of that kind: an asker's own request, cleared.
+  #
   # `request` answers a symbol. The FIRST requester keeps the request:
   # `:requested` (the request is now this tab's: new, or the same tab asking
   # again, which keeps `requested_at`), `:pending` (another tab's request
@@ -130,6 +132,15 @@ module Editing
         return :none if rows.empty?
 
         rows.first["mine"] ? :requested : :pending
+      end
+
+      # The asking tab goes away (a visit, a closed tab) or no longer wants it:
+      # ITS OWN request is cleared, and no other tab's. True when it cleared one.
+      # One statement; the holder is not told (its `hand_over` then finds
+      # nothing, and it takes its light lock back).
+      def withdraw(subject:, by:, tab:)
+        of(subject).where(requested_by_id: by.id, requested_tab: tab)
+          .update_all(requested_by_id: nil, requested_tab: nil, requested_at: nil).positive? # version: none (a reservation is not content)
       end
 
       # The holder's tab lets go: the row is the requester's from now.
