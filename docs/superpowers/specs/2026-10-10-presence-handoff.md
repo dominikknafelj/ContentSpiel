@@ -52,3 +52,7 @@ Where these and the items above differ, these win.
 29. **The group button's name** names EVERYONE, each with their status ("Also open by 5 people: Dana Weiss, here; Jonas Lind, away 12 min; …"), not only the circles shown, and without a "2 more people" part. "+N" is a visual summary inside the one control and is `aria-hidden`. (This narrows item 22: "2 more people" is not spoken.)
 30. **The tooltip's collision check** is against the nearest box that scrolls or clips it, as well as the window.
 31. **The group's focus ring** is `rounded-cs` (2px), not `rounded-full`: the group is a row, and 2px is CS Studio's focus shape everywhere else.
+32. **The marker's words**, for a screen reader AND in its tooltip (the tooltip says the same words, not the names alone: a row of bare names does not say what they mean): one person "Dana Weiss is here"; several "2 people here: Dana Weiss, Jonas Lind"; more than five "7 people here: A, B, C, D, E and 2 more". (This settles item 12.)
+33. **A posts row's link name** keeps both forms: "Title, Dana Weiss is here" for one, "Title, 2 people here: …" for several.
+34. **The marker's place in a tree row** is where it is: last of the markers, before the subpage count and the "+" link, which are about the tree's structure.
+35. **A long tooltip in the tree** may reach past the tree column over the content; the collision check keeps it inside the window, and it has a z-index above the content area so it is never underneath it.
