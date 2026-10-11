@@ -215,6 +215,32 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
         document.execCommand("insertText", false, "x")
       }, every)
     JS
+  # This tab's reads of the block's card are kept in the page, unsent, until
+  # `release_reads`: a tab that hears nothing reads nothing either. (The live
+  # script has one read on its way at a time, so every later read of the tab
+  # waits behind the first one held.)
+  def hold_reads_of(block)
+    page.execute_script(<<~JS, "/editing/page/\\d+/blocks/#{block.id}")
+      const [ source ] = arguments
+      const real = window.fetch
+      window.__reads = { held: [], open: false }
+      window.fetch = function (input, init = {}) {
+        const url = typeof input === "string" ? input : input.url
+        if (!window.__reads.open && String(init.method || "GET").toUpperCase() === "GET" && new RegExp(source).test(url)) {
+          const args = arguments
+          return new Promise((resolve) => window.__reads.held.push(() => resolve(real.apply(window, args))))
+        }
+        return real.apply(this, arguments)
+      }
+    JS
+  end
+
+  def release_reads = page.execute_script("window.__reads.open = true; window.__reads.held.splice(0).forEach((send) => send())")
+
+  def listen_merged = page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
+
+  def await_merged(block = @block) = await_js("window.__merged.includes('block:#{block.id}')", wait: LIVE)
+
   end
 
   def stop_typing = page.execute_script("clearInterval(window.__typing)")
@@ -396,6 +422,15 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]"
     end
   end
+      # Nor does it read. The `requested` signal it does hear asks for the card
+      # too, and that read waits for the tab's writes, the held hand-over among
+      # them: answered after the pass-over it draws the card as Olga's,
+      # read-only, which is right and is the test below. Whether it or the
+      # typing here came first was the machine's choice (CI, 2026-10-11: the
+      # read won, and there was no field left to type "Late." into), so the
+      # order is the test's: the typing first, the read after it.
+      hold_reads_of(@block)
+      listen_merged
 
   test "Dana takes the block back" do
     open_page
@@ -408,6 +443,8 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     assert_selector "#{card(@block)} .ProseMirror[contenteditable=true]", text: "Dana first.", wait: LIVE
     type_in(@block, "Then Olga. ")
     assert_writes_settled
+      # Locked since it was asked, and until its hand-over is answered.
+      assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]"
 
     using_session(:dana) do
       assert_selector "#{strip}", text: "Olga Braun is editing this block", wait: LIVE
@@ -417,6 +454,12 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_no_selector strip
     end
     assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", wait: LIVE
+
+      # And when it reads at last, the card stays the person's: their text and the notice.
+      release_reads
+      await_merged
+      assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved."
+      assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "Late."
     assert_selector strip, text: "Dana Weiss is editing this block", wait: LIVE
     assert_equal 2, taken_over_events.count
     assert_equal [ true, true ], taken_over_events.order(:id).map { |event| event.metadata["answered"] }
