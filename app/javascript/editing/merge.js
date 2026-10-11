@@ -6,10 +6,14 @@
 // A UNIT (`data-editing-unit`) is what is replaced or kept as one: a block's
 // card (in the list, as a section's panel, in a translation tab's group), a
 // section's own settings form, the page settings panel, a post's form. A
-// PART (`data-editing-part`, a section's tile) holds no form and is always
-// replaced. "Unsaved" is the caller's question (`unsaved(form)`): the write
-// queue's own, asked of the form's autosave controller. This module reads no
-// controller, so a test can hand it a plain predicate.
+// PART (`data-editing-part`, a section's tile) is not a unit: it is replaced
+// like anything that holds no unsaved form, with two exceptions that keep what
+// is not the answer's to take away -- a part that shows an alert with
+// something in it (a notice nobody has dismissed) and a part that holds a kept
+// unit are not replaced (`mergeUnits`). "Unsaved" is the caller's question
+// (`unsaved(form)`): the write queue's own, asked of the form's autosave
+// controller. This module reads no controller, so a test can hand it a plain
+// predicate.
 //
 // DECIDE BY IDS, SUBJECTS AND STATE, NEVER BY COMPARING HTML. A fetched
 // fragment is not byte-equal to what is on screen even when nothing changed
@@ -23,30 +27,67 @@
 // replaced and the kept units put back into it; the list is RECONCILED
 // AROUND them: what does not stay is removed, what was fetched is inserted
 // before, between and after what stays, and an element that is the ancestor
-// of a kept unit (a section's card, its body, its panels, its header) stays
+// of a kept unit (a section's card, its header, its body, its panels) stays
 // too and is reconciled inside, level by level, matched by id. That is why
-// every ancestor of a unit up to the list has an id. The one time a kept
-// unit is moved is when two kept units changed places.
+// every ancestor of a unit up to the list has an id. The one time a kept unit
+// is moved is when two kept units changed places, and then it is the one that
+// does not hold the focus (a unit taken out of the document drops the focus
+// and its editor is built again).
 //
-// A kept unit the answer no longer has (its block was deleted) stays where
-// it is, marked `data-editing-gone`; the caller puts the notice on it.
+// A BLOCK IS ONE SUBJECT AND HAS ONE FORM ON SCREEN AT A TIME. The subject is
+// `data-editing-subject` ("block-<id>", on a card, a panel, a tile and a
+// section's form; "record" on the page settings and a post's form), not the
+// element's id: a tile and a top-level card of one block have the same id, and
+// a panel and a card have the same inner ids. Three things can become of a
+// kept unit:
+//   - the answer has its subject in the same place (same id, a unit, in a
+//     container of the same id): it is KEPT, and the answer's copy is dropped;
+//   - the answer has its subject somewhere else (another container: a card
+//     moved into a section or out of one, a panel moved to another section or
+//     lane) or in another shape (card <-> tile and panel): it is DISPLACED
+//     (`moved`, and also in `kept`). It stays where it is and is not marked
+//     gone, and EVERY element of that subject is removed from the answer
+//     before drawing, so nothing of the block is drawn in its new place: no
+//     second form, no tile that opens nothing, no id twice;
+//   - the answer has no element of its subject: the block is gone (`gone`).
+//     The unit stays, marked `data-editing-gone="true"` (taken back if the
+//     answer has the element again), where it was: after the nearest
+//     preceding sibling the answer still has, else first, and gone units keep
+//     their order. A hidden panel of a kept unit whose tile is no longer on
+//     screen (gone or displaced) is shown (`hidden = false`), or nothing on
+//     screen would lead to the form that holds the person's text.
+// CONTRACT FOR THE CALLER: a displaced unit is not an error and needs no
+// notice. The caller fetches the list again once that unit's form is no
+// longer unsaved; the unit is then replaced like any clean one and the block
+// takes its place. Until then this tab shows that one block where it was.
 //
 // What the person did to the screen and the server knows nothing of is put
 // back around a merge (`withState`): which cards are collapsed, which panel
 // of a section is open (a section reads that from its panels' `hidden`, so
 // the panel's `hidden` is what is restored, and its tile's `aria-expanded`),
-// and where the focus is.
+// and where the focus is. A CLEAN FORM THAT HAS THE FOCUS IS STILL REPLACED
+// (a hold by someone else must be able to make it read-only): the focus goes
+// back to the same control once it exists (an editor mounts a moment after
+// its card arrives, so this waits for it, until the person focuses or
+// presses somewhere else), and for an `input` or `textarea` the selection is
+// put back too. In a rich-text field the caret and the selection are lost.
 //
-// This module touches the document only inside the element it is handed. It
-// opens no connection, fetches nothing, raises no toast and knows no
+// `anchored` keeps the block the person is reading where it is on screen,
+// until the cards redrawn above it have mounted their editors. It sets the
+// scroll position of what scrolls the list, which is outside the list.
+// Otherwise this module touches the document only inside the element it is
+// handed, opens no connection, fetches nothing, raises no toast and knows no
 // controller. Its tests are `test/system/admin/editing_merge_test.rb`.
 
 const UNIT = "[data-editing-unit]"
-const FOCUSABLE = "input:not([type=hidden]), textarea, select, button, [contenteditable=true]"
+const PANEL = "[data-admin--editor--section-target~='panel']"
+const FOCUSABLE = "input:not([type=hidden]), textarea, select, button, a[href], summary, [tabindex]:not([tabindex='-1']), [contenteditable=true]"
 // Set by a script on an element that stays, and not the server's to take away.
-const RUNTIME = [ "inert", "data-picked", "data-notes-active", "data-editing-stays", "data-editing-gone" ]
+const RUNTIME = [ "inert", "data-picked", "data-notes-active", "data-editing-gone" ]
 // How long a focus waits for a field that a controller is still mounting.
 const FOCUS_WAIT = 3000
+// How long the block being read is held in place while the cards above it grow.
+const ANCHOR_WAIT = 1500
 
 // Whether one of the unit's own forms is unsaved. A section's settings form
 // is itself the unit; a card's forms are those not inside a nested unit.
@@ -56,25 +97,35 @@ export function holds(unit, unsaved) {
 }
 
 export function mergeList(list, fresh, { unsaved }) {
-  const keep = new Set([ ...list.querySelectorAll(UNIT) ].filter((unit) => unit.id && holds(unit, unsaved)))
+  const keep = new Set([ ...list.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
+  const moved = displace(list, fresh, keep)
   const gone = []
-  withState(list, () => reconcile(list, [ ...fresh.children ], keep, gone))
-  return { kept: [ ...keep ], gone }
+  withState(list, () => {
+    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone)
+    for (const unit of keep) if (!gone.includes(unit)) unit.removeAttribute("data-editing-gone")
+    for (const unit of keep) if (unit.matches(PANEL) && unit.hidden && !tileOf(list, unit)) unit.hidden = false
+  })
+  return { kept: [ ...keep ], gone, moved }
 }
 
+// `fresh`'s children are the answer for some parts of `root`. A child with
+// no element of its id and shape on screen is `missing` (the caller fetches
+// the list); so is a part that holds a kept unit, which cannot be replaced
+// without taking the unit away and is not (the list merge reconciles around
+// it).
 export function mergeUnits(root, fresh, { unsaved }) {
-  const result = { replaced: [], kept: [], missing: false }
+  const result = { replaced: [], kept: [], missing: false, moved: [] }
   withState(root, () => {
+    const keep = new Set([ ...root.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
+    for (const unit of displace(root, fresh, keep)) { result.moved.push(unit); result.kept.push(unit) }
     for (const twin of [ ...fresh.children ]) {
       const live = twin.id ? document.getElementById(twin.id) : null
       if (!live || !root.contains(live) || live === root || live.matches(UNIT) !== twin.matches(UNIT)) { result.missing = true; continue }
-      if (live.matches(UNIT) && holds(live, unsaved)) { result.kept.push(live); continue }
+      if (keep.has(live)) { result.kept.push(live); continue }
       // A notice the person has not dealt with ("Changed elsewhere", lost
       // work) is theirs to dismiss: a part that shows one is not replaced.
-      if (!live.matches(UNIT) && live.querySelector("[role=alert]")) { result.kept.push(live); continue }
-      // A unit that is not the one asked about but holds a kept unit inside
-      // it would take that unit away: the answer for it is not drawn.
-      if (live.querySelector(UNIT) && [ ...live.querySelectorAll(UNIT) ].some((unit) => unit.id && holds(unit, unsaved))) { result.kept.push(live); continue }
+      if (!live.matches(UNIT) && live.querySelector("[role=alert]:not(:empty)")) { result.kept.push(live); continue }
+      if ([ ...keep ].some((unit) => live.contains(unit))) { result.missing = true; continue }
       live.replaceWith(twin)
       result.replaced.push(twin)
     }
@@ -82,51 +133,133 @@ export function mergeUnits(root, fresh, { unsaved }) {
   return result
 }
 
-// Runs `draw` and puts the block the person is in, or else the first one in
-// view, back where it was on screen.
+// Runs `draw` and holds the block the person is in, or else the first one in
+// view, where it was on screen: now, and again while the redrawn cards above
+// it mount their editors (an editor's field is empty until its controller
+// connects and then at least a field tall), until the person scrolls or the
+// time is up. The anchor is looked up again by id each time, and the next one
+// in view stands in for one that was removed.
 export function anchored(root, draw) {
+  const scroller = scrollerOf(root)
+  const view = viewOf(scroller)
   const inFocus = document.activeElement?.closest?.("[data-block-id], [data-editing-unit]")
-  const anchor = (inFocus && root.contains(inFocus) && inFocus) ||
-    [ ...root.querySelectorAll("[data-block-id]") ].find((card) => !card.closest("[hidden]") && card.getBoundingClientRect().bottom > 0)
-  const top = anchor?.getBoundingClientRect().top
+  const visible = [ ...root.querySelectorAll("[data-block-id]") ].filter((card) => {
+    const rect = card.getBoundingClientRect()
+    return !card.closest("[hidden]") && rect.bottom > view.top && rect.top < view.bottom
+  })
+  const topped = (card) => card.getBoundingClientRect().top >= view.top - 0.5
+  const chosen = [ ...(inFocus && root.contains(inFocus) ? [ inFocus ] : []), ...visible.filter(topped), ...visible.filter((card) => !topped(card)) ].slice(0, 6)
+  const anchors = chosen.map((card) => ({ element: card, id: card.id, top: card.getBoundingClientRect().top }))
+
   const result = draw()
-  const now = anchor && (anchor.isConnected ? anchor : anchor.id && document.getElementById(anchor.id))
-  if (now && top !== undefined && root.contains(now)) {
-    const moved = now.getBoundingClientRect().top - top
-    if (moved !== 0) scrollerOf(root).scrollTop += moved
+  if (!anchors.length) return result
+
+  const find = () => {
+    for (const anchor of anchors) {
+      const now = anchor.element.isConnected && root.contains(anchor.element) ? anchor.element : anchor.id && document.getElementById(anchor.id)
+      if (now && root.contains(now)) return { now, top: anchor.top }
+    }
+    return null
   }
+  const correct = () => {
+    const found = find()
+    if (!found) return
+    const off = found.now.getBoundingClientRect().top - found.top
+    if (Math.abs(off) >= 1) scroller.scrollTop += off
+  }
+  correct()
+
+  let stopped = false
+  const stop = () => { stopped = true }
+  const keys = (event) => { if ([ "PageUp", "PageDown", "Home", "End" ].includes(event.key)) stopped = true }
+  const until = performance.now() + ANCHOR_WAIT
+  addEventListener("wheel", stop, { passive: true, capture: true })
+  addEventListener("touchstart", stop, { passive: true, capture: true })
+  addEventListener("pointerdown", stop, { passive: true, capture: true })
+  addEventListener("keydown", keys, { capture: true })
+  const step = () => {
+    if (stopped || performance.now() > until) {
+      removeEventListener("wheel", stop, { capture: true })
+      removeEventListener("touchstart", stop, { capture: true })
+      removeEventListener("pointerdown", stop, { capture: true })
+      removeEventListener("keydown", keys, { capture: true })
+      return
+    }
+    correct()
+    requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
   return result
 }
 
 const carries = (element, keep) => keep.has(element) || [ ...keep ].some((unit) => element.contains(unit))
 
-// Makes `container`'s children those of `fresh`, in that order, around what stays.
-function reconcile(container, fresh, keep, gone) {
-  const wanted = new Set(fresh.map((each) => each.id).filter(Boolean))
-  for (const child of [ ...container.children ]) {
-    if (!carries(child, keep)) { child.remove(); continue }
-    if (wanted.has(child.id)) { child.removeAttribute("data-editing-stays"); continue }
-    // It stays although the answer has no such element: its block is gone.
-    child.setAttribute("data-editing-stays", "true")
-    for (const unit of keep) if ((unit === child || child.contains(unit)) && !gone.includes(unit)) { unit.dataset.editingGone = "true"; gone.push(unit) }
+const tileOf = (root, panel) => root.querySelector(`[data-editing-part][data-block-id="${panel.dataset.blockId}"]`)
+
+// A parent's id, with the element the merge was handed standing for "the list".
+const containerKey = (element, root) => element.parentElement === root ? "" : (element.parentElement?.id || "")
+
+// The kept units whose subject the answer has somewhere other than where the
+// unit is. Every element of that subject is taken out of the answer, so the
+// block is not drawn in its new place while this one has unsaved text.
+function displace(root, fresh, keep) {
+  const moved = []
+  for (const unit of keep) {
+    const subject = unit.dataset.editingSubject
+    if (!subject) continue
+    const copies = [ ...fresh.querySelectorAll(`[data-editing-subject="${subject}"]`) ]
+    if (!copies.length) continue
+    const home = copies.some((copy) => copy.id === unit.id && copy.matches(UNIT) && containerKey(copy, fresh) === containerKey(unit, root))
+    if (home) continue
+    copies.forEach((copy) => copy.remove())
+    moved.push(unit)
   }
-  const keptIds = new Set([ ...keep ].map((unit) => unit.id))
-  let after = null
+  return moved
+}
+
+// Makes `container`'s children those of `fresh`, in that order, around what stays.
+function reconcile(container, fresh, keep, moved, gone) {
+  const wanted = new Set(fresh.map((each) => each.id).filter(Boolean))
+  // What stays although the answer has no such element, each with the id of
+  // the nearest sibling before it that the answer does have (null: first).
+  const stays = []
+  let anchor = null
+  for (const child of [ ...container.children ]) {
+    const survives = Boolean(child.id) && wanted.has(child.id)
+    if (!carries(child, keep)) {
+      child.remove()
+      if (survives) anchor = child.id
+    } else if (survives) {
+      anchor = child.id
+    } else {
+      stays.push({ element: child, anchor })
+      for (const unit of keep) if ((unit === child || child.contains(unit)) && !moved.has(unit) && !gone.includes(unit)) { unit.dataset.editingGone = "true"; gone.push(unit) }
+    }
+  }
+
+  // The order the container ends in: the stayers that belong first, then each
+  // of the answer's elements followed by the stayers that were behind it.
+  const order = stays.filter((stay) => stay.anchor === null).map((stay) => stay.element)
   for (const twin of fresh) {
     const live = twin.id ? [ ...container.children ].find((child) => child.id === twin.id) : null
-    // A kept unit that is somewhere else in the document (its block was moved
-    // to another container) is still the one on screen: the answer's copy of
-    // its id is not drawn a second time.
-    if (!live && twin.id && keptIds.has(twin.id)) continue
     if (live && !keep.has(live)) {
       syncAttributes(live, twin)
-      reconcile(live, [ ...twin.children ], keep, gone)
-    } else if (!live) {
-      for (const id of keptIds) for (const copy of twin.querySelectorAll(`[id="${CSS.escape(id)}"]`)) copy.remove()
+      reconcile(live, [ ...twin.children ], keep, moved, gone)
     }
-    const node = live || twin
+    order.push(live || twin)
+    if (twin.id) for (const stay of stays) if (stay.anchor === twin.id) order.push(stay.element)
+  }
+
+  let after = null
+  for (const node of order) {
     let expected = after ? after.nextElementSibling : container.firstElementChild
-    while (expected && expected !== node && expected.hasAttribute("data-editing-stays")) expected = expected.nextElementSibling
+    // Whoever has the focus is not the one taken out of the document: what
+    // stands in its way is moved to the end instead (and put in its own place
+    // when its turn comes).
+    while (node !== expected && expected && node.contains(document.activeElement)) {
+      container.appendChild(expected)
+      expected = after ? after.nextElementSibling : container.firstElementChild
+    }
     if (node !== expected) container.insertBefore(node, expected)
     after = node
   }
@@ -139,7 +272,7 @@ function syncAttributes(live, twin) {
 
 function withState(root, draw) {
   const collapsed = [ ...root.querySelectorAll("[data-block-body].hidden") ].map((body) => body.id).filter(Boolean)
-  const open = [ ...root.querySelectorAll("[data-admin--editor--section-target~='panel']:not([hidden])") ].map((panel) => panel.id).filter(Boolean)
+  const open = [ ...root.querySelectorAll(`${PANEL}:not([hidden])`) ].map((panel) => panel.id).filter(Boolean)
   const focus = focusOf(root)
 
   draw()
@@ -159,41 +292,65 @@ function withState(root, draw) {
   restoreFocus(root, focus)
 }
 
+const signature = (element) => [ element.tagName, element.getAttribute("type"), element.getAttribute("name"), element.getAttribute("aria-label"), element.isContentEditable ].join("|")
+
 // Where the focus is, as something that survives its element being replaced:
-// the nearest ancestor with an id and the control's place among that
-// ancestor's controls.
+// the element's own id, or the nearest ancestor with one and the control's
+// place among that ancestor's controls, with what kind of control it is.
 function focusOf(root) {
   const element = document.activeElement
   if (!element || element === document.body || !root.contains(element)) return null
-  const holder = element.id ? element : element.closest("[id]")
+  const own = Boolean(element.id)
+  const holder = own ? element : element.closest("[id]")
   if (!holder) return null
-  return { element, id: holder.id, index: element === holder ? -1 : [ ...holder.querySelectorAll(FOCUSABLE) ].indexOf(element), editable: element.isContentEditable }
+  const index = own ? -1 : [ ...holder.querySelectorAll(FOCUSABLE) ].indexOf(element)
+  if (!own && index < 0) return null
+  let selection = null
+  try { if (typeof element.selectionStart === "number") selection = [ element.selectionStart, element.selectionEnd ] } catch { selection = null }
+  return { element, id: holder.id, own, index, kind: signature(element), selection }
 }
 
 function restoreFocus(root, focus) {
-  if (!focus || focus.element.isConnected) return
+  if (!focus || document.activeElement === focus.element) return
+  // Something else has it already (the person moved on, or a menu took it).
+  if (document.activeElement && document.activeElement !== document.body) return
   const find = () => {
     const holder = document.getElementById(focus.id)
     if (!holder || !root.contains(holder)) return null
-    const target = focus.index < 0 ? holder : holder.querySelectorAll(FOCUSABLE)[focus.index]
-    return target && target.isContentEditable === focus.editable ? target : null
+    const target = focus.own ? holder : holder.querySelectorAll(FOCUSABLE)[focus.index]
+    return target && signature(target) === focus.kind ? target : null
   }
   const attempt = () => {
     const target = find()
-    if (target) target.focus({ preventScroll: true })
-    return Boolean(target)
+    if (!target) return false
+    target.focus({ preventScroll: true })
+    if (focus.selection && typeof target.setSelectionRange === "function") {
+      try { target.setSelectionRange(...focus.selection) } catch { /* a control without a selection */ }
+    }
+    return true
   }
   if (attempt()) return
 
   // The field is not there yet: a controller mounts it (the rich-text editor
   // does, a moment after its card arrives). Wait for it, until the person
-  // goes somewhere else or the wait is over.
-  const observer = new MutationObserver(() => {
-    const moved = document.activeElement && document.activeElement !== document.body
-    if (moved || attempt()) observer.disconnect()
-  })
+  // focuses or presses somewhere else, or the wait is over.
+  const finish = () => {
+    observer.disconnect()
+    clearTimeout(timer)
+    removeEventListener("pointerdown", finish, true)
+    removeEventListener("focusin", finish, true)
+  }
+  const observer = new MutationObserver(() => { if (attempt()) finish() })
+  const timer = setTimeout(finish, FOCUS_WAIT)
+  addEventListener("pointerdown", finish, true)
+  addEventListener("focusin", finish, true)
   observer.observe(root, { childList: true, subtree: true })
-  setTimeout(() => observer.disconnect(), FOCUS_WAIT)
+}
+
+function viewOf(scroller) {
+  if (scroller === document.scrollingElement) return { top: 0, bottom: innerHeight }
+  const rect = scroller.getBoundingClientRect()
+  return { top: rect.top, bottom: rect.bottom }
 }
 
 function scrollerOf(element) {
