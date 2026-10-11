@@ -32,14 +32,16 @@ module Admin
     #
     # THE GROUP IS ONE BUTTON (handoff 23), the one Tab stop: the circles and
     # "+N" are inside it and none of them takes the focus. Its name says
-    # everything a sighted person reads off the circles -- "Also open by 3
-    # people: Dana Weiss, here; Jonas Lind, away 12 min", and "…; 2 more
-    # people" for those behind "+N" -- and pressing it, anywhere, opens the
-    # list of EVERYONE in the same order (`Admin::Ui::MenuComponent`,
+    # who EVERYONE is and how they are -- "Also open by 5 people: Dana Weiss,
+    # here; Jonas Lind, away 12 min; …", those behind "+N" included (handoff
+    # 29; "+N" itself is `aria-hidden`) -- and pressing it, anywhere, opens
+    # the list of everyone in the same order (`Admin::Ui::MenuComponent`,
     # `list: true`: the list takes the focus, Escape gives it back). With one
     # person it is still the Tab stop and opens a list of one. It IS the menu
     # component's button, so nothing interactive is nested in it: "+N" is a
     # span, which also shows the list on hover without moving the focus.
+    # The focus alone opens nothing, and neither does the pointer on the
+    # group: the list would cover the header (handoff 28).
     # Nothing is announced: no live region.
     #
     # ONE CIRCLE (`Admin::Ui::AvatarComponent`, a ring in the colour of what
@@ -116,11 +118,12 @@ module Admin
 
       def circles = people.first(@size.shown)
 
-      # The button's name: how many, then who is shown and how they are, then
-      # how many more.
+      # The button's name: how many, then EVERYONE and how each is (handoff
+      # 29), in the list's order -- not only the circles shown, so a screen
+      # reader's user needs no second step to hear who is behind "+N", which
+      # is a summary for the eye and is hidden from them.
       def group_label
-        said = circles.map { |person| t(".person", name: person.name, status: person.status) }
-        said << t(".more_people", count: more_wide) if more_wide.positive?
+        said = people.map { |person| t(".person", name: person.name, status: person.status) }
         t(".group_label", summary: t(".group", count: people.size), people: said.join(t(".separator")))
       end
 
@@ -132,9 +135,10 @@ module Admin
 
       def hang = @size.hang
 
-      # The one Tab stop, with its focus ring around the group.
+      # The one Tab stop, with its focus ring around the group: CS Studio's
+      # 2px corner, since the group is a row and not a pill (handoff 31).
       def group_class
-        "flex cursor-pointer items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        "flex cursor-pointer items-center rounded-cs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       end
 
       # A circle's own classes: the tooltip's host, over the one before by

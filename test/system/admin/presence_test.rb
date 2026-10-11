@@ -118,7 +118,19 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
     stops = page.evaluate_script("[ ...document.querySelectorAll('.admin-editor-header .admin-presence :is(a, button, input, [tabindex])') ].filter((each) => each.tabIndex >= 0).length")
     assert_equal 1, stops
+    # Handoff 28: the focus alone opens nothing, and neither does the pointer
+    # on the group (the list would cover the header); the group says by its
+    # cursor that it is pressed, and its focus ring is CS Studio's 2px corner
+    # (31), not a pill.
     page.execute_script("document.querySelector(#{group.to_json}).focus()")
+    find(circle(@dana)).hover
+    await_frames
+    assert_no_selector list
+    assert_selector "#{group}[aria-expanded=false]"
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{group.to_json})")
+    look = page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{group.to_json})); return [ style.cursor, style.borderTopLeftRadius ] })()")
+    assert_equal [ "pointer", "2px" ], look
+    page.driver.browser.mouse.move(x: 5, y: 5)
     find(group).send_keys(:enter)
     assert_selector "#{list}[aria-label='Everyone with this open'] [role=listitem]", count: 1
     assert_selector "#{group}[aria-expanded=true]"

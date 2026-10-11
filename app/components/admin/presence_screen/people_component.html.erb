@@ -8,7 +8,7 @@
           <% end %>
         <% end %>
         <% if more? %>
-          <%= tag.span more_label, class: more_class, data: { action: "mouseenter->admin--ui--menu#reveal" } %>
+          <%= tag.span more_label, class: more_class, aria: { hidden: true }, data: { action: "mouseenter->admin--ui--menu#reveal" } %>
         <% end %>
       <% end %>
       <%= render Admin::Ui::MenuComponent.new(label: group, aria_label: group_label, list: true, list_label: list_label, align: hang, button_class: group_class) do |menu| %>

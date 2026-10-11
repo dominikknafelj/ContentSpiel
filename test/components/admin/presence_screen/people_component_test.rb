@@ -53,7 +53,10 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     render_people
 
     assert_selector "#{group}[type=button][aria-label='Also open by 1 person: Dana Weiss, here'][aria-expanded=false]", count: 1
-    assert_selector "#{group}.rounded-full.focus-visible\\:outline-2.focus-visible\\:outline-offset-2.focus-visible\\:outline-accent"
+    # The focus ring is CS Studio's own shape, around the row (31); a pointer
+    # cursor says the group is pressed (28).
+    assert_selector "#{group}.cursor-pointer.rounded-cs.focus-visible\\:outline-2.focus-visible\\:outline-offset-2.focus-visible\\:outline-accent"
+    assert_no_selector "#{group}.rounded-full"
     circle = page.find("#{group} > [data-presence-user='#{@dana.id}'][data-presence-state=here]")
     circle.assert_selector "span.size-6.rounded-full.border.border-line-strong.bg-sunken.text-ink.font-cs-mono.ring-2.ring-paper[aria-hidden=true]", text: "DW", exact_text: true
     circle.assert_selector "span.text-\\[9px\\]", text: "DW"
@@ -127,18 +130,20 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_selector "#{group} > span.lg\\:hidden > [data-presence-more=narrow]", count: 1, visible: :all
   end
 
-  test "four people: three circles and +1, a circle with no fill; the button names the three and says one more; the list is all four in order (6, 20, 21, 22)" do
+  test "four people: three circles and +1, a circle with no fill; the button names all four with how each is, and +1 is not spoken; the list is all four in order (6, 20, 21, 29)" do
     others = [ person("Ann One"), person("Bob Two"), person("Cy Three") ]
     others.each_with_index { |user, index| mark(user, arrived: NOW - (20 - index).minutes) }
     mark(@dana, state: "away", arrived: NOW - 50.minutes, since: NOW - 61.minutes)
 
     render_people
 
-    assert_selector "#{group}[aria-label='Also open by 4 people: Ann One, here; Bob Two, here; Cy Three, here; 1 more person']"
+    assert_selector "#{group}[aria-label='Also open by 4 people: Ann One, here; Bob Two, here; Cy Three, here; Dana Weiss, away over an hour']"
     assert_equal others.map { |user| user.id.to_s }, page.all("#{group} > [data-presence-user]").map { |each| each["data-presence-user"] }
     more = page.find("#{group} > span:last-child")
     assert_equal %w[bg-paper border border-line-strong flex flex-none font-cs-mono items-center justify-center leading-none ml-1 rounded-full size-6 text-[10px] text-dim], more[:class].split.sort
     more.assert_selector "[data-presence-more=wide]", text: "+1", exact_text: true, visible: :all
+    # A summary for the eye inside the one control: the name has everyone (29).
+    assert_equal "true", more["aria-hidden"]
     # Hovering it shows the list; it is no button of its own.
     assert_equal "mouseenter->admin--ui--menu#reveal", more["data-action"]
     assert_equal (others + [ @dana ]).map { |user| user.id.to_s }, rows.map { |each| each["data-presence-listed"] }
@@ -154,12 +159,14 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_no_selector "[role=list] a, [role=list] button, [role=list] [tabindex]", visible: :all
   end
 
-  test "six people: the button says how many more in the plural" do
+  test "six people: the button names all six, and nowhere says how many more (29)" do
     6.times { |index| mark(person("Person #{index}"), arrived: NOW - (20 - index).minutes) }
 
     render_people
 
-    assert_selector "#{group}[aria-label='Also open by 6 people: Person 0, here; Person 1, here; Person 2, here; 3 more people']"
+    assert_selector "#{group}[aria-label='Also open by 6 people: Person 0, here; Person 1, here; Person 2, here; Person 3, here; Person 4, here; Person 5, here']"
+    assert_no_text(/more (people|person)/)
+    assert_no_selector "[aria-label*='more']", visible: :all
   end
 
   test "below 1024px the header shows one circle and the count of the rest, by classes alone (15)" do
@@ -195,7 +202,8 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_selector "div.flex-none.ml-auto[data-controller='admin--presence--record'][data-admin--presence--record-kind-value=media]" \
                     "[data-admin--presence--record-url-value='/cs-studio/presence/media/#{asset.id}?size=panel']", visible: :all
     button = "turbo-frame#presence-media-#{asset.id} button"
-    assert_selector "#{button}[aria-label='Also open by 3 people: Dana Weiss, here; reader, here; 1 more person']"
+    assert_selector "#{button}[aria-label='Also open by 3 people: Dana Weiss, here; reader, here; Ann One, here']"
+    assert_selector "#{button} > span[aria-hidden=true] > [data-presence-more=wide]", visible: :all
     assert_selector "#{button} > [data-presence-user] > span.size-5.text-\\[8px\\].ring-2.ring-surface[aria-hidden=true]", count: 2
     assert_no_selector ".ring-paper", visible: :all
     assert_selector "#{button} > span.size-5.bg-surface.border-line-strong > [data-presence-more=wide]", text: "+1", exact_text: true, visible: :all
