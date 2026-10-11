@@ -187,8 +187,12 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     open_editor
     page.execute_script(<<~JS)
       window.__pending = {}
-      window.fetch = (input) => {
-        const q = new URL(input, location.origin).searchParams.get("q")
+      const real = window.fetch
+      window.fetch = (input, init) => {
+        // Only the tag search is held; the editor's live parts (presence, notes) fetch too and take the real one.
+        const url = new URL(input.url || input, location.origin)
+        if (!url.searchParams.has("q")) return real(input, init)
+        const q = url.searchParams.get("q")
         return new Promise((resolve) => {
           window.__pending[q] = () => resolve(new Response(JSON.stringify([{ value: "answer-" + q, label: "answer-" + q, hint: "1 post" }]), { status: 200 }))
         })
@@ -212,7 +216,9 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     open_editor
     page.execute_script(<<~JS)
       window.__release = null
-      window.fetch = () => new Promise((resolve) => { window.__release = () => resolve(new Response(JSON.stringify([{ value: "late", label: "late" }]), { status: 200 })) })
+      const real = window.fetch
+      // Only the tag search is held; the editor's live parts (presence, notes) fetch too and take the real one.
+      window.fetch = (input, init) => !new URL(input.url || input, location.origin).searchParams.has("q") ? real(input, init) : new Promise((resolve) => { window.__release = () => resolve(new Response(JSON.stringify([{ value: "late", label: "late" }]), { status: 200 })) })
     JS
     tag_field.send_keys("l")
     assert_eventually { page.evaluate_script("window.__release !== null") }
