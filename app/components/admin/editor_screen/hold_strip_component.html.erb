@@ -8,7 +8,7 @@
       <%# What the hold script says beside the button while a take-over is asked, already
           standing, or refused: a polite status, empty until then (the script holds no wording). %>
       <span role="status" aria-live="polite" class="shrink-0 text-xs text-meta" data-editing-take-over-status
-            data-waiting="<%= t(".take_over_waiting") %>" data-pending="<%= t(".take_over_pending") %>" data-failed="<%= t(".take_over_failed") %>"></span>
+            data-waiting="<%= t(".take_over_waiting") %>" data-pending="<%= t(".take_over_pending") %>" data-failed="<%= t(".take_over_failed") %>" data-claimed="<%= t(".take_over_claimed") %>"></span>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".take_over"), variant: :secondary, size: :small,
             data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(@subject) }) %>
     <% end %>

@@ -136,9 +136,27 @@ export default class extends Controller {
   // A form that turned read-only in place (`editing/freeze`, through `admin--editing--hold`): the document
   // stays as typed, for copying, and nothing more is written into it.
   lock() {
+    // Whether THIS call is what made it read-only (`unlock` undoes only that):
+    // an editor that was already read-only -- invalid content, a held form, a
+    // lock before this one -- is never made editable by it.
+    this.lockedHere = Boolean(this.editable())
     this.readOnly = true
-    this.editor?.setEditable(false)
+    // Without an `update` event (the second argument): turning a field read-only
+    // or editable is no edit, and an update would be written to the hidden input
+    // and sent as a change.
+    this.editor?.setEditable(false, false)
     this.element.querySelector("[role=toolbar]")?.setAttribute("hidden", "")
+  }
+
+  // The way back for a LIGHT lock (`admin--editing--hold`, a hand-over that
+  // did not happen): exactly what `lock` took, nothing for an editor it did
+  // not lock.
+  unlock() {
+    if (!this.lockedHere) return
+    this.lockedHere = false
+    this.readOnly = false
+    this.editor?.setEditable(true, false)
+    this.element.querySelector("[role=toolbar]")?.removeAttribute("hidden")
   }
 
   // The hidden input's JSON, or nothing for an empty/absent document (an

@@ -2,15 +2,17 @@ require "application_system_test_case"
 
 # Taking over, in the browser (live-editing spec §4.4,
 # `controllers/admin/editing/hold_controller.js`): "Take over" asks the
-# holder's tab, which sends what it has and lets go; a tab that does not
-# answer is passed over after `Editing::PASS_OVER`. Two or three people are two
-# or three Capybara sessions (`using_session`). The server's pass-over time is
-# set for the whole file (`pass_over`, BEFORE a page is opened: the region
-# renders it as a value for the script too); the notice's time is shortened in
-# the browser through the region's value. A holder "asleep" is a tab that hears
-# no signal (`deafen_tab`) and whose hand-over request is held in a `fetch` stub
-# that takes only its own request; a holder that is "gone" is a row made
-# through the model with a tab no browser has.
+# holder's tab, which locks its fields for the subject, sends what it has and
+# lets go; a tab that does not answer is passed over after the pass-over time.
+# Two or three people are two or three Capybara sessions (`using_session`).
+# Nobody waits for the real five seconds: the script's wait is shortened
+# through the region's value (`quick_pass_over`) and the server's clock is
+# moved on the row (`due`), as the reservation tests move clocks. A tab that
+# does not hear that the block was taken is `stop_hearing_taken`, with its
+# hand-over request held in a `fetch` stub that takes only its own request; a
+# holder that is gone is a row made through the model with a tab no browser
+# has. (A tab that is truly asleep, with text that is refused when it wakes,
+# is the lapsed-save test of `editing_holds_test.rb`.)
 class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
   include TestTypes
 
@@ -22,21 +24,22 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     @dana = users(:two).tap { |user| user.update!(name: "Dana Weiss") }
     @page = create_page(title: "Pricing", published: false)
     @block = add_block
-    @original_pass_over = Editing::PASS_OVER
-    pass_over(3)
     sign_in_via_form(@me)
   end
 
   teardown do
-    pass_over(@original_pass_over)
     page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
   end
 
-  def pass_over(duration)
-    duration = duration.seconds
-    Editing.send(:remove_const, :PASS_OVER)
-    Editing.const_set(:PASS_OVER, duration)
+  def quick_pass_over(ms = 300) = region_set("pass-over", ms)
+
+  # The asking tab's request is old enough to be passed over (the server's clock
+  # is the row's: a request is due PASS_OVER after it was made).
+  def due(subject = @block)
+    Editing::Reservation.of(subject).update_all(requested_at: 6.seconds.ago) # version: none (a system test moves a request's clock)
   end
+
+  def waiting_status(block = @block) = "#{strip(block)} [data-editing-take-over-status]"
 
   def open_page(path = "/cs-studio/pages/#{@page.id}")
     visit path
@@ -78,6 +81,8 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
   def held_by(user, subject = @block) = Editing::Reservation.holder_of(subject)&.user_id == user.id
 
   def body_of(block) = block.reload.body_document(locale: "en").to_json
+
+  def body_text_of(block) = block.reload.body_document(locale: "en").to_json.scan(/"text":"([^"]*)"/).flatten.join
 
   def region_set(name, value) = page.execute_script("document.getElementById('editing').setAttribute('data-admin--editing--hold-#{name}-value', #{value.to_json})")
 
@@ -137,9 +142,9 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
 
   # Answers the NEXT request of `verb` matching `source` with `status` and `body`,
   # without sending it; every other request goes through.
-  def answer_next(verb, source, status, body = "")
-    page.execute_script(<<~JS, verb, source, status, body)
-      const [ verb, source, status, body ] = arguments
+  def answer_next(verb, source, status, body = "", type: nil)
+    page.execute_script(<<~JS, verb, source, status, body, type)
+      const [ verb, source, status, body, type ] = arguments
       let spent = false
       const real = window.fetch
       window.fetch = function (input, init = {}) {
@@ -147,17 +152,16 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
         const method = String(init.method || "GET").toUpperCase()
         if (!spent && method === verb && new RegExp(source).test(url)) {
           spent = true
-          return Promise.resolve(new Response(body, { status }))
+          return Promise.resolve(new Response(body, { status, headers: type ? { "Content-Type": type } : {} }))
         }
         return real.apply(this, arguments)
       }
     JS
   end
 
-  # This tab hears no news that the block was taken, and nothing else changes
-  # it: a laptop with its lid half shut (it still hears when it is asked to
-  # hand over). `undeafen_tab` puts the hearing back.
-  def deafen_tab
+  # This tab hears no news that the block was taken -- it still hears when it
+  # is asked to hand over. `hear_taken` puts the hearing back.
+  def stop_hearing_taken
     page.execute_script(<<~JS)
       const live = window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--live')
       const heard = Object.getPrototypeOf(live).heard
@@ -165,12 +169,55 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     JS
   end
 
-  def undeafen_tab
+  def hear_taken
     page.execute_script(<<~JS)
       const live = window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--live')
       delete live.heard
     JS
   end
+
+  # This holder never hands over (its script is told not to): the request stands
+  # until it is passed over, withdrawn, or the holder lets go.
+  def refuse_to_hand_over
+    page.execute_script("window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--hold').handOver = () => {}")
+  end
+
+  # The NEXT request of `verb` matching `source` fails as a dead network does.
+  def fail_next(verb, source)
+    page.execute_script(<<~JS, verb, source)
+      const [ verb, source ] = arguments
+      let spent = false
+      const real = window.fetch
+      window.fetch = function (input, init = {}) {
+        const url = typeof input === "string" ? input : input.url
+        if (!spent && String(init.method || "GET").toUpperCase() === verb && new RegExp(source).test(url)) {
+          spent = true
+          return Promise.reject(new TypeError("offline"))
+        }
+        return real.apply(this, arguments)
+      }
+    JS
+  end
+
+  # A person typing a letter every `every` ms into the block's field, for as
+  # long as the page lives (what the field refuses, it refuses).
+  def type_continuously(block, every: 30)
+    page.execute_script(<<~JS, "#{card(block)} .ProseMirror", every)
+      const [ selector, every ] = arguments
+      const editor = document.querySelector(selector)
+      window.__typing = setInterval(() => {
+        editor.focus()
+        const range = document.createRange()
+        range.selectNodeContents(editor)
+        range.collapse(false)
+        getSelection().removeAllRanges()
+        getSelection().addRange(range)
+        document.execCommand("insertText", false, "x")
+      }, every)
+    JS
+  end
+
+  def stop_typing = page.execute_script("clearInterval(window.__typing)")
 
   # Records every text put into the polite regions, to hear a transfer said once.
   def watch_announcements
@@ -241,19 +288,20 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
   end
 
   test "from a tab that does not answer: after the pass-over time the block is mine on what was saved" do
-    pass_over(1)
     held_by_nobody_listening
-    assert @block.reload && Editing::Reservation.holder_of(@block).user_id == @dana.id
     open_page
+    quick_pass_over
     record_requests
     assert_selector strip, text: "Dana Weiss is editing this block"
 
     within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    due
 
     assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", wait: LIVE
     assert_no_selector strip
     assert held_by(@me)
-    assert_equal 2, take_over_requests.size
+    assert_operator take_over_requests.size, :>=, 2
     assert_equal 0, hand_over_requests.size
     event = Audit::Event.where(action: "block.taken_over").sole
     assert_equal({ "from_user_id" => @dana.id, "to_user_id" => @me.id, "answered" => false }, event.metadata)
@@ -262,27 +310,31 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     assert_text "took over editing"
   end
 
-  test "a tab that wakes after it was passed over keeps its unsaved text, read-only, with the notice" do
-    pass_over(1)
+  test "a tab that does not hear it was passed over, and whose hand-over came too late, keeps what it types after, read-only, with the notice" do
     open_page
+    quick_pass_over
     join(:dana, @dana) do
       type_in(@block, "Saved. ")
       assert_writes_settled
       raise_debounce(card(@block))
       type_in(@block, "Typed while asleep. ")
-      deafen_tab
+      stop_hearing_taken
       delay_next("POST", "/hand_over")
     end
     assert_selector strip, text: "Dana Weiss is editing this block", wait: LIVE
 
     within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    due
     assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", wait: LIVE
     assert_equal 1, taken_over_events.count
 
     using_session(:dana) do
       await_delayed
       send_delayed
-      undeafen_tab
+      hear_taken
+      # The hand-over was answered `nothing`: the lock comes off, and typing works again.
+      assert_selector "#{card(@block)} .ProseMirror[contenteditable=true]", wait: LIVE
       raise_debounce(card(@block), 50)
       find("#{card(@block)} .ProseMirror").send_keys("Late.")
       assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved.", wait: LIVE
@@ -294,23 +346,25 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     refute_includes body_of(@block), "Late."
   end
 
-  test "a tab that wakes after it was passed over with nothing unsaved shows the block as held by me" do
-    pass_over(1)
+  test "a tab that does not hear it was passed over, with nothing unsaved, shows the block as held by me once it reads" do
     open_page
+    quick_pass_over
     join(:dana, @dana) do
       type_in(@block, "All saved. ")
       assert_writes_settled
-      deafen_tab
+      stop_hearing_taken
       delay_next("POST", "/hand_over")
     end
     assert_selector strip, wait: LIVE
     within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    due
     assert_selector "#{card(@block)} .ProseMirror[contenteditable=true]", wait: LIVE
 
     using_session(:dana) do
       await_delayed
       send_delayed
-      undeafen_tab
+      hear_taken
       page.execute_script("document.getElementById('editing').dispatchEvent(new CustomEvent('admin--editing--hold:refresh', { detail: { subject: 'block-#{@block.id}' } }))")
       assert_selector "#{card(@block)} [data-editing-kind=held]", text: "Olga Braun is editing this block", wait: LIVE
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "All saved."
@@ -509,22 +563,24 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
   end
 
   test "a double click on Take over sends one request" do
-    pass_over(1)
     held_by_nobody_listening
     open_page
+    quick_pass_over(2500)
     record_requests
     page.execute_script("const button = document.querySelector(#{"#{strip} button".to_json}); button.click(); button.click(); button.click()")
 
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    assert_equal 1, take_over_requests.size
+    due
     assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", wait: LIVE
-    # One press, and the one request after the pass-over time that the server wanted.
-    assert_equal 2, take_over_requests.size
     assert_equal 1, taken_over_events.count
   end
 
   test "the holder cannot hand over: nothing is handed over while text cannot be saved, the pass-over happens, and the holder's text is kept, frozen with the notice" do
-    pass_over(2)
     open_page
+    quick_pass_over
     join(:dana, @dana) do
+      region_set("pass-over", 1000)
       type_in(@block, "Saved. ")
       assert_writes_settled
       # From now on this tab's saves fail.
@@ -540,6 +596,8 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     end
     assert_selector strip, wait: LIVE
     within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    due
 
     assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", wait: 20
     assert_includes body_of(@block), "Saved."
@@ -554,27 +612,12 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "typing through the hand-over: everything typed is either in the block that is handed over or still in the holder's field with the notice for lost text" do
+  test "a holder who is typing hands over: the lock stops the typing, everything typed is in the block I get, and nothing says it was lost" do
     open_page
     join(:dana, @dana) do
       type_in(@block, "Start. ")
       assert_writes_settled
-      # A person typing a letter every 150 ms for a few seconds, into the field.
-      page.execute_script(<<~JS)
-        const editor = document.querySelector(#{"#{card(@block)} .ProseMirror".to_json})
-        window.__letters = 0
-        window.__typing = setInterval(() => {
-          if (editor.getAttribute("contenteditable") !== "true") return
-          editor.focus()
-          const range = document.createRange()
-          range.selectNodeContents(editor)
-          range.collapse(false)
-          getSelection().removeAllRanges()
-          getSelection().addRange(range)
-          document.execCommand("insertText", false, "x")
-          window.__letters += 1
-        }, 150)
-      JS
+      type_continuously(@block)
     end
     assert_selector strip, wait: LIVE
     within(card(@block)) { press "Take over" }
@@ -583,30 +626,174 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     dana_field = nil
     using_session(:dana) do
       assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", wait: LIVE
-      page.execute_script("clearInterval(window.__typing)")
+      assert_selector "#{card(@block)} [data-editing-strip-text]", text: "Taken over by Olga Braun", wait: LIVE
+      locked_at = find("#{card(@block)} .ProseMirror", visible: :all).text
       await_frames
+      # The typing goes on (the interval still fires); the field accepts none of it.
+      sleep 0.3 # sleep: letting the typist's interval fire several times against a locked field has no event to wait for
       dana_field = find("#{card(@block)} .ProseMirror", visible: :all).text
+      assert_equal locked_at, dana_field
+      stop_typing
+      assert_no_selector "#{card(@block)} [data-editing-kind=lost]"
     end
-    mine = find("#{card(@block)} .ProseMirror").text
-    # What the new holder has is a prefix of what the old holder's field shows: nothing typed is gone,
-    # and whatever came after the last save is in the field with the notice for lost text.
-    assert dana_field.start_with?("Start."), "the field reads #{dana_field.inspect}"
-    assert dana_field.start_with?(mine), "the field shows less than the new holder has: #{dana_field.inspect} / #{mine.inspect}"
-    using_session(:dana) do
-      if dana_field == mine
-        assert_no_selector "#{card(@block)} [data-editing-kind=lost]"
-      else
-        assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", wait: LIVE
-      end
-    end
+    assert_includes dana_field, "Start."
+    assert_operator dana_field.length, :>, "Start.".length, "nothing was typed through the take-over"
+    assert_equal dana_field, find("#{card(@block)} .ProseMirror").text
     assert_equal true, taken_over_events.sole.metadata["answered"]
   end
 
-  test "the focus goes to the first field when the person has not moved, and stays where it is when they have" do
-    pass_over(1)
+  test "a holder who is typing in another block still hands this one over, and the other stays editable and saved" do
+    other = add_block
+    open_page
+    join(:dana, @dana) do
+      type_in(@block, "First. ")
+      assert_writes_settled
+      type_in(other, "Second. ")
+      assert_writes_settled
+      type_continuously(other)
+    end
+    assert_selector strip(@block), wait: LIVE
+    within(card(@block)) { press "Take over" }
+    assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", text: "First.", wait: LIVE
+
+    assert_equal true, taken_over_events.sole.metadata["answered"]
+    using_session(:dana) do
+      assert_selector "#{card(other)} .ProseMirror[contenteditable=true]"
+      assert_no_selector "#{card(other)} [data-editing-kind]"
+      # A tab that never stops typing reads nothing (its reads wait for its writes to be quiet).
+      stop_typing
+      assert_selector "#{card(@block)} [data-editing-strip-text]", text: "Taken over by Olga Braun", wait: LIVE
+      assert_writes_settled
+      assert_equal find("#{card(other)} .ProseMirror").text, body_text_of(other).strip
+    end
+  end
+
+  test "a holder whose save is refused (422) gets its fields back, and is frozen with the notice once it is passed over" do
+    open_page
+    quick_pass_over
+    join(:dana, @dana) do
+      type_in(@block, "Saved. ")
+      assert_writes_settled
+      raise_debounce(card(@block))
+      type_in(@block, "Rejected.")
+      answer_next("PATCH", "/content_blocks/", 422, "", type: "text/vnd.turbo-stream.html")
+      stop_hearing_taken
+      record_requests
+    end
+    assert_selector strip, wait: LIVE
+    within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+
+    using_session(:dana) do
+      # The lock went on for the flush and came off when it was refused: typing works again.
+      assert_eventually(wait: LIVE, message: "the fields were not given back") { page.evaluate_script("document.querySelector(#{"#{card(@block)} .ProseMirror".to_json}).getAttribute('contenteditable')") == "true" }
+      assert_equal [], hand_over_requests
+      assert_includes find("#{card(@block)} .ProseMirror").text, "Rejected."
+    end
+    due
+    assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", wait: LIVE
+    assert_equal false, taken_over_events.sole.metadata["answered"]
+
+    using_session(:dana) do
+      hear_taken
+      raise_debounce(card(@block), 50)
+      find("#{card(@block)} .ProseMirror").send_keys(" More.")
+      assert_selector "#{card(@block)} [data-editing-kind=lost] [role=alert]", text: "Olga Braun is editing this block. Your changes weren't saved.", wait: LIVE
+      assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]", text: "Rejected."
+    end
+  end
+
+  test "a request that ends with its holder letting go: the asker claims at once, without waiting out the pass-over time" do
+    open_page
+    quick_pass_over(60000)
+    join(:dana, @dana) do
+      type_in(@block, "Dana. ")
+      assert_writes_settled
+      refuse_to_hand_over
+    end
+    assert_selector strip, wait: LIVE
+    record_requests
+    within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+
+    using_session(:dana) { find("#{card(@block)} button[aria-controls]", text: "Rich text").click }
+
+    assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", text: "Dana.", wait: LIVE
+    assert held_by(@me)
+    assert_equal 2, take_over_requests.size
+    assert_equal 0, taken_over_events.count
+  end
+
+  test "a third person claiming while I wait ends the waiting, says so, and asks again for nobody" do
+    reader = users(:reader)
     held_by_nobody_listening
     open_page
+    quick_pass_over
+    record_requests
     within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+
+    Editing::Reservation.of(@block).delete_all
+    Editing::Reservation.claim(subject: @block, record: @page, user: reader, tab: "tab-cccccccc")
+    Editing::Signals.holder(@page, @block, "claimed")
+
+    assert_selector waiting_status, text: "Someone else is editing this now", wait: LIVE
+    assert_no_selector "#{strip} button[disabled]"
+    await_frames
+    sleep 1 # sleep: proving that no re-ask follows needs a few of the (shortened) pass-over times to pass with nothing to wait for
+    assert_equal 1, take_over_requests.size
+    assert_equal 0, taken_over_events.count
+  end
+
+  test "a take-over that fails for the network or a timeout says it did not work, and the button is ready" do
+    held_by_nobody_listening
+    open_page
+    fail_next("POST", "/take_over")
+    within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Couldn't take over. Try again.", wait: LIVE
+    assert_no_selector "#{strip} button[disabled]"
+
+    answer_next("POST", "/take_over", 500, "")
+    within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Couldn't take over. Try again.", wait: LIVE
+    assert_no_selector "#{strip} button[disabled]"
+    assert_selector "#{card(@block)} .ProseMirror[contenteditable=false]"
+    assert_equal 0, taken_over_events.count
+  end
+
+  test "leaving while asking withdraws the request: a visit away, and a page that is closed" do
+    open_page
+    join(:dana, @dana) do
+      type_in(@block, "Dana. ")
+      assert_writes_settled
+      refuse_to_hand_over
+    end
+    assert_selector strip, wait: LIVE
+    within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    assert_equal @me.id, Editing::Reservation.of(@block).sole.requested_by_id
+
+    # A Turbo visit.
+    click_link "Dashboard"
+    assert_eventually(wait: LIVE, message: "the request was not withdrawn by a visit away") { Editing::Reservation.of(@block).sole.requested_by_id.nil? }
+
+    # Closing the page (a full load is the same pagehide).
+    open_page
+    within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    assert_equal @me.id, Editing::Reservation.of(@block).sole.requested_by_id
+    visit "/cs-studio/pages"
+    assert_eventually(wait: LIVE, message: "the request was not withdrawn when the page went") { Editing::Reservation.of(@block).sole.requested_by_id.nil? }
+    assert_equal @dana.id, Editing::Reservation.of(@block).sole.user_id
+  end
+
+  test "the focus goes to the first field when the person has not moved, and stays where it is when they have" do
+    held_by_nobody_listening
+    open_page
+    quick_pass_over
+    within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
+    due
     assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", wait: LIVE
     assert_eventually(wait: LIVE, message: "the focus never reached the card's first field") { active_in?(card(@block)) }
 
@@ -614,8 +801,11 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     Editing::Reservation.of(@block).delete_all
     held_by_nobody_listening
     open_page
+    quick_pass_over
     within(card(@block)) { press "Take over" }
+    assert_selector waiting_status, text: "Asking to take over…", wait: LIVE
     find("#page-title").click
+    due
     assert_selector "#{card(@block)} form[data-controller~='admin--saving--autosave'] .ProseMirror[contenteditable=true]", wait: LIVE
     assert_equal "page-title", page.evaluate_script("document.activeElement.id")
   end

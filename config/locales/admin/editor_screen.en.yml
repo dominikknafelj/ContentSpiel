@@ -170,6 +170,8 @@ en:
           take_over_waiting: "Asking to take over…"
           take_over_pending: "Someone else is already taking this over"
           take_over_failed: "Couldn't take over. Try again."
+          # Somebody else claimed it while this tab was waiting.
+          take_over_claimed: "Someone else is editing this now"
           own_tab: "You're editing this in another tab"
           copy: "Copy my text"
           copied: "Copied"

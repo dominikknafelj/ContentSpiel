@@ -29,6 +29,7 @@ module Admin
           "admin--editing--hold-release-url-value": helpers.admin_editing_release_path(**route),
           "admin--editing--hold-take-over-url-value": helpers.admin_editing_take_over_path(**route),
           "admin--editing--hold-hand-over-url-value": helpers.admin_editing_hand_over_path(**route),
+          "admin--editing--hold-withdraw-url-value": helpers.admin_editing_withdraw_path(**route),
           "admin--editing--hold-block-url-value": (helpers.admin_editing_block_path(**route, block_id: 0).sub("/blocks/0", "/blocks/:block_id") if @record.is_a?(::Page)),
           "admin--editing--hold-hold-value": ::Editing::HOLD.in_milliseconds,
           "admin--editing--hold-pass-over-value": ::Editing::PASS_OVER.in_milliseconds,
