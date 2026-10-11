@@ -132,7 +132,7 @@ In the browser the shared half is `app/javascript/live/connection.js` (one socke
 
 ### `Admin::Slots`: named places on a screen
 
-A slot is a name at a place on a screen where a feature draws something of its own. `Admin::Slots` (`app/components/admin/slots.rb`; in the components layer because it holds component classes, a named exception in `test/lib/source_layout_test.rb`) keeps an ordered list of entries per name, and a screen draws `Admin::Ui::SlotComponent` at the place and does not know what stands there. With nothing registered a slot renders nothing at all, no wrapper element. The names are the screens' to draw and are listed in `Admin::Slots::NAMES`:
+A slot is a name at a place on a screen where a feature draws something of its own. (The pattern explained from the start, with what it buys and what it costs: `docs/reference/slots.md`.) `Admin::Slots` (`app/components/admin/slots.rb`; in the components layer because it holds component classes, a named exception in `test/lib/source_layout_test.rb`) keeps an ordered list of entries per name, and a screen draws `Admin::Ui::SlotComponent` at the place and does not know what stands there. With nothing registered a slot renders nothing at all, no wrapper element. The names are the screens' to draw and are listed in `Admin::Slots::NAMES`:
 
 | Slot | Where | Registered today |
 |---|---|---|
