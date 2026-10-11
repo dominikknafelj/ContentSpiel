@@ -87,13 +87,7 @@ const saveStates = new WeakMap()
 export default class extends Controller {
   static values = {
     statusId: String,
-    debounce: { type: Number, default: 1000 },
-    // A block card's form names the page settings form's base field here
-    // (`Admin::EditorScreen::BlockCardComponent#form_data`): its current value rides
-    // along as `X-Page-Base-Updated-At`, so the server only moves that
-    // form's base forward when it was still current (`Admin::
-    // ContentBlocksController#page_base_streams`).
-    pageBaseId: String
+    debounce: { type: Number, default: 1000 }
   }
 
   // Client-only states `Admin::Ui::SaveStatusComponent` never has occasion to
@@ -402,14 +396,13 @@ export default class extends Controller {
     // writes them onto the live fields synchronously, right now; Turbo's own
     // (later) replace of the same element re-applies the identical value.
     //
-    // Matched by id, not just by name: a block card's response may also carry
-    // the page settings form's own base (the block write touched the page --
-    // `Admin::ContentBlocksController#page_base_streams`), and taking the
-    // first `base_updated_at` in the response would hand this card the page's
-    // value instead of its own. The page base is applied too because the next
-    // request sends it as `X-Page-Base-Updated-At` (`#requestHeaders`).
+    // Matched by id, not just by name: only this form's own base is applied.
+    // A block write no longer carries the page settings form's base (that
+    // form has one of its own, `Page#settings_changed_at`), but a response may
+    // hold more than one `base_updated_at` field and taking the first would
+    // hand this form somebody else's value.
     const ownBase = this.element.querySelector('[name="base_updated_at"]')
-    syncBases(text, [ ownBase?.id, this.hasPageBaseIdValue && this.pageBaseIdValue ].filter(Boolean))
+    syncBases(text, [ ownBase?.id ].filter(Boolean))
 
     Turbo.renderStreamMessage(text)
     return "done"
@@ -445,8 +438,6 @@ export default class extends Controller {
       Accept: "text/vnd.turbo-stream.html",
       "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
     }
-    const pageBase = this.hasPageBaseIdValue && document.getElementById(this.pageBaseIdValue)?.value
-    if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase
     return headers
   }
 

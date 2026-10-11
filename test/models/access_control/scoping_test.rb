@@ -317,7 +317,7 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     # -- 15 sections alternating under A1a and B1, twelve pages each --
     # and closure_tree's `rebuild!` writes their closure rows.
     now = Time.current
-    rows = ->(parent_ids) { parent_ids.each_with_index.map { |parent_id, index| { parent_id: parent_id, position: index, title: { "en" => "Bulk #{index}" }, created_at: now, updated_at: now } } }
+    rows = ->(parent_ids) { parent_ids.each_with_index.map { |parent_id, index| { parent_id: parent_id, position: index, title: { "en" => "Bulk #{index}" }, created_at: now, updated_at: now, settings_changed_at: now } } }
     sections = Page.insert_all!(rows.call(Array.new(15) { |index| index.even? ? @a1a.id : @b1.id }), returning: :id).rows.flatten
     Page.insert_all!(rows.call(sections.flat_map { |section_id| [ section_id ] * 12 }))
     Page.rebuild!

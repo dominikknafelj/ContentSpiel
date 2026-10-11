@@ -55,14 +55,14 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   # alone, its next save was refused as "Changed elsewhere" against the
   # editor's own move. So the tree move answers like a block write does: the
   # client sends the open form's base (`X-Page-Base-Updated-At`), and when
-  # that IS the moved page's `updated_at` as it stood before the move, the
+  # that IS the moved page's `settings_changed_at` as it stood before the move, the
   # answer carries the form's new base.
   test "moving the open page hands its settings form the new base, so its next save isn't stale" do
     travel 1.minute
     patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 },
-      headers: page_base_header(@child.updated_at), as: :turbo_stream
+      headers: page_base_header(@child.settings_changed_at), as: :turbo_stream
     assert_response :success
-    fresh = @child.reload.updated_at.iso8601(6)
+    fresh = @child.reload.settings_changed_at.iso8601(6)
     assert_equal fresh, streamed_page_base
 
     patch "/cs-studio/pages/#{@child.id}", params: { page: { subtitle: "Typed after my own move" }, base_updated_at: fresh }, as: :turbo_stream
@@ -72,13 +72,13 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     # The Undo is the same request, and answers the same way.
     travel 1.minute
     patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @a.id, position: 0, undo: 1 },
-      headers: page_base_header(@child.updated_at), as: :turbo_stream
+      headers: page_base_header(@child.settings_changed_at), as: :turbo_stream
     assert_response :success
-    assert_equal @child.reload.updated_at.iso8601(6), streamed_page_base
+    assert_equal @child.reload.settings_changed_at.iso8601(6), streamed_page_base
   end
 
   test "a move vouches for no base when the page was saved elsewhere since the form loaded" do
-    stale = @child.updated_at
+    stale = @child.settings_changed_at
     travel 1.minute
     as(users(:two), channel: :admin) { Pages::Save.call(@child, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
@@ -91,12 +91,12 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   end
 
   # The base in the header is the OPEN page's. Moving any other page must
-  # never hand that form the moved page's `updated_at`: a base newer than the
+  # never hand that form the moved page's `settings_changed_at`: a base newer than the
   # open page's own would let a stale form overwrite someone else's save.
   test "moving another page than the open one streams no base, whatever base was sent" do
     travel 1.minute
     @a.touch
-    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, headers: page_base_header(@a.updated_at), as: :turbo_stream
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, headers: page_base_header(@a.settings_changed_at), as: :turbo_stream
     assert_response :success
     assert_nil streamed_page_base_stream
   end
@@ -110,7 +110,7 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_nil streamed_page_base_stream
 
-    patch "/cs-studio/tree", params: { page_id: @a.id, parent_id: @child.reload.id, position: 0 }, headers: page_base_header(@a.updated_at), as: :turbo_stream
+    patch "/cs-studio/tree", params: { page_id: @a.id, parent_id: @child.reload.id, position: 0 }, headers: page_base_header(@a.settings_changed_at), as: :turbo_stream
     assert_response :unprocessable_entity
     assert_nil streamed_page_base_stream
   end

@@ -584,4 +584,34 @@ class PageTest < ActiveSupport::TestCase
     assert_not other.valid?
     assert other.errors[:slug_en].any?
   end
+
+  test "settings_changed_at moves when a column of the page changes, and not when the page is only touched" do
+    page = create_page(title: "Pricing")
+    before = page.reload.settings_changed_at
+    assert_not_nil before
+
+    travel 1.minute do
+      page.touch
+      assert_equal before, page.reload.settings_changed_at, "a touch (a block's save) moved the settings base"
+      assert_operator page.updated_at, :>, before
+
+      page.update_columns(translation_sources: page.translation_sources) # version: none (a test's own bookkeeping write)
+      assert_equal before, page.reload.settings_changed_at
+
+      assert Pages::Save.call(page, translations: { "en" => { subtitle: "New" } }).ok?
+      assert_operator page.reload.settings_changed_at, :>, before
+    end
+  end
+
+  test "a block's save leaves its page's settings base where it was" do
+    page = create_page(title: "Pricing")
+    before = page.reload.settings_changed_at
+
+    travel 1.minute do
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).ok?
+    end
+
+    assert_equal before, page.reload.settings_changed_at
+    assert_operator page.updated_at, :>, before
+  end
 end

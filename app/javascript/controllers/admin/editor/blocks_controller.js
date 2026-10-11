@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
-import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "saving/queue"
+import { currentGeneration, enqueue, holdTurboRequest } from "saving/queue"
 import { errorToast, orderErrorToast, sendOrder, streamsApplied } from "saving/order_request"
 import { messages } from "i18n/messages"
 
@@ -69,15 +69,6 @@ export default class extends Controller {
   static targets = ["card", "list", "lane", "tile", "announcer", "destination"]
   static values = { reorderUrl: String }
 
-  // Every block request also carries the page settings form's current base
-  // (`X-Page-Base-Updated-At`): a block write touches the page, and the
-  // server only moves that form's base forward when the one it holds was
-  // still current (`Admin::ContentBlocksController#page_base_streams`).
-  // Turbo's own submissions inside this section (add, duplicate, delete)
-  // get it here; `move` below adds it itself; a card's autosave through
-  // `admin--saving--autosave`'s `pageBaseId` value.
-  static pageBaseId = "page-base-updated-at"
-
   // What the lanes need is made here, not in `connect`: Stimulus tells a
   // controller of the targets already in the page (`laneTargetConnected`)
   // BEFORE it calls `connect`. What is observed is every container's own
@@ -97,33 +88,23 @@ export default class extends Controller {
     // is queued (`saving/queue_state.js`, "PAGE GENERATIONS").
     this.generation = currentGeneration()
     // A write (never a GET) waits its turn in the page-level queue
-    // (`saving/queue.js`) and reads the page base when it is actually sent;
-    // the queue slot is kept until the answer's bases are in the hidden
-    // fields, so the next request sees them. Add, duplicate and delete are
-    // plain Turbo form submissions, and answer with streams that move the
-    // page form's base, so they depend on it exactly as an autosave does.
-    this.addPageBase = (event) => {
+    // (`saving/queue.js`): add, duplicate and delete are plain Turbo form
+    // submissions, and they are held until the request before them has been
+    // answered, exactly as an autosave is.
+    this.holdWrite = (event) => {
       if (String(event.detail.fetchOptions.method).toUpperCase() === "GET") return
 
-      holdTurboRequest(event, {
-        baseIds: [ this.constructor.pageBaseId ],
-        before: (request) => {
-          const pageBase = document.getElementById(this.constructor.pageBaseId)?.value
-          if (pageBase) request.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
-        }
-      })
+      holdTurboRequest(event)
     }
-    this.element.addEventListener("turbo:before-fetch-request", this.addPageBase)
+    this.element.addEventListener("turbo:before-fetch-request", this.holdWrite)
     // The Undo toast after a reorder lives in `#toasts`, outside this
     // section, so its `button_to` request wouldn't pass through the listener
-    // above -- and without the base the server wouldn't move the page form's
-    // base forward after the Undo's own page touch (a spurious "Changed
-    // elsewhere" on the next page save). It's recognised by its URL.
-    this.addPageBaseToUndo = (event) => {
+    // above. It's recognised by its URL.
+    this.holdUndo = (event) => {
       if (this.element.contains(event.target)) return
-      if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.addPageBase(event)
+      if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.holdWrite(event)
     }
-    document.addEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    document.addEventListener("turbo:before-fetch-request", this.holdUndo)
     // Duplicate is picked from a card's "⋯" menu, which closes on the pick:
     // the item that had focus is hidden, and focus fell to <body> -- a
     // keyboard user was back at the top of the page with the copy somewhere
@@ -349,8 +330,8 @@ export default class extends Controller {
   }
 
   disconnect() {
-    this.element.removeEventListener("turbo:before-fetch-request", this.addPageBase)
-    document.removeEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    this.element.removeEventListener("turbo:before-fetch-request", this.holdWrite)
+    document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
     this.element.removeEventListener("turbo:submit-end", this.duplicated)
     clearTimeout(this.copyTimer)
     this.moveStateObserver.disconnect()
@@ -820,8 +801,7 @@ export default class extends Controller {
       headers: {
         "Content-Type": "application/json",
         Accept: "text/vnd.turbo-stream.html",
-        "X-CSRF-Token": csrfToken,
-        "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
+        "X-CSRF-Token": csrfToken
       },
       body: JSON.stringify({
         ids: sent.map((element) => element.dataset.blockId),
@@ -838,7 +818,6 @@ export default class extends Controller {
     // `renderKeepingForms`.
     const keepForms = answer.outcome === "answered" && !answer.ok && this.formsHoldText()
     if (answer.outcome === "answered") {
-      syncBases(answer.text, [ this.constructor.pageBaseId ])
       if (keepForms) this.renderKeepingForms(answer.text)
       else Turbo.renderStreamMessage(answer.text)
       if (answer.ok) {

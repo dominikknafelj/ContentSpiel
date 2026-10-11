@@ -36,7 +36,7 @@ module Admin
 
       def base_updated_at_id = "#{ID_PREFIX}-base-updated-at"
 
-      def base_updated_at_value = page.updated_at.iso8601(6)
+      def base_updated_at_value = page.settings_changed_at.iso8601(6)
 
       # The hero field itself -- a class method so `Admin::PagesController`
       # re-renders a refused choice from exactly what this form renders

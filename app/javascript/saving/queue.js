@@ -1,20 +1,16 @@
 // One screen's writes, one at a time (cs-studio design pass round 2, Task 6
 // fix round 1).
 //
-// WHY. Every write a page editor sends can move the page's `updated_at`: a
-// block save, add, duplicate, delete and reorder all `touch` it. The page
-// settings form holds that `updated_at` as its autosave base, and a stale
-// base is now REFUSED (409, `Admin::AutosaveResponses#refuse_stale_autosave`).
-// To keep the page form's base honest the server moves it forward in a block's
-// answer -- but only when the base the request carried
-// (`X-Page-Base-Updated-At`) was still current before that write. Two
-// requests sent from the same screen at the same moment (the page form and
-// every block form debounce on the same tick after "Use all"; or a block's
-// answer still in flight on a slow connection when the next form sends) carry
-// the same base: the first moves the page, the second's base is then stale, so
-// no base is streamed back and its own touch moves the page again -- and the
-// page form is left holding a base that nobody else made stale. Its next
-// save is a 409 and the form is dead until Reload, losing the typed text.
+// WHY. A page editor's forms write one record each, and a few of them share
+// state on the page: a hidden `base_updated_at` field per autosave form, which
+// a save's answer moves forward. Two requests sent from the same screen at the
+// same moment (the page form and every block form debounce on the same tick
+// after "Use all"; or a block's answer still in flight on a slow connection
+// when the next form sends) would both carry the base the first answer is about
+// to replace, and the second would be refused against nothing but its own
+// editor. The page settings form's base is its own (`Page#settings_changed_at`)
+// and a block write no longer moves it, but the tree's move of the open page
+// still does (`X-Page-Base-Updated-At`, below).
 //
 // WHAT. This queue makes a request be SENT only after the previous one's
 // answer has been received AND its base values written into the hidden fields
@@ -23,12 +19,13 @@
 // therefore reads the freshest bases at SEND time (inside the task), never at
 // queue time. The server's base mechanism is unchanged.
 //
-// Everything that sends `X-Page-Base-Updated-At` goes through here: every
-// `admin--saving--autosave` form (`enqueue`), block reorder (`enqueue`), Turbo's own
-// block form submissions -- add, duplicate, delete, the Undo toast
-// (`holdTurboRequest`) -- and, from outside the editor's forms, the page
-// tree's move (`enqueue`) and its Undo toast (`holdTurboRequest`): moving the
-// page that is open moves its `updated_at` like any other write to it
+// Everything that writes goes through here: every `admin--saving--autosave`
+// form (`enqueue`), block reorder (`enqueue`), Turbo's own block form
+// submissions -- add, duplicate, delete, the Undo toast (`holdTurboRequest`)
+// -- and, from outside the editor's forms, the page tree's move (`enqueue`)
+// and its Undo toast (`holdTurboRequest`). Only the tree's move sends
+// `X-Page-Base-Updated-At`: moving the page that is open moves its
+// `settings_changed_at` like any other save of its own columns
 // (`admin--pages--tree`).
 //
 // THE RULE (fix round 3; final fix wave 1): nothing that REPLACES AN EDITOR

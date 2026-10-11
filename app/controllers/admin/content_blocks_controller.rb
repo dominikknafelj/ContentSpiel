@@ -83,10 +83,10 @@ module Admin
         streams.concat(section_structure_streams(section)) if section && !result.denied?
         render turbo_stream: streams, status: failure_status(result)
       elsif section
-        render turbo_stream: [ *tile_streams(result.record, open: true), *section_count_streams(section), *page_base_streams ], status: :created
+        render turbo_stream: [ *tile_streams(result.record, open: true), *section_count_streams(section) ], status: :created
       else
         reposition_after(result.record, params[:after_id])
-        render turbo_stream: [ *insertion_stream(result.record, params[:after_id]), *page_base_streams ], status: :created
+        render turbo_stream: [ *insertion_stream(result.record, params[:after_id]) ], status: :created
       end
     end
 
@@ -107,10 +107,9 @@ module Admin
       block = @page.content_blocks.find_by(id: params[:id])
       return render_gone unless block
 
-      # The block's own base (its `updated_at`), not the page's. A refused
-      # save vouches for nothing, so it also streams no page base
-      # (`page_base_streams` is only reached on success) -- see
-      # `AutosaveResponses#refuse_stale_autosave`.
+      # The block's own base (its `updated_at`), not the page's: the page
+      # settings form has a base of its own (`Page#settings_changed_at`), which
+      # a block write never moves -- see `AutosaveResponses#refuse_stale_autosave`.
       return if refuse_stale_autosave(block, status_id: Admin::EditorScreen::BlockCardComponent.error_prefix(block) + "-save-status",
         error_prefix: Admin::EditorScreen::BlockCardComponent.error_prefix(block),
         reload_url: admin_page_path(@page, **admin_url_options))
@@ -138,7 +137,6 @@ module Admin
       streams << refused if refused
       streams << tile_summary_stream(result) if block.section_id
       streams.concat(section_save_streams(result.record, layout_before: layout_before, columns_before: columns_before)) if block.container? && result.ok?
-      streams.concat(page_base_streams) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
     end
@@ -181,7 +179,7 @@ module Admin
       # The notes on what was deleted are gone with it (`Notes::Remove`): the
       # header's number, the markers and the next delete dialog's warning are
       # told with the same answer, through the page's one copy of the counts.
-      render turbo_stream: [ *removal_streams(block, kept_ids, section), *page_base_streams,
+      render turbo_stream: [ *removal_streams(block, kept_ids, section),
         turbo_stream.replace("notes-counts", Admin::NotesScreen::CountsComponent.new(counts: Notes::Counts.for_container(@page, user: Current.user), id: "notes-counts")) ]
     end
 
@@ -258,7 +256,6 @@ module Admin
 
       streams = [ turbo_stream.replace(status_id, state) ]
       if result.ok?
-        streams.concat(page_base_streams)
         streams.concat(structural ? move_streams(origins) : reorder_undo_streams(before))
       else
         streams << picker_error_stream(result.errors)
@@ -287,7 +284,7 @@ module Admin
 
       copy = result.record
       streams = copy.section_id ? copy_tile_streams(copy, source) : insertion_stream(copy, source.id)
-      render turbo_stream: [ *streams, *page_base_streams ], status: :created
+      render turbo_stream: streams, status: :created
     end
 
     private
@@ -299,41 +296,6 @@ module Admin
     # on a published page), answered 403 below.
     def set_page
       @page = admin_scope(Page.all).find(params[:page_id])
-      # Before any write this request makes touches it -- see
-      # `#page_base_streams`.
-      @page_updated_at_before_write = @page.updated_at
-    end
-
-    # Every successful block write touches the page (`ContentBlocks::Save`,
-    # final fix wave I3), which moves the `updated_at` the page settings
-    # form on this same screen holds as its autosave base -- so, left
-    # alone, that form's next save would report "Changed elsewhere" against
-    # nothing but this same editor's block edit.
-    #
-    # So a block response may move that form's base forward to the page's
-    # new `updated_at` -- but only when the base the form holds (sent by
-    # `admin--saving--autosave`/`admin--editor--blocks` as `X-Page-Base-Updated-At`) was
-    # still current *before* this write (fix round 2). If the page was saved
-    # elsewhere since the form loaded it (another tab, another user), the
-    # sent base is older than `@page_updated_at_before_write`, and moving it
-    # forward would silently absorb that save: the form's next autosave
-    # would pass the staleness check and overwrite the other editor's
-    # fields without a word. Then the base is left alone, so that autosave
-    # still reports "Changed elsewhere". No base sent (an older client), or
-    # an unparseable one, means nothing to vouch for -- left alone too.
-    def page_base_streams
-      return [] unless page_base_was_current?
-
-      id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
-      [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
-        locals: { id: id, value: Page.where(id: @page.id).pick(:updated_at).iso8601(6) }) ]
-    end
-
-    def page_base_was_current?
-      sent = request.headers["X-Page-Base-Updated-At"]
-      sent.present? && Time.iso8601(sent) >= @page_updated_at_before_write
-    rescue ArgumentError
-      false
     end
 
     def reorder_undo_streams(before)

@@ -106,8 +106,7 @@ module Admin
         {
           controller: "admin--saving--autosave",
           action: "input->admin--saving--autosave#queue change->admin--saving--autosave#queue focusout->admin--saving--autosave#saveNow",
-          "admin--saving--autosave-status-id-value": status_id(block),
-          "admin--saving--autosave-page-base-id-value": "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+          "admin--saving--autosave-status-id-value": status_id(block)
         }
       end
 

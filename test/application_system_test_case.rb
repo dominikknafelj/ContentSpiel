@@ -332,8 +332,13 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # only changes more than `Audit::ChangeSince::SLACK` past the base a
   # form loaded; a record backdated before the form loads puts the next change
   # on the far side of it without waiting a second for it.
+  #
+  # A page's settings form holds `settings_changed_at` as its base
+  # (`Admin::AutosaveResponses#autosave_base`), so a page is backdated in both.
   def backdate(record, by: 5.seconds)
-    record.update_columns(updated_at: record.updated_at - by)
+    columns = { updated_at: record.updated_at - by }
+    columns[:settings_changed_at] = record.settings_changed_at - by if record.is_a?(Page)
+    record.update_columns(**columns) # version: none (a test's own clock bookkeeping)
   end
 
   # Waits until the page's notes are live (notes spec §6): `admin--notes--live`

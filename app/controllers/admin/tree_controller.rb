@@ -11,7 +11,7 @@ module Admin
   # A move is a write to the moved page (`Pages::Move` saves it, so its
   # `updated_at` moves), made from OUTSIDE that page's editor forms -- and the
   # page settings form of that very page may be open next to the tree,
-  # holding the old `updated_at` as its autosave base. See
+  # holding the old `settings_changed_at` as its autosave base. See
   # `#page_base_streams` for how the answer keeps that form able to save.
   class TreeController < BaseController
     include AutosaveResponses
@@ -30,7 +30,7 @@ module Admin
       # is just this same move with these values (see `undo_toast`).
       before = placement(page)
       # Before the write touches it -- see `#page_base_streams`.
-      updated_at_before_move = page.updated_at
+      updated_at_before_move = page.settings_changed_at
       result = Pages::Move.call(page, parent: parent, position: params[:position])
 
       status = if result.ok? then :ok
@@ -96,20 +96,21 @@ module Admin
     # what the New page dialog tells an editor to do ("Drag it in the tree to
     # move it") -- locked that page's own form: its next save was a final
     # 409, "Changed elsewhere" against the editor's own move, the typed text
-    # not saved. So this answers the way a block write does (`Admin::
-    # ContentBlocksController#page_base_streams`): `admin--pages--tree` sends the
-    # open form's base as `X-Page-Base-Updated-At`, through the same queue as
-    # every other write on the screen, and the form's base is moved forward
-    # to the page's new `updated_at`.
+    # not saved. So this answers with the form's new base:
+    # `admin--pages--tree` sends the open form's base as
+    # `X-Page-Base-Updated-At`, through the same queue as every other write on
+    # the screen, and the form's base is moved forward to the page's new
+    # `settings_changed_at`. This one stays, unlike the block side's (a block
+    # write no longer moves the settings base at all): `Pages::Move` saves the
+    # page's own columns, so the move DOES move `settings_changed_at`.
     #
-    # Only when the sent base EQUALS the moved page's `updated_at` as loaded
+    # Only when the sent base EQUALS the moved page's `settings_changed_at` as loaded
     # for this request. That one test says both things that have to hold:
     # - the open form is this page's. The client only sends the header when
     #   it is, but the tree lists every page, and handing a form another
     #   page's (newer) `updated_at` as its base would let a stale form pass
     #   the staleness check and overwrite someone else's save. Hence `==`
-    #   here, where the blocks controller -- whose requests can only be about
-    #   their own page -- has `>=`;
+    #   here;
     # - nobody saved the page since the form loaded it. If someone did, the
     #   base is left alone and the form's next save is still, rightly,
     #   refused.
@@ -121,7 +122,7 @@ module Admin
 
       id = "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
       [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
-        locals: { id: id, value: Page.where(id: page.id).pick(:updated_at).iso8601(6) }) ]
+        locals: { id: id, value: Page.where(id: page.id).pick(:settings_changed_at).iso8601(6) }) ]
     rescue ArgumentError
       []
     end

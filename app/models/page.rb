@@ -222,6 +222,15 @@ class Page < ApplicationRecord
   # instead of answering from where the page used to be.
   after_save :forget_preloaded_branch
 
+  # The settings form's autosave base (live-editing spec §3.3). Moved whenever a
+  # column of the page itself is about to change, and by nothing else: a `touch`
+  # (every block write touches its page) runs no save callbacks, and
+  # `update_columns` and `update_all` go around them on purpose
+  # (`Translations::Confirm`'s bookkeeping must not make an open form stale).
+  # So someone in the settings is refused only when the SETTINGS changed.
+  SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at].freeze
+  before_save { self.settings_changed_at = Time.current if new_record? || (changed - SETTINGS_BASE_IGNORES).any? }
+
   def reload(...)
     forget_preloaded_branch
     super

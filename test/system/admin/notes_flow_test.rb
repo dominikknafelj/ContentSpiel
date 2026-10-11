@@ -208,13 +208,14 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     assert_equal 1, Notes::Thread.count
     assert_equal %w[block.updated note.started], Audit::Event.where(action: %w[block.updated note.started]).order(:id).pluck(:action)
 
-    # The save moved the block and its page; the note moved neither, and
+    # The save moved the block (it touched its page, whose settings base stays
+    # where it was); the note moved neither, and
     # each form's base is what the save made it.
     saved = @block.reload.updated_at
     assert_operator saved, :>, before
     assert_includes @block.body.to_s, "An edit on its way"
     assert_equal saved.iso8601(6), find("#block-#{@block.id}-base-updated-at", visible: :all).value
-    assert_equal @page.reload.updated_at.iso8601(6), find("#page-base-updated-at", visible: :all).value
+    assert_equal @page.reload.settings_changed_at.iso8601(6), find("#page-base-updated-at", visible: :all).value
     assert_operator Notes::Thread.last.created_at, :>, saved
 
     # So the next edit of the same block is saved, not refused as stale.
