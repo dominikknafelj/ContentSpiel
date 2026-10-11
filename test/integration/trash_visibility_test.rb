@@ -808,8 +808,22 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
       assert_response :not_found, kind
 
       get admin_presence_here_path(kind:, ids: [ kept.id, gone.id ], format: :json)
-      assert_equal({ kept.id.to_s => 1 }, response.parsed_body, kind)
+      # The list's marker data, names and all: the kept record's and nothing
+      # of the trashed one's.
+      assert_equal({ kept.id.to_s => { "count" => 1, "names" => [ PersonName.of(users(:one)) ], "label" => "#{PersonName.of(users(:one))} is here", "tip" => PersonName.of(users(:one)) } },
+        response.parsed_body, kind)
+      assert_not_includes response.body, %("#{gone.id}"), kind
     end
+
+    # The markers a list draws with its rows come from the list's own loader,
+    # which is handed only what the list narrowed: the tree and the posts
+    # list draw no row, and so no marker, for the trashed page and post.
+    get admin_page_path(@kept_page)
+    assert_select "#tree [data-presence-marker='page-#{@kept_page.id}']:not([hidden])"
+    assert_select "[data-presence-marker='page-#{@gone_page.id}']", count: 0
+    get admin_posts_path
+    assert_select "[data-presence-marker='post-#{@kept_post.id}']:not([hidden])"
+    assert_select "[data-presence-marker='post-#{@gone_post.id}']", count: 0
 
     # The door a socket uses: the same lookup, through the read scope.
     [ [ "page", @gone_page ], [ "post", @gone_post ], [ "media", @gone_asset ] ].each do |kind, gone|

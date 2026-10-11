@@ -16,6 +16,11 @@ module Presence
     #   moves `seen_at` and never `state_at`.
     Person = Data.define(:user, :state, :since)
 
+    # A list's marker for one record: how many other users are here, and the
+    # first `NAMED` of them, the ones a marker names ("… and 2 more").
+    Here = Data.define(:count, :users)
+    NAMED = 5
+
     def initialize(viewer:)
       @viewer = viewer
     end
@@ -46,6 +51,31 @@ module Presence
     def here_counts(kind, ids)
       Mark.fresh.where(record_type: kind.type, record_id: ids, state: "here")
         .where.not(user_id: @viewer.id).group(:record_id).distinct.count(:user_id)
+    end
+
+    # Who is HERE on each of a list's records, for its markers:
+    # `{ record id => Here }` for the records of `kind` among `ids` (an Array,
+    # or a relation selecting ids, which becomes a subquery), leaving out
+    # those with nobody here. `count` is every other user here; `users` are
+    # the first `NAMED` of them, in the order `on` shows people in -- by the
+    # earliest `arrived_at` over ALL their fresh rows, here or away, so a
+    # reload does not send someone to the end, then by id. One statement for
+    # the marks and, only when someone is here, one for the users, whatever
+    # the number of ids; no record is loaded. A user deleted between the two
+    # is counted and not named. Like `on`, it trusts its caller to have
+    # narrowed `ids` through the read scope.
+    def here_people(kind, ids)
+      rows = Mark.fresh.where(record_type: kind.type, record_id: ids).where.not(user_id: @viewer.id)
+        .pluck(:record_id, :user_id, :state, :arrived_at)
+      here = rows.group_by(&:first).filter_map do |record_id, of_record|
+        user_ids = of_record.group_by { |row| row[1] }.select { |_, own| own.any? { |row| row[2] == "here" } }
+          .sort_by { |user_id, own| [ own.map { |row| row[3] }.min, user_id ] }.map(&:first)
+        [ record_id, user_ids ] if user_ids.any?
+      end
+      return {} if here.empty?
+
+      users = User.where(id: here.flat_map { |_, user_ids| user_ids.first(NAMED) }.uniq).index_by(&:id)
+      here.to_h { |record_id, user_ids| [ record_id, Here.new(count: user_ids.size, users: users.values_at(*user_ids.first(NAMED)).compact) ] }
     end
 
     private

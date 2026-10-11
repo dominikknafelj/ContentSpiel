@@ -162,9 +162,9 @@ class Admin::SlotsTest < ViewComponent::TestCase
   test "the real registry holds notes' components, and presence's people in the header at its size and in the panel at its" do
     assert_equal [ Admin::NotesScreen::HeaderButtonComponent ], Admin::Slots.entries("editor.header.actions").map(&:component)
     assert_equal [ Admin::NotesScreen::MediaSectionComponent ], Admin::Slots.entries("media.panel.sections").map(&:component)
-    assert_equal [ Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("tree.row.markers").map(&:component)
+    assert_equal [ Admin::NotesScreen::RowPillComponent, Admin::PresenceScreen::RowMarkerComponent ], Admin::Slots.entries("tree.row.markers").map(&:component)
     assert_equal [ Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("posts.row.markers").map(&:component)
-    assert_empty Admin::Slots.entries("posts.row.title")
+    assert_equal [ [ Admin::PresenceScreen::RowMarkerComponent, { joined: true } ] ], Admin::Slots.entries("posts.row.title").map { |entry| [ entry.component, entry.options ] }
     assert_equal [ [ Admin::PresenceScreen::PeopleComponent, { size: :header } ] ], Admin::Slots.entries("editor.header.people").map { |entry| [ entry.component, entry.options ] }
     assert_equal [ [ Admin::PresenceScreen::PeopleComponent, { size: :panel } ] ], Admin::Slots.entries("media.panel.header").map { |entry| [ entry.component, entry.options ] }
   end

@@ -16,4 +16,10 @@ Rails.application.config.to_prepare do
   # The lists' rows: the pill's loader reads each list's counts once for all rows.
   Admin::Slots.register "tree.row.markers", Admin::NotesScreen::RowPillComponent, loader: Admin::NotesScreen::RowPillComponent.loader("Page")
   Admin::Slots.register "posts.row.markers", Admin::NotesScreen::RowPillComponent, loader: Admin::NotesScreen::RowPillComponent.loader("Post")
+
+  # Where someone else is working: last among a tree row's markers, and on a
+  # posts row's title line, inside the row's link (`joined`). Each list's
+  # people are read once for all its rows.
+  Admin::Slots.register "tree.row.markers", Admin::PresenceScreen::RowMarkerComponent, loader: Admin::PresenceScreen::RowMarkerComponent.loader("page")
+  Admin::Slots.register "posts.row.title", Admin::PresenceScreen::RowMarkerComponent, loader: Admin::PresenceScreen::RowMarkerComponent.loader("post"), joined: true
 end

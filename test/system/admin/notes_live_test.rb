@@ -696,19 +696,21 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   # A Turbo visit replaces <body>, and with it the controller and its record
   # targets, while the document and its one socket live on.
 
+  # (The page tree beside a page's editor is a list, which listens for every
+  # list: `Presence::ListChannel`, one subscription, kept across the visit.)
   test "after a Turbo visit to another editor only that record is listened to, once" do
     other = create_page(title: "About")
     visit "/cs-studio/pages/#{@page.id}"
     await_notes_live
     hold_consumer
     keep_person_subscription
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ], [ "Presence::ListChannel", "", "" ] ], subscriptions
 
     turbo_visit "/cs-studio/pages/#{other.id}"
     assert_selector "h1", text: "About"
     await_notes_live
     assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: this was no Turbo visit"
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", other.id.to_s ], [ "Presence::Channel", "page", other.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", other.id.to_s ], [ "Presence::Channel", "page", other.id.to_s ], [ "Presence::ListChannel", "", "" ] ], subscriptions
     assert same_person_subscription?, "the person's stream was subscribed to again by the new page"
     assert_no_selector "#notes-open-count"
     watch_notes_fetches
@@ -737,7 +739,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Pricing"
     await_notes_live
     assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: Back was no Turbo restoration"
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ], [ "Presence::ListChannel", "", "" ] ], subscriptions
     assert same_person_subscription?, "the person's stream was subscribed to again on the way"
     assert_selector "#notes-open-count", text: "1"
     watch_notes_fetches

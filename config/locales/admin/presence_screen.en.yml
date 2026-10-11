@@ -1,5 +1,7 @@
 # The strings of `app/components/admin/presence_screen/` (presence handoff 7,
-# 8, 21 to 23, 26 and 29: the wording is the designer's).
+# 8, 21 to 23, 26 and 29: the wording is the designer's; `row_marker` is
+# handoff 12 and 27, whose exact words past "2 people here" are not the
+# designer's yet).
 en:
   admin:
     components:
@@ -20,3 +22,15 @@ en:
             other: "away %{count} min"
           away_long: "away over an hour"
           more: "+%{count}"
+        # A list row's marker. `label` is what a screen reader hears; the
+        # tooltip is the names alone. `joined` stands before the label where
+        # it continues a link's name ("Title, 2 people here: …").
+        row_marker:
+          label:
+            one: "%{names} is here"
+            other: "%{count} people here: %{names}"
+          separator: ", "
+          and_more:
+            one: "%{names} and %{count} more"
+            other: "%{names} and %{count} more"
+          joined: ", "

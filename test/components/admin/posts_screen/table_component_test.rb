@@ -33,10 +33,66 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_equal small, large, "the table ran a notes query per post"
   end
 
-  test "an empty slot after the title draws nothing" do
-    render_table([ create_post(title: "Plain") ])
+  # Both features that mark a row, each read once for the page of posts
+  # (presence plan, Review Focus 5).
+  test "the table with notes and people on every post costs the same queries for 3 posts as for 30, and marks each row with both" do
+    add = lambda do |count, prefix|
+      Array.new(count) { |n| create_post(title: "#{prefix} #{n}") }.each do |post|
+        as(users(:two)) { Notes::Start.call(post, body: "A note") }
+        [ users(:two), users(:reader) ].each { |user| Presence::Mark.arrive(user:, record: post, tab: "tab-#{user.id}-1234567") }
+      end
+    end
+    small_posts = add.(3, "Small")
+    render_table(small_posts)
+    small = count_queries { render_table(small_posts) }
+
+    large_posts = small_posts + add.(27, "Large")
+    large = count_queries { render_table(large_posts) }
+
+    assert_selector "a[data-notes-count]", count: 30
+    assert_selector "th[scope=row] a [data-presence-marker][data-presence-count='2']", count: 30
+    assert_equal small, large, "the table ran a query per post"
+  end
+
+  test "an empty list reads nothing for its markers" do
+    assert_equal 0, count_queries { Admin::PostsScreen::TableComponent.new(posts: [], paths: {}, translation_states: {}, locale: "en") }
+  end
+
+  test "with nothing registered after the title, the title line holds the title alone" do
+    Admin::Slots.with("posts.row.title" => []) do
+      render_table([ create_post(title: "Plain") ])
+    end
 
     assert_no_selector "tbody th[scope=row] > :not(a)"
+    assert_selector "tbody th[scope=row] > a > span:first-child > *", count: 1
+  end
+
+  # Presence handoff 27: the title's line is a row -- the title, cut with an
+  # ellipsis before the marker is, then the marker 6px after it, inside the
+  # link; the path line under it is as it was.
+  test "the title's line is the title and then presence's marker, inside the link; the path line is unchanged" do
+    busy = create_post(title: "Translating Everything With Mobility")
+    quiet = create_post(title: "Quiet")
+    [ users(:two), users(:reader) ].each { |user| Presence::Mark.arrive(user:, record: busy, tab: "tab-#{user.id}-1234567") }
+    users(:two).update!(name: "Dana Weiss")
+
+    render_table([ busy, quiet ], paths: { busy.id => "/blog/translating" })
+
+    assert_selector "div[data-controller='admin--presence--list'][data-live-part=waiting][data-admin--presence--list-kind-value=post]" \
+                    "[data-admin--presence--list-url-value='/cs-studio/presence/here?kind=post'] > table"
+    link = "tr#post_#{busy.id} th[scope=row] > a.flex.min-w-0.flex-col.gap-0\\.5.text-ink.no-underline.hover\\:underline"
+    assert_selector "#{link} > span", count: 2
+    line = "#{link} > span:first-child"
+    assert_equal %w[flex gap-1.5 items-center min-w-0], page.find(line)[:class].split.sort
+    assert_selector "#{line} > span.min-w-0.truncate.font-medium:first-child", text: "Translating Everything With Mobility", exact_text: true
+    assert_selector "#{line} > span.truncate + span[data-presence-marker='post-#{busy.id}'].flex-none.text-meta:not([hidden])[data-presence-count='2']"
+    assert_selector "#{line} > [data-presence-marker] > span.sr-only", text: ", 2 people here: Dana Weiss, reader", exact_text: true
+    assert_selector "#{link} > span.truncate.font-cs-mono.text-\\[11px\\].text-meta:last-child", text: "/blog/translating", exact_text: true
+    # Nothing interactive inside the link, and no Tab stop per row.
+    assert_no_selector "th[scope=row] a a, th[scope=row] a button, th[scope=row] a [tabindex]", visible: :all
+    # Nobody there: the marker's element, hidden, and nothing said.
+    assert_selector "tr#post_#{quiet.id} th[scope=row] a > span:first-child > [data-presence-marker='post-#{quiet.id}'][hidden]", visible: :all
+    assert_selector "tr#post_#{quiet.id} th[scope=row] a", text: /\A\s*Quiet\s*Not listed\s*\z/
   end
 
   test "the columns, a checkbox per row, and the select-all header checkbox" do

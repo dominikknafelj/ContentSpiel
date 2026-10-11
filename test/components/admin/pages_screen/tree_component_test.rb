@@ -60,6 +60,49 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_equal small, large, "the tree ran a notes query per page"
   end
 
+  # Both features that mark a row, each read once for the whole tree
+  # (presence plan, Review Focus 5): notes' pill and presence's marker, with
+  # a note and two people on every page.
+  test "the tree with notes and people on every page costs the same queries for 3 pages as for 30, and marks each row with both" do
+    mark_all = lambda do |pages|
+      as(users(:two)) { pages.each { |page| Notes::Start.call(page, body: "A note") } }
+      pages.each { |page| [ users(:two), users(:reader) ].each { |user| Presence::Mark.arrive(user:, record: page, tab: "tab-#{user.id}-1234567") } }
+    end
+
+    mark_all.(add_pages(3, "Small"))
+    render_tree # warm up whatever a first render loads once
+    small = count_queries { render_tree }
+
+    mark_all.(add_pages(27, "Large"))
+    large = count_queries { render_tree }
+
+    assert_selector "span[data-notes-marker]", minimum: 30
+    assert_selector "span[data-presence-marker][data-presence-count='2']", count: 30
+    assert_equal small, large, "the tree ran a query per page"
+  end
+
+  # Presence handoff 10: the marker is the last of the row's markers, after
+  # the notes pill, in the row's own 6px gap; every readable row has its
+  # element, hidden where nobody is, and a context-only row has none.
+  test "each readable row ends its markers with presence's, shown where someone else is here, and the tree is the list its script reads" do
+    busy, quiet = add_pages(2, "Row")
+    as(users(:two)) { Notes::Start.call(busy, body: "A note") }
+    Presence::Mark.arrive(user: users(:two), record: busy, tab: "tab-12345678")
+    Presence::Mark.arrive(user: users(:one), record: quiet, tab: "tab-12345678") # the viewer: not company
+
+    render_tree
+
+    assert_selector "turbo-frame#tree[data-controller='admin--pages--tree admin--presence--list'][data-live-part=waiting]" \
+                    "[data-admin--presence--list-kind-value=page][data-admin--presence--list-url-value='/cs-studio/presence/here?kind=page']"
+    row = "li[data-page-id='#{busy.id}'] > div"
+    assert_selector "#{row}.flex.items-center.gap-1\\.5 > [data-notes-marker] + [data-presence-marker='page-#{busy.id}']:not([hidden])"
+    assert_selector "#{row} > [data-presence-marker] > [data-presence-marker-label][data-presence-lead='']", text: "#{PersonName.of(users(:two))} is here", exact_text: true
+    # Beside the title's link, never inside it.
+    assert_no_selector "#{row} a [data-presence-marker]", visible: :all
+    assert_selector "li[data-page-id='#{quiet.id}'] > div > [data-presence-marker='page-#{quiet.id}'][hidden]", visible: :all
+    assert_selector "[data-presence-marker]", count: Page.kept.count, visible: :all
+  end
+
   # Handoff §10 B24: "↻N" outdated and "○N" missing, summed over the target
   # languages, no box, no "!", the tooltip naming the languages.
   test "a row shows outdated and missing counts summed over the languages, with labels and a tooltip" do

@@ -30,19 +30,29 @@ module Admin
       render people, layout: turbo_frame_request? ? false : "admin"
     end
 
-    # `{ "<id>": <number of other people here> }` for those of the ids the
-    # viewer may read and that have someone here. An id the viewer may not
-    # read, a trashed one and one that is not there are the same silence, and
-    # so is an unknown kind: `{}`.
+    # What a list's markers show (`admin--presence--list` asks):
+    # `{ "<id>": { "count": 2, "names": ["Dana Weiss", "Jonas Lind"],
+    # "label": "2 people here: Dana Weiss, Jonas Lind", "tip": "Dana Weiss,
+    # Jonas Lind" } }` for those of the ids the viewer may read and that have
+    # someone else here. `names` are the first five in order of arrival, and
+    # `count` says when there are more; `label` and `tip` are the marker's
+    # two texts, worded where the first drawing words them
+    # (`Admin::PresenceScreen::RowMarkerComponent.words`), so the script
+    # holds no wording and a marker reads the same before and after it. A
+    # name is what a person typed: it is a JSON string here and text in the
+    # page. An id the viewer may not read, a trashed one and one that is not
+    # there are the same silence, and so is an unknown kind: `{}`.
     def here
       kind = RecordKinds.named(params[:kind])
       ids = Array.wrap(params[:ids]).grep(String).grep(/\A\d{1,18}\z/).uniq.first(MAX_IDS)
       return render(json: {}) unless kind && ids.any?
 
       # The asked ids narrowed through the kind's read scope as a subquery:
-      # one statement counts the readable ones, and no record is loaded.
+      # one statement reads who is here on the readable ones, a second their
+      # users, and no record is loaded.
       readable = kind.readable_ids(Current.actor, channel: Current.channel).where(id: ids)
-      render json: Presence::Roster.new(viewer: Current.user).here_counts(kind, readable).transform_keys(&:to_s)
+      here = Presence::Roster.new(viewer: Current.user).here_people(kind, readable)
+      render json: here.to_h { |id, people| [ id.to_s, Admin::PresenceScreen::RowMarkerComponent.words(people) ] }
     end
   end
 end

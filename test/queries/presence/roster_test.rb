@@ -157,4 +157,78 @@ class Presence::RosterTest < ActiveSupport::TestCase
       assert_equal({}, counts([ asset ], kind: media))
     end
   end
+
+  # --- here_people: who is here on each of a list's records ------------------
+
+  def people(records, kind: @page_kind) = @roster.here_people(kind, records.map(&:id))
+
+  test "here_people names the users here on each record in order of arrival, once each, without the viewer, the away and the stale" do
+    travel_to(@now) do
+      busy = create_page(title: "Busy")
+      quiet = create_page(title: "Quiet")
+      mine = create_page(title: "Mine")
+      stale = create_page(title: "Stale")
+      mark(@third, busy, arrived: @now - 10.minutes)
+      mark(@other, busy, arrived: @now - 5.minutes)
+      mark(@other, busy, arrived: @now - 1.minute)
+      mark(@other, quiet, state: "away")
+      mark(@viewer, mine)
+      mark(@viewer, busy)
+      mark(@other, stale, seen: @now - 151.seconds)
+
+      answer = people([ busy, quiet, mine, stale, @page ])
+
+      assert_equal [ busy.id ], answer.keys
+      assert_equal 2, answer[busy.id].count
+      assert_equal [ @third, @other ], answer[busy.id].users
+      assert_equal({}, people([]))
+    end
+  end
+
+  test "here_people keeps a person's place across a reload: the earliest arrival of all their fresh rows, here or away" do
+    travel_to(@now) do
+      mark(@other, arrived: @now - 20.minutes, state: "away")
+      mark(@other, arrived: @now - 1.minute)
+      mark(@third, arrived: @now - 10.minutes)
+
+      assert_equal [ @other, @third ], people([ @page ])[@page.id].users
+    end
+  end
+
+  test "here_people counts everyone and loads the first five" do
+    travel_to(@now) do
+      seven = Array.new(7) { |i| User.create!(name: "Person #{i}", email_address: "person#{i}@example.com", password: "a-long-password-1") }
+      seven.each_with_index { |user, index| mark(user, arrived: @now - (20 - index).minutes) }
+
+      here = people([ @page ])[@page.id]
+
+      assert_equal 7, here.count
+      assert_equal seven.first(5), here.users
+      assert_equal 5, Presence::Roster::NAMED
+    end
+  end
+
+  test "here_people is one statement for the marks and one for the users, for 3 records and for 30, and none for the users with nobody here" do
+    travel_to(@now) do
+      pages = Array.new(30) { |i| create_page(title: "Page #{i}") }
+      pages.each { |page| mark(@other, page) && mark(@third, page) }
+      assert_equal 2, capture_sql { assert_equal 3, people(pages.first(3)).size }.size
+      statements = capture_sql { assert_equal 30, people(pages).size }
+      assert_equal 2, statements.size
+      assert_equal 1, capture_sql { assert_equal({}, people([ @page ])) }.size
+      # A relation is a subquery of the one statement, and no record is loaded.
+      relation = Page.where(id: pages.first(5).map(&:id)).select(:id)
+      statements = capture_sql { assert_equal 5, @roster.here_people(@page_kind, relation).size }
+      assert_equal 2, statements.size
+      assert statements.none? { |statement| statement.include?("SELECT \"pages\".* ") }
+    end
+  end
+
+  test "here_people for an image does not mix with a page of the same id" do
+    travel_to(@now) do
+      mark(@other, Media::Asset.new(id: @page.id))
+      assert_equal({}, people([ @page ]))
+      assert_equal [ @other ], people([ Media::Asset.new(id: @page.id) ], kind: RecordKinds.named("media"))[@page.id].users
+    end
+  end
 end

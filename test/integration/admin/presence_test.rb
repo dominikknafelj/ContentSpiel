@@ -19,6 +19,9 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
 
   def here(kind, ids) = get(admin_presence_here_path(kind:, ids:, format: :json))
 
+  # The answer's counts alone: `{ "<id>" => count }`.
+  def counts = response.parsed_body.transform_values { |each| each.fetch("count") }
+
   test "the routes" do
     assert_equal "/cs-studio/presence/page/#{@page.id}", admin_record_presence_path("page", @page.id)
     assert_equal "/cs-studio/presence/here?kind=post", admin_presence_here_path(kind: "post")
@@ -139,7 +142,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     sign_in_as @viewer
     here("page", [ @page.id, other_page.id, @page.id + 10_000 ])
     assert_response :success
-    assert_equal({ @page.id.to_s => 2, other_page.id.to_s => 1 }, response.parsed_body)
+    assert_equal({ @page.id.to_s => 2, other_page.id.to_s => 1 }, counts)
 
     sign_out
     sign_in_as stranger
@@ -186,7 +189,7 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     sign_out
     sign_in_as @viewer
     here("media", [ @asset.id ])
-    assert_equal({ @asset.id.to_s => 1 }, response.parsed_body)
+    assert_equal({ @asset.id.to_s => 1 }, counts)
   end
 
   test "here ignores the ids past 500" do
@@ -196,12 +199,60 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     here("page", Array.new(500) { |i| 900_000_000 + i } + [ pages.first.id ])
     assert_equal({}, response.parsed_body)
     here("page", Array.new(499) { |i| 900_000_000 + i } + [ pages.first.id ])
-    assert_equal({ pages.first.id.to_s => 1 }, response.parsed_body)
+    assert_equal({ pages.first.id.to_s => 1 }, counts)
+  end
+
+  # What a list's marker shows and says (handoff 9, 12, 27): the count, the
+  # names in order of arrival through `PersonName.of`, and the two texts the
+  # marker is given as they are -- the script holds no wording.
+  test "here answers the count, the names in order of arrival and the marker's two texts" do
+    @other.update!(name: "Dana Weiss")
+    @third.update!(name: nil)
+    mark(@third, @page, arrived: 9.minutes.ago)
+    mark(@other, @page, arrived: 2.minutes.ago)
+    mark(@other, @post)
+    sign_in_as @viewer
+
+    here("page", [ @page.id ])
+    assert_equal({ @page.id.to_s => { "count" => 2, "names" => [ "reader", "Dana Weiss" ], "label" => "2 people here: reader, Dana Weiss", "tip" => "reader, Dana Weiss" } }, response.parsed_body)
+    here("post", [ @post.id ])
+    assert_equal({ @post.id.to_s => { "count" => 1, "names" => [ "Dana Weiss" ], "label" => "Dana Weiss is here", "tip" => "Dana Weiss" } }, response.parsed_body)
+    assert_equal "no-store", response.headers["Cache-Control"]
+  end
+
+  test "here names at most five, and says how many more" do
+    seven = Array.new(7) { |i| User.create!(name: "Person #{i}", email_address: "person#{i}@example.com", password: "a-long-password-1") }
+    seven.each_with_index { |user, index| mark(user, @page, arrived: (20 - index).minutes.ago) }
+    six = create_page(title: "Six")
+    seven.first(6).each_with_index { |user, index| mark(user, six, arrived: (20 - index).minutes.ago) }
+    sign_in_as @viewer
+
+    here("page", [ @page.id, six.id ])
+
+    answer = response.parsed_body
+    assert_equal 7, answer.dig(@page.id.to_s, "count")
+    assert_equal [ "Person 0", "Person 1", "Person 2", "Person 3", "Person 4" ], answer.dig(@page.id.to_s, "names")
+    assert_equal "7 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", answer.dig(@page.id.to_s, "label")
+    assert_equal "Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", answer.dig(@page.id.to_s, "tip")
+    assert_equal "6 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 1 more", answer.dig(six.id.to_s, "label")
+  end
+
+  # A name is what a person typed: it travels as a JSON string, and the
+  # script puts it in the page as text.
+  test "a name with markup in it is answered as the text it is" do
+    @other.update!(name: %(<img src=x onerror="alert(1)">))
+    mark(@other, @page)
+    sign_in_as @viewer
+
+    here("page", [ @page.id ])
+
+    assert_equal "application/json", response.media_type
+    assert_equal [ %(<img src=x onerror="alert(1)">) ], response.parsed_body.dig(@page.id.to_s, "names")
   end
 
   test "here costs the same number of statements at 3 ids and at 30" do
     pages = Array.new(30) { |i| create_page(title: "Page #{i}") }
-    pages.each { |page| mark(@other, page) }
+    pages.each { |page| mark(@other, page) && mark(@third, page) }
     sign_in_as @viewer
     here("page", pages.first(3).map(&:id)) # a first request pays for what it caches
     few = capture_sql { here("page", pages.first(3).map(&:id)) }.size

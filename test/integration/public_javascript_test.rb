@@ -112,6 +112,29 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller*='presence--record']", count: 0
     assert modulepreloads.none? { |href| href.include?("controllers/admin/presence/") }
     assert_not_includes entry_point_script, "presence/record"
+    # Nor the lists' (`admin--presence--list`, on the page tree and the posts
+    # table), which listens for every list. Found on the Posts screen below.
+    assert_select "[data-controller*='presence--list']", count: 0
+    assert_select "[data-presence-marker]", count: 0
+    assert_not_includes entry_point_script, "presence/list"
+  end
+
+  # The other half for the lists: the posts table and the page tree carry
+  # the list's part, and its controller is preloaded.
+  test "the posts list and the page tree in CS Studio carry presence's list and preload its controller" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    post = create_post(title: "Notes")
+
+    get "/cs-studio/posts"
+
+    assert_response :success
+    assert_select "[data-controller*='presence--list'][data-controller='admin--presence--list'] tr#post_#{post.id} [data-presence-marker='post-#{post.id}']"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/presence/list_controller") }
+    get "/cs-studio/pages/#{root_page.id}"
+    assert_select "turbo-frame#tree[data-controller~='admin--presence--list'] [data-presence-marker='page-#{root_page.id}']"
+    get "/cs-studio/tags"
+    assert_select "[data-controller*='presence--list']", count: 0
   end
 
   # The other half for presence: an editor carries the part, in its header,

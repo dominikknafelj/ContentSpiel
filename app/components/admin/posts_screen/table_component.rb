@@ -9,7 +9,8 @@ module Admin
     # `translation_states` (`Translations::StateIndex.states_for`, one query)
     # and the posts themselves come from the controller (no tags are shown or preloaded).
     # The same goes for what features mark a row with (`posts.row.markers`, in
-    # the column after Translations; `posts.row.title`, right after the title):
+    # the column after Translations; `posts.row.title`, on the title's line and
+    # inside the row's link):
     # `Admin::Slots.load` calls each entry's loader once with all the rows of
     # the page, and each row's slot is handed its slice, so a row costs no
     # query of its own.
@@ -33,13 +34,14 @@ module Admin
         @paths = paths
         @translation_states = translation_states
         @loaded = Admin::Slots.load("posts.row.markers", posts, viewer: Current.actor)
+        @title_loaded = Admin::Slots.load("posts.row.title", posts, viewer: Current.actor)
         @url_options = url_options
         @locale = locale.to_s
       end
 
       private
 
-      attr_reader :posts, :paths, :translation_states, :loaded, :url_options, :locale
+      attr_reader :posts, :paths, :translation_states, :loaded, :title_loaded, :url_options, :locale
 
       # The selection column is there only for someone who can act on a
       # selection: the bulk bar (`BulkBarComponent#render?`) offers Publish or
