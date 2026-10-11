@@ -34,6 +34,15 @@ class Current < ActiveSupport::CurrentAttributes
   # it in a record's signal so that tab can ignore its own echo; it is used
   # for nothing else and is nil outside a notes request.
   attribute :notes_tab
+
+  # The opaque id of the browser tab a CS Studio request came from: the header
+  # `X-Notes-Tab`, in the shape `Live::Signals::TAB`, read for EVERY admin
+  # request by `Admin::BaseController`. Only `Editing` reads it: as the
+  # `origin` of its signals and as the tab that holds a reservation. It is not
+  # `notes_tab`, which only the notes controllers set: a content request that
+  # set that one would put an origin on `Notes::Remove`'s signal, and the tab
+  # that deleted a block would skip the refresh of its own notes drawer.
+  attribute :editing_tab
   delegate :user, to: :session, allow_nil: true
 
   # The site's settings row, loaded at most once per request (spec §6.1) --

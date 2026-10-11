@@ -22,6 +22,12 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
     assert_empty Media::Usage.where(owner_type: "ContentBlock", owner_id: @right.id)
   end
 
+  test "the deleted block's event names its page" do
+    assert ContentBlocks::Destroy.call(@after, actor: nil).ok?
+
+    assert_equal @page.id, Audit::Event.where(action: "block.deleted").last.metadata["page_id"]
+  end
+
   test "keep_blocks lifts the blocks to the section's place in reading order, then removes the section" do
     assert_difference -> { ContentBlock.count } => -1, -> { Audit::Event.where(action: "block.deleted").count } => 1 do
       assert ContentBlocks::Destroy.call(@section, keep_blocks: true, actor: nil).ok?
@@ -42,7 +48,7 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
     assert ContentBlocks::Destroy.call(@left_a, actor: nil).ok?
     assert ContentBlocks::Destroy.call(@before, actor: nil).ok?
     assert_equal [ @left_b, @right ], @section.section_blocks.reload.to_a
-    assert_equal({}, Audit::Event.where(action: "block.deleted").last.metadata)
+    assert_equal({ "page_id" => @page.id }, Audit::Event.where(action: "block.deleted").last.metadata)
   end
 
   test "a live page's version moves when a section is deleted either way" do
