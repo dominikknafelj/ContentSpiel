@@ -23,12 +23,14 @@
       <%# The open form of a block in a section (sections spec §4.3): a heading, not a
           collapse button -- the tile is what opens and closes it. %>
       <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= render panel_title %></h3>
+      <span data-editing-mark-slot><%= render updated_mark %></span>
     <% elsif !list? %>
       <%# `:group`: nothing to collapse, move or delete from here, only the type's name. %>
       <%# The notes marker stands directly after the name, on the left, where the notes
           drawer cannot cover it; the spacer after it takes the rest of the row. %>
       <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
       <%= render note_marker %>
+      <span data-editing-mark-slot><%= render updated_mark %></span>
       <span class="flex-1"></span>
       <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
       <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
@@ -44,6 +46,7 @@
           <%= label %>
         </button>
         <%= render note_marker %>
+        <span data-editing-mark-slot><%= render updated_mark %></span>
       </div>
 
       <%# Move up / Move down keep calling `admin--editor--blocks#moveUp|moveDown`; their `data-move` is how

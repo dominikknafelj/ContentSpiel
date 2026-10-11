@@ -16,12 +16,17 @@ module Admin
 
       # `slot_context` is the header's (`HeaderComponent`): what the screen has
       # already read that a feature at the header's slots would read again.
-      def initialize(post:, locale:, url_options: {}, slot_context: {})
+      def initialize(post:, locale:, url_options: {}, slot_context: {}, form_only: false)
         @post = post
         @locale = locale
         @url_options = url_options
         @slot_context = slot_context
+        @form_only = form_only
       end
+
+      # The answer to `Admin::EditingController#record`: the form alone, without
+      # the header above it, which nothing fetches.
+      def form_only? = @form_only
 
       def save_status_id = "post-save-status"
 

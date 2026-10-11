@@ -40,6 +40,9 @@
   <% end %>
 <% end %>
 
+<%# The element the live editing scripts stand on (`Admin::EditorScreen::LiveRegionComponent`):
+    the settings and the blocks, not the header or the notes drawer. %>
+<%= render Admin::EditorScreen::LiveRegionComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options) do %>
 <%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
 
 <%# The one slot a block action with nothing left to replace on the page
@@ -101,6 +104,7 @@
     <%= render Admin::EditorScreen::MoveDialogComponent.new %>
   <% end %>
 </section>
+<% end %>
 
 <%# The notes drawer (notes spec §4.1): once per screen, after everything
     else and outside every form. `?notes=open` (a link from the inbox, the

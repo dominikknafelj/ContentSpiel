@@ -1,11 +1,13 @@
 <%# The header (breadcrumb, title, publish state, actions, language tabs) is
     `Admin::EditorScreen::HeaderComponent`, shared with the page editor. Its
     dialogs are siblings of it, so they sit outside this form. %>
+<% unless form_only? %>
 <%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options, slot_context: @slot_context) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4). %>
     <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: post, locale: locale, editable: editable?) %>
   <% end %>
+<% end %>
 <% end %>
 
 <%# `data-controller="admin--saving--autosave"` sits on this form directly, same as
@@ -15,7 +17,7 @@
     it) -- and only on an editable post (`form_data`). The `<fieldset>`
     (`contents`, so it doesn't affect the form's layout) disables every
     field at once for a view-only one. %>
-<%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data do %>
+<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data.merge(editing_unit: "", editing_subject: "record") do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>

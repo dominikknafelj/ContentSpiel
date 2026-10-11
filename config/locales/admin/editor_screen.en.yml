@@ -146,3 +146,7 @@ en:
         section_group:
           heading: "Section"
           unavailable: "Unavailable type — %{type}"
+        # The mark a card carries for a few seconds after a colleague's save
+        # arrived (live-editing handoff 10).
+        updated_mark:
+          updated_by: "Updated by %{name}"

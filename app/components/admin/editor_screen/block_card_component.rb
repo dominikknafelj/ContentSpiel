@@ -116,11 +116,12 @@ module Admin
       # padding, hover); a disabled one dims and drops the hover fill.
       MENU_ITEM_CLASS = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent".freeze
 
-      def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false)
+      def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false, updated_by: nil)
         raise ArgumentError, "unknown block card placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
 
         @placement = placement
         @open = open
+        @updated_by = updated_by
         @editable = editable
         @page = page
         @block = block
@@ -142,13 +143,19 @@ module Admin
       # card of the list is a `card` (dragged, moved, counted for Move up and
       # Move down); only a panel is hidden, and it is its section's to show.
       def wrapper_attributes
-        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **(@open ? { open: true } : {}) } } if panel?
+        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **editing_marks, **(@open ? { open: true } : {}) } } if panel?
 
-        { data: { block_id: block.id, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
+        { data: { block_id: block.id, **editing_marks, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
       end
 
       # The panel is the region its tile's `aria-controls` points at, named by
       # its own heading -- which an unavailable block's panel doesn't have.
+      # What the editor's merge reads (`editing/merge`): this wrapper is one unit,
+      # replaced or kept whole, and says whose it is.
+      def editing_marks = { editing_unit: "", editing_subject: ::Editing.key(block) }
+
+      def updated_mark = Admin::EditorScreen::UpdatedMarkComponent.new(change: @updated_by)
+
       def panel_name = unavailable? ? {} : { role: "region", aria: { labelledby: self.class.panel_title_id(block) } }
 
       # "Image · column 2" (spec §4.3), drawn by the component a stream

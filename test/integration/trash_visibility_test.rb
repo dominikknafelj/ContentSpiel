@@ -831,6 +831,34 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The parts an open editor fetches (live-editing spec §3.2) follow their
+  # record into the trash: an editor open when its page or post is trashed is
+  # answered 404 by each of the GETs, as by every other door. The kept record
+  # beside it is served, so the test cannot pass by a route that answers nothing.
+  test "a trashed page's and a trashed post's editing parts are not served" do
+    sign_in_as users(:one)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: @kept_page), attributes: { block_type: "rich_text" }).record
+
+    get admin_editing_blocks_path(kind: "page", id: @kept_page.id)
+    assert_response :ok
+    get admin_editing_block_path(kind: "page", id: @kept_page.id, block_id: block.id)
+    assert_response :ok
+    get admin_editing_record_path(kind: "page", id: @kept_page.id)
+    assert_response :ok
+    get admin_editing_record_path(kind: "post", id: @kept_post.id)
+    assert_response :ok
+
+    gone_block = ContentBlocks::Save.call(ContentBlock.new(owner: @gone_page), attributes: { block_type: "rich_text" }).record
+    [ admin_editing_blocks_path(kind: "page", id: @gone_page.id),
+      admin_editing_block_path(kind: "page", id: @gone_page.id, block_id: gone_block.id),
+      admin_editing_record_path(kind: "page", id: @gone_page.id),
+      admin_editing_record_path(kind: "post", id: @gone_post.id),
+      admin_editing_blocks_path(kind: "post", id: @gone_post.id) ].each do |path|
+      get path
+      assert_response :not_found, path
+    end
+  end
+
   # Notes follow their record into the trash (notes spec D12, §4.4): hidden
   # with it, counted nowhere. The records are trashed AFTER their notes were
   # written, as in life: `Notes::Start` refuses a record that is already in
