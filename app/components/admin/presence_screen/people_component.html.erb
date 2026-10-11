@@ -31,7 +31,7 @@
   <%= frame %>
 <% else %>
   <%= tag.div class: wrapper_class, data: { controller: "admin--presence--record", live_part: "waiting",
-        "admin--presence--record-kind-value": kind.name, "admin--presence--record-id-value": @record.id, "admin--presence--record-url-value": url } do %>
+        "admin--presence--record-beat-value": Presence::BEAT_EVERY.in_milliseconds.to_i, "admin--presence--record-kind-value": kind.name, "admin--presence--record-id-value": @record.id, "admin--presence--record-url-value": url } do %>
     <%= frame %>
   <% end %>
 <% end %>

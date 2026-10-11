@@ -8,7 +8,7 @@
     the list holds a cable subscription, and says here whether it has been
     answered (`live/state`). %>
 <turbo-frame id="tree" data-controller="admin--pages--tree admin--presence--list" data-admin--pages--tree-move-url-value="<%= helpers.admin_tree_path(**url_options) %>"
-             data-live-part="waiting" data-admin--presence--list-kind-value="page" data-admin--presence--list-url-value="<%= helpers.admin_presence_here_path(kind: "page") %>">
+             data-live-part="waiting" data-admin--presence--list-kind-value="page" data-admin--presence--list-chunk-value="<%= Presence::HERE_IDS %>" data-admin--presence--list-url-value="<%= helpers.admin_presence_here_path(kind: "page") %>">
   <%# A flash-style status for the last move, replaced on its own by
       Admin::TreeController#update -- kept empty (not `sr-only`'d away
       entirely) on an ordinary page load, since there is nothing to report

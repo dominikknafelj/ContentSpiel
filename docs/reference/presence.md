@@ -21,7 +21,7 @@ Everyone who can open a record sees everyone on it, read-only viewers included; 
 ## Here, away, stale, swept
 
 - **Here** while the tab's document is visible and the person did something in it (a key, a press, a pointer move, a scroll) within the last **5 minutes**. **Away** after that, or while the document is hidden, as a tab's script reports it. **Gone** when the tab closes, leaves the screen or loses its connection.
-- The tab **beats every 30 seconds**, carrying its state, and reports a change at once.
+- The tab **beats every 30 seconds** (`Presence::BEAT_EVERY`, rendered into the record script's `beat` value; `test/models/presence_test.rb` keeps `STALE_AFTER` at four beats or more), carrying its state, and reports a change at once. The lists' batch size is `Presence::HERE_IDS` (500), rendered into the list script's `chunk` value and used as the controller's cap.
 - A row not refreshed for **`Presence::STALE_AFTER`, 150 seconds**, is ignored by every read, whatever the sweep did or did not delete (`Presence::Mark.fresh`). A tab that crashed or lost its network sends no leave and causes no signal; this is what takes it off the screen.
 - `Presence::Sweep` deletes rows older than **`Presence::SWEEP_AFTER`, 5 minutes**, every 5 minutes, in every environment (`config/recurring.yml`). It only keeps the table small and signals nothing: what it deletes nobody could see.
 - Both scripts also **read again every 60 seconds** while the document is visible, and when it becomes visible, so that a crashed tab's person ages out of a screen that hears no signal.

@@ -4,7 +4,7 @@
     cable subscription, and says here whether it has been answered
     (`live/state`). %>
 <%= tag.div class: "overflow-x-auto rounded-cs border border-line bg-surface",
-      data: { controller: "admin--presence--list", live_part: "waiting", "admin--presence--list-kind-value": "post",
+      data: { controller: "admin--presence--list", live_part: "waiting", "admin--presence--list-kind-value": "post", "admin--presence--list-chunk-value": Presence::HERE_IDS,
               "admin--presence--list-url-value": helpers.admin_presence_here_path(kind: "post") } do %>
   <table class="admin-posts-table w-full min-w-[880px] border-collapse text-sm">
     <thead>

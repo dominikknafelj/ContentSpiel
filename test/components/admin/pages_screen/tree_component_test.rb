@@ -19,6 +19,12 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "the tree's list script is told how many ids one request may ask about" do
+    render_tree
+
+    assert_selector "turbo-frame#tree[data-admin--presence--list-chunk-value='#{Presence::HERE_IDS}']"
+  end
+
   def render_tree = render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, locale: "en"))
 
   # Every statement sent, cached or not (the same counting the tree's

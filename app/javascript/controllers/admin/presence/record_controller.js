@@ -139,6 +139,7 @@ export default class extends Controller {
   static targets = [ "frame" ]
   static values = {
     kind: String, id: String, url: String,
+    // `beat` is sent by the server (`Presence::BEAT_EVERY`); 30000 is only the fallback.
     idle: { type: Number, default: 300000 }, beat: { type: Number, default: 30000 }, refresh: { type: Number, default: 60000 }
   }
 

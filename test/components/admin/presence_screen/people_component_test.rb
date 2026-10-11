@@ -39,6 +39,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_selector "div.hidden[data-controller='admin--presence--record'][data-live-part=waiting]" \
                     "[data-admin--presence--record-kind-value=page][data-admin--presence--record-id-value='#{@record.id}']" \
                     "[data-admin--presence--record-url-value='/cs-studio/presence/page/#{@record.id}']", visible: :all
+    assert_selector "div[data-controller='admin--presence--record'][data-admin--presence--record-beat-value='#{Presence::BEAT_EVERY.in_milliseconds.to_i}']", visible: :all
     assert_selector "#{frame}[data-admin--presence--record-target=frame]", visible: :all
     assert_no_selector "#{frame} *", visible: :all
     assert_no_selector "button, [role=list]", visible: :all

@@ -88,8 +88,9 @@ export default class extends Controller {
     kind: String, url: String,
     interval: { type: Number, default: 5000 }, refresh: { type: Number, default: 60000 },
     // How many ids one request asks about: what the `here` address answers
-    // for (`Admin::PresenceController::MAX_IDS`). A value so that a test can
-    // see a long list asked in parts without drawing 501 rows.
+    // for. The server sends the real number (`Presence::HERE_IDS`, rendered
+    // where the list is drawn); 500 is only the fallback. A value so that a
+    // test can see a long list asked in parts without drawing 501 rows.
     chunk: { type: Number, default: 500 }
   }
 

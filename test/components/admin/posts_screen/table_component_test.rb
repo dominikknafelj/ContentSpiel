@@ -11,6 +11,12 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "the list's script is told how many ids one request may ask about" do
+    render_table([])
+
+    assert_selector "[data-controller='admin--presence--list'][data-admin--presence--list-chunk-value='#{Presence::HERE_IDS}']"
+  end
+
   def count_queries(&block)
     count = 0
     counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }

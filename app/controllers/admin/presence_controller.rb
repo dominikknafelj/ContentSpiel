@@ -6,9 +6,6 @@ module Admin
   class PresenceController < BaseController
     include RecordOfKind
 
-    # How many ids a list may ask about at once; the rest are ignored.
-    MAX_IDS = 500
-
     # Who is on a record changes from one second to the next: neither answer
     # is kept by any cache, the browser's included (a fetch that was answered
     # from one would show who was here a minute ago).
@@ -45,7 +42,7 @@ module Admin
     # is not there are the same silence, and so is an unknown kind: `{}`.
     def here
       kind = RecordKinds.named(params[:kind])
-      ids = Array.wrap(params[:ids]).grep(String).grep(/\A\d{1,18}\z/).uniq.first(MAX_IDS)
+      ids = Array.wrap(params[:ids]).grep(String).grep(/\A\d{1,18}\z/).uniq.first(Presence::HERE_IDS)
       return render(json: {}) unless kind && ids.any?
 
       # The asked ids narrowed through the kind's read scope as a subquery:

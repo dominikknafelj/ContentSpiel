@@ -24,6 +24,14 @@
 # content version. It does not know notes, nor notes it.
 module Presence
   STALE_AFTER = 150.seconds
+  # How often the record's script sends its keep-alive. The server renders it
+  # into the script's `beat` value, so this is the one source; the relation
+  # that matters (STALE_AFTER >= 4 * BEAT_EVERY) is `test/models/presence_test.rb`.
+  BEAT_EVERY = 30.seconds
+  # How many ids one `GET presence/here` answers for, and how many the lists'
+  # script asks about at once (rendered into its `chunk` value where the list
+  # is drawn). More ids in a request are dropped by the server.
+  HERE_IDS = 500
   SWEEP_AFTER = 5.minutes
   STATES = %w[here away].freeze
 end
