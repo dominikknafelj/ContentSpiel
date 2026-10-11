@@ -207,9 +207,11 @@ class Editing::ReservationRaceTest < ActiveSupport::TestCase
       Thread.new { ActiveRecord::Base.connection_pool.with_connection { gate.pop; caller.call } }
     end
     callers.size.times { gate << :go }
-    threads.map { |thread| thread.join.value }
-  ensure
-    threads&.each(&:join)
+    # Every thread is joined, the first error is raised after the last.
+    errors = threads.filter_map { |thread| thread.join && nil rescue $! }
+    raise errors.first if errors.any?
+
+    threads.map(&:value)
   end
 
   # The order forced, not hoped for: `first` runs in a transaction that stays
@@ -299,6 +301,32 @@ class Editing::ReservationRaceTest < ActiveSupport::TestCase
 
     assert_equal [ true, false ], [ handed, passed ]
     assert_equal [ @dana.id, B ], row.values_at(:user_id, :tab)
+  end
+
+  test "a request that finds the row released meanwhile is none: the caller simply claims" do
+    claim(@olga, A)
+
+    released, requested = behind(
+      -> { Editing::Reservation.release(subject: @subject, user: @olga, tab: A) },
+      -> { Editing::Reservation.request(subject: @subject, by: @dana, tab: B) }
+    )
+
+    assert released
+    assert_equal :none, requested
+  end
+
+  test "a request that finds the row handed over to the asking tab meanwhile is none: it is the asker's own now" do
+    claim(@olga, A)
+    Editing::Reservation.request(subject: @subject, by: @dana, tab: B)
+
+    handed, requested = behind(
+      -> { Editing::Reservation.hand_over(subject: @subject, user: @olga, tab: A) },
+      -> { Editing::Reservation.request(subject: @subject, by: @dana, tab: B) }
+    )
+
+    assert handed
+    assert_equal :none, requested
+    assert_equal [ @dana.id, B, nil ], row.values_at(:user_id, :tab, :requested_by_id)
   end
 
   test "a request and the holder's renewal at once: the request survives" do

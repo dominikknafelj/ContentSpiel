@@ -79,26 +79,25 @@ module Editing
       RETURNING (edit_reservations.xmax <> 0 AND COALESCE((SELECT user_id = :user_id AND tab = :tab AND changed_at > :cutoff FROM before), FALSE)) AS renewed
     SQL
 
+    FREE = "(requested_by_id IS NULL OR requested_at IS NULL OR requested_at <= :stale_before OR (requested_by_id = :by_id AND requested_tab = :tab))".freeze
+
     # Someone asks for a subject another tab holds (see the class comment for
-    # the three answers). One statement: the UPDATE and a count of the live
-    # rows of other tabs, which tells `:pending` from `:none`.
-    REQUEST = <<~SQL.squish.freeze # sql: an UPDATE that also reports whether a candidate row existed has no Arel form
-      WITH candidates AS (
-        SELECT 1 FROM edit_reservations
-        WHERE subject_type = :subject_type AND subject_id = :subject_id
-          AND changed_at > :live_since AND NOT (user_id = :by_id AND tab = :tab)
-      ), written AS (
-        UPDATE edit_reservations
-        SET requested_by_id = :by_id, requested_tab = :tab,
-            requested_at = CASE WHEN requested_by_id = :by_id AND requested_tab = :tab AND requested_at > :stale_before
-                                THEN requested_at ELSE :now END
-        WHERE subject_type = :subject_type AND subject_id = :subject_id
-          AND changed_at > :live_since AND NOT (user_id = :by_id AND tab = :tab)
-          AND (requested_by_id IS NULL OR requested_at IS NULL OR requested_at <= :stale_before
-               OR (requested_by_id = :by_id AND requested_tab = :tab))
-        RETURNING 1
-      )
-      SELECT (SELECT count(*) FROM candidates) AS candidates, (SELECT count(*) FROM written) AS written
+    # the three answers). ONE UPDATE over the live rows of other tabs, whose
+    # answer comes from the row the statement locked, not from a snapshot: the
+    # request is written only where it may be (`free`: none stands, or it is
+    # this tab's own, or it is older than twice PASS_OVER), and `mine` says
+    # whose request the row carries afterwards. No row (released, expired,
+    # handed over to the asker meanwhile) is `:none`.
+    REQUEST = <<~SQL.squish.freeze # sql: an UPDATE whose CASE decides per row whether to write, and which reports the row, has no Arel form
+      UPDATE edit_reservations
+      SET requested_by_id = CASE WHEN #{FREE} THEN :by_id ELSE requested_by_id END,
+          requested_tab = CASE WHEN #{FREE} THEN :tab ELSE requested_tab END,
+          requested_at = CASE WHEN NOT #{FREE} THEN requested_at
+                              WHEN requested_by_id = :by_id AND requested_tab = :tab AND requested_at > :stale_before THEN requested_at
+                              ELSE :now END
+      WHERE subject_type = :subject_type AND subject_id = :subject_id
+        AND changed_at > :live_since AND NOT (user_id = :by_id AND tab = :tab)
+      RETURNING (requested_by_id = :by_id AND requested_tab = :tab) AS mine
     SQL
 
     class << self
@@ -127,11 +126,10 @@ module Editing
           live_since: now - Editing::HOLD, stale_before: now - 2 * Editing::PASS_OVER
         } ])
         # sql: sends REQUEST, which has no Arel form
-        counts = connection.exec_query(statement, "Editing request").first # version: none (a reservation is not content)
-        if counts["written"].positive? then :requested
-        elsif counts["candidates"].positive? then :pending
-        else :none
-        end
+        rows = connection.exec_query(statement, "Editing request") # version: none (a reservation is not content)
+        return :none if rows.empty?
+
+        rows.first["mine"] ? :requested : :pending
       end
 
       # The holder's tab lets go: the row is the requester's from now.
