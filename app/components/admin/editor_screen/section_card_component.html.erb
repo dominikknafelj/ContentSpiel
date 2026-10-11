@@ -20,7 +20,10 @@
   <%# The header wraps: on a narrow card the three controls go under the name. The name
       and the count keep a width of their own, so it is the controls that move and not
       the count that is squeezed away. %>
-  <div class="flex flex-wrap items-center gap-2 p-3">
+  <%# It has an id, as every ancestor of a unit up to the block list does: `editing/merge`
+      reconciles the card in place around the settings form below when that form holds
+      unsaved changes, and finds the header again by it. %>
+  <div id="<%= header_id %>" class="flex flex-wrap items-center gap-2 p-3">
     <div class="flex min-w-48 flex-1 items-center gap-2">
       <% if editable? %>
         <%# The block card's own handle, class and actions: `admin--editor--blocks` drags and

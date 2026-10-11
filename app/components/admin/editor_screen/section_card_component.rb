@@ -170,6 +170,8 @@ module Admin
 
       def body_id = "section-#{section.id}-body"
 
+      def header_id = "section-#{section.id}-header"
+
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
 
       def first? = @first

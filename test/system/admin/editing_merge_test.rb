@@ -1,0 +1,346 @@
+require "application_system_test_case"
+
+# The merge rule by itself (`app/javascript/editing/merge.js`): "a form that
+# holds unsaved changes is never replaced, and neither is anything else of its
+# unit; everything else is replaced by what was fetched". The module is
+# imported in the browser and called directly, with the answer the server
+# gives for that part at that moment and the predicate the live controller
+# will hand it (the write queue's own question, asked of a form's autosave
+# controller), the way `notes_merge_test.rb` calls the notes' merge: no cable
+# connection, no controller of the live editor in between.
+class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
+  setup do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    @page = create_page(title: "Pricing", published: false)
+    @first = add_block
+    @second = add_block
+    @section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    @inside = add_block(section_id: @section.id, section_column: 1)
+    sign_in_via_form(users(:one))
+    open_editor
+  end
+
+  def open_editor(path = "/cs-studio/pages/#{@page.id}")
+    visit path
+    await_admin_controllers
+    # `window.Stimulus` is the application, as `app/javascript/controllers/application.js` exposes it.
+    page.execute_script(<<~JS)
+      window.__merge = import("editing/merge")
+      window.__unsaved = (form) => {
+        const autosave = window.Stimulus.getControllerForElementAndIdentifier(form, "admin--saving--autosave")
+        return Boolean(autosave) && (!autosave.clean() || autosave.outstanding() || !autosave.unchanged())
+      }
+      window.__fresh = async (path) => {
+        const body = new DOMParser().parseFromString(await (await fetch(path)).text(), "text/html").body
+        return body
+      }
+    JS
+  end
+
+  def add_block(**placement)
+    ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text", **placement }).record
+  end
+
+  def card(block) = "#content_block_#{block.id}"
+
+  def panel(block) = "#block-#{block.id}-panel"
+
+  def blocks_path(block = nil) = "/cs-studio/editing/page/#{@page.id}/blocks#{"/#{block.id}" if block}"
+
+  # The ids of the page's top-level blocks as the server has them now.
+  def server_order = BlockOutline.new(@page.content_blocks.reload).top_level.map(&:id)
+
+  def list_order = page.evaluate_script("Array.from(document.querySelectorAll('#content-blocks-list > [data-block-id]')).map((each) => Number(each.dataset.blockId))")
+
+  # What a colleague does: the service, as another user, from outside the browser.
+  def colleague(&) = as(users(:two), channel: :admin, &)
+
+  # Types into the block's rich-text field without letting the debounce send it: the autosave's debounce is
+  # raised on the form first, so the form is unsaved for as long as the test needs.
+  def type_unsaved(block, text, within: card(block))
+    raise_debounce("#{within} form[data-controller~='admin--saving--autosave']")
+    field = find("#{within} .ProseMirror", visible: :all)
+    field.click
+    field.send_keys(text)
+  end
+
+  # Raises the debounce, and stops the form sending when the focus leaves it (`focusout` -> `saveNow`): a test that
+  # types into two forms one after the other would otherwise save the first. What the form holds stays unsaved.
+  def raise_debounce(form_selector)
+    page.execute_script(<<~JS)
+      const form = document.querySelector(#{form_selector.to_json})
+      form.setAttribute("data-admin--saving--autosave-debounce-value", 600000)
+      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--saving--autosave").saveNow = () => {}
+    JS
+  end
+
+  def keep(selector, as_name) = page.execute_script("window.#{as_name} = document.querySelector(#{selector.to_json})")
+
+  def same?(as_name, selector) = page.evaluate_script("window.#{as_name} === document.querySelector(#{selector.to_json})")
+
+  # Runs `body` (JS) with `merge`, `list` (#content-blocks-list) and `fresh` (the answer of `path`) in scope; `body`
+  # calls `done(value)` itself, so a test can read the screen in the same task as the merge.
+  def run_merge(path, body)
+    page.evaluate_async_script(<<~JS, path)
+      const [ path, done ] = arguments
+      Promise.all([ window.__merge, window.__fresh(path) ]).then(([ merge, fresh ]) => {
+        const list = document.getElementById("content-blocks-list")
+        #{body}
+      })
+    JS
+  end
+
+  def merge_list(path = blocks_path)
+    run_merge(path, <<~JS)
+      const result = merge.anchored(list, () => merge.mergeList(list, fresh, { unsaved: window.__unsaved }))
+      done({ kept: result.kept.map((each) => each.id), gone: result.gone.map((each) => each.id) })
+    JS
+  end
+
+  def merge_units(path, root_id = "content-blocks-list")
+    page.evaluate_async_script(<<~JS, path, root_id)
+      const [ path, rootId, done ] = arguments
+      Promise.all([ window.__merge, window.__fresh(path) ]).then(([ merge, fresh ]) => {
+        const result = merge.mergeUnits(document.getElementById(rootId), fresh, { unsaved: window.__unsaved })
+        done({ replaced: result.replaced.map((each) => each.id), kept: result.kept.map((each) => each.id), missing: result.missing })
+      })
+    JS
+  end
+
+  def text_of(selector) = page.evaluate_script("document.querySelector(#{selector.to_json})?.textContent")
+
+  test "a card that holds unsaved text is the same element with its text after a list merge, and a clean one is replaced" do
+    type_unsaved(@first, "half a sentence")
+    page.execute_script("window.__a = document.querySelector(#{card(@first).to_json}); window.__b = document.querySelector(#{card(@second).to_json})")
+    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(@second, translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
+
+    result = merge_list
+
+    assert_equal [ "content_block_#{@first.id}" ], result["kept"]
+    assert page.evaluate_script("window.__a === document.querySelector(#{card(@first).to_json})")
+    assert_not page.evaluate_script("window.__b === document.querySelector(#{card(@second).to_json})")
+    assert_selector "#{card(@first)} .ProseMirror", text: "half a sentence"
+    assert_selector "#{card(@second)} .ProseMirror", text: "Theirs"
+
+    # The editor inside the kept card is the one that was there: it still takes typing, and the caret is where it was.
+    find("#{card(@first)} .ProseMirror").send_keys(" and more")
+    assert_selector "#{card(@first)} .ProseMirror", text: "half a sentence and more"
+  end
+
+  test "a replaced card carries the base its next save needs" do
+    colleague { assert ContentBlocks::Save.call(@second, translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
+
+    merge_list
+
+    assert_equal @second.reload.updated_at.iso8601(6), find("#block-#{@second.id}-base-updated-at", visible: :all).value
+  end
+
+  test "an added block appears in its place, a moved one snaps to its place and a deleted one goes, with no card of the list left twice" do
+    added = colleague { add_block }
+    colleague { assert ContentBlocks::Reorder.call(@page, server_order.reverse).ok? }
+    colleague { assert ContentBlocks::Destroy.call(ContentBlock.find(@second.id)).ok? }
+
+    merge_list
+
+    assert_includes server_order, added.id
+    assert_not_includes server_order, @second.id
+    assert_equal server_order, list_order
+    assert_equal list_order.uniq, list_order
+    assert_equal 1, page.evaluate_script("document.querySelectorAll('#content_block_#{added.id}').length")
+  end
+
+  test "a block deleted while its form holds unsaved text stays, marked gone" do
+    type_unsaved(@second, "my words")
+    keep(card(@second), "__a")
+    colleague { assert ContentBlocks::Destroy.call(ContentBlock.find(@second.id)).ok? }
+
+    result = merge_list
+
+    assert_equal [ "content_block_#{@second.id}" ], result["gone"]
+    assert same?("__a", card(@second))
+    assert_equal "true", find(card(@second), visible: :all)["data-editing-gone"]
+    assert_selector "#{card(@second)} .ProseMirror", text: "my words"
+    assert_equal list_order.uniq, list_order
+  end
+
+  test "a hidden panel that holds unsaved text is the same element after a list merge, and stays hidden" do
+    find("#{card(@inside)} .admin-block-tile__face").click
+    assert_selector panel(@inside), visible: :visible
+    type_unsaved(@inside, "typed in a panel", within: panel(@inside))
+    # Closing through the tile sends what the form holds at once, by design (`admin--editor--section#close`), and
+    # then there would be nothing unsaved to keep: the panel is hidden the way the section hides it, without the send.
+    page.execute_script(<<~JS)
+      const panel = document.querySelector(#{panel(@inside).to_json})
+      panel.hidden = true
+      document.querySelector(#{"#{card(@inside)} .admin-block-tile__face".to_json}).setAttribute("aria-expanded", "false")
+    JS
+    keep(panel(@inside), "__a")
+    colleague { assert ContentBlocks::Save.call(ContentBlock.find(@inside.id), translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
+
+    result = merge_list
+
+    assert_equal [ "block-#{@inside.id}-panel" ], result["kept"]
+    assert same?("__a", panel(@inside))
+    assert page.evaluate_script("document.querySelector(#{panel(@inside).to_json}).hidden")
+    assert_equal "false", find("#{card(@inside)} .admin-block-tile__face", visible: :all)["aria-expanded"]
+    assert_includes text_of(panel(@inside)), "typed in a panel"
+    assert_equal 1, page.evaluate_script("document.querySelectorAll('#{panel(@inside)}').length")
+  end
+
+  test "the open panel of a section is open after a merge and its tile says so; a collapsed card stays collapsed" do
+    find("#{card(@inside)} .admin-block-tile__face").click
+    assert_selector panel(@inside), visible: :visible
+    find("#{card(@first)} button[aria-controls='block-#{@first.id}-body']").click
+    assert_selector "#{card(@first)} [data-block-body].hidden", visible: :all
+
+    merge_list
+
+    assert_selector panel(@inside), visible: :visible
+    assert_equal "true", find("#{card(@inside)} .admin-block-tile__face")["aria-expanded"]
+    assert_selector "#{card(@first)} [data-block-body].hidden", visible: :all
+    assert_equal "false", find("#{card(@first)} button[aria-controls='block-#{@first.id}-body']")["aria-expanded"]
+    assert_no_selector "#{card(@second)} [data-block-body].hidden", visible: :all
+  end
+
+  test "a section's own unsaved setting stays while its lanes take a colleague's new tile" do
+    form = "#section-#{@section.id}-form"
+    raise_debounce(form)
+    find("#{form} #block-#{@section.id}-background").find("option[value=strong]").select_option
+    keep(form, "__a")
+    added = colleague { add_block(section_id: @section.id, section_column: 2) }
+
+    result = merge_list
+
+    assert_includes result["kept"], "section-#{@section.id}-form"
+    assert same?("__a", form)
+    assert_equal "strong", find("#{form} #block-#{@section.id}-background").value
+    assert_selector "#section-#{@section.id}-lanes [data-column='2'] [data-block-id='#{added.id}']"
+    assert_selector "#block-#{added.id}-panel", visible: :all
+    assert_equal 1, page.evaluate_script("document.querySelectorAll('#section-#{@section.id}-form').length")
+  end
+
+  test "two cards that both hold unsaved text keep both texts when their order changed" do
+    type_unsaved(@first, "first words")
+    type_unsaved(@second, "second words")
+    keep(card(@first), "__a")
+    keep(card(@second), "__b")
+    colleague { assert ContentBlocks::Reorder.call(@page, [ @second.id, @first.id, @section.id ]).ok? }
+
+    result = merge_list
+
+    assert_equal [ "content_block_#{@first.id}", "content_block_#{@second.id}" ].sort, result["kept"].sort
+    assert same?("__a", card(@first))
+    assert same?("__b", card(@second))
+    assert_equal server_order, list_order
+    assert_selector "#{card(@first)} .ProseMirror", text: "first words"
+    assert_selector "#{card(@second)} .ProseMirror", text: "second words"
+  end
+
+  test "merging the same answer twice changes nothing the second time" do
+    type_unsaved(@first, "half a sentence")
+    keep(card(@first), "__a")
+    keep(panel(@inside), "__p")
+    colleague { assert ContentBlocks::Save.call(@second, translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
+
+    # The answer is parsed once: each merge gets its own copy of it, since a merge moves what it draws out of it.
+    first, second = run_merge(blocks_path, <<~JS)
+      const unsaved = window.__unsaved
+      const once = () => {
+        const result = merge.mergeList(list, fresh.cloneNode(true), { unsaved })
+        return { ids: Array.from(list.children).map((each) => each.id), kept: result.kept.map((each) => each.id), gone: result.gone.length, kept_html: result.kept.map((each) => each.outerHTML) }
+      }
+      done([ once(), once() ])
+    JS
+
+    assert_equal first, second
+    assert same?("__a", card(@first))
+    assert_equal list_order.uniq, list_order
+    assert_equal server_order, list_order
+  end
+
+  test "the block being read does not move on screen when a card is added above it" do
+    8.times { add_block }
+    open_editor
+    page.execute_script("document.querySelector(#{card(@section).to_json}).scrollIntoView({ block: 'start' })")
+    added = colleague { 3.times.map { add_block } }
+    colleague { assert ContentBlocks::Reorder.call(@page, added.map(&:id) + (server_order - added.map(&:id))).ok? }
+
+    moved = run_merge(blocks_path, <<~JS)
+      const card = () => document.getElementById(#{"content_block_#{@section.id}".to_json})
+      const before = card().getBoundingClientRect().top
+      merge.anchored(list, () => merge.mergeList(list, fresh, { unsaved: window.__unsaved }))
+      done({ before, after: card().getBoundingClientRect().top, scrolled: before })
+    JS
+
+    assert_in_delta moved["before"], moved["after"], 2
+    assert_equal server_order, list_order
+  end
+
+  test "one block's answer replaces its card and nothing else; a card holding unsaved text is kept; an answer of the other shape is reported missing" do
+    keep(card(@first), "__a")
+    keep(card(@second), "__b")
+    colleague { assert ContentBlocks::Save.call(@second, translations: { "en" => { body: rich_doc("Theirs") } }).ok? }
+
+    result = merge_units(blocks_path(@second))
+
+    assert_equal [ "content_block_#{@second.id}" ], result["replaced"]
+    assert_equal [], result["kept"]
+    assert_not result["missing"]
+    assert same?("__a", card(@first))
+    assert_not same?("__b", card(@second))
+    assert_selector "#{card(@second)} .ProseMirror", text: "Theirs"
+
+    type_unsaved(@first, "my words")
+    colleague { assert ContentBlocks::Save.call(@first, translations: { "en" => { body: rich_doc("Theirs again") } }).ok? }
+    result = merge_units(blocks_path(@first))
+
+    assert_equal [ "content_block_#{@first.id}" ], result["kept"]
+    assert_equal [], result["replaced"]
+    assert same?("__a", card(@first))
+    assert_selector "#{card(@first)} .ProseMirror", text: "my words"
+
+    colleague { assert ContentBlocks::Reorder.call(@page, [ @inside.id, @first.id ], section: @section.id, column: 1, moved_from: { @first.id => { section_id: "", column: "" } }).ok? }
+    before = page.evaluate_script("document.getElementById('content-blocks-list').innerHTML")
+    keep(card(@second), "__b")
+    result = merge_units(blocks_path(@first))
+
+    assert result["missing"]
+    assert_equal [], result["replaced"]
+    assert same?("__b", card(@second))
+    assert_equal before, page.evaluate_script("document.getElementById('content-blocks-list').innerHTML")
+  end
+
+  test "the focus is on the same field after its card was replaced" do
+    find("#{card(@first)} .ProseMirror").click
+    page.execute_script("window.__old = document.activeElement")
+    assert page.evaluate_script("window.__old.closest(#{card(@first).to_json}) !== null")
+
+    merge_list
+
+    assert_eventually(message: "the focus never came back to the replaced card's field") do
+      page.evaluate_script("document.activeElement !== window.__old && document.activeElement.isConnected && document.activeElement.closest(#{card(@first).to_json}) !== null && document.activeElement.isContentEditable")
+    end
+  end
+
+  test "a part that shows an alert is not replaced" do
+    post = create_post(title: "Notes")
+    open_editor "/cs-studio/posts/#{post.id}"
+    page.execute_script("document.getElementById('editor-notice').innerHTML = '<p role=\"alert\">Changed elsewhere</p>'")
+    keep("#editor-notice [role=alert]", "__a")
+
+    result = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      window.__merge.then((merge) => {
+        const fresh = document.createElement("div")
+        fresh.innerHTML = '<div id="editor-notice"></div>'
+        const result = merge.mergeUnits(document.body, fresh, { unsaved: window.__unsaved })
+        done({ kept: result.kept.map((each) => each.id), replaced: result.replaced.length, missing: result.missing })
+      })
+    JS
+
+    assert_equal [ "editor-notice" ], result["kept"]
+    assert_equal 0, result["replaced"]
+    assert_not result["missing"]
+    assert same?("__a", "#editor-notice [role=alert]")
+  end
+end
