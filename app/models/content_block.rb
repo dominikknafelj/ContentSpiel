@@ -204,6 +204,20 @@ class ContentBlock < ApplicationRecord
     definition&.capability?(:lists_posts) ? BlockTypes::PostList.lists?(settings_object, post) : false
   end
 
+  # The tag a list block's filter names, as an id; nil with no filter, and
+  # nil when no tag has that name. A block rebuilt from a published copy
+  # answers the id the copy recorded (`Publishing::Snapshot`), so a public
+  # list keeps its posts when the tag is renamed. A row asks by name, now,
+  # and never remembers the answer: its settings can change under it.
+  attr_writer :listed_tag_id
+
+  def listed_tag_id
+    return @listed_tag_id if instance_variable_defined?(:@listed_tag_id)
+
+    name = settings_object&.tag.to_s.strip
+    name.present? ? Tag.named(name).order(:id).pick(:id) : nil
+  end
+
   private
 
   # "Live" is the owner's own publication (`Publishable#live?`), as it stands

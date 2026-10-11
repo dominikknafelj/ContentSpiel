@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_11_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -375,6 +375,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "published_versions", force: :cascade do |t|
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.integer "number", null: false
+    t.jsonb "snapshot", default: {}, null: false
+    t.jsonb "blocks", default: [], null: false
+    t.boolean "lists_posts", default: false, null: false
+    t.integer "tag_ids", default: [], null: false, array: true
+    t.datetime "live_at", null: false
+    t.bigint "created_by_id"
+    t.datetime "created_at", null: false
+    t.index ["record_type", "record_id", "live_at"], name: "index_published_versions_on_record_and_live_at"
+    t.index ["record_type", "record_id", "number"], name: "index_published_versions_on_record_and_number", unique: true
+    t.index ["tag_ids"], name: "index_published_versions_on_tag_ids", using: :gin
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -471,5 +487,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
   add_foreign_key "posts", "users", column: "author_id", on_delete: :nullify
   add_foreign_key "posts", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "presence_marks", "users", on_delete: :cascade
+  add_foreign_key "published_versions", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "sessions", "users"
 end

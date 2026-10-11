@@ -19,6 +19,10 @@ module Pages
   #
   # Pages have no author (design spec §8), so there's no `own` rule here.
   #
+  # A page published or scheduled for the first time, or again after an
+  # unpublish, also takes its published copy (`Publishing::Version.take!`)
+  # in the same transaction; a save of a page that has a time takes none.
+  #
   # The hero is a library image (media library design spec §5.1):
   # `hero_media_asset_id` in `attributes` sets, changes or (nil) clears
   # it. Choosing one also needs `media.upload` and an existing asset
@@ -81,6 +85,7 @@ module Pages
       # savepoint, so the FK refusal rescued below can't leave a caller's
       # transaction aborted.
       saved = Page.transaction(requires_new: true) do
+        was_unpublished = @page.published_at_in_database.nil?
         assign
         refused = refusal_after_assign
         raise ActiveRecord::Rollback if refused
@@ -95,6 +100,11 @@ module Pages
         # Where the page stands in each language (`translation_states`), like
         # the usage rows above: derived inside the same transaction.
         Translations::StateIndex.refresh(@page)
+        # Published or scheduled for the first time, or again after an
+        # unpublish: the copy the public site will show (drafts spec §4.3).
+        # A save of a record that already has a time takes none: its changes
+        # wait for `Publishing::PublishChanges`.
+        Publishing::Version.take!(@page, by: actor_user) if was_unpublished && @page.published_at.present?
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end

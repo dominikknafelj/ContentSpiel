@@ -39,6 +39,10 @@ module Posts
   # existence check and that write fails the save as "has an image that
   # doesn't exist" (`Media::Choosing#vanished_media_failure`), not a 500.
   #
+  # A post published or scheduled for the first time, or again after an
+  # unpublish, also takes its published copy (`Publishing::Version.take!`)
+  # in the same transaction; a save of a post that has a time takes none.
+  #
   # `attributes:` is an allow-list (`ATTRIBUTES`), and any other key is an
   # `ArgumentError` -- a programming error, raised before anything is
   # checked or written (see `Pages::Save`, which has the same rule for the
@@ -87,6 +91,7 @@ module Posts
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = Post.transaction(requires_new: true) do
+        was_unpublished = @post.published_at_in_database.nil?
         related_before = related_state
         assign
         refused = refusal_after_assign
@@ -100,6 +105,10 @@ module Posts
         Media::UsageIndex.refresh(@post)
         # The post's stored translation state (`translation_states`).
         Translations::StateIndex.refresh(@post)
+        # Published or scheduled for the first time, or again after an
+        # unpublish: the copy the public site will show (drafts spec §4.3).
+        # Taken after the tags and related posts are written.
+        Publishing::Version.take!(@post, by: actor_user) if was_unpublished && @post.published_at.present?
         record_events(related_before)
         true
       end

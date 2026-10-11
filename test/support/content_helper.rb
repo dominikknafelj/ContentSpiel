@@ -38,6 +38,12 @@ module ContentHelper
     Editing::Reservation.claim(subject: subject, record: record, user: user, tab: tab, now: Time.current)
   end
 
+  # Makes the rows of a published record what the public sees, as "Publish
+  # changes" does.
+  def publish_changes(record)
+    Publishing::Version.transaction { Publishing::Version.take!(record.reload) }
+  end
+
   def create_page(title:, parent: root_page, published: true, translations: {})
     result = Pages::Save.call(attributes: { parent: parent, published: published },
       translations: { Locales.default => { title: title } }.merge(translations))

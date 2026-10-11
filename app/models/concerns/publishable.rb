@@ -25,7 +25,15 @@ module Publishable
     before_destroy :note_live_before_change
     after_commit :bump_public_version_when_live
     after_rollback :forget_live_before_change
+
+    # The copies the public site has shown of this record (`Publishing`).
+    # Deleted with it, around their callbacks: they have none.
+    has_many :published_versions, class_name: "Publishing::Version", as: :record, dependent: :delete_all # version: none (the destroyed record's own after_commit bumps when it was live)
   end
+
+  # The copy a record REBUILT by `Publishing::Snapshot` was made from; nil on
+  # a row. A public reader that needs to know which it holds asks this.
+  attr_accessor :published_version
 
   def status
     if published_at.nil?
