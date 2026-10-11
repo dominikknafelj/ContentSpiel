@@ -410,8 +410,14 @@ export default class extends Controller {
   // never round-trips to the server the way a drag/move does. The title
   // button is the disclosure: `aria-expanded` follows.
   toggle(event) {
-    const hidden = this.cardFor(event)?.querySelector("[data-block-body]")?.classList.toggle("hidden")
-    if (hidden !== undefined) event.currentTarget.setAttribute("aria-expanded", String(!hidden))
+    const card = this.cardFor(event)
+    const hidden = card?.querySelector("[data-block-body]")?.classList.toggle("hidden")
+    if (hidden === undefined) return
+
+    event.currentTarget.setAttribute("aria-expanded", String(!hidden))
+    // A collapsed card's form is closed: whoever holds the block for this tab
+    // lets it go (`admin--editing--hold`), behind the form's last save.
+    this.dispatch("toggled", { detail: { blockId: card.dataset.blockId, hidden } })
   }
 
   // "Move up/down (client-side move, then the same reorder request)" (this

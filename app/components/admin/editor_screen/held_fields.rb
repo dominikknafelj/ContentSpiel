@@ -13,7 +13,7 @@ module Admin
     # and the held form cannot drift apart (the component tests compare every
     # control's name and value, and everything else of its markup). The
     # browser's counterpart, for the one form that turns read-only in place,
-    # will be Task 9's `editing/freeze`: the same lists.
+    # is `editing/freeze`, which reads `rules` below.
     #
     # WHAT THE PARSE KEEPS AND WHAT IT DOES NOT. Parsed with the HTML5
     # parser and written out again, the markup keeps its entities, its
@@ -51,6 +51,12 @@ module Admin
         admin--ui--menu#select
         admin--ui--menu#close
       ].freeze
+      # The rules as data, for the browser's counterpart (`editing/freeze`),
+      # which turns ONE form read-only in place: the region renders this into
+      # the page (`LiveRegionComponent`), so the script and this module read
+      # one source and the lists are written once.
+      def self.rules = { allowed_actions: ALLOWED_ACTIONS, readonly_types: READONLY_TYPES, hidden_types: HIDDEN_TYPES }
+
       GUARD = '<button type="submit" disabled hidden tabindex="-1" data-held-guard></button>'.freeze
       NEWLINE_FIRST = "textarea, pre, listing".freeze
 

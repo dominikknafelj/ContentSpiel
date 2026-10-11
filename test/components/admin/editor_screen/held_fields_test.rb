@@ -187,4 +187,13 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
       assert_survives(rendered_content)
     end
   end
+
+  test "the rules the browser's freeze reads are this module's own lists, and nothing else" do
+    rules = Admin::EditorScreen::HeldFields.rules
+
+    assert_equal %i[allowed_actions hidden_types readonly_types], rules.keys.sort
+    assert_same Admin::EditorScreen::HeldFields::ALLOWED_ACTIONS, rules[:allowed_actions]
+    assert_same Admin::EditorScreen::HeldFields::READONLY_TYPES, rules[:readonly_types]
+    assert_same Admin::EditorScreen::HeldFields::HIDDEN_TYPES, rules[:hidden_types]
+  end
 end

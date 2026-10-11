@@ -19,12 +19,19 @@ module Admin
       def region_data
         route = { kind: kind, id: @record.id, **@url_options }
         {
-          controller: "admin--editing--live", live_part: "waiting",
+          controller: "admin--editing--live admin--editing--hold", live_part: "waiting",
           "admin--editing--live-kind-value": kind, "admin--editing--live-id-value": @record.id,
           "admin--editing--live-blocks-url-value": (helpers.admin_editing_blocks_path(**route) if @record.is_a?(::Page)),
           "admin--editing--live-block-url-value": (helpers.admin_editing_block_path(**route, block_id: 0).sub("/blocks/0", "/blocks/:block_id") if @record.is_a?(::Page)),
           "admin--editing--live-record-url-value": helpers.admin_editing_record_path(**route),
-          "admin--editing--live-notice-value": ::Editing::NOTICE.in_milliseconds
+          "admin--editing--live-notice-value": ::Editing::NOTICE.in_milliseconds,
+          "admin--editing--hold-claim-url-value": helpers.admin_editing_claim_path(**route),
+          "admin--editing--hold-release-url-value": helpers.admin_editing_release_path(**route),
+          "admin--editing--hold-block-url-value": (helpers.admin_editing_block_path(**route, block_id: 0).sub("/blocks/0", "/blocks/:block_id") if @record.is_a?(::Page)),
+          "admin--editing--hold-hold-value": ::Editing::HOLD.in_milliseconds,
+          "admin--editing--hold-pass-over-value": ::Editing::PASS_OVER.in_milliseconds,
+          "admin--editing--hold-notice-value": ::Editing::NOTICE.in_milliseconds,
+          "admin--editing--hold-rules-value": ::Admin::EditorScreen::HeldFields.rules.to_json
         }.compact
       end
     end

@@ -138,6 +138,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
       window.fetch = (url, options = {}) => {
         const method = (options.method || "GET").toUpperCase()
         if (method === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the save the move waits behind
         window.__writes.push(method)
         if (method !== "PATCH" || window.__writes.filter((m) => m === "PATCH").length > 1) return originalFetch(url, options)
         return new Promise((resolve) => { window.__releaseSave = () => resolve(originalFetch(url, options)) })

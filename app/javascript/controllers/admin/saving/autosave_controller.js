@@ -159,8 +159,33 @@ export default class extends Controller {
 
   queue() {
     if (this.paused) return
+    this.announce()
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => this.trigger(), this.debounceValue)
+  }
+
+  // THE FIRST CHANGE OF A CLEAN FORM (live-editing spec §4.2): said once per
+  // burst of typing, before the debounce is even started, so whoever claims
+  // the record for this tab (`admin--editing--hold`) queues its claim ahead
+  // of the save. A form with a save pending or on the wire has said it. The
+  // detail is the form's unit (`data-editing-subject`); a form outside an
+  // editor has none and nobody listens.
+  announce() {
+    if (this.timer || this.busy || this.pending || this.unchanged()) return
+    this.dispatch("dirty", { detail: { subject: this.element.closest("[data-editing-subject]")?.dataset.editingSubject } })
+  }
+
+  // Ends this form's saves as a 409 does, without a request: its claim was
+  // refused before it had sent anything, or it was frozen in place. The text
+  // stays in the fields. A save already queued behind the refused claim finds
+  // the form paused when its turn comes and sends nothing (`attempt`).
+  pause() {
+    this.paused = true
+    this.failed = true
+    this.pending = false
+    if (this.timer) clearTimeout(this.timer)
+    if (this.retryTimer) clearTimeout(this.retryTimer)
+    this.timer = this.retryTimer = null
   }
 
   // Called by `drained()` (`saving/queue.js`) before a header action or a
@@ -205,6 +230,7 @@ export default class extends Controller {
 
   saveNow() {
     if (this.paused) return
+    this.announce()
     if (this.timer) clearTimeout(this.timer)
     this.trigger()
   }
@@ -239,9 +265,15 @@ export default class extends Controller {
     const status = document.getElementById(this.statusIdValue)
     this.setStatus(status && status.hasAttribute("data-live") ? this.text("components.ui.save_status.saving_live") : this.text("components.ui.save_status.saving"))
 
-    const outcome = await enqueue((isCurrent) => this.send(isCurrent), { generation: this.generation })
+    // A form paused while its save waited its turn (its claim was refused
+    // ahead of it, or it was frozen) sends nothing: the notice is already up.
+    const outcome = await enqueue((isCurrent) => this.paused ? "skipped" : this.send(isCurrent), { generation: this.generation })
 
     switch (outcome) {
+      case "skipped":
+        this.pending = false
+        this.busy = false
+        return
       case "stale":
         // This form's page has been replaced -- while the save was in flight
         // or waiting its turn, or before it was even queued (a restoration

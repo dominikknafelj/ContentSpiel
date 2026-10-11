@@ -99,13 +99,44 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a block deleted since is gone, not missing" do
+  test "a block deleted since is gone, not missing, and the answer is the notice naming who deleted it" do
     id = @block.id
-    assert ContentBlocks::Destroy.call(@block).ok?
+    users(:two).update!(name: "Dana Weiss")
+    assert as(users(:two)) { ContentBlocks::Destroy.call(@block) }.ok?
 
     get admin_editing_block_path(kind: "page", id: @page.id, block_id: id)
 
     assert_response :gone
+    assert_select "[role=alert][data-editing-kind=deleted][data-editing-subject='block-#{id}']", text: /Dana Weiss deleted this block\. Your changes weren't saved\./
+    assert_select "button", text: "Copy my text"
+    assert_select "button", text: "Remove"
+  end
+
+  test "a block deleted together with its section is gone too, with the same notice: the section's event lists it" do
+    id = @inside.id
+    users(:two).update!(name: "Dana Weiss")
+    assert as(users(:two)) { ContentBlocks::Destroy.call(@section) }.ok?
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: id)
+
+    assert_response :gone
+    assert_select "[role=alert][data-editing-kind=deleted]", text: /Dana Weiss deleted this block\./
+  end
+
+  test "a block kept when its section was removed is not gone, and a block of another page or never made is a 404" do
+    id = @inside.id
+    assert ContentBlocks::Destroy.call(@section, keep_blocks: true).ok?
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: id)
+    assert_response :ok
+
+    other = create_page(title: "Other", published: false)
+    doomed = ContentBlocks::Save.call(ContentBlock.new(owner: other), attributes: { block_type: "image" }).record
+    assert ContentBlocks::Destroy.call(doomed).ok?
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: doomed.id)
+    assert_response :not_found
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: 999_999_999)
+    assert_response :not_found
   end
 
   test "a reader gets the parts, view-only" do
@@ -297,12 +328,21 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
 
   test "the live region carries the addresses the scripts need, and nothing for blocks on a post" do
     get admin_page_path(@page)
-    assert_select "#editing[data-controller='admin--editing--live'][data-live-part=waiting]" \
+    assert_select "#editing[data-controller='admin--editing--live admin--editing--hold'][data-live-part=waiting]" \
       "[data-admin--editing--live-kind-value=page][data-admin--editing--live-id-value='#{@page.id}']" \
       "[data-admin--editing--live-blocks-url-value='#{admin_editing_blocks_path(kind: "page", id: @page.id)}']" \
       "[data-admin--editing--live-block-url-value='/cs-studio/editing/page/#{@page.id}/blocks/:block_id']" \
       "[data-admin--editing--live-record-url-value='#{admin_editing_record_path(kind: "page", id: @page.id)}']" \
-      "[data-admin--editing--live-notice-value='6000']"
+      "[data-admin--editing--live-notice-value='6000']" \
+      "[data-admin--editing--hold-claim-url-value='#{admin_editing_claim_path(kind: "page", id: @page.id)}']" \
+      "[data-admin--editing--hold-release-url-value='#{admin_editing_release_path(kind: "page", id: @page.id)}']" \
+      "[data-admin--editing--hold-block-url-value='/cs-studio/editing/page/#{@page.id}/blocks/:block_id']" \
+      "[data-admin--editing--hold-hold-value='#{Editing::HOLD.in_milliseconds}']" \
+      "[data-admin--editing--hold-pass-over-value='#{Editing::PASS_OVER.in_milliseconds}']" \
+      "[data-admin--editing--hold-notice-value='#{Editing::NOTICE.in_milliseconds}']"
+    rules = JSON.parse(css_select("#editing").first["data-admin--editing--hold-rules-value"])
+    assert_equal Admin::EditorScreen::HeldFields::ALLOWED_ACTIONS, rules["allowed_actions"], "freeze.js reads the server's own lists"
+    assert_equal Admin::EditorScreen::HeldFields::READONLY_TYPES, rules["readonly_types"]
     assert_select "#editing #page-settings"
     assert_select "#editing #content-blocks-list"
 
@@ -310,5 +350,7 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     get admin_post_path(post)
     assert_select "#editing[data-admin--editing--live-kind-value=post] #post-form"
     assert_select "#editing[data-admin--editing--live-blocks-url-value]", false
+    assert_select "#editing[data-admin--editing--hold-claim-url-value='#{admin_editing_claim_path(kind: "post", id: post.id)}']"
+    assert_select "#editing[data-admin--editing--hold-block-url-value]", false
   end
 end

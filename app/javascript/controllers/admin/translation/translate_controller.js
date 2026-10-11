@@ -81,6 +81,8 @@ export default class extends Controller {
   // --- Asking ---------------------------------------------------------------
 
   async translate() {
+    // A field of a held or frozen form is nobody's to fill.
+    if (!onScreen(this.element)) return
     const field = describe(this.element)
     await this.request([ field ], { url: this.urlValue, locale: this.localeValue })
     await settle()
@@ -219,6 +221,7 @@ export default class extends Controller {
 
   use(event) {
     const button = event.currentTarget
+    if (!onScreen(button)) return
     const box = button.closest("[data-translation-box]")
     const input = document.getElementById(button.dataset.translateInputId)
     if (!input) {
@@ -529,12 +532,13 @@ function emptyFields() {
 // is hidden. The editors have no such panel, so for them everything counts.
 //
 // Nor on a field someone else holds (live editing): a unit that says
-// `data-editing-held`, or a form frozen as `fieldset.admin-held`, is read-only
-// and was never saved from here. Its empty fields are not counted or asked
+// `data-editing-held`, or a form frozen as `fieldset.admin-held` or
+// `data-editing-frozen` (a refused form turned read-only in place), is
+// read-only and was never saved from here. Its empty fields are not counted or asked
 // for, and a suggestion that reached it is neither counted nor applied by
 // Use all nor discarded by Discard all.
 function onScreen(element) {
-  return !element.closest("[data-language-panel][hidden], [data-editing-held], fieldset.admin-held")
+  return !element.closest("[data-language-panel][hidden], [data-editing-held], [data-editing-frozen], fieldset.admin-held")
 }
 
 // A field's Translate wrapper, as the request needs it.

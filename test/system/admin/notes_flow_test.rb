@@ -172,6 +172,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
       window.fetch = (url, options = {}) => {
         const method = (options.method || "GET").toUpperCase()
         if (method === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the autosave this test holds on the wire
         window.__writes.push(`${method} ${new URL(String(url.url || url), location.href).pathname}`)
         if (window.__released) return originalFetch(url, options)
         return new Promise((resolve) => { window.__held.push(() => resolve(originalFetch(url, options))) })

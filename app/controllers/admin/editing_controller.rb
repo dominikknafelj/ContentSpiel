@@ -120,14 +120,19 @@ module Admin
     end
 
     # A block that is not this page's and one that never existed are a 404; a
-    # block this page's audit log says was deleted is a 410. Asked of the
-    # event `ContentBlocks::Destroy` writes, which names its page.
+    # block this page's audit log says was deleted is a 410, whose body is the
+    # notice the hold script shows under the text of someone who was still
+    # typing in it (`admin--editing--hold#deleted`): "Dana Weiss deleted this
+    # block. Your changes weren't saved." Asked of the event
+    # `ContentBlocks::Destroy` writes, which names its page: the block's own,
+    # or the section's that took it along (`deleted_block_ids`).
     def block_gone
-      deleted = Audit::Event.where(action: "block.deleted", subject_type: "ContentBlock", subject_id: params[:block_id].to_i)
-        .order(id: :desc).first
-      raise ActiveRecord::RecordNotFound unless deleted && deleted.metadata.to_h["page_id"] == @record.id
+      deleted = Audit::Event.deleting_block(params[:block_id].to_i, @record.id).order(id: :desc).first
+      raise ActiveRecord::RecordNotFound unless deleted
 
-      head :gone
+      strip = Admin::EditorScreen::HoldStripComponent.new(subject: ContentBlock.new(id: params[:block_id].to_i), hold: nil, viewer: Current.user,
+        kind: :deleted, actor: deleted.user)
+      render strip, status: :gone, layout: false
     end
 
     # The card of a top-level block as `pages/show.html.erb` draws it.

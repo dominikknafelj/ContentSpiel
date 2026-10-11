@@ -32,6 +32,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.fetch = (url, options = {}) => {
         const method = (options.method || "GET").toUpperCase()
         if (method === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim or a release is not one of the saves this test holds
         window.__writes.push(String(url.url || url))
         if (window.__writes.length > 1) return originalFetch(url, options)
         return new Promise((resolve) => { window.__releaseSave = () => resolve(originalFetch(url, options)) })
@@ -45,7 +46,8 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       const originalFetch = window.fetch
       window.__writes = []
       window.fetch = (url, options = {}) => {
-        if ((options.method || "GET").toUpperCase() !== "GET") window.__writes.push(String(url.url || url))
+        // a claim or a release (`/cs-studio/editing/`) is not one of the writes this counts
+        if ((options.method || "GET").toUpperCase() !== "GET" && !String(url.url || url).includes("/cs-studio/editing/")) window.__writes.push(String(url.url || url))
         return originalFetch(url, options)
       }
     JS
@@ -538,6 +540,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.__writes = 0
       window.fetch = (url, options = {}) => {
         if ((options.method || "GET").toUpperCase() === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the layout's save
         window.__writes += 1
         if (window.__writes > 1) return originalFetch(url, options)
         return Promise.resolve(new Response("", { status: 422, headers: { "Content-Type": "text/vnd.turbo-stream.html" } }))
@@ -803,6 +806,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.__release = []
       window.fetch = (url, options = {}) => {
         if ((options.method || "GET").toUpperCase() === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim or a release is not one of the writes the plan scripts
         const number = window.__writes.push(String(url.url || url)) - 1
         if (plan[number] === "fail") return Promise.resolve(failure())
         if (plan[number] !== "hold") return originalFetch(url, options)

@@ -186,6 +186,11 @@ export default class extends Controller {
 
   hide(panel, { refocus }) {
     this.sendNow(panel)
+    // The block's form is closed: whoever holds it for this tab lets it go
+    // (`admin--editing--hold`), behind the save `sendNow` has just queued.
+    // Every way a panel closes comes through here (Close, a second press on
+    // the tile, Escape, another tile opened).
+    this.dispatch("closed", { detail: { blockId: panel.dataset.blockId } })
     panel.hidden = true
     const face = this.faceFor(panel.dataset.blockId)
     face?.setAttribute("aria-expanded", "false")

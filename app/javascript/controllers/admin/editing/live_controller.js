@@ -14,7 +14,11 @@ import { anchored, holds, mergeList, mergeUnits } from "editing/merge"
 // the block list (`structure`), or the record's own form. What comes back is
 // handed to `editing/merge`, which never replaces a form that holds unsaved
 // changes. The tab that made the change skips its own signal (`origin`).
-// `holder` signals (Task 8) and any kind not known are ignored.
+// A `holder` signal (a claim, a release, a request, a take-over) leads to the
+// same fetch of the same part, through the same line: the block's own card
+// (or tile and panel), or the record's form. What the part says about its
+// holder is drawn by the server for this viewer, so the merge does the rest.
+// Any kind not known is ignored.
 //
 // ONE LINE OF READS. This script has at most ONE GET on its way. What is
 // asked meanwhile is owed (`pending`) and coalesced: the list swallows the
@@ -136,6 +140,7 @@ export default class extends Controller {
 
   heard(signal) {
     if (signal.origin === TAB) return
+    if (signal.kind === "holder") return this.want(signal.content_block_id ? `block:${signal.content_block_id}` : "record")
     if (signal.kind !== "content") return
     if (signal.reason === "gone") return this.want("record")
     if (signal.reason === "structure") return this.want(this.hasBlocksUrlValue ? "blocks" : "record")
@@ -145,8 +150,19 @@ export default class extends Controller {
   // The hold script asks for a subject's part again: a hold that lapsed, a
   // refused form that is discarded (`discard`: its unit may be replaced
   // although its form is not clean).
+  //
+  // A DISCARD is a promise to show the server's version whatever it says about
+  // that version: the units of the subject (a block in a section has two, its
+  // tile's panel and its card) are marked, and their version is cleared, so
+  // that no catch-up (`onlyChanged`, which an ask made while the document was
+  // hidden has become) can find them "unchanged" and keep the refused text.
   refresh({ subject, discard = false }) {
-    if (discard) document.querySelector(`[data-editing-unit][data-editing-subject="${CSS.escape(subject)}"]`)?.setAttribute("data-editing-discard", "true")
+    if (discard) {
+      for (const unit of this.element.querySelectorAll(`[data-editing-unit][data-editing-subject="${CSS.escape(subject)}"]`)) {
+        unit.setAttribute("data-editing-discard", "true")
+        unit.removeAttribute("data-editing-version")
+      }
+    }
     this.want(subject === "record" ? "record" : `block:${subject.replace("block-", "")}`)
   }
 

@@ -27,6 +27,15 @@ module Audit
     scope :for_subject, ->(record) { where(subject: record) }
     scope :by_user, ->(user) { where(user_id: user.id) }
 
+    # The `block.deleted` events that took a block away: its own, and the
+    # section's that deleted it WITH the section (`deleted_block_ids`, the one
+    # event `ContentBlocks::Destroy` records for them all), on this page.
+    scope :deleting_block, ->(block_id, page_id) {
+      own = where(subject_type: "ContentBlock", subject_id: block_id)
+      with_section = where(SqlNodes.json_array_contains(arel_table[:metadata], :deleted_block_ids, block_id))
+      where(action: "block.deleted").merge(own.or(with_section)).where(SqlNodes.json_text(arel_table[:metadata], :page_id).eq(page_id.to_s))
+    }
+
     # The events on either side of `event` in the log's own order
     # (`last_occurred_at, id`, see `Audit::Filter.ordered`): a row comparison,
     # `(last_occurred_at, id) < (?, ?)`, on the very pair

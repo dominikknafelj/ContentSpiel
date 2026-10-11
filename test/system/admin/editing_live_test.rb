@@ -67,15 +67,16 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     assert_eventually(wait: LIVE, message: -> { "#{message}: screen #{list_order.inspect}, server #{server_order.inspect}" }) { list_order == server_order }
   end
 
-  # Counts every request to the editing GETs, passing each through. Installed
+  # Counts every request to the editing GETs (not the claims and releases, which are POSTs), passing each through. Installed
   # for the page already open (`count_requests`) or before the next load
   # (`count_requests_from_load`).
   COUNTER = <<~JS.freeze
     window.__seen = []
     const real = window.fetch
-    window.fetch = function (input) {
+    window.fetch = function (input, init = {}) {
       const url = typeof input === "string" ? input : input.url
-      if (url.includes("/cs-studio/editing/")) window.__seen.push(url)
+      // The GETs: a claim or a release (a POST to the same place) is the hold's, not a read.
+      if (url.includes("/cs-studio/editing/") && String(init.method || "GET").toUpperCase() === "GET") window.__seen.push(url)
       return real.apply(this, arguments)
     }
   JS

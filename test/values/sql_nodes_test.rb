@@ -24,6 +24,10 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal %("pages"."title" ->> 'de' ILIKE '%x%'), sql(SqlNodes.json_text(@pages[:title], "de").matches("%x%"))
   end
 
+  test "json_array_contains asks whether a jsonb array at one key holds a value" do
+    assert_equal %(("audit_events"."metadata" -> 'deleted_block_ids') @> CAST('[7]' AS jsonb)), sql(SqlNodes.json_array_contains(@events[:metadata], :deleted_block_ids, 7))
+  end
+
   test "coalesce takes nodes and values" do
     assert_equal %(COALESCE(LOWER("pages"."content_type"), '')), sql(SqlNodes.coalesce(@pages[:content_type].lower, ""))
   end
