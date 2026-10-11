@@ -56,7 +56,22 @@ module Editing
   # NOT_A_CHANGE`): no content row is written, nothing a stale check reads
   # moves.
   #
-  # lock: none (a reservation's statements are atomic by its unique index, and no content row is written)
+  # LOCKS: the subject's own reservation row (`FOR UPDATE`), nothing else:
+  # never a content row, and no other service names `Editing::`, so no cycle
+  # with a content write. It is one short transaction (one locking read, up to
+  # four statements, one audit insert), and nothing is sent or rendered inside
+  # it: the signal and the audit notification go out after the outermost
+  # commit. With no row there is nothing to lock and the unique index settles
+  # the race: the loser's claim is refused and it asks the winner. If both
+  # lost races leave no request standing, the call answers what is true of the
+  # row after the retry, never `pending` without a request.
+  #
+  # LEFT AS IT IS: `Users::Destroy` of the REQUESTER while a transfer of that
+  # person's request runs could deadlock (the transfer's UPDATE checks the
+  # user row that the destroy holds while it waits to nullify the
+  # reservation); Postgres aborts one of them. It needs an admin deleting
+  # someone mid-take-over, and the single statements `hand_over` and
+  # `pass_over` have the same cycle with or without this lock.
   class TakeOver < ApplicationService
     PREFIX = { "ContentBlock" => "block", "Page" => "page", "Post" => "post" }.freeze
 
@@ -94,7 +109,7 @@ module Editing
         return passed(from: @row.user_id, to: user.id, answered: false, outcome: :taken)
       end
 
-      2.times do
+      3.times do
         case Reservation.request(subject: @subject, by: user, tab: @tab, now:)
         when :requested
           @outcome = :requested
@@ -109,7 +124,19 @@ module Editing
         Signals.holder(@record, @subject, "claimed") if claimed == :taken
         return @outcome = :claimed
       end
-      @outcome = :pending
+      # Three lost races in a row cannot leave a live row of another tab
+      # without a request standing (a request would have been written), so this
+      # is reached only by a row that changed under us again: say what is true
+      # of it now.
+      @outcome = settled_outcome(user, now)
+    end
+
+    def settled_outcome(user, now)
+      row = Reservation.of(@subject).live(now).first
+      return :claimed if row.nil? || (row.user_id == user.id && row.tab == @tab)
+      return :requested if row.requested_by_id == user.id && row.requested_tab == @tab
+
+      row.requested? ? :pending : :requested
     end
 
     def hand_over(user, now)

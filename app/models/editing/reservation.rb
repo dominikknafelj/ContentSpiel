@@ -17,7 +17,7 @@ module Editing
   # one row a statement touches (an `ON CONFLICT DO UPDATE` locks the
   # conflicting row even when its WHERE refuses), until the end of the
   # transaction the statement is in: in autocommit that is the statement
-  # itself, which is how every caller must use these. NEVER call one inside a
+  # itself, which is how every caller must use these (the one exception is `Editing::TakeOver`'s short transaction, which locks this very row first). NEVER call one inside a
   # long transaction, or the row stays locked for everyone else's claim.
   #
   # `request` answers a symbol. The FIRST requester keeps the request:

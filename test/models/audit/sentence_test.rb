@@ -412,6 +412,19 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You took over editing “Hello”", read(sentence_for(event("post.taken_over", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
   end
 
+  test "an answered take-over reads as the actor having handed editing over, an unanswered one as having taken it" do
+    page = create_page(title: "Pricing")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    handed = { "from_user_id" => @me.id, "to_user_id" => users(:two).id, "answered" => true }
+    passed = handed.merge("answered" => false)
+
+    assert_equal "You handed over editing a block on “Pricing”", read(sentence_for(event("block.taken_over", subject_type: "ContentBlock", subject_id: block.id, subject_label: "x", metadata: handed)))
+    assert_equal "You took over editing a block on “Pricing”", read(sentence_for(event("block.taken_over", subject_type: "ContentBlock", subject_id: block.id, subject_label: "x", metadata: passed)))
+    assert_equal "You handed over editing “Pricing”", read(sentence_for(event("page.taken_over", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: handed)))
+    assert_equal "You handed over editing “Hello”", read(sentence_for(event("post.taken_over", subject_type: "Post", subject_id: 1, subject_label: "Hello", metadata: handed)))
+    assert_equal "You took over editing “Hello”", read(sentence_for(event("post.taken_over", subject_type: "Post", subject_id: 1, subject_label: "Hello", metadata: passed)))
+  end
+
   test "a note's events read as sentences about the record, a block's about its page" do
     page = create_page(title: "Pricing")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)

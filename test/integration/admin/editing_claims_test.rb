@@ -628,10 +628,25 @@ class Admin::EditingClaimsTest < ActionDispatch::IntegrationTest
     %i[take_over hand_over].each do |action|
       take_over(block: other_block, tab: TAB_A, action:)
       assert_response :not_found
-      post admin_editing_take_over_path(kind: "page", id: 0), headers: { "X-Notes-Tab" => TAB_A }
+      post (action == :take_over ? admin_editing_take_over_path(kind: "page", id: 0) : admin_editing_hand_over_path(kind: "page", id: 0)), headers: { "X-Notes-Tab" => TAB_A }
       assert_response :not_found
       take_over(block: @block, action:)
       assert_response :unprocessable_entity
     end
+  end
+
+  test "take over and hand over answer 404, never 403, for a page outside the viewer's read scope" do
+    outside = create_page(title: "Outside", published: false)
+    limited_editor("pages.edit")
+    AccessControl::Grant.where(group: access_control_groups(:branch_editors), permission: "pages.edit").destroy_all
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: { "page_ids" => [ @page.id ] })
+    sign_in_as users(:editor_branch)
+
+    %i[take_over hand_over].each do |action|
+      take_over(record: outside, tab: TAB_A, action:)
+      assert_response :not_found
+    end
+    take_over(tab: TAB_A)
+    assert_response :ok
   end
 end

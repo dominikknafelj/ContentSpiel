@@ -227,6 +227,8 @@ module Audit
           after = "#{after} for #{date}"
         elsif verb == "unpublished" && schedule_removed?
           before = "removed the schedule from "
+        elsif verb == "taken_over" && handed_over?
+          before = "handed over editing "
         elsif verb == "updated" && @action == "media.updated" && alt_only?
           before = "updated the alt text of "
         end
@@ -276,7 +278,7 @@ module Audit
             when "updated" then [ "edited a #{noun} on ", "" ]
             when "deleted" then [ "deleted a #{noun} from ", "" ]
             when "reordered" then [ "reordered the blocks on ", "" ]
-            when "taken_over" then [ "took over editing a #{noun} on ", "" ]
+            when "taken_over" then [ "#{handed_over? ? "handed over" : "took over"} editing a #{noun} on ", "" ]
             else CONTENT_VERBS.fetch("translation_confirmed")
             end
           subject_parts(before, after)
@@ -284,9 +286,17 @@ module Audit
           case verb
           when "reordered" then [ text("reordered the blocks of a page") ]
           when "translation_confirmed" then subject_parts(*CONTENT_VERBS.fetch("translation_confirmed"))
-          else subject_parts({ "created" => "added ", "updated" => "edited ", "deleted" => "deleted ", "taken_over" => "took over editing " }.fetch(verb))
+          else subject_parts({ "created" => "added ", "updated" => "edited ", "deleted" => "deleted ", "taken_over" => "#{handed_over? ? "handed over" : "took over"} editing " }.fetch(verb))
           end
         end
+      end
+
+      # A take-over event's actor is whoever called the service: the holder
+      # who answered (`answered: true`, they gave it up) or the requester who
+      # passed it over (`answered: false`, they took it). The other person is
+      # in the metadata's ids, never in the sentence.
+      def handed_over?
+        event.metadata.is_a?(Hash) && event.metadata["answered"] == true
       end
 
       def block_type
