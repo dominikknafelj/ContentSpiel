@@ -18,11 +18,8 @@ module ContentBlocks
   module OwnerPermissions
     private
 
-    def owner_refusal(owner)
-      prefix = AccessControl::Checker::BLOCK_OWNER_PREFIX.fetch(owner.class.name)
-      keys = [ "#{prefix}.edit" ]
-      keys << "#{prefix}.publish" if owner.published_at.present?
-      keys.find { |key| !yield(key) }
+    def owner_refusal(owner, &)
+      AccessControl::OwnerRule.refusal(owner, &)
     end
   end
 end

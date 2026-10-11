@@ -1,8 +1,8 @@
 module Editing
   # The live reservations of one page or post, read ONCE for a whole screen:
   # every card, tile and form asks this object, so an editor costs the same
-  # statements for 3 blocks as for 30 (one for the rows, one each for their
-  # users and requesters). `viewer` and `tab` say whose screen it is: a hold
+  # statements for 3 blocks as for 30: up to three (the rows, then their users,
+  # then their requesters), however many blocks there are. `viewer` and `tab` say whose screen it is: a hold
   # is OTHER unless it is this person's in this very tab (their other tab is
   # someone else, and so is everyone when the tab is unknown). A row carries
   # its holder (`user`, `tab`) and its pending request (`requested_by`,

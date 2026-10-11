@@ -11,9 +11,23 @@ module Editing
   # it when that person is deleted): see `#requested?`.
   #
   # EVERY METHOD IS ONE STATEMENT on the unique index of the subject, so two
-  # tabs can never both hold one; none takes a row lock, none runs a callback
+  # tabs can never both hold one; none asks for a lock, none runs a callback
   # and none writes anything but its own row: no `touch`, nothing of the
-  # record, no audit event, no content version. The clock is the caller's
+  # record, no audit event, no content version. What Postgres does lock is the
+  # one row a statement touches (an `ON CONFLICT DO UPDATE` locks the
+  # conflicting row even when its WHERE refuses), until the end of the
+  # transaction the statement is in: in autocommit that is the statement
+  # itself, which is how every caller must use these. NEVER call one inside a
+  # long transaction, or the row stays locked for everyone else's claim.
+  #
+  # `request` answers a symbol. The FIRST requester keeps the request:
+  # `:requested` (the request is now this tab's: new, or the same tab asking
+  # again, which keeps `requested_at`), `:pending` (another tab's request
+  # stands and is younger than `2 * PASS_OVER`: nothing changed) or `:none`
+  # (no live row of another tab: the caller simply claims). A request older
+  # than `2 * PASS_OVER` that was never passed over (its tab is gone) is
+  # replaced by a new requester, and the same tab asking again after that long
+  # starts afresh, so the holder always gets PASS_OVER to answer. The clock is the caller's
   # (`now:`), handed to the statement as a value (never the database's
   # NOW()), so a test asks about any instant without moving time.
   #
@@ -35,10 +49,14 @@ module Editing
 
     # Inserts the row, or takes an expired one, or renews the tab's own; a
     # live row of another tab is left as it is and the statement returns
-    # nothing. `renewed` is read from the row as it stood when the statement
-    # began (the CTE sees the statement's snapshot; a concurrent claim by the
-    # SAME tab that wins the insert first is therefore reported as `taken` by
-    # the other: the row is right, only the word differs). The WHERE of the
+    # nothing. `renewed` needs two things: the row as it stood when the
+    # statement began was this tab's and live (the CTE reads the statement's
+    # snapshot), AND this statement updated it rather than inserted it
+    # (`xmax <> 0`). The second matters when the tab's own `release` commits
+    # between the snapshot and the insert: the row is then new, so the answer
+    # is `taken` and the others hear `claimed`. The other direction (a
+    # concurrent claim by the SAME tab that wins the insert first) answers
+    # `taken` to both: the row is right, only the word differs. The WHERE of the
     # DO UPDATE is re-checked by Postgres against the newest version of the
     # row after waiting for a concurrent writer, which is what makes two
     # simultaneous claims of one expired row end with exactly one holder. A
@@ -58,7 +76,29 @@ module Editing
             requested_at = CASE WHEN edit_reservations.changed_at > :cutoff AND edit_reservations.requested_by_id IS NOT NULL THEN edit_reservations.requested_at END
         WHERE edit_reservations.changed_at <= :cutoff
            OR (edit_reservations.user_id = EXCLUDED.user_id AND edit_reservations.tab = EXCLUDED.tab)
-      RETURNING COALESCE((SELECT user_id = :user_id AND tab = :tab AND changed_at > :cutoff FROM before), FALSE) AS renewed
+      RETURNING (edit_reservations.xmax <> 0 AND COALESCE((SELECT user_id = :user_id AND tab = :tab AND changed_at > :cutoff FROM before), FALSE)) AS renewed
+    SQL
+
+    # Someone asks for a subject another tab holds (see the class comment for
+    # the three answers). One statement: the UPDATE and a count of the live
+    # rows of other tabs, which tells `:pending` from `:none`.
+    REQUEST = <<~SQL.squish.freeze # sql: an UPDATE that also reports whether a candidate row existed has no Arel form
+      WITH candidates AS (
+        SELECT 1 FROM edit_reservations
+        WHERE subject_type = :subject_type AND subject_id = :subject_id
+          AND changed_at > :live_since AND NOT (user_id = :by_id AND tab = :tab)
+      ), written AS (
+        UPDATE edit_reservations
+        SET requested_by_id = :by_id, requested_tab = :tab,
+            requested_at = CASE WHEN requested_by_id = :by_id AND requested_tab = :tab AND requested_at > :stale_before
+                                THEN requested_at ELSE :now END
+        WHERE subject_type = :subject_type AND subject_id = :subject_id
+          AND changed_at > :live_since AND NOT (user_id = :by_id AND tab = :tab)
+          AND (requested_by_id IS NULL OR requested_at IS NULL OR requested_at <= :stale_before
+               OR (requested_by_id = :by_id AND requested_tab = :tab))
+        RETURNING 1
+      )
+      SELECT (SELECT count(*) FROM candidates) AS candidates, (SELECT count(*) FROM written) AS written
     SQL
 
     class << self
@@ -80,13 +120,18 @@ module Editing
         of(subject).where(user_id: user.id, tab:).delete_all.positive? # version: none (a reservation is not content)
       end
 
-      # Someone asks for a subject another tab holds. `requested_at` is kept
-      # when the same tab asks again: the pass-over time runs from the first ask.
       def request(subject:, by:, tab:, now: Time.current)
-        same = arel_table[:requested_by_id].eq(by.id).and(arel_table[:requested_tab].eq(tab))
-        requested_at = Arel::Nodes::Case.new.when(same).then(arel_table[:requested_at]).else(Arel::Nodes.build_quoted(now))
-        of(subject).live(now).where.not(user_id: by.id, tab:)
-          .update_all(requested_by_id: by.id, requested_tab: tab, requested_at:).positive? # version: none (a reservation is not content)
+        # sql: binds the named values of REQUEST, the one statement a request is
+        statement = sanitize_sql_array([ REQUEST, {
+          subject_type: subject.class.polymorphic_name, subject_id: subject.id, by_id: by.id, tab:, now:,
+          live_since: now - Editing::HOLD, stale_before: now - 2 * Editing::PASS_OVER
+        } ])
+        # sql: sends REQUEST, which has no Arel form
+        counts = connection.exec_query(statement, "Editing request").first # version: none (a reservation is not content)
+        if counts["written"].positive? then :requested
+        elsif counts["candidates"].positive? then :pending
+        else :none
+        end
       end
 
       # The holder's tab lets go: the row is the requester's from now.
