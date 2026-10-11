@@ -23,6 +23,15 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     assert_select "html > head > title", false, "a fragment, not a page"
   end
 
+  test "every answer, a 404 included, is kept by no cache" do
+    [ admin_editing_blocks_path(kind: "page", id: @page.id), admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id),
+      admin_editing_record_path(kind: "page", id: @page.id), admin_editing_record_path(kind: "page", id: 0) ].each do |path|
+      get path
+      assert_equal "no-store", response.headers["Cache-Control"], path
+    end
+    assert_response :not_found
+  end
+
   test "a top-level block is its card; a block in a section is its tile and its panel; a section is 204" do
     get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id)
     assert_select "#content_block_#{@block.id}[data-editing-unit]", 1
@@ -50,7 +59,14 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
     assert_select "#content_block_#{@block.id} [data-editing-mark]", text: /Updated by Dana Weiss/
 
     get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id)
-    assert_select "[data-editing-mark]", false
+    assert_select "[data-editing-mark]", false, "no mark without mark=1"
+
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id, mark: 0)
+    assert_select "[data-editing-mark]", false, "mark=0 is not mark=1"
+
+    sign_in_as users(:two)
+    get admin_editing_block_path(kind: "page", id: @page.id, block_id: @block.id, mark: 1)
+    assert_select "[data-editing-mark]", false, "the changer is not told of their own change"
   end
 
   test "the record's form: the settings for a page, the form for a post, each a unit with the base its next save needs" do
@@ -102,8 +118,15 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
 
   test "the list costs the same statements for 3 blocks as for 30" do
     get admin_editing_blocks_path(kind: "page", id: @page.id) # the first request of a process also asks whether setup is complete
+    ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "image", media_asset_id: create_media_asset.id })
     three = capture_sql { get admin_editing_blocks_path(kind: "page", id: @page.id) }.size
     27.times { ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text" }) }
+    # An image with a library image, and a section with blocks in it: a query per image or per section would show.
+    4.times do
+      ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "image", media_asset_id: create_media_asset.id })
+      section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+      2.times { |column| ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text", section_id: section.id, section_column: column + 1 }) }
+    end
     thirty = capture_sql { get admin_editing_blocks_path(kind: "page", id: @page.id) }.size
 
     assert_equal three, thirty

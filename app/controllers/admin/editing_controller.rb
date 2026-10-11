@@ -43,7 +43,7 @@ module Admin
       return head(:no_content) if Admin::EditorScreen::SectionCardComponent.draws?(block, outline:)
 
       editable = can_edit?(@record)
-      change = params[:mark].present? ? ::Editing::LastChange.for(block, viewer: Current.user) : nil
+      change = params[:mark] == "1" ? ::Editing::LastChange.for(block, viewer: Current.user) : nil
       render html: helpers.safe_join(parts_of(block, outline:, editable:, change:).map { |part| view_context.render(part) }), layout: false
     end
 

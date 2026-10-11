@@ -26,6 +26,19 @@ class Editing::LastChangeTest < ActiveSupport::TestCase
     assert_nil Editing::LastChange.for(@block, viewer: users(:one))
   end
 
+  test "the newest change decides: one made without a user, or by the viewer, leaves no one to name" do
+    travel(1.minute) { as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(@block, translations: { "en" => { caption: "x" } }).ok? } }
+    assert_equal users(:two), Editing::LastChange.for(@block, viewer: users(:one)).user
+
+    travel(2.minutes) { Audit.record("block.updated", subject: @block, snapshot: nil) }
+    assert_nil Audit::Event.order(:id).last.user_id
+    assert_nil Editing::LastChange.for(@block, viewer: users(:one))
+
+    travel(3.minutes) { as(users(:one), channel: :admin) { assert ContentBlocks::Save.call(@block, translations: { "en" => { caption: "y" } }).ok? } }
+    assert_nil Editing::LastChange.for(@block, viewer: users(:one))
+    assert_equal users(:one), Editing::LastChange.for(@block, viewer: users(:two)).user
+  end
+
   test "it is two statements at most: the event, and its user" do
     viewer = users(:two) # the fixture's own lookup is not the query's
 
