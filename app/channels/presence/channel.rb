@@ -47,7 +47,9 @@ module Presence
       return if left?
 
       state = state_of(data)
-      apply(state) if @record && state
+      return unless @record && state
+
+      in_order(data) { apply(state) }
     end
 
     # The tab is still here (`data["state"]`: what it is now; absent or
@@ -55,15 +57,18 @@ module Presence
     def beat(data)
       return if left? || !@record
 
-      state = state_of(data) || @state
-      return apply(state) if state != @state
+      in_order(data) do
+        state = state_of(data) || @state
+        next apply(state) if state != @state
 
-      heal(state) unless Mark.beat(user: @user, record: @record, tab: @tab)
+        heal(state) unless Mark.beat(user: @user, record: @record, tab: @tab)
+      end
     end
 
     private
 
     def subscribed
+      @order = Mutex.new
       @tab = params[:tab].to_s[Live::Signals::TAB]
       return reject unless @tab
 
@@ -97,6 +102,28 @@ module Presence
       return unless @record
 
       Signals.changed(@record) if Mark.leave(user: @user, record: @record, tab: @tab, token: @token)
+    end
+
+    # THE ORDER OF A SUBSCRIPTION'S COMMANDS. Action Cable gives each incoming
+    # message of a connection to whichever thread of its pool is free
+    # (`Worker#async_invoke`, a `Concurrent::ThreadPoolExecutor`, four
+    # threads by default), so a `report` sent a millisecond after another can
+    # be worked on first, or at the same time, and the older state would win.
+    # The tab numbers what it sends (`seq`, rising, from `live/connection`'s
+    # `perform`); the commands of one subscription are worked on one at a
+    # time (`@order`), and a command numbered at or below the last one worked
+    # on is dropped: it says what the tab was, not what it is. A command with
+    # no number (an old script) is worked on as it comes. The number goes on
+    # rising across a reconnect, and this object starts again from nothing.
+    def in_order(data)
+      seq = data.is_a?(Hash) ? data["seq"] : nil
+      seq = nil unless seq.is_a?(Integer)
+      @order.synchronize do
+        next if seq && @seq && seq <= @seq
+
+        @seq = seq if seq
+        yield
+      end
     end
 
     def state_of(data)

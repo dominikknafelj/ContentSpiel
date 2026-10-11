@@ -32,7 +32,8 @@ import { settle } from "live/state"
 //
 // THE CHANNEL'S CONTRACT (`app/channels/presence/channel.rb`), kept here:
 // - THE STATE IS REPORTED ON EVERY `connected`, the first and after every
-//   reconnect, because an arrival makes the row "here" whatever the tab is;
+//   reconnect, because an arrival makes the row "here" whatever the tab is
+//   (so only a state other than "here" needs saying; see `arrived`);
 //   and right after `listen` when the subscription is already up -- a
 //   listener that joins a subscription already running is told nothing, and
 //   a Turbo visit to the same record's screen keeps the subscription (it is
@@ -171,7 +172,7 @@ export default class extends Controller {
     window.addEventListener("pageshow", this.back)
 
     const listener = Object.assign((signal) => this.heard(signal), {
-      connected: () => this.arrived(), disconnected: () => this.answered(), rejected: () => this.gone()
+      connected: () => this.arrived(true), disconnected: () => this.answered(), rejected: () => this.gone()
     })
     this.stop = listen(this.params, listener)
     this.running = true
@@ -236,8 +237,16 @@ export default class extends Controller {
   // Confirmed (or found already up): say what the tab is, and read who is
   // here -- someone may have come between the page's rendering and now, and
   // whatever was signalled while the socket was down was not heard.
-  arrived() {
-    this.stop.perform("report", { state: this.state })
+  arrived(fresh = false) {
+    // A CONFIRMATION (`fresh`) IS an arrival, and an arrival is "here" on the
+    // server (`Presence::Channel#arrived`), so a visible tab says nothing: a
+    // report sent now is the one a state change a few milliseconds later
+    // could overtake (the server works a connection's commands on whichever
+    // thread is free), leaving "here" as the last word. A hidden tab, made
+    // "here" for an instant by its arrival, says "away". A subscription found
+    // already up (a Turbo visit kept it) was not arrived at again, and its row
+    // may say anything: it is told.
+    if (!fresh || this.state !== "here") this.stop.perform("report", { state: this.state })
     this.answered()
     this.fetchPeople()
   }

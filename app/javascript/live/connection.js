@@ -62,7 +62,8 @@ const pool = new Map()
 // SUBSCRIPTION, not to the listener -- every listener with these params
 // shares the one subscription, and the channel cannot tell them apart -- so
 // whatever is sent must mean the same sent twice (presence's `report` and
-// `beat` do).
+// `beat` do). Each is sent with a `seq`, rising per subscription, so that a
+// channel can tell which of two commands that overtook each other is older.
 //
 // And `suspend()` and `resume()`: see where they are defined, below.
 export function listen(params, listener) {
@@ -111,7 +112,11 @@ export function listen(params, listener) {
   }
   const perform = (action, data = {}) => {
     if (!entry.up || entry.closed || !entry.made || !entry.listeners.has(listener)) return false
-    return entry.made.perform(action, data) !== false
+    // Numbered, in the order of sending, per subscription: the server works a
+    // connection's commands on whichever thread is free and a channel that
+    // cares which came last (presence's) drops a number it has passed.
+    entry.seq = (entry.seq || 0) + 1
+    return entry.made.perform(action, { ...data, seq: entry.seq }) !== false
   }
   // Ends the subscription ON THE SERVER AT ONCE, in this task, and keeps the
   // listeners: `resume` asks for it again. For a document that is going

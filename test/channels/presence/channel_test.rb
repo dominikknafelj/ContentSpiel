@@ -102,6 +102,48 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
     assert_equal 2, broadcasts(record_stream).size
   end
 
+  test "a command numbered at or below the last one worked on is dropped: reports that crossed end in the newer state" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id, tab: TAB
+    clear_messages
+
+    perform :report, state: "away", seq: 2
+    perform :report, state: "here", seq: 1
+    assert_equal "away", Presence::Mark.sole.state
+    perform :beat, state: "here", seq: 2
+    assert_equal "away", Presence::Mark.sole.state
+    assert_equal 1, broadcasts(record_stream).size
+
+    perform :report, state: "here", seq: 3
+    assert_equal "here", Presence::Mark.sole.state
+    perform :report, state: "away"
+    assert_equal "away", Presence::Mark.sole.state, "a command with no number is worked on as it comes"
+  end
+
+  test "two threads reporting at once are worked on one at a time, and the older number loses" do
+    connect_as users(:reader)
+    subscribe type: "page", id: @page.id, tab: TAB
+    inside = 0
+    overlapped = false
+    original = Presence::Mark.method(:report)
+    Presence::Mark.define_singleton_method(:report) do |**args|
+      inside += 1
+      overlapped ||= inside > 1
+      Thread.pass
+      original.call(**args)
+    ensure
+      inside -= 1
+    end
+    begin
+      [ { state: "away", seq: 2 }, { state: "here", seq: 1 } ].map { |data| Thread.new { subscription.report(data.stringify_keys) } }.each(&:join)
+    ensure
+      Presence::Mark.singleton_class.remove_method(:report)
+      Presence::Mark.define_singleton_method(:report, original)
+    end
+    assert_not overlapped
+    assert_equal "away", Presence::Mark.sole.state
+  end
+
   test "a signal on the list names no record, whatever the kind" do
     asset = create_media_asset
     post = create_post(title: "Hello")

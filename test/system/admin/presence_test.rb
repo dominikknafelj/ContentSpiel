@@ -869,6 +869,44 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "coming back did not arrive again") { marks(@me).exists? }
   end
 
+  # Action Cable works a connection's commands on whichever thread is free,
+  # so a `report` sent right after the confirmation can be overtaken by the
+  # next change of state and leave "here" as the last word (it failed CI once:
+  # a document hidden at once). An arrival is "here" on the server already, so
+  # a visible tab says nothing; a hidden one says "away", and only that.
+  def sent_reports(&arrive)
+    using_session(:dana) do
+      sign_in_via_form(@dana)
+      # On THIS page only (`Browser#evaluate_on_new_document` is for pages not yet
+      # made, and would stay for every later test).
+      page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument", source: <<~JS)
+        (() => {
+          window.__wire = []
+          const send = WebSocket.prototype.send
+          WebSocket.prototype.send = function (data) { window.__wire.push(String(data)); return send.call(this, data) }
+        })()
+      JS
+      visit "/cs-studio/pages/#{@page.id}"
+      await_notes_live
+      assert_eventually(message: "the arrival never reached the server") { marks(@dana).exists? }
+      arrive ? arrive.call : await_frames
+      Array(page.evaluate_script("window.__wire")).grep(/\\"action\\":\\"report\\"/).map { |each| each[/\\"state\\":\\"(\w+)\\"/, 1] }
+    end
+  end
+
+  test "a freshly arrived visible tab sends no report: its arrival said here" do
+    open_page
+    assert_equal [], sent_reports
+  end
+
+  test "a tab hidden the moment it arrived sends one report, away, and no report of here before it" do
+    open_page
+    assert_equal [ "away" ], sent_reports {
+      hide_document
+      assert_eventually(message: "the hidden tab never reported away") { marks(@dana).where(state: "away").exists? }
+    }
+  end
+
   # Leaving a page hides its document on the way out. A report of "away"
   # sent then would race the socket's own close on the server, and a row
   # written after the leave would keep the person on the record for as long
