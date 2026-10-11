@@ -22,7 +22,8 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     Post.insert_all(rows)
   end
 
-  def row_titles = css_select("tbody tr th[scope=row] span:first-child").map { |node| node.text.strip }
+  # The title is the first thing on the title's line, which is the first line of the row's link.
+  def row_titles = css_select("tbody tr th[scope=row] a > span:first-child > span:first-child").map { |node| node.text.strip }
 
   def query_count
     count = 0

@@ -25,5 +25,8 @@
    directory of scripts that writes class names needs its line here too:
    `test/lib/tailwind_sources_test.rb` fails without it. */
 @source "../../javascript/mind_graph";
+/* The notes' merge builds the "NEW" divider, "1 new message" and the line
+   that says a thread was deleted (`notes/merge.js`). */
+@source "../../javascript/notes";
 @import "./content-spiel.tailwind.css";
 @import "./admin-rich-text.css";

@@ -1,0 +1,35 @@
+# The strings of `app/components/admin/presence_screen/` (presence handoff 7,
+# 8, 21 to 23, 26 and 29: the wording is the designer's; `row_marker` is
+# handoff 12, 27 and 32).
+en:
+  admin:
+    components:
+      presence_screen:
+        people:
+          group:
+            one: "Also open by 1 person"
+            other: "Also open by %{count} people"
+          group_label: "%{summary}: %{people}"
+          person: "%{name}, %{status}"
+          separator: "; "
+          everyone: "Everyone with this open"
+          label: "%{name} · %{status}"
+          here: "here"
+          away_now: "away just now"
+          away:
+            one: "away %{count} min"
+            other: "away %{count} min"
+          away_long: "away over an hour"
+          more: "+%{count}"
+        # A list row's marker. `label` is what a screen reader hears and what
+        # the tooltip shows (handoff 32). `joined` stands before the label where
+        # it continues a link's name ("Title, 2 people here: …").
+        row_marker:
+          label:
+            one: "%{names} is here"
+            other: "%{count} people here: %{names}"
+          separator: ", "
+          and_more:
+            one: "%{names} and %{count} more"
+            other: "%{names} and %{count} more"
+          joined: ", "

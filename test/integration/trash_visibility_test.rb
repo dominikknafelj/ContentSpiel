@@ -788,6 +788,49 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section .content-section__column:nth-child(2) img", 1
   end
 
+  # Presence follows its record into the trash (presence spec §5.4): a person
+  # who has a record open when it is trashed leaves a row behind (it expires
+  # by itself), and that row is shown in no door: the record's people are a
+  # 404, its marker count is left out of the list's answer, and a tab cannot
+  # subscribe to it. The record is trashed AFTER the person arrived, as in life.
+  test "a trashed page, post and image have no presence anywhere: not their people, not their count, not a subscription" do
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: nil) }
+    [ @kept_post, @gone_post, @kept_page, @gone_page, @kept_asset, @gone_asset ].each do |record|
+      Presence::Mark.arrive(user: users(:one), record: record, tab: "tab-12345678")
+    end
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: Time.current) }
+    sign_in_as users(:two)
+
+    { "page" => [ @kept_page, @gone_page ], "post" => [ @kept_post, @gone_post ], "media" => [ @kept_asset, @gone_asset ] }.each do |kind, (kept, gone)|
+      get admin_record_presence_path(kind, kept.id)
+      assert_select "turbo-frame#presence-#{kind}-#{kept.id} [data-presence-user='#{users(:one).id}']"
+      get admin_record_presence_path(kind, gone.id)
+      assert_response :not_found, kind
+
+      get admin_presence_here_path(kind:, ids: [ kept.id, gone.id ], format: :json)
+      # The list's marker data: the kept record's and nothing
+      # of the trashed one's.
+      assert_equal({ kept.id.to_s => { "count" => 1, "label" => "#{PersonName.of(users(:one))} is here" } },
+        response.parsed_body, kind)
+      assert_not_includes response.body, %("#{gone.id}"), kind
+    end
+
+    # The markers a list draws with its rows come from the list's own loader,
+    # which is handed only what the list narrowed: the tree and the posts
+    # list draw no row, and so no marker, for the trashed page and post.
+    get admin_page_path(@kept_page)
+    assert_select "#tree [data-presence-marker='page-#{@kept_page.id}']:not([hidden])"
+    assert_select "[data-presence-marker='page-#{@gone_page.id}']", count: 0
+    get admin_posts_path
+    assert_select "[data-presence-marker='post-#{@kept_post.id}']:not([hidden])"
+    assert_select "[data-presence-marker='post-#{@gone_post.id}']", count: 0
+
+    # The door a socket uses: the same lookup, through the read scope.
+    [ [ "page", @gone_page ], [ "post", @gone_post ], [ "media", @gone_asset ] ].each do |kind, gone|
+      assert_nil RecordKinds.find(kind, users(:two), gone.id), kind
+    end
+  end
+
   # Notes follow their record into the trash (notes spec D12, §4.4): hidden
   # with it, counted nowhere. The records are trashed AFTER their notes were
   # written, as in life: `Notes::Start` refuses a record that is already in

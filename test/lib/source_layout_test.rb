@@ -81,9 +81,13 @@ class SourceLayoutTest < ActiveSupport::TestCase
     assert_empty missing, "keys read but not defined:\n#{missing.join("\n")}"
   end
 
-  test "nothing is loose in app/components/admin but the base class" do
+  # The base class, and the registry of screen slots: `Admin::Slots` holds component CLASSES, so it is
+  # not a model (a model never names a component) and no screen's or `Ui`'s part.
+  LOOSE_IN_COMPONENTS = %w[admin_component.rb slots.rb].freeze
+
+  test "nothing is loose in app/components/admin but the base class and the slot registry" do
     loose = Dir[ROOT.join("app/components/admin/*.{rb,erb}")].map { |path| File.basename(path) }
-    assert_equal %w[admin_component.rb], loose
+    assert_equal LOOSE_IN_COMPONENTS, loose.sort
   end
 
   # One locale file per component folder: `config/locales/admin/<folder>.en.yml`
@@ -184,9 +188,10 @@ class SourceLayoutTest < ActiveSupport::TestCase
   end
 
   # The module folders under app/javascript hold what a topic's controllers import, so each is
-  # named after its topic. i18n and search are the two named exceptions.
+  # named after its topic. i18n, live and search are the named exceptions.
   SHARED_MODULE_FOLDERS = {
     "i18n" => "the script messages every screen reads (messages(element).t), no one topic's",
+    "live" => "the cable connection, shared by the notes and presence topics",
     "search" => "the title and tag search every picker shares, no one topic's"
   }.freeze
 
@@ -194,7 +199,7 @@ class SourceLayoutTest < ActiveSupport::TestCase
     topics = Dir[CONTROLLERS.join("admin/*/")].map { |path| File.basename(path) }
     modules = Dir[ROOT.join("app/javascript/*/")].map { |path| File.basename(path) } - %w[controllers]
     strangers = modules - topics - SHARED_MODULE_FOLDERS.keys
-    assert_empty strangers, "module folders with no topic of that name (#{SHARED_MODULE_FOLDERS.keys.join(' and ')} are shared helpers): #{strangers.inspect}"
+    assert_empty strangers, "module folders with no topic of that name (#{SHARED_MODULE_FOLDERS.keys.to_sentence} are shared helpers): #{strangers.inspect}"
   end
 
   test "no identifier of the old one-level form is left" do

@@ -236,7 +236,12 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "turbo-frame#tree li[data-page-id='#{root_page.id}'][data-context-only] > div" do |rows|
       assert_nil rows.first.at_css("[data-translation-marker]")
+      # Nor presence's marker element, shown or hidden: nothing is asked
+      # about a page the viewer may not read.
+      assert_nil rows.first.at_css("[data-presence-marker]")
     end
+    assert_select "turbo-frame#tree [data-presence-marker='page-#{root_page.id}']", count: 0
+    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div > [data-presence-marker='page-#{@a.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]"
   end
 

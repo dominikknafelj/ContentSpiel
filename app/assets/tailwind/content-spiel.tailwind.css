@@ -213,6 +213,25 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .admin-spinner { animation-duration: 2s; } }
 
+/* Presence (`Admin::PresenceScreen::PeopleComponent`, the presence handoff's
+   items 14 and 25): someone who arrives fades in, 150ms, opacity only, and
+   not at all with reduced motion. Nobody fades out and nobody slides: who
+   left is not in the next drawing, and the others are where they belong.
+   `admin--presence--record` marks the circle that is new in a drawing; here
+   to away is a redraw with no mark, so it changes at once.
+
+   BELOW 1024px THE NOTES ARE A SHEET over the whole editor, and the sheet
+   shows no presence (handoff 15). The sheet only COVERS the editor's header
+   (it is no modal: nothing behind it is made inert, and the header's other
+   controls are still in the Tab order and the accessibility tree there),
+   so the people are taken out of both while it is open. */
+.admin-presence [data-presence-arriving] { animation: admin-presence-in 150ms var(--cs-ease); }
+@keyframes admin-presence-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .admin-presence [data-presence-arriving] { animation: none; } }
+@media (max-width: 1023px) {
+  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header .admin-presence { display: none; }
+}
+
 /* Styled native select (design pass spec §4). The chevron is two CSS
    gradients rather than an image so it takes the token colour in both
    themes. Size/width come from the utility classes beside it.
@@ -503,7 +522,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    scroll under a thread. By where the frame stands, like the rules around
    this one: in the media panel and on a record's notes page the same thread
    is in the flow of what scrolls there, and none of this applies.
-   `admin--notes--live#scroller` reads `overflow-y` to tell the two apart. */
+   `notes/merge`'s `scrollerOf` reads `overflow-y` to tell the two apart. */
 .admin-notes-drawer [data-notes-scroller]:has([data-notes-view="thread"]) { overflow: hidden; }
 .admin-notes-drawer turbo-frame#notes:has(> [data-notes-view="thread"]),
 .admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }

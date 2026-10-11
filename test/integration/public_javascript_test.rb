@@ -12,7 +12,7 @@ require "test_helper"
 # The import map itself is the same on both (it's only a lookup table);
 # what differs is what each page preloads and imports.
 class PublicJavascriptTest < ActionDispatch::IntegrationTest
-  ADMIN_ONLY = %w[controllers/admin/ rich_text/ saving/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
+  ADMIN_ONLY = %w[controllers/admin/ rich_text/ saving/ live/ notes/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
 
   test "a public page loads the application entry point without any admin module" do
     create_page(title: "About")
@@ -38,7 +38,10 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     preloads = modulepreloads
-    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema prosemirror-model].each do |name|
+    # `live/connection` and `notes/merge` among them: pinned `preload: "admin"`,
+    # they are part of what every CS Studio screen runs (the notes' two
+    # controllers on <body> import them), not a late import.
+    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema prosemirror-model live/connection live/state notes/merge].each do |name|
       assert preloads.any? { |href| href.include?(name) }, "expected #{name} to be modulepreloaded in CS Studio: #{preloads.inspect}"
     end
     assert_includes entry_point_script, %(import "admin")
@@ -81,9 +84,11 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
   end
 
   # Notes spec §6.2: the cable is CS Studio's. A public page names no cable
-  # address, carries nothing that subscribes (`admin--notes--live` is the one
-  # script that asks turbo-rails for its consumer, and Turbo's own stream
-  # element is used nowhere) and preloads no script that would.
+  # address, carries nothing that subscribes (`admin--notes--live` and
+  # `admin--notes--inbox` are the controllers that listen, through
+  # `live/connection`, the one script that asks turbo-rails for its consumer;
+  # Turbo's own stream element is used nowhere) and preloads no script that
+  # would. Each fragment below is one the next test finds on a CS Studio page.
   test "a public page asks for no cable connection" do
     create_page(title: "About")
 
@@ -92,15 +97,74 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "meta[name=action-cable-url]", count: 0
     assert_select "[data-controller*='notes--live']", count: 0
+    assert_select "[data-controller*='notes--inbox']", count: 0
     assert_select "[data-controller*='notes--alert']", count: 0
     assert_no_match "turbo-cable-stream-source", response.body
     assert modulepreloads.none? { |href| href.include?("notes/live_controller") }
+    assert modulepreloads.none? { |href| href.include?("notes/inbox_controller") }
     # "notes/live" is in every specifier of the controller (`controllers/admin/notes/live_controller`),
     # so an inline import of it would contain it; modulepreload alone would not see an inline import.
     assert_not_includes entry_point_script, "notes/live"
+    assert_not_includes entry_point_script, "notes/inbox"
+    # Nor presence's part (`admin--presence--record`, in
+    # `controllers/admin/presence/`), which subscribes for the record it is
+    # on. Both fragments are found on an editor by the test below.
+    assert_select "[data-controller*='presence--record']", count: 0
+    assert modulepreloads.none? { |href| href.include?("controllers/admin/presence/") }
+    assert_not_includes entry_point_script, "presence/record"
+    # Nor the lists' (`admin--presence--list`, on the page tree and the posts
+    # table), which listens for every list. Found on the Posts screen below.
+    assert_select "[data-controller*='presence--list']", count: 0
+    assert_select "[data-presence-marker]", count: 0
+    assert_not_includes entry_point_script, "presence/list"
+    # Nor the shared tooltip (`admin--ui--tooltip`), whose first users are
+    # presence's people and markers; an admin page below carries it.
+    assert_select "[data-controller~='admin--ui--tooltip']", count: 0
+    assert modulepreloads.none? { |href| href.include?("controllers/admin/ui/tooltip_controller") }
+    assert_not_includes entry_point_script, "ui/tooltip"
   end
 
-  # The other half: CS Studio does load it, on every screen, on <body>.
+  # The other half for the lists: the posts table and the page tree carry
+  # the list's part, and its controller is preloaded.
+  test "the posts list and the page tree in CS Studio carry presence's list and preload its controller" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    post = create_post(title: "Notes")
+
+    get "/cs-studio/posts"
+
+    assert_response :success
+    assert_select "[data-controller*='presence--list'][data-controller='admin--presence--list'] tr#post_#{post.id} [data-presence-marker='post-#{post.id}']"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/presence/list_controller") }
+    assert_select "tr#post_#{post.id} [data-presence-marker='post-#{post.id}'][data-controller~='admin--ui--tooltip']"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/ui/tooltip_controller") }
+    get "/cs-studio/pages/#{root_page.id}"
+    assert_select "turbo-frame#tree[data-controller~='admin--presence--list'] [data-presence-marker='page-#{root_page.id}']"
+    get "/cs-studio/tags"
+    assert_select "[data-controller*='presence--list']", count: 0
+  end
+
+  # The other half for presence: an editor carries the part, in its header,
+  # and its controller is preloaded like every admin controller.
+  test "an editor in CS Studio carries presence's part and preloads its controller" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    post = create_post(title: "Notes")
+
+    get "/cs-studio/posts/#{post.id}"
+
+    assert_response :success
+    assert_select "header [data-controller*='presence--record'][data-controller='admin--presence--record'] turbo-frame#presence-post-#{post.id}"
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/presence/record_controller") }
+    # A screen that shows no record has no such part.
+    get "/cs-studio/tags"
+    assert_select "[data-controller*='presence--record']", count: 0
+  end
+
+  # The other half: CS Studio does load them, on every screen, on <body>: the
+  # record's side (`admin--notes--live`) and the person's (`admin--notes--inbox`,
+  # with the addresses it fetches), and the one question the second asks the
+  # first.
   test "CS Studio loads the notes' live controller on every screen" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_as(users(:one))
@@ -108,12 +172,14 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     get "/cs-studio/tags"
 
     assert_response :success
-    assert_select "body[data-controller~='admin--notes--live'][data-admin--notes--live-unread-url-value='/cs-studio/notes/unread'][data-admin--notes--live-delivery-url-value='/cs-studio/notes/deliveries/0'][data-action~='visibilitychange@document->admin--notes--live#visible']"
+    assert_select "body[data-controller~='admin--notes--live'][data-action~='visibilitychange@document->admin--notes--live#visible'][data-action~='admin--notes--inbox:watching@document->admin--notes--live#watched']"
+    assert_select "body[data-controller~='admin--notes--inbox'][data-admin--notes--inbox-unread-url-value='/cs-studio/notes/unread'][data-admin--notes--inbox-delivery-url-value='/cs-studio/notes/deliveries/0'][data-admin--notes--inbox-person-value='#{users(:one).id}']"
     assert_select "template#toast-note-template", count: 1
     assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/live_controller") }
+    assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/inbox_controller") }
     # And beside it what makes a mention heard (notes spec §6.4), with the
     # person's two settings as data.
-    assert_select "body[data-controller~='admin--notes--alert'][data-action~='admin--notes--live:delivery@document->admin--notes--alert#delivery'][data-admin--notes--alert-sound-value=true][data-admin--notes--alert-desktop-value=false][data-admin--notes--alert-person-value='#{users(:one).id}']"
+    assert_select "body[data-controller~='admin--notes--alert'][data-action~='admin--notes--inbox:delivery@document->admin--notes--alert#delivery'][data-admin--notes--alert-sound-value=true][data-admin--notes--alert-desktop-value=false][data-admin--notes--alert-person-value='#{users(:one).id}']"
     assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/alert_controller") }
   end
 

@@ -122,8 +122,11 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     # a caller's next `visit` fires. Without this, a caller moving straight
     # on to its own `visit` could race the still-in-flight sign-in POST,
     # navigate away before its `Set-Cookie` response ever arrives, and land
-    # right back on the sign-in page, unauthenticated.
-    assert_selector "nav[aria-label='Modules']"
+    # right back on the sign-in page, unauthenticated. A busy runner or
+    # laptop can take longer than Capybara's default to answer the sign-in
+    # POST, and every system test begins here, so this one wait is generous
+    # (seen on CI and locally, 2026-10-10).
+    assert_selector "nav[aria-label='Modules']", wait: 15
   end
 
   # Opens the editor header's ⋯ menu (Activity, Schedule…, Unpublish, Move to
@@ -334,8 +337,10 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   # Waits until the page's notes are live (notes spec §6): `admin--notes--live`
-  # is connected, the socket is up and EVERY subscription of the page -- the
-  # person's and one per record shown -- has been answered by the server. A
+  # and `admin--notes--inbox` are connected, the socket is up and EVERY
+  # subscription of the page -- the person's (the inbox controller's) and one
+  # per record shown (the live controller's) -- has been answered by the
+  # server; `live/state` puts the two controllers' words together. A
   # signal the test causes after this is received; one caused a moment
   # earlier, while a subscription was still on its way, would be lost with
   # nothing to wait for. The cable needs no setting up for it: the suite's

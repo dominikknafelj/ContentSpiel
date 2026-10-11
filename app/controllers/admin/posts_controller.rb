@@ -56,16 +56,6 @@ module Admin
       # shows. Read from the stored `translation_states` rows
       # (`Translations::StateIndex`), one query for the whole page.
       @translation_states = Translations::StateIndex.states_for(@posts)
-      # The "Notes" column (notes spec §4.4): the open threads of each listed
-      # post, one grouped query for the page of rows, and one beside it for
-      # the rows that hold something unread for the viewer (what turns a
-      # count accent, §4.5). `Notes::Counts` hides nothing itself: the ids
-      # are this page's rows, which `base_posts` already narrowed through
-      # the read scope (kept posts the viewer may read), so no count exists
-      # for a post that is in the trash or out of scope.
-      post_ids = @posts.map(&:id)
-      @note_counts = Notes::Counts.by_container("Post", post_ids)
-      @note_unread = Notes::Counts.unread_among("Post", post_ids, Current.user)
     end
 
     # Publishes or moves to the trash the posts ticked on the list (Task 17).

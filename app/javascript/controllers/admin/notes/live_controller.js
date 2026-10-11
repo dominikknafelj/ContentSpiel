@@ -1,80 +1,41 @@
 import { Controller } from "@hotwired/stimulus"
-import { cable } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
-import { forgetDrafts } from "controllers/admin/notes/composer_controller"
+import { TAB, listen } from "live/connection"
+import { json } from "notes/json"
+import { report } from "live/state"
+import { hold, mergeGone, mergeList, mergeThread, scrollerOf } from "notes/merge"
 
-// Live delivery of notes (notes spec §6). Lives on <body>. A signal over the
-// cable says only THAT something changed (`Notes::Signals`: a kind and ids);
-// this controller then fetches the part again through the same scoped GET the
-// page used on load, so what a tab can show is always what its viewer may
-// read. The consumer is the one bundled in turbo-rails; nothing but this file
-// asks for it, so a public page opens no socket, and the socket is closed
-// again when a Turbo visit leaves CS Studio (`listen`).
+// Live delivery of notes, the RECORD'S side (notes spec §6): a record's
+// threads and its list kept current while someone reads or types in them,
+// and the answers to the tab's own buttons merged the same way. Lives on
+// <body>, so the parts that show one record's notes (its `record` targets)
+// are found wherever they are drawn. A signal over the cable says only THAT
+// something changed (`Notes::Signals`: a kind and ids); this controller then
+// fetches the part again through the same scoped GET the page used on load,
+// so what a tab can show is always what its viewer may read. The connection
+// is `live/connection`'s (the consumer, the shared subscriptions, the tab's
+// id and the socket's closing when a Turbo visit leaves CS Studio): this
+// controller listens through it (`listen`).
 //
-// TWO SUBSCRIPTIONS.
-// - `Notes::PersonChannel`, once per tab. `delivery`: a delivery was written
-//   for the viewer. The sidebar's count and, on the dashboard, the two cards
-//   are fetched again; then that one delivery is FETCHED as data -- the
-//   signal may have reached someone who has since lost the right to read the
-//   record, and a refusal ends it there, with nothing said -- announced on
-//   `document` (`admin--notes--live:delivery`) and raised as a toast. No toast
-//   when the person is LOOKING AT that thread (`watching`, the one predicate:
-//   it is the view of a notes frame of this tab, and the document is not
-//   hidden -- the window's focus is not asked for, so two windows side by
-//   side both stay live): the thread's own refresh shows the message and,
-//   being the thread's GET, reads the delivery. `inbox`: deliveries of theirs
-//   were read or removed elsewhere; only the count and the cards are fetched,
-//   and nothing is said.
-//   SEVERAL AT ONCE (the handoff's decision 18). A BURST is deliveries
-//   announced within `burstMs` (10 s) of the one before; it ends that long
-//   after the last. The first two that are said in a burst get their own
-//   toasts; from the third, those named toasts are taken away and ONE toast
-//   stands for the burst, "You have 3 new notes", whose "Open" leads to the
-//   inbox; with each further one it is put up again with the new count, so
-//   its 8 seconds start over. Every delivery is still announced by itself
-//   (`admin--notes--live:delivery`), with `detail.burstMs`, the length of the
-//   window, so that `admin--notes--alert` counts its once-per-burst chime by
-//   the same clock. The burst is kept beside the controller (`burst`), like
-//   `pending`: it outlives a Turbo visit.
-// - `Notes::RecordChannel`, one per `record` target (an editor's drawer, the
-//   media panel's notes, the mind graph's card): a thread of that record
-//   changed, or went with a deleted block.
+// The PERSON'S side -- the person's stream, the sidebar's count, the
+// dashboard's cards, the toasts and their bursts -- is `admin--notes--inbox`,
+// beside this controller on <body>. It asks this one whether the person is
+// looking at a thread (`watched`, `watching`), and that is all the two say to
+// each other.
+//
+// THE SUBSCRIPTIONS. `Notes::RecordChannel`, one per `record` target (an
+// editor's drawer, the media panel's notes, the mind graph's card): a thread
+// of that record changed, or went with a deleted block.
 //
 // REFRESHING WITHOUT LOSING WORK (§6.3). What is READ is replaced; what is
 // TYPED is never touched.
-// - The list view: everything in `#notes-list` is replaced AROUND a new-note
-//   field that is on screen. The field is not moved, not even within the
-//   list, so its text, its names, its open picker and the focus stay.
-// - The thread view: its `messages` part is replaced -- Back, the heading,
-//   Notify, Close and Pin are in it (its two rows, which in the drawer stay
-//   at the top while the messages under them scroll: the handoff's decision
-//   35), and show a state someone else can change. A message with an open edit form or an open "Delete this note?"
-//   stays the element it is. The `reply` part is never replaced: only its
-//   Resolve / Reopen button and the empty form that button sends are swapped
-//   when the thread's state changed, so the button says what it now does.
-//   A message's reaction chips are read, not typed: they are redrawn with
-//   their message, and in a message that stays the element it is (a delete
-//   question is open) the chips alone are swapped. The set of emoji someone
-//   has open under a message ("Add a reaction") is open afterwards too.
-//   A message's files are the very elements that were there (a picture is
-//   not fetched again, a GIF that plays goes on playing).
-//   Whatever had the focus has it afterwards (the same element, or the same
-//   control of the new markup), and the scroll position stays -- unless the
-//   reader was at the bottom, who stays at the bottom. Messages that arrived
-//   are set off by a "NEW" divider above the first of them, which stays
-//   where it first stood until the thread is left; a reader who is not at
-//   the bottom gets "1 new message ↓" above the reply field and nothing
-//   moves.
-// - A composer is never replaced by a refresh, and that goes for one that
-//   holds CHOSEN FILES and no text as for one that holds text: the thread's
-//   reply part and the list's new-note field are left where they are (a
-//   file field's files cannot be put back by a script).
-// - A thread that is gone (its GET answers the list, "This note is gone")
-//   while its reply field or an edit holds text, or its reply field holds
-//   chosen files: the text stays, with "This
-//   thread was deleted" above the field, and everything that would send it
-//   to a thread that is not there is switched off. Without typed text the
-//   frame goes to the list.
+// The rule has one owner, `notes/merge` (`mergeList`, `mergeThread`,
+// `mergeGone`), whose header says what counts as typed and how a list and
+// a thread are merged; `redrawList`, `redrawThread` and `gone` here call it
+// and do what is not the view's business. What this controller decides is
+// WHETHER a part is fetched:
+// - A thread that is gone and holds no typed text: the frame goes to the
+//   list (`gone`).
 // - A drawer that is closed gets its counts only (`data-notes-counts-url`,
 //   handed to `admin--notes--drawer#refreshCounts`): fetching a thread is what marks
 //   it read, and nobody is reading a closed drawer. It is remembered as
@@ -124,117 +85,18 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 //
 // THE SOCKET. When it drops, CS Studio works as without push; when it is
 // back, every part is fetched once -- signals sent meanwhile were never
-// received. A session that ended has its socket closed by the server
-// (`Session#disconnect_cable`); the consumer's one reconnect is refused with
-// `reconnect: false`, and it stops there, silently.
+// received. What a session's end does to the socket: `live/connection`.
 // `data-notes-live="connected"` on <body> says that every subscription of
 // this page has been answered (confirmed, or rejected for a record the
-// viewer may not read): a signal sent from then on is received.
+// viewer may not read): a signal sent from then on is received. This
+// controller says how the records' subscriptions stand, `admin--notes--inbox`
+// how the person's does, and `live/state` puts the two together.
 //
 // NO PAGE REFRESH, NO MORPHING (decision D20): nothing here touches an editor
 // form, the write queue or anything outside the notes parts.
 const COALESCE_MS = 500
-const NEAR_BOTTOM = 48
-const FOCUSABLE = "a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, [tabindex]"
-
-// This tab, for as long as its document lives: the shape the server echoes
-// (`Notes::Signals::TAB`, lower-case letters, digits and dashes, 8 to 40).
-const TAB = `tab-${Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("")}`
-
-// The subscriptions of this document, one per channel-and-parameters, shared
-// by whoever listens. A Turbo visit replaces <body>, and with it this
-// controller and its `record` targets: the old ones let go and the new ones
-// ask in the same task. Unsubscribing and subscribing again to the same
-// identifier at once is what Action Cable can't promise the order of (the
-// server works its commands on a pool; a late "unsubscribe" would remove the
-// new subscription, and the confirmation of the old one would have been taken
-// for it), so a subscription nobody listens to is let go a task later, and
-// one asked for again in between is simply kept. When the last one goes, the
-// tab has left CS Studio and the socket is closed.
-const pool = new Map()
-
-function listen(params, listener) {
-  const key = JSON.stringify(params)
-  let entry = pool.get(key)
-  if (!entry) {
-    entry = { listeners: new Set(), up: false, settled: false, rejected: false }
-    const tell = (name, ...args) => [ ...entry.listeners ].forEach((each) => each[name]?.(...args))
-    entry.subscription = cable.subscribeTo(params, {
-      connected: () => { entry.up = entry.settled = true; tell("connected") },
-      disconnected: () => { entry.up = entry.settled = false; tell("disconnected") },
-      rejected: () => { entry.rejected = entry.settled = true; tell("rejected") },
-      received: (signal) => tell("received", signal)
-    })
-    pool.set(key, entry)
-  }
-  clearTimeout(entry.release)
-  entry.listeners.add(listener)
-
-  const stop = () => {
-    entry.listeners.delete(listener)
-    if (entry.listeners.size > 0) return
-    entry.release = setTimeout(async () => {
-      const subscription = await entry.subscription
-      if (entry.listeners.size > 0) return
-      pool.delete(key)
-      // A rejected one is forgotten on both sides already.
-      if (!entry.rejected) subscription.unsubscribe()
-      if (pool.size === 0) (await cable.getConsumer()).disconnect()
-    }, 0)
-  }
-  return { entry, stop }
-}
-
-// What the person's stream has said and nobody has acted on yet: the
-// deliveries to announce, and whether the count and the cards are due. Beside
-// `pool`, not on the controller: a signal waits half a second before anything
-// is fetched, and a Turbo visit inside that window replaces <body> and the
-// controller with it. The next page's controller takes these over
-// (`connect`), so the toast is raised there.
-//
-// `person` is whose they are: the signed-in person's id as the page that was
-// told gave it. A session that ended and was replaced by another sign-in in
-// the same document must not inherit the ids of the person before (`connect`
-// empties this for a different person). `live` is the controller of the
-// <body> that is in the document now, the only one that may announce
-// anything: a run of `inbox` that outlives its page hands what it has left
-// to it (`handBack`).
-const pending = { deliveries: new Set(), due: false, person: null }
-let live = null
-
-// The burst of deliveries being announced (see "SEVERAL AT ONCE"): when the
-// last one was announced, how many of it were said in a toast, the named
-// toasts that are its first two, and the one toast that replaced them. The
-// elements may be gone (dismissed, timed out, left behind by a visit);
-// removing one that is gone does nothing.
-const NAMED_TOASTS = 2
-const BURST_MS = 10000
-const burst = { last: 0, said: 0, named: [], summary: null }
-
-function endBurst() {
-  Object.assign(burst, { last: 0, said: 0, named: [], summary: null })
-}
-
-// The last segment of the address a control's form posts to: "follow", "pin".
-const change = (control) => control.closest("form")?.getAttribute("action")?.split("?")[0].split("/").pop()
-
-// The controls of a thread's first rows, each as a name and how to find it
-// in markup drawn again. Notify and Pin are a form each; which of the two
-// words the form's address ends in changes with the thread.
-const CONTROLS = [
-  [ "back", (root) => root.querySelector("a[data-note-back]") ],
-  [ "close", (root) => root.querySelector("button[data-note-close]") ],
-  [ "leave", (root) => root.querySelector("button[data-note-leave]") ],
-  [ "notify", (root) => [ ...root.querySelectorAll("[data-note-actions] form button") ].find((button) => [ "follow", "unfollow" ].includes(change(button))) ],
-  [ "pin", (root) => [ ...root.querySelectorAll("[data-note-actions] form button") ].find((button) => [ "pin", "unpin" ].includes(change(button))) ],
-  [ "state", (root) => root.querySelector("button[data-note-state]") ]
-]
-
-const nearBottom = (scroller) => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < NEAR_BOTTOM
-
 export default class extends Controller {
   static targets = [ "record" ]
-  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String, burstMs: { type: Number, default: BURST_MS } }
 
   // Before the first target connects, which is before `connect`.
   initialize() {
@@ -243,50 +105,27 @@ export default class extends Controller {
     this.records = new Map()
     this.timers = new Map()
     this.stale = new WeakSet()
-    this.dropped = false
   }
 
   connect() {
     this.element.dataset.notesTab = TAB
-    this.person = listen({ channel: "Notes::PersonChannel" }, {
-      connected: () => this.online(),
-      disconnected: () => this.offline(),
-      rejected: () => this.sync(),
-      received: (signal) => this.addressed(signal)
-    })
-    // A socket the server closed for good (the session ended; someone has
-    // signed in again since) is opened again by the first page that asks.
-    cable.getConsumer().then((consumer) => consumer.ensureActiveConnection())
-    // What the page before this one was told and had not acted on -- its
-    // timer not yet run, or its run still out when the visit came (that run
-    // announces nothing more, `inbox`). Nothing of it for another person.
-    if (pending.person !== this.personValue) {
-      pending.deliveries.clear()
-      pending.due = false
-      pending.person = this.personValue
-      endBurst()
-    }
-    // The tab's note drafts are this person's or nobody's (`forgetDrafts`).
-    forgetDrafts(this.personValue)
-    live = this
-    if (pending.due || pending.deliveries.size > 0) this.soon("person", () => this.inbox())
     this.sync()
   }
 
   disconnect() {
-    this.person?.stop()
-    this.person = null
     this.records.forEach((record) => record.stop())
     this.records.clear()
-    if (live === this) live = null
-    // The timers go; what the person's stream said stays (`pending`).
     this.timers.forEach((timer) => clearTimeout(timer))
     this.timers.clear()
   }
 
   recordTargetConnected(element) {
     const record = { dropped: false }
-    const { entry, stop } = listen({ channel: "Notes::RecordChannel", type: element.dataset.notesType, id: String(element.dataset.notesId) }, {
+    const heard = (signal) => {
+      if (signal?.kind !== "threads" || signal.origin === TAB) return
+      this.soon(element, () => this.refresh(element, signal.thread_id ?? null))
+    }
+    const stop = listen({ channel: "Notes::RecordChannel", type: element.dataset.notesType, id: String(element.dataset.notesId) }, Object.assign(heard, {
       connected: () => {
         if (record.dropped) this.soon(element, () => this.refresh(element, null))
         record.dropped = false
@@ -296,13 +135,9 @@ export default class extends Controller {
         record.dropped = true
         this.sync()
       },
-      rejected: () => this.sync(),
-      received: (signal) => {
-        if (signal?.kind !== "threads" || signal.origin === TAB) return
-        this.soon(element, () => this.refresh(element, signal.thread_id ?? null))
-      }
-    })
-    this.records.set(element, Object.assign(record, { entry, stop }))
+      rejected: () => this.sync()
+    }))
+    this.records.set(element, Object.assign(record, { stop }))
     this.sync()
   }
 
@@ -312,20 +147,6 @@ export default class extends Controller {
     clearTimeout(this.timers.get(element))
     this.timers.delete(element)
     this.sync()
-  }
-
-  // `submit` on the sidebar's Sign out form: the tab's note drafts go with the
-  // session. When the document actually goes (`pagehide`), not at the press:
-  // with unsaved content the browser asks "Leave site?" first, and a person
-  // who stays must find their half-typed note where it was. If they stay,
-  // the next key or pointer press takes the intent back, so a later reload,
-  // which is meant to keep drafts, removes nothing.
-  signingOut() {
-    const clear = () => forgetDrafts()
-    const stay = () => window.removeEventListener("pagehide", clear)
-    window.addEventListener("pagehide", clear, { once: true })
-    document.addEventListener("pointerdown", stay, { once: true, capture: true })
-    document.addEventListener("keydown", stay, { once: true, capture: true })
   }
 
   // `turbo:before-fetch-request` on the document: this tab's notes WRITES say
@@ -361,7 +182,7 @@ export default class extends Controller {
     // pressed for as long as its request is out, and a disabled button has
     // lost the focus by the time the answer is drawn.
     const view = frame.querySelector(":scope > [data-notes-view='thread']")
-    this.sent = { frame, form: event.target, held: view ? this.hold(view) : null }
+    this.sent = { frame, form: event.target, held: view ? hold(view) : null }
   }
 
   // `turbo:before-frame-render` on the document: see "THE ANSWER TO ONE OF
@@ -401,7 +222,7 @@ export default class extends Controller {
   // render, so nothing is painted in between. Where the thread is in the
   // flow, what scrolls is outside the frame and stays by itself.
   keepPlace(event, frame, view) {
-    const scroller = this.scroller(view)
+    const scroller = scrollerOf(view)
     if (!view.contains(scroller)) return
 
     const top = scroller.scrollTop
@@ -409,7 +230,7 @@ export default class extends Controller {
     event.detail.render = (current, next) => {
       draw(current, next)
       const now = frame.querySelector(":scope > [data-notes-view='thread']")
-      if (now) this.scroller(now).scrollTop = top
+      if (now) scrollerOf(now).scrollTop = top
     }
   }
 
@@ -442,24 +263,11 @@ export default class extends Controller {
 
   // --- the socket -------------------------------------------------------------------
 
-  // Whether every subscription of this page has been answered.
+  // Whether every record subscription of this page has been answered: this
+  // controller's half of `data-notes-live` (`live/state`; the person's
+  // subscription is `admin--notes--inbox`'s half).
   sync() {
-    const settled = Boolean(this.person?.entry.up) && [ ...this.records.values() ].every((record) => record.entry.settled)
-    this.element.dataset.notesLive = settled ? "connected" : "connecting"
-  }
-
-  // The person's stream is up. After a drop, what the person's signals lead
-  // to is fetched once; each record's own subscription does the same for
-  // its part (`recordTargetConnected`).
-  online() {
-    if (this.dropped) this.soon("person", () => this.inbox())
-    this.dropped = false
-    this.sync()
-  }
-
-  offline() {
-    this.dropped = true
-    this.sync()
+    report(this.element, "records", [ ...this.records.values() ].every((record) => record.stop.settled))
   }
 
   // One run per key per COALESCE_MS, at the end of the burst's first window.
@@ -561,383 +369,39 @@ export default class extends Controller {
     return url.pathname + url.search
   }
 
+  // The three below are the controller's side of the merge (`notes/merge`,
+  // which owns the rule and every change inside the view): each hands the
+  // view and the answer over, with the page's translator for what the merge
+  // says, and does the rest itself.
   redrawList(view, answer) {
-    if (answer.dataset.notesView !== "list") return
-    const next = document.importNode(answer, true)
-    const field = view.querySelector(":scope > #notes-new")
-    const held = this.hold(view)
-    const scroller = this.scroller(view)
-    const top = scroller.scrollTop
-    const resolved = view.querySelector("#notes-resolved-section")?.open
-
-    if (field) {
-      // Around the field, which stays where it is: what the answer has
-      // before the field's place goes before it, the rest after. In an
-      // answer without the place (the block the note is on went a moment
-      // ago) the counts and the list's sentence go before it.
-      const place = next.querySelector(":scope > #notes-new")
-      const parts = [ ...next.children ]
-      const at = place ? parts.indexOf(place) : parts.findIndex((part) => !part.matches("[hidden], [role='status']"))
-      // Not the field's own place, and no second "New note" beside the field.
-      const drawn = (part) => part !== place && !part.querySelector("[data-note-new-link]")
-      ;[ ...view.children ].forEach((part) => { if (part !== field) part.remove() })
-      field.before(...(at < 0 ? parts : parts.slice(0, at)).filter(drawn))
-      field.after(...(at < 0 ? [] : parts.slice(at)).filter(drawn))
-    } else {
-      view.replaceChildren(...next.children)
-    }
-
-    const section = view.querySelector("#notes-resolved-section")
-    if (resolved && section) section.open = true
-    scroller.scrollTop = top
-    this.give(view, held)
+    mergeList(view, answer)
   }
 
-  // `own`: the answer to this tab's own button (`answered`), not a signal's
-  // fetch -- nothing in it "arrived". `reply`: the reply's composer is what
-  // was sent, so its part is the answer's. `state`: Resolve or Reopen was
-  // sent, whose refusal is said in the composer (`refusal`). `held`: what had the focus when
-  // the button was pressed (`asked`).
-  redrawThread(frame, view, answer, url, { own = false, reply: sentReply = false, state: sentState = false, held: heldBefore = null } = {}) {
-    const old = view.querySelector(":scope > [data-note-part='messages']")
-    const reply = view.querySelector(":scope > [data-note-part='reply']")
-    if (!old || !reply) return
-    // A message someone is working in: an open edit form, an open question.
-    const busy = [ ...old.querySelectorAll("[data-note-message]") ].filter((message) => message.querySelector("form[data-note-composer], [data-note-delete-question]"))
-
-    if (answer.dataset.notesView !== "thread" || answer.dataset.noteThread !== view.dataset.noteThread) return this.gone(frame, view, old, reply, busy, answer, url)
-    if (view.querySelector("[data-note-gone]")) return
-
-    const scroller = this.scroller(view)
-    const atBottom = nearBottom(scroller)
-    const top = scroller.scrollTop
-    // What had the focus at the press -- unless the person has since moved
-    // into a field: then that field, which is where their typing goes. (It
-    // is noted, not left alone: a message that is kept is moved into the new
-    // part, and an element that is moved drops the focus.)
-    const held = (!this.typing(view) && heldBefore) || this.hold(view)
-    const known = new Set([ ...old.querySelectorAll("[data-note-message]") ].map((message) => message.dataset.noteMessage))
-    const next = document.importNode(answer.querySelector(":scope > [data-note-part='messages']"), true)
-    const find = (id) => [ ...next.querySelectorAll("[data-note-message]") ].find((message) => message.dataset.noteMessage === id)
-
-    const arrived = [ ...next.querySelectorAll("[data-note-message]") ].filter((message) => !known.has(message.dataset.noteMessage))
-    // The set of emoji that is open under a message, to be open again.
-    // (Not after this tab's own press: an emoji was picked from it.)
-    const picking = own ? null : old.querySelector("details[data-reaction-add][open]")?.closest("[data-note-message]")?.dataset.noteMessage
-    // The very elements, in the place the answer gives their messages -- shown,
-    // should that place now be among the folded ones; one whose message was
-    // deleted meanwhile keeps its text at the end.
-    busy.forEach((message) => {
-      const twin = find(message.dataset.noteMessage)
-      // Its reactions are what others did, not what is being typed: the new
-      // ones, disabled under an edit form (which is not touched). Not while
-      // its own set of emoji is open.
-      if (twin && !message.querySelector("details[data-reaction-add][open]")) this.takeReactions(message, twin, { disabled: Boolean(message.querySelector("form[data-note-composer]")) })
-      if (twin) twin.replaceWith(message)
-      // At the end of the messages, which is inside what scrolls (decision 35).
-      else (next.querySelector(":scope > [data-note-scroll]") || next).append(message)
-      message.closest("details")?.setAttribute("open", "")
-    })
-    // A message's files never change (they are fixed when it is written), so
-    // the very elements are kept in the place the answer gives them: a
-    // picture is not fetched again for every refresh (its address is never
-    // cached, `Admin::NoteFilesController`), and a GIF someone set playing
-    // goes on playing. A message being worked in was moved whole, above.
-    old.querySelectorAll("[data-note-message]").forEach((message) => {
-      if (busy.includes(message)) return
-      const kept = message.querySelector(":scope > [data-note-files]")
-      const place = kept && find(message.dataset.noteMessage)?.querySelector(":scope > [data-note-files]")
-      if (place) place.replaceWith(kept)
-    })
-    if (old.querySelector("details[data-note-fold]")?.open) next.querySelector("details[data-note-fold]")?.setAttribute("open", "")
-    if (picking) find(picking)?.querySelector("details[data-reaction-add]")?.setAttribute("open", "")
-    // The divider stays where it first stood while the thread is open.
-    const first = old.querySelector("[data-note-new-divider]")?.nextElementSibling?.dataset.noteMessage
-    const mark = own ? null : (first && find(first)) || arrived[0]
-    if (mark) {
-      mark.closest("details")?.setAttribute("open", "")
-      mark.before(this.divider())
-    }
-
-    // A refused Pin or Notify is cleared by the PERSON'S next action (the
-    // handoff's decision 40), not by somebody else's change: a refresh that
-    // is not this tab's own answer carries the alert over, as the element it
-    // is (its four seconds, when the note is gone, go on counting).
-    const refusal = own ? null : old.querySelector(":scope > [data-note-refusal]")
-    if (refusal) next.querySelector(":scope > [data-note-rows]")?.after(refusal)
-
-    old.replaceWith(next)
-    view.dataset.state = answer.dataset.state
-    this.takeCounts(view, answer)
-    this.settle(reply, answer)
-    if (sentState) this.refusal(reply, answer)
-    const nextReply = sentReply && document.importNode(answer.querySelector(":scope > [data-note-part='reply']"), true)
-    // The reply was sent from its part -- the field, or the button beside
-    // it: the focus goes to the field of the part that takes its place.
-    const fromReply = Boolean(nextReply && held?.element && reply.contains(held.element))
-    if (nextReply) reply.replaceWith(nextReply)
-    if (fromReply) nextReply.querySelector("textarea")?.focus({ preventScroll: true })
-    else this.give(view, held)
-
-    // The reader at the bottom stays there, and so sees what arrived; anyone
-    // else stays where they are and is told. Asked for again: the messages'
-    // own scroller is part of what was just replaced.
-    const now = this.scroller(view)
-    now.scrollTop = atBottom ? now.scrollHeight : top
-    if (nextReply) return
-    if (atBottom) reply.querySelector(":scope > [data-note-jump]")?.remove()
-    else if (arrived.length > 0 && !own) this.jump(view, reply, arrived.length)
+  // `own`, `reply`, `state` and `held` are `mergeThread`'s (`answered`
+  // passes them; a live refresh passes none).
+  redrawThread(frame, view, answer, url, options = {}) {
+    const merged = mergeThread(view, answer, { ...options, t: (key, values) => messages(this.element).t(key, values) })
+    if (merged?.gone) this.gone(frame, view, answer, url)
   }
 
-  // The thread is no longer there: its GET answered the list. With nothing
-  // typed, the frame goes where that answer came from (the list, which says
-  // "This note is gone"). With text in the reply field or in an edit, the
-  // text stays (spec §6.3): the messages go, Back and Close stay, Notify, Pin
-  // and every way of sending are taken away -- each would be answered with
-  // the list, over the text -- and the field says why.
-  gone(frame, view, old, reply, busy, answer, url) {
+  // The thread is no longer there: its GET answered the list. The record's
+  // counts are the answer's. With nothing typed, the frame goes where that
+  // answer came from (the list, which says "This note is gone"); typed text
+  // stays, and `mergeGone` says in the view why it can't be sent.
+  gone(frame, view, answer, url) {
     const counts = answer.querySelector("[data-admin--notes--drawer-target~='counts']")?.dataset.counts
     if (counts) this.notes?.refreshCounts(JSON.parse(counts))
-    if (view.querySelector("[data-note-gone]")) return
+    if (mergeGone(view, { t: (key, values) => messages(this.element).t(key, values) })) return
 
-    const editing = busy.filter((message) => [ ...message.querySelectorAll("textarea") ].some((field) => field.value !== field.defaultValue))
-    // Chosen files are typed work too: a field that holds some is kept, even
-    // with no text beside them.
-    const files = reply.querySelector("input[type='file']")?.files.length > 0
-    if (!reply.querySelector("textarea")?.value && !files && editing.length === 0) {
-      const list = new URL(url, window.location.origin)
-      frame.src = list.pathname + list.search
-      return
-    }
-
-    const held = this.hold(view)
-    const rows = old.querySelector(":scope > [data-note-rows]")
-    rows?.querySelectorAll("[data-note-actions] form").forEach((form) => form.remove())
-    // What is left under the rows: the edits that hold text, and nothing else.
-    old.querySelector(":scope > [data-note-scroll]")?.replaceChildren(...editing)
-
-    const line = document.createElement("p")
-    line.dataset.noteGone = ""
-    line.setAttribute("role", "status")
-    line.className = "rounded-cs border border-line bg-sunken px-3 py-2 text-[13px] text-ink"
-    line.textContent = messages(this.element).t("notes.script.live.gone")
-    ;(reply.querySelector("form[data-note-composer]") || reply.lastElementChild).before(line)
-    reply.querySelector(":scope > [data-note-jump]")?.remove()
-
-    view.querySelectorAll("form").forEach((form) => form.addEventListener("submit", (event) => event.preventDefault()))
-    view.querySelectorAll("button[type='submit']").forEach((button) => {
-      // No longer the composer's to enable when the field has text.
-      button.removeAttribute("data-admin--notes--composer-target")
-      button.disabled = true
-    })
-    this.give(view, held)
-  }
-
-  // Resolve or Reopen, in the composer's bottom row, and the empty form it
-  // sends: swapped when the thread's state changed, and only then. Nothing
-  // else of the reply part is ever replaced.
-  settle(reply, answer) {
-    const button = reply.querySelector("button[data-note-state]")
-    const twin = answer.querySelector("[data-note-part='reply'] button[data-note-state]")
-    if (!button || !twin || button.dataset.noteState === twin.dataset.noteState) return
-
-    const form = button.form
-    const formTwin = answer.querySelector(`[data-note-part='reply'] form[id="${CSS.escape(twin.getAttribute("form"))}"]`)
-    if (form && formTwin) form.replaceWith(document.importNode(formTwin, true))
-    button.replaceWith(document.importNode(twin, true))
-  }
-
-  // Resolve or Reopen was pressed, and the answer says in the composer
-  // whether it was refused (`ThreadComponent`: the sentence stands where the
-  // button does). The reply part is not replaced for it -- its field may
-  // hold text -- so the sentence alone is taken over: the answer's, in the
-  // place the composer has for one, or none when the press went through.
-  refusal(reply, answer) {
-    const form = reply.querySelector("form[data-note-composer]")
-    const twin = answer.querySelector("[data-note-part='reply'] form[data-note-composer]")
-    if (!form || !twin) return
-
-    form.querySelector(":scope > ul[role='alert']")?.remove()
-    const said = twin.querySelector(":scope > ul[role='alert']")
-    if (said) form.querySelector(":scope > input[name='mention_names']")?.after(document.importNode(said, true))
-  }
-
-  // The "NEW" divider (handoff): an accent line filling the row, then the
-  // word.
-  divider() {
-    const divider = document.createElement("div")
-    divider.dataset.noteNewDivider = ""
-    divider.className = "flex items-center gap-2 px-4 pt-2.5"
-    const line = document.createElement("span")
-    line.className = "h-px flex-1 bg-accent"
-    const label = document.createElement("span")
-    label.className = "font-cs-mono text-[10px] uppercase tracking-mono text-accent"
-    label.textContent = messages(this.element).t("notes.script.live.new_divider")
-    divider.append(line, label)
-    return divider
-  }
-
-  // "1 new message ↓", 12px above the reply field (the dock is positioned, so
-  // the button stands on it wherever the thread is scrolled to; 13px from the
-  // dock's padding edge, which is 12px above the line on its top). It counts
-  // what arrived since the reader was last at the bottom, and goes when they
-  // are there again -- by pressing it or by scrolling.
-  //
-  // What scrolls is asked for each time (`scroller`): the messages' own
-  // scroller is replaced with every refresh, while this button, in the reply
-  // part, stays. So the scroll is heard on the document in the capture
-  // phase, which hears every scroller in it (a scroll does not bubble) and
-  // the window's too.
-  jump(view, reply, count) {
-    let button = reply.querySelector(":scope > [data-note-jump]")
-    const total = count + Number(button?.dataset.count || 0)
-    if (!button) {
-      button = document.createElement("button")
-      button.type = "button"
-      button.dataset.noteJump = ""
-      button.className = "absolute bottom-full left-1/2 mb-[13px] -translate-x-1/2 cursor-pointer whitespace-nowrap rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink shadow-menu focus-visible:outline-2 focus-visible:outline-accent"
-      const watch = () => { if (!button.isConnected || !view.isConnected || nearBottom(this.scroller(view))) dismiss() }
-      const dismiss = () => {
-        document.removeEventListener("scroll", watch, { capture: true })
-        if (button.contains(document.activeElement)) view.focus({ preventScroll: true })
-        button.remove()
-      }
-      document.addEventListener("scroll", watch, { capture: true, passive: true })
-      button.addEventListener("click", () => {
-        if (button.contains(document.activeElement)) view.focus({ preventScroll: true })
-        const scroller = this.scroller(view)
-        scroller.scrollTop = scroller.scrollHeight
-        dismiss()
-      })
-      reply.prepend(button)
-    }
-    button.dataset.count = String(total)
-    button.textContent = messages(this.element).t("notes.script.live.new_messages", { count: total })
-  }
-
-  // The answer's own copy of the record's counts, in the place of the one
-  // the view had: `admin--notes--drawer` reads a counts element as it connects.
-  takeCounts(view, answer) {
-    const counts = answer.querySelector(":scope > [data-admin--notes--drawer-target~='counts']")
-    const own = view.querySelector(":scope > [data-admin--notes--drawer-target~='counts']")
-    if (counts && own) own.replaceWith(document.importNode(counts, true))
+    const list = new URL(url, window.location.origin)
+    frame.src = list.pathname + list.search
   }
 
   async refreshCounts(element) {
     const url = element.dataset.notesCountsUrl
     if (!url) return
-    const counts = await this.json(url)
+    const counts = await json(url)
     if (counts && element.isConnected) this.notes?.refreshCounts(counts)
-  }
-
-  // What scrolls a view. A thread in the drawer or the sheet: its messages'
-  // own scroller, between the two rows and the composer (decision 35), which
-  // is so by the stylesheet and is asked of it. Anything else -- the list, a
-  // thread in the media panel or on a record's notes page: the drawer's
-  // body, or the page.
-  scroller(view) {
-    const own = view.querySelector(":scope > [data-note-part='messages'] > [data-note-scroll]")
-    if (own && /auto|scroll/.test(window.getComputedStyle(own).overflowY)) return own
-    return view.closest("[data-notes-scroller]") || document.scrollingElement
-  }
-
-  // What has the focus inside `root`, to be given back after a redraw
-  // (`give`): the element itself, which may survive; failing that, what it
-  // was -- one of a thread's own controls, an element with an id (a row of
-  // the list), or the nth control of a message.
-  hold(root) {
-    const active = document.activeElement
-    if (!active || active === document.body || !root.contains(active)) return null
-
-    const message = active.closest("[data-note-message]")
-    return {
-      element: active,
-      control: CONTROLS.find(([ , find ]) => find(root) === active)?.[0],
-      id: active.id || null,
-      message: message && root.contains(message) ? message.dataset.noteMessage : null,
-      index: message ? [ ...message.querySelectorAll(FOCUSABLE) ].indexOf(active) : -1,
-      // A reaction's chip, or an emoji of the set: by its emoji, since the
-      // chips before it may be others after the redraw.
-      reaction: active.closest("[data-note-reactions], [data-reaction-add]") ? active.dataset.reaction || active.value || null : null,
-      selection: typeof active.selectionStart === "number" ? [ active.selectionStart, active.selectionEnd, active.selectionDirection ] : null
-    }
-  }
-
-  // Never left to fall to <body>: when nothing of the new markup is what had
-  // the focus, the view takes it (or, for the list, what holds it: the
-  // drawer).
-  give(root, held) {
-    if (!held || document.activeElement === held.element) return
-
-    const message = held.message ? [ ...root.querySelectorAll("[data-note-message]") ].find((each) => each.dataset.noteMessage === held.message) : null
-    const target = (held.element.isConnected && held.element)
-      || (held.control && CONTROLS.find(([ name ]) => name === held.control)[1](root))
-      || (held.id && [ ...root.querySelectorAll("[id]") ].find((each) => each.id === held.id))
-      || (message && held.reaction && this.reaction(message, held.reaction))
-      || (message && [ ...message.querySelectorAll(FOCUSABLE) ][held.index])
-      || root.closest("[tabindex]")
-    if (!target) return
-
-    target.focus({ preventScroll: true })
-    if (target === held.element && held.selection) target.setSelectionRange(...held.selection)
-  }
-
-  // Whether the focus is in a field of the view right now.
-  typing(root) {
-    const active = document.activeElement
-    return Boolean(active?.isConnected && root.contains(active) && active.matches("textarea, input:not([type=hidden]), select"))
-  }
-
-  // The chip of an emoji in a message as it is drawn now; the way to the set
-  // (the add chip, or the meta line's control once the row is gone) when that
-  // emoji's last reaction went and its chip with it. Compared as data, never
-  // built into a selector: the emoji is whatever the button held.
-  reaction(message, emoji) {
-    return [ ...message.querySelectorAll("[data-note-reactions] button[data-reaction]:not([disabled])") ].find((chip) => chip.dataset.reaction === emoji)
-      || message.querySelector("details[data-reaction-add] > summary")
-  }
-
-  // A message that stays the element it is gets the answer's reactions: its
-  // row of chips, or -- for a message nobody has reacted to -- the control in
-  // its meta line. Either may have come or gone since, so each is taken out
-  // and put where the message's own markup has it: the row before whatever
-  // is asked under the text, the control before the "⋯" menu.
-  //
-  // `disabled`: the message is being edited. The answer draws it as it is
-  // for everyone else, with chips to press; here they are made what
-  // `ReactionsComponent` draws under an edit form -- its `:disabled` state:
-  // the row at half opacity taking no pointer, every button `disabled`, the
-  // add chip a disabled button in place of the <details>, and no control in
-  // the meta line.
-  takeReactions(message, twin, { disabled = false } = {}) {
-    const row = twin.querySelector(":scope > [data-note-reactions]")
-    const control = disabled ? null : twin.querySelector(":scope > div > details[data-reaction-add]")
-    if (row && disabled) {
-      row.dataset.noteReactions = "disabled"
-      row.classList.add("pointer-events-none", "opacity-50")
-      row.querySelectorAll("details[data-reaction-add]").forEach((add) => {
-        const summary = add.querySelector("summary")
-        const button = document.createElement("button")
-        button.type = "button"
-        button.className = summary.className
-        button.setAttribute("aria-label", summary.getAttribute("aria-label"))
-        button.dataset.reactionAdd = "true"
-        button.append(...summary.childNodes)
-        add.replaceWith(button)
-      })
-      row.querySelectorAll("button").forEach((button) => { button.disabled = true })
-    }
-    message.querySelectorAll(":scope > [data-note-reactions], :scope > div > details[data-reaction-add]").forEach((old) => old.remove())
-    if (row) {
-      const under = message.querySelector(":scope > [role='alert'], :scope > [data-note-delete-question]")
-      if (under) under.before(row)
-      else message.append(row)
-    }
-    if (control) {
-      const menu = message.querySelector(":scope > div > [data-controller~='admin--ui--menu']")
-      if (menu) menu.before(control)
-      else message.firstElementChild?.append(control)
-    }
   }
 
   // `admin--notes--drawer`, on the same element.
@@ -945,192 +409,28 @@ export default class extends Controller {
     return this.application.getControllerForElementAndIdentifier(this.element, "admin--notes--drawer")
   }
 
-  // --- the person's inbox -----------------------------------------------------------
+  // --- is the person looking at a thread ------------------------------------------------
 
-  // A signal on the person's stream. Every delivery named in a burst is
-  // announced; the count and the cards are fetched once for all of them.
-  addressed(signal) {
-    if (signal?.kind === "delivery") {
-      if (Number.isInteger(signal.delivery_id)) pending.deliveries.add(signal.delivery_id)
-    } else if (signal?.kind !== "inbox" || signal.origin === TAB) {
-      return
-    }
-    pending.due = true
-    this.soon("person", () => this.inbox())
-  }
-
-  // ONLY THE CONTROLLER OF THE PAGE IN THE DOCUMENT ANNOUNCES. A run can
-  // outlive its page: a Turbo visit replaces <body> while the count or a
-  // delivery is being fetched. After every `await` the run asks whether it
-  // is still `live`; if not it announces nothing -- its `record` targets are
-  // the old page's, so it would judge "is the person looking at this
-  // thread" by a page that is gone -- puts back the delivery it was reading
-  // and hands everything to the page that is there (`handBack`). An id is
-  // taken off `pending` before it is read, so two runs never read the same
-  // one, and it is put back only by the run that took it: no delivery is
-  // announced twice, and none is stranded waiting for another signal.
-  async inbox() {
-    pending.due = false
-    await this.refreshInbox()
-    if (live !== this) return this.handBack()
-
-    for (const id of [ ...pending.deliveries ]) {
-      // Taken by another run since this one began.
-      if (!pending.deliveries.delete(id)) continue
-      const row = await this.read(id)
-      if (live !== this) return this.handBack(id)
-      if (row) this.announce(row)
-    }
-  }
-
-  // This run's page is gone. What it had not announced is the next page's:
-  // the delivery it was reading goes back, the count and the cards are due
-  // again (the answer went to the old page's elements), and the controller
-  // that is live runs -- now, not at the next signal. Without one yet, its
-  // `connect` will. Nothing is handed to another person's page.
-  handBack(id = null) {
-    if (pending.person !== this.personValue) return
-    if (id != null) pending.deliveries.add(id)
-    pending.due = true
-    live?.soon("person", () => live?.inbox())
-  }
-
-  // One delivery, read through the scoped endpoint before anything is said.
-  // Not found or refused (the record left the viewer's scope, or went to the
-  // trash): null, and nothing is said.
-  read(id) {
-    // The address of delivery 0, with this one's id as its last segment.
-    const url = new URL(this.deliveryUrlValue, window.location.origin)
-    url.pathname = url.pathname.replace(/\/0$/, `/${encodeURIComponent(id)}`)
-    return this.json(url.pathname + url.search)
-  }
-
-  // In one task, with no `await`: the controller that was live when the
-  // delivery had been read is the one that judges and says it.
-  announce(row) {
-    const now = Date.now()
-    if (now - burst.last > this.burstWindow) endBurst()
-    burst.last = now
-
-    const shown = this.watching(row.thread_id)
-    const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown, burstMs: this.burstWindow }
-    document.dispatchEvent(new CustomEvent("admin--notes--live:delivery", { detail }))
-    if (shown) return
-
-    // The first two of a burst by name; from the third, one toast for all.
-    burst.said += 1
-    if (burst.said <= NAMED_TOASTS) {
-      const toast = this.toast(row)
-      if (toast) burst.named.push(toast)
-    } else {
-      this.summarise()
-    }
-  }
-
-  // The length of a burst's window: `burstMs`, or the 10 seconds for
-  // anything that is not a positive finite number -- a NaN here would make a
-  // burst that never ends.
-  get burstWindow() {
-    const ms = this.burstMsValue
-    return Number.isFinite(ms) && ms > 0 ? ms : BURST_MS
-  }
-
-  // "You have 3 new notes": in the place of the burst's named toasts, and of
-  // itself when the count grows -- a new element, so its 8 seconds start
-  // again (`admin--ui--toast` counts from when it connects). "Open" is the
-  // template's own, which leads to the inbox.
-  summarise() {
-    burst.named.forEach((toast) => toast.remove())
-    burst.named = []
-    burst.summary?.remove()
-
-    const toast = this.blankToast()
-    if (!toast) return
-    toast.dataset.noteToast = "many"
-    toast.querySelector("span:not([aria-hidden])").textContent = messages(this.element).t("notes.script.toast.many", { count: burst.said })
-    document.getElementById("toasts").append(toast)
-    burst.summary = toast
+  // `admin--notes--inbox:watching` on the document: `admin--notes--inbox`,
+  // which raises the toasts, asks whether the person is looking at a thread.
+  // The answer is written into the event's own `detail`, and `dispatchEvent`
+  // is synchronous, so the asker reads it on its next line. Neither
+  // controller holds the other: no outlet, no import.
+  watched(event) {
+    event.detail.watching = this.watching(event.detail.threadId)
   }
 
   // Whether the person is looking at that thread, THE ONE PREDICATE: it is
   // the view of a notes frame that is open here, in a document that is not
-  // hidden. It is `detail.shown` of the delivery's event, what keeps the
-  // toast away, and -- its second half, in `fetchPart` -- what lets a thread
-  // be fetched at all. The window's focus is not part of it.
+  // hidden. It is `detail.shown` of the delivery's event
+  // (`admin--notes--inbox:delivery`), what keeps the toast away, and -- its
+  // second half, in `fetchPart` -- what lets a thread be fetched at all. The
+  // window's focus is not part of it.
   watching(threadId) {
     if (document.hidden) return false
     return this.recordTargets.some((element) => {
       const view = element.hidden ? null : element.querySelector("turbo-frame#notes > [data-notes-view='thread']")
       return Boolean(view) && view.dataset.noteThread === String(threadId) && !view.querySelector("[data-note-gone]")
     })
-  }
-
-  async refreshInbox() {
-    const count = await this.json(this.unreadUrlValue)
-    const badge = document.getElementById("sidebar-badge-dashboard")
-    if (count && badge) {
-      const unread = Number(count.unread) || 0
-      badge.textContent = unread > 0 ? String(unread) : ""
-      badge.hidden = unread === 0
-      badge.toggleAttribute("data-badge", unread > 0)
-    }
-    this.reload(document.getElementById("notes-for-you"), this.cardUrlValue)
-    this.reload(document.getElementById("notes-open-threads"), this.openThreadsUrlValue)
-  }
-
-  // The dashboard's two cards are frames drawn with the page, with no `src`
-  // of their own: the first signal gives them one, later ones reload it.
-  reload(frame, url) {
-    if (!frame || !url) return
-    if (frame.getAttribute("src") === url) frame.reload()
-    else frame.src = url
-  }
-
-  // JSON from one of CS Studio's own endpoints, or null: a refusal, a
-  // redirect to the sign-in page (which answers 200 with a page) and
-  // anything else that is not JSON are all "nothing to show".
-  async json(url) {
-    const response = await fetch(url, { headers: { Accept: "application/json" } })
-    if (!response.ok || response.redirected || !(response.headers.get("Content-Type") || "").includes("json")) return null
-    return response.json()
-  }
-
-  // The layout's `#toast-note-template` with an accent dot before its
-  // sentence (accent means "for you"), not yet in the page; nothing where
-  // there is no template or no region to put it in.
-  blankToast() {
-    const toast = document.getElementById("toast-note-template")?.content.firstElementChild?.cloneNode(true)
-    if (!toast || !document.getElementById("toasts")) return null
-
-    const dot = document.createElement("span")
-    dot.className = "size-1.5 shrink-0 rounded-full bg-accent"
-    dot.setAttribute("aria-hidden", "true")
-    toast.prepend(dot)
-    return toast
-  }
-
-  // One delivery's toast: "Dana mentioned you on Pricing" and "Open". The
-  // action is a GET form, whose query a browser rebuilds from its fields:
-  // the URL's parameters go in as hidden fields. Answers the element.
-  toast(row) {
-    const toast = this.blankToast()
-    const region = document.getElementById("toasts")
-    if (!toast) return null
-
-    toast.dataset.noteToast = "one"
-    toast.querySelector("span:not([aria-hidden])").textContent = messages(this.element).t("notes.script.toast.on", { sentence: row.sentence, title: row.title })
-
-    const form = toast.querySelector("form")
-    const target = new URL(row.url, window.location.origin)
-    form.action = target.pathname
-    target.searchParams.forEach((value, name) => {
-      const field = document.createElement("input")
-      field.type = "hidden"
-      field.name = name
-      field.value = value
-      form.append(field)
-    })
-    region.append(toast)
-    return toast
   }
 }

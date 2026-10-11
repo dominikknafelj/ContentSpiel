@@ -302,6 +302,12 @@ Rails.application.routes.draw do
     # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at
     # its own `/pages` (`resources :pages` above), no longer at the root.
     root to: "dashboard#show"
+    # Presence (presence spec §5): who else has a record open, and which of a
+    # list's records have someone here. Two reads, both through the read
+    # scope; the writes are a channel's (`Presence::Channel`). `here` comes
+    # first and its words can not be taken for a kind below.
+    get "presence/here", to: "presence#here", as: :presence_here, defaults: { format: :json }
+    get "presence/:kind/:id", to: "presence#show", as: :record_presence, constraints: { kind: /page|post|media/, id: /\d+/ }
     # Notes on content (notes spec §3.4, §4). Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
     # `/notes/media/5` -- so a controller finds the container through the read

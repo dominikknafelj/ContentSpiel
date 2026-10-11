@@ -1,0 +1,37 @@
+<% frame = capture do %>
+  <%= tag.turbo_frame id: frame_id, class: "flex items-center", data: { "admin--presence--record-target": "frame" } do %>
+    <% if people.any? %>
+      <% group = capture do %>
+        <% circles.each_with_index do |person, index| %>
+          <%= tag.span class: circle_class(index), data: circle_data(person) do %>
+            <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: avatar_size, tone: tone(person), ring: ground) %><%= render Admin::Ui::TooltipComponent.new(text: person.label) %>
+          <% end %>
+        <% end %>
+        <% if more? %>
+          <%= tag.span more_label, class: more_class, aria: { hidden: true }, data: { action: "mouseenter->admin--ui--menu#reveal" } %>
+        <% end %>
+      <% end %>
+      <%= render Admin::Ui::MenuComponent.new(label: group, aria_label: group_label, list: true, list_label: list_label, panel_id: "#{frame_id}-list", align: hang, button_class: group_class) do |menu| %>
+        <% people.each do |person| %>
+          <% menu.with_item do %>
+            <%= tag.div class: "flex items-center gap-2 px-2 py-1.5", data: { presence_listed: person.user.id, presence_state: person.state } do %>
+              <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: :md, tone: tone(person)) %>
+              <span class="min-w-0">
+                <span class="block max-w-56 truncate text-sm text-ink" data-presence-name><%= person.name %></span>
+                <span class="block text-xs text-meta" data-presence-status><%= person.status %></span>
+              </span>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+<% if frame_only? %>
+  <%= frame %>
+<% else %>
+  <%= tag.div class: wrapper_class, data: { controller: "admin--presence--record", live_part: "waiting",
+        "admin--presence--record-beat-value": Presence::BEAT_EVERY.in_milliseconds.to_i, "admin--presence--record-kind-value": kind.name, "admin--presence--record-id-value": @record.id, "admin--presence--record-url-value": url } do %>
+    <%= frame %>
+  <% end %>
+<% end %>

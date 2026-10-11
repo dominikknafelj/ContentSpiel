@@ -6,6 +6,9 @@ module Notes
   # session has ended, or whose user is gone, is rejected
   # (`ApplicationCable::Channel#subscriber`).
   class PersonChannel < ApplicationCable::Channel
+    private
+
+    # Private: a public method of a channel is an action a client may send.
     def subscribed
       subscriber ? stream_from(Signals.person_stream(subscriber.id)) : reject
     end

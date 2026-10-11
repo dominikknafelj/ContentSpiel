@@ -42,7 +42,7 @@ module Notes
 
     before_validation :derive_container
 
-    validates :subject_type, inclusion: { in: SUBJECT_TYPES }
+    validates :subject_type, inclusion: { in: ->(_thread) { Notes.subject_types } }
     validates :state, inclusion: { in: STATES }
     validates :origin_view, inclusion: { in: ORIGIN_VIEWS }
     validates :quote, length: { maximum: MAX_QUOTE }

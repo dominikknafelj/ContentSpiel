@@ -23,13 +23,14 @@
   <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
-<%# The page's open notes (notes spec §4.3): two queries for the header's
-    number, every marker's and which of them hold something unread for the
+<%# The page's open notes (notes spec §4.3): two queries for the drawer's
+    counts, every marker's and which of them hold something unread for the
     viewer. Here in the view, because every way this screen is rendered needs
-    them. %>
+    them. The header's Notes button is a slot component (`Admin::Slots`) and
+    is handed the same counts rather than reading them again. %>
 <% note_counts = Notes::Counts.for_container(@page, user: Current.user) %>
 
-<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) do |header| %>
+<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options, slot_context: { counts: note_counts }) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4): only
         in a non-default language, for a viewer who may edit the page, with AI

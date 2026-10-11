@@ -36,4 +36,8 @@ class Notes::PersonChannelTest < ActionCable::Channel::TestCase
     assert subscription.rejected?
     assert_empty subscription.streams
   end
+
+  test "the channel offers a client no action: subscribed is private" do
+    assert_empty Notes::PersonChannel.action_methods
+  end
 end

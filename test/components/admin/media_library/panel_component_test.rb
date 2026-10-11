@@ -171,6 +171,74 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_selector "#media-trash-help", text: "In use in 2 places. Remove it there first."
   end
 
+  class HeaderProbeComponent < ViewComponent::Base
+    def initialize(**) = nil
+
+    def call = tag.b("header", data: { slot_probe: "header" })
+  end
+
+  class SectionsProbeComponent < ViewComponent::Base
+    def initialize(**) = nil
+
+    def call = tag.b("sections", data: { slot_probe: "sections" })
+  end
+
+  test "the panel's slots stand at the right end of the file-name row and below Used on, and draw nothing while empty" do
+    asset = create_media_asset
+
+    Admin::Slots.with("media.panel.header" => [ HeaderProbeComponent ], "media.panel.sections" => [ SectionsProbeComponent ]) do
+      render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en")
+    end
+
+    html = rendered_content
+    order = [ "media-panel-title", 'data-slot-probe="header"', "<img", "Used on", 'data-slot-probe="sections"', "Move to trash" ].map { |needle| html.index(needle) }
+    assert_not_includes order, nil
+    assert_equal order.sort, order
+  end
+
+  # Presence handoff 13: the people stand between the file name and the "×".
+  # The name takes the room that is left and is cut on ONE line (the whole
+  # name is its `title`, and is in full in the fields below); what the slot
+  # draws never gives way; the "×" stays last.
+  test "the file-name row: the name is cut on one line with the whole name as its title, the slot follows 8px after it and the close 12px after that" do
+    asset = create_media_asset
+    asset.update_columns(title: "a-very-long-file-name-that-would-have-wrapped-over-three-lines.png") # version: none (a component test's own image)
+
+    Admin::Slots.with("media.panel.header" => [ HeaderProbeComponent ], "media.panel.sections" => []) do
+      render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en")
+    end
+
+    row = page.find("#media-panel > div:first-child")
+    assert_equal %w[flex gap-2 items-start], row[:class].split.sort
+    assert_equal [ "h2", "b", "a" ], row.all(:xpath, "./*").map(&:tag_name)
+    heading = row.find("h2#media-panel-title")
+    assert_equal %w[flex-1 font-semibold min-w-0 text-ink text-lg truncate], heading[:class].split.sort
+    assert_selector "h2#media-panel-title > span[title='#{asset.title}']", text: asset.title, exact_text: true
+    close = row.find("a[aria-label='Close panel']")
+    assert_includes close[:class].split, "ml-1"
+    assert_includes close[:class].split, "shrink-0"
+  end
+
+  test "with nobody else on the image the row is the name and the close, and presence's element is there without a group" do
+    asset = create_media_asset
+
+    as(users(:one)) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en") }
+
+    row = page.find("#media-panel > div:first-child")
+    assert_equal [ "h2", "div", "a" ], row.all(:xpath, "./*", visible: :all).map(&:tag_name)
+    row.assert_selector "div.hidden.flex-none.ml-auto[data-controller='admin--presence--record'] turbo-frame#presence-media-#{asset.id}", visible: :all
+    row.assert_no_selector "button", visible: :all
+  end
+
+  test "with nothing registered at its slots the panel is the panel without the notes section" do
+    Admin::Slots.with("media.panel.header" => [], "media.panel.sections" => []) do
+      render_inline Admin::MediaLibrary::PanelComponent.new(asset: create_media_asset, locale: "en")
+    end
+
+    assert_selector "#media-panel"
+    assert_no_selector "#media-notes"
+  end
+
   private
 
   def media_only_viewer

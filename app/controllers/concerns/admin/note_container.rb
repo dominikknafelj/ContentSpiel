@@ -11,6 +11,7 @@ module Admin
   # (`render_list`) and one thread (`render_thread`), which replaces it.
   module NoteContainer
     extend ActiveSupport::Concern
+    include Admin::RecordOfKind
 
     included do
       before_action :set_container
@@ -22,15 +23,7 @@ module Admin
     private
 
     def set_container
-      @container =
-        case params[:container_type]
-        when "page" then admin_scope(Page.all).find(params[:container_id])
-        when "post" then admin_scope(Post.all).find(params[:container_id])
-        else
-          return forbidden! unless can?("media.upload")
-
-          Media::Asset.kept.find(params[:container_id])
-        end
+      @container = record_of_kind(params[:container_type], params[:container_id])
     end
 
     # Which tab this is (`X-Notes-Tab`, set by `admin--notes--live` on its

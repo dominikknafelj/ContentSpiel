@@ -96,7 +96,10 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
 
   # The identifiers the tab's consumer is subscribed to, as [channel, type,
   # id], sorted: one entry per subscription, so a second subscription to the
-  # same thing shows.
+  # same thing shows. An editor's header also holds presence's subscription
+  # for its record (`admin--presence--record`), which follows a visit the
+  # same way: the record that was left is let go, the one that is here is
+  # listened to once.
   def subscriptions
     page.evaluate_script("window.__consumer.subscriptions.subscriptions.map((each) => JSON.parse(each.identifier)).map((id) => [ id.channel, id.type || '', id.id || '' ])").sort_by(&:to_s)
   end
@@ -143,7 +146,8 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: "Dana mentioned you on Pricing"
     assert_selector "#toasts .admin-toast > span[aria-hidden=true][class~='bg-accent']:first-child"
     within("#toasts .admin-toast") { press "Open" }
-    assert_selector "#notes-drawer [data-notes-view=thread]", text: "Look at this"
+    # A whole editor visit and then the drawer's frame: more than the default wait on a busy machine.
+    assert_selector "#notes-drawer [data-notes-view=thread]", text: "Look at this", wait: LIVE
     assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=\d+\z/)
   end
 
@@ -188,7 +192,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     reply_field.send_keys("Half a thou")
     keep_reply_field
 
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__delivery = event.detail })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__delivery = event.detail })")
 
     # Addressed to the viewer, so that there IS a delivery the lines at the
     # end are about: without the mention this person, who never wrote in the
@@ -226,7 +230,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   test "a window that shows the thread without having the focus is refreshed like any other, with no toast" do
     open_thread
     page.execute_script("document.hasFocus = () => false")
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__shown = event.detail.shown })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__shown = event.detail.shown })")
 
     reply_as_dana("Are you there, @[#{users(:one).id}]?")
 
@@ -244,7 +248,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     open_thread
     hide_document
     watch_notes_fetches
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__shown = event.detail.shown })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__shown = event.detail.shown })")
 
     reply_as_dana("While you were away, @[#{users(:one).id}]")
 
@@ -273,24 +277,42 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_equal 1, page.evaluate_script("window.__threadFetches")
   end
 
+  # The reader stands at 40, neither the top nor the bottom: at 0 a scroller
+  # that was replaced and never put back would pass for one that was kept.
+  # And where they stand is also noted in the very turn of the refresh (an
+  # observer of the view's own parts, which runs as the redraw ends), so
+  # nothing that scrolls the thread a moment later can pass for the refresh.
   test "a reader who is not at the bottom is not moved: a button says what arrived and leads there" do
     as(users(:two)) { 2.times { |index| Notes::Reply.call(@thread, body: ([ "A long line #{index}" ] * 40).join("\n")) } }
     open_thread
-    page.execute_script("document.querySelector('#notes-drawer [data-note-scroll]').scrollTop = 0")
-    assert_equal 0, drawer_scroll
+    page.execute_script("document.querySelector('#notes-drawer [data-note-scroll]').scrollTop = 40")
+    assert_equal 40, drawer_scroll
+    room = page.evaluate_script("(() => { const s = document.querySelector('#notes-drawer [data-note-scroll]'); return s.scrollHeight - s.scrollTop - s.clientHeight })()")
+    assert_operator room, :>, 100, "the thread is too short for this test to say anything"
+    page.execute_script(<<~JS)
+      window.__tops = []
+      new MutationObserver(() => window.__tops.push(document.querySelector('#notes-drawer [data-note-scroll]').scrollTop))
+        .observe(document.querySelector('#notes-drawer [data-notes-view=thread]'), { childList: true })
+    JS
 
-    reply_as_dana("Down here")
+    # Long ones: with more than three messages the older ones are folded
+    # away, and a thread of short replies would then be too short to scroll,
+    # which puts any reader at 0.
+    reply_as_dana(([ "Down here" ] * 40).join("\n"))
 
     assert_selector "#note-thread-#{@thread.id}-reply button[data-note-jump]", text: "1 new message ↓", wait: LIVE
-    assert_equal 0, drawer_scroll
+    assert_equal 40, drawer_scroll
+    assert_equal [ 40 ], page.evaluate_script("window.__tops").uniq, "the reader was moved while the thread was drawn again"
     assert_selector "[data-note-new-divider] + [data-note-message]", text: "Down here", visible: :all
     # 12px above the reply field's dock, which is fixed at the bottom.
     gap = page.evaluate_script("document.querySelector('#note-thread-#{@thread.id}-reply').getBoundingClientRect().top - document.querySelector('[data-note-jump]').getBoundingClientRect().bottom")
     assert_in_delta 12, gap, 0.5
 
-    reply_as_dana("And here")
+    reply_as_dana(([ "And here" ] * 40).join("\n"))
     assert_selector "button[data-note-jump]", text: "2 new messages ↓", count: 1, wait: LIVE
-    assert_equal 0, drawer_scroll
+    assert_equal 40, drawer_scroll
+    assert_equal [ 40 ], page.evaluate_script("window.__tops").uniq
+    assert_operator page.evaluate_script("window.__tops.length"), :>=, 2, "the observer saw no second redraw"
     assert_selector "[data-note-new-divider]", count: 1
 
     find("button[data-note-jump]").click
@@ -610,6 +632,47 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     await_js("document.body.dataset.notesLive === 'connected'")
   end
 
+  # `data-notes-live` is what `await_notes_live` waits on, and two controllers
+  # hold the subscriptions: the person's is `admin--notes--inbox`'s, a record's
+  # is `admin--notes--live`'s (`live/state` puts their words together).
+  # A half that is taken for the whole would not fail a test, it would make
+  # one lose a signal now and then. Each subscription's own callbacks are
+  # called here, as Action Cable calls them, one side at a time.
+  test "the page says it is live only while the person's subscription and the record's are both answered, whichever of the two is not" do
+    open_list
+    hold_consumer
+    state = -> { page.evaluate_script("[ document.body.dataset.notesLive, document.body.getAttribute('data-notes-live-person'), document.body.getAttribute('data-notes-live-records') ]") }
+    tell = ->(channel, callback) { page.execute_script("window.__consumer.subscriptions.subscriptions.find((each) => each.identifier.includes(#{channel.to_json})).#{callback}()") }
+    assert_equal %w[connected answered answered], state.call
+
+    tell.call("PersonChannel", "disconnected")
+    assert_equal %w[connecting waiting answered], state.call
+    tell.call("PersonChannel", "connected")
+    assert_equal %w[connected answered answered], state.call
+
+    tell.call("RecordChannel", "disconnected")
+    assert_equal %w[connecting answered waiting], state.call
+    tell.call("RecordChannel", "connected")
+    assert_equal %w[connected answered answered], state.call
+
+    # And a half that has said nothing yet is not answered: on a <body> where
+    # only one controller has spoken, the page is not live on its word.
+    said = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("live/state").then(({ report }) => {
+        const one = document.createElement("body")
+        const other = document.createElement("body")
+        report(one, "records", true)
+        report(other, "person", true)
+        const halves = [ one.dataset.notesLive, other.dataset.notesLive ]
+        report(one, "person", true)
+        report(other, "records", true)
+        done([ ...halves, one.dataset.notesLive, other.dataset.notesLive ])
+      })
+    JS
+    assert_equal %w[connecting connecting connected connected], said
+  end
+
   # A session that ended has its socket closed by the server. The consumer
   # tries once more and is refused for good: no loop, and nothing in the
   # console (which would fail this test in its teardown).
@@ -633,19 +696,21 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   # A Turbo visit replaces <body>, and with it the controller and its record
   # targets, while the document and its one socket live on.
 
+  # (The page tree beside a page's editor is a list, which listens for every
+  # list: `Presence::ListChannel`, one subscription, kept across the visit.)
   test "after a Turbo visit to another editor only that record is listened to, once" do
     other = create_page(title: "About")
     visit "/cs-studio/pages/#{@page.id}"
     await_notes_live
     hold_consumer
     keep_person_subscription
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ], [ "Presence::ListChannel", "", "" ] ], subscriptions
 
     turbo_visit "/cs-studio/pages/#{other.id}"
     assert_selector "h1", text: "About"
     await_notes_live
     assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: this was no Turbo visit"
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", other.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", other.id.to_s ], [ "Presence::Channel", "page", other.id.to_s ], [ "Presence::ListChannel", "", "" ] ], subscriptions
     assert same_person_subscription?, "the person's stream was subscribed to again by the new page"
     assert_no_selector "#notes-open-count"
     watch_notes_fetches
@@ -674,7 +739,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Pricing"
     await_notes_live
     assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: Back was no Turbo restoration"
-    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ] ], subscriptions
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ], [ "Presence::Channel", "page", @page.id.to_s ], [ "Presence::ListChannel", "", "" ] ], subscriptions
     assert same_person_subscription?, "the person's stream was subscribed to again on the way"
     assert_selector "#notes-open-count", text: "1"
     watch_notes_fetches
@@ -698,7 +763,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/tags"
     await_notes_live
     hold_consumer
-    page.execute_script("document.addEventListener('admin--notes--live:delivery', (event) => { window.__announced = (window.__announced || 0) + 1 })")
+    page.execute_script("document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__announced = (window.__announced || 0) + 1 })")
 
     page.execute_script(<<~JS)
       window.__visited = false
@@ -741,7 +806,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     JS
   end
 
-  def count_announcements = page.execute_script("window.__announced = []; document.addEventListener('admin--notes--live:delivery', (event) => { window.__announced.push(event.detail.id) })")
+  def count_announcements = page.execute_script("window.__announced = []; document.addEventListener('admin--notes--inbox:delivery', (event) => { window.__announced.push(event.detail.id) })")
 
   # The run that answers a signal is already out -- the sidebar's count is
   # being fetched -- when a visit replaces the controller that started it.

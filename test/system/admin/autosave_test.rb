@@ -157,7 +157,9 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     page.execute_script(<<~JS)
-      window.fetch = () => Promise.resolve(new Response("Internal Server Error", { status: 500, headers: { "Content-Type": "text/plain" } }))
+      const originalFetch = window.fetch
+      // Only the save fails; the editor's live parts (presence, notes) read with GET and take the real fetch.
+      window.fetch = (url, options = {}) => (options.method || "GET").toUpperCase() === "GET" ? originalFetch(url, options) : Promise.resolve(new Response("Internal Server Error", { status: 500, headers: { "Content-Type": "text/plain" } }))
     JS
 
     title_field = find_field("Title")

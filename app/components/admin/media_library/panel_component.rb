@@ -13,13 +13,12 @@ module Admin
     # typing editor. The panel is narrower than 880px, so the translation pair
     # stacks on its own (`container-type` on the form).
     #
-    # Below "Used on" are the image's notes (notes spec §4.4): the same frame
-    # the editors' drawer shows, in place -- this screen has no drawer, so a
-    # thread opens where the list was. It stands OUTSIDE the autosave form:
-    # the frame brings forms of its own, a form cannot nest, and inside an
-    # `admin--saving--autosave` form a note's field would be the image's. Anyone who
-    # may open the panel may read and write notes there (`media.upload`,
-    # `Admin::NoteContainer`), whether or not the image is theirs to edit.
+    # Slots (`Admin::Slots`): `media.panel.header` stands at the right end of
+    # the file-name row, above the preview, and `media.panel.sections` below
+    # "Used on", OUTSIDE the autosave form: what a feature draws there brings
+    # forms of its own, and a form cannot nest. Features register what stands
+    # there in `config/initializers/admin_slots.rb`; each is built with the
+    # image, the viewer and the panel's `locale:` and `url_options:`.
     #
     # `link_params` is the grid's own state (`q`, `filter`, `page`, symbol keys,
     # never `locale`, which `url_options` carries): every link out of the panel
@@ -75,31 +74,17 @@ module Admin
 
       def uploader = asset.created_by
 
-      # The image's notes: `view: "media"` travels with every request of the
-      # frame, so a thread started here records where it was written;
-      # `thread` (a link from the inbox, `/media?selected=<id>&thread=<id>`)
-      # starts the frame on that thread's view instead of the list. Digits or
-      # nothing: it becomes a path segment.
-      def notes_path
-        options = { view: "media", **url_options }
-        thread = helpers.params[:thread].to_s[/\A\d+\z/]
-        thread ? helpers.admin_record_note_thread_path("media", asset.id, thread, **options) : helpers.admin_record_notes_path("media", asset.id, **options)
-      end
+      # Who is looking, for the slots: the actor `can?` already asks about.
+      # What `#media-panel-title` holds: the name, and the name again as its
+      # `title`, because the row cuts a long one short. One place for it: the
+      # panel draws it and `Admin::MediaController`'s autosave answer updates
+      # the heading with it (`view`: whatever has the tag helpers).
+      def self.title_content(asset, view) = view.tag.span(asset.title, title: asset.title)
 
-      # The image's counts as the page loaded them (`#notes-counts`), which
-      # `admin--notes--drawer` on <body> reads; every answer of the frame brings a
-      # newer copy. Read here and not left to the frame, because that
-      # controller keeps the last counts it saw: the panel of the image chosen
-      # next would show the last image's number until its own frame had loaded.
-      def note_counts = @note_counts ||= ::Notes::Counts.for_container(asset, user: Current.user)
+      def viewer = Current.actor
 
-      # "Notes · 2 open" (in mono capitals, the handoff's header). The number
-      # is an `admin--notes--drawer` `total`, like the one beside the drawer's title,
-      # so it follows a note added or resolved in the frame below.
-      def notes_open
-        total = note_counts.fetch("total").to_i
-        t(".notes_open_html", number: tag.span(total, hidden: total.zero?, data: { "admin--notes--drawer-target": "total" }))
-      end
+      # What every slot of the panel is handed beside the image and the viewer.
+      def slot_context = { locale: locale, url_options: url_options }
 
       def status_id = "media-save-status"
 
@@ -189,7 +174,7 @@ module Admin
         days.positive? ? "Kept in Trash for #{helpers.pluralize(days, "day")}." : "Kept in Trash until someone empties it."
       end
 
-      # "Only by items in the trash: “About”, “Notes”." naming only the owners
+      # "Only by items in the trash: “About”, “Pricing”." naming only the owners
       # this viewer may read (a trashed page or post they couldn't open is not
       # named, the same rule as the kept list's "a page you can't open"); the
       # bare sentence when there is none to name.

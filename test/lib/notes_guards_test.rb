@@ -17,7 +17,7 @@ class NotesGuardsTest < ActiveSupport::TestCase
   # switches a page refresh on, or sends one: named anywhere in the app --
   # code, markup, a script or a comment that could be uncommented -- it fails.
   # (Any OTHER broadcast is refused by `test/models/notes/signals_test.rb`,
-  # "nothing in the app broadcasts but Notes::Signals".)
+  # "nothing in the app broadcasts but Live::Signals, ...".)
   # A refresh sent as a stream is one too: `turbo_stream.refresh`, or the
   # element it writes.
   MORPHING = /turbo_refreshes_with|turbo_refresh_method_tag|turbo_refresh_scroll_tag|turbo-refresh-method|turbo-refresh-scroll|broadcasts?_refresh|turbo_stream\.refresh\b(?!_)|turbo_stream_refresh_tag|<turbo-stream[^>]*action=["']refresh/

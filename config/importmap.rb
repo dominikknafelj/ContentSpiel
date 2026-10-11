@@ -28,6 +28,17 @@ pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", pre
 pin_all_from "app/javascript/rich_text", under: "rich_text", preload: "admin"
 # The one-at-a-time write queue every autosaving form and block action shares.
 pin_all_from "app/javascript/saving", under: "saving", preload: "admin"
+# The cable connection CS Studio's scripts share: one socket, its pooled
+# subscriptions and the tab's id (`live/connection`), and `live/state`, which
+# makes `data-notes-live` on <body> of what the scripts that hold a
+# subscription say of theirs (notes' two controllers, presence's part).
+# Nothing on a public page imports either, so a public page opens no socket.
+pin_all_from "app/javascript/live", under: "live", preload: "admin"
+# The notes' plain modules, imported by the notes' controllers: `notes/merge`,
+# the merge of a notes view with the server's fresh markup ("what is read is
+# replaced, what is typed is never touched"); and `notes/json`, the one fetch
+# of JSON the live and inbox controllers share.
+pin_all_from "app/javascript/notes", under: "notes", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"

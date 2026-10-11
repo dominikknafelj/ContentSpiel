@@ -59,8 +59,8 @@
             footer's and the write queue's `beforeunload` guards). What the
             tab's `sessionStorage` holds is not the document's and would
             stay: the unsent note drafts are removed as the document goes
-            (`admin--notes--live#signingOut`). %>
-        <%= button_to "Sign out", admin_sign_out_path, method: :delete, form: { data: { turbo: false, action: "submit->admin--notes--live#signingOut" } }, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
+            (`admin--notes--inbox#signingOut`). %>
+        <%= button_to "Sign out", admin_sign_out_path, method: :delete, form: { data: { turbo: false, action: "submit->admin--notes--inbox#signingOut" } }, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
       </div>
     </div>
   </div>

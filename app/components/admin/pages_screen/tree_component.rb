@@ -38,12 +38,11 @@ module Admin
     # hint at a page the actor can't open. With no target language (one
     # enabled) there's nothing to mark, so none of that runs.
     #
-    # Each readable row's open notes (notes spec §4.4), the page's own and its
-    # blocks' together, are read the same way: `Notes::Counts.by_container`
-    # once for the whole tree, and `unread_among` once beside it for the rows
-    # that hold something unread for the viewer. `Notes::Counts` hides nothing
-    # itself: the ids handed to it are the readable rows (`tree_visibility`
-    # lists kept pages only), never a context-only one.
+    # What features mark a row with (the `tree.row.markers` slot) is loaded
+    # here once for the whole tree, for the readable rows -- `Admin::Slots.load`
+    # calls each entry's loader once with all of them, and the result is handed
+    # down like `children_by_parent`. A context-only row draws no markers, so
+    # none is loaded for it (`tree_visibility` lists kept pages only).
     #
     # The header (handoff §10 C34) holds "Pages", "+ New page" where the actor
     # may create under Home, and a "⋯" menu with "Create starter pages" while
@@ -63,14 +62,13 @@ module Admin
         @children_by_parent = {}
         @context_only_ids = Set.new
         @translation_counts = {}
-        @note_counts = {}
-        @note_unread = Set.new
+        @loaded = {}
         @root = root && load_visible(root)
       end
 
       private
 
-      attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids, :translation_counts, :note_counts, :note_unread
+      attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids, :translation_counts, :loaded
 
       def load_visible(root)
         visibility = AccessControl.tree_visibility(Current.actor)
@@ -81,13 +79,8 @@ module Admin
         @children_by_parent = pages.group_by(&:parent_id)
         readable = pages.reject { |page| @context_only_ids.include?(page.id) }
         @translation_counts = translation_counts_for(readable)
-        # Open notes per page, its blocks' included (a thread's container is the
-        # page), read once for the whole tree and only for the pages the viewer
-        # may read -- a context-only ancestor shows none (notes spec §4.4). One
-        # more query beside it for "unread for you" (§4.5).
-        readable_ids = readable.map(&:id)
-        @note_counts = Notes::Counts.by_container("Page", readable_ids)
-        @note_unread = Notes::Counts.unread_among("Page", readable_ids, Current.user)
+        # The row markers features register, read once for the readable rows.
+        @loaded = Admin::Slots.load("tree.row.markers", readable, viewer: Current.actor)
         pages.find { |page| page.id == root.id }
       end
 
