@@ -180,40 +180,60 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     assert_no_selector "#toasts [role=status], #toasts [role=alert]"
   end
 
-  # The mark's life is recorded in the page (a MutationObserver stamps when it
-  # appeared, when the leaving class was set and when it was removed), so the
-  # test reads the times, not a screenshot of them.
+  # The mark's life as the SCRIPT timed it, read from the script's own timers
+  # and never from a clock of the test's. A lower bound measured from outside
+  # ("the mark stayed at least 890 ms") cannot hold: an observer in the page
+  # hears of the mark only after the card's editor has been mounted, tens of
+  # milliseconds after the script armed its timer on a slow machine, and CI
+  # measured 843 and 870 ms for a wait of 900. So `setTimeout` is wrapped, and
+  # only for the mark: a timer of exactly the notice's length (`NOTICE_MS`, a
+  # number nothing else in the page waits for) and one armed from inside that
+  # timer's own callback (the fade). Each records what the mark was when it was
+  # armed, when it was due and after it ran: "shown", "leaving" or "gone".
+  NOTICE_MS = 937
+
   def watch_mark
-    page.execute_script(<<~JS)
-      window.__mark = { added: null, leaving: null, removed: null }
-      const isMark = (node) => node.nodeType === 1 && (node.matches("[data-editing-mark]") || node.querySelector("[data-editing-mark]"))
-      new MutationObserver((records) => {
-        for (const record of records) {
-          const now = performance.now()
-          if (record.type === "attributes" && record.target.matches("[data-editing-mark].admin-editing-mark--leaving") && window.__mark.leaving === null) window.__mark.leaving = now
-          for (const node of record.addedNodes) if (isMark(node) && window.__mark.added === null) window.__mark.added = now
-          for (const node of record.removedNodes) if (node.nodeType === 1 && node.matches("[data-editing-mark]") && window.__mark.removed === null) window.__mark.removed = now
-        }
-      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: [ "class" ] })
+    page.execute_script(<<~JS, NOTICE_MS)
+      const [ notice ] = arguments
+      window.__mark = []
+      const state = () => {
+        const mark = document.querySelector("[data-editing-mark]")
+        return !mark ? "gone" : (mark.classList.contains("admin-editing-mark--leaving") ? "leaving" : "shown")
+      }
+      const real = window.setTimeout
+      let inside = false
+      window.setTimeout = function (act, ms, ...rest) {
+        if (typeof act !== "function" || !(ms === notice || inside)) return real.call(window, act, ms, ...rest)
+        window.__mark.push([ "armed", ms, state() ])
+        return real.call(window, () => {
+          window.__mark.push([ "due", ms, state() ])
+          const outer = inside
+          inside = true
+          try { act(...rest) } finally { inside = outer }
+          window.__mark.push([ "ran", ms, state() ])
+        }, ms)
+      }
     JS
   end
 
-  def mark_times = page.evaluate_script("window.__mark")
+  def mark_life = page.evaluate_script("window.__mark")
 
   test "the mark stays for the notice, then the fade starts, and the mark is gone" do
     open_page
-    set_value("notice", 900)
+    # Not the 6 seconds of the default: the region's value decides.
+    set_value("notice", NOTICE_MS)
     watch_mark
     dana_saves(@block, "Prices from May")
     assert_selector "#{card(@block)} [data-editing-mark]", text: "Updated by Dana Weiss", wait: LIVE
-    # Not the 6 seconds of the default: the region's value decides.
-    assert_no_selector "[data-editing-mark]", wait: 4
+    assert_no_selector "[data-editing-mark]", wait: LIVE
 
-    times = mark_times
-    assert_not_nil times["leaving"], "the fade never started"
-    # Timers never fire early: a lower bound holds on any machine.
-    assert_operator times["leaving"] - times["added"], :>=, 890
-    assert_operator times["removed"], :>=, times["leaving"]
+    # Armed for the notice's time with the mark in the document, still shown
+    # when that time was up, fading from then for 200 ms, and gone after it.
+    assert_equal [
+      [ "armed", NOTICE_MS, "shown" ], [ "due", NOTICE_MS, "shown" ],
+      [ "armed", 200, "leaving" ], [ "ran", NOTICE_MS, "leaving" ],
+      [ "due", 200, "leaving" ], [ "ran", 200, "gone" ]
+    ], mark_life
     # The fade is the stylesheet's: 200 ms, an opacity transition.
     duration = page.evaluate_script("(() => { const probe = document.createElement('span'); probe.className = 'admin-editing-mark'; document.body.append(probe); const value = getComputedStyle(probe).transitionDuration; probe.remove(); return value })()")
     assert_equal "0.2s", duration
@@ -222,15 +242,14 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
   test "with reduced motion the mark goes when its time is up, without fading" do
     page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
     open_page
-    set_value("notice", 900)
+    set_value("notice", NOTICE_MS)
     watch_mark
     dana_saves(@block, "Prices from May")
     assert_selector "#{card(@block)} [data-editing-mark]", wait: LIVE
-    assert_no_selector "[data-editing-mark]", wait: 4
+    assert_no_selector "[data-editing-mark]", wait: LIVE
 
-    times = mark_times
-    assert_nil times["leaving"], "the mark faded although motion is reduced"
-    assert_operator times["removed"] - times["added"], :>=, 890
+    # Shown until its time was up, then gone at once: no fade, and no second timer.
+    assert_equal [ [ "armed", NOTICE_MS, "shown" ], [ "due", NOTICE_MS, "shown" ], [ "ran", NOTICE_MS, "gone" ] ], mark_life
   end
 
   test "my own save draws no mark and fetches nothing" do
