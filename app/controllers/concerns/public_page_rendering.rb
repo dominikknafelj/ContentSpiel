@@ -35,9 +35,14 @@ module PublicPageRendering
     # reaches CS Studio, sign-in or setup").
     #
     # What the path lets a theme replace is not "any template": the folder
-    # is checked against `Theme::Contract` when the application starts, and
-    # one that holds the layout, `pages/_seo_meta`, `shared/_theme_head` or
-    # the preview bar does not start.
+    # is checked against `Theme::Contract` when the application starts
+    # (`Theme::Check`, run by `Theme.load` in the `to_prepare` of
+    # `config/initializers/theme.rb`, whose first run is the boot), and one
+    # that holds the layout, `pages/_seo_meta`, `shared/_theme_head` or the
+    # preview bar does not start (`test/lib/production_boot_test.rb`:
+    # "production with a theme folder that holds a file the contract does
+    # not name does not start, and names the file";
+    # `test/values/theme/check_test.rb` for each name).
     before_action :look_in_the_theme_first
   end
 

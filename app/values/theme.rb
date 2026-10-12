@@ -48,6 +48,17 @@ class Theme
 
     # `theme` for the length of the block, and the theme that was current
     # before afterwards, also when the block raises.
+    #
+    # FOR TESTS ONLY, and so is `current=` outside the one assignment in
+    # `config/initializers/theme.rb`. `current` is one variable of the
+    # PROCESS, not of a request or a thread: a swap made while a request is
+    # being answered draws every other request of the process with the
+    # other theme, and puts its fingerprint into their ETags. That is what a
+    # test wants (a system test's server runs in the test's process and
+    # must see the swap) and what the application must never do: it asks
+    # `Theme.current` and sets nothing. `test/lib/theme_guards_test.rb`
+    # ("nothing in the application swaps the theme") reads app, lib and
+    # config for either.
     def with(theme)
       before = current
       @current = theme
@@ -57,10 +68,24 @@ class Theme
     end
 
     # The theme a folder is (`ThemeFolder`), with the fingerprint and the
-    # number of templates it has at this moment. The application's own is
-    # loaded when it is prepared (`config/initializers/theme.rb`); a test
-    # loads the second theme (`test/support/theme_test_helper.rb`).
+    # number of templates it has at this moment. REFUSES a folder that holds
+    # anything the contract does not name, or a template that cannot draw a
+    # page or writes what is the CMS's to write (`Theme::Check`), with every
+    # problem in the message: called when the application is prepared
+    # (`config/initializers/theme.rb`), whose first run is the boot, so such
+    # a folder stops the boot (theming spec §8). A test loads the second
+    # theme through here too (`test/support/theme_test_helper.rb`).
+    #
+    # The one door: nothing in the application builds a Theme of a folder
+    # with `new`, which checks nothing (`test/lib/theme_guards_test.rb`).
     def load(folder)
+      problems = Check.problems(folder)
+      if problems.any?
+        raise ThemeFolder::Invalid, "#{ThemeFolder::VARIABLE} (#{folder.path}) is not a theme this version can draw:\n" \
+                                    "#{problems.map { |problem| "  - #{problem}\n" }.join}" \
+                                    "Correct the folder, or unset #{ThemeFolder::VARIABLE} to start with the default theme."
+      end
+
       new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size)
     end
   end

@@ -1,5 +1,7 @@
 require "test_helper"
 require "open3"
+require "tmpdir"
+require "fileutils"
 
 # Production is wired to `HostSettings`, and nothing else in the suite knows:
 # every other test of hosts, HTTPS and HSTS hands `HostSettings.apply` a
@@ -18,9 +20,11 @@ require "open3"
 # without a secret; the secret check has its tests in `host_settings_test.rb`
 # and is not booted for here.
 #
-# Each boot is about three seconds, so there are five and no more: an https
-# address, none, and a value that is no address; and for the theme, a folder
-# and a path that is none.
+# Each boot is about three seconds, so there are six and no more: an https
+# address, none, and a value that is no address; and for the theme, a
+# folder, a path that is none, and a folder with a file the contract does
+# not name (`Theme::Check`, run by `Theme.load` in `to_prepare`: the one
+# proof that the contract is checked when the application starts).
 class ProductionBootTest < ActiveSupport::TestCase
   SCRIPT = <<~'RUBY'.freeze
     config = Rails.application.config
@@ -91,6 +95,20 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_includes printed, "THEME_PATH names no directory: /no/such/theme/anywhere"
     assert_includes printed, "ThemeFolder::Invalid"
     assert_no_match(/^hosts:/, printed)
+  end
+
+  test "production with a theme folder that holds a file the contract does not name does not start, and names the file" do
+    Dir.mktmpdir("theme") do |dir|
+      FileUtils.mkdir_p(File.join(dir, "views/pages"))
+      File.write(File.join(dir, "views/pages/shwo.html.erb"), "x")
+
+      printed, status = boot_production("THEME_PATH" => dir)
+
+      assert_not status.success?, printed
+      assert_includes printed, "ThemeFolder::Invalid"
+      assert_includes printed, "views/pages/shwo.html.erb is not part of the theme contract"
+      assert_no_match(/^hosts:/, printed)
+    end
   end
 
   private

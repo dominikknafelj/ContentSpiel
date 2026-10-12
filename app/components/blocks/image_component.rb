@@ -46,8 +46,11 @@ module Blocks
     # asset's own defaults per locale, so an override written in another
     # language never beats the asset's default in this one -- which
     # resolving them first through `translated` (the fallback chain) did.
-    def alt = asset.alt_text(override: block.read_attribute(:alt))
+    # Each answers nil for a block with no image: a theme's template may call
+    # them without the default template's guard around them (theming spec §3,
+    # `Theme::Contract::COMPONENTS`).
+    def alt = asset&.alt_text(override: block.read_attribute(:alt))
 
-    def caption = asset.caption_text(override: block.read_attribute(:caption))
+    def caption = asset&.caption_text(override: block.read_attribute(:caption))
   end
 end

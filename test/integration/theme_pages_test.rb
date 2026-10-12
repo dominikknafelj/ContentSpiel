@@ -154,6 +154,53 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The head's slot is not a theme's either, for the reason the title's is
+  # not: `content_for` appends, so a page or block template that wrote to
+  # `:head` would put its tags in the middle of the CMS's part of the head,
+  # ahead of the description and the Open Graph tags (and on a 404, alone
+  # there). The layout reads no slot: it prints the CMS's tags itself. A
+  # theme's own head tags are `layouts/public/_head`, and the folder check
+  # refuses a template that writes to the slot
+  # (`test/values/theme/check_test.rb`), which is why this folder is handed
+  # to `Theme.new`, which checks nothing: what is shown here is that the
+  # rendering holds without the check.
+  test "a theme's template that writes to the head's slot puts nothing into the head: on a page, in a block and on a 404" do
+    with_theme_copy do |dir|
+      slot = ->(name) { "<% content_for :head do %><meta name=\"slot-#{name}\" content=\"x\"><link rel=\"canonical\" href=\"https://elsewhere.example/\"><% end %>\n" }
+      dir.join("views/pages/show.html.erb").write(slot.("page") + dir.join("views/pages/show.html.erb").read)
+      dir.join("views/pages/not_found.html.erb").write(slot.("missing") + "<h1>Nothing here</h1>\n")
+      dir.join("views/layouts/public/_frame.html.erb").write(slot.("frame") + "<main><%= yield %></main>\n")
+      dir.join("components/blocks/rich_text_component.html.erb").write(slot.("block") + "<div class=\"plain-text\"><%= rich_text(block) %></div>\n")
+
+      Theme.with(Theme.new(path: dir)) do
+        get "/about"
+        assert_response :success
+        assert_select "div.plain-text", minimum: 1
+        assert_no_match(/slot-|elsewhere\.example/, response.body)
+        assert_select "head meta[property='og:title'][content='About']", count: 1
+        assert_select "head meta[property='og:url']", count: 1
+        assert_select "head link[rel=canonical]", count: 1
+
+        get "/no-such-page"
+        assert_response :not_found
+        assert_select "h1", text: "Nothing here"
+        assert_no_match(/slot-|elsewhere\.example/, response.body)
+      end
+    end
+  end
+
+  test "an empty theme draws the homepage as the default theme does" do
+    get "/"
+    default = response.body
+
+    Dir.mktmpdir("theme") do |dir|
+      Theme.with(Theme.load(ThemeFolder.new(dir))) { get "/" }
+    end
+
+    assert_response :success
+    assert_equal default, response.body
+  end
+
   test "the title is the theme's pattern on one line, escaped once" do
     with_plain_theme do
       get "/about"

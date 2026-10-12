@@ -20,22 +20,19 @@
     refusing such a `_head` is the folder check's. %>
 <html lang="<%= I18n.locale %>"<%= " class=\"scroll-pt-9\"".html_safe if @preview_record %>>
   <head>
-    <%# The head tags that describe what is shown are collected first: the
-        partial prints nothing here, it fills `content_for(:head)`. It is rendered by the layout, not by
-        pages/show, so a theme that replaces the page template cannot lose
-        them.
+    <%# Whether the response describes a record, for the title here and the
+        description and Open Graph tags below.
 
         Not for a 404, and the response's status is what says so, not
         `@page`: a 404 can have a record in hand (`assign_record` assigns
         the page and the post before it finds that no block lists the post,
         and the preview answers 404 for a post whose listing page the editor
         may not read), and its title and description are not a 404's to
-        print. While pages/show rendered this partial, not rendering
-        pages/show was the guard
+        print. While pages/show rendered the tags, not rendering pages/show
+        was the guard
         (`test/integration/theme_pages_test.rb`: "a 404 that had a record in
         hand describes none"). %>
     <% described = @page && !response.not_found? %>
-    <% render "pages/seo_meta", page: @page, post: @post if described %>
     <%# The title's text is asked for here and not read from a
         `content_for(:title)` slot: `content_for` appends, so a theme's
         template that wrote to the slot would have its text put in front of
@@ -52,7 +49,17 @@
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
 
-    <%= yield :head %>
+    <%# The description and the Open Graph tags, printed here by the layout
+        and not read from a `content_for(:head)` slot, for the reason the
+        title is not: the page is rendered before the layout, `content_for`
+        appends, and a theme's page or block template that wrote to the slot
+        would have its tags printed here, among the CMS's own and ahead of
+        the description. The theme's part of the head is
+        layouts/public/_head, below
+        (`test/integration/theme_pages_test.rb`: "a theme's template that
+        writes to the head's slot puts nothing into the head"; the folder
+        check refuses a template that writes to the slot, `Theme::Check`). %>
+    <%= render "pages/seo_meta", page: @page, post: @post if described %>
 
     <%# hreflang alternates (spec §6.5): every enabled language's URL for the
         page or post currently shown, plus x-default pointing search engines
