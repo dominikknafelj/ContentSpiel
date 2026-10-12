@@ -5,8 +5,9 @@ module Publishing
   # withdrawn (`withdraw_pending!`: "Cancel scheduled change", and a discard).
   # Two things about a copy are written afterwards, each by one method here:
   # `settled_at` (`settle!`), which is not its content, and a merged tag
-  # (`repoint_tag!`): its id wherever the copy refers to it, and the id and
-  # name a post's copy shows of it, the one piece of content ever rewritten.
+  # (`repoint_tag!`): its id wherever the copy refers to it, the id and name
+  # a post's copy shows of it and the name a copied list block's filter
+  # holds, the one piece of content ever rewritten.
   #
   # THE ORDER OF COPIES. `live_at` is never earlier than the moment a copy is
   # taken, and taking a copy removes the pending one, so there is at most one
@@ -198,10 +199,16 @@ module Publishing
     # A copy's rows and a carrier's rows then say the same about the tag,
     # which is why the merge marks no post (`Tags::Listings#touch_carrying_posts`).
     #
-    # The name in a list block's `settings` is NOT touched: no visitor reads
-    # it (the list is matched by `listed_tag_id`), and it changes when the
-    # page is published. A list block that recorded NO id lists nothing and
-    # is left so, whatever name it holds.
+    # THE NAME A LIST BLOCK'S FILTER HOLDS FOLLOWS TOO: a copied list block
+    # that recorded the merged tag's id gets the kept tag's id and, in its
+    # `settings`, the kept tag's name, as `Tags::Merge#repoint_blocks`
+    # writes the row's block. No visitor reads that name (the list is
+    # matched by `listed_tag_id`), but the overview compares it, and left
+    # alone every such page stood marked "Unpublished changes" with a
+    # "Changed: Post list" that published nothing anyone could see. So A
+    # MERGE MARKS NOTHING: not a post, not a page. A list block that
+    # recorded NO id lists nothing and is left so, whatever name it holds
+    # (its page differed from its rows before the merge and still does).
     #
     # Rows are written around `readonly?` with `update_all`, one statement
     # per copy that holds the id, and only those copies are read: the array
@@ -216,7 +223,11 @@ module Publishing
       end
 
       listing_tag([ from.id ]).pluck(:id, :blocks).each do |id, blocks|
-        blocks = blocks.map { |block| block["listed_tag_id"] == from.id ? block.merge("listed_tag_id" => to.id) : block }
+        blocks = blocks.map do |block|
+          next block unless block["listed_tag_id"] == from.id
+
+          block.merge("listed_tag_id" => to.id, "settings" => (block["settings"] || {}).merge("tag" => to.name))
+        end
         unscoped.where(id: id).update_all(blocks: blocks) # version: none (Tags::Merge, the one caller, bumps for the whole merge)
       end
     end

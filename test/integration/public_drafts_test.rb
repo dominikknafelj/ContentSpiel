@@ -1102,7 +1102,8 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     kept = Tag.find_by!(name: "gems").id
     assert_equal [ kept ], Publishing.pending(post).tag_ids
     assert_equal [ kept ], Publishing.pending(tagged).blocks.filter_map { |block| block["listed_tag_id"] }
-    assert_equal %w[ruby], Publishing.pending(tagged).blocks.filter_map { |block| block.dig("settings", "tag") }, "the name in the copy is as it was taken"
+    assert_equal %w[gems], Publishing.pending(tagged).blocks.filter_map { |block| block.dig("settings", "tag") }, "and the name its filter holds, as the rows' block does"
+    assert_not tagged.reload.unpublished_changes? || post.reload.unpublished_changes?, "a merge marks nothing"
     travel_to 3.days.from_now do
       PublicSite::Paths.refresh
       assert_listed_at_tagged

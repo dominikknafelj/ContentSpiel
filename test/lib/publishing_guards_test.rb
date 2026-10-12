@@ -41,7 +41,8 @@ class PublishingGuardsTest < ActiveSupport::TestCase
   # which replaces a merged tag's id (a reference that is about to name
   # nothing; drafts fix round, Task 4) and, with it, the id and name a
   # post's copy shows of that tag (the hand test's finding: the site printed
-  # a merged-away name); and `settle!`, which marks a copy whose coming into
+  # a merged-away name) and the name a copied list block's filter holds (so
+  # a merge marks nothing); and `settle!`, which marks a copy whose coming into
   # force is being acted on (Task 4b) and touches nothing a copy shows.
   WRITERS_IN_THE_MODEL = %w[take! repoint_tag! settle! withdraw_pending!].freeze
   # `withdraw_pending!` deletes the one copy that was never public (its time

@@ -163,7 +163,7 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal Publishing::DiscardChanges::REMAINS, result.notice
   end
 
-  test "with nothing renamed, merged or deleted the tags go back, the mark is gone and the result says nothing more" do
+  test "with nothing renamed or deleted the tags go back, the mark is gone and the result says nothing more" do
     post = live_post(%w[ruby rails])
     assert Posts::Save.call(post, attributes: { tag_names: %w[other] }).ok?
 
@@ -233,8 +233,9 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal tags, Tag.count
     assert_nil Tag.find_by(name: "alpha")
     assert_equal "Pricing", Mobility.with_locale(:en) { @page.reload.title }
-    assert @page.unpublished_changes?, "the copy's block still says alpha by name"
-    assert_equal Publishing::DiscardChanges::REMAINS, result.notice
+    assert_equal "beta", Publishing.current(@page).blocks.find { |block| block["id"] == list.id }.dig("settings", "tag"), "and the name, as the rows' block"
+    assert_not @page.unpublished_changes?, "the rows are the copy again"
+    assert_nil result.notice, "a merge leaves nothing a discard cannot put back"
 
     publish_changes(@page)
     assert_equal "/pricing/hello", post.reload.full_path("en"), "the list still lists the post"
@@ -300,6 +301,7 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert_equal [ Publishing::DiscardChanges::REMAINS ], result.errors
+    assert_equal "A tag was renamed or deleted since this was published: that difference stays, as unpublished changes", Publishing::DiscardChanges::REMAINS
     assert_equal events, Audit::Event.count
     assert_equal updated_at, post.reload.updated_at
     assert post.unpublished_changes?

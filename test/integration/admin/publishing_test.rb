@@ -464,7 +464,7 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
 
     post admin_publishing_discard_path(kind: "post", id: record.id)
 
-    assert_equal "Changes discarded. A tag was renamed, merged or deleted since this was published: that difference stays, as unpublished changes", flash[:notice]
+    assert_equal "Changes discarded. A tag was renamed or deleted since this was published: that difference stays, as unpublished changes", flash[:notice]
     assert_equal "Tagged", Mobility.with_locale(:en) { record.reload.title }
     assert record.unpublished_changes?
     follow_redirect!

@@ -96,7 +96,7 @@ module Tags
         # and name, so no visitor reads the name of a tag that is gone
         # (`Publishing::Version.repoint_tag!`). `into` is the locked row.
         Publishing::Version.repoint_tag!(from: source, to: into)
-        PostTag.where(tag_id: source.id).delete_all
+        PostTag.where(tag_id: source.id).delete_all # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
         source.destroy!
         # Join rows, block settings and the copies were written around the
         # callbacks (`insert_all`, `delete_all`, `update_columns`,
@@ -127,7 +127,7 @@ module Tags
     def give_target_to_carriers(into, carrier_ids)
       return if carrier_ids.empty?
 
-      PostTag.insert_all(carrier_ids.map { |post_id| { post_id: post_id, tag_id: into.id } },
+      PostTag.insert_all(carrier_ids.map { |post_id| { post_id: post_id, tag_id: into.id } }, # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
         unique_by: :index_post_tags_on_post_id_and_tag_id)
     end
 
@@ -179,14 +179,15 @@ module Tags
       now = Time.current
       Page.where(id: blocks.select { |block| block.owner_type == "Page" }.map(&:owner_id)).order(:id).lock.pluck(:id) # i18n-ok: a class name compared with owner_type
       fresh = ContentBlock.where(id: blocks.map(&:id)).order(:id).lock.select { |block| block_names_tag?(block, source.name) }
-      fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
+      fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) } # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
       pages = Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)) # i18n-ok: a class name compared with owner_type
-      # Marked: the rows of these pages name the kept tag now, their copies
-      # still the merged one's name. A page whose list already filtered by the
-      # kept tag is not here: its rows and its copy (whose id for the merged
-      # tag `repoint_tag!` replaced) say the same.
-      Publishing.note_change(pages)
-      pages.touch_all
+      # Touched, NOT marked as having unpublished changes: the copies of
+      # these pages are repointed as their rows are here, id and name
+      # (`Publishing::Version.repoint_tag!`), so the merge puts nothing
+      # between a page's rows and its copy and its publish dialog has
+      # nothing to show for it. A merge marks nothing by itself; a page that
+      # was marked before keeps its mark.
+      pages.touch_all # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
     end
   end
 end

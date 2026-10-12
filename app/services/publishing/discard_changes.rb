@@ -15,9 +15,11 @@ module Publishing
   # go back to the ids its copy holds, each under the name that tag has NOW;
   # a list block's filter goes back to the tag the copy recorded, under its
   # present name. A tag deleted since stays deleted and a merged tag stays
-  # merged: the standing rule of this work. Where that leaves the rows
-  # different from the copy (the copy still shows the old name, or a tag
-  # that is gone), the discard succeeds, says so (`REMAINS`, the result's
+  # merged: the standing rule of this work. A merge leaves no difference
+  # behind (it rewrites the copies as it rewrites the rows,
+  # `Publishing::Version.repoint_tag!`); where a rename or a delete leaves
+  # the rows different from the copy (the copy still shows the old name, or
+  # a tag that is gone), the discard succeeds, says so (`REMAINS`, the result's
   # `notice`), and the mark STAYS: the difference is visible in the
   # overview and is published, or left, by a person.
   #
@@ -68,9 +70,10 @@ module Publishing
 
     NOTHING = "There is nothing to discard".freeze
     # What a discard cannot put back: a tag is a reference, not content of
-    # the record, and one that was renamed, merged or deleted since the copy
-    # was taken stays as it is now (see TAGS in the class comment).
-    REMAINS = "A tag was renamed, merged or deleted since this was published: that difference stays, as unpublished changes".freeze
+    # the record, and one that was renamed or deleted since the copy was
+    # taken stays as it is now (see TAGS in the class comment). Not a merged
+    # one: a merge rewrites the copies too and leaves nothing to say.
+    REMAINS = "A tag was renamed or deleted since this was published: that difference stays, as unpublished changes".freeze
     PAGE_TRANSLATED = %w[title subtitle meta_title meta_description hero_alt].freeze
     POST_TRANSLATED = %w[title excerpt].freeze
     BLOCK_TRANSLATED = %w[caption alt].freeze
