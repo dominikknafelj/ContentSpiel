@@ -9,9 +9,14 @@ module Admin
     # (422) carries the token in its hidden field, and the empty page must
     # not be answerable from a copy of that one. `no-store` also keeps both
     # out of the browser's back/forward cache.
-    before_action :no_store, only: %i[ edit legacy update ]
+    before_action :no_store, only: %i[ edit legacy check update ]
     before_action :set_user_by_token, only: :update
     rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_admin_password_path, alert: "Try again later." }
+    # The early check has the request form's limit, counted on its own
+    # (`name:`), so that asking for links and opening them do not use each
+    # other up. Past it the answer is a bare 429, which the page's script
+    # takes as "not known": it shows the form, and `update` decides.
+    rate_limit to: 10, within: 3.minutes, only: :check, name: "check", with: -> { head :too_many_requests }
 
     def new
     end
@@ -62,6 +67,24 @@ module Admin
       redirect_to admin_edit_password_path, status: :found
     end
 
+    # THE EARLY CHECK. The page cannot know whether its link is good (it is
+    # drawn without the token), and `update` says so only after a password
+    # was typed twice. So the page's script asks here once, as soon as it
+    # has moved the token out of the address: a POST with the token in its
+    # body, never in an address, masked in the log like `update`'s.
+    #
+    # The answer is a status and nothing else, and says no more than
+    # `update` would: 204 for a token `update` would take now, 410 for every
+    # other (`user_for_token`: one answer whatever is wrong with it). It
+    # writes nothing: no session key, no audit event, no change to the user,
+    # and a good token is as good afterwards. It is advice to the page, not
+    # the rule: a token can lapse while a password is typed, and a request
+    # that never arrives leaves the form as it is, so `update` checks again
+    # whatever was answered here.
+    def check
+      head user_for_token ? :no_content : :gone
+    end
+
     def update
       # `actor: @user`: nobody is signed in here (a nil actor on `:admin`
       # is denied), but the emailed reset token `set_user_by_token` just
@@ -95,19 +118,27 @@ module Admin
         { origin: request.base_url }
       end
 
-      # The token from the form's body. Anything that is not a signed
-      # token of a user as they are now -- tampered, lapsed, used (it is
-      # signed over the password it was mailed for), blank, missing, or a
-      # list or a hash where a string belongs -- is one answer.
-      def set_user_by_token
+      # The user a token from a request's body stands for, or nil. Anything
+      # that is not a signed token of a user as they are now is ONE answer:
+      # tampered, lapsed, used (it is signed over the password it was
+      # mailed for), blank, missing, a list or a hash where a string
+      # belongs, and a good token of a user who has been deleted since
+      # (Active Record looks the id up before it compares anything, and
+      # raises `RecordNotFound` for that one, which would be a 404).
+      def user_for_token
         token = params[:token]
-        raise ActiveSupport::MessageVerifier::InvalidSignature unless token.is_a?(String) && token.present?
+        return unless token.is_a?(String) && token.present?
 
-        @user = User.find_by_password_reset_token!(token)
-      rescue ActiveSupport::MessageVerifier::InvalidSignature
-        # `expired` selects the "This link has expired" state of the request
-        # page (a bad signature and a lapsed 15 minutes look the same).
-        redirect_to new_admin_password_path(expired: 1)
+        User.find_by_password_reset_token!(token)
+      rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound
+        nil
+      end
+
+      # `expired` selects the "This link has expired" state of the request
+      # page (a bad signature and a lapsed 15 minutes look the same).
+      def set_user_by_token
+        @user = user_for_token
+        redirect_to new_admin_password_path(expired: 1) unless @user
       end
   end
 end

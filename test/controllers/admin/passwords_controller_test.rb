@@ -153,6 +153,8 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     get admin_edit_password_path
     assert_response :success
 
+    assert_select "main [data-controller='reset-token'][data-reset-token-check-url-value='#{ADMIN}/password/check']" \
+                  "[data-reset-token-expired-url-value='#{ADMIN}/password/new?expired=1']", count: 1
     assert_select "main [data-controller='reset-token']" do
       assert_select "form[hidden][method=post][action='#{ADMIN}/password'][data-reset-token-target=form]", count: 1 do
         assert_select "input[type=hidden][name=_method][value=patch]"
@@ -264,8 +266,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     session = @user.sessions.create!
     good = @user.password_reset_token
 
-    cases = { "tampered" => "#{good[0..-6]}AAAAA", "another's words" => "invalid token", "blank" => "", "missing" => nil,
-              "a list" => [ good ], "a hash" => { "a" => good } }
+    cases = bad_tokens(good)
     cases.each do |name, token|
       assert_no_changes -> { @user.reload.password_digest }, name do
         patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }.compact
@@ -430,8 +431,177 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A good token of a user who is gone: Active Record raises RecordNotFound
+  # for it (it looks the id up before it compares the signature's purpose),
+  # which was a 404. It is the one answer of every token that is no good.
+  test "a good token of a user deleted since is the expired state, not a 404" do
+    user = User.create!(email_address: "leaving@example.com", password: "a-long-password-0")
+    token = user.password_reset_token
+    user.delete
+
+    patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+
+    assert_redirected_to new_admin_password_path(expired: 1)
+  end
+
+  # THE EARLY CHECK (`check`): what the page's script asks once, with the
+  # token in the body. A status and nothing else.
+  test "check answers 204 for a token update would take, with no body, and is kept by no cache" do
+    post admin_check_password_path, params: { token: @user.password_reset_token }
+
+    assert_response :no_content
+    assert_empty response.body
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_nil response.location
+  end
+
+  test "check answers 410 for every token that is no good: tampered, lapsed, used, blank, missing, no string, of a deleted user" do
+    gone = User.create!(email_address: "leaving@example.com", password: "a-long-password-0")
+    of_gone = gone.password_reset_token
+    gone.delete
+    lapsed = @user.password_reset_token
+    used = @user.password_reset_token
+
+    bad_tokens(@user.password_reset_token).merge("of a deleted user" => of_gone).each do |name, token|
+      post admin_check_password_path, params: { token: token }.compact
+
+      assert_response :gone, name
+      assert_empty response.body, name
+      assert_equal "no-store", response.headers["Cache-Control"], name
+    end
+
+    travel 16.minutes do
+      post admin_check_password_path, params: { token: lapsed }
+      assert_response :gone
+    end
+
+    patch admin_update_password_path, params: { token: used, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    assert_redirected_to admin_sign_in_path
+    post admin_check_password_path, params: { token: used }
+    assert_response :gone
+  end
+
+  # It is a question, not a use: the token is as good afterwards, and
+  # nothing of the user, of a session or of the audit log has moved.
+  test "check writes nothing: no user, no session, no audit event, no cookie, and the token still sets the password" do
+    token = @user.password_reset_token
+    session = @user.sessions.create!
+
+    statements = capture_sql do
+      assert_no_difference -> { Audit::Event.count } do
+        assert_no_changes -> { @user.reload.attributes } do
+          post admin_check_password_path, params: { token: token }
+          post admin_check_password_path, params: { token: "#{token}x" }
+        end
+      end
+    end
+
+    assert_empty statements.grep(/\A\s*(INSERT|UPDATE|DELETE)/i)
+    assert_nil response.headers["Set-Cookie"], "a signed-out check sets no cookie"
+    assert Session.exists?(session.id)
+
+    patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    assert_redirected_to admin_sign_in_path
+  end
+
+  # It tells nobody more than update would: two answers, and the same one
+  # for everything that is wrong.
+  test "check's answers are two, and every bad token's answer is the same response" do
+    answers = bad_tokens(@user.password_reset_token).values.map do |token|
+      post admin_check_password_path, params: { token: token }.compact
+      [ response.status, response.body, response.headers.to_h.except("x-request-id", "x-runtime", "server-timing") ]
+    end
+
+    assert_equal 1, answers.uniq.size
+  end
+
+  test "nothing logged for a check holds the token, good or bad" do
+    token = @user.password_reset_token
+
+    log = capture_log(REQUEST_LOGGERS) do
+      post admin_check_password_path, params: { token: token }
+      post admin_check_password_path, params: { token: "#{token}x" }
+    end
+
+    assert_not_includes log, token
+    assert_includes log, %(Started POST "#{ADMIN}/password/check")
+    assert_includes log, "Processing by Admin::PasswordsController#check"
+    assert_match(/Parameters: \{.*"token" ?=> ?"\[FILTERED\]"/, log)
+    assert_includes log, "Completed 204"
+    assert_includes log, "Completed 410"
+  end
+
+  # The request form's limit, counted on its own. The test environment's
+  # cache keeps nothing, so the counter is put in the store's place for the
+  # block: what is tested is the declaration (ten, this action, a bare 429)
+  # and that the limit comes before the token is looked at.
+  test "check is limited like the request form: the eleventh in three minutes is a bare 429, whatever the token" do
+    counts = Hash.new(0)
+    counter = ->(key, amount = 1, **) { counts[key] += amount }
+
+    with_singleton_override(Admin::PasswordsController.cache_store, :increment, counter) do
+      10.times do
+        post admin_check_password_path, params: { token: @user.password_reset_token }
+        assert_response :no_content
+      end
+      post admin_check_password_path, params: { token: @user.password_reset_token }
+
+      assert_response :too_many_requests
+      assert_empty response.body
+      assert_equal 1, counts.size
+      assert_match(/check/, counts.keys.sole)
+
+      # Counted apart from the request form's own limit.
+      post admin_password_path, params: { email_address: "nobody@example.com" }
+      assert_redirected_to new_admin_password_path(sent: 1)
+    end
+  end
+
+  # FORGERY PROTECTION is off in the test environment, so it is switched on
+  # here: the form's PATCH and the script's check are refused without the
+  # page's token and taken with it. (A refused check is not a 410, so the
+  # script shows the form and the form's own request decides.)
+  test "with forgery protection on, the form and the check are refused without the page's token and taken with it" do
+    with_forgery_protection do
+      token = @user.password_reset_token
+      get admin_edit_password_path
+      csrf = css_select("meta[name=csrf-token]").first["content"]
+
+      assert_no_changes -> { @user.reload.password_digest } do
+        patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+      end
+      assert_response :unprocessable_entity
+
+      post admin_check_password_path, params: { token: token }
+      assert_response :unprocessable_entity
+
+      post admin_check_password_path, params: { token: token }, headers: { "X-CSRF-Token" => csrf }
+      assert_response :no_content
+
+      assert_changes -> { @user.reload.password_digest } do
+        patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1", authenticity_token: csrf }
+      end
+      assert_redirected_to admin_sign_in_path
+    end
+  end
+
   private
     def assert_notice(text)
       assert_select "main", /#{text}/
+    end
+
+    # Every way a token handed over is not a good one, but for time: what
+    # only the clock or a use makes bad is each test's own.
+    def bad_tokens(good)
+      { "tampered" => "#{good[0..-6]}AAAAA", "another's words" => "invalid token", "blank" => "", "missing" => nil,
+        "a list" => [ good ], "a hash" => { "a" => good } }
+    end
+
+    def with_forgery_protection
+      was = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+      yield
+    ensure
+      ActionController::Base.allow_forgery_protection = was
     end
 end

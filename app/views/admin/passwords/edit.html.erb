@@ -7,14 +7,30 @@
     (`reset-token`, controllers/reset_token_controller.js) moves the token
     from the address into the field, takes it out of the address bar and
     shows the form; with no token it shows the "incomplete" message instead.
-    Whether the link is good is answered when the form is sent: a bad, used
-    or lapsed one goes to the "expired" state of the request page.
+
+    WHETHER THE LINK IS GOOD the page learns by asking once, as soon as it
+    has the token (`check_url`, a POST with the token in its body): a link
+    that is bad, used or lapsed goes to the "expired" state of the request
+    page (`expired_url`) before anything is typed, and the fields are
+    read-only until the answer is there. The rule is still the form's own
+    request, which answers the same way.
 
     `@token` is set only on the 422 of a refused password, where the form
-    comes back with the token it was sent with, so it is drawn open.
+    comes back with the token it was sent with, so it is drawn open and
+    nothing is asked again.
 
-    Without JavaScript neither is shown, and the <noscript> line says why. %>
-<div class="flex flex-col gap-[18px]" data-controller="reset-token">
+    Without JavaScript neither the form nor the message is shown, and the
+    <noscript> line says why. A script that is on but never runs (a module
+    that did not load) leaves the heading alone: the message is NOT drawn
+    visible for that case, because everyone with a good link would see "This
+    link is incomplete" until the script had connected.
+
+    `autocomplete="off"` on the token field is not decoration: it keeps a
+    browser from putting a value the script wrote back into the field on
+    Back or a reload. %>
+<div class="flex flex-col gap-[18px]" data-controller="reset-token"
+     data-reset-token-check-url-value="<%= admin_check_password_path %>"
+     data-reset-token-expired-url-value="<%= new_admin_password_path(expired: 1) %>">
   <%= render "admin/shared/auth_heading", title: "Update your password" %>
 
   <% if flash[:alert] %>
