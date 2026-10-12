@@ -493,7 +493,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Hello"
 
     assert_equal [ { record_type: "Post", record_id: post.id, locale: "en", path: "/blog/hello" } ],
-      PublicSite::Paths.foresee(post.reload).select { |row| row[:locale] == "en" }, "what the overview can say beforehand: its own address"
+      PublicSite::Paths.foresee(post.reload).lost.select { |row| row[:locale] == "en" }, "what the overview can say beforehand: its own address"
 
     # A change WITH A TIME is asked nothing when it is scheduled: nobody
     # tries the future. At its time the post yields and the clash is reported.
@@ -584,9 +584,9 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal "/blog/hello", path_of(post.reload), "a live page's rows move nothing"
 
     foreseen = nil
-    assert_nothing_happened { foreseen = PublicSite::Paths.foresee(blog.reload) }
+    assert_nothing_happened { foreseen = PublicSite::Paths.foresee(blog.reload).lost }
     assert_equal %w[de en es].map { |locale| { record_type: "Post", record_id: post.id, locale: locale, path: "/blog/hello" } }, foreseen.sort_by { |row| row[:locale] }
-    assert_empty PublicSite::Paths.foresee(topic.reload), "a publish that takes nothing away names nothing"
+    assert_equal [ [], [] ], PublicSite::Paths.foresee(topic.reload).then { |seen| [ seen.lost, seen.moved ] }, "a publish that takes nothing away names nothing"
 
     log = StringIO.new
     sink = ActiveSupport::Logger.new(log)
@@ -607,10 +607,52 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     Rails.logger.stop_broadcasting_to(sink) if sink
   end
 
+  # Found by hand: the home page lists posts too, so a post whose list on
+  # "Blog" is removed is not left without an address, it MOVES to the home
+  # page's, and the dialog (which named only the records that end with no
+  # address) said nothing about it.
+  test "removing a page's list block when another page lists the posts too MOVES them: named beforehand with the old and the new address, and the old one then redirects" do
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: root_page), attributes: { block_type: "post_list", settings: {} }).ok? # the home page's teaser: every type, so "Blog" comes first
+    publish_changes(root_page)
+    blog = listing_page("Blog")
+    post = create_post(title: "Hello")
+    assert_equal "/blog/hello", path_of(post)
+    assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
+
+    foreseen = nil
+    assert_nothing_happened { foreseen = PublicSite::Paths.foresee(blog.reload) }
+    assert_empty foreseen.lost, "nothing ends with no address"
+    assert_equal %w[de en es].map { |locale| { record_type: "Post", record_id: post.id, locale: locale, path: "/blog/hello", to: "/hello", redirects: true } },
+      foreseen.moved.sort_by { |row| row[:locale] }
+
+    publish_changes(blog)
+
+    assert_equal "/hello", path_of(post.reload), "what was foreseen is what the publish does"
+    get "/blog/hello"
+    assert_redirected_to "/hello"
+    assert_addresses_as_rebuilt
+  end
+
+  test "a post whose own published tags take it to another list is foreseen as moving, its own address among the moved" do
+    Tag.create!(name: "topic")
+    listing_page("Blog")
+    listing_page("Topic", tag: "topic")
+    post = create_post(title: "Hello")
+    assert_equal "/blog/hello", path_of(post)
+    assert Posts::Save.call(post, attributes: { tag_names: %w[topic] }).ok?
+
+    foreseen = PublicSite::Paths.foresee(post.reload)
+
+    assert_empty foreseen.lost
+    assert_equal [ { record_type: "Post", record_id: post.id, locale: "en", path: "/blog/hello", to: "/topic/hello", redirects: true } ],
+      foreseen.moved.select { |row| row[:locale] == "en" }
+    assert_equal "/blog/hello", path_of(post.reload)
+  end
+
   test "a page's scheduled change that will take a live post's address away is taken and moves nothing yet; at its time the post yields and the clash is reported once" do
     topic, post = topic_about_to_take_hello
     assert_equal [ { record_type: "Post", record_id: post.id, locale: "en", path: "/blog/hello" } ],
-      PublicSite::Paths.foresee(topic.reload, now: 2.days.from_now).select { |row| row[:locale] == "en" }, "the overview can say it for the time asked"
+      PublicSite::Paths.foresee(topic.reload, now: 2.days.from_now).lost.select { |row| row[:locale] == "en" }, "the overview can say it for the time asked"
 
     publish_changes(topic, at: 2.days.from_now)
     assert_not_nil Publishing.pending(topic)

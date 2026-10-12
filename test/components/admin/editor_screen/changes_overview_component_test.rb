@@ -25,9 +25,9 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
     assert Pages::Save.call(@pricing, translations: { "de" => { subtitle: "Preise und Pläne" } }).ok?
   end
 
-  def overview(record = @pricing, lost: [], viewer: @me)
+  def overview(record = @pricing, lost: [], moved: [], viewer: @me)
     as(viewer) do
-      render_inline Admin::EditorScreen::ChangesOverviewComponent.new(record: record.reload, changes: Publishing::Changes.of(record), lost: lost,
+      render_inline Admin::EditorScreen::ChangesOverviewComponent.new(record: record.reload, changes: Publishing::Changes.of(record), lost: lost, moved: moved,
         holds: Editing::Holds.on(record, viewer: viewer, tab: "tab-aaaaaaaa"), locale: "en")
     end
   end
@@ -128,7 +128,8 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
     lost = %w[en de].map { |locale| { record_type: "Post", record_id: post.id, locale: locale, path: "/blog/hello" } }
     overview(lost: lost)
 
-    assert_selector "[data-publishing-lost-addresses] h3", text: "Addresses"
+    assert_selector "[data-publishing-addresses] h3", text: "Addresses", count: 1
+    assert_no_selector "[data-publishing-moved-addresses]"
     assert_text "When this page is published, these lose their address and show “not found” on the site:"
     assert_selector "[data-lost-address]", count: 1
     assert_selector "[data-lost-address] a[href='/cs-studio/posts/#{post.id}'][data-turbo-frame=_top]", text: "Hello"
@@ -147,6 +148,69 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
     assert_no_text "Secret plans"
     assert_no_selector "[data-lost-address]"
     assert_selector "[data-publishing-lost-addresses]", text: "1 more that you can’t open"
+  end
+
+  def moves(record, locales, from, to, redirects: true)
+    locales.map { |locale| { record_type: record.class.name, record_id: record.id, locale: locale, path: from, to: to, redirects: redirects } }
+  end
+
+  # The hand test's finding: a post that moves was not named at all.
+  test "the records that would move are a second group under its own sentence: each once, by title with a link, the old address, the new one and the languages" do
+    edit
+    post = create_post(title: "Hello")
+    overview(moved: moves(post, %w[en de], "/blog/hello", "/hello"))
+
+    assert_selector "[data-publishing-addresses] h3", text: "Addresses", count: 1
+    assert_no_selector "[data-publishing-lost-addresses]"
+    assert_selector "[data-publishing-moved-addresses]", text: "When this page is published, these move to another address. Each old address then redirects to the new one:"
+    assert_selector "[data-moved-address]", count: 1
+    assert_selector "[data-moved-address] a[href='/cs-studio/posts/#{post.id}'][data-turbo-frame=_top]", text: "Hello"
+    assert_selector "[data-moved-address]", text: "/blog/hello → /hello"
+    assert_selector "[data-moved-address]", text: "(DE and EN)"
+    assert_no_text "no redirect"
+    assert_no_selector "[data-publishing-own-address]"
+  end
+
+  test "both groups stand under one heading, the losses first and as they were" do
+    edit
+    gone = create_post(title: "Gone")
+    going = create_post(title: "Going")
+    overview(lost: [ { record_type: "Post", record_id: gone.id, locale: "en", path: "/blog/gone" } ], moved: moves(going, %w[en], "/blog/going", "/going"))
+
+    assert_selector "[data-publishing-addresses] h3", text: "Addresses", count: 1
+    assert_selector "[data-publishing-addresses] > [data-publishing-lost-addresses] + [data-publishing-moved-addresses]"
+    assert_selector "[data-publishing-lost-addresses] [data-lost-address]", text: "Gone", count: 1
+    assert_selector "[data-publishing-moved-addresses] [data-moved-address]", text: "Going", count: 1
+  end
+
+  test "a record that moves differently in two languages has a line for each, and one whose old address another record takes says there is no redirect" do
+    edit
+    post = create_post(title: "Hello")
+    overview(moved: moves(post, %w[en], "/blog/hello", "/hello") + moves(post, %w[de], "/blog/hallo", "/hallo", redirects: false))
+
+    assert_selector "[data-moved-address]", count: 2
+    assert_selector "[data-moved-address]", text: "/blog/hello → /hello (EN)", normalize_ws: true
+    assert_selector "[data-moved-address]", text: "/blog/hallo → /hallo (DE) (no redirect: another page or post takes the old address)", normalize_ws: true
+  end
+
+  test "the record's own move is named as its own, with no link" do
+    edit
+    overview(moved: moves(@pricing, %w[en], "/pricing", "/plans/pricing"))
+
+    assert_selector "[data-moved-address]", count: 1
+    assert_selector "[data-moved-address]", text: "This page /pricing → /plans/pricing (EN)", normalize_ws: true
+    assert_no_selector "[data-moved-address] a"
+  end
+
+  test "a moving record the viewer may not read is counted, not named" do
+    edit
+    hidden = create_post(title: "Secret plans")
+    overview(moved: moves(hidden, %w[en], "/blog/secret-plans", "/secret-plans"), viewer: users(:editor_branch))
+
+    assert_no_text "Secret plans"
+    assert_no_text "/secret-plans"
+    assert_no_selector "[data-moved-address]"
+    assert_selector "[data-publishing-moved-addresses]", text: "1 more that you can’t open"
   end
 
   test "the record's own address is the refusal, said as one" do

@@ -23,8 +23,8 @@ module Admin
     # A POST, AND SENT THROUGH THE TAB'S WRITE QUEUE (`admin--editor--publish-dialog`),
     # for two reasons. The overview is true only once every save the tab has
     # outstanding has landed, and the queue is what orders them. And the
-    # addresses a publish would take away are found by TRYING it
-    # (`Publishing::Changes.lost_addresses`: the record's row lock, a copy and
+    # addresses a publish would take away or move are found by TRYING it
+    # (`Publishing::Changes.addresses`: the record's row lock, a copy and
     # its addresses written inside a savepoint that is rolled back), which
     # must never run on a GET, where a prefetch or a crawler could hold a
     # page's lock against its editors.
@@ -42,8 +42,8 @@ module Admin
       response.set_header("Cache-Control", "no-store")
       return render(Admin::EditorScreen::ChangesOverviewComponent.schedule_only(record: @record), layout: false) if params[:part] == "schedule"
 
-      lost = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.lost_addresses(@record) : []
-      render Admin::EditorScreen::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: lost,
+      addresses = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.addresses(@record) : ::PublicSite::Paths::Foreseen.nothing
+      render Admin::EditorScreen::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: addresses.lost, moved: addresses.moved,
         holds: ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab), locale: admin_locale, url_options: admin_url_options), layout: false
     end
 

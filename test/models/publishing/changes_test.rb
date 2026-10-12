@@ -120,16 +120,17 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
     page
   end
 
-  test "nothing differs, nothing is taken away: lost_addresses is empty, and Changes.of itself reads no address and has no such answer" do
+  test "nothing differs, nothing is taken away or moved: addresses is empty, and Changes.of itself reads no address and has no such answer" do
     assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
     result = nil
     statements = capture_sql { result = Publishing::Changes.of(@page.reload); result.fields }
     assert_empty statements.grep(/public_paths|FOR UPDATE/), "Changes.of reads no address and takes no lock"
-    assert_not_respond_to result, :lost_addresses
+    assert_not_respond_to result, :addresses
 
-    assert_empty Publishing::Changes.lost_addresses(@page), "a title takes nothing away"
-    assert_empty Publishing::Changes.lost_addresses(create_page(title: "Same"))
-    assert_empty Publishing::Changes.lost_addresses(create_page(title: "Draft", published: false))
+    [ @page, create_page(title: "Same"), create_page(title: "Draft", published: false) ].each do |page|
+      seen = Publishing::Changes.addresses(page)
+      assert_equal [ [], [] ], [ seen.lost, seen.moved ], "a title, nothing and a draft take nothing away and move nothing"
+    end
   end
 
   # `test/integration/public_drafts_test.rb`: "removing a page's list block and
@@ -143,9 +144,28 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
     assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
 
     expected = %w[de en es].map { |locale| { record_type: "Post", record_id: post.id, locale: locale, path: "/blog/hello" } }
-    assert_equal expected, Publishing::Changes.lost_addresses(blog.reload).sort_by { |row| row[:locale] }
+    assert_equal expected, Publishing::Changes.addresses(blog.reload).lost.sort_by { |row| row[:locale] }
+    assert_empty Publishing::Changes.addresses(blog.reload).moved
     assert_equal "/blog/hello", PublicSite::Urls.new.path_for(post, "en"), "asking moved nothing"
     assert_equal 1, Publishing::Version.of(blog).count, "and kept no copy"
-    assert_empty Publishing::Changes.lost_addresses(topic.reload)
+    assert_empty Publishing::Changes.addresses(topic.reload).lost
+  end
+
+  test "removing a page's list block names the live posts a publish would move to another page's list, with where to" do
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: root_page), attributes: { block_type: "post_list", settings: {} }).ok? # the home page's teaser: every type, so "Blog" comes first
+    publish_changes(root_page)
+    blog = listing_page("Blog")
+    post = create_post(title: "Hello")
+    draft = create_post(title: "Unseen", published: false)
+    assert_equal "/blog/hello", PublicSite::Urls.new.path_for(post, "en")
+    assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
+
+    seen = Publishing::Changes.addresses(blog.reload)
+
+    assert_empty seen.lost
+    assert_equal %w[de en es].map { |locale| { record_type: "Post", record_id: post.id, locale: locale, path: "/blog/hello", to: "/hello", redirects: true } },
+      seen.moved.sort_by { |row| row[:locale] }, "the live post, and not the draft (#{draft.id}) that nobody can visit"
+    assert_equal "/blog/hello", PublicSite::Urls.new.path_for(post, "en"), "asking moved nothing"
+    assert_equal 1, Publishing::Version.of(blog).count, "and kept no copy"
   end
 end

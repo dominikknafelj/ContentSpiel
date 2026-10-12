@@ -21,7 +21,7 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
     "canonical_page" => "the page a post's address runs through",
     "canonical_pages" => "the same for several posts",
     "post_path" => "a post's path under a given page, for the preview's link",
-    "foresee" => "the addresses a publish would take away, tried in a savepoint and rolled back (`Publishing::Changes.lost_addresses`)"
+    "foresee" => "the addresses a publish would take away or move, tried in a savepoint and rolled back (`Publishing::Changes.addresses`)"
   }.freeze
   # Read by nothing under app/ yet: the name goes here until a caller exists,
   # and moves into READS then (a test below fails the day it has one).

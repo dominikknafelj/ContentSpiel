@@ -360,6 +360,26 @@ en:
             hidden:
               one: "1 more that you can’t open"
               other: "%{count} more that you can’t open"
+          # Live records that a publish MOVES to another address (a post
+          # whose list on this page goes and which another page lists too):
+          # the second group under "Addresses". The old address stays as a
+          # redirect of the record (`PublicSite::Paths.foresee` reads it from
+          # the trial), except where another record takes it in the same
+          # publish, which the line then says (`no_redirect`).
+          moved_addresses:
+            body:
+              page: "When this page is published, these move to another address. Each old address then redirects to the new one:"
+              post: "When this post is published, these move to another address. Each old address then redirects to the new one:"
+            # The old address and the new one.
+            change: "%{from} → %{to}"
+            # The record whose dialog this is, among those that move.
+            own:
+              page: "This page"
+              post: "This post"
+            no_redirect: "(no redirect: another page or post takes the old address)"
+            hidden:
+              one: "1 more that you can’t open"
+              other: "%{count} more that you can’t open"
           # The record's own address: the one thing a publish is refused for.
           own_address:
             page: "This page would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."

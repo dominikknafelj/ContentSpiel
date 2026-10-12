@@ -143,6 +143,32 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_nil record.reload.full_path("en"), "and the publish is not refused for it"
   end
 
+  test "changes names the live post that would MOVE when the page's list block is removed and the home page lists it too: old address, new address, nothing kept" do
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: root_page), attributes: { block_type: "post_list", settings: {} }).ok? # the home page's teaser: every type, so "Blog" comes first
+    publish_changes(root_page)
+    blog = create_page(title: "Blog", published: false)
+    list = ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+    assert Pages::Save.call(blog, attributes: { published: true }).ok?
+    record = create_post(title: "Hello")
+    assert_equal "/blog/hello", record.reload.full_path("en")
+    assert ContentBlocks::Destroy.call(list).ok?
+
+    post admin_publishing_changes_path(kind: "page", id: blog.id)
+
+    assert_select "[data-publishing-lost-addresses]", count: 0
+    assert_select "[data-publishing-moved-addresses] [data-moved-address]", count: 1
+    assert_select "[data-moved-address] a[href='#{admin_post_path(record)}']", text: "Hello"
+    assert_select "[data-moved-address]", text: %r{/blog/hello → /hello}
+    assert_select "[data-publishing-moved-addresses]", text: /Each old address then redirects to the new one/
+    assert_equal "/blog/hello", record.reload.full_path("en"), "asking moved nothing"
+
+    post admin_publishing_publish_path(kind: "page", id: blog.id), params: { when: "now" }
+    assert_nil flash[:publish_error]
+    assert_equal "/hello", record.reload.full_path("en")
+    get "/blog/hello"
+    assert_redirected_to "/hello", "the sentence is true: the old address sends a visitor on"
+  end
+
   test "someone who may not publish is shown the overview without the trial of the addresses" do
     blog = create_page(title: "Blog", published: false)
     list = ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
@@ -154,7 +180,7 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     statements = capture_sql { post admin_publishing_changes_path(kind: "page", id: blog.id) }
 
     assert_response :success
-    assert_select "[data-publishing-lost-addresses]", count: 0
+    assert_select "[data-publishing-addresses]", count: 0
     assert_empty statements.grep(/FOR UPDATE|SAVEPOINT/)
   end
 

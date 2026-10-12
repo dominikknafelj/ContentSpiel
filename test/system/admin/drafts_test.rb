@@ -255,6 +255,37 @@ class Admin::DraftsSystemTest < ApplicationSystemTestCase
 
   # -- the addresses a publish takes away -------------------------------------------
 
+  test "the dialog names the post that will MOVE when the page is published, with its old and its new address, and a visitor is sent on from the old one" do
+    post = nil
+    as_me do
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: root_page), attributes: { block_type: "post_list", settings: {} }).ok? # the home page's teaser: every type, so "Blog" comes first
+      publish_changes(root_page)
+      list = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+      publish_changes(@page)
+      post = create_post(title: "Hello there")
+      assert_equal "#{@address}/hello-there", post.reload.full_path("en")
+      assert ContentBlocks::Destroy.call(list).ok?
+    end
+    open_editor
+    press "Publish changes…"
+
+    within publish_dialog do
+      assert_selector "[data-publishing-moved-addresses]", text: "When this page is published, these move to another address. Each old address then redirects to the new one:"
+      assert_selector "[data-moved-address] a[href='#{admin_post_path(post)}']", text: "Hello there"
+      assert_selector "[data-moved-address]", text: "#{@address}/hello-there → /hello-there"
+      assert_no_selector "[data-publishing-lost-addresses]"
+      press "Publish changes"
+    end
+
+    assert_text "Changes published"
+    assert_equal "/hello-there", post.reload.full_path("en")
+    using_session(:visitor) do
+      visit "#{@address}/hello-there"
+      assert_text "Hello there"
+      assert_equal "/hello-there", page.current_path
+    end
+  end
+
   test "the dialog names the post that will lose its address when the page is published, links it, and publishing is not refused" do
     post = nil
     as_me do

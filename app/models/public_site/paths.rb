@@ -21,6 +21,12 @@ module PublicSite
     # the path it should have (`to`, nil for none) and, for a post, the id of
     # the page that path runs through (`listed_on`).
     Change = Struct.new(:record, :locale, :row_id, :from, :to, :listed_on)
+    # What `foresee` answers: the addresses a publish would take away and
+    # those it would move (rows of plain data, see there). `nothing` is the
+    # answer for a caller that knows without trying.
+    Foreseen = Data.define(:lost, :moved) do
+      def self.nothing = new(lost: [], moved: [])
+    end
 
     module_function
 
@@ -250,23 +256,40 @@ module PublicSite
       end
     end
 
-    # INFORMATION, for the overview of what a publish will change: the
-    # addresses that live records would LOSE if the working rows of
+    # INFORMATION, for the overview of what a publish will change: what
+    # would happen to the addresses of LIVE records if the working rows of
     # `record` (a published or scheduled page or post) were published at
-    # `now`, as `[{ record_type:, record_id:, locale:, path: }, ...]`, the
-    # record's own among them. Data, never wording, and no service decides
-    # anything by it.
+    # `now`, the record's own among them (`Foreseen`):
+    #
+    # - `lost`: those left with NO address in a language, as
+    #   `[{ record_type:, record_id:, locale:, path: }, ...]`;
+    # - `moved`: those that would stand at ANOTHER address, as
+    #   `[{ record_type:, record_id:, locale:, path:, to:, redirects: }, ...]`
+    #   (a post whose list on this page goes and which another page lists
+    #   too; a post whose own published tags take it to another list).
+    #   `redirects` is whether the old address is then a redirect of that
+    #   record: it is, unless another record took that very address in the
+    #   same refresh (`write_all` gives a wanted path to its new holder and
+    #   deletes the redirect that stood there). Read from the trial's own
+    #   rows, so the dialog's sentence is what the publish will do.
+    #
+    # A hand test found the dialog silent about the second: only `lost` was
+    # answered, and a post that moved from `/blog/x` to `/x` was nobody's
+    # news until a visitor's bookmark was redirected.
+    #
+    # Data, never wording, and no service decides anything by it.
     #
     # It tries: inside a savepoint the copy is taken and the addresses
     # follow, the current rows are compared with what they were, and the
     # savepoint is rolled back whatever happened, so nothing is kept: no
     # copy, no settled mark, no address, no content version, no
     # announcement, no report (each is a row of that savepoint or deferred
-    # to a commit that does not come). It reads every current row twice,
-    # which is why it is asked for one dialog and never on a save path, and
-    # it holds the record's row lock until it is done.
+    # to a commit that does not come). It reads every current row twice
+    # (and, when something moves, the redirects of the moved records), which
+    # is why it is asked for one dialog and never on a save path, and it
+    # holds the record's row lock until it is done.
     def foresee(record, now: Time.current)
-      lost = []
+      lost = moved = []
       PublicPath.transaction(requires_new: true) do
         before = PublicPath.current.pluck(:record_type, :record_id, :locale, :path)
         begin
@@ -274,12 +297,18 @@ module PublicSite
         rescue Publishing::AddressTaken
           # The record's own address: the rows say so already.
         end
-        kept = PublicPath.current.pluck(:record_type, :record_id, :locale).to_set
-        lost = before.reject { |type, id, locale, _| kept.include?([ type, id, locale ]) }
+        after = PublicPath.current.pluck(:record_type, :record_id, :locale, :path).to_h { |type, id, locale, path| [ [ type, id, locale ], path ] }
+        lost, moved = before.reject { |*key, path| after[key] == path }.partition { |*key, _| !after.key?(key) }
+        sent_on = moved.empty? ? [] : PublicPath.redirects.where(record_id: moved.map(&:second).uniq).pluck(:record_type, :record_id, :locale, :path)
+        moved = moved.map { |*key, path| [ *key, path, after[key], sent_on.include?([ *key, path ]) ] }
         raise ActiveRecord::Rollback
       end
-      live = lost.group_by(&:first).flat_map { |type, rows| type.constantize.where(id: rows.map(&:second), published_at: ..now).ids.map { |id| [ type, id ] } }
-      lost.filter_map { |type, id, locale, path| { record_type: type, record_id: id, locale: locale, path: path } if live.include?([ type, id ]) }
+      live = (lost + moved).group_by(&:first).flat_map { |type, rows| type.constantize.where(id: rows.map(&:second), published_at: ..now).ids.map { |id| [ type, id ] } }
+      Foreseen.new(
+        lost: lost.filter_map { |type, id, locale, path| { record_type: type, record_id: id, locale: locale, path: path } if live.include?([ type, id ]) },
+        moved: moved.filter_map do |type, id, locale, path, to, redirects|
+          { record_type: type, record_id: id, locale: locale, path: path, to: to, redirects: redirects } if live.include?([ type, id ])
+        end)
     end
 
     def ids_of(records)

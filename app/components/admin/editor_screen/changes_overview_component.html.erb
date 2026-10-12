@@ -36,22 +36,49 @@
     <%= tag.p t(".own_address.#{type}", path: own_lost.path, languages: lost_languages(own_lost)), role: "alert",
           class: "mt-4 rounded-cs bg-danger-tint px-3 py-2 text-[13px] text-danger-ink", data: { publishing_own_address: "" } %>
   <% end %>
-  <% if others_lost.any? || hidden_lost.to_i.positive? %>
-    <%= tag.section class: "mt-4 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink", data: { publishing_lost_addresses: "" } do %>
+  <%# One box, one heading: who loses an address, then who moves to another. %>
+  <% if addresses? %>
+    <%= tag.section class: "mt-4 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink", data: { publishing_addresses: "" } do %>
       <h3 class="font-medium"><%= t(".lost_addresses.heading") %></h3>
-      <p class="mt-1"><%= t(".lost_addresses.body.#{type}") %></p>
-      <ul class="mt-1 list-disc pl-5">
-        <% others_lost.each do |entry| %>
-          <li data-lost-address>
-            <%= link_to lost_title(entry), lost_url(entry), class: "underline hover:text-ink", data: { turbo_frame: "_top" } %>
-            <span class="font-cs-mono text-[12px]"><%= entry.path %></span>
-            <span>(<%= lost_languages(entry) %>)</span>
-          </li>
+      <% if others_lost.any? || hidden_lost.to_i.positive? %>
+        <%= tag.div data: { publishing_lost_addresses: "" } do %>
+          <p class="mt-1"><%= t(".lost_addresses.body.#{type}") %></p>
+          <ul class="mt-1 list-disc pl-5">
+            <% others_lost.each do |entry| %>
+              <li data-lost-address>
+                <%= link_to lost_title(entry), lost_url(entry), class: "underline hover:text-ink", data: { turbo_frame: "_top" } %>
+                <span class="font-cs-mono text-[12px]"><%= entry.path %></span>
+                <span>(<%= lost_languages(entry) %>)</span>
+              </li>
+            <% end %>
+            <% if hidden_lost.to_i.positive? %>
+              <li><%= t(".lost_addresses.hidden", count: hidden_lost) %></li>
+            <% end %>
+          </ul>
         <% end %>
-        <% if hidden_lost.to_i.positive? %>
-          <li><%= t(".lost_addresses.hidden", count: hidden_lost) %></li>
+      <% end %>
+      <% if moved_entries.any? || hidden_moved.positive? %>
+        <%= tag.div class: "mt-2", data: { publishing_moved_addresses: "" } do %>
+          <p class="mt-1"><%= t(".moved_addresses.body.#{type}") %></p>
+          <ul class="mt-1 list-disc pl-5">
+            <% moved_entries.each do |entry| %>
+              <li data-moved-address>
+                <% if own?(entry) %>
+                  <span><%= t(".moved_addresses.own.#{type}") %></span>
+                <% else %>
+                  <%= link_to lost_title(entry), lost_url(entry), class: "underline hover:text-ink", data: { turbo_frame: "_top" } %>
+                <% end %>
+                <span class="font-cs-mono text-[12px]"><%= t(".moved_addresses.change", from: entry.path, to: entry.to) %></span>
+                <span>(<%= lost_languages(entry) %>)</span>
+                <% unless entry.redirects %><span><%= t(".moved_addresses.no_redirect") %></span><% end %>
+              </li>
+            <% end %>
+            <% if hidden_moved.positive? %>
+              <li><%= t(".moved_addresses.hidden", count: hidden_moved) %></li>
+            <% end %>
+          </ul>
         <% end %>
-      </ul>
+      <% end %>
     <% end %>
   <% end %>
 
