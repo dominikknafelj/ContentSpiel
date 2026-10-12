@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_11_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_11_121000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -364,6 +364,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_120000) do
     t.bigint "record_id", null: false
     t.string "record_type", null: false
     t.datetime "updated_at", null: false
+    t.bigint "listed_on_id"
+    t.index ["listed_on_id"], name: "index_public_paths_on_listed_on", where: "(current AND (listed_on_id IS NOT NULL))"
     t.index ["locale", "path"], name: "index_public_paths_on_locale_and_path", unique: true
     t.index ["record_type", "record_id", "locale"], name: "index_public_paths_one_current_per_record_locale", unique: true, where: "current"
     t.index ["record_type", "record_id"], name: "index_public_paths_on_record_type_and_record_id"

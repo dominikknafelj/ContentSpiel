@@ -45,7 +45,7 @@ module PublicSite
     end
 
     def sync(record)
-      write_all({ record => compute(record) })
+      record.is_a?(Post) ? write_posts([ record ]) : write_all({ record => compute(record) })
     end
 
     # A page and everything below it, in a number of statements that doesn't
@@ -159,7 +159,17 @@ module PublicSite
     # whatever differs.
     def sync_posts(content_type)
       scope = content_type ? Post.where(content_type: content_type) : Post.all
-      scope.includes(:tags).find_in_batches { |posts| write_all(post_paths(posts)) }
+      scope.includes(:tags).find_in_batches { |posts| write_posts(posts) }
+    end
+
+    # The addresses of these posts, each written with THE PAGE THAT GIVES IT
+    # (`listed_on_id` of its current rows): the one fact about a post's
+    # address that cannot be read back from the records afterwards, because
+    # which page listed a post "until a moment ago" is gone once the block,
+    # the copy or the tag that said so has changed.
+    def write_posts(posts)
+      hosts = canonical_pages(posts)
+      write_all(post_paths(posts, hosts: hosts), hosts: hosts)
     end
 
     # `sync_posts` for every content type the listing blocks on `pages` and on
@@ -323,7 +333,7 @@ module PublicSite
       changes = changes_between({ post => desired }, stored)
       held = held_by_others(changes)
       clashing = changes.select { |change| change.to && held.key?([ change.locale, change.to ]) }
-      write_all({ post => desired }, stored: stored, held: held)
+      write_all({ post => desired }, stored: stored, held: held, hosts: canonical_pages([ post ]))
       return if clashing.empty?
       return unless Rails.cache.write("public_paths/clash/#{version.id}", true, unless_exist: true, expires_in: 2.days)
 
@@ -417,8 +427,8 @@ module PublicSite
     # `{ post => { locale => path } }` for several posts in one pass: their
     # canonical pages together (`canonical_pages`), then those pages' current
     # paths in one query.
-    def post_paths(posts, rows: false)
-      pages = canonical_pages(posts, rows: rows)
+    def post_paths(posts, rows: false, hosts: nil)
+      pages = hosts || canonical_pages(posts, rows: rows)
       listing_paths = current_paths("Page", pages.values.compact.map(&:id).uniq)
 
       posts.index_with do |post|
@@ -636,6 +646,13 @@ module PublicSite
     # record may take the address another record of this same call (one
     # batch) has just left (one address per locale, redirects included).
     #
+    # `hosts` (`{ post => page }`, `canonical_pages`' answer) is written with
+    # a post's row as `listed_on_id`. A row is only written when its path
+    # changes, and that is enough: a post's path begins with its host's, and
+    # a current path belongs to one page, so the host cannot change under a
+    # path that stays (`assert_parity` in the paths test compares the column
+    # with a rebuild's after every write path).
+    #
     # `update_all`, `delete_all` and `insert_all!`, never a model save: this
     # runs from inside another record's `after_save`, and re-entering
     # callbacks or validations on a row nobody edited would be both wasted
@@ -658,7 +675,7 @@ module PublicSite
     # live in the same save is bumped by its own `after_commit`, and one that
     # goes live by the clock by `PublicSite.content_version`'s publication
     # times.
-    def write_all(desired, stored: nil, held: nil)
+    def write_all(desired, stored: nil, held: nil, hosts: {})
       records = desired.keys
       return if records.empty?
 
@@ -691,7 +708,8 @@ module PublicSite
           # transaction start time).
           now = Time.current
           PublicPath.insert_all!(moved.map do |change|
-            { record_type: type, record_id: change.record.id, locale: change.locale, path: change.to, current: true, created_at: now, updated_at: now }
+            { record_type: type, record_id: change.record.id, locale: change.locale, path: change.to, current: true,
+              listed_on_id: hosts[change.record]&.id, created_at: now, updated_at: now }
           end)
         end
 

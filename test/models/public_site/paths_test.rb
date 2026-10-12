@@ -468,7 +468,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
   # out. What anchors the derivation itself are the literal addresses
   # asserted along the way (and the tests above that pin single rules).
   def live_rows
-    PublicPath.current.order(:record_type, :record_id, :locale, :path).pluck(:record_type, :record_id, :locale, :path)
+    PublicPath.current.order(:record_type, :record_id, :locale, :path).pluck(:record_type, :record_id, :locale, :path, :listed_on_id)
   end
 
   def assert_parity(step)
@@ -1224,5 +1224,24 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_equal [ nil, nil ], [ current(post), current(job) ]
       assert_parity "publishing after two unswept scheduled changes"
     end
+  end
+
+  # -- the recorded host (Task 4b) ---------------------------------------------
+  #
+  # A post's current row says which page gives it its address. That is the
+  # "before" every caller used to reconstruct for itself.
+
+  test "a post's current row records the page that lists it, in every language, and a page's row records none" do
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal [ blog.id ], PublicPath.current.where(record: post).distinct.pluck(:listed_on_id)
+    assert_equal Locales.enabled.size, PublicPath.current.where(record: post).count
+    assert_equal [ nil ], PublicPath.current.where(record_type: "Page").distinct.pluck(:listed_on_id)
+
+    journal = listing(@root, "Journal", "blog")
+    journal.update!(position: 0)
+    assert_equal "/journal/hello", current(post)
+    assert_equal [ journal.id ], PublicPath.current.where(record: post).distinct.pluck(:listed_on_id), "the host follows the address"
   end
 end
