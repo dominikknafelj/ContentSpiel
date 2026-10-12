@@ -37,6 +37,14 @@ class RichTextScrubberTest < ActiveSupport::TestCase
     assert_includes html, %(<iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ")
   end
 
+  test "a struck text keeps its element, with no attribute of its own" do
+    html = scrub(%(<p>was <s class="x" onclick="alert(1)">struck</s></p>))
+
+    assert_includes html, "<s"
+    assert_includes html, "struck</s>"
+    assert_not_includes html, "onclick"
+  end
+
   test "on* event handler attributes are stripped" do
     html = scrub(%(<p onclick="x()">Hi</p><img src="/a.png" onerror="y()">))
 
