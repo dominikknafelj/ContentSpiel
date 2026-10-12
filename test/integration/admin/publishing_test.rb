@@ -335,6 +335,46 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_equal "Two", Mobility.with_locale(:en) { @page.reload.title }
   end
 
+  test "after a refusal the publish dialog reopens with the sentence, the choice and the time that was typed" do
+    post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "at", published_at: "2001-01-01T09:00" }
+    follow_redirect!
+
+    assert_select "dialog#publish-changes-page-#{@page.id}[data-admin--ui--dialog-open-on-load]" do
+      assert_select "[role=alert]", text: "Pick a time in the future."
+      assert_select "input[type=radio][name=when][value=at][checked]"
+      assert_select "input[type=radio][name=when][checked]", count: 1
+      assert_select "input[name=published_at][value='2001-01-01T09:00']"
+    end
+    assert_select "#toasts [role=alert]", count: 0
+
+    get admin_page_path(@page)
+    assert_select "dialog#publish-changes-page-#{@page.id}[data-admin--ui--dialog-open-on-load]", count: 0
+    assert_select "dialog#publish-changes-page-#{@page.id} input[type=radio][name=when][value=now][checked]"
+  end
+
+  test "the record's own address taken is the publish dialog's error, with nothing written" do
+    blog = create_page(title: "Blog", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert Pages::Save.call(blog, attributes: { published: true }).ok?
+    Tag.create!(name: "one")
+    ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "one" } })
+    publish_changes(@page)
+    create_page(title: "Hello", parent: @page)
+    record = create_post(title: "Hello")
+    assert Posts::Save.call(record, attributes: { tag_names: %w[one] }).ok?
+    copies = Publishing::Version.count
+
+    post admin_publishing_changes_path(kind: "post", id: record.id)
+    assert_select "[data-publishing-own-address]", text: %r{This post would lose its own address, /blog/hello}
+
+    post admin_publishing_publish_path(kind: "post", id: record.id), params: { when: "now" }
+    follow_redirect!
+
+    assert_select "dialog#publish-changes-post-#{record.id}[data-admin--ui--dialog-open-on-load] [role=alert]", text: "The post “Hello” would get the address /one/hello, which is already taken in EN, DE, and ES"
+    assert_equal copies, Publishing::Version.count
+    assert record.reload.unpublished_changes?
+  end
+
   # -- the header follows the mark (Task 6) --------------------------------------
 
   # Only the chip is streamed: the Publish changes form is drawn once and
@@ -415,7 +455,9 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     get admin_page_path(live)
     assert_select "#publishing-chip", count: 1
     assert_select "#publishing-chip *", count: 0
-    assert_select "#publishing-actions form[action$='/publishing/page/#{live.id}/publish']", count: 1, text: /Publish changes/
+    assert_select "#publishing-actions button[data-admin--ui--dialog-id-param='publish-changes-page-#{live.id}']", count: 1, text: "Publish changes…"
+    assert_select "#publishing-actions form", count: 0
+    assert_select "dialog#publish-changes-page-#{live.id} form[action$='/publishing/page/#{live.id}/publish']", count: 1
     assert_select "[data-publish-changes-offered]", count: 0
   end
 

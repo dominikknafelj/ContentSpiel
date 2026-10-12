@@ -1,0 +1,58 @@
+<% if may_publish? %>
+  <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".title"), width: :form, open_on_load: error.present?) do |dialog| %>
+    <%= tag.div data: { controller: "admin--editor--publish-dialog", admin__editor__publish_dialog_url_value: changes_url,
+          action: "admin--ui--dialog:opening@window->admin--editor--publish-dialog#opening" } do %>
+      <% if error %>
+        <p id="<%= error_id %>" role="alert" class="mb-3 rounded-cs bg-danger-tint px-3 py-2 text-[13px] text-danger-ink"><%= error %></p>
+      <% end %>
+      <%# Filled when the dialog opens (see the script): never a form, never an id from the editor. %>
+      <p class="text-sm text-dim" data-admin--editor--publish-dialog-target="loading"><%= t(".loading") %></p>
+      <p class="text-sm text-danger-ink" role="alert" hidden data-admin--editor--publish-dialog-target="failed"><%= t(".failed") %></p>
+      <div id="publishing-changes" aria-live="polite" data-admin--editor--publish-dialog-target="overview"></div>
+
+      <%= form_with url: publish_url, method: :post, id: form_id, class: "mt-4 border-t border-line pt-4", data: queue_hold, html: { novalidate: true } do %>
+        <fieldset>
+          <legend class="<%= setup_label_class %>"><%= t(".when") %></legend>
+          <% if pending_at %>
+            <label class="mt-2 flex items-center gap-2 text-sm"><%= radio_button_tag :when, "kept", chosen == "kept", id: "#{dialog_id}-kept" %> <%= t(".kept", time: pending_time) %></label>
+          <% end %>
+          <label class="mt-2 flex items-center gap-2 text-sm"><%= radio_button_tag :when, "now", chosen == "now", id: "#{dialog_id}-now" %> <%= t(".now") %></label>
+          <label class="mt-2 flex items-center gap-2 text-sm"><%= radio_button_tag :when, "at", chosen == "at", id: "#{dialog_id}-at", data: { admin__editor__publish_dialog_target: "at" } %> <%= t(".at") %></label>
+          <%= tag.input type: "datetime-local", id: input_id, name: "published_at", value: input_value, min: min_value, class: "#{setup_input_class} mt-2",
+                aria: { label: t(".time"), describedby: [ (error_id if error), zone_id ].compact.join(" ") },
+                data: { action: "input->admin--editor--publish-dialog#choseTime change->admin--editor--publish-dialog#choseTime" } %>
+          <p id="<%= zone_id %>" class="mt-2 text-[13px] text-dim"><%= zone_line %></p>
+        </fieldset>
+      <% end %>
+    <% end %>
+    <% dialog.with_footer do %>
+      <%= tag.form method: "dialog" do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
+      <% end %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :primary, type: "submit", form: form_id) %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if may_discard? %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: discard_dialog_id, title: t(".discard_title"), body: t(".discard_body.#{type}")) do |dialog| %>
+    <% if pending_at %>
+      <% dialog.with_details do %><p data-discard-withdraws><%= t(".discard_scheduled", time: pending_time) %></p><% end %>
+    <% end %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: discard_url, method: :post, data: queue_hold do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".discard_confirm"), variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if may_cancel? %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(id: cancel_dialog_id, title: t(".cancel_scheduled_title"), body: t(".cancel_scheduled_body", time: pending_time), cancel_label: t(".cancel_scheduled_keep")) do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: cancel_url, method: :post, data: queue_hold do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel_scheduled_confirm"), variant: :primary, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

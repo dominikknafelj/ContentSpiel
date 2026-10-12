@@ -49,9 +49,9 @@
         <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
       <% end %>
 
-      <%# Whoever may publish this record may publish what is in it (D5): shown
-          only while `Publishing::State` says there is something to publish,
-          and always drawn (empty otherwise) so a save's answer can fill it. %>
+      <%# "Discard changes…" and "Publish changes…": drawn once for whoever has
+          the right, each shown only while `Publishing::State` offers it (a
+          mark in the chip part, which a save's answer replaces). %>
       <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :actions, url_options: url_options, state: state) unless draft? %>
 
       <% if can_edit_schedule? %>
@@ -66,6 +66,9 @@
           <% end %>
           <% if can_schedule? %>
             <% menu.with_item do %><%= tag.button "Schedule…", type: "button", data: dialog_trigger(schedule_dialog_id) %><% end %>
+          <% end %>
+          <% if can_cancel_scheduled_change? %>
+            <% menu.with_item do %><%= tag.button t(".cancel_scheduled_change"), type: "button", data: dialog_trigger(cancel_scheduled_change_dialog_id) %><% end %>
           <% end %>
           <% if can_unpublish? %>
             <% menu.with_item do %><%= tag.button "Unpublish", type: "button", data: dialog_trigger(unpublish_dialog_id) %><% end %>
@@ -156,6 +159,13 @@
 <%# Dialogs: siblings of the header (see the class comment). %>
 <% if can_schedule? || can_edit_schedule? %>
   <%= render Admin::EditorScreen::ScheduleDialogComponent.new(record: record, url_options: url_options, error: schedule_error, value: schedule_value) %>
+<% end %>
+
+<%# The publish, discard and cancel dialogs of a record that is not a draft:
+    drawn once, whatever there is to publish now (see the component). %>
+<% unless draft? %>
+  <%= render Admin::EditorScreen::PublishChangesDialogComponent.new(record: record, state: state, url_options: url_options,
+        error: publish_error, when_chosen: publish_when, value: publish_value) %>
 <% end %>
 
 <% if can_unpublish? %>

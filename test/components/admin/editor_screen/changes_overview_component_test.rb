@@ -112,6 +112,16 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
     assert_no_selector "[data-change]"
   end
 
+  test "with nothing changed since a change was scheduled, it says it is the same as what is scheduled" do
+    edit
+    publish_changes(@pricing, at: Time.zone.local(2031, 10, 12, 9))
+    overview
+
+    assert_text "Nothing new to publish. This is the same as the changes scheduled for 12 Oct 2031, 09:00."
+    assert_no_text "the same as what is published"
+    assert_no_selector "[data-change]"
+  end
+
   test "the records that would lose their address are named once each, by title, with a link to their editor, their address and the languages" do
     edit
     post = create_post(title: "Hello")

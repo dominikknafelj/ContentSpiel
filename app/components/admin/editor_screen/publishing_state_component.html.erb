@@ -2,10 +2,21 @@
   <% if chip? %>
     <%= render Admin::Ui::UnpublishedChipComponent.new if changes? %>
     <%= render Admin::EditorScreen::NoAddressChipComponent.new if no_address? %>
+    <%= tag.span t(".scheduled", time: scheduled_time), class: "text-[12px] text-dim", data: { change_scheduled: "" } if scheduled_time %>
     <%= tag.span "", hidden: true, data: { publish_changes_offered: "" } if publish_changes? %>
-  <% elsif may_publish? %>
-    <%# Drawn once and never replaced (see the class comment); shown while the chip part says so (CSS, not the `hidden` attribute: Tailwind's preflight makes that `!important`). %>
-    <%= button_to t(".publish_changes"), publish_url, method: :post, class: setup_primary_button_class,
-          form: { class: "hidden group-has-[[data-publish-changes-offered]]/publishing:contents", data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
+    <%= tag.span "", hidden: true, data: { discard_changes_offered: "" } if discard_changes? %>
+  <% else %>
+    <%# Drawn once and never replaced (see the class comment); each shown while the chip part carries its mark.
+        The class names are written out: Tailwind reads them from this file. %>
+    <% if may_discard? %>
+      <span class="hidden group-has-[[data-discard-changes-offered]]/publishing:contents">
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".discard_changes"), variant: :secondary, type: "button", data: helpers.dialog_trigger(discard_dialog_id)) %>
+      </span>
+    <% end %>
+    <% if may_publish? %>
+      <span class="hidden group-has-[[data-publish-changes-offered]]/publishing:contents">
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".publish_changes"), variant: :primary, type: "button", data: helpers.dialog_trigger(dialog_id)) %>
+      </span>
+    <% end %>
   <% end %>
 <% end %>

@@ -146,6 +146,21 @@ module Admin
 
       def primary_label = scheduled? ? "Publish now" : "Publish"
 
+      # "Cancel scheduled change" (the state's own action), in the menu; its
+      # confirmation and its form are the publish dialogs' (`PublishChangesDialogComponent`).
+      def can_cancel_scheduled_change? = state.action?(:cancel_scheduled_change) && may_publish?
+
+      def cancel_scheduled_change_dialog_id = PublishChangesDialogComponent.cancel_dialog_id_for(record)
+
+      # What the last refused publish left in the flash (`Admin::PublishingController#refuse_publish`),
+      # read once, here, so the publish dialog reopens with it. Never
+      # `flash[:alert]`: that is the toast region's.
+      def publish_error = helpers.flash[:publish_error]
+
+      def publish_when = helpers.flash[:publish_when]
+
+      def publish_value = helpers.flash[:publish_value]
+
       # Trash spec §4.1: a page with subpages moves its whole branch, so only
       # the homepage is refused (`Page#only_one_root_page`, `Trash::Move`).
       def can_delete? = !(page? && record.root?)
@@ -179,7 +194,7 @@ module Admin
       # Whether the ⋯ menu has anything to hold (a viewer who can only read
       # gets no empty menu).
       def menu_items?
-        can?("audit.view") || can_schedule? || can_unpublish? || may_delete?
+        can?("audit.view") || can_schedule? || can_cancel_scheduled_change? || can_unpublish? || may_delete?
       end
 
       # [label, url-or-nil] per crumb; a crumb the viewer may not open is plain

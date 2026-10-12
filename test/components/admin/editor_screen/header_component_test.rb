@@ -102,8 +102,9 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
 
     render_header(edit_title(live))
     assert_selector "header #publishing-chip [data-unpublished-changes]", text: "Unpublished changes"
-    assert_selector "header #publishing-actions form[action='/cs-studio/publishing/page/#{live.id}/publish'] button", text: "Publish changes"
+    assert_selector "header #publishing-actions button[data-admin--ui--dialog-id-param='publish-changes-page-#{live.id}']", text: "Publish changes…"
     assert_selector "header #publishing-chip [data-publish-changes-offered]", visible: :all
+    assert_selector "header #publishing-chip [data-discard-changes-offered]", visible: :all
   end
 
   test "a scheduled record with unpublished changes offers them too, and a draft shows neither the chip nor the button, whatever mark it kept" do
@@ -121,7 +122,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     render_header(draft)
     assert_no_selector "header [data-unpublished-changes]"
     assert_no_selector "header #publishing-chip", visible: :all
-    assert_no_selector "header button", text: "Publish changes"
+    assert_no_selector "header button", text: "Publish changes", visible: :all
   end
 
   test "a live record with a change scheduled offers Publish changes with or without edits since, because its time can be changed" do
@@ -132,9 +133,98 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
 
     render_header(live)
 
-    assert_selector "header #publishing-actions form[action='/cs-studio/publishing/page/#{live.id}/publish'] button", text: "Publish changes"
+    assert_selector "header #publishing-actions button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='publish-changes-page-#{live.id}']", text: "Publish changes…"
     assert_selector "header #publishing-chip [data-publish-changes-offered]", visible: :all
+    assert_selector "header #publishing-chip [data-discard-changes-offered]", visible: :all
     assert_no_selector "header [data-unpublished-changes]"
+  end
+
+  # -- Task 7: the dialogs ---------------------------------------------------------
+
+  test "the Publish changes control opens the dialog and is not a form" do
+    live = edit_title(create_page(title: "About"))
+    render_header(live)
+
+    assert_selector "header #publishing-actions button[type=button][data-admin--ui--dialog-id-param='publish-changes-page-#{live.id}']", text: "Publish changes…"
+    assert_selector "dialog#publish-changes-page-#{live.id} form[action='/cs-studio/publishing/page/#{live.id}/publish']", visible: :all
+  end
+
+  test "no form in the header publishes without the dialog" do
+    render_header(edit_title(create_page(title: "About")))
+
+    assert_no_selector "#publishing-actions form", visible: :all
+    assert_no_selector "header form[action*='/publishing/']", visible: :all
+  end
+
+  test "Discard changes… is offered with it to someone who may change the record, opens its own dialog, and stands before Publish changes…" do
+    live = edit_title(create_page(title: "About"))
+    render_header(live)
+
+    assert_selector "header #publishing-actions button[type=button][data-admin--ui--dialog-id-param='discard-changes-page-#{live.id}']", text: "Discard changes…"
+    assert_equal [ "Discard changes…", "Publish changes…" ], page.all("header #publishing-actions button", visible: :all).map { |button| button.text(:all).strip }
+    assert_selector "dialog#discard-changes-page-#{live.id}[data-destructive] form[action='/cs-studio/publishing/page/#{live.id}/discard']", visible: :all
+  end
+
+  test "the buttons and the dialogs are drawn for a live record with nothing to publish too, without their marks: the first save's answer shows them" do
+    live = create_page(title: "About")
+    render_header(live)
+
+    assert_selector "header #publishing-actions button", text: "Publish changes…", visible: :all
+    assert_selector "header #publishing-actions button", text: "Discard changes…", visible: :all
+    wrappers = page.all("header #publishing-actions > span", visible: :all).map { |span| span[:class] }
+    assert_equal [ "hidden group-has-[[data-discard-changes-offered]]/publishing:contents", "hidden group-has-[[data-publish-changes-offered]]/publishing:contents" ], wrappers
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all
+    assert_no_selector "header [data-discard-changes-offered]", visible: :all
+    assert_selector "dialog#publish-changes-page-#{live.id}", visible: :all
+    assert_selector "dialog#discard-changes-page-#{live.id}", visible: :all
+    assert_includes page.find("header.admin-editor-header")[:class].split, "group/publishing"
+  end
+
+  test "a draft has neither the dialogs nor the buttons" do
+    draft = create_page(title: "Draft", published: false)
+    render_header(draft)
+
+    assert_no_selector "dialog[id^=publish-changes-]", visible: :all
+    assert_no_selector "dialog[id^=discard-changes-]", visible: :all
+    assert_no_selector "dialog[id^=cancel-scheduled-change-]", visible: :all
+  end
+
+  test "changes that are scheduled are named with their time, and Cancel scheduled change is in the menu with its confirmation" do
+    live = create_page(title: "About")
+    assert as_owner { Pages::Save.call(live, translations: { "en" => { title: "Edited" } }) }.ok?
+    assert as_owner { Publishing::PublishChanges.call(live.reload, at: Time.zone.local(2031, 10, 12, 9)) }.ok?
+
+    render_header(live.reload)
+
+    assert_selector "header #publishing-chip [data-change-scheduled]", text: "Changes scheduled for 12 Oct 2031, 09:00"
+    assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='cancel-scheduled-change-page-#{live.id}']", text: "Cancel scheduled change", visible: :all
+    assert_selector "dialog#cancel-scheduled-change-page-#{live.id} form[action='/cs-studio/publishing/page/#{live.id}/cancel_scheduled_change']", visible: :all
+    items = page.all("[role=menu] a, [role=menu] button", visible: :all).map { |item| item.text(:all).strip }
+    assert_equal [ "Cancel scheduled change", "Unpublish" ], items[items.index("Cancel scheduled change"), 2]
+  end
+
+  test "with no change scheduled there is no such item, no such dialog and no such line" do
+    live = edit_title(create_page(title: "About"))
+    render_header(live)
+
+    assert_no_selector "[role=menu] button", text: "Cancel scheduled change", visible: :all
+    assert_no_selector "dialog[id^=cancel-scheduled-change-]", visible: :all
+    assert_no_selector "[data-change-scheduled]"
+  end
+
+  test "someone who may read but not change the record gets no button, no dialog and no menu item of these" do
+    live = create_page(title: "About")
+    assert as_owner { Pages::Save.call(live, translations: { "en" => { title: "Edited" } }) }.ok?
+    assert as_owner { Publishing::PublishChanges.call(live.reload, at: 2.days.from_now) }.ok?
+    assert as_owner { Pages::Save.call(live.reload, translations: { "en" => { title: "Edited again" } }) }.ok?
+
+    render_header(live.reload, actor: users(:reader))
+
+    assert_selector "header [data-unpublished-changes]"
+    assert_selector "header [data-change-scheduled]"
+    assert_no_selector "button", text: /Publish changes|Discard changes|Cancel scheduled change/, visible: :all
+    assert_no_selector "dialog[id^=publish-changes-], dialog[id^=discard-changes-], dialog[id^=cancel-scheduled-change-]", visible: :all
+    assert_no_selector "[data-publish-changes-offered], [data-discard-changes-offered]", visible: :all
   end
 
   test "someone who may not publish sees the chip and no button" do
@@ -143,7 +233,8 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     render_header(post, actor: users(:reader))
 
     assert_selector "header [data-unpublished-changes]"
-    assert_no_selector "header button", text: "Publish changes"
+    assert_no_selector "header button", text: "Publish changes", visible: :all
+    assert_no_selector "header button", text: "Discard changes", visible: :all
   end
 
   test "a live page that has no address says so, and one that has an address, a draft and an unlisted post do not" do

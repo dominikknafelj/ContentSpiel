@@ -1,6 +1,6 @@
 <%= tag.div data: { publishing_overview: "", nothing: (none? ? "" : nil) } do %>
   <% if none? %>
-    <p class="text-sm text-dim"><%= t(".none") %></p>
+    <p class="text-sm text-dim"><%= scheduled_baseline? ? t(".none_scheduled", time: baseline_time) : t(".none") %></p>
   <% else %>
     <% if scheduled_baseline? %>
       <p class="mb-3 text-[13px] text-dim"><%= t(".compared_with_scheduled", time: baseline_time) %></p>
