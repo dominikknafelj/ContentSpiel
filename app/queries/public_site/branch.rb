@@ -50,13 +50,20 @@ module PublicSite
     #             preview's).
     # `depth`     how far below the homepage: 0 for it, 1 for a page directly
     #             under it.
-    # `children`  the pages directly under it, as nodes, in the tree's order.
+    # `children`  the pages directly under it, as nodes, in the tree's order,
+    #             frozen (a node is remembered for the render, and what one
+    #             partial added would be drawn by the next).
     #             EMPTY FOR A NODE THAT WAS NOT READ AS PART OF A BRANCH: the
     #             homepage among the pages above (its branch is the whole
     #             site) and, in a preview, a page above that the section's
     #             tree does not hold.
     # `current?`  the page being shown.
-    # `open?`     the shown page is somewhere below.
+    # `open?`     the shown page is somewhere below: true for every page
+    #             above it (every node of `around`'s `above`), also in the
+    #             preview of a draft, which the tree itself does not hold.
+    # `leaf?`     no children.
+    # `reading_order`
+    #             itself, then its subpages, each followed by its own.
     Node = Data.define(:id, :title, :subtitle, :slug, :path, :depth, :children, :current, :open) do
       def current? = current
 
@@ -76,6 +83,11 @@ module PublicSite
     Around = Data.define(:above, :section)
     NOWHERE = Around.new(above: [].freeze, section: nil)
 
+    # What a branch can be asked about: a page (a row, or one rebuilt from
+    # its copy) or a node. NOT "anything with an id": a post answers `id`
+    # too, and its number is some page's.
+    def self.in_the_tree?(thing) = thing.is_a?(Page) || thing.is_a?(Node)
+
     def initialize(urls:, locale: I18n.locale)
       @urls = urls
       @locale = locale.to_s
@@ -84,16 +96,19 @@ module PublicSite
     # The branch under and including `top`, to any depth, or nil when `top`
     # itself is not shown (nil, trashed, not published, no address in this
     # language). `top` is a page or a node; `current` is the page being
-    # shown (a page or a node), if it is in the branch.
+    # shown (a page or a node), if it is in the branch. Anything else is no
+    # top and marks nothing (`in_the_tree?`).
     def under(top, current: nil)
       top = row_of(top) or return nil
+      current = nil unless self.class.in_the_tree?(current)
       depth = top.root? ? 0 : top.depth # public: rows (how deep the branch sits is the tree's)
 
       read(top, depth: depth, current: current).first
     end
 
     # The pages above `page` and its section, from the same statements as
-    # the section's tree. `page` is a page or a node; nil is nowhere.
+    # the section's tree. `page` is a page or a node; nil, and anything
+    # else, is nowhere.
     def around(page)
       page = row_of(page) or return NOWHERE
       chain = page.self_and_ancestors.to_a.reverse # public: rows (which pages are above is the tree's; every title below is read from a copy)
@@ -107,9 +122,11 @@ module PublicSite
 
     private
 
-    # A page is itself; a node, or anything else with an id, is looked up.
+    # A page is itself and a node is looked up; anything else is no page
+    # (`in_the_tree?`), and nothing is read for it.
     def row_of(page)
-      return page if page.nil? || page.is_a?(Page)
+      return page if page.is_a?(Page)
+      return nil unless page.is_a?(Node)
 
       Page.find_by(id: page.id) # public: rows (a node names a page by its id; only its place in the tree is read from the row)
     end
@@ -124,8 +141,11 @@ module PublicSite
     def read(top, depth:, current:, beside: {})
       pages = top.self_and_descendants.kept.published.to_a # public: rows (which pages are in a branch, and their order, is the tree's; titles are read from the copies below)
       by_id = pages.index_by(&:id)
+      # `beside` is the pages above the shown one, so each is open, whether
+      # or not the walk from the shown page reaches it: in the preview of a
+      # draft the shown page is not among `pages`, and the walk finds none.
       context = facts_of(pages | beside.keys).merge(by_parent: pages.group_by(&:parent_id), current_id: current&.id,
-        open_ids: ids_above(current, by_id), nodes: {})
+        open_ids: ids_above(current, by_id) | beside.keys.map(&:id), nodes: {})
       tree = build(by_id[top.id], depth, context) if by_id.key?(top.id)
       beside.each { |row, at| context[:nodes][row.id] ||= lone(row, at, context) }
 
@@ -185,7 +205,7 @@ module PublicSite
       stored = context[:paths].dig(page.id, @locale)
       Node.new(id: page.id, title: Locales.read(shown, :title, locale: @locale), subtitle: Locales.read(shown, :subtitle, locale: @locale),
         slug: stored.split("/").last.to_s, path: @urls.path_from(stored, @locale),
-        depth: depth, children: children, current: current, open: open)
+        depth: depth, children: children.freeze, current: current, open: open)
     end
   end
 end

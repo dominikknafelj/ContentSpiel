@@ -205,7 +205,10 @@ class ThemeTest < ActiveSupport::TestCase
     end
   end
 
-  test "the application's theme is loaded when it is prepared, and under test it is the default" do
+  # Not a proof that the initializer runs: `Theme.current` answers a default
+  # theme by itself when nothing was assigned. That proof is the production
+  # boots (`test/lib/production_boot_test.rb`).
+  test "under test the application's theme is the default: THEME_PATH is not read" do
     assert_instance_of Theme, Theme.current
     assert_not Theme.current.configured?
   end

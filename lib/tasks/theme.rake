@@ -25,7 +25,12 @@ namespace :theme do
             "THEME_NEW_PATH='…' bin/rails theme:new"
     end
     path = arguments[:path].to_s.strip
-    path = ENV["THEME_NEW_PATH"].to_s.strip if path.empty?
+    if path.empty?
+      path = ENV["THEME_NEW_PATH"].to_s.strip
+      # Said BEFORE anything is written: a variable left in a shell from the
+      # last run names a folder nobody is thinking of now.
+      puts "The path is THEME_NEW_PATH's: #{File.expand_path(path)}" unless path.empty?
+    end
     abort "Say where: bin/rails 'theme:new[PATH]'" if path.empty?
 
     begin
@@ -56,9 +61,10 @@ namespace :theme do
   # What still ends it before the list, each with its own sentence and no
   # trace: a path that is no directory, something at the folder's top that
   # is no part of a theme, a file that cannot be read, a link out of the
-  # folder (`ThemeFolder::Invalid`: the folder cannot be read as a theme at
-  # all, so there is no list to make; everything at the top that is no part
-  # of a theme is said together), and in production with a real secret a
+  # folder or to nothing, a hidden folder below the top
+  # (`ThemeFolder::Invalid`: the folder cannot be read as a theme at all,
+  # so there is no list to make; everything at the top that is no part of a
+  # theme is said together), and in production with a real secret a
   # stylesheet built for another theme.
   desc "Say what is wrong with a theme folder: THEME_PATH, or bin/rails 'theme:check[PATH]'"
   task :check, [ :path ] do |_task, arguments|
@@ -89,7 +95,13 @@ namespace :theme do
     # was asked about, and inside `checking` a refusal of THAT folder is
     # kept, not raised. Saying nothing of it would end 0 in a process whose
     # every public page raises.
-    other = path.empty? ? nil : Theme.current.refusal
+    #
+    # Not when the folder asked about IS that folder (`theme:check[x]` with
+    # THEME_PATH=x): it was checked, and its list is above.
+    real = ->(directory) { File.realpath(directory.to_s) rescue File.expand_path(directory.to_s) }
+    started = ThemeFolder.current
+    same = started.configured? && real.(started.path) == real.(folder.path)
+    other = path.empty? || same ? nil : Theme.current.refusal
     if other
       warn "#{ThemeFolder::VARIABLE} names another folder, which was NOT checked here and is refused: the application does " \
            "not start under it. Run bin/rails theme:check with no path to hear why."

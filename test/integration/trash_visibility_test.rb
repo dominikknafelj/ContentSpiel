@@ -187,6 +187,11 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     create_page(title: "Deep leaf", parent: gone)
     gone.update_columns(trashed_at: Time.current) # version: none (a test puts a row in the trash around the callbacks, so that the page under it keeps its address)
 
+    with_plain_theme { get "/guide/gone-part/deep-leaf" }
+    assert_response :success
+    assert_select "p.plain-crumb a", text: "Guide"
+    assert_not_includes response.body, "Gone part"
+
     sign_in_as users(:one)
     with_plain_theme { get "/preview/guide/gone-part/deep-leaf" }
 

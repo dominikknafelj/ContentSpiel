@@ -20,7 +20,7 @@ class Theme
   # page or the head (`written`). `deep: true` is `bin/rails theme:check`'s
   # and a site's image build's: it also compiles every template (a syntax
   # error is found at the build and not by a visitor) and reads each for the
-  # four names the public ETag cannot see (spec §6).
+  # five names the public ETag cannot see (`FORBIDDEN`, spec §6).
   #
   # THE READING OF A TEMPLATE IS A FENCE AGAINST MISTAKES, NOT A SANDBOX. A
   # theme is code the server runs: its templates are ERB, they call whatever
@@ -59,10 +59,10 @@ class Theme
     # `send`, through a local (`r = controller; r.request`) or a helper of
     # another name; asked with `&.` (`helpers&.request`); handed on by a
     # keyword's shorthand (`render "theme/x", params:`); in a template that
-    # binds the same name itself (`bound_in`); and after a spelling Ruby
-    # reads by whether a name is a local (`reads?`). A fence, as the comment
-    # above says, and one that lets through where it is unsure: it gates a
-    # site's build.
+    # binds the same name itself, from that tag onward (`bound_in`); and
+    # after a spelling Ruby reads by whether a name is a local (`reads?`). A
+    # fence, as the comment above says, and one that lets through where it
+    # is unsure: it gates a site's build.
     FORBIDDEN = %w[params request cookies session flash].freeze
 
     # Who a template can ask for one of them.
@@ -568,19 +568,23 @@ class Theme
       code_of(tag).match?(pattern) && code_of(tag, locals: true).match?(pattern)
     end
 
-    # The fenced names a template binds itself, in any of its tags: a
-    # block's parameter (`sessions.each do |session|`, `{ |request| … }`),
-    # a lambda's (`->(flash) { … }`) and a local that is assigned
-    # (`request = …`). From there on the name is the theme's own variable
-    # and not the view's method, in that tag and in the tags after it, and a
-    # template that lists a conference's sessions is not told to "take
-    # session out". Asked of the whole template's code, since a block opened
-    # in one tag is used in the next.
+    # The names of `names` (the fenced ones, unless said) that a piece of a
+    # template's code binds itself: a block's parameter (`sessions.each do
+    # |session|`, `{ |request| … }`), a lambda's (`->(flash) { … }`) and a
+    # local that is assigned (`request = …`). From there on the name is the
+    # theme's own variable and not the view's method, in that tag and in
+    # the tags after it (a block opened in one tag is used in the next),
+    # and a template that lists a conference's sessions is not told to
+    # "take session out". NOT IN THE TAGS BEFORE IT (`bound_through`): a
+    # parameter cannot be used before its block opens, and a read of
+    # `request` at a template's top with a loop over `|request|` at its
+    # bottom is the mistake the fence is for.
     #
-    # The price, a miss: once a name is bound anywhere in a template, no
-    # read of the view's method of that name is seen in it, before the
-    # binding or after (`request = request.path` hides both), and a default
-    # value in a parameter list binds what it names (`|a, b = params|`).
+    # The price, a miss: from the tag that binds a name to the template's
+    # end no read of the view's method of that name is seen, in the binding
+    # tag itself (`request = request.path`) and after the block has closed,
+    # and a default value in a parameter list binds what it names
+    # (`|a, b = params|`).
     PARAMETERS = /(?:\bdo|\{)\s*\|([^|]*)\||->\s*\(([^)]*)\)/
 
     def bound_in(code, names = FORBIDDEN)
@@ -641,15 +645,16 @@ class Theme
       # check is a gate of a site's build, where a wrong refusal blocks a
       # deploy.
       tags = source.gsub(/<%#.*?%>/m, "").scan(TAG).flatten
-      bound = bound_in(tags.map { |tag| code_of(tag) }.join("\n;\n"))
-      asked = REQUEST_RECEIVERS.map { |receiver| "(?<=\\b#{receiver}\\.)" }.join("|")
-      (FORBIDDEN - bound).each do |name|
+      # A name is exempt from the tag that binds it onward, and not before
+      # it (`bound_through`).
+      bound = bound_through(tags, FORBIDDEN)
+      FORBIDDEN.each do |name|
         # Not a method of something else (`text.request_id`, `post.session`),
-        # not a symbol or an instance variable, and not a Hash key
-        # (`data: { session: "1" }`: the colon touches the name; in a ternary,
-        # `ok ? params : nil`, it does not).
+        # not a symbol or an instance variable (`asked_of`), and not a Hash
+        # key (`data: { session: "1" }`: the colon touches the name; in a
+        # ternary, `ok ? params : nil`, it does not).
         # Each tag by itself, and however Ruby would read it (`reads?`).
-        next unless tags.any? { |tag| reads?(tag, /(?:(?<![.\w@:])|#{asked})#{name}\b(?!:(?!:))/) }
+        next unless tags.each_with_index.any? { |tag, index| !bound[index].include?(name) && reads?(tag, /#{asked_of(name)}(?!:(?!:))/) }
 
         found << "#{file} reads #{name}: a public page is one answer for every visitor, and its ETag does not know what a template " \
                  "reads there. Take #{name} out of the template. (This reading finds mistakes and is no sandbox: a theme is code " \

@@ -30,9 +30,11 @@ module PublicPageRendering
     # `Theme.current` can differ between two requests of one process (a
     # test's `Theme.with`). Only the two controllers that include this
     # concern do it, `PagesController` and `PreviewController`: no CS Studio
-    # controller does, so a theme's template can never be found for an admin
-    # view (`test/integration/theme_pages_test.rb`: "nothing of a theme
-    # reaches CS Studio, sign-in or setup").
+    # controller does, and no mailer, so a theme's template can never be
+    # found for an admin view, a password page or a mail
+    # (`test/integration/theme_pages_test.rb`, four tests: "nothing of a
+    # theme reaches sign-in…", "…CS Studio…", "…setup…", "…the password pages
+    # or a mail…").
     #
     # What the path lets a theme replace is not "any template": the folder
     # is checked against `Theme::Contract` when the application starts

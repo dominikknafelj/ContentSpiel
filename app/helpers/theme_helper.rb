@@ -43,8 +43,9 @@ module ThemeHelper
   end
 
   # The elements whose headings are not the article's own
-  # (`with_heading_ids`).
-  NOT_THE_ARTICLE = %w[nav aside header footer li a].freeze
+  # (`with_heading_ids`). A list item is the sixth and is not on this list,
+  # because it is not always one: `template_item?`.
+  NOT_THE_ARTICLE = %w[nav aside header footer a].freeze
   OUTSIDE_THE_ARTICLE = NOT_THE_ARTICLE.map { |name| "ancestor::#{name}" }.join(" | ").freeze
 
   # Current.site memoizes itself for the process/request; no ivar of our own
@@ -133,8 +134,9 @@ module ThemeHelper
   # The branch under and including `top` (a node, or a page), to any depth,
   # as nested nodes. nil when `top` is nil or not shown.
   def page_tree(top, current: (@page if page_found?))
-    return nil if top.nil? || not_found_answer?
+    return nil if !in_the_tree?(top) || not_found_answer?
 
+    current = nil unless in_the_tree?(current)
     @page_trees ||= {}
     key = [ top.id, current&.id ]
     @page_trees.fetch(key) { @page_trees[key] = page_branch.under(top, current: current) }
@@ -171,11 +173,16 @@ module ThemeHelper
   #
   # THE ARTICLE is what the template hands in, less the pieces that list or
   # link OTHER content or are the page's furniture: a heading inside `nav`,
-  # `aside`, `header`, `footer`, a list item or a link is not a heading of
-  # this text (a post list's titles, a card that is one link) and is neither
-  # listed nor given an id (`NOT_THE_ARTICLE`). A post's own text, which its
-  # template wraps in `article`, and a text in a section's column are. The cost is one more parse of the article for a request that is
-  # not a 304, paid only by a template that calls this.
+  # `aside`, `header`, `footer` or a link is not a heading of this text (a
+  # card that is one link) and is neither listed nor given an id
+  # (`NOT_THE_ARTICLE`). Nor is one inside a list item A TEMPLATE WROTE (a
+  # post list's titles). One inside a list item of a RENDERED TEXT is: a
+  # list item of a text holds blocks, an author may write a heading in one,
+  # and spec §7 gives each heading of the text an id (`template_item?`). A
+  # post's own text, which its template wraps in `article`, and a text in a
+  # section's column are the article's too. The cost is one more parse of
+  # the article for a request that is not a 304, paid only by a template
+  # that calls this.
   #
   # AFTER THE RENDER CACHE, NEVER IN IT: a body is cached by its document's
   # digest and is the same HTML in CS Studio's preview and in the MCP
@@ -197,6 +204,7 @@ module ThemeHelper
 
     fragment = Nokogiri::HTML5.fragment(html)
     nodes = fragment.css(levels.map { |level| "h#{level}" }.join(", ")).reject { |node| node.at_xpath(OUTSIDE_THE_ARTICLE) }
+    nodes = nodes.reject { |node| template_item?(node) } # before an id is put on anything: an item is known by its markup
     return [ html, [] ] if nodes.empty?
 
     taken = fragment.css("[id]").map { |node| node["id"] }.to_set
@@ -262,8 +270,14 @@ module ThemeHelper
   # an internal link should still point at the German page on a German
   # URL. `urls:` is the controller's own `public_urls`, so `/preview`
   # renders internal links under `/preview` and the public site doesn't.
+  #
+  # A text that holds a heading and a list is remembered for the render:
+  # `with_heading_ids` asks whether a list item is a text's own
+  # (`template_item?`).
   def rich_text(record)
-    ::Locales.read(record, :body).to_html(locale: I18n.locale, urls: public_urls)
+    ::Locales.read(record, :body).to_html(locale: I18n.locale, urls: public_urls).tap do |html|
+      (@texts_with_items ||= []) << html if html.include?("<li") && html.include?("<h")
+    end
   end
   # One block of a page, rendered: its registered type's ViewComponent
   # (`Theme.current.component_for`, open-types spec §5), not a partial named
@@ -329,6 +343,30 @@ module ThemeHelper
     @block_outlines[page] ||= BlockOutline.new(page.content_blocks)
   end
 
+  # Whether a heading is in a list item that is NOT a rendered text's: a
+  # template's own (`<li><h3>` of a post list). The CMS's own, for
+  # `with_heading_ids`.
+  #
+  # HOW A TEXT'S ITEM IS KNOWN. A rendered text has no wrapper of the CMS's
+  # (the element and the class around it are the theme's, decision 12), so
+  # nothing in the article's markup says where a text begins. What is known
+  # is what `rich_text` answered during this render: an item of the article
+  # is a text's own when it is, tag for tag, an item of one of those texts
+  # (both read by the same parser and written by the same serialiser). A
+  # template's item is taken for a text's only when it is the same markup
+  # as an item an author wrote on this page, heading and all. A text that
+  # did not come through `rich_text` in this render (a string a template
+  # built itself) is not known, and its items are a template's.
+  def template_item?(heading)
+    item = heading.at_xpath("ancestor::li[1]") or return false # the nearest one
+
+    @items_of_texts ||= {}
+    known = (@texts_with_items || []).flat_map do |text|
+      @items_of_texts[text] ||= Nokogiri::HTML5.fragment(text).css("li").select { |li| li.at_css("h1, h2, h3, h4, h5, h6") }.map(&:to_html)
+    end
+    !known.include?(item.to_html)
+  end
+
   # One `PublicSite::Branch` per render, on this request's urls and language.
   # The CMS's own: not in `Theme::Contract::HELPERS`, a template asks the
   # helpers above.
@@ -340,7 +378,7 @@ module ThemeHelper
   # whatever the section's size) and once per page per render. The section
   # is its tree, so `page_tree` of it is remembered here. The CMS's own.
   def page_surroundings(page)
-    return PublicSite::Branch::NOWHERE if page.nil? || not_found_answer?
+    return PublicSite::Branch::NOWHERE if !in_the_tree?(page) || not_found_answer?
 
     @page_surroundings ||= {}
     @page_surroundings.fetch(page.id) do
@@ -349,6 +387,13 @@ module ThemeHelper
       @page_surroundings[page.id] = around
     end
   end
+
+  # What a tree helper can be asked about: a page or a node, and nothing
+  # else (`PublicSite::Branch.in_the_tree?`). The answers are remembered by
+  # an id, and a post's id is some page's: `page_ancestors(@post || @page)`,
+  # which is how `language_links` is called, would otherwise answer the
+  # crumbs of the page with the post's number. The CMS's own.
+  def in_the_tree?(thing) = PublicSite::Branch.in_the_tree?(thing)
 
   # The answer says "not found". The CMS's own: a template asks
   # `page_found?`.

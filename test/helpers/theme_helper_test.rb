@@ -231,6 +231,57 @@ class ThemeHelperTest < ActionView::TestCase
     assert_includes html, "<nav><h2>Menu</h2></nav>"
   end
 
+  # N1: a list item of a rich text holds blocks ("paragraph block*"), so an
+  # author can write a heading in one, and spec §7 gives EACH heading of the
+  # text an id. The `li` that is passed over is a template's (a post list's
+  # titles); one that `rich_text` rendered is the article's own.
+  test "a heading an author wrote inside a list item of a text is listed and given an id; the same heading in a template's own list item is not" do
+    document = { "type" => "doc", "content" => [
+      { "type" => "heading", "attrs" => { "level" => 2 }, "content" => [ { "type" => "text", "text" => "Steps" } ] },
+      { "type" => "bulletList", "content" => [
+        { "type" => "listItem", "content" => [
+          { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "First" } ] },
+          { "type" => "heading", "attrs" => { "level" => 3 }, "content" => [ { "type" => "text", "text" => "Inside an item" } ] }
+        ] }
+      ] }
+    ] }
+    page = create_page(title: "Guide")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, translations: { "en" => { body: document } })
+    assert result.ok?, result.errors.to_sentence
+    text = rich_text(result.record)
+    assert_includes text, "<li>"
+    assert_includes text, "<h3>Inside an item</h3>"
+
+    article = safe_join([ tag.div(text, class: "any-wrapper"), "<ol><li><h3>A post's title</h3></li><li><h3>Inside an item</h3><p>a card</p></li></ol>".html_safe ])
+    html, headings = with_heading_ids(article)
+
+    assert_equal [ [ "steps", 2 ], [ "inside-an-item", 3 ] ], headings.map { |heading| [ heading.id, heading.level ] }
+    assert_includes html, %(<h3 id="inside-an-item">Inside an item</h3>)
+    assert_includes html, "<li><h3>A post's title</h3></li>"
+    assert_includes html, "<li><h3>Inside an item</h3><p>a card</p></li>", "a template's list item with the same words is still not the text's"
+  end
+
+  # N2: `page_ancestors(@post || @page)` is the pattern `language_links` is
+  # called with, and a post's id is some page's.
+  test "a helper handed a post answers empty, never the crumbs, the section or the mark of the page with its id" do
+    guide = create_page(title: "Guide")
+    start = create_page(title: "Start", parent: guide)
+    post = create_post(title: "A post")
+    post.update_columns(id: start.id) # version: none, changes: none (a test gives a post the id of a page)
+    post = Post.find(start.id)
+
+    assert_equal [], page_ancestors(post)
+    assert_nil page_section(post)
+    assert_nil page_tree(post)
+    assert_empty page_tree(guide, current: post).reading_order.select(&:current?)
+
+    assert_equal guide.id, page_section(start).id, "the page with that id is answered as itself"
+    assert_equal [], page_ancestors(post), "and its answer is not handed out for the post afterwards"
+    assert_nil page_section(post)
+    assert_equal [ "Start" ], page_tree(guide, current: start).reading_order.select(&:current?).map(&:title)
+    assert_empty page_tree(guide, current: post).reading_order.select(&:current?)
+  end
+
   # I2: with no page and on a 404 every helper answers empty.
   test "with no page every helper answers empty and none raises" do
     assert_not page_found?

@@ -85,6 +85,56 @@ class ThemeTasksTest < ActiveSupport::TestCase
     assert_includes said, "bin/rails theme:check"
   end
 
+  # N1 of the re-review: with THEME_PATH=x refused and `theme:check[x]`, the
+  # whole list for x was printed and then "names another folder, which was
+  # NOT checked". It was checked.
+  test "theme:check of the very folder the application started under does not say that another folder was not checked" do
+    with_theme_copy do |dir|
+      dir.join("views/pages/shwo.html.erb").write("x")
+      started = ThemeFolder.new(dir)
+      refused = Theme.prepare(started, reload: true)
+      assert refused.refusal
+
+      [ dir.to_s, "#{dir}/", File.join(dir, "views", "..") ].each do |argument|
+        @check.reenable
+        status = nil
+        _, said = with_singleton_override(ThemeFolder, :current, -> { started }) do
+          Theme.with(refused) { capture_io { status = assert_raises(SystemExit) { @check.invoke(argument) }.status } }
+        end
+
+        assert_equal 1, status
+        assert_includes said, "views/pages/shwo.html.erb is not part of the theme contract"
+        assert_includes said, "1 problem."
+        assert_not_includes said, "NOT checked", argument
+      end
+    end
+  end
+
+  # N2: a variable left in a shell from the last run names a folder nobody
+  # is thinking of. The task says where it took the path from before it
+  # writes anything.
+  test "theme:new says, before it writes, that the path is THEME_NEW_PATH's, and says nothing of it for a path in the brackets" do
+    Dir.mktmpdir("theme") do |dir|
+      target = File.join(dir, "from-the-variable")
+      output = with_env("THEME_NEW_PATH" => target) { capture_io { @new.invoke }.first }
+
+      assert_equal "The path is THEME_NEW_PATH's: #{target}", output.lines.first.chomp
+      assert_operator output.index("THEME_NEW_PATH's"), :<, output.index("Wrote ")
+
+      @new.reenable
+      File.write(File.join(target, "views/pages/show.html.erb"), "changed")
+      said = with_env("THEME_NEW_PATH" => target) { capture_io { assert_raises(SystemExit) { @new.invoke } } }
+      assert_includes said.first, "The path is THEME_NEW_PATH's: #{target}", "said also when the folder is then refused"
+      assert_includes said.last, "is not empty"
+
+      @new.reenable
+      other = File.join(dir, "in-the-brackets")
+      output = with_env("THEME_NEW_PATH" => target) { capture_io { @new.invoke(other) }.first }
+      assert_not_includes output, "THEME_NEW_PATH"
+      assert File.file?(File.join(other, "views/pages/show.html.erb"))
+    end
+  end
+
   test "theme:check of a sound folder says so and how many templates it has" do
     output = capture_io { @check.invoke(ThemeTestHelper::PLAIN.to_s) }.first
 

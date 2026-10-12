@@ -592,8 +592,11 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   LEAK = "THEME-LEAK".freeze
   PRIVATE_VIEWS = %w[
     layouts/admin layouts/product layouts/setup layouts/mailer
-    admin/dashboard/show admin/sessions/new setup/token setup/system_check
+    admin/dashboard/show admin/sessions/new admin/passwords/new admin/passwords/edit setup/token setup/system_check
+    passwords_mailer/reset
   ].freeze
+  # A mail has a text part with a template and a layout of its own.
+  PRIVATE_TEXT_VIEWS = %w[layouts/mailer passwords_mailer/reset].freeze
 
   def with_leaking_theme
     with_theme_copy do |dir|
@@ -602,6 +605,10 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
         file = dir.join("views/#{name}.html.erb")
         file.dirname.mkpath
         file.write("#{LEAK}\n")
+      end
+      PRIVATE_TEXT_VIEWS.each do |name|
+        assert Rails.root.join("app/views/#{name}.text.erb").file?, "#{name}.text.erb is no view of the CMS any more: name one that is"
+        dir.join("views/#{name}.text.erb").write("#{LEAK}\n")
       end
       # The control: the same folder IS where a public page's template comes from.
       dir.join("views/pages/not_found.html.erb").write("<p>THEME-FOUND</p>\n")
@@ -640,6 +647,32 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       get "/cs-studio"
       assert_no_theme_here
       assert_select "head meta[name='theme-color'][content='#123456']", count: 0
+    end
+  end
+
+  # The two the three tests above never asked: the password pages are a
+  # second controller under the product layout (a path given to that
+  # controller alone would be seen by no other test), and a mail is drawn
+  # outside any request, by a class that is no controller at all.
+  test "nothing of a theme reaches the password pages or a mail: a theme's file named as either's view or layout is never drawn" do
+    with_leaking_theme do
+      assert_theme_reached_the_public_page
+
+      get new_admin_password_path
+      assert_no_theme_here
+      assert_equal "Admin::PasswordsController", controller.class.name
+      assert_select "form input[type=email]"
+
+      get admin_edit_password_path
+      assert_no_theme_here
+
+      mail = PasswordsMailer.reset(users(:one), origin: "http://www.example.com").deliver_now
+      assert_equal [ users(:one).email_address ], mail.to
+      [ mail.html_part, mail.text_part ].each do |part|
+        assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, part.body.to_s)
+        assert_includes part.body.to_s, "/password/edit#"
+      end
+      assert_not_includes PasswordsMailer.view_paths.map(&:to_s), @leaking_views
     end
   end
 
@@ -760,6 +793,31 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select "ol.plain-contents a[href='#about-this-blog']"
     assert_select "ol.plain-posts li h3", text: "First post"
     assert_select "ol.plain-posts li h3[id]", count: 0
+  end
+
+  # The same, the other way round: a heading an AUTHOR wrote inside a list
+  # item of the text is the text's, and is in the contents with its id.
+  test "a heading inside a list item of a page's text is in the contents and has its id, under a theme whose wrapper is its own" do
+    document = { "type" => "doc", "content" => [
+      { "type" => "heading", "attrs" => { "level" => 2 }, "content" => [ { "type" => "text", "text" => "Steps" } ] },
+      { "type" => "orderedList", "content" => [
+        { "type" => "listItem", "content" => [
+          { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "First" } ] },
+          { "type" => "heading", "attrs" => { "level" => 3 }, "content" => [ { "type" => "text", "text" => "Inside an item" } ] }
+        ] }
+      ] }
+    ] }
+    page = create_page(title: "How to")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, translations: { "en" => { body: document } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(page)
+
+    with_plain_theme { get "/how-to" }
+
+    assert_response :success
+    assert_select "div.plain-text li h3#inside-an-item", text: "Inside an item"
+    assert_select "ol.plain-contents a[href='#inside-an-item']", count: 1
+    assert_select "ol.plain-contents a", count: 2
   end
 
   test "the preview's tree links the preview's addresses and shows the rows' titles; the public one shows the published" do

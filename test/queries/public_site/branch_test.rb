@@ -181,6 +181,7 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
       assert_instance_of PublicSite::Branch::Node, node
       assert node.frozen?
       assert_kind_of Array, node.children
+      assert node.children.frozen?, "a node is remembered for the render: what one partial adds to its children a later one would draw"
       %i[parent content_blocks attributes ancestors descendants siblings self_and_descendants page record owner
          read_attribute published_at reload save update].each do |name|
         assert_not_respond_to node, name
@@ -189,6 +190,33 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
         assert_includes [ String, Integer, NilClass, TrueClass, FalseClass ], value.class, "a node holds #{value.class}"
       end
     end
+  end
+
+  # A helper's argument is whatever a template hands it, and
+  # `page_ancestors(@post || @page)` is what `language_links` is called with.
+  # A post was taken for the PAGE with its number: another page's crumbs.
+  test "what is neither a page nor a node is nowhere and no branch's top, and marks nothing as the shown page: a post with a page's id" do
+    post = create_post(title: "A post")
+    post.update_columns(id: @install.id) # version: none, changes: none (a test gives a post the id of a page, which two tables' sequences do by themselves)
+    post = Post.find(@install.id)
+
+    assert_equal NOWHERE, branch.around(post)
+    assert_nil branch.under(post)
+    assert_empty branch.under(@guide, current: post).reading_order.select { |node| node.current? || node.open? }
+    assert_equal NOWHERE, branch.around(Struct.new(:id).new(@install.id))
+    assert_empty capture_sql { branch.around(post); branch.under(post) }
+  end
+
+  # In the preview of a draft the tree holds published pages only, so the
+  # shown page is not in it; the pages above it are, and they are open.
+  test "every page above the shown one is open, also in the preview of a draft that the tree does not hold" do
+    draft = create_page(title: "Draft", parent: @start, published: false)
+    around = branch(preview: true).around(draft)
+
+    assert_equal [ @home.id, @guide.id, @start.id ], around.above.map(&:id)
+    assert around.above.all?(&:open?), around.above.map { |node| [ node.title, node.open? ] }.inspect
+    assert_equal %w[Guide Start], around.section.reading_order.select(&:open?).map(&:title)
+    assert_empty around.section.reading_order.select(&:current?)
   end
 
   # M7: the order of a sidebar is the order of every other list of the tree.

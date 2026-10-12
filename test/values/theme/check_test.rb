@@ -667,6 +667,24 @@ class Theme::CheckTest < ActiveSupport::TestCase
     ERB
   end
 
+  # Q1 of the re-review: one harmless binding switched the fence off for the
+  # whole template, before the binding as well as after it. A read at the
+  # top and a loop at the bottom is a common shape, and the read at the top
+  # is the mistake the fence is there for.
+  test "a fenced word read BEFORE the template binds it is still refused: a block parameter or a local further down exempts the tags from there on" do
+    {
+      "<p><%= request.remote_ip %></p>\n<% [].each do |request| %><%= request %><% end %>\n" => "request",
+      "<%= session[:id] %>\n<% sessions = [] %><% sessions.each { |session| session.to_s } %>\n" => "session",
+      "<%= params[:q] %>\n<% params = {} %><%= params[:q] %>\n" => "params",
+      "<%= flash[:notice] %>\n<% show = ->(flash) { flash.to_s } %>\n" => "flash"
+    }.each do |source, name|
+      problems = problems_with({ "views/theme/_x.html.erb" => source }, deep: true)
+
+      assert_equal 1, problems.size, "#{source}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_x.html.erb reads #{name}:"
+    end
+  end
+
   test "a local before a slash or a question mark does not turn the string after it into code" do
     assert_empty problems_with({ "views/theme/_x.html.erb" => <<~'ERB' }, deep: true)
       <% width = 4 %><% ok = true %>
