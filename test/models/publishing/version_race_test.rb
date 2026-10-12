@@ -69,14 +69,30 @@ class Publishing::VersionRaceTest < ActiveSupport::TestCase
     assert_equal "Too late", title_of(Page.find(@page.id))
   end
 
-  test "blocks a colleague added since this request read them are in the copy, with the query cache on" do
+  test "a copy that fails after the pending one was replaced leaves the pending one, also when called outside any transaction" do
+    pending = Publishing::Version.take!(@page, live_at: 2.days.from_now)
+    assert_not Page.connection.transaction_open?
+
+    with_singleton_override(Publishing::Version, :create!, ->(**) { raise ActiveRecord::StatementInvalid, "the insert failed" }) do
+      assert_raises(ActiveRecord::StatementInvalid) { Publishing::Version.take!(@page) }
+    end
+
+    assert_equal pending, Publishing.pending(@page)
+  end
+
+  test "Snapshot.of reads the rows fresh under the query cache, and issues no FOR UPDATE" do
     ActiveRecord::Base.cache do
       assert_empty ContentBlock.where(owner: @page).to_a # the request's own earlier read, now cached
+      Page.find(@page.id) # and the row's
       Thread.new { ActiveRecord::Base.connection_pool.with_connection { ContentBlock.create!(owner: @page, block_type: "rich_text", position: 0) } }.join
+      Thread.new { ActiveRecord::Base.connection_pool.with_connection { Mobility.with_locale(:en) { Page.find(@page.id).update!(title: "Later") } } }.join
 
-      version = Page.transaction { Publishing::Version.take!(@page) }
+      data = nil
+      statements = capture_sql { data = Publishing::Snapshot.of(@page) }
 
-      assert_equal 1, version.blocks.size
+      assert_equal 1, data["blocks"].size
+      assert_equal({ "en" => "Later" }, data.dig("fields", "title"))
+      assert_empty statements.grep(/FOR UPDATE/i)
     end
   end
 end

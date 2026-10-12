@@ -19,7 +19,11 @@ module Publishing
   # `ActiveRecord::ReadOnlyRecord`. WHAT REMAINS POSSIBLE: a relation built
   # from the class (`Page.where(id: view.id).update_all`), a scope on a
   # collection (`view.content_blocks.where(...)`, which also READS rows),
-  # raw SQL, and an in-memory change to an attribute (it is never saved, but
+  # raw SQL, a write through an association that was NOT loaded at rebuild
+  # time (only the loaded collections are guarded: `view.published_versions
+  # .delete_all`, `view.children.create`, `post_view.post_tags.delete_all`,
+  # and, after `rebuild(..., with_blocks: false)`, `view.content_blocks
+  # .create` / `.delete_all`, which also read the rows), and an in-memory change to an attribute (it is never saved, but
   # `view.title = "x"` is not refused); and a rebuilt record is `==` and
   # `hash`-equal to its row (same class and id), so a hash keyed by one finds
   # the other. Never hand a rebuilt object to a service.
@@ -53,16 +57,18 @@ module Publishing
     end
 
     # The copy's data. The record is READ FROM ITS ROW, fresh (`row:` when the
-    # caller has just locked it, as the copy-taking method does), never from the
-    # object in memory, which may be older than a colleague's committed save.
+    # caller has just locked it: only the copy-taking method locks), never from the
+    # object in memory or a loaded association, which may be older than a
+    # colleague's committed save. This method takes NO lock: the overview of
+    # the publish dialog calls it on a GET, and a GET must not lock a row.
     #
     # `uncached`: inside a request Rails answers a repeated SELECT from its
-    # query cache, and a page's blocks or a post's tags read earlier in the
-    # request (before a colleague's commit) would come back as they were. A
-    # locking read is never cached, the other reads here would be.
+    # query cache, and a row, a page's blocks or a post's tags read earlier
+    # in the request (before a colleague's commit) would come back as they
+    # were. (A locking read is never cached; these reads would be.)
     def of(record, row: nil)
       ActiveRecord::Base.uncached do
-        row ||= record.class.lock.find(record.id)
+        row ||= record.class.unscoped.find(record.id)
         data = { "fields" => row.attributes.slice(*Publishing.content_columns(row)).as_json }
         case row
         when Page then data["blocks"] = blocks_of(row)

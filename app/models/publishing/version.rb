@@ -51,30 +51,34 @@ module Publishing
     # `Trash::Purge` takes after a post's destroy, never ahead of it) and the
     # fields, blocks and tags are read after it. The object in memory is not
     # read and not changed: a colleague's autosave committed since this
-    # request loaded it is in the copy. The caller has an open transaction (a
-    # save service after its `save`, `Publishing::PublishChanges`).
+    # request loaded it is in the copy. The work is one transaction of its own
+    # (it joins the caller's: a save service after its `save`,
+    # `Publishing::PublishChanges`), so the lock, the removal of a pending copy
+    # and the new copy stand or fall together, also for a caller with none.
     # `live_at` in the past means now. A pending copy is replaced; its number
     # is not given out again.
     def self.take!(record, live_at: nil, by: nil, now: Time.current)
-      row = record.class.lock.find(record.id)
-      live_at = [ live_at || now, now ].max
-      mine = of(row)
-      number = (mine.maximum(:number) || 0) + 1
-      mine.pending(now).delete_all
-      data = Snapshot.of(row, row: row)
-      version = create!(record_type: row.class.polymorphic_name, record_id: row.id, number: number, live_at: live_at,
-        snapshot: data.except("blocks"), blocks: data.fetch("blocks", []), lists_posts: Snapshot.lists_posts?(data),
-        tag_ids: data.fetch("tags", []).map { |tag| tag["id"] }.sort, created_by_id: by&.id, created_at: now)
-      # A scheduled record shows nothing yet, so its copy changes nothing the
-      # public can see (the moment it goes live is the content version's own
-      # publication-time lookup, as for the record itself).
-      # INTERIM, until Task 5: a scheduled CHANGE (a future `live_at` on a
-      # live record) bumps now and not when it comes into force, so between
-      # Task 2 and Task 5 a conditional GET keeps answering 304 with the old
-      # page at that moment. Task 5 adds the part of the content version that
-      # follows copies by the clock.
-      PublicSite.bump_version! if row.live?
-      version
+      transaction do
+        row = record.class.lock.find(record.id)
+        live_at = [ live_at || now, now ].max
+        mine = of(row)
+        number = (mine.maximum(:number) || 0) + 1
+        mine.pending(now).delete_all
+        data = Snapshot.of(row, row: row)
+        version = create!(record_type: row.class.polymorphic_name, record_id: row.id, number: number, live_at: live_at,
+          snapshot: data.except("blocks"), blocks: data.fetch("blocks", []), lists_posts: Snapshot.lists_posts?(data),
+          tag_ids: data.fetch("tags", []).map { |tag| tag["id"] }.sort, created_by_id: by&.id, created_at: now)
+        # A scheduled record shows nothing yet, so its copy changes nothing the
+        # public can see (the moment it goes live is the content version's own
+        # publication-time lookup, as for the record itself).
+        # INTERIM, until Task 5: a scheduled CHANGE (a future `live_at` on a
+        # live record) bumps now and not when it comes into force, so between
+        # Task 2 and Task 5 a conditional GET keeps answering 304 with the old
+        # page at that moment. Task 5 adds the part of the content version that
+        # follows copies by the clock.
+        PublicSite.bump_version! if row.live?
+        version
+      end
     end
 
     def readonly? = persisted?

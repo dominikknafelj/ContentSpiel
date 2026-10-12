@@ -12,7 +12,7 @@ class PublishingGuardsTest < ActiveSupport::TestCase
 
   def sources(*roots) = roots.flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,rake,erb}") }.to_h { |path| [ path.to_s.delete_prefix("#{Rails.root}/"), path.read ] }
 
-  test "a copy is taken only where the spec says: the publish service, the two save services and the migration" do
+  test "a copy is taken only where the spec says: the publish service and the two save services" do
     callers = sources("app", "lib").select { |_path, source| source.match?(/\bVersion\.take!|def self\.take!/) }.keys
 
     assert_empty callers - TAKERS.keys, "these files take a published copy: add them to TAKERS with the reason, after reading drafts spec §7"

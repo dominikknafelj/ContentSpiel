@@ -141,7 +141,7 @@ Nothing reads a copy after this task. It adds the table, the two classes, the fi
 **Interfaces:**
 - Produces: the table `published_versions` (`record_type`, `record_id`, `number`, `snapshot` jsonb, `blocks` jsonb, `lists_posts` boolean, `tag_ids` integer[], `live_at`, `created_by_id`, `created_at`).
 - Produces: `Publishing::CONTENT` → `{ "Page" => [...], "Post" => [...] }`; `Publishing.content_columns(record_or_class)` → `Array<String>`; `Publishing.current(record, now: Time.current)` → `Publishing::Version` or nil; `Publishing.baseline(record)` → the newest `Version` or nil; `Publishing.pending(record, now: Time.current)` → the `Version` with a future `live_at` or nil; `Publishing.copied?(record)` → Boolean.
-- Produces: `Publishing::Version.take!(record, live_at: nil, by: nil, now: Time.current)` → `Version` (the caller holds the record's row lock and an open transaction); `Version.of(record)`, `.in_force(now)`, `.pending(now)`, `.current(now)` (relations); `Version.take_first_copies!` → Integer.
+- Produces: `Publishing::Version.take!(record, live_at: nil, by: nil, now: Time.current)` → `Version` (takes the record's row lock itself, first, inside a transaction of its own that joins the caller's); `Version.of(record)`, `.in_force(now)`, `.pending(now)`, `.current(now)` (relations). There is no `take_first_copies!`: the migration carries its own frozen logic.
 - Produces: `Publishing::Snapshot.of(record)` → `{ "fields" => Hash, "blocks" => Array<Hash> }` for a page, `{ "fields" => Hash, "tags" => [ { "id", "name" } ] }` for a post; `Snapshot.rebuild(version, record, with_blocks: true)` → a read-only `Page` or `Post`; `Snapshot.blocks_from(version, owner)` → `Array<ContentBlock>` (read-only, `owner` set).
 - Produces: `Publishable#published_version` (the `Version` a rebuilt record was made from; nil on a row) and `has_many :published_versions`; `ContentBlock#listed_tag_id` and `#listed_tag_id=`.
 - Produces: `ContentHelper#publish_changes(record)` for tests (Task 2 points it at the service).
@@ -2467,7 +2467,7 @@ In `app/models/media/usage_index.rb`:
     end
 ```
 
-(`asset_ids_in` is private.) In `Publishing::Version.take!`, after `create!` and before the `Paths` call: `Media::UsageIndex.refresh_published(record, now: now)`. In `take_first_copies!` nothing changes: it goes through `take!`.
+(`asset_ids_in` is private.) In `Publishing::Version.take!`, after `create!` and before the `Paths` call: `Media::UsageIndex.refresh_published(record, now: now)`. The migration that made the first copies carries its own frozen logic and does not go through `take!`, so nothing changes there.
 
 - [ ] **Step 6: The sitemap.** In `config/sitemap.rb`, read the current copies' times once, without their content, and date each record by them:
 
@@ -2919,7 +2919,7 @@ module Publishing
       @record = record
       @version = version
       @changed_locales = Set.new
-      now = Snapshot.of(record)
+      now = Snapshot.of(record) # reads the rows fresh and takes no lock: this runs on a GET
       was = version ? { "fields" => version.snapshot.fetch("fields", {}), "tags" => version.snapshot.fetch("tags", []), "blocks" => version.blocks } : now
       @fields = changed_fields(was, now)
       @blocks = changed_blocks(was.fetch("blocks", []), now.fetch("blocks", []))
@@ -4355,7 +4355,7 @@ What the spec does not settle, what was chosen, and what it costs if it is wrong
 9. **"Moved" in the overview is a rule of thumb** (a change of container, or not part of the longest run of blocks in unchanged order). Cost: now and then two blocks that swapped are named as one moved, never a change missed.
 10. **Images of a copy that a scheduled change replaced by the clock stay "in use" until the next publish of that record.** Cost: an image that could be deleted cannot yet.
 11. **The readers guard is a list and a pattern.** It sees where a public file gets its records, not what a record handed in from elsewhere is. The behaviour tests are the real guard; the list is a tripwire for the next public reader.
-12. **The migration runs application code** (`Publishing::Version.take_first_copies!`). With no production yet this is cheap; a later change to `Snapshot.of` changes what an old database's first copies hold.
+12. **The migration carries its own frozen logic** (its own minimal models; no application class), so a later change to `take!` or `Snapshot.of` cannot break it; `test/models/publishing/first_copies_migration_test.rb` compares its copy with `Snapshot.of`'s, and a change of the copy's shape on purpose needs a successor migration.
 13. **The mark's guard is per file.** A file that touches a page anywhere is taken at its word for every write in it.
 14. **The preview's menu and lists show other records' rows,** as before; only the public site shows copies.
 15. **`Publishing::PublishChanges` was built in Task 2,** with a plain button, so that the branch was never without a way to publish. Nothing of it is left after Task 7.
@@ -4363,5 +4363,5 @@ What the spec does not settle, what was chosen, and what it costs if it is wrong
 ## Self-review
 
 - **Spec coverage.** §3: Tasks 6 (the header's state, the marks, the dashboard), 7 (the dialog, discard, the wording, scheduling). §4.1: Task 1 (with disagreements 3 and 4). §4.2: Task 1. §4.3: Tasks 1 (first publish, schedule), 2 (`PublishChanges`), 7 (`DiscardChanges`). §4.4: Task 6. §5: Tasks 2 (page, post, SEO, preview), 3 (menus, subpages, lists, list membership), 4 (addresses, by disagreement 1), 5 (sitemap, cache, images, the guard). §6: Tasks 6 and 7 (CS Studio), 8 (the slug), 7 (MCP). §7: the Global Constraints and Task 8, Step 8. §8: each task's tests; the list of rewritten tests is asked for in Tasks 2, 3, 5, 7 and gathered in Task 8, Step 11. §9: "What is not built" in the reference file, and the delete dialog's sentence (Task 7). §10: "Wording and placement nobody designed".
-- **Names used across tasks:** `Publishing.published`, `.published_all`, `.current`, `.baseline`, `.pending`, `.copied?`, `.note_change`, `.clear_changes`, `.content_columns`; `Publishing::Version.take!`, `.of`, `.in_force`, `.pending`, `.current`, `.take_first_copies!`; `Publishing::Snapshot.of`, `.rebuild`, `.blocks_from`, `.tags_from`, `.lists_posts?`; `Publishing::Listing.posts`, `.lists?`, `.tag_ids`, `.blocks`; `Publishing::Changes.of` with `fields`, `blocks`, `locales`, `version`, `none?`; `PublicSite::Paths.published`, `.sync_copies_went_live`; `Media::UsageIndex.refresh_published`; `ContentBlock#listed_tag_id`; `Publishable#published_version`, `#unpublished_changes?`; `ContentHelper#publish_changes(record, at: nil)`.
+- **Names used across tasks:** `Publishing.published`, `.published_all`, `.current`, `.baseline`, `.pending`, `.copied?`, `.note_change`, `.clear_changes`, `.content_columns`; `Publishing::Version.take!`, `.of`, `.in_force`, `.pending`, `.current`; `Publishing::Snapshot.of`, `.rebuild`, `.blocks_from`, `.tags_from`, `.lists_posts?`; `Publishing::Listing.posts`, `.lists?`, `.tag_ids`, `.blocks`; `Publishing::Changes.of` with `fields`, `blocks`, `locales`, `version`, `none?`; `PublicSite::Paths.published`, `.sync_copies_went_live`; `Media::UsageIndex.refresh_published`; `ContentBlock#listed_tag_id`; `Publishable#published_version`, `#unpublished_changes?`; `ContentHelper#publish_changes(record, at: nil)`.
 - **What was not verified by running anything:** all of it. The places most likely to need a second round are named as judgement in each task's head.
