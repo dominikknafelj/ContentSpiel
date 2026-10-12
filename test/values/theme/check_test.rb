@@ -333,6 +333,36 @@ class Theme::CheckTest < ActiveSupport::TestCase
     end
   end
 
+  # The wall is `PublicController`, which lets no cookie leave whatever a
+  # template calls; this is the sentence that tells the author, when the
+  # application starts and not when a visitor's banner forgets them.
+  test "a template that writes a cookie, the session or the flash is refused when the application starts, and the message says the write is lost" do
+    [ '<% cookies[:seen] = "1" %>', '<% cookies["seen"] ||= "1" %>', '<% cookies.signed[:who] = "x" %>', '<% cookies.encrypted[:who] = "x" %>',
+      '<% cookies.permanent[:forever] = { value: "1" } %>', '<% cookies.permanent.signed[:who] = "x" %>', "<% cookies.delete(:seen) %>",
+      '<% helpers.cookies[:seen] = "1" %>', '<% session[:visitor] = "seen" %>', '<% controller.session[:visitor] = "seen" %>',
+      '<% flash[:notice] = "hello" %>', '<% response.set_cookie(:by_hand, "1") %>', "<% response.delete_cookie(:session_id) %>",
+      "<% reset_session %>" ].each do |markup|
+      problems = problems_with("views/theme/_banner.html.erb" => "<p>x</p>\n#{markup}\n")
+
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_banner.html.erb sets or deletes a cookie"
+      assert_includes problems.first, "the write is lost"
+      assert_includes problems.first, "Take it out of the template"
+    end
+  end
+
+  test "a cookie that is only named is no write: in text, in a string, in a comment, read, compared, or a variable of the theme's own" do
+    assert_empty problems_with("views/theme/_banner.html.erb" => <<~'ERB')
+      <p>We set no cookies: cookies[:seen] = "1" is not here.</p>
+      <%= link_to "cookies[:x] = 1", "/cookies" %>
+      <% # cookies[:seen] = "1" and session[:x] = 1 %>
+      <% if cookies[:seen] == "1" %><% end %>
+      <% [ {} ].each do |session| %><% session[:room] = "A" %><% end %>
+      <% flash = {} %><% flash[:x] = 1 %>
+      <%= tag.div data: { cookies: "1", session: "2" } %>
+    ERB
+  end
+
   test "the reading is not fooled: a comment, a word in text, a language link in the page, a feed link, another slot" do
     assert_empty problems_with(
       HEAD => "<%# no canonical link, no csrf_meta_tags and no content_for :head here %>\n" \

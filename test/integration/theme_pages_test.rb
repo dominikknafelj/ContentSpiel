@@ -192,16 +192,27 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # A PUBLIC PAGE DRAWN UNDER A THEME SETS NO COOKIE, whatever the theme's
   # templates call (theming spec §2: "no CSRF token on a public page, which
   # is the same cookie-less answer for every visitor"). The wall is
-  # `PublicController`: it mints no token and commits no session. Forgery
-  # protection is off in the test environment, where every one of these
-  # helpers prints nothing and no test would notice, so it is switched on
-  # here as production has it. The folder is handed to `Theme.new`, which
-  # checks nothing: `Theme::Check` refuses these words with a clear message,
-  # and this is what holds for the spelling it does not see.
+  # `PublicController`: it mints no token, commits no session and lets no
+  # `Set-Cookie` leave, whether a template wrote to the cookie jar (plain,
+  # signed, encrypted, permanent, a delete), to the session, to the flash or
+  # to the response's header itself. Forgery protection is off in the test
+  # environment, where every token helper prints nothing and no test would
+  # notice, so it is switched on here as production has it. The folder is
+  # handed to `Theme.new`, which checks nothing: `Theme::Check` refuses
+  # these words with a clear message, and this is what holds for the
+  # spelling it does not see.
   GRASPING = <<~ERB.freeze
     <%= csrf_meta_tags %>
     <meta name="minted" content="<%= form_authenticity_token %>">
     <% session[:visitor] = "seen" %>
+    <% flash[:notice] = "hello" %>
+    <% cookies[:seen] = "1" %>
+    <% cookies.signed[:who] = "someone" %>
+    <% cookies.encrypted[:what] = "something" %>
+    <% cookies.permanent[:forever] = "1" %>
+    <% cookies.delete(:session_id) %>
+    <% response.set_cookie(:by_hand, "1") %>
+    <% response.headers["Set-Cookie"] = [ response.headers["Set-Cookie"], "raw=1; path=/" ].flatten.compact %>
   ERB
 
   def with_forgery_protection
@@ -212,7 +223,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     ActionController::Base.allow_forgery_protection = before
   end
 
-  test "a public page drawn under a theme sets no cookie and carries no token: a form, the CSRF tags, a token asked for and a write to the session" do
+  test "a public page drawn under a theme sets no cookie and carries no token: a form, the CSRF tags, a token asked for, and a write to the session, the flash, the cookie jar and the header" do
     with_theme_copy do |dir|
       dir.join("views/layouts/public/_head.html.erb").write(GRASPING)
       dir.join("views/pages/not_found.html.erb").write("<h1>Nothing here</h1>\n")
@@ -247,7 +258,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # public site in the browser they work in. The public page must neither
   # set a cookie nor take one away (a session that is not committed is not
   # dropped either), and CS Studio must still know them afterwards.
-  test "a signed-in editor reads a public page under a grasping theme and is still signed in: no cookie set, none taken away" do
+  test "a signed-in editor reads a public page under a grasping theme and is still signed in: no cookie set, none changed, none taken away" do
     with_theme_copy do |dir|
       dir.join("views/layouts/public/_head.html.erb").write(GRASPING)
 
@@ -279,10 +290,11 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # The preview is the other controller that draws a theme, and it is none
   # of the above: signed in, private, never cached. A form there carries its
   # token, as any form of CS Studio does.
-  test "the preview, which is private and signed in, keeps its token: the wall is the public controller's alone" do
+  test "the preview, which is private and signed in, keeps its token and its cookies: the wall is the public controller's alone" do
     with_theme_copy do |dir|
       dir.join("views/layouts/public/_frame.html.erb").write(
-        "<main><%= yield %></main>\n<%= form_with url: \"/newsletter\", method: :post do |form| %><%= form.submit \"Join\" %><% end %>\n")
+        "<main><%= yield %></main>\n<%= form_with url: \"/newsletter\", method: :post do |form| %><%= form.submit \"Join\" %><% end %>\n" \
+        "<% cookies[:seen] = \"1\" %>\n")
       sign_in_as users(:one)
 
       with_forgery_protection do
@@ -291,6 +303,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       assert_select "form[action='/newsletter'] input[name=authenticity_token]", count: 1
+      assert_equal "1", cookies[:seen], "a cookie a template sets in the preview is the preview's to set"
     end
   end
 

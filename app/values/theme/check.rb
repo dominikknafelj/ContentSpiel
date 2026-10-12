@@ -37,8 +37,8 @@ class Theme
   # - the CMS's head tags are lines of `layouts/application.html.erb`,
   #   printed once and before the theme's, and the layout reads no
   #   `content_for` slot (`test/integration/theme_pages_test.rb`);
-  # - a public page commits no session and mints no token
-  #   (`PublicController`).
+  # - a public page commits no session, mints no token and leaves with no
+  #   `Set-Cookie`, whatever a template calls (`PublicController`).
   # What does NOT hold by itself: the page template is rendered before the
   # layout and in the same view, and the layout decides the title, the
   # description, the canonical and language links and the preview bar from
@@ -155,8 +155,8 @@ class Theme
     # (spec §2). Asking for the token is what does the harm, not the tag:
     # Rails reads the session to mint it and so sets a cookie on a response
     # that is publicly cacheable. `PublicController` is the wall (it mints
-    # none and commits no session, whatever a template calls); this is the
-    # sentence that tells an author why their tag prints nothing. (In the
+    # none, commits no session and lets no cookie leave, whatever a template
+    # calls); this is the sentence that tells an author why their tag prints nothing. (In the
     # test environment forgery protection is off, so no rendering test
     # would notice without switching it on.)
     CSRF = /\bcsrf_meta_tags?\b|\bcsrf-(?:token|param)\b|\bform_authenticity_token\b/
@@ -218,6 +218,23 @@ class Theme
     # are no word.
     COMMENTS = %i[on_comment on_embdoc_beg on_embdoc on_embdoc_end].freeze
     WORDS = %i[on_tstring_content on_CHAR].freeze
+
+    # A WRITE to a cookie, by any of the three ways a view has: the jar
+    # (`cookies[:x] = …`, through `.signed`, `.encrypted` and `.permanent`
+    # too, and `cookies.delete`), the session and the flash (which is kept
+    # in the session), and the response's own `set_cookie` and
+    # `delete_cookie`; `reset_session` is a write as well. On a public page
+    # none of them arrives: `PublicController` lets no `Set-Cookie` leave,
+    # whatever a template calls, because the response is one answer for
+    # every visitor and a shared cache may keep it. That is the wall; this
+    # is the sentence that tells an author why their consent banner forgets
+    # everyone, when the application starts and not from a visitor. READING
+    # one of them is the deep check's (`FORBIDDEN`), since a read costs a
+    # wrong page and not a lost write. Asked of a tag's code (`reads?`),
+    # and not of a name the template bound itself (`bound_through`).
+    COOKIE_HOLDERS = %w[cookies session flash].freeze
+    ASSIGNED = /\s*(?:\|\||&&|[-+*\/%|&^])?=(?![=~>])/
+    COOKIE_CALLS = /\b(?:set|delete)_cookie\b|(?<![.\w@:])reset_session\b/
 
     # A write to the slot the CMS's head once read. The layout reads none
     # now, so the tag would be lost without a word.
@@ -352,6 +369,11 @@ class Theme
                  "sent without one. Write a search form with `method: :get`, and a form that posts to another service as a " \
                  "plain <form> tag."
       end
+      if writes_cookie?(tags)
+        found << "#{file} sets or deletes a cookie (a write to cookies, to the session or to the flash): a public page is one " \
+                 "answer for every visitor and a cache may keep it, so no cookie leaves with it and the write is lost. Take it " \
+                 "out of the template; what differs from one visitor to the next is kept in the browser, by a script."
+      end
       if code.match?(HEAD_SLOT)
         found << "#{file} writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, " \
                  "so the tag would never be printed. Put the tag into #{HEAD}, which is the theme's part of the head."
@@ -370,6 +392,35 @@ class Theme
                  "`page_title` and `site_title`, or delete the file to get the default pattern."
       end
       found
+    end
+
+    # `COOKIE_HOLDERS`' comment says what a write is.
+    def writes_cookie?(tags)
+      bound = bound_through(tags, COOKIE_HOLDERS)
+      tags.each_with_index.any? do |tag, index|
+        next true if reads?(tag, COOKIE_CALLS)
+
+        (COOKIE_HOLDERS - bound[index]).any? do |name|
+          through = "#{asked_of(name)}(?:\\s*\\.\\s*\\w+)*"
+          reads?(tag, /#{through}\s*\[[^\]]*\]#{ASSIGNED}/) || (name == "cookies" && reads?(tag, /#{through}\s*\.\s*delete\b/))
+        end
+      end
+    end
+
+    # A view's method by its bare name or asked of one of the three
+    # receivers a template has for it (`REQUEST_RECEIVERS`), as a pattern's
+    # source. Not a method of something else (`text.request_id`,
+    # `post.session`), not a symbol or an instance variable.
+    def asked_of(name)
+      asked = REQUEST_RECEIVERS.map { |receiver| "(?<=\\b#{receiver}\\.)" }.join("|")
+      "(?:(?<![.\\w@:])|#{asked})#{name}\\b"
+    end
+
+    # For each tag of a template, in order, the names of `names` the
+    # template has bound itself UP TO AND IN that tag (`bound_in`).
+    def bound_through(tags, names)
+      so_far = []
+      tags.map { |tag| so_far |= bound_in(code_of(tag), names) }
     end
 
     # Whether a frame prints the page: some tag that prints (`<%=`, `<%==`)
@@ -443,10 +494,10 @@ class Theme
     # value in a parameter list binds what it names (`|a, b = params|`).
     PARAMETERS = /(?:\bdo|\{)\s*\|([^|]*)\||->\s*\(([^)]*)\)/
 
-    def bound_in(code)
+    def bound_in(code, names = FORBIDDEN)
       parameters = code.scan(PARAMETERS).flatten.compact.flat_map { |list| list.scan(/[a-z_]\w*/) }
-      assigned = FORBIDDEN.select { |name| code.match?(/(?<![.\w@$:])#{name}\s*(?:\|\||&&|[-+*\/%|&^])?=(?![=~>])/) }
-      (parameters + assigned) & FORBIDDEN
+      assigned = names.select { |name| code.match?(/(?<![.\w@$:])#{name}#{ASSIGNED}/) }
+      (parameters + assigned) & names
     end
 
     # What is wrong with a template Ruby will not compile, as one sentence.

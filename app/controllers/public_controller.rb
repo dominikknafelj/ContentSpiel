@@ -4,6 +4,12 @@
 # controller for exactly this reason. Everything that varies per visitor
 # (the theme toggle) stays in the browser.
 class PublicController < ActionController::Base
+  # NO COOKIE LEAVES, AS A WALL. First in the file, so it is around every
+  # callback and action of this class and of its subclasses, one that
+  # answers early included (`leave_no_cookie` below says what it does and
+  # what it does not hold).
+  around_action :leave_no_cookie
+
   # Rails' automatic "fall back to layouts/application" convention only
   # fires because ApplicationController's own name happens to match that
   # file (its `controller_path` is literally "application"). Skipping
@@ -26,8 +32,9 @@ class PublicController < ActionController::Base
   # `:public` is untrusted: a nil actor on it is denied everything.
   before_action { Current.channel = :public }
 
-  # NO SESSION AND NO TOKEN, AS A WALL (theming spec §2: "no CSRF token on a
-  # public page, which is the same cookie-less answer for every visitor").
+  # NO SESSION AND NO TOKEN, AS A WALL TOO (theming spec §2: "no CSRF token
+  # on a public page, which is the same cookie-less answer for every
+  # visitor").
   # The first line of this file was a convention while every public
   # template was the CMS's own. A theme's templates are not: a `form_with`
   # or a `button_to` in a theme's footer, `csrf_meta_tags` in its head or a
@@ -51,12 +58,53 @@ class PublicController < ActionController::Base
   # cached. `Theme::Check` refuses the same words in a theme's template with
   # a message that says why; this is what holds for a spelling it does not
   # see (`test/integration/theme_pages_test.rb`: "a public page drawn under
-  # a theme sets no cookie and carries no token").
+  # a theme sets no cookie and carries no token…").
   before_action { request.session_options[:skip] = true }
 
   helper_method :public_urls
 
   private
+
+  # THE COOKIE JAR IS NOT THE SESSION. `cookies[:seen] = "1"` in a theme's
+  # template (a consent banner, an A/B flag: honest mistakes), and
+  # `cookies.signed`, `.encrypted`, `.permanent` and `cookies.delete`, are
+  # kept in the request's jar and written into the response by
+  # `ActionDispatch::Cookies`, a middleware of its own that never asks the
+  # session's `:skip`. The response says `Cache-Control: public`, so a
+  # shared cache that keeps it would hand one visitor's `Set-Cookie` to the
+  # next. So, once the action and its templates are done (the layout is
+  # rendered inside the action), and also when a callback answered early:
+  #
+  # - the request gets a NEW jar, built from the cookies the browser sent
+  #   and holding no write and no delete, which is the one the middleware
+  #   then finds and writes nothing from (actionpack 8.1.4,
+  #   `ActionDispatch::Cookies#call`: `request.cookie_jar.write(response)`).
+  #   Nothing is sent to delete a cookie either: a signed-in editor's
+  #   cookies are neither changed nor taken away by reading a public page;
+  # - a `Set-Cookie` put on the response by hand (`response.set_cookie`,
+  #   `response.headers["Set-Cookie"] = …`) is taken off.
+  #
+  # A write to the flash is a write to the session and goes with it
+  # (`:skip`, below).
+  #
+  # WHAT THIS HOLDS: no `Set-Cookie` leaves a response of this controller
+  # or of a subclass, whatever a template calls in the view. What it does
+  # not: an action that raises is answered by the exceptions application,
+  # outside this controller (the cookie middleware writes nothing then: it
+  # is passed by the exception), and a cookie set by a script in the browser
+  # (`document.cookie`) is the browser's and never this response's.
+  # `Theme::Check` refuses a cookie write in a theme's template at the boot
+  # with a sentence that says why; this is what holds for the spelling it
+  # does not see (`test/integration/theme_pages_test.rb`: "a public page
+  # drawn under a theme sets no cookie and carries no token…", "a signed-in
+  # editor reads a public page under a grasping theme and is still signed
+  # in…").
+  def leave_no_cookie
+    yield
+  ensure
+    request.cookie_jar = ActionDispatch::Cookies::CookieJar.build(request, request.cookies) if request.have_cookie_jar?
+    response.delete_header("Set-Cookie")
+  end
 
   def protect_against_forgery? = false
 
