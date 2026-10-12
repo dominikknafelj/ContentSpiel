@@ -627,4 +627,143 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       assert_includes error.backtrace.join("\n"), dir.join("views/pages/show.html.erb").to_s
     end
   end
+
+  test "the second theme draws the section's tree, the crumbs, the contents and previous and next" do
+    guide = create_page(title: "Guide")
+    start = create_page(title: "Start", parent: guide)
+    create_page(title: "Write", parent: guide)
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: start), attributes: { block_type: "rich_text" },
+      translations: { "en" => { body: rich_doc("## Setup\n\nFirst.\n\n## Setup\n\nAgain.") } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(start)
+
+    with_plain_theme { get "/guide/start" }
+
+    assert_response :success
+    assert_select "nav.plain-tree > ul > li.is-open > a[href='/guide']", text: "Guide"
+    assert_select "nav.plain-tree a[href='/guide/start'][aria-current=page]", text: "Start"
+    assert_select "nav.plain-tree a[href='/guide/write']", text: "Write"
+    assert_select "nav.plain-tree a[aria-current=page]", count: 1
+    assert_select "p.plain-crumb a[href='/guide']", text: "Guide"
+    assert_select "ol.plain-contents a[href='#setup']", text: "Setup"
+    assert_select "ol.plain-contents a[href='#setup-2']", text: "Setup"
+    assert_select "article.plain-page div.plain-text h2#setup"
+    assert_select "article.plain-page div.plain-text h2#setup-2"
+    assert_select "nav.plain-neighbours a[rel=prev][href='/guide']", text: "Guide"
+    assert_select "nav.plain-neighbours a[rel=next][href='/guide/write']", text: "Write"
+  end
+
+  test "the homepage has no section, and a 404 no tree" do
+    with_plain_theme do
+      get "/"
+      assert_select "nav.plain-tree", count: 0
+
+      get "/no-such-page"
+      assert_response :not_found
+      assert_select "nav.plain-tree", count: 0
+    end
+  end
+
+  test "the tree in another language links that language's addresses" do
+    guide = create_page(title: "Guide")
+    create_page(title: "Start", parent: guide)
+
+    with_plain_theme { get "/de/guide/start" }
+
+    assert_response :success
+    assert_select "nav.plain-tree a[href='/de/guide']"
+    assert_select "nav.plain-tree a[href='/de/guide/start'][aria-current=page]"
+  end
+
+  # A 404 can have a page in hand (`PublicPageRendering#assign_record`: a
+  # post whose list is gone), and a 404 says nothing of a record: the second
+  # theme's frame asks `response.not_found?` before it asks for the section,
+  # which is what a theme that draws a tree in its frame has to do.
+  test "a 404 that had a page in hand draws no tree" do
+    blog = create_page(title: "Blog")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(blog)
+    create_post(title: "Hello")
+    assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
+
+    sign_in_as users(:one)
+    with_plain_theme { get "/preview/blog/hello" }
+
+    assert_response :not_found
+    assert_select "div.plain-frame"
+    assert_select "nav.plain-tree", count: 0
+  end
+
+  test "the preview's tree links the preview's addresses and shows the rows' titles; the public one shows the published" do
+    guide = create_page(title: "Guide")
+    start = create_page(title: "Start", parent: guide)
+    assert Pages::Save.call(start, translations: { "en" => { title: "Start UNPUBLISHED" } }).ok?
+
+    with_plain_theme { get "/guide/start" }
+    assert_select "nav.plain-tree a[href='/guide/start'][aria-current=page]", text: "Start"
+    assert_not_includes response.body, "UNPUBLISHED"
+
+    sign_in_as users(:one)
+    with_plain_theme { get "/preview/guide/start" }
+    assert_select "nav.plain-tree a[href='/preview/guide/start'][aria-current=page]", text: "Start UNPUBLISHED"
+    assert_select "p.plain-crumb a[href='/preview/guide']", text: "Guide"
+  end
+
+  # The tree on a page is other pages' titles: the page's ETag must move when
+  # one of them is published, or a visitor's cached page keeps the old tree.
+  test "a page a visitor has is asked for again when another page of its tree is published under a new title" do
+    guide = create_page(title: "Guide")
+    create_page(title: "Start", parent: guide)
+    write = create_page(title: "Write", parent: guide)
+
+    with_plain_theme do
+      get "/guide/start"
+      etag = response.headers["ETag"]
+      get "/guide/start", headers: { "If-None-Match" => etag }
+      assert_response :not_modified
+
+      assert Pages::Save.call(write, translations: { "en" => { title: "Write well" } }).ok?
+      publish_changes(write)
+      get "/guide/start", headers: { "If-None-Match" => etag }
+
+      assert_response :success
+      assert_select "nav.plain-tree a[href='/guide/write']", text: "Write well"
+    end
+  end
+
+  # Spec §5 and §7: a body is rendered once, cached by its document's digest,
+  # and is the same HTML in CS Studio, for the MCP server and on the site.
+  # `with_heading_ids` works on what the page's template captured, after
+  # that cache. With a real store: the suite's null store would never hand a
+  # cached render back.
+  test "heading ids are on the page a theme draws and not in the cached render of the text" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: @about), attributes: { block_type: "rich_text" },
+      translations: { "en" => { body: rich_doc("## Setup\n\nFirst.") } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(@about)
+    document = Locales.read(result.record, :body, locale: "en")
+    plain = %(<h2>Setup</h2>)
+
+    assert_includes document.to_html(locale: :en, urls: PublicSite::Urls.new), plain
+    with_plain_theme { get "/about" }
+    assert_select "article.plain-page h2#setup", text: "Setup"
+
+    hits = []
+    ActiveSupport::Notifications.subscribed(->(*, payload) { hits << payload[:hit] }, "cache_read.active_support") do
+      @cached = document.to_html(locale: :en, urls: PublicSite::Urls.new)
+    end
+    assert_equal [ true ], hits, "the render was not served from the cache: this test shows nothing"
+    assert_includes @cached, plain, "an id reached the cached render"
+    assert_not_includes @cached, "id="
+
+    get "/about"
+    assert_select "div.cs-prose h2", text: "Setup"
+    assert_select "div.cs-prose h2[id]", count: 0
+    with_plain_theme { get "/about" }
+    assert_select "article.plain-page h2#setup", text: "Setup"
+  ensure
+    Rails.cache = original_cache
+  end
 end

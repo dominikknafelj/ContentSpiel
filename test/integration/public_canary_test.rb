@@ -30,7 +30,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
   # Public controller routes (every route whose controller is a
   # `PublicController`) and how this test requests each.
   LISTED_ROUTES = {
-    "pages#show" => "every `public_paths` row in every language, the home page of each language and a 404"
+    "pages#show" => "every `public_paths` row in every language, the home page of each language and a 404; and all of them again under the second theme, which draws what a theme may ask of the page tree (`PublicSite::Branch`)"
   }.freeze
 
   # Columns that say where a row is or when it was written, not what it shows.
@@ -114,6 +114,14 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     get path
     page = Nokogiri::HTML5(response.body)
     [ response.status, page.at_css("title")&.text, page.at_css("meta[name=description]")&.[]("content"), page.at_css("main")&.to_html ]
+  end
+
+  # What the second theme draws around a page from OTHER records: the
+  # section's tree, the crumbs, previous and next, and the page itself.
+  def themed_look(path)
+    get path
+    page = Nokogiri::HTML5(response.body)
+    [ response.status, *%w[nav.plain-tree p.plain-crumb nav.plain-neighbours main].map { |selector| page.at_css(selector)&.to_html } ]
   end
 
   def every_look = urls.index_with { |path| look(path) }
@@ -229,6 +237,37 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     # listing to stand in: their new copies are read instead.
     @posts.each do |post|
       assert_includes Publishing.current(post.reload).snapshot.to_json, CANARY, "#{post.title} was not published"
+    end
+  end
+
+  # Theming spec §7: a theme's templates may ask for a branch of the page
+  # tree, the pages above a page and its neighbours (`PublicSite::Branch`).
+  # The default theme draws none of them, so the test above cannot see a
+  # reader there that shows rows; the second theme (test/fixtures/themes/plain)
+  # draws all three on every page.
+  test "under a theme that draws the page tree, the crumbs and previous and next, rows overwritten without publishing reach none of them" do
+    build_site
+    child = PublicSite::Urls.new.path_for(@child, "en")
+
+    with_plain_theme do
+      before = urls.index_with { |path| themed_look(path) }
+      assert_includes before.fetch(child)[1], "Alpha en", "the tree names no page: this test would pass by being empty"
+      assert_includes before.fetch(child)[1], "Alpha child en"
+      assert_includes before.fetch(child)[2], "Alpha en", "the crumbs name no page"
+      assert_includes before.fetch(child)[3], "Alpha en", "previous and next name no page"
+
+      overwrite_rows!
+
+      urls.each do |path|
+        assert_equal before.fetch(path), themed_look(path), "#{path} changed under the theme with no publish"
+        assert_nothing_of_the_rows_anywhere_in(path)
+      end
+
+      # Publishing brings the rows into the tree: the test cannot pass by a
+      # tree that never changes.
+      publish_changes(@alpha)
+      get child
+      assert_includes Nokogiri::HTML5(response.body).at_css("nav.plain-tree").text, CANARY
     end
   end
 end

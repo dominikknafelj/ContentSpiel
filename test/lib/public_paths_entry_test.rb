@@ -17,6 +17,7 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
   }.freeze
   READS = {
     "current_path" => "a stored address",
+    "current_paths" => "the stored addresses of several records at once, for a branch of the page tree (`PublicSite::Branch`)",
     "compute" => "the address a record would have, for the slug's validation",
     "canonical_page" => "the page a post's address runs through",
     "canonical_pages" => "the same for several posts",

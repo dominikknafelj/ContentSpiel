@@ -4,6 +4,27 @@
 module ThemeHelper
   LanguageLink = Data.define(:code, :name, :path, :current)
 
+  # A heading of an article as `with_heading_ids` lists it.
+  Heading = Data.define(:id, :text, :level) do
+    # The id a heading's words give, before a number makes it unique. For
+    # Latin text it is what `parameterize` answers ("Über uns" is
+    # "uber-uns"). For every other script it is the words themselves, lower
+    # case, with a hyphen for each run of anything that is not a letter, a
+    # mark or a digit: `parameterize` alone answers nothing for Greek, Arabic
+    # or Japanese, and a page in one of them would get "section",
+    # "section-2", … , ids that follow a heading's PLACE and move when a
+    # heading is added above it. A Latin letter the transliteration does not
+    # know (Vietnamese "ư") loses its marks and stays a letter, where
+    # `parameterize` would put a hyphen in the middle of the word. HTML takes
+    # any character but a space in an id, and a browser encodes the link to
+    # it. "" when the words hold no letter and no digit.
+    def self.id_from(words)
+      words.to_s.unicode_normalize(:nfc)
+        .gsub(/\p{Latin}/) { |letter| ActiveSupport::Inflector.transliterate(letter, "").presence || letter.unicode_normalize(:nfd).gsub(/\p{M}/, "") }
+        .downcase.gsub(/[^\p{L}\p{M}\p{N}_]+/, "-").gsub(/\A-+|-+\z/, "")
+    end
+  end
+
   # Current.site memoizes itself for the process/request; no ivar of our own
   # needed the way SetupController's @site_setting is.
   def theme_site
@@ -33,12 +54,130 @@ module ThemeHelper
     public_urls.preview? ? records.to_a : Publishing.published_all(records)
   end
 
+  # Memoised for the render: a theme may draw the menu more than once (a
+  # header, a drawer for narrow screens, a footer).
   def navigation_pages
-    theme_root_page ? published_views(theme_root_page.children.kept.published) : [] # public: rows (the menu's membership and order are the rows' (the tree); titles come from published_views)
+    return @navigation_pages if defined?(@navigation_pages)
+
+    @navigation_pages = theme_root_page ? published_views(theme_root_page.children.kept.published) : [] # public: rows (the menu's membership and order are the rows' (the tree); titles come from published_views)
   end
 
   def home_url_path
     theme_root_page ? page_url_path(theme_root_page) : "/"
+  end
+
+  # --- The page tree and the article, for a theme (theming spec §7) ---------
+  #
+  # Read-only, and as the public sees it: every page these answer is kept
+  # and published, and every title comes from the page's copy
+  # (`PublicSite::Branch`). Each is read once per render, however often a
+  # template asks. "The shown page" is the page the controller resolved
+  # (`@page`), never the request's path: a public page is one answer for
+  # every visitor, and nothing here asks who is asking.
+
+  # The pages above `page`, the homepage first. Empty for the homepage. A
+  # page above that is not published is left out (only a preview can show a
+  # page under one).
+  def page_ancestors(page)
+    @page_ancestors ||= {}
+    @page_ancestors.fetch(page.id) { @page_ancestors[page.id] = page_branch.above(page) }
+  end
+
+  # The page's branch directly under the homepage: for /editors/pages/x it
+  # is /editors, and a page directly under the homepage is its own. nil for
+  # the homepage.
+  #
+  # Found by its parent being the homepage, not by its place in
+  # `page_ancestors`: that list leaves an unpublished page out, so the
+  # second of it is not always the section. nil too when the section is not
+  # shown (the homepage or the page under it is unpublished or in the trash,
+  # which only a preview can meet): like every page these helpers answer, a
+  # section is one the public sees.
+  def page_section(page)
+    return nil if page.root?
+
+    home = page_ancestors(page).first
+    return nil unless home&.root?
+    return (page if page.live? && !page.trashed?) if page.parent_id == home.id
+
+    page_ancestors(page).find { |candidate| candidate.parent_id == home.id }
+  end
+
+  # The branch under and including `top`, to any depth, as nested nodes:
+  # `title`, `path`, `children`, `current?` (the shown page), `open?` (the
+  # shown page is somewhere below), `leaf?`. nil when `top` is not shown.
+  def page_tree(top, current: @page)
+    @page_trees ||= {}
+    key = [ top.id, current&.id ]
+    @page_trees.fetch(key) { @page_trees[key] = page_branch.under(top, current: current) }
+  end
+
+  # A branch flattened in reading order: a page, then its subpages, each
+  # followed by its own.
+  def pages_in_reading_order(node) = node ? node.reading_order : []
+
+  # [previous, next] of the shown page within `tree`, as nodes or nil.
+  # `skip` is a callable that says which pages the walk passes over (a theme
+  # hands in "the pages that only group others", so next after the last page
+  # of a group is the first page of the next); the shown page is never
+  # skipped.
+  def neighbouring_pages(tree, skip: nil)
+    walk = pages_in_reading_order(tree).reject { |node| !node.current? && skip&.call(node) }
+    index = walk.index(&:current?) or return [ nil, nil ]
+
+    [ (walk[index - 1] if index.positive?), walk[index + 1] ]
+  end
+
+  # The rendered blocks of a page with an id on each heading of `levels`,
+  # and those headings as `id`, `text`, `level`: what a table of contents
+  # and a link to a heading need.
+  #
+  # Made on the RENDERED page, from each heading's words, not stored in the
+  # document (decision 17): an id must be unique on the whole page, and a
+  # page's text is several blocks, each rendered and cached alone. So an id
+  # follows its heading's words (`Heading.id_from`): REWORDING A HEADING
+  # CHANGES ITS ID, and a link to it from elsewhere then opens the page at
+  # its top. A number is added when two are alike, and a heading with no
+  # letter and no digit in it is "section". An id a heading already has is
+  # kept. The cost is one more parse of the article for a request that is
+  # not a 304, paid only by a template that calls this.
+  #
+  # AFTER THE RENDER CACHE, NEVER IN IT: a body is cached by its document's
+  # digest and is the same HTML in CS Studio's preview and in the MCP
+  # server's Markdown round trip (spec §5), so the ids are put on a copy of
+  # what `rich_text` answered and the cached render never holds one
+  # (`test/integration/theme_pages_test.rb`: "heading ids are on the page a
+  # theme draws and not in the cached render of the text").
+  #
+  # `html_safe` on the way out, so what comes in is made safe first: rendered
+  # blocks (a `capture`) already are and pass as they are, anything else is
+  # escaped, or this would be the way to print a title as markup. The parse
+  # adds one attribute, made of letters, marks, digits, "-" and "_", which
+  # the serialiser quotes. A text with no heading of `levels` is handed back
+  # as it came, unparsed where it holds no heading at all.
+  def with_heading_ids(html, levels: 2..3)
+    html = html.to_s
+    html = ERB::Util.html_escape(html) unless html.html_safe?
+    return [ html, [] ] unless html.include?("<h")
+
+    fragment = Nokogiri::HTML5.fragment(html)
+    nodes = fragment.css(levels.map { |level| "h#{level}" }.join(", "))
+    return [ html, [] ] if nodes.empty?
+
+    taken = fragment.css("[id]").map { |node| node["id"] }.to_set
+    headings = nodes.map do |node|
+      id = node["id"].presence || begin
+        base = Heading.id_from(node.text).presence || "section"
+        candidate = base
+        number = 1
+        candidate = "#{base}-#{number += 1}" while taken.include?(candidate)
+        taken << candidate
+        node["id"] = candidate
+      end
+      Heading.new(id: id, text: node.text.squish, level: node.name.delete_prefix("h").to_i)
+    end
+
+    [ fragment.to_html.html_safe, headings ]
   end
 
   def post_date(post)
@@ -153,5 +292,12 @@ module ThemeHelper
   def block_outline(page)
     @block_outlines ||= {}
     @block_outlines[page] ||= BlockOutline.new(page.content_blocks)
+  end
+
+  # One `PublicSite::Branch` per render, on this request's urls and language.
+  # The CMS's own: not in `Theme::Contract::HELPERS`, a template asks the
+  # helpers above.
+  def page_branch
+    @page_branch ||= PublicSite::Branch.new(urls: public_urls, locale: I18n.locale)
   end
 end

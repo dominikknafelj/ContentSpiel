@@ -150,6 +150,31 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select ".page-children", count: 0
   end
 
+  # Theming spec §7: the tree, the crumbs and previous/next a theme's
+  # template asks for (`PublicSite::Branch`), drawn here by the second theme.
+  test "a theme's page tree, crumbs and previous and next never name a trashed page, publicly or in preview" do
+    guide = create_page(title: "Guide")
+    create_page(title: "First leaf", parent: guide)
+    gone = create_page(title: "Gone leaf", parent: guide)
+    create_page(title: "Last leaf", parent: guide)
+    gone.update!(trashed_at: Time.current)
+
+    with_plain_theme { get "/guide/first-leaf" }
+
+    assert_response :success
+    assert_select "nav.plain-tree a", text: "First leaf"
+    assert_select "nav.plain-tree a", text: "Last leaf"
+    assert_select "nav.plain-neighbours a[rel=next]", text: "Last leaf"
+    assert_not_includes response.body, "Gone leaf"
+
+    sign_in_as users(:one)
+    with_plain_theme { get "/preview/guide/first-leaf" }
+
+    assert_response :success
+    assert_select "nav.plain-tree a", text: "Last leaf"
+    assert_not_includes response.body, "Gone leaf"
+  end
+
   test "a post list block never lists a trashed post, published or not" do
     block = @blog.content_blocks.listing.sole
     assert_includes block.listed_posts, @kept_post

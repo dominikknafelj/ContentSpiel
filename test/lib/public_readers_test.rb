@@ -60,6 +60,7 @@ class PublicReadersTest < ActiveSupport::TestCase
     app/models/public_site/resolver.rb
     app/models/public_site/urls.rb
     app/queries/publishing/listing.rb
+    app/queries/public_site/branch.rb
   ].freeze
 
   # Folders of components that are public readers whether or not a template
@@ -70,7 +71,7 @@ class PublicReadersTest < ActiveSupport::TestCase
   REGISTRIES = %w[app/models/block_types app/models/content_types config/initializers/rich_text.rb].freeze
 
   CLASSES = /\b(?:Page|Post|ContentBlock|Tag|PostTag)\.(?!polymorphic_name|name\b|model_name|human|table_name|column_names|columns|statuses|page_types)\w+/
-  WALKS = /\.(?:owner|parent|ancestors|self_and_ancestors|siblings|descendants|children|record|posts|listed_posts|canonical_pages?|title_matching\w*)\b|\.content_blocks\.(?!to_a\b)\w+|\bcanonical_pages?\(/
+  WALKS = /\.(?:owner|parent|ancestors|self_and_ancestors|self_and_descendants|siblings|descendants|children|record|posts|listed_posts|canonical_pages?|title_matching\w*)\b|\.content_blocks\.(?!to_a\b)\w+|\bcanonical_pages?\(/
   ROWS = Regexp.union(CLASSES, WALKS)
   MARK = /public:\s*rows\s*\((?<reason>[^)]*)\)/
 
@@ -150,7 +151,7 @@ class PublicReadersTest < ActiveSupport::TestCase
 
     %w[app/controllers/pages_controller.rb app/controllers/concerns/public_page_rendering.rb app/views/pages/show.html.erb
        app/views/layouts/application.html.erb app/helpers/theme_helper.rb app/components/blocks/post_list_component.rb
-       app/components/media/picture_component.rb config/sitemap.rb app/queries/publishing/listing.rb].each do |path|
+       app/components/media/picture_component.rb config/sitemap.rb app/queries/publishing/listing.rb app/queries/public_site/branch.rb].each do |path|
       assert_includes files, path
     end
     assert_empty files.grep(%r{\Aapp/components/admin/|\Aapp/controllers/admin/|\Aapp/views/admin/})
@@ -183,6 +184,7 @@ class PublicReadersTest < ActiveSupport::TestCase
       "@page.ancestors.each { |page| crumb(page.title) }",
       "<%= @page.parent.title %>",
       "@page.siblings.map(&:title)",
+      "pages = top.self_and_descendants.kept.published.to_a",
       "block.owner.title",
       "PublicPath.current.each { |row| row.record.title }",
       "page.content_blocks.listing.any?",

@@ -1,0 +1,8 @@
+<ul>
+  <% nodes.each do |node| %>
+    <li<%= ' class="is-open"'.html_safe if node.open? %>>
+      <%= link_to node.title, node.path, aria: { current: ("page" if node.current?) } %>
+      <%= render "theme/nodes", nodes: node.children unless node.leaf? %>
+    </li>
+  <% end %>
+</ul>
