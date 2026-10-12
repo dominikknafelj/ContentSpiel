@@ -1,6 +1,6 @@
 <p class="plain-crumb mt-[7px]">
   <%= link_to translated(theme_site, :title), home_url_path %>
   <% page_ancestors(@page).drop(1).each do |ancestor| %>
-    / <%= link_to translated(ancestor, :title), page_url_path(ancestor) %>
+    / <%= link_to ancestor.title, ancestor.path %>
   <% end %>
 </p>

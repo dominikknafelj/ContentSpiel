@@ -1,5 +1,5 @@
 <ol class="plain-posts">
   <% posts.each do |post| %>
-    <li><%= link_to translated(post, :title), post_url_path(post, listed_on: page) %></li>
+    <li><h3><%= link_to translated(post, :title), post_url_path(post, listed_on: page) %></h3></li>
   <% end %>
 </ol>

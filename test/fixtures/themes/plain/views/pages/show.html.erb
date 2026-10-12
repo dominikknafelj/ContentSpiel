@@ -13,8 +13,7 @@
     </ol>
   <% end %>
   <%= text %>
-  <% section = page_section(@page) %>
-  <% previous_page, next_page = neighbouring_pages(section && page_tree(section)) %>
+  <% previous_page, next_page = neighbouring_pages(page_section(@page)) %>
   <% if previous_page || next_page %>
     <nav class="plain-neighbours" aria-label="Previous and next page">
       <%= link_to previous_page.title, previous_page.path, rel: "prev" if previous_page %>

@@ -32,7 +32,7 @@
         was the guard
         (`test/integration/theme_pages_test.rb`: "a 404 that had a record in
         hand describes none"). %>
-    <% described = @page && !response.not_found? %>
+    <% described = page_found? %>
     <%# The title's text is asked for here and not read from a
         `content_for(:title)` slot: `content_for` appends, so a theme's
         template that wrote to the slot would have its text put in front of
@@ -72,7 +72,7 @@
         (`test/integration/theme_pages_test.rb`: "a 404 that had a record in
         hand names no canonical address and no other language's, in the
         preview and in public"). %>
-    <% if !response.not_found? && (alternate_record = @post || @page) %>
+    <% if page_found? && (alternate_record = @post || @page) %>
       <%# The one address of what is shown: the record's own in this language,
           on the site's configured address, with no query string -- so
           `/about?utm=1` and a request under any other `Host` name the same

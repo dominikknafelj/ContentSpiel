@@ -15,6 +15,8 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
 
   def branch(locale: "en", preview: false) = PublicSite::Branch.new(urls: PublicSite::Urls.new(preview: preview), locale: locale)
 
+  NOWHERE = PublicSite::Branch::NOWHERE
+
   def titles(node) = node.reading_order.map(&:title)
 
   test "the branch is nested as the tree is, in the tree's order, with addresses" do
@@ -71,7 +73,7 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
     under = create_page(title: "Under the draft", parent: draft)
 
     assert_not_includes titles(branch.under(@guide)), "Under the draft"
-    assert_equal [ @home.id, @guide.id ], branch.above(under).map(&:id)
+    assert_equal [ @home.id, @guide.id ], branch.around(under).above.map(&:id)
   end
 
   test "a trashed page is absent, and a branch whose top is trashed is nothing" do
@@ -90,7 +92,8 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
 
     assert_equal %w[Guide Write], titles(branch.under(@guide))
     assert_nil branch.under(@start)
-    assert_equal [ @home.id, @guide.id ], branch.above(@install).map(&:id)
+    assert_equal [ @home.id, @guide.id ], branch.around(@install).above.map(&:id)
+    assert_equal %w[Guide Write], titles(branch.around(@install).section)
   end
 
   test "titles are the published ones, and in a preview the rows'" do
@@ -118,24 +121,118 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
     assert_equal %w[Guide Start Install Write], titles(branch.under(@guide)), "the other language keeps the page"
   end
 
-  test "the pages above a page are the published ones, the homepage first, and the homepage has none" do
-    assert_equal [ @home.id, @guide.id, @start.id ], branch.above(@install).map(&:id)
-    assert_empty branch.above(@home)
+  test "the pages above a page are nodes as published, the homepage first, and the homepage has none" do
+    around = branch.around(@install)
+
+    assert_equal [ @home.id, @guide.id, @start.id ], around.above.map(&:id)
+    assert_equal [ [ "/", 0 ], [ "/guide", 1 ], [ "/guide/start", 2 ] ], around.above.map { |node| [ node.path, node.depth ] }
+    assert around.above.all?(&:open?)
+    assert_empty around.above.first.children, "the homepage's branch is not read for the pages above"
+    assert_equal NOWHERE, branch.around(@home)
+    assert_equal NOWHERE, branch.around(nil)
 
     assert Pages::Save.call(@guide, translations: { "en" => { title: "Guide CHANGED" } }).ok?
-    assert_equal "Guide", Locales.read(branch.above(@install)[1], :title, locale: "en")
-    assert_equal "Guide CHANGED", Locales.read(branch(preview: true).above(@install)[1], :title, locale: "en")
+    assert_equal "Guide", branch.around(@install).above[1].title
+    assert_equal "Guide CHANGED", branch(preview: true).around(@install).above[1].title
+    assert_equal "/preview/guide", branch(preview: true).around(@install).above[1].path
   end
 
-  test "a branch costs three statements at 4 pages and at 30" do
+  test "the section around a page is its tree with the page marked, and the pages above are that tree's nodes" do
+    around = branch.around(@install)
+
+    assert_equal %w[Guide Start Install Write], titles(around.section)
+    assert_equal [ "Install" ], around.section.reading_order.select(&:current?).map(&:title)
+    assert_same around.section, around.above[1]
+    assert_same around.section.children.first, around.above[2]
+    assert_equal @guide.id, branch.around(@guide).section.id, "a page directly under the homepage is its own section"
+    assert branch.around(@guide).section.current?
+  end
+
+  test "the section is found by its parent being the homepage; an unpublished one is no section, and the pages above are still named" do
+    hidden = create_page(title: "Hidden", published: false)
+    below = create_page(title: "Below", parent: hidden)
+    draft = create_page(title: "Draft", parent: @guide, published: false)
+    under = create_page(title: "Under", parent: draft)
+
+    assert_nil branch.around(below).section
+    assert_equal [ [ @home.id, 0 ] ], branch.around(below).above.map { |node| [ node.id, node.depth ] }
+    assert_nil branch.around(hidden).section
+    assert_equal @guide.id, branch.around(under).section.id
+    assert_equal [ @home.id, @guide.id ], branch.around(under).above.map(&:id)
+  end
+
+  # I3: what a template is handed. A Page, even one rebuilt from its copy,
+  # answers `.children` and `.content_blocks` from the rows.
+  test "a node is a value: it answers what is documented and no way to a record or its rows" do
+    assert Pages::Save.call(@start, translations: { "en" => { title: "Start", subtitle: "Where to begin" } }).ok?
+    publish_changes(@start)
+    assert Pages::Save.call(@start, translations: { "en" => { subtitle: "UNPUBLISHED" } }).ok?
+    around = branch.around(@install)
+    start = around.section.children.first
+
+    assert_equal %i[id title subtitle slug path depth children current open], PublicSite::Branch::Node.members
+    assert_equal [ @start.id, "Start", "Where to begin", "start", "/guide/start", 2 ], [ start.id, start.title, start.subtitle, start.slug, start.path, start.depth ]
+    assert_nil around.section.subtitle
+    assert_equal [ "", 0 ], [ around.above.first.slug, around.above.first.depth ]
+    assert_equal [ 1, 2, 3, 2 ], around.section.reading_order.map(&:depth)
+    assert_equal "UNPUBLISHED", branch(preview: true).around(@install).section.children.first.subtitle
+
+    [ *around.above, *around.section.reading_order ].each do |node|
+      assert_instance_of PublicSite::Branch::Node, node
+      assert node.frozen?
+      assert_kind_of Array, node.children
+      %i[parent content_blocks attributes ancestors descendants siblings self_and_descendants page record owner
+         read_attribute published_at reload save update].each do |name|
+        assert_not_respond_to node, name
+      end
+      node.to_h.except(:children).each_value do |value|
+        assert_includes [ String, Integer, NilClass, TrueClass, FalseClass ], value.class, "a node holds #{value.class}"
+      end
+    end
+  end
+
+  # M7: the order of a sidebar is the order of every other list of the tree.
+  test "pages are in the tree's own order, one without a position last: as the menu's and CS Studio's tree" do
+    last = create_page(title: "Last", parent: @guide)
+    @start.update_columns(position: nil) # version: none (a test takes a position away, as only a half-written row has none)
+    PublicSite::Paths.rebuild!
+
+    in_branch = branch.under(@guide).children.map(&:id)
+
+    assert_equal [ @write.id, last.id, @start.id ], in_branch
+    assert_equal @guide.children.kept.published.pluck(:id), in_branch, "the public tree's own order (closure_tree's)"
+    assert_equal AccessControl.preload_branches(Page.all.to_a).select { |page| page.parent_id == @guide.id }.map(&:id), in_branch, "CS Studio's tree"
+  end
+
+  test "under takes a node for its top and for the shown page" do
+    tree = branch.under(@guide, current: @install)
+    again = branch.under(tree.children.first, current: tree.children.first.children.first)
+
+    assert_equal %w[Start Install], titles(again)
+    assert_equal 2, again.depth
+    assert again.children.first.current?
+    assert_nil branch.under(nil)
+  end
+
+  test "a branch costs four statements at 4 pages and at 30, the homepage's three, and what is around a page four with none per page above" do
     branch.under(@guide, current: @install) # the settings row and the schema are read once, here
     small = capture_sql { branch.under(@guide, current: @install) }
+    around_small = capture_sql { branch.around(@install) }
 
     26.times { |index| create_page(title: "Leaf #{index}", parent: index.even? ? @write : @start) }
+    deep = create_page(title: "Deep", parent: create_page(title: "Deeper", parent: @install))
     large = capture_sql { @tree = branch.under(@guide, current: @install) }
+    around_large = capture_sql { @around = branch.around(deep) }
+    whole = capture_sql { @site = branch.under(@home) }
 
-    assert_equal 30, @tree.reading_order.size
-    assert_equal 3, small.size, small.join("\n")
-    assert_equal 3, large.size, large.join("\n")
+    assert_equal 32, @tree.reading_order.size
+    assert_equal 5, @around.above.size
+    assert_equal 33, @site.reading_order.size
+    assert_equal 4, small.size, small.join("\n")
+    assert_equal 4, large.size, large.join("\n")
+    assert_equal 4, around_small.size, around_small.join("\n")
+    assert_equal 4, around_large.size, around_large.join("\n")
+    assert_equal 3, whole.size, whole.join("\n")
+    assert_equal 1, capture_sql { branch.around(@home) }.size
   end
 end

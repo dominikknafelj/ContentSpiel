@@ -1,7 +1,7 @@
 <div class="plain-frame" data-controller="theme--hello">
   <%= render "layouts/public/header" %>
-  <% section = page_section(@page) if @page && !response.not_found? %>
-  <% tree = page_tree(section) if section %>
+  <% if page_found? %><p class="plain-here"><%= translated(@page, :title) %></p><% end %>
+  <% tree = page_tree(page_section(@page)) %>
   <% if tree %>
     <nav class="plain-tree" aria-label="In this section"><%= render "theme/nodes", nodes: [ tree ] %></nav>
   <% end %>

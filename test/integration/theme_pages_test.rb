@@ -676,22 +676,46 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   end
 
   # A 404 can have a page in hand (`PublicPageRendering#assign_record`: a
-  # post whose list is gone), and a 404 says nothing of a record: the second
-  # theme's frame asks `response.not_found?` before it asks for the section,
-  # which is what a theme that draws a tree in its frame has to do.
-  test "a 404 that had a page in hand draws no tree" do
+  # post whose list is gone), and a 404 says nothing of a record. The second
+  # theme's frame asks for the section on every page with no condition of
+  # its own: the helpers answer nothing on a 404, and `page_found?` is what
+  # the frame asks before it prints the page's title.
+  test "a 404 that had a page in hand draws no tree and nothing of the page; the same page found draws both" do
     blog = create_page(title: "Blog")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
     publish_changes(blog)
     create_post(title: "Hello")
-    assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
 
+    with_plain_theme { get "/blog/hello" }
+    assert_response :success
+    assert_select "nav.plain-tree a[href='/blog']"
+    assert_select "p.plain-here", text: "Blog"
+
+    assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
     sign_in_as users(:one)
     with_plain_theme { get "/preview/blog/hello" }
 
     assert_response :not_found
     assert_select "div.plain-frame"
     assert_select "nav.plain-tree", count: 0
+    assert_select "p.plain-here", count: 0
+  end
+
+  # The fixture's post list draws each title as a heading in a list item:
+  # a list of OTHER texts, not a heading of this page's.
+  test "a post list's titles are not in the page's contents, and get no id" do
+    blog = create_page(title: "Blog")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("## About this blog") } }).ok?
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(blog)
+    create_post(title: "First post")
+
+    with_plain_theme { get "/blog" }
+
+    assert_select "ol.plain-contents a", count: 1
+    assert_select "ol.plain-contents a[href='#about-this-blog']"
+    assert_select "ol.plain-posts li h3", text: "First post"
+    assert_select "ol.plain-posts li h3[id]", count: 0
   end
 
   test "the preview's tree links the preview's addresses and shows the rows' titles; the public one shows the published" do

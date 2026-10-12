@@ -6,6 +6,13 @@ module ThemeHelper
 
   # A heading of an article as `with_heading_ids` lists it.
   Heading = Data.define(:id, :text, :level) do
+    # What is taken out of a heading's words before anything else: the
+    # characters nobody sees. Format characters (a zero-width joiner or
+    # space, a soft hyphen), the variation selectors (what makes "⚠" the
+    # coloured sign) and the marks that combine with a SYMBOL (the keycap of
+    # "1️⃣"). Ruby counts the last two as marks, and a mark is kept below.
+    UNSEEN = /[\p{Cf}\u{FE00}-\u{FE0F}\u{20D0}-\u{20FF}\u{E0100}-\u{E01EF}]/
+
     # The id a heading's words give, before a number makes it unique. For
     # Latin text it is what `parameterize` answers ("Über uns" is
     # "uber-uns"). For every other script it is the words themselves, lower
@@ -15,15 +22,30 @@ module ThemeHelper
     # "section-2", … , ids that follow a heading's PLACE and move when a
     # heading is added above it. A Latin letter the transliteration does not
     # know (Vietnamese "ư") loses its marks and stays a letter, where
-    # `parameterize` would put a hyphen in the middle of the word. HTML takes
-    # any character but a space in an id, and a browser encodes the link to
-    # it. "" when the words hold no letter and no digit.
+    # `parameterize` would put a hyphen in the middle of the word; only a
+    # letter that is not ASCII is asked of it (a rule lookup each). A mark
+    # stays where it follows a letter or a digit (Hindi, Thai and Arabic
+    # are written with them) and nowhere else, so an id never starts with a
+    # character nobody can see or type: "⚠️ Warning" is "warning". HTML
+    # takes any character but a space in an id, and a browser encodes the
+    # link to it. "" when the words hold no letter and no digit.
     def self.id_from(words)
-      words.to_s.unicode_normalize(:nfc)
-        .gsub(/\p{Latin}/) { |letter| ActiveSupport::Inflector.transliterate(letter, "").presence || letter.unicode_normalize(:nfd).gsub(/\p{M}/, "") }
+      words.to_s.unicode_normalize(:nfc).gsub(UNSEEN, "")
+        .gsub(/(?=\P{ASCII})\p{Latin}/) { |letter| ActiveSupport::Inflector.transliterate(letter, "").presence || letter.unicode_normalize(:nfd).gsub(/\p{M}/, "") }
+        .gsub(/(?<![\p{L}\p{N}\p{M}])\p{M}+/, "")
         .downcase.gsub(/[^\p{L}\p{M}\p{N}_]+/, "-").gsub(/\A-+|-+\z/, "")
     end
+
+    # A heading's words as read: its text, a space for each line break in it.
+    def self.words_of(node)
+      node.xpath(".//text() | .//br").map { |part| part.name == "br" ? " " : part.text }.join.squish
+    end
   end
+
+  # The elements whose headings are not the article's own
+  # (`with_heading_ids`).
+  NOT_THE_ARTICLE = %w[nav aside header footer li a].freeze
+  OUTSIDE_THE_ARTICLE = NOT_THE_ARTICLE.map { |name| "ancestor::#{name}" }.join(" | ").freeze
 
   # Current.site memoizes itself for the process/request; no ivar of our own
   # needed the way SetupController's @site_setting is.
@@ -74,39 +96,45 @@ module ThemeHelper
   # template asks. "The shown page" is the page the controller resolved
   # (`@page`), never the request's path: a public page is one answer for
   # every visitor, and nothing here asks who is asking.
-
-  # The pages above `page`, the homepage first. Empty for the homepage. A
-  # page above that is not published is left out (only a preview can show a
-  # page under one).
-  def page_ancestors(page)
-    @page_ancestors ||= {}
-    @page_ancestors.fetch(page.id) { @page_ancestors[page.id] = page_branch.above(page) }
-  end
-
-  # The page's branch directly under the homepage: for /editors/pages/x it
-  # is /editors, and a page directly under the homepage is its own. nil for
-  # the homepage.
   #
-  # Found by its parent being the homepage, not by its place in
-  # `page_ancestors`: that list leaves an unpublished page out, so the
-  # second of it is not always the section. nil too when the section is not
-  # shown (the homepage or the page under it is unpublished or in the trash,
-  # which only a preview can meet): like every page these helpers answer, a
-  # section is one the public sees.
-  def page_section(page)
-    return nil if page.root?
+  # WHAT A TEMPLATE GETS IS A NODE, NEVER A PAGE (`PublicSite::Branch::Node`:
+  # `id`, `title`, `subtitle`, `slug`, `path`, `depth`, `children`,
+  # `current?`, `open?`, `leaf?`): a value with nothing to walk rows from.
+  #
+  # NONE RAISES, AND A 404 IS NOWHERE. With no page (`nil`), and on every
+  # answer that says "not found", each answers empty: no pages above, no
+  # section, no tree, no neighbours. A 404 can have a page in hand
+  # (`PublicPageRendering#assign_record`: a post whose list is gone; in the
+  # preview a post on a page the editor may not read), and a 404 says
+  # nothing of a record. So a frame may ask for the section on every page
+  # without a condition of its own.
 
-    home = page_ancestors(page).first
-    return nil unless home&.root?
-    return (page if page.live? && !page.trashed?) if page.parent_id == home.id
+  # Whether a page is being shown: there is one, and the answer is not a
+  # 404. What a frame or a partial asks before it draws something OF the
+  # page (its title in a bar, its crumbs); the helpers below ask it
+  # themselves.
+  def page_found? = @page.present? && !not_found_answer?
 
-    page_ancestors(page).find { |candidate| candidate.parent_id == home.id }
-  end
+  # The pages above `page`, the homepage first, as nodes. Empty for the
+  # homepage. A page above that is not published is left out (only a preview
+  # can show a page under one). The homepage's node has no `children` (its
+  # branch is the whole site: `page_tree` reads it); the others are the
+  # nodes of the section's tree.
+  def page_ancestors(page) = page_surroundings(page).above
 
-  # The branch under and including `top`, to any depth, as nested nodes:
-  # `title`, `path`, `children`, `current?` (the shown page), `open?` (the
-  # shown page is somewhere below), `leaf?`. nil when `top` is not shown.
-  def page_tree(top, current: @page)
+  # The page's branch directly under the homepage, as the node of its tree
+  # with `page` marked: for /editors/pages/x it is /editors with everything
+  # under it, and a page directly under the homepage is its own. nil for the
+  # homepage, and when the section is not shown (the homepage or the page
+  # under it is unpublished or in the trash, which only a preview can meet).
+  # `page_tree(page_section(page))` is this same node and reads nothing.
+  def page_section(page) = page_surroundings(page).section
+
+  # The branch under and including `top` (a node, or a page), to any depth,
+  # as nested nodes. nil when `top` is nil or not shown.
+  def page_tree(top, current: (@page if page_found?))
+    return nil if top.nil? || not_found_answer?
+
     @page_trees ||= {}
     key = [ top.id, current&.id ]
     @page_trees.fetch(key) { @page_trees[key] = page_branch.under(top, current: current) }
@@ -138,8 +166,15 @@ module ThemeHelper
   # follows its heading's words (`Heading.id_from`): REWORDING A HEADING
   # CHANGES ITS ID, and a link to it from elsewhere then opens the page at
   # its top. A number is added when two are alike, and a heading with no
-  # letter and no digit in it is "section". An id a heading already has is
-  # kept. The cost is one more parse of the article for a request that is
+  # letter and no digit in it is "section", numbered like any other. A line
+  # break in a heading is a space. An id a heading already has is kept.
+  #
+  # THE ARTICLE is what the template hands in, less the pieces that list or
+  # link OTHER content or are the page's furniture: a heading inside `nav`,
+  # `aside`, `header`, `footer`, a list item or a link is not a heading of
+  # this text (a post list's titles, a card that is one link) and is neither
+  # listed nor given an id (`NOT_THE_ARTICLE`). A post's own text, which its
+  # template wraps in `article`, and a text in a section's column are. The cost is one more parse of the article for a request that is
   # not a 304, paid only by a template that calls this.
   #
   # AFTER THE RENDER CACHE, NEVER IN IT: a body is cached by its document's
@@ -161,20 +196,20 @@ module ThemeHelper
     return [ html, [] ] unless html.include?("<h")
 
     fragment = Nokogiri::HTML5.fragment(html)
-    nodes = fragment.css(levels.map { |level| "h#{level}" }.join(", "))
+    nodes = fragment.css(levels.map { |level| "h#{level}" }.join(", ")).reject { |node| node.at_xpath(OUTSIDE_THE_ARTICLE) }
     return [ html, [] ] if nodes.empty?
 
     taken = fragment.css("[id]").map { |node| node["id"] }.to_set
     headings = nodes.map do |node|
       id = node["id"].presence || begin
-        base = Heading.id_from(node.text).presence || "section"
+        base = Heading.id_from(Heading.words_of(node)).presence || "section"
         candidate = base
         number = 1
         candidate = "#{base}-#{number += 1}" while taken.include?(candidate)
         taken << candidate
         node["id"] = candidate
       end
-      Heading.new(id: id, text: node.text.squish, level: node.name.delete_prefix("h").to_i)
+      Heading.new(id: id, text: Heading.words_of(node), level: node.name.delete_prefix("h").to_i)
     end
 
     [ fragment.to_html.html_safe, headings ]
@@ -300,4 +335,22 @@ module ThemeHelper
   def page_branch
     @page_branch ||= PublicSite::Branch.new(urls: public_urls, locale: I18n.locale)
   end
+
+  # The pages above a page and its section, read together (four statements
+  # whatever the section's size) and once per page per render. The section
+  # is its tree, so `page_tree` of it is remembered here. The CMS's own.
+  def page_surroundings(page)
+    return PublicSite::Branch::NOWHERE if page.nil? || not_found_answer?
+
+    @page_surroundings ||= {}
+    @page_surroundings.fetch(page.id) do
+      around = page_branch.around(page)
+      (@page_trees ||= {})[[ around.section.id, page.id ]] ||= around.section if around.section
+      @page_surroundings[page.id] = around
+    end
+  end
+
+  # The answer says "not found". The CMS's own: a template asks
+  # `page_found?`.
+  def not_found_answer? = response.not_found?
 end
