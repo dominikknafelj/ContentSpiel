@@ -68,14 +68,22 @@ module Tags
     # rows are removed, which is what it reads.
     #
     # The carriers are also MARKED as having unpublished changes
-    # (`Publishing.note_change`): a post's copy holds its tags by id and name,
-    # and the carrying post's rows have now moved on from it (a renamed tag
-    # has another name, a deleted or merged one is gone), while the site shows
-    # the copy until the post is published again (drafts plan, disagreement 5).
-    # Only the live and scheduled ones; a draft has no copy to differ from.
-    def touch_carrying_posts(tag)
+    # (`Publishing.note_change`) by a rename and a delete: a post's copy
+    # holds its tags by id and name, and the carrying post's rows have now
+    # moved on from it (a renamed tag has another name, a deleted one is
+    # gone), while the site shows the copy until the post is published again
+    # (drafts plan, disagreement 5). Only the live and scheduled ones; a
+    # draft has no copy to differ from.
+    #
+    # NOT BY A MERGE (`mark: false`): `Publishing::Version.repoint_tag!`
+    # rewrites every copy as the merge rewrites the rows, the merged tag's
+    # entry becoming the kept tag's, so the merge puts no difference between
+    # a carrier's rows and its copies and there is nothing to publish. A
+    # carrier that was marked before (something else was typed, or a tag of
+    # its was renamed) keeps its mark: nothing here clears one.
+    def touch_carrying_posts(tag, mark: true)
       carriers = Post.where(id: tag.post_tags.select(:post_id))
-      Publishing.note_change(carriers)
+      Publishing.note_change(carriers) if mark
       carriers.touch_all
       # `touch_all` runs no `after_commit` on the posts, and what follows it
       # (a rename, a delete, a merge) changes what they print and which

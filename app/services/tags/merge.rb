@@ -83,20 +83,27 @@ module Tags
         blocks = listing_blocks_naming(source.name)
 
         give_target_to_carriers(into, carrier_ids)
-        touch_carrying_posts(source)
+        # Touched, not marked: the copies are rewritten below exactly as the
+        # rows are here, so the merge leaves no carrier with anything to
+        # publish.
+        touch_carrying_posts(source, mark: false)
         repoint_blocks(blocks, source, into)
         # The published copies too, after the page locks above: a merge is
         # immediate everywhere, as a slug is. The copies reference the tag by
         # id and `source`'s is about to stop existing, so its id is replaced
-        # by the kept tag's and the lists that held its posts still hold them
-        # (`Publishing::Version.repoint_tag!`).
+        # by the kept tag's and the lists that held its posts still hold them;
+        # and what a post's copy SHOWS of the tag becomes the kept tag, id
+        # and name, so no visitor reads the name of a tag that is gone
+        # (`Publishing::Version.repoint_tag!`). `into` is the locked row.
         Publishing::Version.repoint_tag!(from: source, to: into)
         PostTag.where(tag_id: source.id).delete_all
         source.destroy!
-        # Join rows and block settings were written around the callbacks
-        # (`insert_all`, `delete_all`, `update_columns`, `touch_all`), so no
-        # post's or page's `after_commit` speaks for them: the merge moves
-        # the public content version itself, deferred to the commit.
+        # Join rows, block settings and the copies were written around the
+        # callbacks (`insert_all`, `delete_all`, `update_columns`,
+        # `touch_all`, `update_all`), so no post's or page's `after_commit`
+        # speaks for them: the merge moves the public content version
+        # itself, deferred to the commit, and with it every cached page that
+        # printed the merged tag's name.
         PublicSite.bump_version!
 
         record_event("tag.merged", subject: into, metadata: { "merged" => source.name, "posts" => carrier_ids.size })

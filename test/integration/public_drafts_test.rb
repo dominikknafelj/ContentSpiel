@@ -942,7 +942,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_listed_at_tagged
     kept = Tag.find_by!(name: "gems").id
     assert_equal [ kept ], Publishing.current(post).tag_ids
-    assert_equal %w[ruby], Publishing.current(post).snapshot["tags"].map { |tag| tag["name"] }, "the name a visitor reads is the copy's until the post is published"
+    assert_equal %w[gems], Publishing.current(post).snapshot["tags"].map { |tag| tag["name"] }, "the name a visitor reads follows the merge too"
 
     [ tagged, post ].each do |record|
       publish_changes(record)
@@ -950,6 +950,57 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     end
     get "/everything"
     assert_equal [ "/tagged/carrier" ], list_hrefs
+  end
+
+  def tags_on_post_page = css_select(".content-block--post-list-detail ul li").map { |item| item.text.strip }
+  def tags_in_list = css_select(".content-block--post-list li > span:last-child").map { |item| item.text.strip }
+
+  # Found by hand: "rails" merged into "ruby", the tag "rails" was gone, and
+  # the public post and the lists went on printing it beside "ruby" until
+  # the post was published again, which the merge dialog says is not needed.
+  test "after a merge a visitor reads the kept tag's name once and the merged one nowhere, on the post and in the list, with no publish" do
+    Tag.create!(name: "rails") # the older id: the tag a list prints for a post is its first
+    listing_page("Notes")
+    both = create_post(title: "Both", tags: %w[rails ruby])
+    one = create_post(title: "One", tags: %w[rails])
+    get "/notes"
+    assert_equal %w[rails rails], tags_in_list
+    etag = response.headers["ETag"]
+    version = PublicSite.content_version
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: Tag.find_by!(name: "ruby")).ok?
+
+    assert_not_equal version, PublicSite.content_version, "the caches follow"
+    get path_of(both)
+    assert_equal %w[ruby], tags_on_post_page
+    assert_no_match(/rails/i, main_html)
+    get path_of(one)
+    assert_equal %w[ruby], tags_on_post_page
+    assert_no_match(/rails/i, main_html)
+    get "/notes"
+    assert_equal %w[Both One], list_titles.sort
+    assert_equal %w[ruby ruby], tags_in_list
+    assert_no_match(/rails/i, main_html)
+    assert_not_equal etag, response.headers["ETag"]
+  end
+
+  test "a merge alone leaves a live post with nothing to publish and no mark; one that had unpublished changes before keeps its mark and its changes" do
+    listing_page("Notes")
+    untouched = create_post(title: "Untouched", tags: %w[rails])
+    both = create_post(title: "Both", tags: %w[rails ruby])
+    edited = create_post(title: "Edited", tags: %w[rails])
+    assert Posts::Save.call(edited, translations: { "en" => { excerpt: "Typed, not published" } }).ok?
+    assert edited.reload.unpublished_changes?
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: Tag.find_by!(name: "ruby")).ok?
+
+    [ untouched, both ].each do |post|
+      assert_not post.reload.unpublished_changes?, post.title
+      assert Publishing::Changes.of(post).none?, post.title
+      assert_equal "live", Publishing::State.of(post).status.to_s, post.title
+    end
+    assert edited.reload.unpublished_changes?, "what was typed before the merge is still to publish"
+    assert_equal %w[excerpt], Publishing::Changes.of(edited).fields, "and the merge is no part of it"
   end
 
   # The other direction is the merge itself: two tags are one from now on,

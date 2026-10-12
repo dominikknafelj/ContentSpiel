@@ -39,9 +39,10 @@ class PublishingGuardsTest < ActiveSupport::TestCase
   # `take!`, which writes a copy and removes a pending one;
   # `withdraw_pending!`, which removes a pending one and nothing else; `repoint_tag!`,
   # which replaces a merged tag's id (a reference that is about to name
-  # nothing; drafts fix round, Task 4); and `settle!`, which marks a copy
-  # whose coming into force is being acted on (Task 4b). Neither of the last
-  # two touches what a copy shows.
+  # nothing; drafts fix round, Task 4) and, with it, the id and name a
+  # post's copy shows of that tag (the hand test's finding: the site printed
+  # a merged-away name); and `settle!`, which marks a copy whose coming into
+  # force is being acted on (Task 4b) and touches nothing a copy shows.
   WRITERS_IN_THE_MODEL = %w[take! repoint_tag! settle! withdraw_pending!].freeze
   # `withdraw_pending!` deletes the one copy that was never public (its time
   # has not come): "Cancel scheduled change", and a discard, which goes back

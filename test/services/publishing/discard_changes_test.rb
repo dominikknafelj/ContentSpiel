@@ -200,8 +200,9 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_nil Tag.find_by(name: "alpha"), "the merged tag did not come back"
     assert_equal tags, Tag.count
     assert_equal "Hello", Mobility.with_locale(:en) { post.title }
-    assert post.unpublished_changes?, "the copy still shows the name alpha: that is left to publish"
-    assert_equal Publishing::DiscardChanges::REMAINS, result.notice
+    assert_equal %w[beta gamma], Publishing.current(post).snapshot["tags"].map { |tag| tag["name"] }.sort, "the merge rewrote the copy's names too"
+    assert_not post.unpublished_changes?, "so the rows are the copy again and nothing is left to publish"
+    assert_nil result.notice
 
     paths = PublicPath.current.order(:id).pluck(:record_type, :record_id, :locale, :path)
     listed = Publishing::Listing.blocks.flat_map { |block| Publishing::Listing.posts(block).map(&:id) }.sort

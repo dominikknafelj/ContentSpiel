@@ -56,6 +56,65 @@ class Publishing::VersionTest < ActiveSupport::TestCase
       version.snapshot.fetch("fields").keys.sort
   end
 
+  def shown_tags(version) = version.reload.snapshot.fetch("tags").map { |tag| tag.values_at("id", "name") }
+
+  # A hand test found the merged-away tag's NAME on the public post and in
+  # the lists after a merge: only `tag_ids` had been repointed.
+  test "a merge rewrites what a post's copy shows of the merged tag: the kept tag's id and name in its place, the others where they were" do
+    post = create_post(title: "Tagged", tags: %w[rails other])
+    rails, other = Tag.find_by!(name: "rails"), Tag.find_by!(name: "other")
+    ruby = Tag.create!(name: "ruby") # the newest id, so "in its place" is not "in id order"
+    copy = Publishing.current(post)
+    assert_equal [ [ rails.id, "rails" ], [ other.id, "other" ] ], shown_tags(copy)
+
+    assert Tags::Merge.call(rails, into: ruby).ok?
+
+    assert_equal [ [ ruby.id, "ruby" ], [ other.id, "other" ] ], shown_tags(copy)
+    assert_equal [ other.id, ruby.id ], copy.reload.tag_ids
+    assert_equal %w[ruby other], Publishing.published(post.reload).tags.map(&:name), "and that is what a rebuilt post carries"
+  end
+
+  test "a merge removes the merged tag from a copy that already carried the kept one, which stays once, where and as it was" do
+    post = create_post(title: "Both", tags: %w[first rails ruby last])
+    ids = %w[first rails ruby last].index_with { |name| Tag.find_by!(name: name).id }
+    copy = Publishing.current(post)
+
+    assert Tags::Merge.call(Tag.find(ids["rails"]), into: Tag.find(ids["ruby"])).ok?
+
+    assert_equal [ [ ids["first"], "first" ], [ ids["ruby"], "ruby" ], [ ids["last"], "last" ] ], shown_tags(copy)
+    assert_equal ids.values_at("first", "ruby", "last").sort, copy.reload.tag_ids
+  end
+
+  test "a merge rewrites the pending copy and the older ones as it does the one in force" do
+    post = create_post(title: "Scheduled", tags: %w[rails])
+    ruby = Tag.create!(name: "ruby")
+    first = Publishing.current(post)
+    assert Posts::Save.call(post, translations: { "en" => { excerpt: "Now" } }).ok?
+    publish_changes(post)
+    assert Posts::Save.call(post, translations: { "en" => { excerpt: "Later" } }).ok?
+    publish_changes(post, at: 2.days.from_now)
+    copies = [ first, Publishing.current(post), Publishing.pending(post) ]
+    assert_equal 3, copies.map(&:id).uniq.size
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: ruby).ok?
+
+    copies.each do |copy|
+      assert_equal [ [ ruby.id, "ruby" ] ], shown_tags(copy), "copy #{copy.number}"
+      assert_equal [ ruby.id ], copy.reload.tag_ids
+    end
+  end
+
+  test "a copy that carried neither tag is not written by a merge" do
+    post = create_post(title: "Bystander", tags: %w[other])
+    create_post(title: "Carrier", tags: %w[rails])
+    copy = Publishing.current(post)
+
+    statements = capture_sql { assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: Tag.create!(name: "ruby")).ok? }
+
+    assert_equal 1, statements.count { |sql| sql.match?(/\AUPDATE "published_versions"/) }, "one statement, for the one copy that held the tag"
+    assert_equal [ [ Tag.find_by!(name: "other").id, "other" ] ], shown_tags(copy)
+  end
+
   test "saving a published record again, and pressing Publish on a live one, take no copy" do
     page = create_page(title: "One")
 

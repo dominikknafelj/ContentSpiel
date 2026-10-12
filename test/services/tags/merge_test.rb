@@ -470,14 +470,17 @@ class Tags::MergeTest < ActiveSupport::TestCase
 
   def listed(page) = Publishing::Listing.posts(Publishing.published(page).content_blocks.to_a.sole).map(&:id)
 
-  test "merging a tag marks the live posts that carry it and nothing that only repoint_tag! made equal, and the site shows them as before" do
+  # A merge used to mark every live carrier: its copy kept the merged tag's
+  # name. `repoint_tag!` rewrites the name now, so rows and copy agree.
+  test "merging a tag marks no post, carrier or not: repoint_tag! makes every copy say what the rows say, and the lists hold what they held" do
     page, live, draft = live_list_and_carriers
     kept_page, kept_post, = live_list_and_carriers("kept")
     shown = listed(page)
 
     assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: Tag.find_by!(name: "kept")).ok?
 
-    assert marked?(live)
+    assert_not marked?(live), "its copy names the kept tag as its rows do"
+    assert Publishing::Changes.of(live).none?
     assert_not marked?(draft)
     assert_not marked?(kept_post), "it carried only the kept tag: its rows and its copy say the same"
     assert_not marked?(kept_page), "its list already filtered by the kept tag"

@@ -3,9 +3,10 @@ module Publishing
   # `take!`, and never changed (`readonly?`); the only row ever removed is one
   # whose `live_at` is still in the future: replaced by the next `take!`, or
   # withdrawn (`withdraw_pending!`: "Cancel scheduled change", and a discard).
-  # Two things about a copy that are not its content are written afterwards,
-  # each by one method here: `settled_at` (`settle!`) and a merged tag's id
-  # (`repoint_tag!`).
+  # Two things about a copy are written afterwards, each by one method here:
+  # `settled_at` (`settle!`), which is not its content, and a merged tag
+  # (`repoint_tag!`): its id wherever the copy refers to it, and the id and
+  # name a post's copy shows of it, the one piece of content ever rewritten.
   #
   # THE ORDER OF COPIES. `live_at` is never earlier than the moment a copy is
   # taken, and taking a copy removes the pending one, so there is at most one
@@ -166,36 +167,52 @@ module Publishing
       marked.select { |_, type, record_id| times[[ type, record_id ]] }
     end
 
-    # THE ONE WRITE TO WHAT A COPY REFERS TO after it is taken, for
-    # `Tags::Merge` alone (`test/lib/publishing_guards_test.rb` holds both
-    # halves). A tag's id in a copy is a reference, not content: the tags a
-    # post's copy carries (`tag_ids`) and the tag a list block's filter
-    # recorded (`listed_tag_id`) are what the public lists and the posts'
-    # addresses are matched by, and a merge deletes the tag `from` names.
-    # Left alone, every copy would point at a tag that no longer exists, and
-    # the next publish of the page or of a post, alone, would drop posts
-    # from a list and take their addresses. So the id is replaced by the
-    # kept tag's in every copy, in force, pending and older (an older copy
-    # is in force again for a moment when its record is published after an
-    # unpublish). After a merge the lists that held the merged tag's posts
-    # still hold them. The two ids are one from then on, so a list that
-    # filters by either holds the carriers of both: a post of the KEPT tag
-    # that nobody touched can move to a list that filtered by the merged
-    # one (`Tags::Merge` refreshes the pages and posts of both).
+    # THE ONE WRITE TO A COPY'S CONTENT after it is taken, for `Tags::Merge`
+    # alone (`test/lib/publishing_guards_test.rb` holds both halves). A
+    # tag's id in a copy is a reference, not content: the tags a post's copy
+    # carries (`tag_ids`) and the tag a list block's filter recorded
+    # (`listed_tag_id`) are what the public lists and the posts' addresses
+    # are matched by, and a merge deletes the tag `from` names. Left alone,
+    # every copy would point at a tag that no longer exists, and the next
+    # publish of the page or of a post, alone, would drop posts from a list
+    # and take their addresses. So the id is replaced by the kept tag's in
+    # every copy, in force, pending and older (an older copy is in force
+    # again for a moment when its record is published after an unpublish).
+    # After a merge the lists that held the merged tag's posts still hold
+    # them. The two ids are one from then on, so a list that filters by
+    # either holds the carriers of both: a post of the KEPT tag that nobody
+    # touched can move to a list that filtered by the merged one
+    # (`Tags::Merge` refreshes the pages and posts of both).
     #
-    # What a visitor READS is not touched: the tag names in a post's copy
-    # and the name in a block's settings change when the record is
-    # published. A list block that recorded NO id lists nothing and is left
-    # so, whatever name it holds.
+    # WHAT A VISITOR READS OF THE TAG FOLLOWS, in the same statement: a
+    # post's copy holds its tags by id AND NAME (`snapshot["tags"]`, what
+    # `Snapshot.tags_from` hands the public post and the lists), and the
+    # merged tag is no tag any more. This used to leave the name alone
+    # "until the post is published", and a hand test found the site printing
+    # "rails" beside "ruby" after the one had been merged into the other,
+    # with every carrier marked as having unpublished changes, for a merge
+    # the dialog calls immediate. So the merged tag's entry becomes the kept
+    # tag's, id and name, where it stood (`merged_tags`); a copy that
+    # carried the kept tag already keeps that entry as it is and loses the
+    # merged one, so the tag is there once and the others keep their order.
+    # A copy's rows and a carrier's rows then say the same about the tag,
+    # which is why the merge marks no post (`Tags::Listings#touch_carrying_posts`).
+    #
+    # The name in a list block's `settings` is NOT touched: no visitor reads
+    # it (the list is matched by `listed_tag_id`), and it changes when the
+    # page is published. A list block that recorded NO id lists nothing and
+    # is left so, whatever name it holds.
     #
     # Rows are written around `readonly?` with `update_all`, one statement
     # per copy that holds the id, and only those copies are read: the array
     # by its index, the blocks by containment (`listing_tag`). In the
     # caller's transaction, after its page locks; it takes no lock of its
-    # own beyond the rows it writes.
+    # own beyond the rows it writes. `to` is the caller's LOCKED row: its
+    # name is the one the rows show.
     def self.repoint_tag!(from:, to:)
-      unscoped.where(SqlNodes.array_contains(arel_table[:tag_ids], [ from.id ])).pluck(:id, :tag_ids).each do |id, tag_ids|
-        unscoped.where(id: id).update_all(tag_ids: ((tag_ids - [ from.id ]) | [ to.id ]).sort) # version: none (Tags::Merge, the one caller, bumps for the whole merge)
+      unscoped.where(SqlNodes.array_contains(arel_table[:tag_ids], [ from.id ])).pluck(:id, :tag_ids, :snapshot).each do |id, tag_ids, snapshot|
+        shown = snapshot.key?("tags") ? snapshot.merge("tags" => merged_tags(snapshot["tags"], from, to)) : snapshot
+        unscoped.where(id: id).update_all(tag_ids: ((tag_ids - [ from.id ]) | [ to.id ]).sort, snapshot: shown) # version: none (Tags::Merge, the one caller, bumps for the whole merge)
       end
 
       listing_tag([ from.id ]).pluck(:id, :blocks).each do |id, blocks|
@@ -203,6 +220,20 @@ module Publishing
         unscoped.where(id: id).update_all(blocks: blocks) # version: none (Tags::Merge, the one caller, bumps for the whole merge)
       end
     end
+
+    # A copy's tags (`[{ "id" =>, "name" => }, ...]`) after `from` was merged
+    # into `to`: `from`'s entry is `to`'s, in its place, unless the copy
+    # carried `to` already, whose own entry then stands for both. Nothing
+    # else moves.
+    def self.merged_tags(tags, from, to)
+      carried = tags.any? { |tag| tag["id"] == to.id }
+      tags.filter_map do |tag|
+        next tag unless tag["id"] == from.id
+
+        { "id" => to.id, "name" => to.name } unless carried
+      end
+    end
+    private_class_method :merged_tags
 
     # The copies of pages one of whose blocks recorded one of these tag ids
     # as its filter (`listed_tag_id`): in force, pending and older alike.
