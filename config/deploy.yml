@@ -16,7 +16,9 @@ servers:
 # Enable SSL auto certification via Let's Encrypt and allow for multiple apps on a single web server.
 # If used with Cloudflare, set encryption mode in SSL/TLS setting to "Full" to enable CF-to-app encryption.
 #
-# Using an SSL proxy like this requires turning on config.assume_ssl and config.force_ssl in production.rb!
+# Using an SSL proxy like this needs PUBLIC_HOST set to the site's https address (env, below): HTTPS is
+# then forced from it (lib/host_settings.rb), and production.rb sets neither config.force_ssl nor
+# config.assume_ssl itself. ASSUME_SSL=1 is only for a proxy that does not send X-Forwarded-Proto.
 #
 # Don't use this when deploying to multiple web servers (then you have to terminate SSL at your load balancer).
 proxy:
