@@ -107,7 +107,7 @@ module ContentBlocks
         # and a block's `updated_at` -- its autosave base -- must not move
         # because it was dragged: its open form would be refused as stale.
         @ordered_ids.each_with_index do |id, index|
-          blocks[id].update_columns(section_id: @section_id, section_column: @column, position: index) # version: none (a changed order touches the page below, and a live page's after_commit bumps)
+          blocks[id].update_columns(section_id: @section_id, section_column: @column, position: index) # version: none (the owner is touched below: its after_commit bumps where its rows are what the site shows, and a page with a copy shows the copy)
         end
         @moved_from.values.uniq.each { |section_id, column| renumber(@page.content_blocks.in_column(section_id, column)) }
 

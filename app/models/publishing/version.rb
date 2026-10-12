@@ -84,13 +84,16 @@ module Publishing
           settled_at: (now if live_at <= now && row.published_at&.<=(now)))
         # A scheduled record shows nothing yet, so its copy changes nothing the
         # public can see (the moment it goes live is the content version's own
-        # publication-time lookup, as for the record itself).
-        # INTERIM, until Task 5: a scheduled CHANGE (a future `live_at` on a
-        # live record) bumps now and not when it comes into force, so between
-        # Task 2 and Task 5 a conditional GET keeps answering 304 with the old
-        # page at that moment. Task 5 adds the part of the content version that
-        # follows copies by the clock.
-        PublicSite.bump_version! if row.live?
+        # publication-time lookup, as for the record itself). A scheduled
+        # CHANGE (a future `live_at` on a live record) changes nothing now
+        # either: it comes into force when its time passes, which is the part
+        # of `PublicSite.content_version` that reads the newest `live_at` in
+        # force, so no write and no job is what moves the version then.
+        PublicSite.bump_version! if row.live? && live_at <= now
+        # The images the copies show count as used (`Media::Usage` role
+        # `published`), in this transaction, whether the copy is in force now
+        # or pending.
+        Media::UsageIndex.refresh_published(row, now: now)
         # In this transaction, after the record's row was locked above: the
         # order every refresh from a save has. A copy of a record that is
         # only scheduled is in force too and is refreshed now (a scheduled

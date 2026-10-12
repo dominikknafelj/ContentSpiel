@@ -125,19 +125,63 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
 
   # --- Live pages and posts ----------------------------------------------------
 
-  test "creating and editing a live post moves" do
+  # Drafts of live content: the public reads a published record's COPY, so an
+  # edit of its rows changes nothing a visitor sees and leaves the version
+  # alone; publishing the changes takes the next copy, which moves it.
+  test "creating a live post moves; editing it stays, and publishing the changes moves" do
     post = nil
     assert_moves("creating a live post") { post = create_post(title: "Live") }
-    assert_moves("a live post's title") { ok(Posts::Save.call(post, translations: { "en" => { title: "Live, edited" } })) }
-    assert_moves("a live post's body") { ok(Posts::Save.call(post, translations: { "en" => { body: rich_doc("Text") } })) }
+    assert_stays("a live post's title") { ok(Posts::Save.call(post, translations: { "en" => { title: "Live, edited" } })) }
+    assert_stays("a live post's body") { ok(Posts::Save.call(post, translations: { "en" => { body: rich_doc("Text") } })) }
+    assert_moves("publishing the changes") { publish_changes(post) }
   end
 
-  test "creating and editing a live page moves" do
+  test "creating a live page moves; editing it stays, and publishing the changes moves" do
     page = nil
     assert_moves("creating a live page") { page = create_page(title: "Live") }
-    assert_moves("a live page's title") { ok(Pages::Save.call(page, translations: { "en" => { title: "Live, edited" } })) }
-    assert_moves("a live page's slug") { ok(Pages::Save.call(page, translations: { "en" => { slug: "renamed" } })) }
-    assert_moves("a live page's hero") { ok(Pages::Save.call(page, attributes: { hero_media_asset_id: create_media_asset.id })) }
+    assert_stays("a live page's title") { ok(Pages::Save.call(page, translations: { "en" => { title: "Live, edited" } })) }
+    asset = create_media_asset
+    assert_stays("a live page's hero") { ok(Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })) }
+    assert_moves("publishing the changes") { publish_changes(page) }
+  end
+
+  test "a slug, a move and an unpublish of a live page with a copy still move: they are immediate" do
+    page = create_page(title: "Immediate")
+    other = create_page(title: "Other")
+
+    assert_moves("a slug") { ok(Pages::Save.call(page, translations: { "en" => { slug: "moved-address" } })) }
+    assert_moves("a move") { ok(Pages::Move.call(page, parent: other, position: 0)) }
+    assert_moves("an unpublish") { ok(Pages::Save.call(page, attributes: { published: false })) }
+  end
+
+  test "a live record with no copy moves on every write, as before: its rows are what the site shows" do
+    page = create_page(title: "Bare", published: false)
+    page.update_columns(published_at: 1.day.ago) # version: none (a test makes a live page with no copy)
+
+    assert_moves("a title") { ok(Pages::Save.call(page.reload, translations: { "en" => { title: "Bare, edited" } })) }
+    assert_moves("a block") { ok(ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" })) }
+  end
+
+  test "a scheduled change coming into force by the clock changes the version with no write" do
+    page = create_page(title: "Before")
+    ok(Pages::Save.call(page, translations: { "en" => { title: "After" } }))
+    publish_changes(page, at: 2.days.from_now)
+    before = PublicSite.content_version
+
+    travel_to 3.days.from_now do
+      assert_not_equal before, PublicSite.content_version
+    end
+  end
+
+  test "a scheduled change does not move the version when it is taken, and does at its instant, not one second after" do
+    page = create_page(title: "Before")
+    ok(Pages::Save.call(page, translations: { "en" => { title: "After" } }))
+    at = 1.hour.from_now.change(usec: 0)
+
+    assert_stays("taking a copy with a time of its own") { publish_changes(page, at: at) }
+    before = PublicSite.content_version
+    travel_to(at - 1.second) { assert_equal before, PublicSite.content_version }
+    travel_to(at + 1.second) { assert_not_equal before, PublicSite.content_version }
   end
 
   test "publishing and unpublishing move, for a post and for a page" do
@@ -218,23 +262,28 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_equal [ three.id, one.id, two.id ], live_order.call
   end
 
-  test "the blocks of a live page move: add, edit, reorder, delete" do
+  test "the blocks of a live page stay: add, edit, reorder, delete; publishing them moves once" do
     page = create_page(title: "Live")
     first = second = nil
 
-    assert_moves("adding a block to a live page") { first = block_on(page) }
-    assert_moves("adding a second block") { second = block_on(page) }
-    assert_moves("editing a live page's block") { ok(ContentBlocks::Save.call(first, translations: { "en" => { body: rich_doc("Edited") } })) }
-    assert_moves("reordering a live page's blocks") { ok(ContentBlocks::Reorder.call(page, [ second.id, first.id ])) }
+    assert_stays("adding a block to a live page") { first = block_on(page) }
+    assert_stays("adding a second block") { second = block_on(page) }
+    assert_stays("editing a live page's block") { ok(ContentBlocks::Save.call(first, translations: { "en" => { body: rich_doc("Edited") } })) }
+    assert_stays("reordering a live page's blocks") { ok(ContentBlocks::Reorder.call(page, [ second.id, first.id ])) }
     assert_stays("an order resubmitted unchanged") { ok(ContentBlocks::Reorder.call(page, [ second.id, first.id ])) }
-    assert_moves("deleting a live page's block") { ok(ContentBlocks::Destroy.call(second)) }
+    assert_stays("deleting a live page's block") { ok(ContentBlocks::Destroy.call(second)) }
+
+    before = counter
+    publish_changes(page)
+    assert_equal before + 1, counter, "publishing the blocks moves the version once"
   end
 
   # A move is written with `update_columns` and a duplicate through saves
   # and a reorder: each touches the page, whose `after_commit` moves the
   # version of a live one.
-  test "a live page's block moved between containers or duplicated moves, a draft's stays" do
-    [ [ create_page(title: "Live"), :assert_moves ], [ create_page(title: "Draft", published: false), :assert_stays ] ].each do |page, expectation|
+  test "a live page's block moved between containers or duplicated stays, as a draft's does" do
+    [ create_page(title: "Live"), create_page(title: "Draft", published: false) ].each do |page|
+      expectation = :assert_stays
       block = block_on(page)
       section = ok(ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section" })).record
 
@@ -247,14 +296,19 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
   end
 
   # Without the services' owner touch: the block's own `after_commit`.
-  test "a block of a live page saved or destroyed without its service moves, a draft's stays" do
+  test "a block of a live page saved or destroyed without its service stays on a live page that has a copy and on a draft, and moves on a live page that has none" do
     live = block_on(create_page(title: "Live"))
     draft = block_on(create_page(title: "Draft", published: false))
+    bare_page = create_page(title: "Bare")
+    bare = block_on(bare_page)
+    Publishing::Version.of(bare_page).delete_all # version: none (a test takes the copy away: this page is served from its rows)
 
-    assert_moves("a live page's block, saved directly") { live.update!(position: 5) }
+    assert_stays("a copied live page's block, saved directly") { live.update!(position: 5) }
     assert_stays("a draft's block, saved directly") { draft.update!(position: 5) }
-    assert_moves("a live page's block, destroyed directly") { live.destroy! }
+    assert_moves("a live page with no copy, its block saved directly") { bare.update!(position: 5) }
+    assert_stays("a copied live page's block, destroyed directly") { live.destroy! }
     assert_stays("a draft's block, destroyed directly") { draft.destroy! }
+    assert_moves("a live page with no copy, its block destroyed directly") { bare.destroy! }
   end
 
   # `Posts::Bulk` writes nothing itself: each post goes through `Posts::Save`
@@ -272,12 +326,12 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     end
   end
 
-  test "a live post's tags move" do
+  test "a live post's tags stay until its changes are published" do
     post = create_post(title: "Live", tags: [ "one" ])
 
-    assert_moves("a live post gaining a tag") { ok(Posts::Save.call(post, attributes: { tag_names: %w[one two] })) }
-    assert_moves("a live post losing a tag") { ok(Posts::Save.call(post, attributes: { tag_names: %w[two] })) }
-    assert_moves("a tag put on a live post around the service") { post.tags << Tag.create!(name: "three") }
+    assert_stays("a live post gaining a tag") { ok(Posts::Save.call(post, attributes: { tag_names: %w[one two] })) }
+    assert_stays("a live post losing a tag") { ok(Posts::Save.call(post, attributes: { tag_names: %w[two] })) }
+    assert_moves("publishing the changes") { publish_changes(post) }
   end
 
   # --- Addresses ---------------------------------------------------------------
@@ -525,16 +579,18 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
 
   # --- The version itself ------------------------------------------------------
 
-  test "the version read costs exactly three queries" do
+  test "the version read costs exactly four queries" do
     create_post(title: "Live")
     PublicSite::Version.current # the first read of a model loads its schema
+    Publishing::Version.in_force.maximum(:live_at)
 
     statements = capture_sql { PublicSite.content_version }
 
-    assert_equal 3, statements.size, statements.join("\n")
+    assert_equal 4, statements.size, statements.join("\n")
     assert_match(/public_site_versions/, statements[0])
     assert_match(/MAX\("pages"."published_at"\)/, statements[1])
     assert_match(/MAX\("posts"."published_at"\)/, statements[2])
+    assert_match(/MAX\("published_versions"."live_at"\)/, statements[3])
   end
 
   test "the per-request memo is one read, and a bump clears it" do

@@ -350,4 +350,63 @@ class Media::UsageIndexTest < ActiveSupport::TestCase
     assert_nothing_raised { Media::UsageIndex.refresh(setting) }
     assert_empty Media::Usage.where(owner_type: "SiteSetting", owner_id: setting.id)
   end
+
+  # --- Drafts of live content: the published copy's images are used ----------
+
+  test "an image only the published copy shows cannot be moved to the trash or deleted, and can once the changes are published" do
+    hero = create_media_asset
+    picture = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: false, hero_media_asset_id: hero.id }, translations: { "en" => { title: "Gallery" } }).record
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: picture.id }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+
+    assert ContentBlocks::Destroy.call(block).ok?
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: nil }).ok?
+
+    [ hero, picture ].each do |asset|
+      assert_equal [ [ "Page", page.id, "published" ] ], asset.usages.pluck(:owner_type, :owner_id, :role)
+      assert asset.reload.used_by_kept_owner?
+      assert_not Trash::Move.call(asset).ok?, "an image on the site went to the trash"
+    end
+
+    publish_changes(page)
+
+    [ hero, picture ].each do |asset|
+      assert_not asset.reload.used?
+      assert Trash::Move.call(asset).ok?
+    end
+  end
+
+  test "an image in a published post's body is used by the copy when the rows drop it" do
+    asset = create_media_asset
+    post = Posts::Save.call(attributes: { content_type: "blog", published: true }, translations: { "en" => { title: "Pictured", body: rich_doc(%(::image{asset="#{asset.id}"})) } }).record
+
+    assert Posts::Save.call(post, translations: { "en" => { body: rich_doc("No picture") } }).ok?
+
+    assert_equal [ "published" ], asset.usages.where(owner: post).pluck(:role)
+  end
+
+  test "a refresh of a page's own usages leaves the copy's alone, and a destroyed page takes both" do
+    asset = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: asset.id }, translations: { "en" => { title: "Hero" } }).record
+    assert_equal %w[hero published], asset.usages.pluck(:role).sort
+
+    Media::UsageIndex.refresh(page)
+    assert_equal %w[hero published], asset.usages.pluck(:role).sort
+
+    delete_for_good(page)
+    assert_empty asset.usages.reload
+  end
+
+  test "an image a pending copy shows is used as well as the current copy's" do
+    now_shown = create_media_asset
+    later = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: now_shown.id }, translations: { "en" => { title: "Hero" } }).record
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: later.id }).ok?
+    publish_changes(page, at: 2.days.from_now)
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: nil }).ok?
+
+    assert now_shown.usages.exists?(role: "published")
+    assert later.usages.exists?(role: "published")
+  end
 end

@@ -28,6 +28,8 @@ class Media::UsageIndex
   # documenting about which columns "the same usage" actually means.
   UNIQUE_BY = %i[media_asset_id owner_type owner_id role locale].freeze
 
+  PUBLISHED = "published".freeze
+
   class << self
     # Recomputes `owner`'s own rows and replaces them in one transaction:
     # delete whatever's currently stored for this owner, then insert
@@ -44,7 +46,27 @@ class Media::UsageIndex
       rows = owner.destroyed? ? [] : rows_for(owner)
 
       Media::Usage.transaction do
-        Media::Usage.where(owner: owner).delete_all
+        # Not the rows of role `published`: those are the copies', refreshed
+        # when a copy is taken. A destroyed owner takes both (`role` is never
+        # NULL, so `where.not(role: nil)` is every row).
+        Media::Usage.where(owner: owner).where.not(role: (owner.destroyed? ? nil : PUBLISHED)).delete_all
+        insert_rows(rows)
+      end
+    end
+
+    # The images a record's published copies show: its current copy and the
+    # one waiting for its time. An image only they show (dropped from the
+    # rows since) must not be deleted from under the site: these rows, with
+    # the foreign key on `media_usages`, are what refuses. A copy that a
+    # pending one replaced by the clock keeps its rows until the next copy is
+    # taken: more protection than needed, never less.
+    def refresh_published(record, now: Time.current)
+      copies = [ Publishing.current(record, now: now), Publishing.pending(record, now: now) ].compact
+      ids = copies.flat_map { |version| asset_ids_in(version) }.uniq
+      stamp = Time.current
+      rows = Media::Asset.where(id: ids).pluck(:id).map { |id| row(asset_id: id, owner: record, role: PUBLISHED, locale: nil, now: stamp) }
+      Media::Usage.transaction do
+        Media::Usage.where(owner: record, role: PUBLISHED).delete_all
         insert_rows(rows)
       end
     end
@@ -70,6 +92,7 @@ class Media::UsageIndex
       OWNER_CLASSES.each do |klass|
         klass.find_each do |owner|
           refresh(owner)
+          refresh_published(owner) if owner.respond_to?(:published_versions)
         rescue StandardError => e
           failures += 1
           Rails.logger.error("[media_usage_index] rebuild_all: #{owner.class.polymorphic_name}##{owner.id} failed: #{e.class}: #{e.message}")
@@ -79,6 +102,15 @@ class Media::UsageIndex
     end
 
     private
+
+    # Every library image a copy refers to: the hero, the blocks' images and
+    # the images inside the bodies (the record's and the blocks'), as ids.
+    def asset_ids_in(version)
+      fields = version.snapshot.fetch("fields", {})
+      bodies = [ fields["body"], *version.blocks.map { |block| block["body"] } ].flat_map { |by_locale| by_locale.is_a?(Hash) ? by_locale.values : [] }
+      direct = [ fields["hero_media_asset_id"], *version.blocks.map { |block| block["media_asset_id"] } ]
+      (direct + bodies.select { |doc| doc.is_a?(Hash) }.flat_map { |doc| image_asset_ids(doc) }).filter_map { |value| normalize_asset_id(value) }
+    end
 
     def media_managed?(owner) = OWNER_CLASSES.any? { |klass| owner.is_a?(klass) }
 

@@ -11,7 +11,10 @@ class Media::Usage < ApplicationRecord
   # has to be spelled out explicitly.
   self.table_name = "media_usages"
 
-  ROLES = %w[hero block_image rich_text].freeze
+  # `published`: an image a current or pending published copy of the owner shows
+  # (`Media::UsageIndex.refresh_published`); the owner is the page or post,
+  # never a block, since a copy's block may no longer exist as a row.
+  ROLES = %w[hero block_image rich_text published].freeze
 
   belongs_to :media_asset, class_name: "Media::Asset"
 

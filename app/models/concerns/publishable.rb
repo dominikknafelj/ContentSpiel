@@ -7,6 +7,10 @@ module Publishable
 
   STATUSES = %w[draft scheduled live].freeze
 
+  # Columns whose change no page shows: a save that changes only these, or
+  # only content a copy holds, changes nothing public where a copy is shown.
+  BOOKKEEPING = %w[updated_at settings_changed_at unpublished_changes_at translation_sources translation_original_changed_at].freeze
+
   included do
     scope :published, -> { where(published_at: ..Time.current) }
     # Waiting for its time: strictly later than now, so a draft (NULL) and a
@@ -23,6 +27,8 @@ module Publishable
     # `after_commit` sees only the last.
     before_save :note_live_before_change
     before_destroy :note_live_before_change
+    # A destroy has no `changed`, and it is always immediate.
+    before_destroy { @immediate_change = true }
     after_commit :bump_public_version_when_live
     after_rollback :forget_live_before_change
 
@@ -81,14 +87,27 @@ module Publishable
   def note_live_before_change
     before = published_at_in_database
     @live_before_change ||= before.present? && before <= Time.current
+    # What is immediate (drafts spec D7): the slug, the tree, `published_at`,
+    # the trash, a post's type; a new record. Or-ed across the saves of one
+    # transaction, like the line above.
+    @immediate_change ||= new_record? || (changed - Publishing.content_columns(self) - BOOKKEEPING).any?
   end
 
   def forget_live_before_change
     @live_before_change = nil
+    @immediate_change = nil
   end
 
+  # The version moves for a committed change the public can see. With a copy
+  # (`Publishing`), that is only what is immediate: the copy's content does
+  # not change when the rows do, and taking the next copy bumps
+  # (publishing the changes), or, for a change with a time of its own,
+  # the part of `PublicSite.content_version` that follows the copies by the
+  # clock. Without a copy the rows are what the site shows, and every write
+  # moves it, as it always did. A `touch` (a block's write) notes nothing, so
+  # it moves the version only without a copy.
   def bump_public_version_when_live
-    PublicSite.bump_version! if live_before_or_after_save?
+    PublicSite.bump_version! if live_before_or_after_save? && (@immediate_change || !Publishing.copied?(self))
   ensure
     forget_live_before_change
   end

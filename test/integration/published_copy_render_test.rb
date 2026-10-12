@@ -224,6 +224,10 @@ class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
     block = add_block(page, block_type: "image", media_asset_id: gone.id, translations: { "en" => { alt: "A vanished picture" } })
     publish_changes(page)
     assert ContentBlocks::Destroy.call(block).ok?
+    # Setup fix (Task 5): the copy keeps the image "used", so the service
+    # refuses to delete it. This test is about a copy whose image is gone
+    # anyway (rows written around the services), so the usage goes first.
+    Media::Usage.where(media_asset_id: gone.id).delete_all # version: none (a test takes the usage away; nothing public is read from it)
     delete_for_good(gone)
 
     html = body_of(PublicSite::Urls.new.path_for(page.reload, :en), from_copy: true)

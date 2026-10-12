@@ -22,7 +22,7 @@ module ThemeHelper
   def theme_root_page
     return @theme_root_page if defined?(@theme_root_page)
 
-    @theme_root_page = Page.find_by(parent_id: nil)
+    @theme_root_page = Page.find_by(parent_id: nil) # public: rows (only its address and its children are read; a title goes through published_views)
   end
 
   # Other records a page shows by their title, as a visitor sees them: each

@@ -31,13 +31,13 @@ module PublicSite
       return false if record.trashed?
 
       pages = case record
-      when Page then record.self_and_ancestors
-      when Post then (page = PublicSite::Paths.canonical_page(record)) ? page.self_and_ancestors : nil
+      when Page then record.self_and_ancestors # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
+      when Post then (page = PublicSite::Paths.canonical_page(record)) ? page.self_and_ancestors : nil # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
       end
       return false if pages.nil?
       return false if record.is_a?(Post) && !record.live?
 
-      pages.where.not(id: Page.published.select(:id)).none?
+      pages.where.not(id: Page.published.select(:id)).none? # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
     end
 
     def initialize(scope:, urls: PublicSite::Urls.new(preview: scope == :preview))
@@ -70,7 +70,7 @@ module PublicSite
       page_row = PublicPath.current.find_by(record_type: "Page", locale: locale.to_s, path: parent_path.presence || "/")
       return nil if page_row.nil? || slug.blank?
 
-      post = Post.kept.i18n.where(slug: slug, locale: locale.to_s).find { |candidate| listed_on?(page_row.record, candidate) }
+      post = Post.kept.i18n.where(slug: slug, locale: locale.to_s).find { |candidate| listed_on?(page_row.record, candidate) } # public: rows (a slug is the row's; listed_on? judges by the copies)
       return nil if post.nil? || !visible?(post)
 
       target = @urls.path_for(post, locale)
@@ -87,7 +87,7 @@ module PublicSite
     # post's (a scope on a rebuilt page's blocks would query the rows), for
     # the preview by the rows.
     def listed_on?(page, post)
-      return page.content_blocks.listing.any? { |block| block.lists?(post) } if @scope == :preview
+      return page.content_blocks.listing.any? { |block| block.lists?(post) } if @scope == :preview # public: rows (the preview shows the working version)
 
       @listing_blocks ||= {}
       blocks = @listing_blocks[page.id] ||= Publishing.published(page).content_blocks.to_a

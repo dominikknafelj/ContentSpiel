@@ -28,6 +28,13 @@ urls = PublicSite::Urls.new(host: SitemapGenerator::Sitemap.default_host)
 # resolver would 404.
 visible = PublicSite::Resolver.method(:visible?)
 
+# When what a visitor sees of a record last changed: the time its current copy
+# came into force, or the time it went live if that was later (a record
+# scheduled ahead). An autosave of a live record does not move it. A record
+# with no copy is dated by its row, as before. Read once, without the copies'
+# content.
+came_into_force = Publishing::Version.in_force.group(:record_type, :record_id).maximum(:live_at)
+
 # `include_root` would add "/" unconditionally -- the loop below already adds
 # it itself (as the root Page's own entry in the current default locale, which
 # is exactly the page "/" resolves to), so leaving this on would list it twice.
@@ -52,6 +59,8 @@ SitemapGenerator::Sitemap.create(include_root: false) do
     # every language's URL, including its own, exactly as
     # `application.html.erb`'s hreflang tags do for a live request.
     alternates = urls.alternates(record).map { |locale, href| { href: href, lang: locale } }
-    add path, lastmod: record.updated_at, alternates: alternates
+    key = [ public_path.record_type, public_path.record_id ]
+    lastmod = came_into_force.key?(key) ? [ came_into_force[key], record.published_at ].compact.max : record.updated_at
+    add path, lastmod: lastmod, alternates: alternates
   end
 end

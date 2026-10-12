@@ -43,6 +43,8 @@ class PostTag < ApplicationRecord
 
   # No post (it was destroyed with this row): its own `after_commit` decides.
   def bump_public_version_when_post_live
-    PublicSite.bump_version! if post&.live?
+    # A post that has a copy shows the copy's tags: its tags change what the
+    # public sees when the changes are published (taking the next copy bumps).
+    PublicSite.bump_version! if post&.live? && !Publishing.copied?(post)
   end
 end

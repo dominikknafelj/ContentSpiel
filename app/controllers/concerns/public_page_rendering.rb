@@ -70,7 +70,7 @@ module PublicPageRendering
   # the page whose rows list it (`PublicSite::Resolver#listing_fallback`).
   def assign_record(record, listing_page: nil)
     if record.is_a?(Post)
-      page = listing_page || PublicSite::Paths.canonical_page(record)
+      page = listing_page || PublicSite::Paths.canonical_page(record) # public: rows (an address; as_published is the next line)
       return false if page.nil?
 
       @page = as_published(page)

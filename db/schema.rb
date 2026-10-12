@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_11_122000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_12_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -389,6 +389,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_122000) do
     t.bigint "created_by_id"
     t.datetime "created_at", null: false
     t.datetime "settled_at"
+    t.index ["live_at"], name: "index_published_versions_on_live_at"
     t.index ["live_at"], name: "index_published_versions_on_live_at_unsettled", where: "(settled_at IS NULL)"
     t.index ["record_type", "record_id", "live_at"], name: "index_published_versions_on_record_and_live_at"
     t.index ["record_type", "record_id", "number"], name: "index_published_versions_on_record_and_number", unique: true

@@ -116,7 +116,7 @@ module ContentBlocks
       (top[0...at] + inside + top[at..]).each_with_index do |block, index|
         next if block.section_id.nil? && block.position == index
 
-        block.update_columns(section_id: nil, section_column: nil, position: index) # version: none (the owner is touched below, and a live page's after_commit bumps)
+        block.update_columns(section_id: nil, section_column: nil, position: index) # version: none (the owner is touched below: its after_commit bumps where its rows are what the site shows, and a page with a copy shows the copy)
       end
     end
   end

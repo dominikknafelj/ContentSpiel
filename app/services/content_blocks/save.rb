@@ -248,7 +248,7 @@ module ContentBlocks
 
       last = ContentBlock.in_column(@block.id, keep).maximum(:position) || -1
       stranded.each_with_index do |block, index|
-        block.update_columns(section_column: keep, position: last + 1 + index) # version: none (the owner is touched below, and a live page's after_commit bumps)
+        block.update_columns(section_column: keep, position: last + 1 + index) # version: none (the owner is touched below: its after_commit bumps where its rows are what the site shows, and a page with a copy shows the copy)
       end
       stranded.map(&:id)
     end

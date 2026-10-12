@@ -42,7 +42,7 @@ module Blocks
     def posts(settings)
       return Publishing::Listing.posts(block, limit: settings.limit) unless helpers.public_urls.preview?
 
-      rows = block.listed_posts.order(published_at: :desc).includes(:tags)
+      rows = block.listed_posts.order(published_at: :desc).includes(:tags) # public: rows (the preview shows the working version)
       settings.limit.present? ? rows.limit(settings.limit) : rows
     end
   end
