@@ -602,4 +602,87 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Changes published"
     assert_select "#publishing-chip *", count: 0
   end
+
+  # -- a scheduled record has the same ways out of a change as a live one (final fix, I1) --
+
+  # Scheduled for Friday, edited, and a change published for Saturday: the
+  # state is `:scheduled` with a copy pending and no edits since.
+  def scheduled_page_with_a_scheduled_change
+    page = create_page(title: "Scheduled as this", published: false)
+    assert Pages::Save.call(page, attributes: { published_at: 3.days.from_now }).ok?
+    assert Pages::Save.call(page, translations: { "en" => { title: "Changed for Saturday" } }).ok?
+    publish_changes(page, at: 5.days.from_now)
+    assert_not page.reload.unpublished_changes?
+    page
+  end
+
+  test "a scheduled page with a scheduled change and no edits since offers its way out in the header: publish changes, discard, and the cancel in the menu" do
+    page = scheduled_page_with_a_scheduled_change
+
+    get admin_page_path(page)
+
+    assert_select "#publishing-chip [data-publish-changes-offered]", count: 1
+    assert_select "#publishing-chip [data-discard-changes-offered]", count: 1
+    assert_select "#publishing-chip [data-change-scheduled]", count: 1
+    assert_select "dialog#cancel-scheduled-change-page-#{page.id} form[action='#{admin_publishing_cancel_scheduled_change_path(kind: "page", id: page.id)}']"
+    assert_select "button", text: "Cancel scheduled change"
+  end
+
+  test "a scheduled page's change published again at another time moves the change and leaves the page scheduled" do
+    page = scheduled_page_with_a_scheduled_change
+    at = 7.days.from_now.change(sec: 0)
+    shown = Publishing.pending(page).id
+
+    post admin_publishing_publish_path(kind: "page", id: page.id), params: { when: "at", published_at: at.in_time_zone(Current.site.effective_time_zone).strftime("%Y-%m-%dT%H:%M"), pending: shown }
+
+    assert_redirected_to admin_page_path(page)
+    assert_match(/\AChanges scheduled for /, flash[:notice])
+    assert_in_delta at.to_f, Publishing.pending(page).live_at.to_f, 60
+    assert_equal 1, Publishing::Version.of(page).pending.count
+    assert_equal "scheduled", page.reload.status
+  end
+
+  test "a scheduled page's scheduled change is cancelled: the copy goes, the rows stay, the page stays scheduled" do
+    page = scheduled_page_with_a_scheduled_change
+
+    post admin_publishing_cancel_scheduled_change_path(kind: "page", id: page.id), params: { pending: Publishing.pending(page).id }
+
+    assert_redirected_to admin_page_path(page)
+    assert_equal "Scheduled change cancelled", flash[:notice]
+    assert_nil Publishing.pending(page)
+    assert_equal "Changed for Saturday", Mobility.with_locale(:en) { page.reload.title }
+    assert page.unpublished_changes?, "what was scheduled is unpublished changes again"
+    assert_equal "scheduled", page.status
+  end
+
+  test "a scheduled page's scheduled change is discarded: the copy goes and the rows go back to what was scheduled" do
+    page = scheduled_page_with_a_scheduled_change
+
+    post admin_publishing_discard_path(kind: "page", id: page.id), params: { pending: Publishing.pending(page).id }
+
+    assert_redirected_to admin_page_path(page)
+    assert_equal "Changes discarded", flash[:notice]
+    assert_nil Publishing.pending(page)
+    assert_equal "Scheduled as this", Mobility.with_locale(:en) { page.reload.title }
+    assert_not page.unpublished_changes?
+    assert_equal "scheduled", page.status
+  end
+
+  test "the same ways out for a scheduled post" do
+    record = create_post(title: "Post", published: false)
+    assert Posts::Save.call(record, attributes: { published_at: 3.days.from_now }).ok?
+    assert Posts::Save.call(record, translations: { "en" => { title: "Changed for Saturday" } }).ok?
+    publish_changes(record, at: 5.days.from_now)
+
+    get admin_post_path(record)
+    assert_select "#publishing-chip [data-publish-changes-offered]", count: 1
+    assert_select "#publishing-chip [data-discard-changes-offered]", count: 1
+    assert_select "dialog#cancel-scheduled-change-post-#{record.id}"
+
+    post admin_publishing_cancel_scheduled_change_path(kind: "post", id: record.id)
+    assert_equal "Scheduled change cancelled", flash[:notice]
+    post admin_publishing_discard_path(kind: "post", id: record.id)
+    assert_equal "Changes discarded", flash[:notice]
+    assert_equal "Post", Mobility.with_locale(:en) { record.reload.title }
+  end
 end

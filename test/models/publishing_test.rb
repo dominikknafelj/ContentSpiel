@@ -11,7 +11,7 @@ class PublishingTest < ActiveSupport::TestCase
   test "current, baseline, pending and copied? follow the copies of a record" do
     page = create_page(title: "One")
     first = Publishing.current(page)
-    assert Publishing.copied?(page)
+    assert copied?(page)
     assert_equal first, Publishing.baseline(page)
 
     later = Publishing::Version.take!(page, live_at: 2.days.from_now)
@@ -19,7 +19,7 @@ class PublishingTest < ActiveSupport::TestCase
     assert_equal first, Publishing.current(page)
     assert_equal later, Publishing.pending(page)
     assert_equal later, Publishing.baseline(page)
-    assert_not Publishing.copied?(create_page(title: "Draft", published: false))
+    assert_not copied?(create_page(title: "Draft", published: false))
   end
 
   test "published is the copy for a live record, the record itself for a draft and for one with no copy" do

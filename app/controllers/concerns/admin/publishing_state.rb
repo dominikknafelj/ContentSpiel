@@ -15,6 +15,18 @@ module Admin
   module PublishingState
     private
 
+    # The toast of "Publish now". A scheduled record goes live as it was
+    # scheduled (its copy is taken when it is scheduled; later edits are
+    # unpublished changes, drafts spec §3: typing never publishes), so when it
+    # has such changes the person is told that they are not on the site.
+    # `was_scheduled` is read BEFORE the save: it moves `published_at`.
+    def published_now_notice(record, was_scheduled:)
+      current = record.class.find_by(id: record.id)
+      return "Published" unless was_scheduled && current && ::Publishing::State.of(current).changes?
+
+      I18n.t("admin.components.editor_screen.publishing.published_as_scheduled")
+    end
+
     def publishing_state_streams(record)
       owner = record.is_a?(ContentBlock) ? record.owner : record
       return [] unless owner.is_a?(Page) || owner.is_a?(Post)

@@ -92,14 +92,6 @@ module Publishable
     @touched_without_mark = nil
   end
 
-  def publish_now!
-    update!(published_at: Time.current)
-  end
-
-  def unpublish!
-    update!(published_at: nil)
-  end
-
   private
 
   # `published_at_in_database`: the stored value this save or destroy

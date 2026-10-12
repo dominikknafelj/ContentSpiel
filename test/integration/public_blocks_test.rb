@@ -62,7 +62,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     publish_changes(page)
     get path # warms what the first request of a process loads once
     one_block = capture_sql { get path }
-    assert Publishing.copied?(page)
+    assert copied?(page)
 
     4.times { add_image.call }
     publish_changes(page)

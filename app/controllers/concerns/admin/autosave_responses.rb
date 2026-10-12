@@ -175,9 +175,7 @@ module Admin
       record.respond_to?(:published_at) && record.published_at.present?
     end
 
-    # `live:` (a page or post that is published or scheduled -- its edits wait for "Publish changes…";
-    # formerly: its edits go straight to the
-    # site) rides on every state, not just "saved": the status line is
+    # `live:` (a page or post that is published or scheduled -- its edits wait for "Publish changes…") rides on every state, not just "saved": the status line is
     # replaced wholesale, and `autosave_controller.js` reads `data-live`
     # off whatever element is there when it writes its own "saving" line.
     def save_status_component(record:, result:, status_id:, base_updated_at:)

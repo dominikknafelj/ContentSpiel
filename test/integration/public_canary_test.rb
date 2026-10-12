@@ -118,6 +118,15 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
 
   def every_look = urls.index_with { |path| look(path) }
 
+  # The WHOLE response of a URL, not the parts `look` keeps: the menu, the
+  # footer and the rest of the head are drawn outside `main`, and a reader
+  # there that showed rows would otherwise pass. The body and every header.
+  def assert_nothing_of_the_rows_anywhere_in(path)
+    get path
+    assert_not_includes response.body, CANARY, "#{path} shows the rows somewhere in its body"
+    assert_not_includes response.headers.to_h.to_a.flatten.join("\n"), CANARY, "#{path} shows the rows in a header"
+  end
+
   def deep_canary(value)
     case value
     when Hash then value.transform_values { |inner| deep_canary(inner) }
@@ -192,6 +201,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     after.each do |path, look|
       assert_equal before.fetch(path), look, "#{path} changed with no publish"
       assert_not_includes look.join, CANARY, "#{path} shows the rows"
+      assert_nothing_of_the_rows_anywhere_in(path)
     end
     LOCALES.each do |locale|
       get PublicSite::Urls.new.path_for(@alpha, locale)

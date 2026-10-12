@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `Publishing::State`: the one object that says which of six things a page or
+# `Publishing::State`: the one object that says which of five things a page or
 # post is and what may be done to it (drafts plan, task 6, addition 1). Three
 # facts, nothing stored: the time (`published_at`), a copy pending, the mark.
 class Publishing::StateTest < ActiveSupport::TestCase
@@ -14,8 +14,8 @@ class Publishing::StateTest < ActiveSupport::TestCase
     [ :none, true, true ] => [ :draft, false, %i[publish schedule] ],
     [ :future, false, false ] => [ :scheduled, false, %i[publish schedule unpublish] ],
     [ :future, false, true ] => [ :scheduled, true, %i[publish schedule publish_changes discard_changes unpublish] ],
-    [ :future, true, false ] => [ :scheduled, false, %i[publish schedule unpublish] ],
-    [ :future, true, true ] => [ :scheduled, true, %i[publish schedule publish_changes discard_changes unpublish] ],
+    [ :future, true, false ] => [ :scheduled, false, %i[publish schedule publish_changes cancel_scheduled_change discard_changes unpublish] ],
+    [ :future, true, true ] => [ :scheduled, true, %i[publish schedule publish_changes cancel_scheduled_change discard_changes unpublish] ],
     [ :past, false, false ] => [ :live, false, %i[unpublish] ],
     [ :past, false, true ] => [ :live_with_changes, true, %i[publish_changes discard_changes unpublish] ],
     [ :past, true, false ] => [ :live_change_scheduled, false, %i[publish_changes cancel_scheduled_change discard_changes unpublish] ],
@@ -109,6 +109,32 @@ class Publishing::StateTest < ActiveSupport::TestCase
       assert_equal :live_change_scheduled, state.state
       assert_equal %i[publish_changes cancel_scheduled_change unpublish], state.actions
       assert_not Publishing::DiscardChanges.call(record).ok?, "and the service has nothing to discard there"
+    end
+  end
+
+  test "a copy pending on a scheduled record offers the same ways out as on a live one, with or without edits since" do
+    [ false, true ].each do |mark|
+      %i[page post].each do |kind|
+        record = record_with(:future, true, mark, kind: kind)
+        state = Publishing::State.of(record)
+
+        assert_equal :scheduled, state.state
+        assert_equal Publishing.pending(record).live_at, state.pending_at
+        assert_equal %i[publish schedule publish_changes cancel_scheduled_change discard_changes unpublish], state.actions, "#{kind} mark=#{mark}"
+      end
+    end
+  end
+
+  test "a scheduled record whose only copy is the pending one is not offered a discard, and the service has nothing to discard there" do
+    [ false, true ].each do |mark|
+      record = record_with(:future, true, mark)
+      Publishing::Version.of(record).in_force.delete_all # version: none (a test makes a record that was written around the services)
+
+      state = Publishing::State.of(record)
+
+      assert_equal :scheduled, state.state
+      assert_equal %i[publish schedule publish_changes cancel_scheduled_change unpublish], state.actions
+      assert_not Publishing::DiscardChanges.call(record).ok?
     end
   end
 end

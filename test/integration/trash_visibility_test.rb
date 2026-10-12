@@ -82,7 +82,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     post = create_post(title: "Copied post")
     page_path = PublicSite::Urls.new.path_for(child, "en")
     post_path = PublicSite::Urls.new.path_for(post, "en")
-    assert Publishing.copied?(child) && Publishing.copied?(post)
+    assert copied?(child) && copied?(post)
 
     assert Trash::Move.call(child).ok?
     assert Trash::Move.call(menu).ok?

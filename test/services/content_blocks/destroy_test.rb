@@ -62,7 +62,7 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
 
   test "a live page that has a copy keeps its version when a section is deleted either way" do
     assert @page.reload.live?
-    assert Publishing.copied?(@page)
+    assert copied?(@page)
 
     assert_no_changes -> { PublicSite.content_version } do
       ContentBlocks::Destroy.call(@section, keep_blocks: true, actor: nil)

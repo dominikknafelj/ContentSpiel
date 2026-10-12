@@ -1,5 +1,5 @@
 module Publishing
-  # WHICH OF SIX THINGS a page or post is, as far as publishing goes, and what
+  # WHICH OF FIVE THINGS a page or post is, as far as publishing goes, and what
   # may be done to it. The one place that says so: the editor's header (its
   # chip and its buttons), the page tree's and the posts list's marks and the
   # dashboard's list ask THIS object and derive nothing of their own.
@@ -24,7 +24,16 @@ module Publishing
   #   the header says "Draft" for both today, and telling them apart would
   #   cost a read of the copies for no screen that wants it.
   # - `:scheduled`: a time in the future (a mark is `changes?`, a pending copy
-  #   `pending_at`; the state stays this one).
+  #   `pending_at`; the state stays this one, as `:live` and `:live_with_changes`
+  #   are two states only because the screens draw them differently). A scheduled
+  #   record has the same ways out of a change as a live one, where the services
+  #   accept them: with a copy pending (a change published with a time of its
+  #   own on a scheduled record) it can be published again (now, or at another
+  #   time), withdrawn, or discarded; with the mark alone, published or discarded.
+  #   `discard_changes` is offered only where a copy is IN FORCE (a scheduled
+  #   record's first copy is, from the moment it is taken): `DiscardChanges`
+  #   answers "nothing to discard" for a record that has none, so it is not
+  #   offered there.
   # - `:live`: a time that has passed, no copy pending, no mark.
   # - `:live_with_changes`: live, the mark, no copy pending.
   # - `:live_change_scheduled`: live, a copy pending (whatever the mark: more
@@ -39,17 +48,19 @@ module Publishing
   # A combination that should not exist (a mark on a draft) is answered as
   # the nearest true state and never raises: this runs on a page view.
   #
-  # THE ONE PLACE. The header's Publish, Schedule, Edit schedule, Unpublish
-  # and Publish changes, every status chip and `Publishable#status` ask this
-  # object (`status` is its one comparison of `published_at` with the clock);
-  # nobody compares the time again.
+  # THE ONE PLACE for what a screen offers. The header's Publish, Schedule,
+  # Edit schedule, Unpublish and Publish changes, every status chip and
+  # `Publishable#status` ask this object (`status` is its one comparison of
+  # `published_at` with the clock for a screen). The services and the usage
+  # and path indexes compare `published_at` with a clock they are handed
+  # themselves, where they need a time in a statement.
   #
   # `actions` is what makes sense in the state, BEFORE rights are applied
   # (`can?("pages.publish")` and the rest are the caller's):
   #
   # | state                  | actions                                              |
   # | :draft                 | publish, schedule                                    |
-  # | :scheduled             | publish, schedule (+ publish_changes, discard_changes when changes?), unpublish |
+  # | :scheduled             | publish, schedule, then (+ publish_changes, discard_changes when changes? and no copy is pending) or (+ publish_changes, cancel_scheduled_change, and discard_changes when a copy is in force, when a copy is pending), unpublish |
   # | :live                  | unpublish                                            |
   # | :live_with_changes     | publish_changes, discard_changes, unpublish          |
   # | :live_change_scheduled | publish_changes, cancel_scheduled_change, (discard_changes when a copy is in force), unpublish |
@@ -109,10 +120,10 @@ module Publishing
     def actions
       case state
       when :draft then %i[publish schedule]
-      when :scheduled then %i[publish schedule] + changes_actions + %i[unpublish]
+      when :scheduled then %i[publish schedule] + (pending_at ? pending_actions : changes_actions) + %i[unpublish]
       when :live then %i[unpublish]
       when :live_with_changes then changes_actions + %i[unpublish]
-      when :live_change_scheduled then %i[publish_changes cancel_scheduled_change] + (in_force? ? %i[discard_changes] : []) + %i[unpublish]
+      when :live_change_scheduled then pending_actions + %i[unpublish]
       end
     end
 
@@ -124,9 +135,13 @@ module Publishing
 
     def changes_actions = changes? ? %i[publish_changes discard_changes] : []
 
+    # A copy is pending, a live or a scheduled record's alike (whatever the
+    # mark): published again, withdrawn, or discarded where one is in force.
+    def pending_actions = %i[publish_changes cancel_scheduled_change] + (in_force? ? %i[discard_changes] : [])
+
     # Whether a copy is in force: what a discard returns to. Asked only for
-    # a live record with a change scheduled (one statement, the first time):
-    # one whose ONLY copy is the pending one is shown from its rows, so there
+    # a record with a change scheduled (one statement, the first time): one
+    # whose ONLY copy is the pending one is shown from its rows, so there
     # is nothing to go back to, and withdrawing the change is its action.
     def in_force? = defined?(@in_force) ? @in_force : (@in_force = Publishing.in_force?(record, now: now))
   end

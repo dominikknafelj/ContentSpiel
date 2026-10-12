@@ -107,7 +107,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     page.content_blocks.create!(block_type: :image, position: 0, section_id: section.id, section_column: 1, media_asset: asset, caption: "A caption", alt: "An alt")
     page.content_blocks.create!(block_type: :rich_text, position: 0, section_id: section.id, section_column: 2, body: rich_doc("In a column"))
     page.content_blocks.create!(block_type: :post_list, position: 2, settings: { "content_type" => "blog" })
-    assert_not Publishing.copied?(page)
+    assert_not copied?(page)
     from_rows = %w[en de].index_with { |locale| get(path_of(page, locale)) && main_html }
     assert_includes from_rows["en"], "In a column"
     assert_includes from_rows["en"], "Listed"
@@ -180,6 +180,41 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     get path_of(page)
 
     assert_select "h1", text: "Scheduled as this"
+  end
+
+  test "Publish now on a scheduled record with edits since puts what was scheduled on the site, and the answer says the changes are not published yet" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as users(:one)
+    page = create_page(title: "Scheduled as this", published: false)
+    assert Pages::Save.call(page, attributes: { published_at: 2.days.from_now }).ok?
+    assert Pages::Save.call(page, translations: { "en" => { title: "Edited after scheduling" } }).ok?
+
+    post publish_admin_page_path(page)
+
+    assert_equal "Published as it was scheduled. The changes made since are not published yet: “Publish changes…” publishes them.", flash[:notice]
+    get path_of(page)
+    assert_select "h1", text: "Scheduled as this"
+    assert_not_includes response.body, "Edited after scheduling"
+    get admin_page_path(page)
+    assert_select "#publishing-chip [data-unpublished-changes]", count: 1
+    assert_select "#publishing-chip [data-publish-changes-offered]", count: 1
+  end
+
+  test "Publish now on a scheduled post with edits since says so too, and with no edits since says only Published" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as users(:one)
+    record = create_post(title: "Scheduled as this", published: false)
+    assert Posts::Save.call(record, attributes: { published_at: 2.days.from_now }).ok?
+    assert Posts::Save.call(record, translations: { "en" => { title: "Edited after scheduling" } }).ok?
+
+    post publish_admin_post_path(record)
+    assert_match(/\APublished as it was scheduled\./, flash[:notice])
+
+    clean = create_post(title: "Scheduled and left", published: false)
+    assert Posts::Save.call(clean, attributes: { published_at: 2.days.from_now }).ok?
+
+    post publish_admin_post_path(clean)
+    assert_equal "Published", flash[:notice]
   end
 
   test "a scheduled record shows what was scheduled when its time has come, with no write" do

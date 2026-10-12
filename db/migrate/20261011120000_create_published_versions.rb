@@ -71,6 +71,11 @@ class CreatePublishedVersions < ActiveRecord::Migration[8.1]
     # The first copy of everything already published or scheduled, from its
     # rows as they are, so the site is unchanged on the day this ships.
     take_first_copies
+    # The images the copies show are protected by `media_usages` rows of role
+    # `published`, which this migration does not write (it calls no
+    # application class): without them an image only a copy shows could be
+    # trashed or deleted. `media:reindex` writes them for every record with a copy.
+    say "Run `bin/rails media:reindex` now: it records which images the first copies show, so that none of them can be trashed or deleted from under the site"
   end
 
   def down

@@ -95,9 +95,10 @@ module Mcp
         # in). A draft has nothing to publish this way (`published: true`
         # publishes it). When the publication is refused (the post's own
         # address is taken) the edit above stays saved, and the answer says
-        # both.
+        # both. Published NOW, as the description says: without a time the
+        # service would keep the time of a change already scheduled.
         if publish_changes && result.record.published_at.present?
-          published_changes = Publishing::PublishChanges.call(result.record)
+          published_changes = Publishing::PublishChanges.call(result.record, at: Time.current)
           return error_response("The post was saved, but its changes were not published: #{published_changes.errors.to_sentence}") unless published_changes.ok?
         end
 

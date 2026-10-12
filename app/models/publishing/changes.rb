@@ -9,8 +9,8 @@ module Publishing
   # where the longest run of blocks in unchanged order leaves it. A block's
   # timestamps, its translation bookkeeping and its bare `position` are not
   # compared; neither are a record's (`Publishable::BOOKKEEPING`), which are
-  # in a copy so that a discard can put them back, and say nothing a person
-  # edited.
+  # in a copy as a record of the marks when it was taken (a discard does not
+  # put them back), and say nothing a person edited.
   #
   # THE MARK IS NOT THE ANSWER. `unpublished_changes_at` says THAT something
   # was written, cheaply, for every list; this says WHAT, and is asked for
@@ -33,7 +33,7 @@ module Publishing
       @record = record
       @version = version
       @changed_locales = Set.new
-      now = Snapshot.of(record) # reads the rows fresh and takes no lock: this runs on a GET
+      now = Snapshot.of(record) # reads the rows fresh and takes no lock: the overview must not hold a row
       was = version ? { "fields" => version.snapshot.fetch("fields", {}), "tags" => version.snapshot.fetch("tags", []), "blocks" => version.blocks } : now
       @fields = changed_fields(was, now)
       @blocks = changed_blocks(was.fetch("blocks", []), now.fetch("blocks", []))

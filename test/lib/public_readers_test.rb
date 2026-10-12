@@ -189,7 +189,7 @@ class PublicReadersTest < ActiveSupport::TestCase
       "page.content_blocks.where(block_type: 'image')",
       "posts = block.listed_posts.order(published_at: :desc)",
       "Publishing.published_all(@page.children.kept.published)",
-      "Post.kept.published.select { |post| Publishing.copied?(post) }.map(&:title)"
+      "Post.kept.published.select { |post| post.excerpt.present? }.map(&:title)"
     ].each(&fails)
 
     assert_empty self.class.offences("x", "@theme_root_page = Page.find_by(parent_id: nil) # public: rows (only its address and its children are read)\n")

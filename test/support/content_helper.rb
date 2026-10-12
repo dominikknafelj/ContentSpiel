@@ -46,6 +46,9 @@ module ContentHelper
     record
   end
 
+  # Whether the record has any published copy, pending or in force.
+  def copied?(record) = Publishing::Version.of(record).exists?
+
   # Removes every published copy taken so far, so that the records built up
   # to here are served and judged from their ROWS, as records written around
   # the services are (`Publishing`): for a test of something that acts on the

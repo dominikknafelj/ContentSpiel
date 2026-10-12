@@ -80,7 +80,7 @@ class FirstCopiesMigrationTest < ActiveSupport::TestCase
 
     assert_equal [ block.id ], Publishing.current(live).blocks.map { |row| row["id"] }
     assert_equal Publishing::Version.of(scheduled).sole, Publishing.current(scheduled)
-    assert_not Publishing.copied?(draft)
+    assert_not copied?(draft)
     assert_equal 1, Publishing::Version.of(copied).count
     assert_equal 0, migrate, "a second run finds nothing to do"
   end

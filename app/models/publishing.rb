@@ -107,18 +107,13 @@ module Publishing
   # `live_at`; ids and times rise together (`Version`).
   def current(record, now: Time.current) = Version.of(record).in_force(now).order(live_at: :desc, id: :desc).first
 
-  # The current copy of each of these records in ONE statement:
-  # `{ [record_type, record_id] => Version }`, a record with none left out.
-  def current_for(records, now: Time.current) = Version.current_for(records, now: now)
-
-  # The newest copy, pending or current: what "Discard changes" returns to
-  # and what the overview compares the rows with.
+  # The newest copy, pending or current: what the overview compares the rows
+  # with. (A discard returns to the copy IN FORCE, `current`, and withdraws a
+  # pending one.)
   def baseline(record) = Version.of(record).order(number: :desc).first
 
   # The copy waiting for its time, or nil. There is at most one.
   def pending(record, now: Time.current) = Version.of(record).pending(now).first
-
-  def copied?(record) = Version.of(record).exists?
 
   # Whether the public sees a copy of this record now: one is in force. A
   # record with only a pending copy (a change published with a time, on a

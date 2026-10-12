@@ -302,6 +302,8 @@ en:
         # What the redirect says once the copy is taken.
         publishing:
           published: "Changes published"
+          # "Publish now" on a scheduled record that has been edited since: it goes live as it was scheduled.
+          published_as_scheduled: "Published as it was scheduled. The changes made since are not published yet: “Publish changes…” publishes them."
           # A copy that waits for its time.
           scheduled: "Changes scheduled for %{time}"
           # The press found the rows and the newest copy the same.

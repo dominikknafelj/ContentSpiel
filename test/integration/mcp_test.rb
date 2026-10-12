@@ -226,6 +226,20 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal 2, Publishing::Version.of(record).count
   end
 
+  test "update_post with publish_changes: true publishes now, also over a change already scheduled for later" do
+    record = live_post
+    assert Current.set(actor: @user) { Posts::Save.call(record, translations: { "en" => { title: "Scheduled for later" } }).ok? }
+    Current.set(actor: @user) { publish_changes(record, at: 3.days.from_now) }
+    assert Publishing.pending(record)
+
+    result = call_tool("update_post_tool", id: record.id, title: "Edited and published", publish_changes: true)
+
+    assert_equal false, result["isError"]
+    assert_equal false, tool_data(result)["unpublished_changes"]
+    assert_nil Publishing.pending(record), "the scheduled change is replaced by this publication"
+    assert_equal "Edited and published", Mobility.with_locale(:en) { Publishing.published(record.reload).title }
+  end
+
   test "publish_changes on a draft is ignored: it is published with published: true" do
     record = Current.set(actor: @user) { Posts::Save.call(attributes: { content_type: "blog" }, translations: { "en" => { title: "Draft" } }).record }
 

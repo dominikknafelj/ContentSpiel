@@ -8,12 +8,12 @@ class PublishableTest < ActiveSupport::TestCase
     assert_equal "live", Page.new(published_at: 1.minute.ago).status
   end
 
-  test "publish_now! and unpublish! set and clear published_at" do
-    post = Post.create!(content_type: :blog, title: "Draft")
-    post.publish_now!
+  test "publishing and unpublishing through the save service set and clear published_at" do
+    post = Posts::Save.call(attributes: { content_type: "blog" }, translations: { "en" => { title: "Draft" } }).record
+    assert Posts::Save.call(post, attributes: { published: true }).ok?
     assert post.reload.live?
 
-    post.unpublish!
+    assert Posts::Save.call(post, attributes: { published: false }).ok?
     assert_equal "draft", post.reload.status
   end
 

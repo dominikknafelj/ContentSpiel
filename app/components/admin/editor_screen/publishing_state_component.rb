@@ -7,7 +7,7 @@ module Admin
     # ONLY THE CHIP IS EVER REPLACED. A save's answer (`Admin::PublishingState`)
     # and another tab's change (`admin--editing--live`, `Admin::EditingController#publishing`)
     # redraw `#publishing-chip`; what is in `#publishing-actions` is drawn
-    # once, with the page, and stays. Since Task 7 the actions are two
+    # once, with the page, and stays. The actions are two
     # buttons that OPEN A DIALOG ("Discard changes…", "Publish changes…"),
     # and the forms a press sends are in those dialogs
     # (`PublishChangesDialogComponent`), drawn once as well: the write queue

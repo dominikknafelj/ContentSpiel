@@ -132,7 +132,7 @@ class Publishing::VersionTest < ActiveSupport::TestCase
 
   test "a record deleted for good takes its copies with it" do
     page = create_page(title: "Gone")
-    assert Publishing.copied?(page)
+    assert copied?(page)
 
     delete_for_good(page)
 
@@ -141,7 +141,7 @@ class Publishing::VersionTest < ActiveSupport::TestCase
 
   test "a post deleted for good takes its copies with it" do
     post = create_post(title: "Gone")
-    assert Publishing.copied?(post)
+    assert copied?(post)
 
     delete_for_good(post)
 
@@ -197,13 +197,13 @@ class Publishing::VersionTest < ActiveSupport::TestCase
     one = capture_sql { one_answer = Publishing.current(pages.first) }
     assert_equal Publishing::Version.of(pages.first).order(:number).first, one_answer
     batch = nil
-    statements = capture_sql { batch = Publishing.current_for(pages + stand_ins) }
+    statements = capture_sql { batch = Publishing::Version.current_for(pages + stand_ins) }
 
     assert_equal 1, one.size
     assert_equal 1, statements.size
     assert_equal pages.map { |page| [ "Page", page.id ] }.sort, batch.keys.sort
     assert_equal Publishing::Version.of(pages.first).order(:number).first, batch[[ "Page", pages.first.id ]]
-    assert_equal later, Publishing.current_for(pages, now: 3.days.from_now)[[ "Page", pages.first.id ]]
-    assert_empty Publishing.current_for([])
+    assert_equal later, Publishing::Version.current_for(pages, now: 3.days.from_now)[[ "Page", pages.first.id ]]
+    assert_empty Publishing::Version.current_for([])
   end
 end

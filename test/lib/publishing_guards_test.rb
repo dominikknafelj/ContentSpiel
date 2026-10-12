@@ -14,7 +14,7 @@ class PublishingGuardsTest < ActiveSupport::TestCase
 
   def sources(*roots) = roots.flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,rake,erb}") }.to_h { |path| [ path.to_s.delete_prefix("#{Rails.root}/"), path.read ] }
 
-  test "a copy is taken only where the spec says: the publish service and the two save services" do
+  test "a copy is taken only where the spec says: the publish service, the two save services and the rolled-back trial" do
     callers = sources("app", "lib").select { |_path, source| source.match?(/\bVersion\.take!|def self\.take!/) }.keys
 
     assert_empty callers - TAKERS.keys, "these files take a published copy: add them to TAKERS with the reason, after reading drafts spec §7"
@@ -83,7 +83,6 @@ class PublishingGuardsTest < ActiveSupport::TestCase
   PUBLISHERS = {
     "app/services/pages/save.rb" => "publishes, schedules and unpublishes a page, and takes its copy",
     "app/services/posts/save.rb" => "publishes, schedules and unpublishes a post, and takes its copy",
-    "app/models/concerns/publishable.rb" => "publish_now! and unpublish!: called by nothing under app/ or lib/ (tests and a console)",
     "app/services/starter_contents/add.rb" => "unsaved stand-ins to ask the rights for; the records are written by the save services"
   }.freeze
   ASSIGNS_PUBLISHED_AT = /\.published_at\s*=(?![=~])|\[:published_at\]\s*=(?![=~])|\b(?:update_column|write_attribute)\(\s*:published_at\b|\b(?:update!?|update_columns?|update_all|assign_attributes|new|create!?|insert_all!?|upsert_all)\b[^\n]*\bpublished_at:/
@@ -92,8 +91,6 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     assigning = sources("app", "lib").select { |_path, source| source.lines.any? { |line| !line.strip.start_with?("#") && line.match?(ASSIGNS_PUBLISHED_AT) } }.keys
 
     assert_equal PUBLISHERS.keys.sort, assigning.sort, "a new place that sets published_at must take the copy too (drafts spec §4.1): read Pages::Save before adding it here"
-    assert_empty sources("app", "lib").select { |_path, source| source.lines.any? { |line| !line.strip.start_with?("#") && line.match?(/\.(?:publish_now!|unpublish!)/) } }.keys,
-      "publish_now! and unpublish! take no copy: publish through Pages::Save or Posts::Save"
   end
 
   test "the published_at guard sees a setter, an update and a new record, and not a condition" do

@@ -60,7 +60,9 @@ module Publishing
     # caller has just locked it: only the copy-taking method locks), never from the
     # object in memory or a loaded association, which may be older than a
     # colleague's committed save. This method takes NO lock: the overview of
-    # the publish dialog calls it on a GET, and a GET must not lock a row.
+    # the publish dialog calls it on a request that must not hold a page's
+    # row against its editors (a POST since the dialog's overview moved
+    # through the write queue, `Admin::PublishingController#changes`).
     #
     # `uncached`: inside a request Rails answers a repeated SELECT from its
     # query cache, and a row, a page's blocks or a post's tags read earlier
