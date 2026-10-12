@@ -633,4 +633,61 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     assert_equal [ "/preview/blog/hello" ], list_hrefs
   end
+
+  # The check that can refuse runs when a change is scheduled; a sweep cannot.
+  test "a scheduled change of a post's tags that comes into force onto an address taken since keeps the post's address, and reports the clash once" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = listing_page("Topic", tag: "topic")
+    post = create_post(title: "Hello")
+    assert Posts::Save.call(post, attributes: { tag_names: %w[topic] }).ok?
+    publish_changes(post, at: 1.hour.from_now) # the address is free now
+    create_page(title: "Hello", parent: topic) # and taken before the time comes
+    reports = []
+    subscriber = Rails.error.subscribe(Class.new { define_method(:report) { |error, handled:, context:, **| reports << [ error.class, handled, context ] } }.new)
+    cache = ActiveSupport::Cache::MemoryStore.new
+
+    travel_to 2.hours.from_now do
+      with_singleton_override(Rails, :cache, -> { cache }) do
+        PublicSite::Paths.sync_went_live(since: 1.day.ago)
+        PublicSite::Paths.sync_went_live(since: 1.day.ago)
+      end
+
+      assert_equal "/blog/hello", path_of(post.reload)
+      get "/blog/hello"
+      assert_response :success
+      assert_select "h1", text: "Hello"
+      get "/topic/hello"
+      assert_select "h1", text: "Hello" # the page that holds it
+    end
+
+    assert_equal 1, reports.size, reports.inspect
+    error, handled, context = reports.sole
+    assert_equal [ PublicSite::Paths::AddressTaken, true ], [ error, handled ]
+    assert_equal [ "Post", post.id ], context.values_at(:record_type, :record_id)
+    assert_includes context[:addresses], { locale: "en", wanted: "/topic/hello", kept: "/blog/hello" }
+    assert_not_includes context.to_s, "Hello", "an address and ids, never content"
+  ensure
+    Rails.error.unsubscribe(subscriber) if subscriber
+  end
+
+  test "a scheduled change that would give a post its first address, on one taken since, leaves it without and reports the clash" do
+    Tag.create!(name: "topic")
+    topic = listing_page("Topic", tag: "topic")
+    post = create_post(title: "Hello")
+    assert_nil path_of(post)
+    assert Posts::Save.call(post, attributes: { tag_names: %w[topic] }).ok?
+    publish_changes(post, at: 1.hour.from_now)
+    create_page(title: "Hello", parent: topic)
+    reports = []
+    subscriber = Rails.error.subscribe(Class.new { define_method(:report) { |error, context:, **| reports << context } }.new)
+
+    travel_to(2.hours.from_now) { PublicSite::Paths.sync_went_live(since: 1.day.ago) }
+
+    assert_nil path_of(post.reload)
+    assert_equal [ [ "Post", post.id ] ], reports.map { |context| context.values_at(:record_type, :record_id) }
+    assert_includes reports.sole[:addresses], { locale: "en", wanted: "/topic/hello", kept: nil }
+  ensure
+    Rails.error.unsubscribe(subscriber) if subscriber
+  end
 end

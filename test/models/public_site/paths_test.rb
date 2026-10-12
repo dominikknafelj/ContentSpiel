@@ -832,6 +832,23 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       ok! Trash::Move.call(hello.reload)
       ok! Trash::Purge.call(hello.reload)
       assert_parity "deleting a post for good"
+
+      # A scheduled change in force by the clock and not swept (nothing
+      # sweeps here), then the next publish of the same page: it reads back
+      # past the scheduled copy to the one the addresses still reflect.
+      # Last in this test: the clock is moved, and a copy taken under it
+      # would be a pending one once it is put back.
+      ok! ContentBlocks::Save.call(press_block.reload, attributes: { settings: { content_type: "blog", tag: "newsroom" } })
+      publish_changes(press)
+      assert_equal "/press/wire", current(wire)
+      ok! ContentBlocks::Destroy.call(press_block.reload)
+      publish_changes(press, at: 1.hour.from_now)
+      travel_to 2.hours.from_now do
+        assert_equal "/press/wire", current(wire), "time passing writes nothing"
+        publish_changes(press)
+        assert_equal "/journal/wire", current(wire)
+        assert_parity "publishing a page whose scheduled change was in force and unswept"
+      end
     end
   end
 
@@ -1146,5 +1163,47 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
     assert_equal 50 * Locales.enabled.size, PublicPath.current.where(record_type: "Post").count
     assert_equal few.size, many.size, "the statements grew with the posts:\n#{many.map { |sql| sql.first(160) }.join("\n")}"
+  end
+
+  # Where nothing sweeps (development), or between two runs: a scheduled copy
+  # is in force by the clock while the addresses still say what the copy
+  # before it listed. The next publish must not take it for swept.
+  test "a scheduled change that came into force and was never swept is not skipped by the next publish of the page" do
+    page = create_page(title: "Blog", published: false)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Hello")
+    assert ContentBlocks::Destroy.call(block).ok?
+    publish_changes(page, at: 1.hour.from_now)
+
+    travel_to 2.hours.from_now do
+      assert_equal "/blog/hello", current(post), "time passing writes nothing"
+
+      publish_changes(page)
+
+      assert_nil current(post)
+      assert_parity "publishing a page whose scheduled change was in force and unswept"
+    end
+  end
+
+  test "two scheduled changes in a row, neither swept, on a page that had no copy before them: the next publish reads back past both, to what the rows listed" do
+    page = listing(@root, "Blog", "blog", published_at: 3.days.ago)
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 3.days.ago)
+    job = Post.create!(content_type: :resume_entry, title: "Job", published_at: 3.days.ago)
+    publish_changes(page, at: 1.hour.from_now)
+    page.content_blocks.sole.update!(settings: { "content_type" => "resume_entry" })
+    assert_equal [ nil, "/blog/job" ], [ current(post), current(job) ], "until the first copy's time the rows decide"
+
+    travel_to 2.hours.from_now do
+      ContentBlock.where(owner: page).delete_all # version: none (a test removes a block around its sync, so only the copies speak)
+      publish_changes(page, at: 1.hour.from_now)
+      assert_equal [ nil, "/blog/job" ], [ current(post), current(job) ], "nothing was swept and nothing announced"
+    end
+    travel_to 4.hours.from_now do
+      publish_changes(page)
+
+      assert_equal [ nil, nil ], [ current(post), current(job) ]
+      assert_parity "publishing after two unswept scheduled changes"
+    end
   end
 end
