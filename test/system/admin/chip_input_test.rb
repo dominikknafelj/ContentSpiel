@@ -18,7 +18,7 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
 
   def tag_field = find("#post-tag_names")
 
-  def saved? = has_selector?("#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 6)
+  def saved? = has_selector?("#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 6)
 
   test "typing, ArrowDown and Enter picks a suggestion as a chip, and it survives a reload" do
     Tag.create!(name: "rails")

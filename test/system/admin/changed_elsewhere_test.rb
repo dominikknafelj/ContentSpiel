@@ -87,8 +87,8 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     fill_in "Subtitle", with: "First"
     blocks.each_with_index { |block, i| fill_in id: "block-#{block.id}-caption", with: "Caption #{i}" }
 
-    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
-    blocks.each { |block| assert_selector "#block-#{block.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8 }
+    assert_selector "#page-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 8
+    blocks.each { |block| assert_selector "#block-#{block.id}-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 8 }
 
     fill_in "Subtitle", with: "Second"
     assert_eventually { @page.reload.subtitle == "Second" }
@@ -641,11 +641,11 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
   def assert_saves_twice(record)
     fill_in "Subtitle", with: "one"
     page.execute_script("document.activeElement.blur()")
-    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
+    assert_selector "#page-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 8
     fill_in "Subtitle", with: "two"
     page.execute_script("document.activeElement.blur()")
     assert_eventually { record.reload.subtitle == "two" }
-    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
+    assert_selector "#page-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 8
     assert_no_text "CHANGED ELSEWHERE"
   end
 end

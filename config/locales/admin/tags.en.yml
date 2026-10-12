@@ -44,6 +44,8 @@ en:
           title: "Merge tag"
           picker_label: "Merge into"
           picker_placeholder: "Find a tag…"
+          # Tags in published copies follow a merge at once (drafts of live content).
+          published_lists: "A merge changes published lists at once, without “Publish changes…”: posts with the merged tag join the lists that show the chosen tag, and a post with either tag can move to another address."
           cancel: "Cancel"
           submit: "Merge tags"
           busy: "Merging…"

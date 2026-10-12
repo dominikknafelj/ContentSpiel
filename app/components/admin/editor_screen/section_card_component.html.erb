@@ -58,7 +58,7 @@
               id: field_id("background"), class: select_class, "aria-label": t(".background") %>
         <%= select_tag "block[settings][width]", options_for_select(width_options, setting("width")),
               id: field_id("width"), class: select_class, "aria-label": t(".width") %>
-        <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
+        <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.published_at.present?) %>
         <%# One slot per setting, as every field of a block has: `update` replaces all three
             with each answer. Together they take a line of their own, and no room at all
             while none holds a message (`.admin-section-errors`). %>

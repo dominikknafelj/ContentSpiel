@@ -67,6 +67,11 @@ module Admin
 
       def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)
 
+      # On a published or scheduled page a deleted block can come back
+      # ("Discard changes…" creates it again), and its notes do not: the
+      # dialog says so there (drafts spec §9).
+      def body = [ t(".body"), (t(".published_notes") if page.published_at.present?) ].compact.join(" ")
+
       private
 
       attr_reader :page, :block, :url_options

@@ -111,6 +111,22 @@ module Admin
 
       def preview_path = preview_urls.path_for(record, locale)
 
+      # For a post without an address: a published or scheduled page whose
+      # unpublished rows hold a list block that lists it
+      # (`Publishing::WaitingListers`). Asked only when there is no address.
+      def waiting_lister
+        return @waiting_lister if defined?(@waiting_lister)
+
+        @waiting_lister = page? || public_path.present? ? nil : ::Publishing::WaitingListers.for(record).first
+      end
+
+      # The page is named only to someone who may read it.
+      def waiting_lister_line
+        return t(".waiting_lister_unnamed") unless can?("pages.read", waiting_lister)
+
+        t(".waiting_lister", title: ::Locales.read(waiting_lister, :title, locale: locale))
+      end
+
       # Access control (design spec §5 "Everywhere"): publishing, unpublishing
       # and scheduling need `<pages|posts>.publish` on the record, moving it to
       # the trash `.delete` -- absent, not disabled, without them. A readable
@@ -189,7 +205,8 @@ module Admin
         body
       end
 
-      def live_hint = t(".live_hint", type: type)
+      # A save of a live or scheduled record is not a publication (drafts spec §3).
+      def live_hint = t(scheduled? ? ".scheduled_hint" : ".live_hint", type: type)
 
       # Whether the ⋯ menu has anything to hold (a viewer who can only read
       # gets no empty menu).

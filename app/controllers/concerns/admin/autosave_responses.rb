@@ -165,16 +165,18 @@ module Admin
     # colleague's block. Everything else holds `updated_at`.
     def autosave_base(record) = record.is_a?(Page) ? record.settings_changed_at : record.updated_at
 
-    # Whether an edit to `record` goes straight to the site: a live page or
-    # post, and a content block whose owner page/post is live (a block is
-    # published with its owner, so its save line reads "SAVED TO SITE" like
-    # the page's own).
+    # Whether a save of `record` is a save that is not yet a publication
+    # (drafts spec §3): a published or scheduled page or post, and a content
+    # block of one (a block is published with its owner, so its save line
+    # reads "SAVED · NOT PUBLISHED" like the page's own). An image and a tag
+    # have no such state.
     def live_record?(record)
       record = record.owner if record.is_a?(ContentBlock)
-      record.respond_to?(:live?) && record.live?
+      record.respond_to?(:published_at) && record.published_at.present?
     end
 
-    # `live:` (a page or post that is live -- its edits go straight to the
+    # `live:` (a page or post that is published or scheduled -- its edits wait for "Publish changes…";
+    # formerly: its edits go straight to the
     # site) rides on every state, not just "saved": the status line is
     # replaced wholesale, and `autosave_controller.js` reads `data-live`
     # off whatever element is there when it writes its own "saving" line.

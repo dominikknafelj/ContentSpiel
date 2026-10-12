@@ -41,7 +41,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     # <dialog>'s content as visible. The Publish changes form is in the header
     # for whoever may publish and shown by a mark (CSS), so no mark is no primary button.
     assert_no_selector "header [data-publish-changes-offered]", visible: :all
-    assert_selector "[role=status]", text: "This page is live. Changes are published with “Publish changes”."
+    assert_selector "[role=status]", text: "This page is live. Changes are published with “Publish changes…”."
     assert_selector "[role=menu] button", text: "Unpublish", visible: :all
     assert_selector "a[href='/about']", text: "View on site"
   end
@@ -271,7 +271,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "[data-view-only-hint]"
 
     render_header(post)
-    assert_text "Changes are published with “Publish changes”."
+    assert_text "Changes are published with “Publish changes…”."
   end
 
   test "a post shows its type and, unlisted, says so" do
@@ -279,6 +279,73 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     render_header(post)
     assert_selector ".admin-type-dot"
     assert_text "Not listed on any page yet — add a post list block for this type"
+  end
+
+  test "a scheduled page's hint says what was scheduled goes live at its time" do
+    page = create_page(title: "Later", published: false)
+    assert as_owner { Pages::Save.call(page, attributes: { published_at: 3.days.from_now }) }.ok?
+    render_header(page.reload)
+
+    assert_selector "[role=status]", text: "This page is scheduled. What was scheduled goes live at its time; later changes are published with “Publish changes…”."
+    assert_selector "p#page-save-status[data-live]", visible: :all
+
+    post = create_post(title: "Later post", published: false)
+    assert as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }.ok?
+    render_header(post.reload)
+    assert_selector "[role=status]", text: "This post is scheduled. What was scheduled goes live at its time"
+  end
+
+  test "a draft has no such hint, and its save line is the plain one" do
+    render_header(create_page(title: "Draft", published: false))
+
+    assert_no_text "Changes are published with"
+    assert_no_text "later changes are published"
+    assert_no_selector "p#page-save-status[data-live]", visible: :all
+  end
+
+  test "a post without an address whose list block waits in a live page's unpublished rows says so, naming the page to someone who may read it" do
+    blog = create_page(title: "Journal page")
+    post = create_post(title: "Loose")
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }) }.ok?
+    assert_nil post.reload.full_path("en"), "the list block is not published, so the post has no address"
+
+    render_header(post)
+    assert_selector "[data-waiting-lister]", text: "Not listed on the site yet: the page “Journal page” lists this post, and its changes are not published."
+    assert_no_text "add a post list block for this type"
+
+    group = AccessControl::Group.create!(name: "Posts only")
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
+    reader = User.create!(email_address: "posts-only@example.com", password: "password12345")
+    AccessControl::Membership.create!(user: reader, group: group)
+    render_header(post, actor: reader)
+    assert_selector "[data-waiting-lister]", text: "Not listed on the site yet: a page lists this post, and its changes are not published."
+    assert_no_text "Journal page"
+
+    as_owner { publish_changes(blog) }
+    render_header(post.reload)
+    assert_no_selector "[data-waiting-lister]"
+    assert_no_text "Not listed"
+  end
+
+  test "a list block in a draft page's rows, in a trashed page's, or for another type is no such line" do
+    post = create_post(title: "Loose")
+    draft = create_page(title: "Draft list", published: false)
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: draft), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }) }.ok?
+    other = create_page(title: "Other type")
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: other), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } }) }.ok?
+    trashed = create_page(title: "Trashed list")
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: trashed), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }) }.ok?
+    assert as_owner { Trash::Move.call(trashed.reload) }.ok?
+
+    render_header(post.reload)
+
+    if post.full_path("en").nil?
+      assert_no_selector "[data-waiting-lister]"
+      assert_text "Not listed on any page yet — add a post list block for this type"
+    else
+      assert_equal "/draft-list/loose", post.full_path("en"), "a draft page lists what its rows list, so the post has a would-be address there"
+      assert_no_selector "[data-waiting-lister]"
+    end
   end
 
   test "the dialog ids the later tasks and the tests rely on" do

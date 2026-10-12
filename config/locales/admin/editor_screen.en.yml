@@ -69,6 +69,8 @@ en:
         delete_block_dialog:
           title: "Delete this block?"
           body: "Blocks don’t go to the trash. This can’t be undone."
+          # One more sentence on a published or scheduled page (drafts spec §9).
+          published_notes: "Its notes are deleted with it and do not come back if the changes are discarded."
           confirm: "Delete block"
         # The heading of a block's form under a section's lanes.
         panel_title:
@@ -269,11 +271,16 @@ en:
         # The rest of the header's strings are in `notes.en.yml` or not
         # converted yet.
         header:
+          # Under the title of a post that has no address although a page's
+          # unpublished rows hold a list block for it.
+          waiting_lister: "Not listed on the site yet: the page “%{title}” lists this post, and its changes are not published."
+          waiting_lister_unnamed: "Not listed on the site yet: a page lists this post, and its changes are not published."
           # The ⋯ menu's item, while a change waits for its time.
           cancel_scheduled_change: "Cancel scheduled change"
-          # Under the address of a live record; the plan's wording, with the
-          # button's name as it reads today (no ellipsis until it opens a dialog).
-          live_hint: "This %{type} is live. Changes are published with “Publish changes”."
+          # Under the address of a live record, and of a scheduled one: the
+          # plan's wording, with the button's name as it reads.
+          live_hint: "This %{type} is live. Changes are published with “Publish changes…”."
+          scheduled_hint: "This %{type} is scheduled. What was scheduled goes live at its time; later changes are published with “Publish changes…”."
         # What the redirect says once the copy is taken.
         publishing:
           published: "Changes published"

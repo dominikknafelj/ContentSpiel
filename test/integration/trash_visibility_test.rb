@@ -929,6 +929,17 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # each list hands them the ids it is about to draw, which went through the
   # read scope. The viewer is mentioned in every note, so a count that leaked
   # would leak in accent too.
+  test "a trashed page is not named as the page that will list a post once its changes are published" do
+    blog = create_page(title: "Waiting list")
+    post = create_post(title: "Loose")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    assert_equal [ blog ], Publishing::WaitingListers.for(post.reload)
+
+    assert Trash::Move.call(blog.reload).ok?
+
+    assert_empty Publishing::WaitingListers.for(post.reload)
+  end
+
   test "note counts in the posts list, the page tree and the media grid are for kept records only, and so are the media panel's notes" do
     [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: nil) }
     as(users(:two)) do

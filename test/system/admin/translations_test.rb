@@ -93,7 +93,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     press_within "#translation-suggestion-post-title", "Use"
 
-    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "[de] Hello", find_field(id: "post-title").value
     assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
     post.reload
@@ -125,7 +125,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     press_within "#translation-suggestion-post-title", "Use"
 
-    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "Edited by hand", find_field(id: "post-title").value
     assert_equal "Edited by hand", post.reload.title(locale: "de", fallback: false)
 
@@ -145,7 +145,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     press_within "#translation-suggestion-post-body-json", "Use"
 
-    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     post.reload
     assert_equal paragraph("[de] Body text"), post.body(locale: "de").to_h
     assert_equal :current, post.translation_state("body", "de")
@@ -169,8 +169,8 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
       press "Use all"
 
-      assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
-      assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+      assert_selector "#page-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
+      assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
       page_record.reload
       assert_equal "[de] About", page_record.title(locale: "de", fallback: false)
       assert_equal "[de] Who we are", page_record.subtitle(locale: "de", fallback: false)
@@ -201,7 +201,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       press "Suggest translations for 3 empty fields"
       assert_text "3 suggestions ready"
       press "Use all"
-      blocks.each { |block| assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5 }
+      blocks.each { |block| assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5 }
 
       fill_in id: "page-subtitle", with: "Typed after Use all"
       assert_eventually { page_record.reload.subtitle(locale: "de", fallback: false) == "Typed after Use all" }
@@ -230,7 +230,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       assert_no_selector "#translation-suggestion-page-title [role='alert']"
 
       press "Use all"
-      assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+      assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
       assert_equal "[de] To be", block.reload.translated_settings.dig("de", "text")
       assert_nil page_record.reload.title(locale: "de", fallback: false)
     end
@@ -264,7 +264,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     find("#translation-suggestion-post-excerpt textarea[data-translate-suggestion-text]").fill_in with: "Edited summary"
     press "Use all"
 
-    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "[de] Hello", find_field(id: "post-title").value
     assert_equal "Edited summary", find_field(id: "post-excerpt").value
     assert_no_selector "[data-translation-suggestion]"
@@ -427,7 +427,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     press_within "#translation-suggestion-post-title", "Use"
 
-    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "[de] About our team", post.reload.title(locale: "de", fallback: false)
     assert_equal :current, post.translation_state("title", "de")
   end
@@ -457,7 +457,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{post.id}"
     await_admin_controllers
     fill_in "Title", with: "Hello there"
-    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal :outdated, post.reload.translation_state("title", "de")
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
@@ -575,7 +575,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       assert_no_selector "#translation-suggestion-block-#{block.id}-text", visible: :all
       press "Use all"
 
-      assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+      assert_selector "#page-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
       assert_equal "", find("#block-#{block.id}-text", visible: :all).value
       assert_nil block.reload.translated_settings.dig("de", "text")
     end

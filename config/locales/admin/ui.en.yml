@@ -45,11 +45,12 @@ en:
 
         save_status:
           saving: "SAVING…"
-          saving_live: "SAVING TO SITE…"
+          # A published or scheduled record: a save is not a publication (drafts spec §3).
+          saving_live: "SAVING…"
           saved: "SAVED"
           saved_at: "SAVED %{time}"
-          saved_live: "● SAVED TO SITE"
-          saved_live_at: "● SAVED TO SITE %{time}"
+          saved_live: "SAVED · NOT PUBLISHED"
+          saved_live_at: "SAVED · NOT PUBLISHED %{time}"
           error:
             one: "Couldn't save — %{count} problem"
             other: "Couldn't save — %{count} problems"

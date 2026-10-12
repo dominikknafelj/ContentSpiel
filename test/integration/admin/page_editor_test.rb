@@ -12,7 +12,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", "About"
     assert_select "[data-status='live']"
-    assert_includes response.body, "This page is live. Changes are published with “Publish changes”."
+    assert_includes response.body, "This page is live. Changes are published with “Publish changes…”."
     assert_select "form[data-controller~='admin--saving--autosave'] input[name='page[title]'][value='About']"
   end
 
@@ -39,7 +39,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "About us" }, base_updated_at: @page.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
     assert_equal "About us", @page.reload.title(locale: :en)
-    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
+    assert_match(/SAVED( · NOT PUBLISHED)? \d\d:\d\d/, response.body)
   end
 
   # Fix (final-fixes round, finding 1): the tree lives outside this form

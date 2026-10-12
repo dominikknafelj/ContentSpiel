@@ -42,7 +42,7 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     assert_selector "#page-save-status", text: "SAVING", wait: 5
     assert asks_before_unload?, "an edit on its way to the server was not guarded"
 
-    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 10
+    assert_selector "#page-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}/, wait: 10
     assert_equal "Typed, not sent yet", @page.reload.subtitle
     assert_not asks_before_unload?, "a saved editor still asked before unloading"
     assert_equal [ "/cs-studio/pages/#{@page.id}" ], page.evaluate_script("window.__saves"), "the one save this test held"

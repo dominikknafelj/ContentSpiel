@@ -113,6 +113,8 @@
         <%= render Admin::Ui::ChipInputComponent.new(name: "into", id: "merge-tag-into", label: t(".merge_dialog.picker_label"), search_url: admin_tag_suggestions_path,
               single: true, create: false, noun: "tag", placeholder: t(".merge_dialog.picker_placeholder"), lowercase: true) %>
         <p class="text-ink" data-admin--tags--dialogs-target="mergeText"></p>
+        <%# A merge is immediate in the published copies too (`Tags::Merge` replaces the tag's id in them), in both directions. %>
+        <p class="mt-2 text-[13px] text-dim" data-merge-published-lists><%= t(".merge_dialog.published_lists") %></p>
       <% end %>
       <% dialog.with_footer do %>
         <%= tag.form method: "dialog" do %>
