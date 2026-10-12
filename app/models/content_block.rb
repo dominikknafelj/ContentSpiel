@@ -318,11 +318,12 @@ class ContentBlock < ApplicationRecord
 
   # For a block that lists posts, or did until this save changed its type
   # (`block_type_before_last_save`; after a destroy that is its type as last
-  # saved). Only a page's block is a candidate at all, and a page destroyed
-  # with its blocks is found gone by the refresh, which then has nothing to
-  # look at.
+  # saved). Only a page's block is a candidate at all. Not for a block
+  # destroyed WITH its page: the page's row is still there at that moment,
+  # so a refresh would write the page's addresses back after they were
+  # deleted; the page's own `after_destroy` says what was touched.
   def sync_listed_post_paths
-    return unless owner_type == Page.polymorphic_name
+    return if owner_type != Page.polymorphic_name || destroyed_by_association
     return unless definition&.capability?(:lists_posts) || BlockTypes.find(block_type_before_last_save)&.capability?(:lists_posts)
 
     PublicSite::Paths.refresh(pages: [ owner_id ])

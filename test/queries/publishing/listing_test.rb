@@ -187,7 +187,6 @@ class Publishing::ListingTest < ActiveSupport::TestCase
 
     assert_equal [ [ copied.id, "blog" ], [ draft.id, "now_update" ] ], blocks.map { |block| [ block.owner.id, block.settings_object.content_type ] }.sort
     assert blocks.none? { |block| block.owner.readonly? }, "the owner is the page's row"
-    assert_equal [ copied.id ], Publishing::Listing.blocks(page_ids: [ copied.id ]).map { |block| block.owner.id }
   end
 
   test "blocks loads the copies that list posts and no other, in the same statements for 2 pages as for 8" do

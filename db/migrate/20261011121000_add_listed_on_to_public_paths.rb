@@ -3,7 +3,7 @@
 # that was worked out again by every writer that needed to know "which posts
 # could this page's change have moved", each from a before-picture of its
 # own; recorded, it is one query on this table (`PublicSite::Paths.refresh`).
-# NULL on a page's row and on a redirect that was written before this.
+# NULL on a page's row and on every redirect.
 #
 # No foreign key: `public_paths` is derived, its `record_id` has none either,
 # and a page deleted for good loses its posts' rows through the sync of its

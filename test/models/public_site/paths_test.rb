@@ -1371,4 +1371,69 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
     assert_empty sql.grep(/FROM "post_tags"/), "the unhoused post was loaded:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
   end
+
+  # -- a standing clash is nobody's change (fix round 1, I2) --------------------
+  #
+  # A live record without an address is looked at by every page's refresh
+  # (the unhoused), wants its address again each time and yields again. That
+  # writes no row, so it moves no version and is not logged a second time.
+
+  def logged
+    log = StringIO.new
+    original = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(log)
+    yield
+    log.string
+  ensure
+    Rails.logger = original
+  end
+
+  test "with a live post that stands without an address, renaming an unrelated draft page leaves the content version where it was and logs nothing; a real change bumps as it does without it" do
+    blog = listing(@root, "Blog", "blog")
+    first = Page.create!(parent: @root, title: "First", published_at: 1.day.ago)
+    second = Page.create!(parent: @root, title: "Second", published_at: 1.day.ago)
+    draft = Page.create!(parent: @root, title: "Draft")
+    without = PublicSite::Version.current
+    first.update!(slug: "first-renamed")
+    without = PublicSite::Version.current - without
+    assert_operator without, :>, 0
+
+    Page.create!(parent: blog, title: "Hello", published_at: 1.day.ago)
+    post = Post.new(content_type: :blog, title: "Hello", slug: "hello", published_at: 1.day.ago)
+    post.save!(validate: false)
+    assert_nil current(post), "it yields to the page at /blog/hello"
+
+    before = PublicSite::Version.current
+    lines = logged { draft.update!(slug: "draft-renamed") }
+    assert_equal before, PublicSite::Version.current, "a yield that writes no row moved the version"
+    assert_no_match(/gets no .* URL/, lines)
+    assert_nil current(post)
+
+    second.update!(slug: "second-renamed")
+    assert_equal without, PublicSite::Version.current - before, "a live page's rename bumps as often with a standing yielder as without"
+  end
+
+  test "destroying a kept page that owns a list block leaves no row of it behind, and its posts go to the next list" do
+    blog = listing(@root, "Blog", "blog")
+    listing(@root, "Archive", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/blog/hello", current(post)
+
+    blog.destroy!
+
+    assert_empty PublicPath.where(record_type: "Page", record_id: blog.id)
+    assert_equal "/archive/hello", current(post)
+    assert_parity "destroying a kept listing page directly"
+    assert Page.new(parent: @root, title: "Blog", published_at: 1.day.ago).valid?, "its address is free again"
+  end
+
+  test "a redirect carries no host: the row a post leaves behind says nothing of the page it was listed on" do
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    blog.update!(slug: "journal")
+
+    assert_equal "/journal/hello", current(post)
+    assert_equal [ nil ], PublicPath.redirects.where(record: post).distinct.pluck(:listed_on_id)
+  end
 end

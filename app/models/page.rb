@@ -212,6 +212,11 @@ class Page < ApplicationRecord
   # fields -- can't have changed a URL, and syncing for it re-derived every
   # descendant and every listed post inside each autosave's transaction.
   after_save :sync_public_paths
+  # A kept page destroyed directly (a console, a test; the application
+  # destroys only trashed pages, which give no address): the posts it gave
+  # an address to are found by the host their rows record, although the page
+  # is gone, and go to the next list or lose theirs.
+  after_destroy { PublicSite::Paths.refresh(pages: [ id ]) unless trashed? }
 
   # `AccessControl.preload_branches` leaves a snapshot of this page's
   # self-and-ancestor ids on the object (so rendering the tree checks

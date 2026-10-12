@@ -26,8 +26,9 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
 
   PATHS = "app/models/public_site/paths.rb".freeze
 
+  # A root is a directory, searched, or a single file.
   def code(*roots)
-    roots.flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,rake,erb}") }.to_h do |path|
+    roots.flat_map { |root| Rails.root.join(root).file? ? [ Rails.root.join(root) ] : Rails.root.glob("#{root}/**/*.{rb,rake,erb}") }.to_h do |path|
       [ path.to_s.delete_prefix("#{Rails.root}/"), path.read.lines.reject { |line| line.strip.start_with?("#") }.join ]
     end
   end
@@ -39,6 +40,7 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
 
     reaching_in = called.reject { |name, _| WRITES.key?(name) || READS.key?(name) }
     assert_empty reaching_in, "these call into PublicSite::Paths past its entry point: say what was touched with `refresh(pages:, posts:)` instead"
+    assert_includes called, [ "rebuild!", "db/seeds.rb" ], "the seed file is read by this guard"
     (WRITES.keys + READS.keys - called.map(&:first)).each { |name| flunk "nothing outside #{PATHS} calls Paths.#{name} any more: remove it from this test's lists" }
   end
 

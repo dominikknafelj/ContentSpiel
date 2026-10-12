@@ -44,12 +44,6 @@ module Publishing
       unscoped.where(id: newest).select(*(columns || column_names)).index_by { |version| [ version.record_type, version.record_id ] }
     end
 
-    # The newest copy in force of EVERY record, whole table: for a sweep. A
-    # record or a list asks `Publishing.current` / `current_for`.
-    def self.current(now = Time.current)
-      where(id: unscoped.in_force(now).group(:record_type, :record_id).select(arel_table[:id].maximum))
-    end
-
     # Takes a copy of `record`, from its ROWS as they are at this moment: the
     # first statement locks the record's row (the page's row first, the same
     # first lock every block write takes, `ContentBlocks::Structure#lock_owner`;

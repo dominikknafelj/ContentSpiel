@@ -625,22 +625,28 @@ module PublicSite
 
       type = records.first.class.polymorphic_name
       PublicPath.transaction do
-        # Inside the transaction, so the bump waits for *this* commit even
-        # when the caller has none open (a tag service's sync after its own
-        # commit, `PostTag`'s `after_commit`, `SyncWentLiveJob`). Called
-        # ahead of it, the counter would move at once and the rows commit
-        # afterwards: a request in between would render the old addresses
-        # under the new version, and nothing would bump again.
-        PublicSite.bump_version! if changes.any? { |change| !change.record.respond_to?(:live?) || change.record.live? }
         held ||= held_by_others(changes)
         given = Set.new
         moved, rest = changes.partition { |change| change.to && !held.key?([ change.locale, change.to ]) && given.add?([ change.locale, change.to ]) }
         gone, yielding = rest.partition { |change| change.to.nil? }
+        # The bump is decided from the rows this call writes, never from what
+        # a record merely wants: a record that stands without an address
+        # wants it again in every refresh that looks at it, yields again and
+        # writes nothing, and that is nobody's change. Inside the
+        # transaction, so the bump waits for *this* commit even when the
+        # caller has none open (a tag service's refresh after its own commit,
+        # `PostTag`'s `after_commit`, the job). Called ahead of it, the
+        # counter would move at once and the rows commit afterwards: a
+        # request in between would render the old addresses under the new
+        # version, and nothing would bump again.
+        written = moved + gone + yielding.select(&:row_id)
+        PublicSite.bump_version! if written.any? { |change| !change.record.respond_to?(:live?) || change.record.live? }
         yielding.each { |change| yield_to_holder(change) }
 
         delete_rows(gone)
         PublicPath.where(id: yielding.filter_map(&:row_id)).delete_all if yielding.any?(&:row_id)
-        PublicPath.where(id: moved.filter_map(&:row_id)).update_all(current: false, updated_at: Time.current) if moved.any?(&:row_id)
+        # A redirect carries no host: the column is about current rows.
+        PublicPath.where(id: moved.filter_map(&:row_id)).update_all(current: false, listed_on_id: nil, updated_at: Time.current) if moved.any?(&:row_id)
         if moved.any?
           addresses(PublicPath.redirects, moved.map { |change| [ change.locale, change.to ] }).delete_all
           # Timestamps from the application clock, as a model save writes
@@ -721,13 +727,18 @@ module PublicSite
     # unhoused), so a holder that is a page hands the address over in the
     # very save that moves it away. What is still not looked at is named
     # there; `bin/rails public_paths:rebuild` is the fix when a record is
-    # found without an address. Logged, since nothing on screen says why the
-    # record vanished from that address.
+    # found without an address. Logged when the address is LOST, since
+    # nothing on screen says why the record vanished from it; a record that
+    # had none and is met again (every page's refresh looks at it) is not
+    # logged again, and neither is one that wanted its first address and
+    # could not be given it: the two cannot be told apart here.
     def yield_to_holder(change)
+      return unless change.row_id
+
       record = change.record
       Rails.logger.warn("[public_paths] #{record.class.polymorphic_name}##{record.id} gets no #{change.locale} URL: " \
         "#{change.to} is already another record's current path")
-      announce(record, change.locale, change.from, nil) if change.row_id
+      announce(record, change.locale, change.from, nil)
     end
 
     # Every row -- current and redirects alike -- of the records and locales

@@ -83,17 +83,15 @@ module Publishing
       # list shows the post. A trashed page has none.
       #
       # Each block's `owner` is the page's ROW: what `canonical_pages` ranks
-      # and answers. `page_ids:` narrows to those pages (ids or a relation of
-      # ids).
+      # and answers.
       #
       # Four statements whatever the number of pages (the row blocks and their
       # owners, the copies, their pages, and nothing per page), and only the
       # copies that list posts are loaded: the newest copy of each page is
       # chosen among the pages that ever had a copy listing posts, so a site's
       # other copies are neither grouped nor read.
-      def blocks(page_ids: nil, now: Time.current)
+      def blocks(now: Time.current)
         pages = Page.kept
-        pages = pages.where(id: page_ids) if page_ids
         copying = pages.where.not(published_at: nil).where(id: Version.in_force(now).where(record_type: "Page").select(:record_id))
 
         rows = ContentBlock.listing.where(owner_type: "Page", owner_id: pages.where.not(id: copying.select(:id)).select(:id)).includes(:owner).to_a

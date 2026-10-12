@@ -75,7 +75,7 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     "app/models/concerns/publishable.rb" => "publish_now! and unpublish!: called by nothing under app/ or lib/ (tests and a console)",
     "app/services/starter_contents/add.rb" => "unsaved stand-ins to ask the rights for; the records are written by the save services"
   }.freeze
-  ASSIGNS_PUBLISHED_AT = /\.published_at\s*=(?![=~])|\b(?:update!?|update_columns?|update_all|assign_attributes|new|create!?|insert_all!?|upsert_all)\b[^\n]*\bpublished_at:/
+  ASSIGNS_PUBLISHED_AT = /\.published_at\s*=(?![=~])|\[:published_at\]\s*=(?![=~])|\b(?:update_column|write_attribute)\(\s*:published_at\b|\b(?:update!?|update_columns?|update_all|assign_attributes|new|create!?|insert_all!?|upsert_all)\b[^\n]*\bpublished_at:/
 
   test "published_at is assigned only in the two save services" do
     assigning = sources("app", "lib").select { |_path, source| source.lines.any? { |line| !line.strip.start_with?("#") && line.match?(ASSIGNS_PUBLISHED_AT) } }.keys
@@ -86,10 +86,11 @@ class PublishingGuardsTest < ActiveSupport::TestCase
   end
 
   test "the published_at guard sees a setter, an update and a new record, and not a condition" do
-    [ "page.published_at = now", "post.update!(published_at: nil)", "Page.new(parent: home, published_at: now)", "scope.update_all(published_at: now)" ].each do |line|
+    [ "page.published_at = now", "post.update!(published_at: nil)", "Page.new(parent: home, published_at: now)", "scope.update_all(published_at: now)",
+      "page.update_column(:published_at, now)", "write_attribute(:published_at, now)", "self[:published_at] = now" ].each do |line|
       assert_match ASSIGNS_PUBLISHED_AT, line
     end
-    [ "Post.where(published_at: ..now)", "page.published_at == nil", "Pages::Save.call(page, attributes: { published_at: at })" ].each do |line|
+    [ "Post.where(published_at: ..now)", "page.published_at == nil", "Pages::Save.call(page, attributes: { published_at: at })", "Page.arel_table[:published_at].gt(since)" ].each do |line|
       assert_no_match ASSIGNS_PUBLISHED_AT, line
     end
   end
