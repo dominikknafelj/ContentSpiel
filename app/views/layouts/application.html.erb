@@ -1,11 +1,40 @@
 <!DOCTYPE html>
-<html lang="<%= I18n.locale %>"<%= " class=\"scroll-pt-9\"".html_safe if content_for?(:preview_banner) %>>
+<%# THE PUBLIC LAYOUT IS THE CMS'S AND NO THEME REPLACES IT (theming spec §2,
+    decision 10). What a site breaks without is written here; what is look or
+    voice is one of four partials a theme replaces, each with the default
+    theme's as the fallback:
+
+      layouts/public/_title   the pattern of the page title
+      layouts/public/_icons   the favicon and the touch icon
+      layouts/public/_head    the theme's own tags (fonts, theme-colour)
+      layouts/public/_frame   everything inside <body> but the preview bar
+
+    The CMS's tags, which a theme cannot remove: the <title> element, the
+    viewport, the CSP tag, the script that picks light or dark before the
+    first paint, the description and Open Graph tags (pages/_seo_meta), the
+    canonical and language links, the stylesheet link and the import map.
+    `test/integration/theme_pages_test.rb` ("every tag the CMS writes into
+    the head is there under both themes") holds the list. %>
+<html lang="<%= I18n.locale %>"<%= " class=\"scroll-pt-9\"".html_safe if @preview_record %>>
   <head>
-    <title><%= content_for(:title) || "ContentSpiel" %></title>
+    <%# The head tags that describe what is shown are collected first: the
+        partial prints nothing here, it fills `content_for(:title)` and
+        `content_for(:head)`. It is rendered by the layout, not by
+        pages/show, so a theme that replaces the page template cannot lose
+        them.
+
+        Not for a 404, and the response's status is what says so, not
+        `@page`: a 404 can have a record in hand (`assign_record` assigns
+        the page and the post before it finds that no block lists the post,
+        and the preview answers 404 for a post whose listing page the editor
+        may not read), and its title and description are not a 404's to
+        print. While pages/show rendered this partial, not rendering
+        pages/show was the guard
+        (`test/integration/theme_pages_test.rb`: "a 404 that had a record in
+        hand describes none"). %>
+    <% render "pages/seo_meta", page: @page, post: @post if @page && !response.not_found? %>
+    <title><%= content_for(:title) || themed_title(page_title: nil, site_title: Locales.read(Current.site, :title)) %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="ContentSpiel">
-    <meta name="mobile-web-app-capable" content="yes">
     <%# No csrf_meta_tags (spec §6.4): PublicController serves the same
         cookie-less response to every visitor, and Rails only reads/writes
         the session -- which would set a cookie on an otherwise anonymous,
@@ -35,12 +64,8 @@
       <% end %>
     <% end %>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
-    <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
+    <%= render "layouts/public/icons" %>
+    <%= render "layouts/public/head" %>
 
     <%# The public theme only (spec §9) -- never the product stylesheet. %>
     <%= stylesheet_link_tag "theme-default", "data-turbo-track": "reload" %>
@@ -50,7 +75,9 @@
   <%# In a preview the bar (layouts/public/_preview_banner) is fixed to the
       top of the window and out of the flow, so the body is pushed down by its
       height (`pt-9`, 36px) and anchor jumps keep clear of it (`scroll-pt-9` on
-      <html>). Neither exists on the public site proper.
+      <html>). Neither exists on the public site proper. The bar is product UI
+      on a public page: it is rendered here, by the CMS, and no theme
+      replaces it.
 
       `overflow-x-clip` is for a full-width section (sections spec §5.3,
       `themes/default/sections.css`): its band is `100vw` wide, and `100vw`
@@ -58,13 +85,13 @@
       with such a band would scroll sideways by those few pixels. On <body>
       the value is handed to the viewport, which stays the page's one
       scroller -- so a `position: sticky` element and a code block's own
-      sideways scroll (`.cs-prose pre`) behave as before. %>
-  <body class="min-h-screen overflow-x-clip bg-paper font-cs text-ink scheme-light dark:scheme-dark<%= " pt-9" if content_for?(:preview_banner) %>">
-    <%= yield :preview_banner %>
-    <div class="mx-auto max-w-3xl px-4">
-      <%= render "layouts/public/header" %>
-      <main class="py-12"><%= yield %></main>
-      <%= render "layouts/public/footer" %>
-    </div>
+      sideways scroll (`.cs-prose pre`) behave as before.
+
+      The classes on <body> are the default theme's and read tokens only: a
+      theme changes the page's ground and type by its tokens, or by a `body`
+      rule of its own, which comes later in the one stylesheet. %>
+  <body class="min-h-screen overflow-x-clip bg-paper font-cs text-ink scheme-light dark:scheme-dark<%= " pt-9" if @preview_record %>">
+    <%= render "layouts/public/preview_banner" if @preview_record %>
+    <%= render layout: "layouts/public/frame" do %><%= yield %><% end %>
   </body>
 </html>

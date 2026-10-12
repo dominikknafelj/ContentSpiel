@@ -1,0 +1,10 @@
+<%# The frame of every public page, inside <body>: the content column with the
+    header, the page and the footer (theming spec §2). A theme replaces this
+    file to lay the page out its own way; `yield` is the page
+    (pages/show, pages/not_found). The layout around it
+    (layouts/application.html.erb) is the CMS's and is not replaceable. %>
+<div class="mx-auto max-w-3xl px-4">
+  <%= render "layouts/public/header" %>
+  <main class="py-12"><%= yield %></main>
+  <%= render "layouts/public/footer" %>
+</div>

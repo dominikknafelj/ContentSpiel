@@ -23,6 +23,22 @@ module PublicPageRendering
     # route's own `locale` constraint (one of the three configured locales) or
     # the site's default locale, itself validated against that same list.
     around_action :render_in_requested_locale
+
+    # The theme's page and layout templates are looked up before app/views
+    # (theming spec §2), for this request only: `prepend_view_path` on the
+    # instance changes this request's lookup and no other's, so
+    # `Theme.current` can differ between two requests of one process (a
+    # test's `Theme.with`). Only the two controllers that include this
+    # concern do it, `PagesController` and `PreviewController`: no CS Studio
+    # controller does, so a theme's template can never be found for an admin
+    # view (`test/integration/theme_pages_test.rb`: "nothing of a theme
+    # reaches CS Studio, sign-in or setup").
+    #
+    # What the path lets a theme replace is not "any template": the folder
+    # is checked against `Theme::Contract` when the application starts, and
+    # one that holds the layout, `pages/_seo_meta`, `shared/_theme_head` or
+    # the preview bar does not start.
+    before_action :look_in_the_theme_first
   end
 
   private
@@ -110,6 +126,11 @@ module PublicPageRendering
   def preload_page_images(page)
     ActiveRecord::Associations::Preloader.new(records: [ page ], associations: { hero_media_asset: Media::Asset::VARIANT_INCLUDES }).call
     ActiveRecord::Associations::Preloader.new(records: page.content_blocks.to_a, associations: { media_asset: Media::Asset::VARIANT_INCLUDES }).call
+  end
+
+  def look_in_the_theme_first
+    views = Theme.current.views_path
+    prepend_view_path(views.to_s) if views&.directory?
   end
 
   def render_in_requested_locale(&block)

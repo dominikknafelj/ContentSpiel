@@ -1,0 +1,7 @@
+<article class="plain-page">
+  <%= render "theme/crumb" %>
+  <% if @post.nil? %>
+    <h1><%= translated(@page, :title) %></h1>
+  <% end %>
+  <% block_outline(@page).top_level.each do |block| %><%= render_block(block) %><% end %>
+</article>

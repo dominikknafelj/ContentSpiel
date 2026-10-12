@@ -57,4 +57,11 @@ Rails.application.configure do
   config.active_record.encryption.primary_key = "bucjIMC1e75jAXYLfrKbf3aIriMMYu2k"
   config.active_record.encryption.deterministic_key = "jlibvbSMI4KFeyeILzWPfJAWGFpJkVgZ"
   config.active_record.encryption.key_derivation_salt = "L0wR0q5UUCl1myUS0fbgkCkLKbvzcLaI"
+
+  # The second theme's images (`test/fixtures/themes/plain`): Propshaft's
+  # load path is fixed at boot and the suite swaps themes in-process
+  # (`Theme.with`), so `image_path("plain-mark.svg")` in that theme's
+  # templates has to resolve whichever theme the application started with.
+  # A real theme's folders are added by config/initializers/theme.rb.
+  config.assets.paths << Rails.root.join("test/fixtures/themes/plain/assets/images").to_s
 end

@@ -1,10 +1,13 @@
 <%# The head tags describing this response: the document title, the meta
     description and the Open Graph card (page-tree design spec section 7).
 
-    Rendered from the body template rather than written into the layout because
-    this is where the `Page` -- and, at a post permalink, the `Post` -- it has
-    to describe is in scope. The layout picks both halves up through
-    `content_for(:title)` and its `yield :head`. %>
+    Rendered by the layout (layouts/application.html.erb), first thing in
+    <head>, and not by pages/show: a theme replaces the page template and
+    must not be able to lose these (theming spec §2). It prints nothing where
+    it is rendered; the layout picks both halves up through
+    `content_for(:title)` and its `yield :head`. The `Page` -- and, at a post
+    permalink, the `Post` -- it describes are handed in from the controller's
+    `@page` and `@post`. %>
 <% title = seo_title(page, post: post) %>
 <% description = seo_description(page, post: post) %>
 
