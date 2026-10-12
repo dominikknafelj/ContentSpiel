@@ -70,7 +70,7 @@ module Page::TreeRanking
     # them (`PublicSite::Paths.canonical_page`), ignores trashed pages, and a
     # restored page rejoins at the position `Trash::Restore` gives it.
     others = self.class.kept.where(parent_id: parent_id).where.not(id: id).order(:position, :id).to_a
-    ordered = others.insert(requested.clamp(0, others.size), self) # version: none (Array#insert, no SQL)
+    ordered = others.insert(requested.clamp(0, others.size), self) # version: none (Array#insert, no SQL) # changes: none (an Array#insert, no row is written)
 
     # No `PublicSite.bump_version!` for the siblings, although their rows are
     # written around the callbacks (here, and by closure_tree's own
@@ -84,7 +84,7 @@ module Page::TreeRanking
     # bumps there. A draft placed among live siblings changes nothing on the
     # site.
     ordered.each_with_index do |page, index|
-      page.update_columns(position: index) unless page.position == index # version: none (see above: only this page's rank changes, and its own save bumps when it is live)
+      page.update_columns(position: index) unless page.position == index # version: none (see above: only this page's rank changes, and its own save bumps when it is live) # changes: none (a position is not in a copy)
     end
   end
 end

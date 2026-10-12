@@ -168,4 +168,46 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
   private
 
   def rich_text_doc(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
+
+  test "unpublished changes lists live and scheduled records with a mark, newest first, within the read scope, and no draft" do
+    older = create_post(title: "Older mark")
+    newer = create_page(title: "Newer mark")
+    scheduled = create_post(title: "Scheduled mark", published: false)
+    scheduled.update_columns(published_at: 3.days.from_now) # version: none (a test schedules a post) # changes: none (a test schedules a post)
+    clean = create_post(title: "No mark")
+    draft = create_post(title: "Draft mark", published: false)
+    trashed = create_post(title: "Trashed mark")
+    older.update_columns(unpublished_changes_at: 3.hours.ago) # version: none (a test sets the mark) # changes: none (a test sets the mark)
+    scheduled.update_columns(unpublished_changes_at: 2.hours.ago) # version: none (a test sets the mark) # changes: none (a test sets the mark)
+    newer.update_columns(unpublished_changes_at: 1.hour.ago) # version: none (a test sets the mark) # changes: none (a test sets the mark)
+    draft.update_columns(unpublished_changes_at: 1.minute.ago) # version: none (a test gives a draft a stale mark) # changes: none (a test gives a draft a stale mark)
+    trashed.update_columns(unpublished_changes_at: 1.second.ago, trashed_at: Time.current) # version: none (a test trashes a marked post) # changes: none (a test trashes a marked post)
+
+    assert_equal [ newer, scheduled, older ], feed.unpublished_changes
+    assert_not_includes feed.unpublished_changes, clean
+    assert_not_includes feed.unpublished_changes, draft
+    assert_not_includes feed.unpublished_changes, trashed
+  end
+
+  test "unpublished changes are read-scoped: a viewer who may read only blog posts sees no resume entry and no page" do
+    blog = create_post(title: "Blog mark")
+    resume = create_post(title: "Resume mark", content_type: "resume_entry")
+    page = create_page(title: "Page mark")
+    [ blog, resume, page ].each { |record| record.update_columns(unpublished_changes_at: Time.current) } # version: none (a test sets the mark) # changes: none (a test sets the mark)
+    blog_readers = AccessControl::Group.create!(name: "Blog readers")
+    blog_readers.grants.create!(permission: "posts.read", scope: { "content_types" => [ "blog" ] })
+    reader = User.create!(email_address: "blog-reader@example.com", password: "password12345")
+    AccessControl::Membership.create!(user: reader, group: blog_readers)
+
+    assert_equal [ blog ], feed(reader).unpublished_changes
+    assert_equal [ blog, resume, page ].map(&:id).sort, feed(@me).unpublished_changes.map(&:id).sort
+  end
+
+  test "unpublished changes is cut to five, and costs a query per model" do
+    7.times { |n| create_post(title: "Marked #{n}").update_columns(unpublished_changes_at: n.minutes.ago) } # version: none (a test sets the mark) # changes: none (a test sets the mark)
+
+    statements = capture_sql { assert_equal 5, feed.unpublished_changes.size }
+
+    assert_equal 2, statements.grep(/FROM "(pages|posts)"/).size
+  end
 end

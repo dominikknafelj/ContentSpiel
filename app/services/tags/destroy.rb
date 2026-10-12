@@ -30,6 +30,7 @@ module Tags
       carriers = @tag.post_tags.pluck(:post_id)
       destroyed = Tag.transaction do
         touch_carrying_posts(@tag)
+        note_pages_changed(pages)
         record_event("tag.deleted", subject: @tag)
         @tag.destroy || raise(ActiveRecord::Rollback)
       end

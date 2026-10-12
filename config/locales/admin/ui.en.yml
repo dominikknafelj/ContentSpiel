@@ -70,6 +70,18 @@ en:
             scheduled: "Scheduled"
             live: "Live"
 
+        # The rows of a published or scheduled record have moved on from what
+        # the site shows (drafts spec §4.4). The compact form (the page tree)
+        # is a dot, so its label is also the dot's name for a screen reader.
+        unpublished_chip:
+          label: "Unpublished changes"
+
+        # A live page or post the site has no address for: another record
+        # holds it, so a visitor is told "not found" (drafts plan, task 6).
+        no_address_chip:
+          label: "No address"
+          title: "Another page or post holds this address, so this one shows “not found” on the site."
+
         translation_chip:
           aria_label:
             complete: "%{language}: translated"

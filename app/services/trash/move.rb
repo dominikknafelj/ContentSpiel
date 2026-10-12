@@ -86,7 +86,7 @@ module Trash
 
     def trash_descendants
       ids = @record.descendants.kept.pluck(:id)
-      Page.where(id: ids).update_all(trashed_at: now, trashed_by_id: actor_user&.id, trash_root_id: @record.id, updated_at: now)
+      Page.where(id: ids).update_all(trashed_at: now, trashed_by_id: actor_user&.id, trash_root_id: @record.id, updated_at: now) # changes: none (the trash is not in a copy: it is immediate)
       bump_public_version_for(ids)
       ids
     end

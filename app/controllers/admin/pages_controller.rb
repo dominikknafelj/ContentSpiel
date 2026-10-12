@@ -14,6 +14,7 @@ module Admin
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
+    include PublishingState
     include EditingClaims
     include Scheduling
     include MediaFields
@@ -219,6 +220,7 @@ module Admin
       # from here whether *this* save happened to be the one that mattered
       # to it.
       streams << tree_replace_stream if result.ok?
+      streams.concat(publishing_state_streams(@page)) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
     end

@@ -85,21 +85,68 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu] [role=separator]", visible: :all
   end
 
-  test "a live and a scheduled record offer Publish changes to someone who may publish, and a draft does not" do
+  def edit_title(record, title = "Edited")
+    assert as_owner { Pages::Save.call(record, translations: { "en" => { title: title } }) }.ok? if record.is_a?(Page)
+    assert as_owner { Posts::Save.call(record, translations: { "en" => { title: title } }) }.ok? if record.is_a?(Post)
+    record.reload
+  end
+
+  test "a live record with unpublished changes shows the chip and Publish changes; without changes neither, and both elements are there, empty" do
     live = create_page(title: "About", published: true)
     render_header(live)
-    assert_selector "header form[action='/cs-studio/publishing/page/#{live.id}/publish'] button", text: "Publish changes"
+    assert_selector "header #publishing-chip", visible: :all
+    assert_selector "header #publishing-actions", visible: :all
+    assert_no_selector "header #publishing-chip [data-unpublished-changes]"
+    assert_no_selector "header button", text: "Publish changes"
 
+    render_header(edit_title(live))
+    assert_selector "header #publishing-chip [data-unpublished-changes]", text: "Unpublished changes"
+    assert_selector "header #publishing-actions form[action='/cs-studio/publishing/page/#{live.id}/publish'] button", text: "Publish changes"
+  end
+
+  test "a scheduled record with unpublished changes offers them too, and a draft shows neither the chip nor the button, whatever mark it kept" do
     post = create_post(title: "Later", published: false)
     as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
     render_header(post.reload)
+    assert_no_selector "header button", text: "Publish changes"
+
+    render_header(edit_title(post.reload))
+    assert_selector "header [data-unpublished-changes]"
     assert_selector "header button", text: "Publish changes"
 
-    render_header(create_page(title: "Draft", published: false))
+    draft = create_page(title: "Draft", published: false)
+    draft.update_columns(unpublished_changes_at: Time.current) # version: none (a test gives a draft a stale mark) # changes: none (a test gives a draft a stale mark)
+    render_header(draft)
+    assert_no_selector "header [data-unpublished-changes]"
+    assert_no_selector "header #publishing-chip", visible: :all
     assert_no_selector "header button", text: "Publish changes"
+  end
 
-    render_header(create_post(title: "Read me"), actor: users(:reader))
+  test "someone who may not publish sees the chip and no button" do
+    post = edit_title(create_post(title: "Read me"))
+
+    render_header(post, actor: users(:reader))
+
+    assert_selector "header [data-unpublished-changes]"
     assert_no_selector "header button", text: "Publish changes"
+  end
+
+  test "a live page that has no address says so, and one that has an address, a draft and an unlisted post do not" do
+    page = create_page(title: "About")
+    render_header(page)
+    assert_no_selector "header [data-no-address]"
+
+    PublicPath.where(record: page).delete_all # version: none (a test takes a live page's address away) # changes: none (a test removes derived rows)
+    render_header(page.reload)
+    assert_selector "header #publishing-chip [data-no-address]", text: "No address"
+
+    draft = create_page(title: "Draft", published: false)
+    PublicPath.where(record: draft).delete_all # version: none (a test takes a draft's address away) # changes: none (a test removes derived rows)
+    render_header(draft)
+    assert_no_selector "header [data-no-address]"
+
+    render_header(create_post(title: "Nobody lists me"))
+    assert_no_selector "header [data-no-address]", text: "No address"
   end
 
   test "a viewer who can only read sees View only and nothing that writes" do

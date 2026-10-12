@@ -175,4 +175,33 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     render_table([ draft ])
     assert_no_selector "[role=menu] button", text: "Move to trash", visible: :all
   end
+
+  test "a live post with unpublished changes carries the chip in the Status column; a draft with a stale mark and a plain live post do not" do
+    live = create_post(title: "Marked live")
+    assert Posts::Save.call(live, translations: { "en" => { title: "Typed" } }).ok?
+    draft = create_post(title: "Marked draft", published: false)
+    draft.update_columns(unpublished_changes_at: Time.current) # version: none (a test gives a draft a stale mark) # changes: none (a test gives a draft a stale mark)
+    plain = create_post(title: "Plain live")
+
+    render_table([ live.reload, draft.reload, plain ])
+
+    assert_selector "tbody tr", count: 3
+    assert_selector "[data-unpublished-changes]", count: 1
+    assert_selector "tbody tr:has(th a[href*='/posts/#{live.id}']) td [data-unpublished-changes]", text: "Unpublished changes"
+  end
+
+  test "the table with marked posts costs the same queries for 3 posts as for 30" do
+    add = lambda do |count, prefix|
+      Array.new(count) { |n| create_post(title: "#{prefix} #{n}") }.each { |post| assert Posts::Save.call(post, translations: { "en" => { title: "#{post.title} typed" } }).ok? }
+    end
+    small_posts = add.(3, "Small").map(&:reload)
+    render_table(small_posts)
+    small = count_queries { render_table(small_posts) }
+
+    large_posts = small_posts + add.(27, "Large").map(&:reload)
+    large = count_queries { render_table(large_posts) }
+
+    assert_selector "[data-unpublished-changes]", count: 30
+    assert_equal small, large
+  end
 end

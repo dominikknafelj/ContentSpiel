@@ -1,0 +1,12 @@
+# The dashboard's own keys (docs/reference/i18n.md): `admin.dashboard.show` is
+# the view's lazy-lookup scope (`app/views/admin/dashboard/show.html.erb`). Only
+# what a later change added is here; the rest of the view is not converted yet.
+en:
+  admin:
+    dashboard:
+      show:
+        # The card of published and scheduled pages and posts whose rows have
+        # moved on from what the site shows (drafts spec §3).
+        unpublished_changes:
+          title: "Unpublished changes"
+          empty: "Nothing is waiting to be published."

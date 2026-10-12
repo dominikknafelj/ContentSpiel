@@ -115,7 +115,7 @@ module ContentBlocks
     # directly after the source, among the source's own siblings.
     def place_after_source(copy)
       siblings = @source.owner.content_blocks.in_column(@source.section_id, @source.section_column).reorder(:position, :id).ids - [ copy.id ]
-      siblings.insert(siblings.index(@source.id) + 1, copy.id) # version: none (Array#insert, no SQL)
+      siblings.insert(siblings.index(@source.id) + 1, copy.id) # version: none (Array#insert, no SQL) # changes: none (an Array#insert, no row is written)
       ContentBlocks::Reorder.call(@source.owner, siblings, section: @source.section_id, column: @source.section_column, actor: @actor)
     end
 

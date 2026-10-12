@@ -125,12 +125,6 @@ module Admin
 
       def can_publish? = !live? && may_publish?
 
-      # Whoever may publish this record may publish what is in it (D5). Shown
-      # for every published or scheduled record until Task 6 knows whether
-      # there is anything to publish.
-      def can_publish_changes? = record.published_at.present? && may_publish?
-      def publish_changes_url = helpers.admin_publishing_publish_path(kind: type, id: record.id, **url_options)
-
       def can_unpublish? = status != "draft" && may_publish?
 
       # Only a draft is scheduled from the menu; a scheduled record edits its

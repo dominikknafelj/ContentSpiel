@@ -245,7 +245,7 @@ class Page < ApplicationRecord
   # move descendants with `update_all`, so a descendant's base does not move on
   # trash and restore while the branch root's does: harmless, no settings value
   # changes.
-  SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at parent_id position].freeze
+  SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at unpublished_changes_at parent_id position].freeze
   before_save { self.settings_changed_at = Time.current if new_record? || (changed - SETTINGS_BASE_IGNORES).any? }
 
   def reload(...)

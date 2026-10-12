@@ -153,6 +153,8 @@ class Publishing::VersionTest < ActiveSupport::TestCase
     scheduled = create_post(title: "Later", published: false)
     assert Posts::Save.call(scheduled, attributes: { published_at: 3.days.from_now }).ok?
 
+    assert Pages::Save.call(live, translations: { "en" => { title: "Changed" } }).ok? # Task 6: a publish with nothing changed takes no copy
+    assert Posts::Save.call(scheduled, translations: { "en" => { title: "Changed" } }).ok?
     before = PublicSite::Version.current
     publish_changes(live)
     assert_operator PublicSite::Version.current, :>, before, "a copy of a live record must move the version"

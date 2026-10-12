@@ -20,12 +20,12 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
     "compute" => "the address a record would have, for the slug's validation",
     "canonical_page" => "the page a post's address runs through",
     "canonical_pages" => "the same for several posts",
-    "post_path" => "a post's path under a given page, for the preview's link"
+    "post_path" => "a post's path under a given page, for the preview's link",
+    "foresee" => "the addresses a publish would take away, tried in a savepoint and rolled back (`Publishing::Changes#lost_addresses`)"
   }.freeze
-  # Read by nothing under app/ yet: the overview of what a publish will
-  # change (Task 6 of the drafts plan) is its caller. When that exists, this
-  # moves into READS.
-  AWAITED = { "foresee" => "the addresses a publish would take away, tried in a savepoint and rolled back" }.freeze
+  # Read by nothing under app/ yet: the name goes here until a caller exists,
+  # and moves into READS then (a test below fails the day it has one).
+  AWAITED = {}.freeze
 
   PATHS = "app/models/public_site/paths.rb".freeze
 

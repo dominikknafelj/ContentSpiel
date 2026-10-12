@@ -45,7 +45,8 @@ module Publishing
       "trashed_at" => "the trash is immediate",
       "trashed_by_id" => "the trash is immediate",
       "trash_root_id" => "the trash is immediate",
-      "settings_changed_at" => "editor state: when the settings last changed; no public reader"
+      "settings_changed_at" => "editor state: when the settings last changed; no public reader",
+      "unpublished_changes_at" => "editor state: the mark that the rows moved on from the copy; no public reader"
     },
     "Post" => {
       "slug" => "an address is immediate",
@@ -53,7 +54,8 @@ module Publishing
       "published_at" => "publishing and scheduling are immediate",
       "trashed_at" => "the trash is immediate",
       "trashed_by_id" => "the trash is immediate",
-      "author_id" => "no public component draws the author"
+      "author_id" => "no public component draws the author",
+      "unpublished_changes_at" => "editor state: the mark that the rows moved on from the copy; no public reader"
     },
     "ContentBlock" => {}
   }.freeze
@@ -120,6 +122,30 @@ module Publishing
   # record with only a pending copy (a change published with a time, on a
   # record that had no copy) is still shown from its rows until that time.
   def in_force?(record, now: Time.current) = Version.of(record).in_force(now).exists?
+
+  # THE MARK (`unpublished_changes_at`, drafts spec §4.4) says THAT the rows of
+  # a published or scheduled record have moved on from what is published;
+  # `Publishing::Changes` says how. A save and a touch set it
+  # (`Publishable`); these two are for a write around the callbacks
+  # (`update_columns`, `touch_all`, `insert_all` on a join table) and for the
+  # services that take a copy or find there is nothing to take. Neither moves
+  # the public content version: nothing public reads the mark.
+  #
+  # Marks the published and scheduled records of `records` (a record or a
+  # relation); a draft has no copy to differ from.
+  def note_change(records, now: Time.current)
+    relation = records.is_a?(ActiveRecord::Relation) ? records : records.class.where(id: records.id)
+    relation.where.not(published_at: nil).update_all(unpublished_changes_at: now) # version: none (a mark CS Studio reads; no page shows it)
+  end
+
+  # The rows and the newest copy are the same now (a copy was taken, or the
+  # difference was found to be nothing): nothing is waiting. Also on the
+  # object in memory, as a read, so the next screen drawn from it is true.
+  def clear_changes(record)
+    record.class.where(id: record.id).update_all(unpublished_changes_at: nil) # version: none (a mark CS Studio reads; no page shows it)
+    record.unpublished_changes_at = nil
+    record.clear_attribute_changes([ :unpublished_changes_at ])
+  end
 
   # THE ONE CHECK THAT REFUSES A SAVE OR A PUBLISH FOR AN ADDRESS, after the
   # slug's validation (`HasPublicPaths#public_paths_are_available`), which

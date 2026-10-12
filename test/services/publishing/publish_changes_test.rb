@@ -24,6 +24,7 @@ class Publishing::PublishChangesTest < ActiveSupport::TestCase
 
   test "a post's event is post.changes_published" do
     post = create_post(title: "Post")
+    assert Posts::Save.call(post, translations: { "en" => { title: "Changed" } }).ok? # Task 6: a publish with nothing changed takes no copy
 
     assert Publishing::PublishChanges.call(post).ok?
 
@@ -74,5 +75,42 @@ class Publishing::PublishChangesTest < ActiveSupport::TestCase
 
     assert lock, "no row lock on the page"
     assert_operator lock, :<, first_copy_statement
+  end
+
+  test "with nothing changed it takes no copy and records nothing, and the mark is gone" do
+    assert Pages::Save.call(@page, translations: { "en" => { title: "One" } }).ok? # typed back to what is published
+    assert @page.reload.unpublished_changes?
+
+    result = Publishing::PublishChanges.call(@page)
+
+    assert result.ok?
+    assert_equal 1, Publishing::Version.of(@page).count
+    assert_empty Audit::Event.where(action: "page.changes_published")
+    assert_not @page.reload.unpublished_changes?
+  end
+
+  test "a new time for changes already scheduled is taken although nothing else changed" do
+    assert Publishing::PublishChanges.call(@page, at: 2.days.from_now).ok?
+
+    assert Publishing::PublishChanges.call(@page, at: 4.days.from_now).ok?
+
+    assert_operator Publishing.pending(@page).live_at, :>, 3.days.from_now
+  end
+
+  test "a record with no copy at all has its first copy taken, although it can be compared with nothing" do
+    bare = create_page(title: "Bare", published: false)
+    bare.update_columns(published_at: 1.day.ago) # version: none (a test makes a live record around the services) # changes: none (a test makes a live record around the services)
+
+    assert Publishing::PublishChanges.call(bare.reload).ok?
+
+    assert_equal 1, Publishing::Version.of(bare).count
+  end
+
+  test "it clears the mark when it takes the copy, and a copy for a time clears it too" do
+    assert @page.reload.unpublished_changes?
+
+    assert Publishing::PublishChanges.call(@page, at: 2.days.from_now).ok?
+
+    assert_not @page.reload.unpublished_changes?
   end
 end

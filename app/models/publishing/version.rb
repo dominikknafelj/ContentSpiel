@@ -90,6 +90,10 @@ module Publishing
         # of `PublicSite.content_version` that reads the newest `live_at` in
         # force, so no write and no job is what moves the version then.
         PublicSite.bump_version! if row.live? && live_at <= now
+        # The rows and the newest copy are the same now, so nothing is waiting.
+        # Inside this transaction: a publish that is refused or rolled back
+        # (the address below raises) leaves the mark where it was.
+        Publishing.clear_changes(row)
         # The images the copies show count as used (`Media::Usage` role
         # `published`), in this transaction, whether the copy is in force now
         # or pending.

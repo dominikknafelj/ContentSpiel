@@ -100,6 +100,9 @@ module Posts
 
         (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
         touch_for_join_rows(related_before)
+        # A post is touched for its tags only when nothing else of it changed;
+        # the mark (a post's tags are in its copy) must not depend on that.
+        Publishing.note_change(@post) if related_before.key?("tag_names") && related_before["tag_names"] != tag_names
         # The body's `image` nodes, every locale (media library design spec
         # §5.1) -- recomputed from the saved post, so an image removed from
         # one locale's body loses exactly that locale's row.

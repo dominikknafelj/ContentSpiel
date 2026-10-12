@@ -42,7 +42,7 @@ module Locales
         [ Page, Post ].each do |model|
           model.find_each do |record|
             record.fill_blank_slugs([ @code ])
-            record.update_columns(slug: record.read_attribute(:slug)) if record.changed?
+            record.update_columns(slug: record.read_attribute(:slug)) if record.changed? # changes: none (a slug is not in a copy)
           end
         end
         # Slugs written around the callbacks, and a language every public

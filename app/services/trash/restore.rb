@@ -140,7 +140,7 @@ module Trash
 
     def restore_branch_members
       ids = @record.descendants.where(trash_root_id: @record.trash_root_id).pluck(:id)
-      Page.where(id: ids).update_all(trashed_at: nil, trashed_by_id: nil, trash_root_id: nil, updated_at: Time.current)
+      Page.where(id: ids).update_all(trashed_at: nil, trashed_by_id: nil, trash_root_id: nil, updated_at: Time.current) # changes: none (the trash is not in a copy: it is immediate)
       # Written around the callbacks: a live member coming back moves the
       # public content version here (the root's save bumps for the root).
       PublicSite.bump_version! if ids.any? && Page.where(id: ids).published.exists?
@@ -187,7 +187,7 @@ module Trash
         Media::Usage.where(owner_type: type, owner_id: owner_ids).pluck(:media_asset_id)
       end.uniq
       @restored_assets = Media::Asset.trashed.where(id: ids).order(:id).to_a
-      Media::Asset.where(id: @restored_assets.map(&:id)).update_all(trashed_at: nil, trashed_by_id: nil, updated_at: Time.current)
+      Media::Asset.where(id: @restored_assets.map(&:id)).update_all(trashed_at: nil, trashed_by_id: nil, updated_at: Time.current) # changes: none (a library image, not a page or post)
       # Around the callbacks, so `Media::Asset`'s own bump doesn't run: an
       # image back in the library renders again wherever a page uses it.
       PublicSite.bump_version! if @restored_assets.any?

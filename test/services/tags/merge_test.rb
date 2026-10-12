@@ -453,4 +453,50 @@ class Tags::MergeTest < ActiveSupport::TestCase
     assert_equal "a", block.reload.settings["tag"]
     assert_equal 0, PostTag.where(tag_id: into.id).count
   end
+
+  def marked?(record) = record.class.where(id: record.id).pick(:unpublished_changes_at).present?
+
+  # A live page whose list filters by the tag, a live post and a draft that
+  # carry it, and the page's list as the site shows it.
+  def live_list_and_carriers(tag_name = "rails")
+    Tag.find_or_create_by!(name: tag_name) # the page's copy records the tag's id: it must exist when the page is published
+    page = create_page(title: "Rails posts #{tag_name}", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => tag_name } })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    live = create_post(title: "Live carrier #{tag_name}", tags: [ tag_name ])
+    draft = create_post(title: "Draft carrier #{tag_name}", tags: [ tag_name ], published: false)
+    [ page, live, draft ]
+  end
+
+  def listed(page) = Publishing::Listing.posts(Publishing.published(page).content_blocks.to_a.sole).map(&:id)
+
+  test "merging a tag marks the live posts that carry it and nothing that only repoint_tag! made equal, and the site shows them as before" do
+    page, live, draft = live_list_and_carriers
+    kept_page, kept_post, = live_list_and_carriers("kept")
+    shown = listed(page)
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: Tag.find_by!(name: "kept")).ok?
+
+    assert marked?(live)
+    assert_not marked?(draft)
+    assert_not marked?(kept_post), "it carried only the kept tag: its rows and its copy say the same"
+    assert_not marked?(kept_page), "its list already filtered by the kept tag"
+    assert_equal [ Tag.find_by!(name: "kept").id ], Publishing.current(live).tag_ids, "the copy's reference stays real"
+    assert_equal (shown + [ kept_post.id ]).sort, listed(page).sort, "the list still holds what it held; the two tags are one from now on, so the kept tag's posts are in it too"
+  end
+
+  test "a live page whose list block named the merged tag is marked, and its public list holds the same posts until it is published" do
+    page, live, = live_list_and_carriers
+    kept = Tag.create!(name: "kept")
+    assert_equal [ live.id ], listed(page)
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: kept).ok?
+
+    assert marked?(page)
+    assert_equal [ live.id ], listed(page), "the copy still lists the post"
+    assert_equal "kept", page.content_blocks.sole.settings["tag"], "the rows name the kept tag"
+    publish_changes(page)
+    assert_equal [ live.id ], listed(page)
+    assert_not marked?(page)
+  end
 end

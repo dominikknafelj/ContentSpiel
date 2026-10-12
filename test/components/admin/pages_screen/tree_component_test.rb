@@ -196,4 +196,33 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     render_tree
     assert_selector "li[data-page-id='#{leaf.id}'] > div a[title='#{leaf.title}']"
   end
+
+  test "a live page with unpublished changes carries the mark; a draft with a stale mark does not; the tree costs no statement more for it" do
+    live = create_page(title: "Marked live")
+    assert Pages::Save.call(live, translations: { "en" => { title: "Typed" } }).ok?
+    draft = create_page(title: "Marked draft", published: false)
+    draft.update_columns(unpublished_changes_at: Time.current) # version: none (a test gives a draft a stale mark) # changes: none (a test gives a draft a stale mark)
+    create_page(title: "Plain live")
+
+    render_tree
+
+    assert_selector "li[data-page-id='#{live.id}'] > div [data-unpublished-changes][role=img][aria-label='Unpublished changes']"
+    assert_no_selector "li[data-page-id='#{draft.id}'] [data-unpublished-changes]"
+    assert_selector "[data-unpublished-changes]", count: 1
+  end
+
+  test "the mark is a column already loaded: 3 marked pages cost the same queries as 30" do
+    mark = lambda do |count, prefix|
+      add_pages(count, prefix).each { |page| assert Pages::Save.call(page, translations: { "en" => { title: "#{page.title} typed" } }).ok? }
+    end
+    mark.call(3, "Small")
+    render_tree
+    small = count_queries { render_tree }
+
+    mark.call(27, "Large")
+    large = count_queries { render_tree }
+
+    assert_selector "[data-unpublished-changes]", count: 30
+    assert_equal small, large
+  end
 end

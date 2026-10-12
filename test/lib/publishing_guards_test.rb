@@ -1,4 +1,5 @@
 require "test_helper"
+require_relative "version_bump_test"
 
 # What a change can break without anything failing loudly (drafts spec §7).
 class PublishingGuardsTest < ActiveSupport::TestCase
@@ -109,6 +110,32 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     assert_match(/\bVersion\b[^\n]*#{WRITES}/, "Version.where(id: 1).delete_all")
     assert_match(/\bpublished_versions\b[^\n]*#{WRITES}/, "page.published_versions.update_all(live_at: nil)")
     assert_match(/\bVersion\b[^\n]*#{WRITES}/, "Publishing::Version.of(page).destroy_all")
+  end
+
+  # Files that write pages, posts or blocks. A write around the callbacks in
+  # one of them runs neither `Publishable`'s `before_save` nor its
+  # `after_touch`, so nothing marks the record as changed for it.
+  CONTENT_WRITERS = %w[
+    app/services/content_blocks/**/*.rb app/services/tags/**/*.rb app/services/pages/**/*.rb app/services/posts/**/*.rb
+    app/services/translations/**/*.rb app/services/trash/**/*.rb app/services/locales/**/*.rb app/services/publishing/**/*.rb
+    app/models/page/**/*.rb app/models/rich_text/action_text_import.rb app/models/access_control/seeds.rb
+  ].freeze
+  MARKS = /\.touch\b|\bPublishing\.note_change\(/
+  NO_CHANGE = /changes:\s*none\s*\((?<reason>[^)]{10,})\)/
+
+  test "a write around the callbacks in a file that writes pages, posts or blocks marks the record as changed, or says on its line why it is no change to content" do
+    offences = CONTENT_WRITERS.flat_map { |pattern| Rails.root.glob(pattern) }.uniq.sort.flat_map do |file|
+      path = file.to_s.delete_prefix("#{Rails.root}/")
+      source = file.read
+      VersionBumpTest.writes(path, source).reject { |write| source.match?(MARKS) || write.comment.match?(NO_CHANGE) }.map { |write| "#{path}:#{write.line}: #{write.code}" }
+    end
+
+    assert_empty offences, <<~MESSAGE
+      These lines write around the model callbacks in a file that writes content. If the write
+      changes what a copy holds of a published record (drafts spec §4.2), touch the page or post
+      or call `Publishing.note_change(…)` in the file. If it does not, end the line with
+      `# changes: none (why not)`. A file that marks at all is taken at its word for all its writes.
+    MESSAGE
   end
 
   test "Admin::Publishing is not defined" do

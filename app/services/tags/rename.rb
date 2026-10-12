@@ -31,7 +31,12 @@ module Tags
         # (`touch_all`: callbacks and validations skipped, only the base moves).
         # Only when the name really changed: a rename to the same name is no
         # change and records no event, so it must not stale those forms.
-        touch_carrying_posts(@tag) if @tag.saved_change_to_name?
+        if @tag.saved_change_to_name?
+          touch_carrying_posts(@tag)
+          # The lists that named the old name or name the new one (a name
+          # that matched no tag until now) resolve to another tag.
+          note_pages_changed(pages_listing(names: [ old_name, @tag.name ]))
+        end
 
         changes = Audit::Snapshot.field_changes_for(@tag)
         record_event("tag.renamed", subject: @tag, field_changes: changes) if changes.any?

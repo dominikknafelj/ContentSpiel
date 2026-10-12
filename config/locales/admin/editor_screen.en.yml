@@ -227,14 +227,19 @@ en:
           # The status beside "Copy my text" when the read of the card to show after
           # "Discard" failed: the notice stays.
           discard_failed: "Couldn't load the block. Try again."
-        # The header's button that makes a published or scheduled record's rows
-        # what the public sees (drafts spec §4.3); the rest of the header's
-        # strings are in `notes.en.yml` or not converted yet.
-        header:
+        # The header's two publishing parts (`PublishingStateComponent`): the
+        # button that makes a published or scheduled record's rows what the
+        # public sees (drafts spec §4.3).
+        publishing_state:
           publish_changes: "Publish changes"
+        # The rest of the header's strings are in `notes.en.yml` or not
+        # converted yet.
+        header:
           # Under the address of a live record; the plan's wording, with the
           # button's name as it reads today (no ellipsis until it opens a dialog).
           live_hint: "This %{type} is live. Changes are published with “Publish changes”."
         # What the redirect says once the copy is taken.
         publishing:
           published: "Changes published"
+          # The press found the rows and the newest copy the same.
+          nothing: "Nothing to publish"

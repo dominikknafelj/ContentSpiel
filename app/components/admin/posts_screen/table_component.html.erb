@@ -60,7 +60,12 @@
             <% end %>
           </th>
           <td class="py-2.5 pr-4 text-dim"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: post.content_type) %></td>
-          <td class="py-2.5 pr-4"><%= render Admin::Ui::StatusChipComponent.new(status: post.status, at: post.published_at, hide_live: true) %></td>
+          <td class="py-2.5 pr-4">
+            <span class="inline-flex flex-wrap items-center gap-1">
+              <%= render Admin::Ui::StatusChipComponent.new(status: post.status, at: post.published_at, hide_live: true) %>
+              <%= render Admin::Ui::UnpublishedChipComponent.new if post.unpublished_changes? %>
+            </span>
+          </td>
           <%# One chip per *target* language (translation helpers spec §4): the
               original is what the others are measured against, so it has no
               state of its own here. %>

@@ -31,6 +31,16 @@ module Tags
       tag.present? && names.include?(tag.downcase)
     end
 
+    # The live and scheduled pages in `page_ids` have list blocks whose rows no
+    # longer say what their copy recorded (a block's tag name resolves to
+    # another id, or to none): marked, in the transaction of the write that
+    # did it. The copy keeps listing what it listed until the page is
+    # published (`Publishing::Version.repoint_tag!` keeps the ids it refers to
+    # real).
+    def note_pages_changed(page_ids)
+      Publishing.note_change(Page.where(id: page_ids))
+    end
+
     # WHAT A TAG SERVICE TOUCHED, for `PublicSite::Paths.refresh`: the pages
     # whose list blocks refer to a tag. Only a tag service can know them, so
     # this finder is theirs; which posts follow from those pages is the
@@ -56,8 +66,17 @@ module Tags
     # editor's tag-only change. `touch_all` skips callbacks and validations on
     # purpose: only the stale-save base moves. Must run before the tag's join
     # rows are removed, which is what it reads.
+    #
+    # The carriers are also MARKED as having unpublished changes
+    # (`Publishing.note_change`): a post's copy holds its tags by id and name,
+    # and the carrying post's rows have now moved on from it (a renamed tag
+    # has another name, a deleted or merged one is gone), while the site shows
+    # the copy until the post is published again (drafts plan, disagreement 5).
+    # Only the live and scheduled ones; a draft has no copy to differ from.
     def touch_carrying_posts(tag)
-      Post.where(id: tag.post_tags.select(:post_id)).touch_all
+      carriers = Post.where(id: tag.post_tags.select(:post_id))
+      Publishing.note_change(carriers)
+      carriers.touch_all
       # `touch_all` runs no `after_commit` on the posts, and what follows it
       # (a rename, a delete, a merge) changes what they print and which
       # listings show them: the public content version moves, whether or not

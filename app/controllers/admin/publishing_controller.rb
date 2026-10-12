@@ -7,11 +7,17 @@ module Admin
 
     before_action :set_record
 
+    # Says which of the two happened: a copy was taken, or the rows and the
+    # newest copy were found to be the same (typed and typed back) and none
+    # was. The result does not say, so the baseline's number before and after
+    # does.
     def publish
+      before = ::Publishing.baseline(@record)&.number
       result = ::Publishing::PublishChanges.call(@record)
-      return redirect_to editor_path, status: :see_other, notice: t("admin.components.editor_screen.publishing.published") if result.ok?
+      return forbidden_or(result) { redirect_to editor_path, status: :see_other, alert: result.errors.to_sentence } unless result.ok?
 
-      forbidden_or(result) { redirect_to editor_path, status: :see_other, alert: result.errors.to_sentence }
+      key = ::Publishing.baseline(@record)&.number == before ? "nothing" : "published"
+      redirect_to editor_path, status: :see_other, notice: t("admin.components.editor_screen.publishing.#{key}")
     end
 
     private

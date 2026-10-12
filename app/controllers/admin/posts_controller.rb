@@ -9,6 +9,7 @@ module Admin
   # to disambiguate against either).
   class PostsController < BaseController
     include AutosaveResponses
+    include PublishingState
     include EditingClaims
     include Scheduling
     include BulkResponses
@@ -208,6 +209,7 @@ module Admin
       )
 
       streams.concat(group_error_streams(result.record, definition, fields_hash)) if definition && fields_hash
+      streams.concat(publishing_state_streams(@post)) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
     end

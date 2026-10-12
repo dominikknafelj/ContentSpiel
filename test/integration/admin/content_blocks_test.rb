@@ -651,7 +651,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     copy = (@page.content_blocks.reload.to_a - [ first, second ]).sole
     assert_equal [ first, copy, second ], @page.content_blocks.to_a
     assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
-    assert_not_includes response.body, %(<turbo-stream action="replace")
+    # Task 6: the answer carries the header's two publishing parts, and no card.
+    assert_select "turbo-stream[action='replace']:not([target='publishing-chip']):not([target='publishing-actions'])", count: 0
   end
 
   # A copy stands directly after its source in the source's own container

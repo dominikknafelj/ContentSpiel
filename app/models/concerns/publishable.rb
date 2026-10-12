@@ -17,6 +17,9 @@ module Publishable
     # record going live this very instant are both left out -- `published`'s
     # exact complement among the records that have a time at all.
     scope :scheduled, -> { where(arel_table[:published_at].gt(Time.current)) }
+    # The records `unpublished_changes?` is true of, as a relation: a time
+    # and a mark.
+    scope :with_unpublished_changes, -> { where.not(published_at: nil).where.not(unpublished_changes_at: nil) }
 
     # The public content version (`PublicSite`, technical cleanup spec §4.8)
     # moves with every committed change to a record that is live before or
@@ -26,6 +29,13 @@ module Publishable
     # transaction may hold several saves of one record, of which
     # `after_commit` sees only the last.
     before_save :note_live_before_change
+    # The mark that the rows have moved on from what is published
+    # (`unpublished_changes_at`, drafts spec §4.4). After `note_live_before_change`
+    # so it reads the same pending changes; a save marks, and a `touch` (which
+    # runs no save callback: every block write touches its page, a post is
+    # touched for its tags) marks around the callbacks.
+    before_save :note_unpublished_changes
+    after_touch :note_unpublished_changes_on_touch
     before_destroy :note_live_before_change
     # A destroy has no `changed`, and it is always immediate.
     before_destroy { @immediate_change = true }
@@ -54,6 +64,14 @@ module Publishable
   def live?
     status == "live"
   end
+
+  # Whether this record's rows have moved on from what is published: the
+  # cheap read every list makes, a column and no comparison. A draft has no
+  # unpublished changes, whatever mark it kept from before. It is
+  # `Publishing::State#changes?`, asked of the record
+  # (`test/models/publishing/state_test.rb` holds that the two agree); the
+  # scope below is the same fact in SQL.
+  def unpublished_changes? = Publishing::State.of(self).changes?
 
   # Whether this record's own publication time is in the past on either side
   # of the change being committed (or, asked outside one, right now): what
@@ -91,6 +109,28 @@ module Publishable
     # the trash, a post's type; a new record. Or-ed across the saves of one
     # transaction, like the line above.
     @immediate_change ||= new_record? || (changed - Publishing.content_columns(self) - BOOKKEEPING).any?
+  end
+
+  # A column a copy holds is about to change on a record that has a time and
+  # keeps it. The save that publishes or schedules for the first time (or a
+  # new record) is not a change waiting to be published: its copy is taken
+  # from these very rows. The mark may be set when the net difference is
+  # nothing (typed and typed back): `Publishing::Changes` then finds none.
+  # It moves neither `updated_at` nor a page's settings base (both ignore it).
+  def note_unpublished_changes
+    return if published_at.nil? || published_at_in_database.nil?
+
+    self.unpublished_changes_at = Time.current if (changed & Publishing.content_columns(self)).any?
+  end
+
+  # A touch is how a write beside the record says it changed: every block
+  # write touches its page, and a post is touched for its tags. `touch` runs
+  # no `before_save`, so the mark is written here, around the callbacks, and
+  # moves neither `updated_at` nor a page's settings base.
+  def note_unpublished_changes_on_touch
+    return if published_at.nil?
+
+    update_column(:unpublished_changes_at, Time.current) # version: none (a mark CS Studio reads; no page shows it)
   end
 
   def forget_live_before_change

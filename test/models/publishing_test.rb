@@ -84,4 +84,127 @@ class PublishingTest < ActiveSupport::TestCase
       assert Publishing::ROWS.fetch(name).values.all?(&:present?), "every column left on the rows needs its reason"
     end
   end
+
+  # -- the mark (drafts spec §4.4) ---------------------------------------------
+
+  def marked?(record) = record.class.where(id: record.id).pick(:unpublished_changes_at).present?
+
+  test "a content column saved on a published or scheduled record sets the mark; on a draft, and for what is not in a copy, it does not" do
+    live = create_page(title: "Live")
+    scheduled = create_post(title: "Scheduled", published: false)
+    assert Posts::Save.call(scheduled, attributes: { published_at: 2.days.from_now }).ok?
+    draft = create_page(title: "Draft", published: false)
+    assert_not marked?(live), "a first publication left a mark"
+    assert_not marked?(scheduled)
+
+    assert Pages::Save.call(live, translations: { "en" => { slug: "another-address" } }).ok?
+    assert Pages::Save.call(live, attributes: { published_at: 1.hour.ago }).ok?
+    assert_not marked?(live), "a slug or a publication time is immediate: no change is waiting"
+
+    assert Pages::Save.call(live, translations: { "en" => { title: "Typed" } }).ok?
+    assert Posts::Save.call(scheduled, translations: { "en" => { excerpt: "Typed" } }).ok?
+    assert Pages::Save.call(draft, translations: { "en" => { title: "Typed" } }).ok?
+
+    assert marked?(live)
+    assert marked?(scheduled)
+    assert_not marked?(draft)
+    assert live.reload.unpublished_changes?
+  end
+
+  test "a block added, saved, moved, duplicated and deleted each mark its live page, and leave the page's settings base alone" do
+    page = create_page(title: "Blocks")
+    base = page.reload.settings_changed_at
+    writes = {
+      "add" => -> { @block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).record },
+      "save" => -> { ContentBlocks::Save.call(@block, translations: { "en" => { body: rich_doc("Text") } }) },
+      "duplicate" => -> { @copy = ContentBlocks::Duplicate.call(@block).record },
+      "move" => -> { ContentBlocks::Reorder.call(page, [ @copy.id, @block.id ]) },
+      "delete" => -> { ContentBlocks::Destroy.call(@copy) }
+    }
+
+    writes.each do |name, write|
+      Publishing.clear_changes(page)
+      write.call
+      assert marked?(page), "#{name} left no mark"
+    end
+    assert_equal base, page.reload.settings_changed_at
+  end
+
+  test "a post's tags mark it, also in a save that changes nothing else and in one that changes only its slug besides" do
+    post = create_post(title: "Tagged", tags: %w[ruby])
+
+    assert Posts::Save.call(post, attributes: { tag_names: %w[rails] }).ok?
+    assert marked?(post)
+
+    Publishing.clear_changes(post)
+    assert Posts::Save.call(post, attributes: { tag_names: %w[ruby] }, translations: { "en" => { slug: "moved" } }).ok?
+    assert marked?(post)
+  end
+
+  test "taking a copy clears the mark, and an unpublished record shows none whatever it kept" do
+    page = create_page(title: "One")
+    assert Pages::Save.call(page, translations: { "en" => { title: "Two" } }).ok?
+    publish_changes(page)
+    assert_not marked?(page)
+
+    assert Pages::Save.call(page, translations: { "en" => { title: "Three" } }).ok?
+    assert Pages::Save.call(page, attributes: { published: false }).ok?
+    assert_not page.reload.unpublished_changes?
+  end
+
+  test "a publish that is refused leaves the mark where it was" do
+    blog = create_page(title: "Blog", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert Pages::Save.call(blog, attributes: { published: true }).ok?
+    post = create_post(title: "Hello")
+    topic = create_page(title: "Topic", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "x" } })
+    create_page(title: "Hello", parent: topic)
+    assert Posts::Save.call(post, attributes: { tag_names: %w[x] }).ok?
+    assert marked?(post)
+    assert Pages::Save.call(topic, attributes: { published: true }).ok?
+
+    refused = Publishing::PublishChanges.call(post.reload)
+
+    assert_not refused.ok?
+    assert marked?(post), "the mark outlives a publish that was rolled back"
+    assert_equal 1, Publishing::Version.of(post).count
+  end
+
+  test "the mark is no audited field and no change to a page's settings base" do
+    post = create_post(title: "Audited")
+    assert Posts::Save.call(post, translations: { "en" => { title: "Changed" } }).ok?
+
+    assert_not Audit::Event.where(action: "post.updated", subject: post).last.field_changes.key?("unpublished_changes_at")
+    assert_includes Page::SETTINGS_BASE_IGNORES, "unpublished_changes_at"
+  end
+
+  test "the mark moves nothing a stale check reads and does not move the public content version" do
+    page = create_page(title: "Stale")
+    page.reload
+    updated, base = page.updated_at, page.settings_changed_at
+    version = PublicSite::Version.current
+
+    Publishing.note_change(page)
+
+    assert marked?(page)
+    page.reload
+    assert_equal [ updated, base ], [ page.updated_at, page.settings_changed_at ]
+    assert_equal version, PublicSite::Version.current
+  end
+
+  test "note_change marks the published and scheduled records of a relation and no draft" do
+    live = create_post(title: "Live")
+    draft = create_post(title: "Draft", published: false)
+
+    Publishing.note_change(Post.where(id: [ live.id, draft.id ]))
+
+    assert marked?(live)
+    assert_not marked?(draft)
+  end
+
+  test "every column of pages and posts has a place, the mark included" do
+    assert_includes Publishing::ROWS.fetch("Page"), "unpublished_changes_at"
+    assert_includes Publishing::ROWS.fetch("Post"), "unpublished_changes_at"
+  end
 end

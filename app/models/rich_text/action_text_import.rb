@@ -171,7 +171,14 @@ module RichText
         locale, JSON.generate(document.to_h), Time.current
       ])
       # A body written around the callbacks: whether its post or its block's
-      # page is live is not asked, the import is a one-off.
+      # page is live is not asked, the import is a one-off. Marked as changed
+      # for what is published (`Publishing.note_change`, which asks): the body
+      # is in a copy, and the owner's copy does not hold it until published.
+      if model == ContentBlock
+        ContentBlock.where(id: id).pluck(:owner_type, :owner_id).each { |type, owner_id| Publishing.note_change(type.constantize.where(id: owner_id)) }
+      else
+        Publishing.note_change(model.where(id: id))
+      end
       PublicSite.bump_version!
     end
 

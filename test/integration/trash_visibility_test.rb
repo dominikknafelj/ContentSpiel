@@ -314,6 +314,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     # Drafts are "mine" by their newest audit event, so create them as the viewer.
     kept_draft, gone_draft = as(users(:one)) { [ create_post(title: "Kept draft", published: false), create_post(title: "Gone draft", published: false) ] }
     [ @kept_post, @gone_post ].each { |post| post.update_columns(published_at: 3.days.from_now) }
+    # Both have unpublished changes (a scheduled post is a record with a copy to differ from).
+    [ @kept_post, @gone_post ].each { |post| post.update_columns(unpublished_changes_at: Time.current) } # version: none (a test marks two posts) # changes: none (a test marks two posts)
     gone_draft.update!(trashed_at: Time.current)
     # The trashed post is the NEWEST outdated item, so a leak would show it.
     Translations::State.where(record_type: "Post", record_id: [ @kept_post.id, @gone_post.id ], locale: "de")
@@ -329,6 +331,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-drafts] a", text: "Gone draft", count: 0
     assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Kept post"
     assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Gone post", count: 0
+    assert_select "section[aria-labelledby=dashboard-unpublished-changes] a[href=?]", "/cs-studio/posts/#{@kept_post.id}"
+    assert_select "section[aria-labelledby=dashboard-unpublished-changes] a", text: "Gone post", count: 0
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@kept_post.id}?locale=de"
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@gone_post.id}?locale=de", count: 0
     assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"

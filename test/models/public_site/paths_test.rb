@@ -865,6 +865,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_parity "a page taking the address a post's scheduled change will want"
       travel_to 2.hours.from_now do
         assert_equal "/press/wire", current(wire), "time passing writes nothing"
+        ok! Pages::Save.call(press.reload, translations: { "en" => { subtitle: "Again" } }) # Task 6: a publish with nothing changed takes no copy, so the page is changed again
         publish_changes(press)
         assert_equal "/journal/wire", current(wire)
         assert_parity "publishing a page whose scheduled change was in force and unswept"
@@ -1302,6 +1303,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     travel_to 2.hours.from_now do
       assert_equal "/blog/hello", current(post), "time passing writes nothing"
 
+      assert Pages::Save.call(page, translations: { "en" => { subtitle: "Again" } }).ok? # Task 6: a publish with nothing changed takes no copy, so the page is changed again
       publish_changes(page)
 
       assert_nil current(post)
@@ -1323,6 +1325,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_equal [ nil, "/blog/job" ], [ current(post), current(job) ], "nothing was swept and nothing announced"
     end
     travel_to 4.hours.from_now do
+      assert Pages::Save.call(page, translations: { "en" => { subtitle: "Again" } }).ok? # Task 6: a publish with nothing changed takes no copy, so the page is changed again
       publish_changes(page)
 
       assert_equal [ nil, nil ], [ current(post), current(job) ]
