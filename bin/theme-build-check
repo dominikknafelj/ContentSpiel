@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # The two halves of "a site's image on top of the CMS's" that are the CMS's
-# own (theming spec §4 and §9), tried with the second theme:
+# own (theming spec §4 and §9), tried with the second theme, COPIED TO A
+# FOLDER OUTSIDE THE APPLICATION with an image, a font and a controller in
+# it. That is what every real site's theme is (`/rails/site-theme`, a
+# checkout beside this one), and a check that only ever saw the fixture
+# inside the application was green while no such site started:
 #
 #   1. the stylesheet builds with THEME_PATH set, and holds the default
 #      theme's styles, the theme's styles and the utilities of the theme's
@@ -30,12 +34,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-theme="$PWD/test/fixtures/themes/plain"
+scratch="$(mktemp -d)"
+theme="$scratch/plain"
+cp -R "$PWD/test/fixtures/themes/plain" "$theme"
+mkdir -p "$theme/assets/fonts"
+printf 'x' > "$theme/assets/fonts/plain-sans.woff2"
+case "$theme/" in "$PWD"/*) echo "theme-build-check: the copy of the theme is inside the application ($theme)" >&2; exit 1 ;; esac
 css="app/assets/builds/theme.css"
 secret="$(printf 'x%.0s' $(seq 1 64))"
 
 restore() {
   status=$?
+  rm -rf "$scratch"
   if ! env -u THEME_PATH bin/rails theme_css:build > /dev/null 2>&1; then
     echo "theme-build-check: the default stylesheet could not be built again: run bin/rails tailwindcss:build" >&2
     [ "$status" -ne 0 ] || status=1
@@ -72,6 +82,8 @@ if ! printed="$(env -u DATABASE_URL THEME_PATH="$theme" RAILS_ENV=production SEC
   puts "pin: #{imports["controllers/theme/hello_controller"]}"
   puts "script: #{Rails.application.assets.load_path.find("controllers/hello_controller.js") ? "found" : "missing"}"
   puts "image: #{Rails.application.assets.load_path.find("plain-mark.svg") ? "found" : "missing"}"
+  puts "font: #{Rails.application.assets.load_path.find("plain-sans.woff2") ? "found" : "missing"}"
+  puts "outside: #{!ThemeFolder.current.path.to_s.start_with?("#{Rails.root}/")}"
   assets = Rails.application.assets.load_path
   digested = assets.find("plain-mark.svg")&.digested_path.to_s
   served = assets.find("theme.css")&.compiled_content.to_s
@@ -92,7 +104,7 @@ if ! printed="$(env -u DATABASE_URL THEME_PATH="$theme" RAILS_ENV=production SEC
   exit 1
 fi
 
-for line in "Theme: $theme (" "theme: plain" "built: true" "pin: controllers/hello_controller.js" "script: found" "image: found" \
+for line in "Theme: $theme (" "theme: plain" "built: true" "pin: controllers/hello_controller.js" "script: found" "image: found" "font: found" "outside: true" \
             "image in the served stylesheet: digested" "stamp an asset: false" \
             "deep check: sound" "deep check of a broken template: refused"; do
   if ! grep -qF -- "$line" <<< "$printed"; then

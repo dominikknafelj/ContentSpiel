@@ -172,7 +172,7 @@ class Theme
 
     module_function
 
-    def problems(folder, deep: false, root: Rails.root)
+    def problems(folder, deep: false, root: Rails.root, paths: Rails.application.config.assets.paths, started: ThemeFolder.current)
       return [] unless folder.configured?
 
       # A file that has no place in a theme is said once, as that: whether
@@ -181,7 +181,7 @@ class Theme
       out_of_place, placed = folder.files.partition { |file| misplaced(file) }
       found = out_of_place.map { |file| misplaced(file) }
       found += folder.hidden_templates.map { |file| hidden(file) }
-      found += shadowing(placed, Pathname(root))
+      found += shadowing(placed, cms_asset_roots(Pathname(root), paths: paths, folder: folder, started: started))
       templates = folder.templates & placed
       found += templates.flat_map { |file| written(file, folder.read(file)) }
       found += templates.flat_map { |file| unsound(file, folder.read(file)) } if deep
@@ -229,17 +229,39 @@ class Theme
     # application is not taken from there but from the list, so the answer
     # does not depend on what the environment added (the test environment
     # puts the second theme's folders on the path).
-    def cms_asset_roots(root, paths: Rails.application.config.assets.paths)
+    #
+    # THE THEME'S OWN FOLDERS ARE NEVER AMONG THEM. The initializer puts
+    # `folder.asset_paths` on the load path before this check runs
+    # (config/initializers/theme.rb), and a real site's theme is a folder
+    # outside the application: taken for a gem's, each of its own three
+    # folders "held" every file of the theme, and every image, font and
+    # controller was refused as named like one of the CMS's own, so no site
+    # with a theme outside the application started. `folder` is the theme
+    # that is checked; its folders are left out by where they are and by
+    # where they really are (a path through a link). So are those of the
+    # theme the application STARTED with (`started`), which are on the path
+    # whatever folder is checked: `theme:check` of a second copy of the
+    # running theme would otherwise find each of the copy's assets in the
+    # running theme's folders.
+    def cms_asset_roots(root, paths: Rails.application.config.assets.paths, folder: nil, started: ThemeFolder.current)
       inside = CMS_ASSET_ROOTS.map { |relative| [ relative, root.join(relative) ] }
-      outside = paths.map { |path| Pathname(path.to_s) }.reject { |path| path.to_s.start_with?("#{Rails.root}/") }
+      own = [ folder, started ].compact.flat_map(&:asset_paths).flat_map { |path| [ path.to_s, real(path.to_s) ] }
+      outside = paths.map { |path| Pathname(path.to_s) }.reject do |path|
+        path.to_s.start_with?("#{Rails.root}/") || own.include?(path.to_s) || own.include?(real(path.to_s))
+      end
       inside + outside.map { |path| [ path.to_s, path ] }
+    end
+
+    def real(path)
+      File.realpath(path)
+    rescue SystemCallError
+      path
     end
 
     # Two files of one theme cannot be served under one name: an image, a
     # font and a controller never share an extension (`ASSET_EXTENSIONS`),
     # and inside one folder a name is a path. So only the CMS's are asked.
-    def shadowing(files, root)
-      roots = cms_asset_roots(root)
+    def shadowing(files, roots)
       files.filter_map { |file| served_as(file) }.filter_map do |name, file|
         taken, = roots.find { |_, directory| directory.join(name).file? }
         next unless taken

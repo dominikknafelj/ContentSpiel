@@ -176,6 +176,43 @@ class Theme::CheckTest < ActiveSupport::TestCase
     Theme::Check::CMS_ASSET_ROOTS.each { |relative| assert Rails.root.join(relative).directory?, "#{relative} is gone" }
   end
 
+  # THE CASE EVERY REAL SITE IS: the theme is a folder outside the
+  # application, and the initializer has put its own asset folders on the
+  # load path before the check runs (config/initializers/theme.rb). Those
+  # are the theme's, not a gem's: asked as "the CMS's own", each of the
+  # theme's assets is found in the theme's own folder and the site does not
+  # start. (Shipped once: every theme the suite booted was the fixture,
+  # inside the application, which another rule let through.)
+  test "a theme outside the application whose own asset folders are on the load path shadows nothing: an image, a font, a controller" do
+    with_theme_copy do |dir|
+      assert_not dir.to_s.start_with?("#{Rails.root}/"), "the copy is outside the application"
+      dir.join("assets/fonts").mkpath
+      dir.join("assets/fonts/plain-sans.woff2").write("x")
+      folder = ThemeFolder.new(dir)
+      assert_equal %w[assets/images assets/fonts javascript].map { |name| dir.join(name) }, folder.asset_paths
+      paths = Rails.application.config.assets.paths + folder.asset_paths.map(&:to_s)
+
+      assert_empty Theme::Check.problems(folder, deep: true, paths: paths)
+      assert_empty Theme::Check.problems(folder, paths: paths.map { |path| File.realpath(path) rescue path }), "the same folders by their real path"
+
+      # A second copy, checked while the first is the theme the application
+      # started with (`bin/rails theme:check` of a folder beside the running
+      # one): the first one's folders are on the path and are a theme's too.
+      with_theme_copy do |other|
+        assert_empty Theme::Check.problems(ThemeFolder.new(other), paths: paths, started: folder)
+        assert_equal 2, Theme::Check.problems(ThemeFolder.new(other), paths: paths, started: ThemeFolder.new(nil)).size,
+          "without knowing which theme started, the running theme's folders would be taken for a gem's"
+      end
+
+      # And what is the CMS's or a gem's is still refused beside them.
+      dir.join("javascript/controllers/theme_controller.js").write("x")
+      dir.join("javascript/stimulus.min.js").write("x")
+      problems = Theme::Check.problems(ThemeFolder.new(dir), paths: paths)
+      assert_equal 1, problems.grep(%r{javascript/controllers/theme_controller\.js is named like an asset of the CMS's own \(app/javascript/}).size
+      assert_empty problems.grep(/#{Regexp.escape(dir.to_s)}/), "no problem names the theme's own folder as the CMS's"
+    end
+  end
+
   test "what the check says of an asset does not depend on whether a build has run" do
     Dir.mktmpdir("application") do |root|
       FileUtils.mkdir_p(File.join(root, "app/assets/builds"))

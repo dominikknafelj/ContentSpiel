@@ -79,14 +79,28 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_no_match(/hunter2|docs\.example\.org|hosts:/, printed)
   end
 
-  test "production under a theme folder says which at boot, and the application's theme is that folder" do
-    plain = Rails.root.join("test/fixtures/themes/plain")
-    printed, status = boot_production("THEME_PATH" => plain.to_s)
-    lines = printed.lines(chomp: true)
+  # The theme is a COPY OUTSIDE THE APPLICATION, with an image, a font and a
+  # controller in it, because that is what every real site's theme is: a
+  # folder beside the application whose own asset folders the boot puts on
+  # the load path. Booted from the fixture inside the application, this test
+  # was green while no such site started (`Theme::Check.cms_asset_roots`
+  # took the theme's own folders for a gem's).
+  test "production under a theme folder outside the application says which at boot, and the application's theme is that folder" do
+    Dir.mktmpdir("site") do |site|
+      plain = Pathname(site).join("plain")
+      FileUtils.cp_r(Rails.root.join("test/fixtures/themes/plain"), plain)
+      plain.join("assets/fonts").mkpath
+      plain.join("assets/fonts/plain-sans.woff2").write("x")
+      assert_not plain.to_s.start_with?("#{Rails.root}/")
+      assert_equal 3, ThemeFolder.new(plain).asset_paths.size, "an image, a font and a controller"
 
-    assert status.success?, printed
-    assert_includes lines, ThemeFolder.announcement(ThemeFolder.new(plain))
-    assert_includes lines, "theme: plain #{ThemeFolder.new(plain).fingerprint}"
+      printed, status = boot_production("THEME_PATH" => plain.to_s)
+      lines = printed.lines(chomp: true)
+
+      assert status.success?, printed
+      assert_includes lines, ThemeFolder.announcement(ThemeFolder.new(plain))
+      assert_includes lines, "theme: plain #{ThemeFolder.new(plain).fingerprint}"
+    end
   end
 
   test "production with a THEME_PATH that names no folder does not start, and says which variable and which path" do
