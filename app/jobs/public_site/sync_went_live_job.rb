@@ -2,16 +2,17 @@ module PublicSite
   # Every five minutes (config/recurring.yml): gives the posts listed on a
   # page that went live *by the clock* their address under it. A scheduled
   # page becomes live when `published_at` passes and no row is written at
-  # that moment, so no model callback can sync the posts its listing blocks
-  # list -- see `PublicSite::Paths.sync_went_live`. The same sweep gives and
-  # takes the addresses that follow a published copy taken with a time
-  # ("Publish changes" at a time) once that time has passed: a list block or
-  # a post's tags as that copy holds them (`Paths.sync_copies_went_live`).
+  # that moment, so no model callback can touch the posts its listing blocks
+  # list -- see `PublicSite::Paths.sync_went_live`.
   #
   # The window is the last 24 hours on every run, deliberately overlapping:
-  # there is no stored "swept up to here" marker to keep right, the sweep is
-  # idempotent and a run with nothing to move writes nothing, and a day's
-  # reach covers a queue that was down for hours.
+  # nothing records that a page's time has passed, the sweep is idempotent
+  # and a run with nothing to move writes nothing, and a day's reach covers a
+  # queue that was down for hours.
+  #
+  # The same run is what settles a published copy taken with a time ("Publish
+  # changes" at a time) soon after that time: every refresh does, this one
+  # included, and that needs no window (`Publishing::Version.settle!`).
   #
   # `config/recurring.yml` only runs where Solid Queue is the adapter
   # (production), like the trash sweep; in development and test nothing

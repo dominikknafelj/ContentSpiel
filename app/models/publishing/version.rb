@@ -1,7 +1,10 @@
 module Publishing
-  # One published copy of a page or post. Written once by `take!` and never
-  # updated (`readonly?`); the only row ever removed is one whose `live_at`
-  # is still in the future, replaced by the next `take!`.
+  # One published copy of a page or post. Its content is written once, by
+  # `take!`, and never changed (`readonly?`); the only row ever removed is one
+  # whose `live_at` is still in the future, replaced by the next `take!`. Two
+  # things about a copy that are not its content are written afterwards, each
+  # by one method here: `settled_at` (`settle!`) and a merged tag's id
+  # (`repoint_tag!`).
   #
   # THE ORDER OF COPIES. `live_at` is never earlier than the moment a copy is
   # taken, and taking a copy removes the pending one, so there is at most one
@@ -60,20 +63,22 @@ module Publishing
     # and the new copy stand or fall together, also for a caller with none.
     # `live_at` in the past means now. A pending copy is replaced; its number
     # is not given out again.
+    #
+    # Answers the copy, which says through `yields` what the addresses did
+    # with it: the changes that had to yield (`PublicSite::Paths.refresh`),
+    # empty for a copy with a time, whose addresses follow when it is due.
     def self.take!(record, live_at: nil, by: nil, now: Time.current)
       transaction do
         row = record.class.lock.find(record.id)
         live_at = [ live_at || now, now ].max
         mine = of(row)
-        # The copy this one follows, read before anything is written: what
-        # the public saw until now.
-        previous = mine.in_force(now).order(id: :desc).first
         number = (mine.maximum(:number) || 0) + 1
         mine.pending(now).delete_all
         data = Snapshot.of(row, row: row)
         version = create!(record_type: row.class.polymorphic_name, record_id: row.id, number: number, live_at: live_at,
           snapshot: data.except("blocks"), blocks: data.fetch("blocks", []), lists_posts: Snapshot.lists_posts?(data),
-          tag_ids: data.fetch("tags", []).map { |tag| tag["id"] }.sort, created_by_id: by&.id, created_at: now)
+          tag_ids: data.fetch("tags", []).map { |tag| tag["id"] }.sort, created_by_id: by&.id, created_at: now,
+          settled_at: (now if live_at <= now))
         # A scheduled record shows nothing yet, so its copy changes nothing the
         # public can see (the moment it goes live is the content version's own
         # publication-time lookup, as for the record itself).
@@ -85,12 +90,33 @@ module Publishing
         PublicSite.bump_version! if row.live?
         # The addresses this copy can change, in this transaction (derived
         # rows are refreshed with the write, after the record's row was
-        # locked above: the order every sync from a save has). A copy with a
-        # time changes none yet: the sweep does when its time has come
-        # (`PublicSite::Paths.sync_copies_went_live`).
-        PublicSite::Paths.published(row, version, previous) if live_at <= now
+        # locked above: the order every refresh from a save has). In force
+        # at once, it is settled as it is written and its record is what was
+        # touched. A copy with a time changes no address yet and is left
+        # due: the first refresh after its time settles it (`settle!`).
+        version.yields = live_at <= now ? PublicSite::Paths.refresh(**{ (row.is_a?(Page) ? :pages : :posts) => [ row ] }, now: now) : []
         version
       end
+    end
+
+    # What `take!` learned from the addresses; not stored.
+    attr_accessor :yields
+
+    # THE COPIES THAT ARE DUE: in force by the clock and not acted on yet.
+    # Marks them and answers `[[id, record type, record id], ...]`, for
+    # `PublicSite::Paths.refresh` alone, which re-derives the addresses of
+    # those records in the same transaction. A copy in force at once is never
+    # due (`take!` marks it as it is written), so this finds the copies that
+    # were taken with a time, once each, however long ago their time came:
+    # nothing has to remember a window.
+    #
+    # The rows are locked as they are read, so of two refreshes at once the
+    # second waits and then finds nothing left to mark. With nothing due
+    # (nearly always) this is one statement on a partial index that is empty.
+    def self.settle!(now = Time.current)
+      due = unscoped.where(settled_at: nil, live_at: ..now).order(:id).lock.pluck(:id, :record_type, :record_id)
+      unscoped.where(id: due.map(&:first)).update_all(settled_at: now) if due.any? # version: none (a mark on a copy, not content: an address that moves bumps in `PublicSite::Paths.write_all`)
+      due
     end
 
     # THE ONE WRITE TO A COPY AFTER IT IS TAKEN, for `Tags::Merge` alone

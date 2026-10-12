@@ -1124,15 +1124,15 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     end
   end
 
-  test "a scheduled change to a post's tags moves its address when the sweep runs after its time, once, and a copy in force at once is not swept" do
+  test "a scheduled change to a post's tags moves its address when a refresh runs after its time, once, and a copy in force at once is never due" do
     ruby = create_page(title: "Ruby", published: false)
     ContentBlocks::Save.call(ContentBlock.new(owner: ruby), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "ruby" } })
     assert Pages::Save.call(ruby, attributes: { published: true }).ok?
     post = create_post(title: "Hello", tags: %w[ruby])
     assert_equal "/ruby/hello", current(post)
 
-    sql = capture_sql { PublicSite::Paths.sync_copies_went_live(since: 1.day.ago) }
-    assert_empty sql.grep(/"posts"|"public_paths"/), "copies in force from the moment they were taken were swept:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
+    sql = capture_sql { PublicSite::Paths.refresh }
+    assert_empty sql.grep(/"posts"|"public_paths"/), "copies in force from the moment they were taken were looked at:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
 
     assert Posts::Save.call(post, attributes: { tag_names: [] }).ok?
     publish_changes(post, at: 2.days.from_now)
@@ -1145,10 +1145,13 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
       sql = capture_sql { PublicSite::Paths.sync_went_live(since: 2.days.ago) }
       assert_empty writes_to_public_paths(sql), "a second run wrote:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
+      assert_empty sql.grep(/"posts"/), "a second run looked at the post again"
     end
   end
 
-  test "a copy that came into force before the window, and one of a trashed page, are not swept" do
+  # The opposite of what the windowed sweep did: a copy's coming into force
+  # is marked, not looked for in a window, so it is never too late for it.
+  test "a copy that came into force long before any sweep is settled all the same, and one of a trashed page is settled and gives no address" do
     page = create_page(title: "Blog", published: false)
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
     assert Pages::Save.call(page, attributes: { published: true }).ok?
@@ -1156,15 +1159,25 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert ContentBlocks::Destroy.call(block).ok?
     publish_changes(page, at: 1.hour.from_now)
 
-    travel_to 3.days.from_now do
+    travel_to 30.days.from_now do
       PublicSite::Paths.sync_went_live(since: 1.day.ago)
-      assert_equal "/blog/hello", current(post), "outside the window: the next sync that reaches the post, or a rebuild, moves it"
+      assert_nil current(post), "a month late is not too late"
+      assert_parity "settling a copy whose time came a month ago"
     end
 
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+    publish_changes(page)
+    assert_equal "/blog/hello", current(post)
+    assert ContentBlocks::Destroy.call(block).ok?
+    publish_changes(page, at: 1.hour.from_now)
+    assert Trash::Move.call(page.reload).ok?
+    assert_nil current(post)
+
     travel_to 2.hours.from_now do
-      page.update_columns(trashed_at: Time.current) # version: none (a test puts a page in the trash around its sync)
-      sql = capture_sql { PublicSite::Paths.sync_copies_went_live(since: 1.day.ago) }
-      assert_empty sql.grep(/"posts"|"public_paths"/)
+      sql = capture_sql { PublicSite::Paths.sync_went_live(since: 1.day.ago) }
+      assert_empty writes_to_public_paths(sql)
+      assert Publishing::Version.of(page).where(settled_at: nil).none?
+      assert_parity "settling the copy of a page in the trash"
     end
   end
 
@@ -1243,5 +1256,113 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     journal.update!(position: 0)
     assert_equal "/journal/hello", current(post)
     assert_equal [ journal.id ], PublicPath.current.where(record: post).distinct.pluck(:listed_on_id), "the host follows the address"
+  end
+
+  # -- the settle marker (Task 4b) ----------------------------------------------
+  #
+  # A copy taken with a time comes into force with no write. `settled_at` says
+  # that its coming into force has been acted on, and EVERY refresh settles
+  # the copies that are due before it derives anything, so no derivation acts
+  # on a picture the clock has made stale.
+
+  # A live page that lists blog posts, with a change scheduled an hour from
+  # now that lists resume entries instead; a blog post at its address.
+  def page_with_scheduled_change
+    page = create_page(title: "Blog", published: false)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Hello")
+    assert_equal "/blog/hello", current(post)
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "content_type" => "resume_entry" } }).ok?
+    publish_changes(page, at: 1.hour.from_now)
+    [ page, post ]
+  end
+
+  {
+    "renamed" => ->(page) { Pages::Save.call(page, translations: { "en" => { slug: "journal" } }) },
+    "moved" => ->(page) { Pages::Move.call(page, parent: Pages::Save.call(attributes: { parent: page.parent, published: true }, translations: { "en" => { title: "Shelf" } }).record, position: 0) },
+    "unpublished" => ->(page) { Pages::Save.call(page, attributes: { published: false }) },
+    "trashed" => ->(page) { Trash::Move.call(page) }
+  }.each do |verb, write|
+    test "a page whose scheduled change is in force and not settled, then #{verb}: the posts its older copy listed are looked at" do
+      page, post = page_with_scheduled_change
+
+      travel_to 2.hours.from_now do
+        assert_equal "/blog/hello", current(post), "time passing writes nothing"
+        assert write.call(page.reload).ok?
+
+        assert_nil current(post), "the copy in force lists another type"
+        assert_parity "a page #{verb} while its scheduled change was in force and not settled"
+        assert Publishing::Version.of(page).where(settled_at: nil).none?
+      end
+    end
+  end
+
+  test "a copy in force at once is settled when it is taken, one with a time when its time has come, and a rebuild settles what is in force" do
+    page, post = page_with_scheduled_change
+    first, scheduled = Publishing::Version.of(page).order(:number).to_a
+    assert first.settled_at
+    assert_nil scheduled.settled_at
+
+    PublicSite::Paths.refresh
+    assert_nil scheduled.reload.settled_at, "its time has not come"
+    assert_equal "/blog/hello", current(post)
+
+    travel_to 2.hours.from_now do
+      PublicSite::Paths.rebuild!
+      assert scheduled.reload.settled_at
+      assert_nil current(post)
+    end
+  end
+
+  test "a refresh of nothing settles what is due, once: a second run reads the due copies and nothing else" do
+    _, post = page_with_scheduled_change
+
+    travel_to 30.days.from_now do
+      PublicSite::Paths.refresh
+      assert_nil current(post)
+      assert_parity "settling a copy whose time came a month ago"
+
+      sql = capture_sql { PublicSite::Paths.refresh }.grep_v(/SAVEPOINT/)
+      assert_equal 1, sql.size, sql.join("\n")
+      assert_match(/"published_versions"/, sql.sole)
+    end
+  end
+
+  test "a save of an unrelated record settles a due copy of another: the first refresh after its time, whoever causes it" do
+    _, post = page_with_scheduled_change
+    other = create_post(title: "Other", content_type: "now_update")
+
+    travel_to 2.hours.from_now do
+      assert Posts::Save.call(other, translations: { "en" => { slug: "elsewhere" } }).ok?
+
+      assert_nil current(post)
+      assert_parity "an unrelated save after a copy's time"
+    end
+  end
+
+  # -- a yielder gets its address when the holder leaves ------------------------
+
+  test "a post that had to yield is given its address by the refresh in which the page that held it moves away" do
+    blog = listing(@root, "Blog", "blog")
+    holder = Page.create!(parent: blog, title: "Hello", published_at: 1.day.ago)
+    post = Post.new(content_type: :blog, title: "Hello", slug: "hello", published_at: 1.day.ago)
+    post.save!(validate: false)
+    assert_nil current(post), "it yields to the page at /blog/hello"
+
+    holder.update!(slug: "hello-page")
+
+    assert_equal "/blog/hello", current(post)
+    assert_parity "a holder moving away"
+  end
+
+  test "a post no list block of the site can list is not read by a page's refresh" do
+    listing(@root, "Blog", "blog")
+    Post.create!(content_type: :now_update, title: "Unlisted", published_at: 1.day.ago)
+    about = Page.create!(parent: @root, title: "About", published_at: 1.day.ago)
+
+    sql = capture_sql { about.update!(slug: "about-us") }
+
+    assert_empty sql.grep(/FROM "post_tags"/), "the unhoused post was loaded:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
   end
 end

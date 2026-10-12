@@ -634,8 +634,9 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal [ "/preview/blog/hello" ], list_hrefs
   end
 
-  # The check that can refuse runs when a change is scheduled; a sweep cannot.
-  # The post yields, as any clash does, and the clash is reported.
+  # The check that can refuse runs when a change is scheduled; the refresh
+  # that settles the copy cannot. The post yields, as any clash does, and the
+  # clash is reported: once because a copy is settled once, with no cache.
   test "a scheduled change of a post's tags that comes into force onto an address taken since leaves the post without an address, and reports the clash once" do
     listing_page("Blog")
     Tag.create!(name: "topic")
@@ -648,13 +649,11 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     publish_changes(child)
     reports = []
     subscriber = Rails.error.subscribe(Class.new { define_method(:report) { |error, handled:, context:, **| reports << [ error.class, handled, context ] } }.new)
-    cache = ActiveSupport::Cache::MemoryStore.new
 
     travel_to 2.hours.from_now do
-      with_singleton_override(Rails, :cache, -> { cache }) do
-        PublicSite::Paths.sync_went_live(since: 1.day.ago)
-        PublicSite::Paths.sync_went_live(since: 1.day.ago)
-      end
+      assert_kind_of ActiveSupport::Cache::NullStore, Rails.cache, "nothing here remembers a report"
+      PublicSite::Paths.sync_went_live(since: 1.day.ago)
+      PublicSite::Paths.sync_went_live(since: 1.day.ago)
 
       assert_nil path_of(post.reload)
       get "/blog/hello"
@@ -667,8 +666,8 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal 1, reports.size, reports.inspect
     error, handled, context = reports.sole
     assert_equal [ PublicSite::Paths::AddressTaken, true ], [ error, handled ]
-    assert_equal [ "Post", post.id ], context.values_at(:record_type, :record_id)
-    assert_includes context[:addresses], { locale: "en", wanted: "/topic/hello" }
+    assert_equal [ Publishing::Version.of(post).order(:number).last.id ], context[:copies]
+    assert_includes context[:yielded], { record_type: "Post", record_id: post.id, locale: "en", wanted: "/topic/hello" }
     assert_not_includes context.to_s, "Hello", "an address and ids, never content"
   ensure
     Rails.error.unsubscribe(subscriber) if subscriber
@@ -688,8 +687,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     travel_to(2.hours.from_now) { PublicSite::Paths.sync_went_live(since: 1.day.ago) }
 
     assert_nil path_of(post.reload)
-    assert_equal [ [ "Post", post.id ] ], reports.map { |context| context.values_at(:record_type, :record_id) }
-    assert_includes reports.sole[:addresses], { locale: "en", wanted: "/topic/hello" }
+    assert_includes reports.sole[:yielded], { record_type: "Post", record_id: post.id, locale: "en", wanted: "/topic/hello" }
   ensure
     Rails.error.unsubscribe(subscriber) if subscriber
   end
