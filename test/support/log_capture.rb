@@ -10,7 +10,8 @@
 # - `LOGGERS`: the path of a mail (the mailer and the job that delivers it).
 # - `REQUEST_LOGGERS`: a request as well: Action Controller's own lines
 #   ("Processing by ...", "Parameters: ...", "Redirected to ..."), Action
-#   View's, and what Action Dispatch writes for a request that raises or
+#   View's, Active Record's (every statement, at debug) and what Action
+#   Dispatch writes for a request that raises or
 #   has no route ("ActionController::RoutingError (No route matches ...)"),
 #   whose logger is not a class's but an entry of the application's
 #   memoised Rack environment (`DISPATCH`).
@@ -27,7 +28,7 @@ module LogCapture
   end
 
   LOGGERS = [ Rails, ActionMailer::Base, ActiveJob::Base ].freeze
-  REQUEST_LOGGERS = [ DISPATCH, *LOGGERS, ActionController::Base, ActionView::Base ].freeze
+  REQUEST_LOGGERS = [ DISPATCH, *LOGGERS, ActionController::Base, ActionView::Base, ActiveRecord::Base ].freeze
 
   def capture_log(owners = LOGGERS)
     were = owners.map(&:logger)

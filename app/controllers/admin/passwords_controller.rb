@@ -53,9 +53,11 @@ module Admin
     # to the page WITHOUT the token. A server cannot hand a browser a
     # fragment it was never sent, and must not repeat the token in another
     # address; the page then says the link is incomplete and offers a new
-    # one. Tokens live fifteen minutes, so this is a loss of the mails on
-    # their way during one deploy. (The token is not even in `params` here:
-    # `OldResetAddress` replaced it before the router ran.)
+    # one. The redirect's `Location`, its body and the parameters line of
+    # the log hold no token. The request's own first log line does hold the
+    # path it was asked for, as the proxy's access log does: nothing is
+    # done about that, because such a link exists only in a mail sent
+    # before this change, for the fifteen minutes its token is good.
     def legacy
       redirect_to admin_edit_password_path, status: :found
     end

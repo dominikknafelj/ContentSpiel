@@ -198,15 +198,16 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # The old PATCH is gone, and is nobody's address any more: the same
-  # not-found as any other address CS Studio does not have, for someone
-  # signed in and for someone who is not, and no password changes.
+  # The old PATCH is gone, and is nobody's address any more: a plain 404,
+  # the same as any other address CS Studio does not have, and no password
+  # changes.
   test "the old address of the form answers nothing: it is not found like any unknown address, and changes no password" do
     token = @user.password_reset_token
 
     assert_no_changes -> { @user.reload.password_digest } do
       patch "#{ADMIN}/password/#{token}", params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
     end
+    assert_response :not_found
     unknown = [ response.status, response.location ]
     patch "#{ADMIN}/no-such-address-here"
 
@@ -394,55 +395,39 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Parameters: \{.*"token" ?=> ?"\[FILTERED\]"/, log)
   end
 
-  # The old addresses DID carry the token in their path, and for fifteen
-  # minutes after a deploy a mail, and a form left open, still do. Rails
-  # writes a request's path down before the router is asked: in the first
-  # line of every request, and in the error line of one that has no route
-  # (the old form's). The middleware `OldResetAddress` has replaced the
-  # token by then.
-  test "nothing logged for a request to the old addresses holds the token" do
+  # THE OLD LINK'S OWN REQUEST. What the application answers and writes for
+  # it holds no token: the redirect's `Location`, its body, and the
+  # parameters line, where `token` is masked. That its span holds none is
+  # telemetry's (test/integration/opentelemetry_test.rb).
+  #
+  # NOT asserted, because it is not so: that the request's first log line
+  # ("Started GET ...") is free of it. Rails writes the path it was asked
+  # for before the router runs, and so does the proxy in front, which this
+  # application cannot filter. A link of that shape exists only in a mail
+  # sent before the token moved, for the fifteen minutes it is good, and no
+  # installation has sent one.
+  test "the old link's request is answered and logged without the token, but for the line that names the address asked for" do
     token = @user.password_reset_token
 
-    log = capture_log(REQUEST_LOGGERS) do
-      get "#{ADMIN}/password/#{token}/edit"
-      patch "#{ADMIN}/password/#{token}", params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
-    end
+    log = capture_log(REQUEST_LOGGERS) { get "#{ADMIN}/password/#{token}/edit" }
 
-    assert_not_includes log, token
-    assert_includes log, %(Started GET "#{ADMIN}/password/[FILTERED]/edit")
-    assert_includes log, %(Started PATCH "#{ADMIN}/password/[FILTERED]")
+    assert_response :found
+    assert_not_includes response.location, token
+    assert_not_includes response.body, token
     assert_includes log, "Processing by Admin::PasswordsController#legacy"
+    assert_match(/Parameters: \{.*"token" ?=> ?"\[FILTERED\]"/, log)
     assert_includes log, "Redirected to http://www.example.com#{ADMIN}/password/edit"
-    assert_includes log, %(ActionController::RoutingError (No route matches [PATCH] "#{ADMIN}/password/[FILTERED]"))
+    assert_equal [ %(Started GET "#{ADMIN}/password/#{token}/edit") ], log.lines.grep(/#{Regexp.escape(token)}/).map { |line| line[/\AStarted GET "[^"]+"/] }
   end
 
-  # The same, for the shapes a mail program or a hand makes of the old link,
-  # and for what a request can say about its own address afterwards.
-  test "the old address's token is gone from the request before Rails reads it, in every spelling" do
-    token = @user.password_reset_token
-
-    [ "#{ADMIN}/password/#{token}/edit", "#{ADMIN}/password/#{token}/edit/", "#{ADMIN}//password//#{token}/edit?a=1",
-      "#{ADMIN}/password/#{token}", "#{ADMIN}/password/#{token}/edit)" ].each do |path|
-      log = capture_log(REQUEST_LOGGERS) { get path }
-
-      assert_not_includes log, token, path
-      assert_includes log, "[FILTERED]", path
-      assert_not_includes request.original_url, token, path
-      assert_not_includes request.fullpath, token, path
-      assert_not_includes response.location.to_s, token, path
-      assert_not_includes response.body, token, path
+  # The request page and the form's page answer under a format too, as they
+  # did before the token moved: nothing rewrites an address under
+  # `<admin>/password/`.
+  test "the request page and the form's page still answer with a format in their address" do
+    [ "#{ADMIN}/password/new.html", "#{ADMIN}/password/edit.html" ].each do |path|
+      get path
+      assert_response :success, path
     end
-  end
-
-  test "the form's own addresses pass the door untouched" do
-    log = capture_log(REQUEST_LOGGERS) do
-      get admin_edit_password_path
-      get new_admin_password_path
-    end
-
-    assert_includes log, %(Started GET "#{ADMIN}/password/edit")
-    assert_includes log, %(Started GET "#{ADMIN}/password/new")
-    assert_not_includes log, "[FILTERED]"
   end
 
   private

@@ -44,9 +44,7 @@ Rails.application.routes.draw do
     #
     # `password/:token/edit` is the link as it was mailed before: it answers
     # with a redirect to the page, without the token (`#legacy`). The old
-    # form's address, PATCH `password/:token`, is gone and has no route. The
-    # token of either never reaches this file: the middleware
-    # `OldResetAddress` has replaced it by then, so that no log line holds it.
+    # form's address, PATCH `password/:token`, is gone and has no route.
     resource :password, only: %i[new create]
     get "password/edit", to: "passwords#edit", as: :edit_password
     patch "password", to: "passwords#update", as: :update_password
