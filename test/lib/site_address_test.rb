@@ -60,6 +60,43 @@ class SiteAddressTest < ActiveSupport::TestCase
     end
   end
 
+  test "the refusal carries no cause: an uncaught one prints nothing of the value" do
+    [ "https://user:hunter2@host.example:abc", "https://user:hunter2@[::1", "https://user:hunter2@a|b",
+      "https://user:hunter2@host.example:99999", "https://[hunter2::zz]" ].each do |value|
+      error = assert_raises(SiteAddress::Invalid, value) { SiteAddress.parse(value) }
+
+      assert_nil error.cause, value
+      assert_no_match(/hunter2|host\.example|bad URI/, error.full_message, value)
+    end
+  end
+
+  test "a host is dot-separated labels of letters, digits and inner hyphens, and nothing else" do
+    [ "https://.example.org", "https://a..b", "https://a.org..", "https://-", "https://-a.example", "https://a-.example",
+      "https://*.example.org", "https://%41.example", "https://a,b", "https://a_b.example", "https://a.example.-" ].each do |value|
+      assert_raises(SiteAddress::Invalid, value) { SiteAddress.parse(value) }
+    end
+
+    assert_equal "a-b.example", SiteAddress.parse("https://a-b.example").host
+    assert_equal "xn--mnchen-3ya.example", SiteAddress.parse("https://xn--mnchen-3ya.example").host
+    assert_equal "localhost", SiteAddress.parse("http://localhost").host
+    assert_equal "3com.example", SiteAddress.parse("https://3com.example").host
+  end
+
+  test "an IPv4 address is a host" do
+    address = SiteAddress.parse("http://192.168.1.20:8080")
+
+    assert_equal "192.168.1.20", address.host
+    assert_equal "http://192.168.1.20:8080", address.origin
+  end
+
+  test "what is in brackets is an IPv6 address or the value is refused" do
+    [ "https://[zz::1]", "https://[1.2.3.4]", "https://[]", "https://[::1", "https://[v1.x]" ].each do |value|
+      error = assert_raises(SiteAddress::Invalid, value) { SiteAddress.parse(value) }
+
+      assert_nil error.cause, value
+    end
+  end
+
   test "an address with user info is refused, also an otherwise good one and an empty one" do
     [ "https://user:hunter2@host.example/", "https://user@host.example", "https://@host.example" ].each do |value|
       error = assert_raises(SiteAddress::Invalid, value) { SiteAddress.parse(value) }

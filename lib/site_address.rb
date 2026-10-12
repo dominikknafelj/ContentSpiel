@@ -1,22 +1,28 @@
 require "uri"
+require "ipaddr"
 
 # The site's public address, parsed once from `PUBLIC_HOST` (else
 # `SITEMAP_HOST`, its older name). Everything that must agree about "where
 # this site lives" (host authorisation, HTTPS, absolute URLs, head tags)
 # reads it here instead of splitting the variable itself.
 #
-# `lib/` is not autoloaded in this app: `config/application.rb` requires
-# this file, and it uses nothing of Rails.
+# `config/application.rb` requires this file itself although `lib/` is
+# autoloaded (`config.autoload_lib`): the environment file, which runs
+# before any autoloading is set up, needs it. It uses nothing of Rails.
 #
 # A blank value is "not configured" (a local checkout has none), never an
 # error; a value that is there but is not an absolute http(s) address with a
 # host raises `Invalid` at once, so a typo stops the boot instead of quietly
 # producing wrong links.
 #
-# THE MESSAGE NEVER REPEATS THE VALUE. It goes to the boot log, and a value
+# THE REFUSAL NEVER REPEATS THE VALUE. It goes to the boot log, and a value
 # someone typed as `https://user:password@…` would put the password there.
 # It names the variable the value came from instead, which is what the
-# person has to go and look at.
+# person has to go and look at. That holds for the error's `cause` too: Ruby
+# prints the causes of an uncaught error, and `URI::InvalidURIError`'s and
+# `IPAddr`'s messages are the raw value, so `Invalid` is never raised from
+# inside a `rescue` (a rescue here answers nil or false and the raise comes
+# after it).
 class SiteAddress
   class Invalid < ArgumentError; end
 
@@ -35,11 +41,12 @@ class SiteAddress
   # origin has none, and dropping it silently would leave a password sitting
   # in the environment unnoticed), a port outside 1..65535, any whitespace or
   # control character inside the value (a newline would also break the log
-  # line), and a host that is not ASCII (write it in its xn-- form; nothing
-  # is converted here). What is normalised: the scheme and the host are
-  # lower-cased, a trailing dot of the host is dropped (no request's Host
-  # would match it), the scheme's default port is dropped, and an IPv6
-  # literal keeps its brackets, as `config.hosts` and `url_for` want it.
+  # line), a host that is not ASCII (write it in its xn-- form; nothing is
+  # converted here) and a host that is not a host name (`host_name?`). What
+  # is normalised: the scheme and the host are lower-cased, ONE trailing dot
+  # of the host is dropped (no request's Host would match it), the scheme's
+  # default port is dropped, and an IPv6 literal keeps its brackets, as
+  # `config.hosts` and `url_for` want it.
   def self.parse(value, source: VARIABLES.first)
     text = value.to_s.strip
     return new(nil, nil, nil) if text.empty?
@@ -48,17 +55,45 @@ class SiteAddress
     uri = begin
       URI.parse(text)
     rescue URI::InvalidURIError
-      raise invalid(source)
+      nil # the raise is below, outside the rescue: see "never repeats the value"
     end
+    raise invalid(source) if uri.nil?
+
     scheme = uri.scheme.to_s.downcase
-    host = uri.host.to_s.downcase.chomp(".")
+    host = uri.host.to_s.downcase.delete_suffix(".")
     # An "@" in the authority is user info even when it is empty
     # (`https://@host`), which URI reports as none.
     user_info = uri.userinfo || text[%r{\A[^:/?#]+://([^/?#]*)}, 1].to_s.include?("@")
-    raise invalid(source) unless DEFAULT_PORTS.key?(scheme) && !host.empty? && !user_info && PORTS.cover?(uri.port)
+    raise invalid(source) unless DEFAULT_PORTS.key?(scheme) && host_name?(host) && !user_info && PORTS.cover?(uri.port)
 
     new(scheme, host, uri.port == DEFAULT_PORTS[scheme] ? nil : uri.port)
   end
+
+  # One label of a host name: ASCII letters and digits, hyphens only inside.
+  LABEL = /\A[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\z/
+
+  # A host is dot-separated labels with none empty (an IPv4 address is that
+  # too), or an IPv6 address in brackets. The grammar is not pedantry: Rails
+  # reads a `config.hosts` entry that starts with a dot as "every subdomain",
+  # so `https://.example.org` would open what the boot line calls refused,
+  # and `a..b`, `*.example.org` or `%41.example` match no request at all,
+  # which locks everyone out.
+  def self.host_name?(host)
+    if host.start_with?("[")
+      inner = host[/\A\[(.*)\]\z/, 1]
+      return false if inner.nil?
+
+      begin
+        IPAddr.new(inner).ipv6?
+      rescue IPAddr::Error
+        false
+      end
+    else
+      labels = host.split(".", -1)
+      !labels.empty? && labels.all? { |label| label.match?(LABEL) }
+    end
+  end
+  private_class_method :host_name?
 
   # Memoised: the environment does not change while the app runs. Tests that
   # set `ENV` go through `with_site_address` (test/support/site_address_helper.rb),
