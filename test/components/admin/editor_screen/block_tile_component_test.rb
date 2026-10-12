@@ -7,13 +7,13 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   setup do
-    @page = create_page(title: "Tile")
-    @section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
-    @block = @page.content_blocks.create!(block_type: "image", section: @section, section_column: 1, position: 0)
+    @editor_page = create_page(title: "Tile")
+    @section = @editor_page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    @block = @editor_page.content_blocks.create!(block_type: "image", section: @section, section_column: 1, position: 0)
   end
 
   def render_tile(block = @block, editable: true)
-    render_inline Admin::EditorScreen::BlockTileComponent.new(page: @page, block: block, locale: "en", editable: editable)
+    render_inline Admin::EditorScreen::BlockTileComponent.new(page: @editor_page, block: block, locale: "en", editable: editable)
   end
 
   def menu_items = Capybara.string(rendered_content).all("[role=menu] [role=none]", visible: :all).map { |item| item.text(:all).strip }
@@ -114,5 +114,74 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     render_tile
     assert_no_selector "[data-notes-add]"
+  end
+
+  test "a tile's version and mark say that its block is held, and differ from the free tile's, for the viewer who is not the holder" do
+    render_tile
+    free_version = Capybara.string(rendered_content).find("#content_block_#{@block.id}")["data-editing-version"]
+    assert_no_selector "[data-editing-held]"
+
+    reserve(@block, @editor_page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_tile }
+
+    assert_selector "#content_block_#{@block.id}[data-editing-held=true]"
+    assert_match(/data-editing-version="[^"]*"\s+data-editing-held="true"/, rendered_content, "the two attributes are separated by whitespace")
+    assert_not_equal free_version, Capybara.string(rendered_content).find("#content_block_#{@block.id}")["data-editing-version"]
+    assert_selector "[role=menu] button", text: "Move up", visible: :all
+    assert_no_selector "button", text: "Take over", visible: :all
+  end
+
+  # Review Focus 4 (the plan): the avatar of whoever holds the block stands in
+  # the slot before the notes marker, on the tile, with the shared tooltip.
+  test "a held block's tile carries the avatar before the notes marker, and no Take over" do
+    users(:two).update!(name: "Dana Weiss")
+    reserve(@block, @editor_page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_tile }
+
+    html = rendered_content
+    assert_selector "#content_block_#{@block.id} [data-holder-avatar] span.size-5", text: "DW"
+    assert_selector "[data-holder-avatar] span.sr-only", text: "Dana Weiss is editing this block"
+    assert_selector "[data-holder-avatar] [data-tooltip]", text: "Dana Weiss is editing this block", visible: :all
+    assert_operator html.index("data-holder-avatar"), :<, html.index("notes-marker-ContentBlock-#{@block.id}"), "the avatar comes before the notes marker"
+    assert_selector "#notes-marker-ContentBlock-#{@block.id}.admin-notes-marker"
+    assert_no_text "Take over"
+    assert_no_selector "button", text: "Take over", visible: :all
+  end
+
+  test "a reader's tile shows the avatar too, and a free tile or one held in this tab shows none" do
+    reserve(@block, @editor_page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:reader), tab: "tab-aaaaaaaa") { render_tile(editable: false) }
+    assert_selector "[data-holder-avatar]"
+
+    Editing::Reservation.of(@block).delete_all # version: none (a test clears a reservation)
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_tile }
+    assert_no_selector "[data-holder-avatar]"
+
+    reserve(@block, @editor_page, users(:one), "tab-aaaaaaaa")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_tile }
+    assert_no_selector "[data-holder-avatar]"
+  end
+
+  test "the tile's version changes when the avatar would: free, held by another, held by the viewer's other tab" do
+    version = lambda do |tab|
+      as_viewer(users(:one), tab: tab) { render_tile }
+      Capybara.string(rendered_content).find("#content_block_#{@block.id}")["data-editing-version"]
+    end
+    free = version.call("tab-aaaaaaaa")
+
+    reserve(@block, @editor_page, users(:two), "tab-bbbbbbbb")
+    by_another = version.call("tab-aaaaaaaa")
+
+    Editing::Reservation.of(@block).delete_all # version: none (a test clears a reservation)
+    reserve(@block, @editor_page, users(:one), "tab-cccccccc")
+    by_other_tab = version.call("tab-aaaaaaaa")
+
+    assert_equal 3, [ free, by_another, by_other_tab ].uniq.size
+  end
+
+  test "the notes marker is still the one control it was, drawn through the slot" do
+    render_tile
+
+    assert_selector "button#notes-marker-ContentBlock-#{@block.id}.admin-notes-marker[aria-label='Add a note on Image'][data-notes-key='ContentBlock-#{@block.id}'][data-notes-name='Image']"
   end
 end

@@ -79,6 +79,8 @@ module Admin
     #   action is "Delete block…" wherever it is drawn (spec §6) and which has
     #   no tile here to hold the dialog for it.
     class BlockCardComponent < AdminComponent
+      include HeldUnit
+
       PLACEMENTS = %i[list panel group].freeze
 
       # `"block-<id>"` is public so `Admin::ContentBlocksController` can
@@ -106,8 +108,7 @@ module Admin
         {
           controller: "admin--saving--autosave",
           action: "input->admin--saving--autosave#queue change->admin--saving--autosave#queue focusout->admin--saving--autosave#saveNow",
-          "admin--saving--autosave-status-id-value": status_id(block),
-          "admin--saving--autosave-page-base-id-value": "#{Admin::EditorScreen::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+          "admin--saving--autosave-status-id-value": status_id(block)
         }
       end
 
@@ -117,11 +118,13 @@ module Admin
       # padding, hover); a disabled one dims and drops the hover fill.
       MENU_ITEM_CLASS = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent".freeze
 
-      def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false)
+      def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false, updated_by: nil, holds: nil)
         raise ArgumentError, "unknown block card placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
 
         @placement = placement
         @open = open
+        @updated_by = updated_by
+        @holds = holds
         @editable = editable
         @page = page
         @block = block
@@ -143,13 +146,41 @@ module Admin
       # card of the list is a `card` (dragged, moved, counted for Move up and
       # Move down); only a panel is hidden, and it is its section's to show.
       def wrapper_attributes
-        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **(@open ? { open: true } : {}) } } if panel?
+        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **editing_marks, **held_marks, **(@open ? { open: true } : {}) } } if panel?
 
-        { data: { block_id: block.id, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
+        { data: { block_id: block.id, **editing_marks, **held_marks, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
       end
 
       # The panel is the region its tile's `aria-controls` points at, named by
       # its own heading -- which an unavailable block's panel doesn't have.
+      # What the editor's merge reads (`editing/merge`): this wrapper is one unit,
+      # replaced or kept whole, and says whose it is.
+      def editing_marks = { editing_unit: "", editing_subject: ::Editing.key(block), editing_version: card_version }
+
+      # The block's version, and -- for a card of the list -- whether it is the
+      # first or the last, which decides whether its Move up / Move down start
+      # disabled: a block that only changed places must not look unchanged.
+      # A panel (the form of a block in a section) also names its place: a move
+      # along a section writes with `update_columns`, so the block's `updated_at`
+      # does not say that its heading ("column 2") changed.
+      def card_version = [ editing_version, ("f" if list? && first?), ("l" if list? && last?), (panel? ? "s#{block.section_id}c#{block.section_column}" : nil) ].compact.join("-")
+
+      # What a hold does to this card is `HeldUnit`'s, asked for the block on
+      # its page. An unavailable block's card has one action and no form: no
+      # hold is drawn for it.
+      def held_subject = block
+
+      def held_record = page
+
+      def hold = unavailable? ? nil : super
+
+      # "Take over" as the first item of the held card's "⋯" menu, the keyboard
+      # and touch path to it (the words are this component's own key, which is
+      # why this one line is not in `HeldUnit`).
+      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(held_subject) })
+
+      def updated_mark = Admin::EditorScreen::UpdatedMarkComponent.new(change: @updated_by)
+
       def panel_name = unavailable? ? {} : { role: "region", aria: { labelledby: self.class.panel_title_id(block) } }
 
       # "Image · column 2" (spec §4.3), drawn by the component a stream
@@ -170,7 +201,7 @@ module Admin
 
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
 
-      def form_data = editable? ? self.class.autosave_form_data(block) : {}
+      def form_data = editable? && !read_only_hold? ? self.class.autosave_form_data(block) : {}
 
       def error_prefix = self.class.error_prefix(block)
 
@@ -191,12 +222,14 @@ module Admin
 
       def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
-      # The block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
+      # IN THE TEMPLATE, with no method here any more (the slot loads nothing).
+      # The block's markers (slot `editor.block.markers`: the notes marker, notes
       # spec §4.3): on a card of the list and on a translation tab's group
       # card, for every viewer. Not on a panel -- the block's tile carries it,
       # and two markers of one block would be two elements with one id -- and
-      # not on an unavailable block's card, which has one action.
-      def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
+      # not on an unavailable block's card, which has one action. A slot for
+      # one block: nothing is loaded for it, and the page's holds, read
+      # already, go to it as context (`holds:`).
 
       def note_key = ::Notes.key(block)
 
@@ -329,7 +362,7 @@ module Admin
       # See `Admin::EditorScreen::PageSettingsFormComponent#translation` -- a block's own
       # fields, confirmed on the block (`block.translation_confirmed`), with
       # the page's edit right (`editable?`, blocks follow their page).
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(block, field, locale: locale, confirmable: editable?)
+      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(block, field, locale: locale, confirmable: editable? && !read_only_hold?)
 
       # The caption/alt fields are this block's per-use overrides of its
       # image's own defaults (media library design spec §6): blank, the

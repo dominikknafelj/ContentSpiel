@@ -139,4 +139,22 @@ class Audit::EventTest < ActiveSupport::TestCase
   test "a raw UPDATE of another column alongside occurrences is still refused" do
     assert_raises(ActiveRecord::StatementInvalid) { Audit::Event.where(id: @event.id).update_all(occurrences: 2, channel: "mcp") }
   end
+
+  test "deleting_block finds the event that took a block away: its own, or the section's that took it along, on that page only" do
+    page = create_page(title: "Page")
+    other = create_page(title: "Other page")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).record
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    inside = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 1 }).record
+    kept = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).record
+    ContentBlocks::Destroy.call(block)
+    ContentBlocks::Destroy.call(section)
+
+    assert_equal 1, Audit::Event.deleting_block(block.id, page.id).count
+    assert_equal [ "block.deleted" ], Audit::Event.deleting_block(inside.id, page.id).pluck(:action), "the section's event lists the blocks that went with it"
+    assert_equal section.id, Audit::Event.deleting_block(inside.id, page.id).first.subject_id
+    assert_empty Audit::Event.deleting_block(kept.id, page.id)
+    assert_empty Audit::Event.deleting_block(block.id, other.id), "another page's block of the same id is not this one's"
+    assert_empty Audit::Event.deleting_block(block.id, page.id, since: 1.minute.from_now), "the scan is bounded by a time window"
+  end
 end

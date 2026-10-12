@@ -1,0 +1,29 @@
+<% if held? %>
+  <%# Handoff 1 and 18: the strip. Neutral, never an alert: nothing is wrong. The
+      sentence is text; the avatar's letters are decoration (`aria-hidden`). %>
+  <%= tag.div class: "flex items-center gap-2 border-b border-line bg-sunken px-3.5 py-2", data: strip_data do %>
+    <%= render Admin::Ui::AvatarComponent.new(initials: initials, size: :md, tone: own? ? :own : :other) %>
+    <p class="min-w-0 flex-1 text-[13px] text-ink" data-editing-strip-text><%= sentence %></p>
+    <% if take_over? %>
+      <%# What the hold script says beside the button while a take-over is asked, already
+          standing, or refused: a polite status, empty until then (the script holds no wording). %>
+      <span role="status" aria-live="polite" class="shrink-0 text-xs text-meta" data-editing-take-over-status
+            data-waiting="<%= t(".take_over_waiting") %>" data-pending="<%= t(".take_over_pending") %>" data-failed="<%= t(".take_over_failed") %>" data-claimed="<%= t(".take_over_claimed") %>"></span>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".take_over"), variant: :secondary, size: :small,
+            data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(@subject) }) %>
+    <% end %>
+  <% end %>
+<% else %>
+  <%# Handoff 14, 15 and 20: lost work is announced at once. Warn, never danger. "Copied" is
+      a status text beside the button (handoff 24), gone after 2 seconds. %>
+  <%# The alert is the sentence alone: "Copied" is a polite status (handoff 24), and a status inside
+      an assertive, atomic alert would have the whole alert read again when it appears. %>
+  <%= tag.div class: "flex flex-wrap items-center gap-2 border border-warn bg-warn-tint px-3.5 py-2 text-[13px] text-warn-ink", data: strip_data do %>
+    <p role="alert" class="min-w-0 flex-1"><%= sentence %></p>
+    <span role="status" aria-live="polite" class="shrink-0 text-xs text-ok-ink" data-editing-copied data-copied="<%= t(".copied") %>" data-copy-failed="<%= t(".copy_failed") %>" data-discard-failed="<%= t(".discard_failed") %>"></span>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".copy"), variant: :secondary, size: :small,
+          data: { action: "admin--editing--hold#copy", editing_subject: ::Editing.key(@subject) }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: last_action.first, variant: :ghost, size: :small,
+          data: { action: last_action.last, editing_subject: ::Editing.key(@subject) }) %>
+  <% end %>
+<% end %>

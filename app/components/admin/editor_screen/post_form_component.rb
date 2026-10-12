@@ -12,16 +12,24 @@ module Admin
     # literal "post" (`ID_PREFIX`), matching `Admin::PostsController`'s own
     # `autosave_stream(error_prefix: "post", ...)` and `post_error_fields`.
     class PostFormComponent < AdminComponent
+      include HeldUnit
+
       ID_PREFIX = "post"
 
       # `slot_context` is the header's (`HeaderComponent`): what the screen has
       # already read that a feature at the header's slots would read again.
-      def initialize(post:, locale:, url_options: {}, slot_context: {})
+      def initialize(post:, locale:, url_options: {}, slot_context: {}, form_only: false, holds: nil)
         @post = post
         @locale = locale
         @url_options = url_options
         @slot_context = slot_context
+        @form_only = form_only
+        @holds = holds
       end
+
+      # The answer to `Admin::EditingController#record`: the form alone, without
+      # the header above it, which nothing fetches.
+      def form_only? = @form_only
 
       def save_status_id = "post-save-status"
 
@@ -41,10 +49,17 @@ module Admin
       # (Review Focus 4).
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(post))
 
+      # The post is held as a whole (one subject, "record"); the strip stands
+      # in the header's notice area (`HoldStripComponent.slot_id`). What a hold
+      # does to the form is `HeldUnit`'s, asked for the post.
+      def held_subject = post
+
+      def held_record = post
+
       # The form's `data-*`: the autosave wiring only when the post is
-      # editable (see `editable?`).
+      # editable (see `editable?`) and nobody else holds it.
       def form_data
-        return {} unless editable?
+        return {} if !editable? || read_only_hold?
 
         {
           controller: "admin--saving--autosave",
@@ -54,7 +69,7 @@ module Admin
       end
 
       # See `Admin::EditorScreen::PageSettingsFormComponent#translation`.
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(post, field, locale: locale, confirmable: editable?)
+      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(post, field, locale: locale, confirmable: editable? && !read_only_hold?)
 
       def field_id(name) = "#{ID_PREFIX}-#{name}"
 

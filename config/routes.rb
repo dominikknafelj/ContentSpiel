@@ -308,6 +308,28 @@ Rails.application.routes.draw do
     # first and its words can not be taken for a kind below.
     get "presence/here", to: "presence#here", as: :presence_here, defaults: { format: :json }
     get "presence/:kind/:id", to: "presence#show", as: :record_presence, constraints: { kind: /page|post|media/, id: /\d+/ }
+    # Live editing (live-editing spec §3.2): the parts an open page or post
+    # editor fetches when it is told something changed, each through the read
+    # scope: a page's block list, one block, the record's own form. Hung under
+    # the record like notes' and presence's, but `kind` is only `page|post`:
+    # the library has no editor of this shape, and a `media` here would be a
+    # route that can only answer 404. `block_id` is digits, so `blocks` and
+    # `blocks/:block_id` can not be taken for each other.
+    scope "editing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
+      get "blocks", to: "editing#blocks", as: :editing_blocks
+      get "blocks/:block_id", to: "editing#block", as: :editing_block, constraints: { block_id: /\d+/ }
+      get "record", to: "editing#record", as: :editing_record
+      # A save is a claim (live-editing spec §4.2): the tab takes a subject ahead
+      # of its first save, and lets it go. `block_id` is optional (absent: the
+      # record itself); a block that is not this record's is a 404.
+      post "claim", to: "editing#claim", as: :editing_claim
+      post "release", to: "editing#release", as: :editing_release
+      # Taking over (spec §4.4): the requester asks, the holder's tab hands over.
+      post "take_over", to: "editing#take_over", as: :editing_take_over
+      post "hand_over", to: "editing#hand_over", as: :editing_hand_over
+      # The asking tab leaves, or stops asking: its own request goes.
+      post "withdraw", to: "editing#withdraw", as: :editing_withdraw
+    end
     # Notes on content (notes spec §3.4, §4). Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
     # `/notes/media/5` -- so a controller finds the container through the read

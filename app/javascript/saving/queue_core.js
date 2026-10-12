@@ -78,6 +78,18 @@ function guardUnload(event) {
 // True while any write is queued, in flight, or still held by a form.
 export function busy() { return !idle() }
 
+// Resolves once the queue is idle: nothing queued or in flight and no form
+// with an edit still to send. For a READ that must not be older than this
+// tab's own writes (live editing's fetches): it waits beside the queue. It
+// takes no turn, is counted as no write and tells no form to send early
+// (unlike `drained`), so a reader never changes what the writers do.
+export async function quiet() {
+  while (!idle()) {
+    await chain()
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+}
+
 // Resolves when `promise` does or after `ms`, whichever is first.
 function within(promise, ms) {
   let timer

@@ -30,7 +30,7 @@ module Admin
       # `:forbidden` is a save a service refused for want of permission
       # (access-control design spec §3.4) -- an editor that's view only never
       # sends one, so it only shows for a stale tab whose rights changed.
-      STATES = %i[idle saving saved error stale saved_over offline retrying signed_out forbidden].freeze
+      STATES = %i[idle saving saved error stale held saved_over offline retrying signed_out forbidden].freeze
 
       #
       # Wording (design pass round 2, handoff §4.1): the saved/saving/offline
@@ -42,7 +42,14 @@ module Admin
       # "saving" line itself, picks the same wording. Every string here that
       # the controller also writes is the same key (`messages_data` hands
       # them to it from <body>), so the two cannot drift.
-      def initialize(id:, state: :idle, at: nil, count: 0, live: false)
+      # `:held` is a save refused because ANOTHER tab holds the subject
+      # (live-editing spec §4.2, handoff 25): "● NOT SAVED · DANA WEISS IS
+      # EDITING", or for the person's own other tab "● NOT SAVED · OPEN IN YOUR
+      # OTHER TAB". `holder:` is the reservation (a user and a tab), nil when
+      # it lapsed between the refusal and this answer; `viewer:` says whose
+      # status line it is, so their own other tab can be told from a colleague.
+      # The capitals are literal text, like every other state's.
+      def initialize(id:, state: :idle, at: nil, count: 0, live: false, holder: nil, viewer: nil)
         raise ArgumentError, "unknown save status state #{state.inspect}" unless STATES.include?(state)
 
         @id = id
@@ -50,6 +57,8 @@ module Admin
         @at = at
         @count = count
         @live = live
+        @holder = holder
+        @viewer = viewer
       end
 
       def text
@@ -65,6 +74,7 @@ module Admin
         # "Not saved": the three record editors refuse a stale save
         # (`Admin::AutosaveResponses#refuse_stale_autosave`).
         when :stale then t(".stale")
+        when :held then held_text
         # The opposite meaning, for the forms that still save on a stale base
         # (Settings, media detail, tag rows): the save WENT THROUGH and
         # overwrote, so it must never read like the refusal above.
@@ -81,7 +91,7 @@ module Admin
       # anything else keeps the neutral colour.
       def css_class
         colour = if state == :saved && live then "text-ok-ink"
-        elsif state == :stale || state == :saved_over then "text-warn-ink"
+        elsif state == :stale || state == :held || state == :saved_over then "text-warn-ink"
         else "text-meta"
         end
         "min-h-[1lh] font-cs-mono text-[11px] tracking-mono #{colour}"
@@ -89,7 +99,16 @@ module Admin
 
       private
 
-      attr_reader :id, :state, :at, :count, :live
+      attr_reader :id, :state, :at, :count, :live, :holder, :viewer
+
+      # Whose it is, in capitals: a name in `PersonName.of` is mixed case, and
+      # the line is a mono-capitals line (`upcase` follows Unicode).
+      def held_text
+        return t(".held_unknown") unless holder&.user
+        return t(".held_own_tab") if viewer && holder.user_id == viewer.id
+
+        t(".held", name: ::PersonName.of(holder.user).upcase)
+      end
 
       # "SAVED 14:05", or just "SAVED" for a save with no time (a stream that
       # carries none); a live record's own wording says it went to the site.

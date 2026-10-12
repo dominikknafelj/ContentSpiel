@@ -1,4 +1,4 @@
-<div id="<%= dom_id %>" class="admin-block-tile flex items-stretch" role="listitem" data-block-id="<%= block.id %>"
+<div id="<%= dom_id %>" class="admin-block-tile flex items-stretch" role="listitem" data-block-id="<%= block.id %>" data-editing-part data-editing-subject="<%= ::Editing.key(block) %>" data-editing-version="<%= editing_version %>" <%= tag.attributes(data: { editing_held: true }) if held? %>
      data-admin--editor--blocks-target="tile" data-admin--editor--section-target="tile">
   <%# What the pointer drags the tile by (SortableJS `handle:` in `admin--editor--blocks`). Not a
       control: see the component. %>
@@ -14,7 +14,7 @@
       a button, and outside the `editable?` block below, because a viewer who can only
       read the page writes notes too. `data-notes-active` on the tile is
       `admin--notes--drawer#markActive`'s. %>
-  <div class="flex shrink-0 items-center px-1"><%= render note_marker %></div>
+  <div class="flex shrink-0 items-center px-1"><%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, label: label, placement: :tile, holds: holds) %></div>
   <% if editable? %>
     <%# Every move a drag makes, by name (see the component). Its `data-move` buttons are
         enabled and disabled by `admin--editor--blocks#refreshMoveState`. %>

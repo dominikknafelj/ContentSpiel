@@ -138,6 +138,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
       window.fetch = (url, options = {}) => {
         const method = (options.method || "GET").toUpperCase()
         if (method === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the save the move waits behind
         window.__writes.push(method)
         if (method !== "PATCH" || window.__writes.filter((m) => m === "PATCH").length > 1) return originalFetch(url, options)
         return new Promise((resolve) => { window.__releaseSave = () => resolve(originalFetch(url, options)) })
@@ -202,7 +203,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
       }
     JS
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(second, translations: { "en" => { caption: "The other editor's caption" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(second, translations: { "en" => { caption: "The other editor's caption" } }) }
     end
 
     fill_in id: "block-#{second.id}-caption", with: "My caption"

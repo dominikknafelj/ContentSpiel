@@ -54,6 +54,7 @@ module Admin
       editor.header.people editor.header.actions
       media.panel.header media.panel.sections
       tree.row.markers posts.row.markers posts.row.title
+      editor.block.markers
     ].freeze
 
     # The slot's own constructor arguments: an option of these names would replace

@@ -88,11 +88,18 @@ class Notes::SignalsTest < ActiveSupport::TestCase
 
   def sent(stream) = broadcasts(stream).map { |payload| ActiveSupport::JSON.decode(payload) }
 
-  # Every broadcast made while the block runs, on whatever stream, as
-  # `[stream, payload]` with the payload as a browser gets it.
+  # Every broadcast made while the block runs, on whatever stream but live
+  # editing's (`Editing::Signals` answers every content write on the page's
+  # own `editing:` stream, which these cases do not measure; its cases are
+  # `test/models/editing/signals_test.rb`), as `[stream, payload]` with the
+  # payload as a browser gets it.
   def capture_signals
     seen = []
-    callback = ->(*, event) { seen << [ event[:broadcasting], ActiveSupport::JSON.decode(event[:message].to_json) ] }
+    callback = lambda do |*, event|
+      next if event[:broadcasting].start_with?("editing:")
+
+      seen << [ event[:broadcasting], ActiveSupport::JSON.decode(event[:message].to_json) ]
+    end
     ActiveSupport::Notifications.subscribed(callback, "broadcast.action_cable") { yield seen }
     seen
   end

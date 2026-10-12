@@ -14,6 +14,7 @@ module Admin
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
+    include EditingClaims
     include Scheduling
     include MediaFields
 
@@ -172,14 +173,18 @@ module Admin
     def update
       # Before anything is read off the form or any service is called -- see
       # `AutosaveResponses#refuse_stale_autosave`.
-      return if refuse_stale_autosave(@page, status_id: "page-save-status", error_prefix: "page", reload_url: admin_page_path(@page, **admin_url_options))
+      # A save is a claim (`Admin::EditingClaims`): first, so a tab that does not
+      # hold the settings is refused before the stale check, and a claim this
+      # very request just took is given back when the save is refused as stale.
+      claim = claim_before_save(@page, record: @page, status_id: "page-save-status", error_prefix: "page", reload_url: admin_page_path(@page, **admin_url_options))
+      return if performed?
 
       page_params = params.fetch(:page, ActionController::Parameters.new).permit(*TRANSLATED_FIELDS, *ATTRIBUTE_FIELDS)
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
 
       stored_hero_id = @page.hero_media_asset_id
-      result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
+      result = saving_under(claim, @page, record: @page) { Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated }) }
 
       streams = autosave_stream(
         record: result.record,
@@ -251,10 +256,14 @@ module Admin
     # "make it live right now" even for a page that was already scheduled
     # ahead, not "clear the schedule".
     def publish
+      return if refuse_instant_redirect(@page, to: admin_page_path(@page, **admin_url_options))
+
       redirect_after Pages::Save.call(@page, attributes: { published: true }), success: "Published"
     end
 
     def unpublish
+      return if refuse_instant_redirect(@page, to: admin_page_path(@page, **admin_url_options))
+
       redirect_after Pages::Save.call(@page, attributes: { published: false }), success: "Unpublished"
     end
 
@@ -264,6 +273,7 @@ module Admin
     # back to a later date without first unpublishing it.
     def schedule
       editor = admin_page_path(@page, **admin_url_options)
+      return if refuse_instant_redirect(@page, to: editor)
 
       if params[:remove] == "1"
         # "Remove schedule" is only offered for a scheduled record; for any

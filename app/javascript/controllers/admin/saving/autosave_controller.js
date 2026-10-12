@@ -1,6 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
+import { TAB_HEADER } from "editing/requests"
+import { TAB } from "live/connection"
 import { currentGeneration, enqueue, isCurrentGeneration, registerForm, syncBases, unregisterForm } from "saving/queue"
 
 // Each autosave form's SAVE STATE, by form ELEMENT:
@@ -63,10 +65,9 @@ const saveStates = new WeakMap()
 // every other autosaving form on the screen and with block add/duplicate/
 // delete/reorder: one request is on the wire at a time, and each reads its
 // body and bases when it is SENT, after the previous answer's bases were
-// written into the hidden fields. Without it, forms that debounce on the same
-// tick ("Use all") send the same page base together, one write makes the
-// other's base stale, and the page settings form is left holding a base
-// nobody else made stale -- now a final 409. See the queue's own comment.
+// written into the hidden fields. Without it, two forms that debounce on the
+// same tick ("Use all") would send together, and a base one answer is about to
+// replace would ride on the other request. See the queue's own comment.
 //
 // Two rules keep a save from being sent, or drawn, where it does not belong
 // (fix round 4):
@@ -87,13 +88,7 @@ const saveStates = new WeakMap()
 export default class extends Controller {
   static values = {
     statusId: String,
-    debounce: { type: Number, default: 1000 },
-    // A block card's form names the page settings form's base field here
-    // (`Admin::EditorScreen::BlockCardComponent#form_data`): its current value rides
-    // along as `X-Page-Base-Updated-At`, so the server only moves that
-    // form's base forward when it was still current (`Admin::
-    // ContentBlocksController#page_base_streams`).
-    pageBaseId: String
+    debounce: { type: Number, default: 1000 }
   }
 
   // Client-only states `Admin::Ui::SaveStatusComponent` never has occasion to
@@ -164,8 +159,51 @@ export default class extends Controller {
 
   queue() {
     if (this.paused) return
+    this.announce()
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => this.trigger(), this.debounceValue)
+  }
+
+  // A CHANGE (live-editing spec §4.2), said before the debounce is even
+  // started, so whoever claims the record for this tab (`admin--editing--hold`)
+  // queues its claim ahead of the save: the first change of a clean form, and
+  // -- the hold's lifetime is two minutes from the last claim or save, and a
+  // person can type for longer than that without a pause that saves -- every
+  // later change, which the hold script answers with a renewal only when its
+  // own last claim is older than half a hold. The detail is the form's unit
+  // (`data-editing-subject`); a form outside an editor has none and nobody
+  // listens.
+  //
+  // A form whose text is exactly what is on the wire now has nothing new to
+  // say (the `focusout` of a card that was just collapsed is not typing: its
+  // text is on its way, and a claim after the release would hold the block
+  // again).
+  announce() {
+    if (this.unchanged()) return
+    if (this.busy && this.signature(new FormData(this.element)) === this.inFlight) return
+    this.dispatch("dirty", { detail: { subject: this.element.closest("[data-editing-subject]")?.dataset.editingSubject } })
+  }
+
+  // Ends this form's saves as a 409 does, without a request: its claim was
+  // refused before it had sent anything, or it was frozen in place. The text
+  // stays in the fields. A save already queued behind the refused claim finds
+  // the form paused when its turn comes and sends nothing (`attempt`).
+  pause() {
+    this.paused = true
+    this.failed = true
+    this.pending = false
+    if (this.timer) clearTimeout(this.timer)
+    this.timer = null
+    // A retry waiting out its backoff is the only thing that would ever clear
+    // `busy` again: with it cancelled, `busy` is cleared here, or the form
+    // would count as outstanding for good and every read and every visit
+    // would wait for a save that is never coming.
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer)
+      this.retryTimer = null
+      this.busy = false
+      this.retryCount = 0
+    }
   }
 
   // Called by `drained()` (`saving/queue.js`) before a header action or a
@@ -210,6 +248,7 @@ export default class extends Controller {
 
   saveNow() {
     if (this.paused) return
+    this.announce()
     if (this.timer) clearTimeout(this.timer)
     this.trigger()
   }
@@ -231,6 +270,9 @@ export default class extends Controller {
 
     this.busy = true
     this.pending = false
+    // What this save will carry (it is read again when the request is sent):
+    // `announce` does not take it for a new change.
+    this.inFlight = this.signature(new FormData(this.element))
     this.attempt()
   }
 
@@ -244,9 +286,15 @@ export default class extends Controller {
     const status = document.getElementById(this.statusIdValue)
     this.setStatus(status && status.hasAttribute("data-live") ? this.text("components.ui.save_status.saving_live") : this.text("components.ui.save_status.saving"))
 
-    const outcome = await enqueue((isCurrent) => this.send(isCurrent), { generation: this.generation })
+    // A form paused while its save waited its turn (its claim was refused
+    // ahead of it, or it was frozen) sends nothing: the notice is already up.
+    const outcome = await enqueue((isCurrent) => this.paused ? "skipped" : this.send(isCurrent), { generation: this.generation })
 
     switch (outcome) {
+      case "skipped":
+        this.pending = false
+        this.busy = false
+        return
       case "stale":
         // This form's page has been replaced -- while the save was in flight
         // or waiting its turn, or before it was even queued (a restoration
@@ -318,6 +366,7 @@ export default class extends Controller {
   async send(isCurrent) {
     const body = new FormData(this.element)
     const sent = this.signature(body)
+    this.inFlight = sent
     let response
     try {
       response = await fetch(this.element.action, {
@@ -402,14 +451,13 @@ export default class extends Controller {
     // writes them onto the live fields synchronously, right now; Turbo's own
     // (later) replace of the same element re-applies the identical value.
     //
-    // Matched by id, not just by name: a block card's response may also carry
-    // the page settings form's own base (the block write touched the page --
-    // `Admin::ContentBlocksController#page_base_streams`), and taking the
-    // first `base_updated_at` in the response would hand this card the page's
-    // value instead of its own. The page base is applied too because the next
-    // request sends it as `X-Page-Base-Updated-At` (`#requestHeaders`).
+    // Matched by id, not just by name: only this form's own base is applied.
+    // A block write no longer carries the page settings form's base (that
+    // form has one of its own, `Page#settings_changed_at`), but a response may
+    // hold more than one `base_updated_at` field and taking the first would
+    // hand this form somebody else's value.
     const ownBase = this.element.querySelector('[name="base_updated_at"]')
-    syncBases(text, [ ownBase?.id, this.hasPageBaseIdValue && this.pageBaseIdValue ].filter(Boolean))
+    syncBases(text, [ ownBase?.id ].filter(Boolean))
 
     Turbo.renderStreamMessage(text)
     return "done"
@@ -443,10 +491,9 @@ export default class extends Controller {
   requestHeaders() {
     const headers = {
       Accept: "text/vnd.turbo-stream.html",
-      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
+      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content,
+      [TAB_HEADER]: TAB
     }
-    const pageBase = this.hasPageBaseIdValue && document.getElementById(this.pageBaseIdValue)?.value
-    if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase
     return headers
   }
 

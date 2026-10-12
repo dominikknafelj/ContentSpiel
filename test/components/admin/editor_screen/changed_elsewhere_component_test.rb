@@ -19,7 +19,7 @@ class Admin::EditorScreen::ChangedElsewhereComponentTest < ViewComponent::TestCa
     assert_selector "a[href='/cs-studio/pages/1'][data-turbo-frame='_top']", text: "Reload"
   end
 
-  test "a change to one of its blocks counts, a refused attempt does not" do
+  test "a change to one of a page's blocks does not count (the settings form's base ignores it), and a refused attempt does not either" do
     page = create_page(title: "About")
     block = page.content_blocks.create!(block_type: :rich_text, position: 0)
     base = page.reload.updated_at
@@ -29,7 +29,8 @@ class Admin::EditorScreen::ChangedElsewhereComponentTest < ViewComponent::TestCa
 
     render_bar(page, since: base)
 
-    assert_text "Changed by two@example.com"
+    assert_text "Changed elsewhere."
+    assert_no_text "Changed by"
     assert_no_text users(:reader).email_address
   end
 

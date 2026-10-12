@@ -114,6 +114,8 @@ module Admin
     # `editable:` as on a block card: handed down by the page view, asked
     # here when left nil.
     class SectionCardComponent < AdminComponent
+      include HeldUnit
+
       def self.lanes_id(section) = "section-#{section.id}-lanes"
 
       def self.panels_id(section) = "section-#{section.id}-panels"
@@ -153,7 +155,7 @@ module Admin
         component.new(page: page, section: section, outline: outline, locale: locale, **options)
       end
 
-      def initialize(page:, section:, outline:, locale:, url_options: {}, first: false, last: false, editable: nil)
+      def initialize(page:, section:, outline:, locale:, url_options: {}, first: false, last: false, editable: nil, holds: nil)
         @page = page
         @section = section
         @outline = outline
@@ -162,6 +164,7 @@ module Admin
         @first = first
         @last = last
         @editable = editable
+        @holds = holds
       end
 
       def dom_id = ActionView::RecordIdentifier.dom_id(section)
@@ -169,6 +172,8 @@ module Admin
       def panels_id = self.class.panels_id(section)
 
       def body_id = "section-#{section.id}-body"
+
+      def header_id = "section-#{section.id}-header"
 
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
 
@@ -185,7 +190,21 @@ module Admin
 
       def form_url = helpers.admin_page_content_block_path(page, section, **url_options)
 
-      def form_data = editable? ? Admin::EditorScreen::BlockCardComponent.autosave_form_data(section) : {}
+      # What a hold on the section's own settings does (it is the section's
+      # form that is held; the blocks in it have holds of their own) is
+      # `HeldUnit`'s, asked for the section on its page.
+      def held_subject = section
+
+      def held_record = page
+
+      def hold = unavailable? ? nil : super
+
+      # "Take over" as the first item of the held section's "⋯" menu, the keyboard
+      # and touch path to it (the words are this component's own key, which is
+      # why this one line is not in `HeldUnit`).
+      def take_over_item = tag.button(t(".take_over"), type: "button", class: menu_item_class, data: { action: "admin--editing--hold#takeOver", editing_subject: ::Editing.key(held_subject) })
+
+      def form_data = editable? && !read_only_hold? ? Admin::EditorScreen::BlockCardComponent.autosave_form_data(section) : {}
 
       def error_prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(section)
 
@@ -232,11 +251,11 @@ module Admin
       def blocks = outline.blocks_in(section)
 
       def lanes
-        Admin::EditorScreen::SectionLanesComponent.new(page: page, section: section, outline: outline, locale: locale, url_options: url_options, editable: editable?)
+        Admin::EditorScreen::SectionLanesComponent.new(page: page, section: section, outline: outline, locale: locale, url_options: url_options, editable: editable?, holds: holds)
       end
 
       def panel(block)
-        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel)
+        Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable?, placement: :panel, holds: holds)
       end
 
       private

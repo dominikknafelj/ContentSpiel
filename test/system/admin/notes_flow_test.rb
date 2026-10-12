@@ -172,6 +172,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
       window.fetch = (url, options = {}) => {
         const method = (options.method || "GET").toUpperCase()
         if (method === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the autosave this test holds on the wire
         window.__writes.push(`${method} ${new URL(String(url.url || url), location.href).pathname}`)
         if (window.__released) return originalFetch(url, options)
         return new Promise((resolve) => { window.__held.push(() => resolve(originalFetch(url, options))) })
@@ -208,13 +209,14 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     assert_equal 1, Notes::Thread.count
     assert_equal %w[block.updated note.started], Audit::Event.where(action: %w[block.updated note.started]).order(:id).pluck(:action)
 
-    # The save moved the block and its page; the note moved neither, and
+    # The save moved the block (it touched its page, whose settings base stays
+    # where it was); the note moved neither, and
     # each form's base is what the save made it.
     saved = @block.reload.updated_at
     assert_operator saved, :>, before
     assert_includes @block.body.to_s, "An edit on its way"
     assert_equal saved.iso8601(6), find("#block-#{@block.id}-base-updated-at", visible: :all).value
-    assert_equal @page.reload.updated_at.iso8601(6), find("#page-base-updated-at", visible: :all).value
+    assert_equal @page.reload.settings_changed_at.iso8601(6), find("#page-base-updated-at", visible: :all).value
     assert_operator Notes::Thread.last.created_at, :>, saved
 
     # So the next edit of the same block is saved, not refused as stale.
@@ -321,8 +323,13 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     # Unsaved content on the same screen does ask, with the note still there.
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
+      // Only the page's own save is held: the claim ahead of it takes the real fetch.
+      window.__held = []
       window.fetch = (url, options = {}) => {
-        if ((options.method || "GET").toUpperCase() === "GET" || window.__released) return originalFetch(url, options)
+        const path = new URL(String(url.url || url), location.href).pathname
+        const save = (options.method || "GET").toUpperCase() === "PATCH" && path === #{"/cs-studio/pages/#{@page.id}".to_json}
+        if (!save || window.__released) return originalFetch(url, options)
+        window.__held.push(path)
         return new Promise((resolve) => { window.__release = () => { window.__released = true; resolve(originalFetch(url, options)) } })
       }
     JS
@@ -331,6 +338,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     await_js("typeof window.__release === 'function'", wait: LIVE)
     page.execute_script("window.__release()")
     assert_writes_settled
+    assert_equal [ "/cs-studio/pages/#{@page.id}" ], page.evaluate_script("window.__held"), "the one save this test held"
     assert_equal "Typed, not saved yet", @page.reload.subtitle
     assert_not asks_before_unload?, "a saved editor with a half-typed note still asked"
 

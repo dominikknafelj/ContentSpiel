@@ -228,6 +228,9 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-presence [data-presence-arriving] { animation: admin-presence-in 150ms var(--cs-ease); }
 @keyframes admin-presence-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .admin-presence [data-presence-arriving] { animation: none; } }
+/* The "Updated by ..." mark of a card a colleague saved: it fades over 200ms when its time is up (`admin--editing--live#fade`; with reduced motion the script removes it at once). */
+.admin-editing-mark { transition: opacity 200ms var(--cs-ease); }
+.admin-editing-mark--leaving { opacity: 0; }
 @media (max-width: 1023px) {
   :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header .admin-presence { display: none; }
 }
@@ -573,6 +576,16 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 /* The chip input's frame is a div around its input, so the rule above misses
    it: sunken too, or it keeps a white frame around a sunken inner field. */
 .admin-view-only .admin-chip-field { background: var(--cs-sunken); }
+
+/* A form someone else holds (live-editing handoff 5 to 7): read-only, not disabled-looking.
+   `readonly` text stays selectable and keeps full contrast; a control that can only be
+   `disabled` (a select, a checkbox, a button) is drawn at full contrast too, and the
+   rich-text area has the same fill with no toolbar and no caret. No lock, no tint. */
+.admin-held :is(input, textarea)[readonly],
+.admin-held :is(select, input, button):disabled,
+.admin-held .admin-rich-text-editor,
+.admin-held .admin-chip-field { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+.admin-held :is(select, input, button):disabled { cursor: default; }
 
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
    main form's unsaved changes, round 3 decision D10): it can't be `disabled`

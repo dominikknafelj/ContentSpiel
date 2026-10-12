@@ -54,7 +54,7 @@ module Admin
       # stream tag either.
       if result.ok?
         base_id = "#{error_prefix}-base-updated-at"
-        streams << turbo_stream.replace(base_id, partial: "admin/shared/base_updated_at_field", locals: { id: base_id, value: record.updated_at.iso8601(6) })
+        streams << turbo_stream.replace(base_id, partial: "admin/shared/base_updated_at_field", locals: { id: base_id, value: autosave_base(record).iso8601(6) })
       end
 
       # A failed save also raises an error toast (handoff §10): the status
@@ -158,6 +158,13 @@ module Admin
 
     private
 
+    # The time a record's autosave form holds as its base: what a save is compared
+    # against and what an answer hands back. A page's SETTINGS form holds
+    # `settings_changed_at` (live-editing spec §3.3): `updated_at` also moves with
+    # every block write, which would refuse someone in the settings for a
+    # colleague's block. Everything else holds `updated_at`.
+    def autosave_base(record) = record.is_a?(Page) ? record.settings_changed_at : record.updated_at
+
     # Whether an edit to `record` goes straight to the site: a live page or
     # post, and a content block whose owner page/post is live (a block is
     # published with its owner, so its save line reads "SAVED TO SITE" like
@@ -189,7 +196,7 @@ module Admin
     def legacy_stale_after_save?(record, base_updated_at)
       return false if base_updated_at.blank?
 
-      previous = record.updated_at_before_last_save
+      previous = record.is_a?(Page) ? record.settings_changed_at_before_last_save : record.updated_at_before_last_save
       return false if previous.nil?
 
       Time.iso8601(base_updated_at) < previous
@@ -197,13 +204,13 @@ module Admin
       false
     end
 
-    # The record's `updated_at` as loaded for this request is newer than the
+    # The record's base (`autosave_base`) as loaded for this request is newer than the
     # base the form sent: someone saved it since the form loaded. Blank or
     # unparseable base: not stale (see `#refuse_stale_autosave`).
     def stale_base?(record, base_updated_at)
       return false if base_updated_at.blank?
 
-      Time.iso8601(base_updated_at) < record.updated_at
+      Time.iso8601(base_updated_at) < autosave_base(record)
     rescue ArgumentError
       false
     end

@@ -44,7 +44,9 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     "app/services/trash/purge.rb" => %w[page.purged post.purged media.purged],
     # "#{EVENT.fetch(record class)}.translation_confirmed": page post block media settings
     "app/services/translations/confirm.rb" => %w[page.translation_confirmed post.translation_confirmed block.translation_confirmed
-      media.translation_confirmed settings.translation_confirmed]
+      media.translation_confirmed settings.translation_confirmed],
+    # "#{PREFIX.fetch(subject class)}.taken_over": a block, a page's settings or a post
+    "app/services/editing/take_over.rb" => %w[page.taken_over post.taken_over block.taken_over]
   }.freeze
 
   def scan_recorded_actions
@@ -398,6 +400,29 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     texts = [ sentence.subject_label, *sentence.parts.map(&:text) ]
     assert(texts.none? { |text| text.html_safe? })
     assert_includes texts, "<b>Bold</b>"
+  end
+
+  test "a take-over reads as having taken over editing, of a block on its page, of a page, of a post" do
+    page = create_page(title: "Pricing")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    post = as(@me) { create_post(title: "Hello", published: false) }
+
+    assert_equal "You took over editing a block on “Pricing”", read(sentence_for(event("block.taken_over", subject_type: "ContentBlock", subject_id: block.id, subject_label: "Rich text block ##{block.id}")))
+    assert_equal "You took over editing “Pricing”", read(sentence_for(event("page.taken_over", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
+    assert_equal "You took over editing “Hello”", read(sentence_for(event("post.taken_over", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
+  end
+
+  test "an answered take-over reads as the actor having handed editing over, an unanswered one as having taken it" do
+    page = create_page(title: "Pricing")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    handed = { "from_user_id" => @me.id, "to_user_id" => users(:two).id, "answered" => true }
+    passed = handed.merge("answered" => false)
+
+    assert_equal "You handed over editing a block on “Pricing”", read(sentence_for(event("block.taken_over", subject_type: "ContentBlock", subject_id: block.id, subject_label: "x", metadata: handed)))
+    assert_equal "You took over editing a block on “Pricing”", read(sentence_for(event("block.taken_over", subject_type: "ContentBlock", subject_id: block.id, subject_label: "x", metadata: passed)))
+    assert_equal "You handed over editing “Pricing”", read(sentence_for(event("page.taken_over", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: handed)))
+    assert_equal "You handed over editing “Hello”", read(sentence_for(event("post.taken_over", subject_type: "Post", subject_id: 1, subject_label: "Hello", metadata: handed)))
+    assert_equal "You took over editing “Hello”", read(sentence_for(event("post.taken_over", subject_type: "Post", subject_id: 1, subject_label: "Hello", metadata: passed)))
   end
 
   test "a note's events read as sentences about the record, a block's about its page" do

@@ -4,15 +4,15 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   setup do
-    @page = create_page(title: "Section card")
-    @section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
-    @text = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 0, body: rich_doc("Hello from a column"))
-    @image = @page.content_blocks.create!(block_type: "image", section: @section, section_column: 3, position: 0)
+    @editor_page = create_page(title: "Section card")
+    @section = @editor_page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
+    @text = @editor_page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 0, body: rich_doc("Hello from a column"))
+    @image = @editor_page.content_blocks.create!(block_type: "image", section: @section, section_column: 3, position: 0)
   end
 
   def render_card
-    outline = BlockOutline.new(@page.content_blocks.reload)
-    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @page, section: outline.top_level.first, outline: outline, locale: "en")
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en")
   end
 
   test "it is a card of the block list, framed, with one lane per column and a tile per block" do
@@ -57,9 +57,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   # viewer who can only read; the only markers and "Add note" items in it are
   # its tiles'.
   test "a section's card offers no way to add a note on the section itself, to an editor or to a view-only viewer" do
-    record = @page
     [ users(:one), users(:reader) ].each do |viewer|
-      @page = record # the test helper's own `page` is kept in the same variable after a render
       as(viewer, channel: :admin) { render_card }
 
       assert_no_selector "#notes-marker-ContentBlock-#{@section.id}", visible: :all
@@ -107,15 +105,14 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   test "the header has the block list's drag handle and a collapse button for the body, and a view-only viewer gets no handle" do
-    site_page = @page # `render_inline` takes `@page` for its own Capybara node
     render_card
 
     assert_selector ".admin-section-card > div:first-child .admin-block-card__handle[aria-label='Move section'][aria-describedby='block-drag-help']"
     assert_selector "button[aria-expanded='true'][aria-controls='section-#{@section.id}-body'][data-action$='admin--editor--blocks#toggle']", text: "Section"
     assert_selector ".admin-section-card > #section-#{@section.id}-body[data-block-body]"
 
-    outline = BlockOutline.new(site_page.content_blocks.reload)
-    render_inline Admin::EditorScreen::SectionCardComponent.new(page: site_page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
 
     assert_no_selector ".admin-block-card__handle"
     assert_selector "#block-#{@text.id}-panel fieldset[disabled]", visible: :all
@@ -188,8 +185,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   test "the section's menu is named, its Move items follow the card's place, and Delete opens the section's own dialog" do
-    outline = BlockOutline.new(@page.content_blocks.reload)
-    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @page, section: outline.top_level.first, outline: outline, locale: "en", first: true, last: false)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en", first: true, last: false)
 
     header = ".admin-section-card > div:first-child"
     assert_selector "#{header} button[aria-haspopup='menu'][aria-label='Section actions']", text: "⋯"
@@ -203,12 +200,10 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   test "the delete dialog counts one block in the singular and says nothing of blocks for an empty section" do
-    site_page = @page # `render_inline` takes `@page` for its own Capybara node
     @image.destroy!
     render_card
     assert_selector "#section-#{@section.id}-delete-count", text: "This also deletes the 1 block in it.", exact_text: true, visible: :all
 
-    @page = site_page
     @text.destroy!
     render_card
     assert_selector "p#section-#{@section.id}-delete-count", text: "", exact_text: true, visible: :all
@@ -227,8 +222,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   test "a viewer who can't edit the page gets no form controls, no menu and no handle" do
-    outline = BlockOutline.new(@page.content_blocks.reload)
-    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
 
     assert_no_selector ".admin-block-card__handle"
     assert_no_selector "[aria-label='Section actions']"
@@ -265,15 +260,15 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   test "a viewer who can't edit the page gets a tile with no grip" do
-    outline = BlockOutline.new(@page.content_blocks.reload)
-    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
 
     assert_no_selector ".admin-block-tile__grip", visible: :all
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@image)} > button.admin-block-tile__face"
   end
 
   test "the panels are in reading order, column by column" do
-    late = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
+    late = @editor_page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
     render_card
 
     ids = page.all("#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']", visible: :all).map { |panel| panel["data-block-id"].to_i }
@@ -293,17 +288,17 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   # ::ContentBlocksController#card_for`): a top-level block is drawn as a
   # section when it is a container, or holds blocks although its type is gone.
   test "a block is drawn as a section when it is a container or still holds blocks, and a plain block never" do
-    outline = BlockOutline.new(@page.content_blocks.reload)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
     section = outline.top_level.first
     assert Admin::EditorScreen::SectionCardComponent.draws?(section, outline: outline)
     assert_not Admin::EditorScreen::SectionCardComponent.draws?(@text, outline: outline)
 
     @section.update_columns(block_type: "gone/section")
-    outline = BlockOutline.new(@page.content_blocks.reload)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
     assert Admin::EditorScreen::SectionCardComponent.draws?(outline.top_level.first, outline: outline)
 
     [ @text, @image ].each(&:destroy!)
-    outline = BlockOutline.new(@page.content_blocks.reload)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
     assert_not Admin::EditorScreen::SectionCardComponent.draws?(outline.top_level.first, outline: outline)
   end
 
@@ -375,5 +370,55 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_no_selector "form[data-controller='admin--saving--queue-hold']", visible: :all
     assert_no_selector "dialog", visible: :all
     assert_no_selector ".admin-block-tile__grip", visible: :all
+  end
+
+  # ----- Held (live-editing Task 7) -----
+
+  def render_card_for(viewer, tab)
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    as_viewer(viewer, tab: tab) { render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en") }
+  end
+
+  def controls_of(selector) = form_controls(within: selector)
+
+  test "a section whose own settings are held by someone else: the strip in its slot, the form read-only with the same names and values, no autosave on it" do
+    dana = users(:two)
+    dana.update!(name: "Dana Weiss")
+    render_card_for(users(:one), "tab-aaaaaaaa")
+    editable = controls_of("#section-#{@section.id}-form")
+    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']"
+
+    reserve(@section, @editor_page, dana, "tab-bbbbbbbb")
+    render_card_for(users(:one), "tab-aaaaaaaa")
+
+    assert_selector "#block-#{@section.id}-hold[data-editing-strip-slot] [data-editing-kind=held]", text: "Dana Weiss is editing this block"
+    assert_selector "#section-#{@section.id}-form[data-editing-unit][data-editing-held=true]:not([data-controller])"
+    assert_equal editable, controls_of("#section-#{@section.id}-form")
+    assert_selector "#section-#{@section.id}-form select[disabled]", count: 2
+    assert_selector "[role=menu] button[data-action='admin--editing--hold#takeOver']", text: "Take over", visible: :all
+  end
+
+  test "held by nobody the slot is there and empty, and held by the viewer in this tab it is drawn as ever" do
+    render_card_for(users(:one), "tab-aaaaaaaa")
+    assert_selector "#block-#{@section.id}-hold[data-editing-strip-slot]:empty"
+
+    reserve(@section, @editor_page, users(:one), "tab-aaaaaaaa")
+    render_card_for(users(:one), "tab-aaaaaaaa")
+    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']"
+    assert_no_selector "[data-editing-held]"
+  end
+
+  test "a held block in a section: its panel is read-only with the strip and its tile says held, while the section stays editable" do
+    dana = users(:two)
+    reserve(@text, @editor_page, dana, "tab-bbbbbbbb")
+
+    render_card_for(users(:one), "tab-aaaaaaaa")
+
+    assert_selector "#block-#{@text.id}-panel[hidden][data-editing-held=true] fieldset.admin-held", visible: :all
+    assert_selector "#block-#{@text.id}-panel #block-#{@text.id}-hold [data-editing-kind=held]", visible: :all
+    assert_no_selector "#block-#{@text.id}-panel [data-controller~='admin--saving--autosave']", visible: :all
+    assert_selector "#content_block_#{@text.id}.admin-block-tile[data-editing-held=true]"
+    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']"
+    assert_selector "#block-#{@image.id}-panel form[data-controller~='admin--saving--autosave']", visible: :all
   end
 end

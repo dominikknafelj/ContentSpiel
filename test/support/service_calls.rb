@@ -181,6 +181,16 @@ module ServiceCalls
   end
 
   FACTORIES = {
+    # A request the holder's tab did not answer in time: the call that passes the
+    # block over, which is the one that writes an event. The control is the
+    # requester, a person: a take-over has no meaning for the trusted actor.
+    "Editing::TakeOver" => lambda {
+      page, (block,) = draft_page_with_blocks
+      Editing::Reservation.claim(subject: block, record: page, user: users(:two), tab: "tab-holder-01", now: 20.seconds.ago)
+      Editing::Reservation.request(subject: block, by: users(:one), tab: "tab-asker-001", now: 10.seconds.ago)
+      { call: -> { Editing::TakeOver.call(block, record: page, tab: "tab-asker-001") }, permission: "pages.edit", on: page, control_actor: users(:one) }
+    },
+
     # Allowed, it only suggests: it writes the audit event and nothing else.
     "AI::Translate" => lambda {
       two_locales

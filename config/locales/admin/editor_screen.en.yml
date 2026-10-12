@@ -13,6 +13,7 @@ en:
         block_card:
           close: "Close"
           move_into: "Move into section…"
+          take_over: "Take over"
 
         # The "+" at the end of a section's lane (sections spec §4.2): the
         # name of a button whose label is the glyph.
@@ -93,6 +94,7 @@ en:
           duplicate: "Duplicate"
           remove_keep: "Remove section, keep blocks"
           delete: "Delete section and its blocks…"
+          take_over: "Take over"
           delete_title: "Delete this section?"
           delete_body: "Blocks don’t go to the trash. This can’t be undone."
           delete_confirm: "Delete section"
@@ -146,3 +148,82 @@ en:
         section_group:
           heading: "Section"
           unavailable: "Unavailable type — %{type}"
+        # The tile's avatar of whoever is changing the block (handoff 4): its
+        # tooltip and its text for a screen reader.
+        holder_avatar:
+          held: "%{name} is editing this block"
+          own_tab: "You're editing this in another tab"
+        # The mark a card carries for a few seconds after a colleague's save
+        # arrived (live-editing handoff 10).
+        updated_mark:
+          updated_by: "Updated by %{name}"
+        # Said in the header's notice area when the open record is in the
+        # trash, deleted or no longer the viewer's (`admin--editing--live#gone`).
+        live_region:
+          missing: "This page was moved to the trash or deleted, or you can no longer open it."
+          missing_post: "This post was moved to the trash or deleted, or you can no longer open it."
+          back: "Back to pages"
+          back_post: "Back to posts"
+        # What stands between a card's header and its form while someone else
+        # holds the block, and the notices that take its place (live-editing
+        # handoff 1, 13 to 20, 23). Every sentence the hold script shows later
+        # is rendered here; `settings` is the page settings (handoff 23).
+        hold_strip:
+          take_over: "Take over"
+          # The status beside "Take over" (`admin--editing--hold#takeOver`): asked and waiting,
+          # someone else's request already stands, and a request that did not go through.
+          take_over_waiting: "Asking to take over…"
+          take_over_pending: "Someone else is already taking this over"
+          take_over_failed: "Couldn't take over. Try again."
+          # Somebody else claimed it while this tab was waiting.
+          take_over_claimed: "Someone else is editing this now"
+          own_tab: "You're editing this in another tab"
+          copy: "Copy my text"
+          copied: "Copied"
+          copy_failed: "Couldn't copy. Select the text and copy it yourself."
+          discard: "Discard"
+          remove: "Remove"
+          held:
+            block: "%{name} is editing this block"
+            post: "%{name} is editing this post"
+            settings: "%{name} is editing the page settings"
+          taken:
+            block: "Taken over by %{name} · just now"
+            post: "Taken over by %{name} · just now"
+            settings: "Taken over by %{name} · just now"
+          announce:
+            block: "%{name} took over this block"
+            post: "%{name} took over this post"
+            settings: "%{name} took over the page settings"
+          # The viewer's own other tab holds it: one sentence for all three things.
+          lost_own_tab: "You're editing this in another tab. Your changes weren't saved."
+          lost:
+            block: "%{name} is editing this block. Your changes weren't saved."
+            post: "%{name} is editing this post. Your changes weren't saved."
+            settings: "%{name} is editing the page settings. Your changes weren't saved."
+          lost_unknown:
+            block: "Someone else changed this block. Your changes weren't saved."
+            post: "Someone else changed this post. Your changes weren't saved."
+            settings: "Someone else changed the page settings. Your changes weren't saved."
+          # An instant action (Publish, Schedule, "Still correct") refused while
+          # another tab holds the subject (`Admin::EditingClaims#held_elsewhere?`).
+          refused:
+            block: "%{name} is editing this block. Try again when they have finished."
+            post: "%{name} is editing this post. Try again when they have finished."
+            settings: "%{name} is editing the page settings. Try again when they have finished."
+            own_tab: "You're editing this in another tab. Do it there, or close that tab first."
+            unknown: "Someone else is editing this. Try again when they have finished."
+          # Bulk publish leaves out the posts someone is editing and says how many
+          # (`Admin::BulkResponses#flash_bulk_result`).
+          bulk_skipped:
+            one: "%{count} post being edited by someone was skipped."
+            other: "%{count} posts being edited by someone were skipped."
+          deleted:
+            block: "%{name} deleted this block. Your changes weren't saved."
+          deleted_unknown:
+            block: "This block was deleted. Your changes weren't saved."
+          # The viewer's own other tab deleted it.
+          deleted_own_tab: "You deleted this block in another tab. Your changes weren't saved."
+          # The status beside "Copy my text" when the read of the card to show after
+          # "Discard" failed: the notice stays.
+          discard_failed: "Couldn't load the block. Try again."

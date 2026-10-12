@@ -75,7 +75,9 @@ module ContentBlocks
           metadata = { (@keep_blocks ? "kept_block_ids" : "deleted_block_ids") => inside.map(&:id) }
           @keep_blocks ? lift(inside) : inside.each { |block| block.destroy || raise(ActiveRecord::Rollback) }
         end
-        record_event("block.deleted", subject: @block, metadata: metadata)
+        # `page_id`: the block's row is gone when the audit notification runs after
+        # the commit, and whoever hears it (live refresh) could not find the page.
+        record_event("block.deleted", subject: @block, metadata: (@block.owner_type == "Page" ? metadata.merge("page_id" => @block.owner_id) : metadata))
         @block.destroy || raise(ActiveRecord::Rollback)
         # Same owner bump as `ContentBlocks::Save` (final fix wave, I3).
         @block.owner.touch

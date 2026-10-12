@@ -60,6 +60,41 @@ class Admin::TranslationScreen::TranslateAllComponentTest < ViewComponent::TestC
     end
   end
 
+  test "the count leaves out a held block's fields and the held page settings, and the bulk run is not offered for a held post (live editing)" do
+    with_test_types do
+      page = create_page(title: "About")
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "test/quote" },
+        translations: { "en" => { settings: { "text" => "To be" } } }).record
+      dana = users(:two)
+      holds = lambda do
+        Current.set(session: users(:one).sessions.create!, editing_tab: "tab-aaaaaaaa") { Editing::Holds.on(page, viewer: users(:one), tab: "tab-aaaaaaaa") }
+      end
+      render_inline Admin::TranslationScreen::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
+      assert_selector "button", text: "Suggest translations for 2 empty fields"
+
+      Editing::Reservation.claim(subject: block, record: page, user: dana, tab: "tab-bbbbbbbb", now: Time.current)
+      render_inline Admin::TranslationScreen::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
+      assert_selector "button", text: "Suggest translations for 1 empty field"
+
+      Editing::Reservation.claim(subject: page, record: page, user: dana, tab: "tab-bbbbbbbb", now: Time.current)
+      render_inline Admin::TranslationScreen::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
+      assert_no_selector "button", text: /Suggest translations/
+    end
+  end
+
+  test "a held post offers no bulk translation: the post form hands the header editable false" do
+    post = english_post
+    Editing::Reservation.claim(subject: post, record: post, user: users(:two), tab: "tab-bbbbbbbb", now: Time.current)
+
+    session = users(:one).sessions.create!
+    Current.set(session: session, editing_tab: "tab-aaaaaaaa") do
+      render_inline Admin::EditorScreen::PostFormComponent.new(post: post, locale: "de")
+    end
+
+    assert_no_selector "[data-action*='translateEmpty']"
+    assert_no_selector "button", text: /Suggest translations/
+  end
+
   test "nothing at all when no field is empty" do
     post = create_post(title: "Hello")
     assert Posts::Save.call(post, translations: { "de" => { title: "Hallo" } }).ok?

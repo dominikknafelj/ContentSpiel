@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -135,6 +135,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.index ["section_id", "section_column", "position"], name: "index_content_blocks_on_section_and_column_and_position"
     t.check_constraint "(section_id IS NULL) = (section_column IS NULL)", name: "content_blocks_section_and_column_together"
     t.check_constraint "section_column IS NULL OR section_column >= 1", name: "content_blocks_section_column_from_one"
+  end
+
+  create_table "edit_reservations", force: :cascade do |t|
+    t.string "subject_type", null: false
+    t.bigint "subject_id", null: false
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.bigint "user_id", null: false
+    t.string "tab", null: false
+    t.datetime "changed_at", null: false
+    t.bigint "requested_by_id"
+    t.string "requested_tab"
+    t.datetime "requested_at"
+    t.index ["record_type", "record_id"], name: "index_edit_reservations_on_record"
+    t.index ["subject_type", "subject_id"], name: "index_edit_reservations_on_subject", unique: true
   end
 
   create_table "media_assets", force: :cascade do |t|
@@ -271,6 +286,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.bigint "trash_root_id"
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.datetime "settings_changed_at", null: false
     t.index "((parent_id IS NULL))", name: "index_pages_on_single_root", unique: true, where: "(parent_id IS NULL)"
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"
@@ -428,6 +444,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
   add_foreign_key "api_tokens", "users"
   add_foreign_key "content_blocks", "content_blocks", column: "section_id"
   add_foreign_key "content_blocks", "media_assets"
+  add_foreign_key "edit_reservations", "users", column: "requested_by_id", on_delete: :nullify
+  add_foreign_key "edit_reservations", "users", on_delete: :cascade
   add_foreign_key "media_assets", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "media_usages", "media_assets"
   add_foreign_key "note_deliveries", "note_messages", column: "message_id", on_delete: :cascade

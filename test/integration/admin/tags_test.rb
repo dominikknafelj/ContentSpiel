@@ -316,11 +316,11 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert_equal %w[rails], post_record.reload.tags.map(&:name)
   end
 
-  test "after a merge an open page form and an open block card are refused as stale" do
+  test "after a merge an open block card is refused as stale, and the page settings form, which the merge did not change, still saves" do
     page = create_page(title: "Rails posts")
     block = ContentBlocks::Save.call(page.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "ruby" } }).record
     create_post(title: "Hi", tags: [ "ruby" ])
-    page_base = page.reload.updated_at.iso8601(6)
+    page_base = page.reload.settings_changed_at.iso8601(6)
     block_base = block.reload.updated_at.iso8601(6)
     travel 2.seconds
     Tag.create!(name: "rails")
@@ -329,8 +329,8 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert_equal "rails", block.reload.settings["tag"]
 
     patch "/cs-studio/pages/#{page.id}", params: { base_updated_at: page_base, page: { title: "Renamed" } }, as: :turbo_stream
-    assert_response :conflict
-    assert_not_equal "Renamed", page.reload.title
+    assert_response :success
+    assert_equal "Renamed", page.reload.title
 
     patch "/cs-studio/pages/#{page.id}/content_blocks/#{block.id}", params: { base_updated_at: block_base, block: { settings: { tag: "ruby" } } }, as: :turbo_stream
     assert_response :conflict

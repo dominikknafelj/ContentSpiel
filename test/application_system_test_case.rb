@@ -332,8 +332,16 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # only changes more than `Audit::ChangeSince::SLACK` past the base a
   # form loaded; a record backdated before the form loads puts the next change
   # on the far side of it without waiting a second for it.
+  #
+  # A page's settings form holds `settings_changed_at` as its base
+  # (`Admin::AutosaveResponses#autosave_base`), not `updated_at`, and that base
+  # is what the SLACK window above is measured from: a page is backdated in both
+  # columns, or a settings change made at once after the form loads falls inside
+  # the window and the notice cannot name who made it.
   def backdate(record, by: 5.seconds)
-    record.update_columns(updated_at: record.updated_at - by)
+    columns = { updated_at: record.updated_at - by }
+    columns[:settings_changed_at] = record.settings_changed_at - by if record.is_a?(Page)
+    record.update_columns(**columns) # version: none (a test's own clock bookkeeping)
   end
 
   # Waits until the page's notes are live (notes spec §6): `admin--notes--live`
@@ -351,19 +359,51 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     await_js("document.body.dataset.notesLive === 'connected'", wait: wait)
   end
 
+  # `as` for a colleague whose save the open editor is NOT told of: the
+  # signal that makes an editor fetch what someone else saved
+  # (`Editing::Signals` -> `Live::Signals.later`) is dropped. For the tests of
+  # the stale machinery itself (a 409, "Changed elsewhere"): a save the editor
+  # heard of would be drawn into it (`admin--editing--live`) and its next save
+  # would no longer be stale. The server's own refusal is what they test, for
+  # a client that was offline, or a script that sends no signal-worthy tab.
+  #
+  # It replaces `Live::Signals.later` for the WHOLE PROCESS while the block
+  # runs, and the system test's server is this process: a notes or presence
+  # signal a browser request causes in that window is dropped too. Keep the
+  # block to the colleague's one service call (it is put back in an `ensure`).
+  def as_unheard(actor, channel: :admin, &block)
+    with_singleton_override(Live::Signals, :later, proc { |*| }) { as(actor, channel: channel, &block) }
+  end
+
   # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered
   # by the `admin` entry point (app/javascript/admin.js) through one dynamic
   # `import()` each, so they connect a moment *after* the page has loaded,
   # even though they're modulepreloaded. A test that types right after
   # `visit` can race them -- before `admin--saving--autosave` is connected its
   # `input` events go nowhere. So this waits until every `admin--*`
-  # controller named on the page is connected.
+  # controller named on the page is connected, and (on an editor) its live
+  # part has answered (`await_live_part`).
   #
   # Cuprite needs no further wait before typing: its key events go to the
   # page through CDP rather than through a WebDriver input queue, so there
   # is no separate "accepting native input" state to wait for (Selenium
   # needed an `await_native_input` handshake here, which is what flaked).
   def await_admin_controllers
+    await_controllers_connected
+    await_live_part
+  end
+
+  # An open editor catches up once when its subscription is confirmed
+  # (`admin--editing--live`): two reads, drawing only what differs, but the
+  # merge still reconciles the elements around what it keeps (attributes a
+  # test or a person has put on them). A test that touched the page before
+  # that would see it changed under it, so the wait is here, on its own, with
+  # its own message. A page with no editor has nothing to wait for.
+  def await_live_part(wait: 8)
+    await_js("(() => { const region = document.getElementById('editing'); return !region || !region.hasAttribute('data-live-part') || region.dataset.livePart === 'answered' })()", wait: wait)
+  end
+
+  def await_controllers_connected
     page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
       const ready = () => {

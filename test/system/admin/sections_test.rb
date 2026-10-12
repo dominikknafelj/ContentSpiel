@@ -32,6 +32,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.fetch = (url, options = {}) => {
         const method = (options.method || "GET").toUpperCase()
         if (method === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim or a release is not one of the saves this test holds
         window.__writes.push(String(url.url || url))
         if (window.__writes.length > 1) return originalFetch(url, options)
         return new Promise((resolve) => { window.__releaseSave = () => resolve(originalFetch(url, options)) })
@@ -45,7 +46,8 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       const originalFetch = window.fetch
       window.__writes = []
       window.fetch = (url, options = {}) => {
-        if ((options.method || "GET").toUpperCase() !== "GET") window.__writes.push(String(url.url || url))
+        // a claim or a release (`/cs-studio/editing/`) is not one of the writes this counts
+        if ((options.method || "GET").toUpperCase() !== "GET" && !String(url.url || url).includes("/cs-studio/editing/")) window.__writes.push(String(url.url || url))
         return originalFetch(url, options)
       }
     JS
@@ -120,7 +122,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     find(face(@left)).click
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "The other editor's caption" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "The other editor's caption" } }) }
     end
     fill_in id: caption(@left), with: "Mine, refused"
     page.execute_script("document.activeElement.blur()")
@@ -355,7 +357,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 4
     find(face(@left)).click
-    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
+    as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
     assert_equal 2, far.reload.section_column
 
     find("#block-picker-#{@section.id}-4 button[aria-haspopup=menu]").click
@@ -456,7 +458,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   test "a layout chosen in a tab that is behind is refused as changed elsewhere, and nothing is folded" do
     open_editor
     backdate(@section, by: 1.minute)
-    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "background" => "tinted" } }).ok? }
+    as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "background" => "tinted" } }).ok? }
 
     find(layout_button).click
     find("button[data-admin--editor--section-layout-param='one']").click
@@ -538,6 +540,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.__writes = 0
       window.fetch = (url, options = {}) => {
         if ((options.method || "GET").toUpperCase() === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the layout's save
         window.__writes += 1
         if (window.__writes > 1) return originalFetch(url, options)
         return Promise.resolve(new Response("", { status: 422, headers: { "Content-Type": "text/vnd.turbo-stream.html" } }))
@@ -600,7 +603,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     find(face(@left)).click
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
     end
     fill_in id: caption(@left), with: "Mine, refused"
     page.execute_script("document.activeElement.blur()")
@@ -729,7 +732,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     find(face(far)).click
     assert_selector panel(far), text: "Image · column 4"
     page.execute_script("document.getElementById(#{"block-#{far.id}-panel".to_json}).dataset.mark = 'kept'")
-    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
+    as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
 
     find("#block-picker-#{@section.id}-4 button[aria-haspopup=menu]").click
     within("#block-picker-#{@section.id}-4") { press "Image" }
@@ -803,6 +806,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.__release = []
       window.fetch = (url, options = {}) => {
         if ((options.method || "GET").toUpperCase() === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim or a release is not one of the writes the plan scripts
         const number = window.__writes.push(String(url.url || url)) - 1
         if (plan[number] === "fail") return Promise.resolve(failure())
         if (plan[number] !== "hold") return originalFetch(url, options)
@@ -1013,7 +1017,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     find(face(@left)).click
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
     end
     fill_in id: caption(@left), with: "Mine, refused"
     page.execute_script("document.activeElement.blur()")
@@ -1049,6 +1053,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
       window.__writes = []
       window.fetch = (url, options = {}) => {
         if ((options.method || "GET").toUpperCase() === "GET") return originalFetch(url, options)
+        if (String(url.url || url).includes("/cs-studio/editing/")) return originalFetch(url, options) // a claim is not the save this test fails
         window.__writes.push(String(url.url || url))
         return /reorder/.test(String(url.url || url)) ? originalFetch(url, options) : Promise.reject(new TypeError("Failed to fetch"))
       }
@@ -1064,6 +1069,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_field caption(@left), with: "Typed while offline"
     assert_equal @section.id, @left.reload.section_id
     assert_empty page.evaluate_script("window.__writes").grep(/reorder/), "the move was sent"
+    assert_equal [ "/cs-studio/pages/#{@page.id}/content_blocks/#{@left.id}" ], page.evaluate_script("window.__writes").map { |url| URI.parse(url).path }.uniq, "only the block's own save was failed"
   end
 
   # Review Focus 4, for a card: its form is in the card, and it is the same rule.
@@ -1087,7 +1093,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   test "a drop into a column another tab has folded away is refused and the list is redrawn" do
     card = @page.content_blocks.create!(block_type: "image", position: 1)
     open_editor
-    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "one" } }).ok? }
+    as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "one" } }).ok? }
     # An edit in another block's form, still inside its debounce: the list
     # that the refusal brings replaces that form.
     page.execute_script(<<~JS)
@@ -1126,7 +1132,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     find(face(@right)).click
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@right, translations: { "en" => { caption: "Theirs" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(@right, translations: { "en" => { caption: "Theirs" } }) }
     end
     fill_in id: caption(@right), with: "Mine, refused"
     page.execute_script("document.activeElement.blur()")
@@ -1251,7 +1257,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   # would send is an order nobody is looking at.
   test "a move queued behind a refused one is not sent once the list has been redrawn" do
     open_editor
-    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "one" } }).ok? }
+    as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "one" } }).ok? }
     count_writes
 
     page.execute_script(<<~JS)
@@ -1849,7 +1855,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   # tile takes it.
   test "a menu move into a column that is gone redraws the list and puts the focus on the block's new tile" do
     open_editor
-    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "one" } }).ok? }
+    as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "one" } }).ok? }
 
     pick_by_keyboard(tile(@left), "Move to column…")
     assert_focus_on "#move-block-destination", "the dialog's select"
@@ -1870,7 +1876,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     find(face(@left)).click
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "The other editor's caption" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "The other editor's caption" } }) }
     end
     fill_in id: caption(@left), with: "Mine, refused"
     page.execute_script("document.activeElement.blur()")
@@ -2231,7 +2237,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
     find(face(@left)).click
     travel 1.minute do
-      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
+      as_unheard(users(:two)) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
     end
     fill_in id: caption(@left), with: "Mine, refused"
     page.execute_script("document.activeElement.blur()")

@@ -1,0 +1,5 @@
+<%= tag.span class: "#{Admin::Ui::TooltipComponent::HOST} inline-flex flex-none items-center", data: { holder_avatar: "", **Admin::Ui::TooltipComponent.host_data } do %>
+  <%= render Admin::Ui::AvatarComponent.new(initials: ::PersonName.initials(name), size: :sm, tone: own? ? :own : :other) %>
+  <%= tag.span words, class: "sr-only" %>
+  <%= render Admin::Ui::TooltipComponent.new(text: words) %>
+<% end %>

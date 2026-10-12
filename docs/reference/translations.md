@@ -15,7 +15,7 @@ Spec `docs/superpowers/specs/2026-10-02-translation-helpers-design.md` (read its
 Every read is literal per locale, never through a fallback. The original's digest is memoised per record and field (and a schema reader's per-locale FieldSet per locale), checked against the stored value it came from and dropped on save, reload and confirm, so a status read digests each original once, not once per target language. `translation_sources` and `translation_original_changed_at` are bookkeeping: they're kept out of audit `field_changes` (`Audit::Snapshot::IGNORED_CHANGES`) but stay in the snapshot.
 
 **Status.** `Translations::Status.for(records, locales:)` (`app/models/translations/status.rb`) rolls fields up to one state per record and locale, in this order of precedence:
-- `:missing`: a required translated field is blank. That's the title, a required schema field, an image's alt when its original has one, or the site title;
+- `:missing`: a **required** translated field is blank. That's the title, a required schema field, an image's alt when its original has one, or the site title. An optional field left blank in a language (a subtitle, an excerpt, a caption, a body) is a choice, not a gap: it does not make the record missing there, marks no language tab, adds nothing to a "○N" count and is not on the Translations screen;
 - `:outdated`: any tracked field is outdated;
 - `:complete`: neither. `:unknown` counts as complete.
 

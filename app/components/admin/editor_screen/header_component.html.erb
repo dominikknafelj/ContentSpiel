@@ -134,8 +134,17 @@
 
   <%# Always present, empty: a 409 autosave answer puts the "Changed
       elsewhere" bar here (`Admin::AutosaveResponses#stale_streams`). Nothing
-      but the tag inside it, so `:empty` holds until a stream fills it. %>
-  <div id="editor-notice"></div>
+      but the tag inside it, so `:empty` holds until a stream fills it.
+      The post's hold strip (`hold_strip`) shares this element with that bar:
+      the live merge never replaces an area showing an alert, so a post that
+      becomes held while the bar is up is read-only without the strip until
+      the bar goes, and a 409 stream replacing the area erases the strip (a
+      held form sends no save, so only the first order is real). The test is
+      `test/system/admin/editing_holds_test.rb`, "a post whose form is stale
+      keeps the Changed elsewhere bar when a hold's notice arrives". %>
+  <div id="editor-notice"><%= render @hold_strip if @hold_strip %></div>
+  <%# A post's change of holder is said here (handoff 19), beside the area, outside what a merge replaces. %>
+  <span class="sr-only" aria-live="polite" data-editing-announcer></span>
 <% end %>
 
 <%# Dialogs: siblings of the header (see the class comment). %>

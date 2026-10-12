@@ -73,4 +73,16 @@ class Audit::ChangeSinceTest < ActiveSupport::TestCase
 
     assert_nil Audit::ChangeSince.for(page, since: base, viewer: users(:one))
   end
+
+  test "a block saved after a page's settings change is not named as the cause of a refused settings save" do
+    page = create_page(title: "Pricing")
+    base = page.reload.settings_changed_at
+    travel_to(base + 1.minute) { as(users(:two), channel: :admin) { assert Pages::Save.call(page, translations: { "en" => { subtitle: "B's" } }).ok? } }
+    travel_to(base + 5.minutes) { as(users(:one), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).ok? } }
+
+    result = Audit::ChangeSince.for(page, since: base, viewer: users(:reader))
+
+    assert_equal users(:two).id, result.event.user_id
+    assert_not result.own
+  end
 end

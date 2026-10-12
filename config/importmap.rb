@@ -39,6 +39,11 @@ pin_all_from "app/javascript/live", under: "live", preload: "admin"
 # replaced, what is typed is never touched"); and `notes/json`, the one fetch
 # of JSON the live and inbox controllers share.
 pin_all_from "app/javascript/notes", under: "notes", preload: "admin"
+# Live editing's plain modules, imported by its controllers: `editing/merge`,
+# the one place that says what an open editor does with what it fetched ("a
+# form that holds unsaved changes is never replaced, and neither is anything
+# else of its unit; everything else is replaced"). Admin only, like the rest.
+pin_all_from "app/javascript/editing", under: "editing", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"

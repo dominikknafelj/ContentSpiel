@@ -559,4 +559,25 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_text(/Was ich gelernt habe/i)
     assert_no_text(/Things I learned/i)
   end
+
+  test "Suggest translations and Use all leave a block someone else holds alone: it is not counted, asked for or filled" do
+    with_test_types do
+      page_record = create_page(title: "About")
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "test/quote" },
+        translations: { "en" => { settings: { "text" => "To be" } } }).record
+      Editing::Reservation.claim(subject: block, record: page_record, user: users(:two), tab: "tab-bbbbbbbb", now: Time.current)
+
+      visit "/cs-studio/pages/#{page_record.id}?locale=de"
+      await_admin_controllers
+
+      press "Suggest translations for 1 empty field"
+      assert_suggestion "translation-suggestion-page-title", "[de] About"
+      assert_no_selector "#translation-suggestion-block-#{block.id}-text", visible: :all
+      press "Use all"
+
+      assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+      assert_equal "", find("#block-#{block.id}-text", visible: :all).value
+      assert_nil block.reload.translated_settings.dig("de", "text")
+    end
+  end
 end

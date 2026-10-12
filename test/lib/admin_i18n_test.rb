@@ -78,6 +78,16 @@ class AdminI18nTest < ActiveSupport::TestCase
   CONVERTED = %w[
     app/views/layouts/admin.html.erb
     app/components/admin/ui/button_component.rb
+    app/components/admin/editor_screen/hold_strip_component.rb
+    app/components/admin/editor_screen/hold_strip_component.html.erb
+    app/components/admin/editor_screen/live_region_component.rb
+    app/components/admin/editor_screen/live_region_component.html.erb
+    app/components/admin/editor_screen/holder_avatar_component.rb
+    app/components/admin/editor_screen/holder_avatar_component.html.erb
+    app/components/admin/editor_screen/updated_mark_component.rb
+    app/components/admin/editor_screen/updated_mark_component.html.erb
+    app/components/admin/editor_screen/held_fields.rb
+    app/components/admin/editor_screen/held_unit.rb
     app/components/admin/ui/button_component.html.erb
     app/components/admin/ui/dialog_component.rb
     app/components/admin/ui/dialog_component.html.erb

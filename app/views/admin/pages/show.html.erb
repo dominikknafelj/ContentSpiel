@@ -30,17 +30,25 @@
     is handed the same counts rather than reading them again. %>
 <% note_counts = Notes::Counts.for_container(@page, user: Current.user) %>
 
+<%# One read of the page's reservations for the whole screen (`Editing::Holds`): the header's
+    bulk translate, every card, tile and form below ask this object, so the editor costs the
+    same statements for 3 blocks as for 30. %>
+<% holds = Editing::Holds.on(@page, viewer: Current.user, tab: Current.editing_tab) %>
+
 <%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options, slot_context: { counts: note_counts }) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4): only
         in a non-default language, for a viewer who may edit the page, with AI
         set up and `ai.translate`. It asks for the page's own fields and its
         blocks' alike -- whatever has a Translate button below. %>
-    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: @page, locale: admin_locale, editable: can_edit?(@page)) %>
+    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: @page, locale: admin_locale, editable: can_edit?(@page), holds: holds) %>
   <% end %>
 <% end %>
 
-<%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+<%# The element the live editing scripts stand on (`Admin::EditorScreen::LiveRegionComponent`):
+    the settings and the blocks, not the header or the notes drawer. %>
+<%= render Admin::EditorScreen::LiveRegionComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options) do %>
+<%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, holds: holds) %>
 
 <%# The one slot a block action with nothing left to replace on the page
     (a stale PATCH/DELETE against an already-deleted block, spec §5.1's 410;
@@ -87,9 +95,9 @@
     <% blocks = outline.top_level %>
     <% blocks.each_with_index do |block, index| %>
       <% if Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline) %>
-        <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+        <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable, holds: holds) %>
       <% else %>
-        <%= render Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+        <%= render Admin::EditorScreen::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable, holds: holds) %>
       <% end %>
     <% end %>
   </div>
@@ -101,6 +109,7 @@
     <%= render Admin::EditorScreen::MoveDialogComponent.new %>
   <% end %>
 </section>
+<% end %>
 
 <%# The notes drawer (notes spec §4.1): once per screen, after everything
     else and outside every form. `?notes=open` (a link from the inbox, the

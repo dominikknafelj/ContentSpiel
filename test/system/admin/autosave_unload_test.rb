@@ -24,10 +24,15 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     # Each write is held for a moment, so "typed but not yet saved" is a
     # state the test can stand in: inside the debounce first, then on the
     # wire -- both are text only this page has.
+    # Only the page's own save is held; every other request (the editor's
+    # live parts, the claim that goes ahead of the save) takes the real fetch.
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
+      window.__saves = []
       window.fetch = async (url, options = {}) => {
-        if ((options.method || "GET").toUpperCase() !== "GET") await new Promise((resolve) => setTimeout(resolve, 1500))
+        const path = new URL(String(url.url || url), location.href).pathname
+        const save = (options.method || "GET").toUpperCase() === "PATCH" && path === #{"/cs-studio/pages/#{@page.id}".to_json}
+        if (save) { window.__saves.push(path); await new Promise((resolve) => setTimeout(resolve, 1500)) }
         return originalFetch(url, options)
       }
     JS
@@ -40,6 +45,7 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 10
     assert_equal "Typed, not sent yet", @page.reload.subtitle
     assert_not asks_before_unload?, "a saved editor still asked before unloading"
+    assert_equal [ "/cs-studio/pages/#{@page.id}" ], page.evaluate_script("window.__saves"), "the one save this test held"
   end
 
   test "an editor paused by Changed elsewhere asks: its text exists only in the page" do
@@ -47,7 +53,7 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     backdate(@page, by: 5.seconds)
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
+    as_unheard(users(:two)) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
     fill_in "Subtitle", with: "My text"
     assert_selector "#page-save-status", text: "● CHANGED ELSEWHERE", wait: 5
@@ -68,11 +74,19 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
       const controller = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector("form[data-controller~='admin--saving--autosave']"), "admin--saving--autosave")
       controller.constructor.retryDelays = [ 10, 10, 10 ]
       const originalFetch = window.fetch
-      window.fetch = (url, options = {}) => ((options.method || "GET").toUpperCase() === "GET" ? originalFetch(url, options) : Promise.reject(new TypeError("Failed to fetch")))
+      // Only the page's own save fails; the claim ahead of it, and every read, take the real fetch.
+      window.__failed = 0
+      window.fetch = (url, options = {}) => {
+        const save = (options.method || "GET").toUpperCase() === "PATCH" && new URL(String(url.url || url), location.href).pathname === #{"/cs-studio/pages/#{@page.id}".to_json}
+        if (!save) return originalFetch(url, options)
+        window.__failed += 1
+        return Promise.reject(new TypeError("Failed to fetch"))
+      }
     JS
     fill_in "Subtitle", with: "Never arrives"
     assert_selector "#page-save-status button", text: "Retry", wait: 10
     assert asks_before_unload?, "an unsaved edit after a failed save was not guarded"
+    assert_equal 4, page.evaluate_script("window.__failed"), "the save and its three retries"
 
     # The Trash screen has no autosave form at all: the guard is not even
     # listening there (it is removed with the last form). Reached by a Turbo

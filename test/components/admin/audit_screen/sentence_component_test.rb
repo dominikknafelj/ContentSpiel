@@ -83,4 +83,12 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
       assert_text "You published “Hello”"
     end
   end
+
+  test "an answered take-over reads handed over, an unanswered one took over, and neither names a second person" do
+    render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("page.taken_over", metadata: { "from_user_id" => 1, "to_user_id" => 2, "answered" => true }))
+    assert_text "You handed over editing “Hello”"
+
+    render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("page.taken_over", metadata: { "from_user_id" => 1, "to_user_id" => 2, "answered" => false }))
+    assert_text "You took over editing “Hello”"
+  end
 end

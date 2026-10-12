@@ -7,7 +7,7 @@ class Admin::NotesScreen::MarkerComponentTest < ViewComponent::TestCase
     page = create_page(title: "Pricing")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
 
-    render_inline(Admin::NotesScreen::MarkerComponent.new(subject: block, name: "Rich text"))
+    render_inline(Admin::NotesScreen::MarkerComponent.new(record: block, label: "Rich text"))
 
     assert_selector "button#notes-marker-ContentBlock-#{block.id}[type=button][data-admin--notes--drawer-target=marker][data-notes-key='ContentBlock-#{block.id}'][aria-label='Add a note on Rich text']"
     assert_selector "button[data-notes-name='Rich text']:not([aria-controls])[data-action='mousedown->admin--notes--drawer#hold admin--notes--drawer#open']"

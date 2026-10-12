@@ -21,6 +21,13 @@ module SqlNodes
   # `column ->> 'key'`: one key of a jsonb column as text (NULL when absent).
   def json_text(column, key) = Arel::Nodes::InfixOperation.new("->>", column, quoted(key.to_s))
 
+  # `(column -> 'key') @> '[value]'::jsonb`: whether the jsonb ARRAY at one key
+  # of a column holds `value` (NULL, so false, when the key is absent).
+  def json_array_contains(column, key, value)
+    Arel::Nodes::Grouping.new(Arel::Nodes::InfixOperation.new("->", column, quoted(key.to_s)))
+      .then { |array| Arel::Nodes::InfixOperation.new("@>", array, cast([ value ].to_json, "jsonb")) }
+  end
+
   # `COALESCE(a, b)`: the first that is not NULL.
   def coalesce(*values) = function("COALESCE", *values)
 

@@ -20,7 +20,10 @@
   <%# The header wraps: on a narrow card the three controls go under the name. The name
       and the count keep a width of their own, so it is the controls that move and not
       the count that is squeezed away. %>
-  <div class="flex flex-wrap items-center gap-2 p-3">
+  <%# It has an id, as every ancestor of a unit up to the block list does: `editing/merge`
+      reconciles the card in place around the settings form below when that form holds
+      unsaved changes, and finds the header again by it. %>
+  <div id="<%= header_id %>" class="flex flex-wrap items-center gap-2 p-3">
     <div class="flex min-w-48 flex-1 items-center gap-2">
       <% if editable? %>
         <%# The block card's own handle, class and actions: `admin--editor--blocks` drags and
@@ -43,8 +46,9 @@
 
     <%# The section's own settings (see the component): an autosave form like a block
         card's, with the same ids. No form may be nested in it. %>
-    <%= form_with url: form_url, method: :patch, id: form_id, class: "flex flex-wrap items-center gap-2", data: form_data do %>
-      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
+    <%= form_with url: form_url, method: :patch, id: form_id, class: "flex flex-wrap items-center gap-2", data: form_data.merge(editing_unit: "", editing_subject: ::Editing.key(section), editing_version: editing_version, **held_marks) do %>
+      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
+      <%= fields do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
         <%# What the layout menu writes into. Beside the menu, not in it: the menu is
             replaced after a save, and this input is the form's own. %>
@@ -64,10 +68,12 @@
           <% end %>
         </div>
       <% end %>
+      <% end %>
     <% end %>
 
     <% if editable? %>
       <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+        <% menu.with_item { take_over_item } if read_only_hold? %>
         <% menu.with_item do %>
           <%= tag.button t(".move_up"), type: "button", disabled: first?, class: menu_item_class,
                 data: { move: "up", action: "click->admin--editor--blocks#moveUp" } %>
@@ -91,6 +97,10 @@
       <% end %>
     <% end %>
   </div>
+  <%# Between the header and the body, as a block card's: always there, empty unless the
+      section's own settings are held. %>
+  <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
+  <span class="sr-only" aria-live="polite" data-editing-announcer></span>
   <% end %>
 
   <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 px-3 pb-3">

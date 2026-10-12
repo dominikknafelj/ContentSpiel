@@ -52,7 +52,8 @@ export default class extends Controller {
     linkTargetsUrl: String,
     locale: String,
     assets: Object,
-    linkTitles: Object
+    linkTitles: Object,
+    readOnly: Boolean
   }
 
   static texts = {
@@ -72,8 +73,10 @@ export default class extends Controller {
     // control -- the toolbar buttons and the hidden input included -- but
     // not a contenteditable, so the editor itself is mounted read-only to
     // match. Nothing is ever written back, and there's no autosave on the
-    // form to send it anyway.
-    this.readOnly = this.element.closest("fieldset[disabled]") !== null
+    // form to send it anyway. A field someone else holds is read-only
+    // without a disabled fieldset (its fields are `readonly`, not
+    // disabled): the column says so with `readOnly`.
+    this.readOnly = this.readOnlyValue || this.element.closest("fieldset[disabled]") !== null
     // A popover left behind in a Turbo cache snapshot (the page was cached
     // with one open) is dead DOM -- its listeners belonged to the previous
     // connection. Same "start from a clean slate" rule as the mount point.
@@ -128,6 +131,32 @@ export default class extends Controller {
     this.editor?.destroy()
     this.editor = null
     this.editorTarget.replaceChildren()
+  }
+
+  // A form that turned read-only in place (`editing/freeze`, through `admin--editing--hold`): the document
+  // stays as typed, for copying, and nothing more is written into it.
+  lock() {
+    // Whether THIS call is what made it read-only (`unlock` undoes only that):
+    // an editor that was already read-only -- invalid content, a held form, a
+    // lock before this one -- is never made editable by it.
+    this.lockedHere = Boolean(this.editable())
+    this.readOnly = true
+    // Without an `update` event (the second argument): turning a field read-only
+    // or editable is no edit, and an update would be written to the hidden input
+    // and sent as a change.
+    this.editor?.setEditable(false, false)
+    this.element.querySelector("[role=toolbar]")?.setAttribute("hidden", "")
+  }
+
+  // The way back for a LIGHT lock (`admin--editing--hold`, a hand-over that
+  // did not happen): exactly what `lock` took, nothing for an editor it did
+  // not lock.
+  unlock() {
+    if (!this.lockedHere) return
+    this.lockedHere = false
+    this.readOnly = false
+    this.editor?.setEditable(true, false)
+    this.element.querySelector("[role=toolbar]")?.removeAttribute("hidden")
   }
 
   // The hidden input's JSON, or nothing for an empty/absent document (an

@@ -146,8 +146,12 @@ export default class extends Controller {
 
   get nothingFocused() { return !document.activeElement || document.activeElement === document.body }
 
-  // The block whose form is showing, or undefined.
-  get openId() { return this.panelTargets.find((panel) => !panel.hidden)?.dataset.blockId }
+  // The block whose form is showing, or undefined. A panel marked
+  // `data-editing-gone` is not "the open one": `editing/merge` shows it because
+  // its block went (deleted, or moved out) and its tile with it, and it holds
+  // text nothing else leads to. Opening a tile does not close it, and only its
+  // own Close button and Escape inside it do (`hide`).
+  get openId() { return this.panelTargets.find((panel) => !panel.hidden && !panel.hasAttribute("data-editing-gone"))?.dataset.blockId }
 
   toggle(event) {
     const id = event.currentTarget.closest("[data-block-id]").dataset.blockId
@@ -169,14 +173,27 @@ export default class extends Controller {
   // field or button that had it is about to be hidden, and focus would fall
   // to <body>, the top of the page for a keyboard user. Not when another
   // tile is being opened -- that tile was just pressed and has the focus.
-  close({ refocus = true } = {}) {
+  close({ refocus = true, currentTarget } = {}) {
+    // The Close button of a panel that has no tile closes that panel.
+    const orphan = currentTarget?.closest?.("[data-editing-gone]")
+    if (orphan) return this.hide(orphan, { refocus: false })
+
     const id = this.openId
     if (!id) return
 
-    const panel = this.panelFor(id)
+    this.hide(this.panelFor(id), { refocus })
+  }
+
+  hide(panel, { refocus }) {
     this.sendNow(panel)
+    // The block's form is closed: whoever holds it for this tab lets it go
+    // (`admin--editing--hold`), once the save `sendNow` has just started (and
+    // any follow-up it has) is over.
+    // Every way a panel closes comes through here (Close, a second press on
+    // the tile, Escape, another tile opened).
+    this.dispatch("closed", { detail: { blockId: panel.dataset.blockId } })
     panel.hidden = true
-    const face = this.faceFor(id)
+    const face = this.faceFor(panel.dataset.blockId)
     face?.setAttribute("aria-expanded", "false")
     if (refocus) face?.focus()
   }
@@ -193,15 +210,17 @@ export default class extends Controller {
   // while it comes from inside a menu, a list or an open dialog, or while a
   // suggestion list of the open form is showing.
   escape(event) {
-    const id = this.openId
-    if (!id || event.defaultPrevented) return
     const target = event.target
+    const orphan = target.closest?.("[data-editing-gone]")
+    const id = orphan ? orphan.dataset.blockId : this.openId
+    if (!id || event.defaultPrevented) return
     if (target.closest("[role=menu], [role=listbox], dialog[open]")) return
     if (target.closest("[data-controller~='admin--ui--menu']")?.querySelector("[aria-expanded=true]")) return
     if (this.panelFor(id)?.querySelector("[role=listbox]:not([hidden])")) return
 
     event.preventDefault()
-    this.close()
+    if (orphan) this.hide(orphan, { refocus: false })
+    else this.close()
   }
 
   sendNow(panel) {

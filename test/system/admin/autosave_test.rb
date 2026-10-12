@@ -158,8 +158,15 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
 
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
-      // Only the save fails; the editor's live parts (presence, notes) read with GET and take the real fetch.
-      window.fetch = (url, options = {}) => (options.method || "GET").toUpperCase() === "GET" ? originalFetch(url, options) : Promise.resolve(new Response("Internal Server Error", { status: 500, headers: { "Content-Type": "text/plain" } }))
+      // Only the page's own save fails; the editor's live parts (presence, notes) read with GET, and the
+      // claim that goes ahead of the save is a POST: both take the real fetch.
+      window.__failed = 0
+      window.fetch = (url, options = {}) => {
+        const save = (options.method || "GET").toUpperCase() === "PATCH" && new URL(String(url.url || url), location.href).pathname === #{"/cs-studio/pages/#{@page.id}".to_json}
+        if (!save) return originalFetch(url, options)
+        window.__failed += 1
+        return Promise.resolve(new Response("Internal Server Error", { status: 500, headers: { "Content-Type": "text/plain" } }))
+      }
     JS
 
     title_field = find_field("Title")
@@ -167,6 +174,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     title_field.send_keys(:tab)
 
     assert_selector "#page-save-status", text: "NOT SAVED · Retry", wait: 20
+    assert_equal 4, page.evaluate_script("window.__failed"), "the save and its three retries"
   end
 
   private

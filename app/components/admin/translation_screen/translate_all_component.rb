@@ -42,8 +42,9 @@ module Admin
     class TranslateAllComponent < Admin::AdminComponent
       def self.label(count) = "Suggest translations for #{count} empty #{"field".pluralize(count)}"
 
-      def initialize(record:, locale:, editable:)
+      def initialize(record:, locale:, editable:, holds: nil)
         @record = record
+        @holds = holds
         @locale = locale.to_s
         @editable = editable
       end
@@ -52,7 +53,7 @@ module Admin
 
       # Memoised: `render?` and the template both read it.
       def count
-        @count ||= owners.sum { |owner| empty_fields(owner) }
+        @count ||= owners.sum { |owner| held?(owner) ? 0 : empty_fields(owner) }
       end
 
       def label = self.class.label(count)
@@ -72,6 +73,13 @@ module Admin
       attr_reader :record, :locale, :editable
 
       # The record and, for a page, its blocks (each tracks its own fields).
+      # A page's settings or a block that someone else holds (live editing,
+      # `Editing::Holds`) is read-only: its fields are neither counted nor
+      # filled by the bulk run (the script skips them on screen the same way).
+      # A WHOLE record held (a post) is not offered at all: the post form
+      # hands `editable: false`.
+      def held?(owner) = @holds&.other(owner).present?
+
       def owners = [ record, *(record.content_blocks if record.respond_to?(:content_blocks)) ]
 
       def empty_fields(owner)

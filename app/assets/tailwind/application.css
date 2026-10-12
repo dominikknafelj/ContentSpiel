@@ -28,5 +28,7 @@
 /* The notes' merge builds the "NEW" divider, "1 new message" and the line
    that says a thread was deleted (`notes/merge.js`). */
 @source "../../javascript/notes";
+/* The editing merge puts a collapsed card's `hidden` back (`editing/merge.js`). */
+@source "../../javascript/editing";
 @import "./content-spiel.tailwind.css";
 @import "./admin-rich-text.css";

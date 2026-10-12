@@ -213,7 +213,7 @@ document.addEventListener("turbo:before-frame-render", (event) => {
 //    the outcome, after `DRAIN_LIMIT_MS` at the latest. On `window`, so it
 //    runs after every listener on an element or on `document`: a request
 //    `holdTurboRequest` already took (block add/duplicate/delete, the reorder
-//    and tree Undo toasts -- which also need the page base) is
+//    and tree Undo toasts) is
 //    `defaultPrevented` by then and left to it. The editor header's five
 //    actions drain earlier still, at `submit` (`admin--saving--queue-hold`), because
 //    they also refuse to run after an unclean drain; this half only catches

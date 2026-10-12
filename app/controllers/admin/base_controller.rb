@@ -72,6 +72,7 @@ module Admin
 
     layout "admin"
     before_action { Current.channel = :admin }
+    before_action { Current.editing_tab = request.headers["X-Notes-Tab"].to_s[Live::Signals::TAB] }
 
     # Every time CS Studio shows or parses -- schedule inputs, "Saved
     # HH:MM", the trash and audit screens, the dashboard -- is in the

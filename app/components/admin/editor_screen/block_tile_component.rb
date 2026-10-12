@@ -63,13 +63,16 @@ module Admin
     # 6), and nothing else. For an editor "Add note" is the first item of
     # the tile's menu.
     class BlockTileComponent < AdminComponent
-      def initialize(page:, block:, locale:, url_options: {}, editable:, open: false)
+      include HeldUnit
+
+      def initialize(page:, block:, locale:, url_options: {}, editable:, open: false, holds: nil)
         @page = page
         @block = block
         @locale = locale
         @url_options = url_options
         @editable = editable
         @open = open
+        @holds = holds
       end
 
       def dom_id = ActionView::RecordIdentifier.dom_id(block)
@@ -81,6 +84,16 @@ module Admin
       def open? = @open
 
       def editable? = @editable
+
+      # The tile stands for a block the panel of which is read-only while
+      # someone else holds it: it says so in its version (a catch-up redraws
+      # it when the hold comes or goes) and in `data-editing-held`. The avatar
+      # of the holder stands in the slot `editor.block.markers`.
+      # `HeldUnit` answers for the block on its page; a tile uses its `held?`
+      # and its `editing_version` and draws no strip, no form and no menu item.
+      def held_subject = block
+
+      def held_record = page
 
       def unavailable? = block.definition.nil?
 
@@ -98,9 +111,11 @@ module Admin
 
       def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
-      # The block's notes marker (`Admin::NotesScreen::MarkerComponent`): on
-      # the tile, never on the block's form panel, and for every viewer.
-      def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
+      # IN THE TEMPLATE, with no method here any more (the slot loads nothing).
+      # The block's markers (slot `editor.block.markers`: the holder's avatar,
+      # then the notes marker): on the tile, never on the block's form panel,
+      # and for every viewer. A slot for one block: nothing is loaded for it,
+      # and the page's holds, read already, go to it as context (`holds:`).
 
       def note_key = ::Notes.key(block)
 

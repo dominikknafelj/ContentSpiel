@@ -109,6 +109,31 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the settings form is saved on its base although a block of the page was saved since" do
+    sign_in_as users(:one)
+    page = create_page(title: "Pricing")
+    base = page.reload.settings_changed_at.iso8601(6)
+    travel(1.minute) { as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).ok? } }
+
+    patch admin_page_path(page), params: { base_updated_at: base, page: { subtitle: "Saved" } }, as: :turbo_stream
+
+    assert_response :ok
+    assert_equal "Saved", page.reload.subtitle
+    assert_includes response.body, %(value="#{page.settings_changed_at.iso8601(6)}")
+  end
+
+  test "the settings form is refused when the settings themselves were saved since" do
+    sign_in_as users(:one)
+    page = create_page(title: "Pricing")
+    base = page.reload.settings_changed_at.iso8601(6)
+    travel(1.minute) { as(users(:two), channel: :admin) { assert Pages::Save.call(page, translations: { "en" => { subtitle: "Theirs" } }).ok? } }
+
+    patch admin_page_path(page), params: { base_updated_at: base, page: { subtitle: "Mine" } }, as: :turbo_stream
+
+    assert_response :conflict
+    assert_equal "Theirs", page.reload.subtitle
+  end
+
   test "a save on a current base still saves" do
     page = create_page(title: "About 3")
     patch admin_page_path(page), params: { base_updated_at: page.updated_at.iso8601(6), page: { subtitle: "Fresh" } }, as: :turbo_stream

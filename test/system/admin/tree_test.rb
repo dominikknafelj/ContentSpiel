@@ -53,9 +53,9 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
   # autosave base. The move used to go around the save queue and tell the form
   # nothing: the next edit was refused as "Changed elsewhere" -- against the
   # editor's own move -- and the form was dead until Reload. Now the move takes
-  # its turn in the queue (never on the wire together with an autosave), sends
-  # the form's base, and writes the new one back. The toast's Undo is the same
-  # request and has to do the same.
+  # its turn in the queue (never on the wire together with an autosave) and
+  # does not move the form's base at all (`Page::SETTINGS_BASE_IGNORES`, live
+  # editing's final review I1). The toast's Undo is the same request.
   test "moving the page that is open, and undoing it, leaves its editor able to save" do
     visit "/cs-studio/pages/#{@alpha.id}"
     await_admin_controllers
@@ -104,8 +104,8 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_equal 1, page.evaluate_script("window.__maxInFlight"), "two writes were on the wire at once"
   end
 
-  # Moving another page than the open one sends no base: the open form keeps
-  # its own, and keeps saving.
+  # Moving another page than the open one says nothing to the open form: it
+  # keeps its base, and keeps saving.
   test "moving another page than the open one leaves the open editor able to save" do
     visit "/cs-studio/pages/#{@beta.id}"
     await_admin_controllers

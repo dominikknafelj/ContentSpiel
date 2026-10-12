@@ -41,13 +41,14 @@ module Admin
     class HeaderComponent < Admin::AdminComponent
       renders_one :suggest
 
-      def initialize(record:, locale:, url_options: {}, slot_context: {})
+      def initialize(record:, locale:, url_options: {}, slot_context: {}, hold_strip: nil)
         raise ArgumentError, "the editor header is for a Page or a Post, not #{record.class}" unless record.is_a?(::Page) || record.is_a?(::Post)
 
         @record = record
         @locale = locale.to_s
         @url_options = url_options
         @slot_context = slot_context
+        @hold_strip = hold_strip
       end
 
       # Who is looking, for the slots: the actor `can?` already asks about.

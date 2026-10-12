@@ -1,11 +1,13 @@
 <%# The header (breadcrumb, title, publish state, actions, language tabs) is
     `Admin::EditorScreen::HeaderComponent`, shared with the page editor. Its
     dialogs are siblings of it, so they sit outside this form. %>
-<%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options, slot_context: @slot_context) do |header| %>
+<% unless form_only? %>
+<%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options, slot_context: @slot_context, hold_strip: (hold_strip if held?)) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4). %>
-    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: post, locale: locale, editable: editable?) %>
+    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: post, locale: locale, editable: editable? && !read_only_hold?) %>
   <% end %>
+<% end %>
 <% end %>
 
 <%# `data-controller="admin--saving--autosave"` sits on this form directly, same as
@@ -15,8 +17,14 @@
     it) -- and only on an editable post (`form_data`). The `<fieldset>`
     (`contents`, so it doesn't affect the form's layout) disables every
     field at once for a view-only one. %>
-<%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data do %>
-<%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
+<%# The fetched answer (`form_only`) carries the notice area too, so that the strip comes and
+    goes with the hold: `admin--editing--live` merges it around an alert already there. On one
+    line, so that `:empty` holds without a strip. %>
+<% if form_only? %><div id="editor-notice"><%= render hold_strip if held? %></div><% end %>
+
+<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
+<%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
+<%= fields do %>
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
@@ -75,7 +83,7 @@
   <%= render Admin::Columns::RichTextColumnComponent.new(
         name: "body", id: field_id("body"), html_name: field_html_name("body"),
         value: value(:body), original: original(:body), locale: locale, errors: field_errors("body"),
-        editable: editable?, **translation(:body)
+        editable: editable? && !read_only_hold?, **translation(:body)
       ) %>
 
   <%# Tags are shared by every language (they are not translated), and a new name is created on save. %>
@@ -88,5 +96,6 @@
   <%= render Admin::EditorScreen::RelatedPostsComponent.new(
         post: post, locale: locale, url_options: url_options, errors: field_errors("related_post_ids")
       ) %>
+<% end %>
 <% end %>
 <% end %>

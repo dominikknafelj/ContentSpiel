@@ -1,9 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
-import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "saving/queue"
+import { currentGeneration, enqueue, holdTurboRequest } from "saving/queue"
 import { errorToast, orderErrorToast, sendOrder, streamsApplied } from "saving/order_request"
 import { messages } from "i18n/messages"
+import { TAB_HEADER } from "editing/requests"
+import { TAB } from "live/connection"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
@@ -69,15 +71,6 @@ export default class extends Controller {
   static targets = ["card", "list", "lane", "tile", "announcer", "destination"]
   static values = { reorderUrl: String }
 
-  // Every block request also carries the page settings form's current base
-  // (`X-Page-Base-Updated-At`): a block write touches the page, and the
-  // server only moves that form's base forward when the one it holds was
-  // still current (`Admin::ContentBlocksController#page_base_streams`).
-  // Turbo's own submissions inside this section (add, duplicate, delete)
-  // get it here; `move` below adds it itself; a card's autosave through
-  // `admin--saving--autosave`'s `pageBaseId` value.
-  static pageBaseId = "page-base-updated-at"
-
   // What the lanes need is made here, not in `connect`: Stimulus tells a
   // controller of the targets already in the page (`laneTargetConnected`)
   // BEFORE it calls `connect`. What is observed is every container's own
@@ -97,33 +90,23 @@ export default class extends Controller {
     // is queued (`saving/queue_state.js`, "PAGE GENERATIONS").
     this.generation = currentGeneration()
     // A write (never a GET) waits its turn in the page-level queue
-    // (`saving/queue.js`) and reads the page base when it is actually sent;
-    // the queue slot is kept until the answer's bases are in the hidden
-    // fields, so the next request sees them. Add, duplicate and delete are
-    // plain Turbo form submissions, and answer with streams that move the
-    // page form's base, so they depend on it exactly as an autosave does.
-    this.addPageBase = (event) => {
+    // (`saving/queue.js`): add, duplicate and delete are plain Turbo form
+    // submissions, and they are held until the request before them has been
+    // answered, exactly as an autosave is.
+    this.holdWrite = (event) => {
       if (String(event.detail.fetchOptions.method).toUpperCase() === "GET") return
 
-      holdTurboRequest(event, {
-        baseIds: [ this.constructor.pageBaseId ],
-        before: (request) => {
-          const pageBase = document.getElementById(this.constructor.pageBaseId)?.value
-          if (pageBase) request.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
-        }
-      })
+      holdTurboRequest(event)
     }
-    this.element.addEventListener("turbo:before-fetch-request", this.addPageBase)
+    this.element.addEventListener("turbo:before-fetch-request", this.holdWrite)
     // The Undo toast after a reorder lives in `#toasts`, outside this
     // section, so its `button_to` request wouldn't pass through the listener
-    // above -- and without the base the server wouldn't move the page form's
-    // base forward after the Undo's own page touch (a spurious "Changed
-    // elsewhere" on the next page save). It's recognised by its URL.
-    this.addPageBaseToUndo = (event) => {
+    // above. It's recognised by its URL.
+    this.holdUndo = (event) => {
       if (this.element.contains(event.target)) return
-      if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.addPageBase(event)
+      if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.holdWrite(event)
     }
-    document.addEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    document.addEventListener("turbo:before-fetch-request", this.holdUndo)
     // Duplicate is picked from a card's "⋯" menu, which closes on the pick:
     // the item that had focus is hidden, and focus fell to <body> -- a
     // keyboard user was back at the top of the page with the copy somewhere
@@ -182,6 +165,9 @@ export default class extends Controller {
   laneTargetDisconnected(lane) {
     if (lane.isConnected) return
 
+    // A lane destroyed under a drag that began in it: SortableJS calls no
+    // `onEnd` for `destroy()`, so the hold is let go here.
+    if (this.dragging && Sortable.active?.el === lane) { this.dragging = false; this.sayMoving() }
     this.laneSortables.get(lane)?.destroy()
     this.laneSortables.delete(lane)
   }
@@ -297,10 +283,15 @@ export default class extends Controller {
       // `event.from` is that container, and the item's parent the one it is
       // in now.
       onStart: () => {
+        this.dragging = true
+        this.sayMoving()
         this.makeCloneInert()
         this.dragSnapshot = this.snapshot()
       },
-      onEnd: (event) => this.move(event.item, event.from, this.dragSnapshot)
+      onEnd: (event) => {
+        this.dragging = false
+        return this.move(event.item, event.from, this.dragSnapshot)
+      }
     }
   }
 
@@ -349,11 +340,15 @@ export default class extends Controller {
   }
 
   disconnect() {
-    this.element.removeEventListener("turbo:before-fetch-request", this.addPageBase)
-    document.removeEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    this.element.removeEventListener("turbo:before-fetch-request", this.holdWrite)
+    document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
     this.element.removeEventListener("turbo:submit-end", this.duplicated)
     clearTimeout(this.copyTimer)
     this.moveStateObserver.disconnect()
+    this.dragging = false
+    this.picked = null
+    this.moveHolds = 0
+    this.sayMoving()
     this.sortable?.destroy()
     // The lanes are told to go after this (`laneTargetDisconnected`), which
     // would keep the Sortable of one that is still in a document.
@@ -415,8 +410,22 @@ export default class extends Controller {
   // never round-trips to the server the way a drag/move does. The title
   // button is the disclosure: `aria-expanded` follows.
   toggle(event) {
-    const hidden = this.cardFor(event)?.querySelector("[data-block-body]")?.classList.toggle("hidden")
-    if (hidden !== undefined) event.currentTarget.setAttribute("aria-expanded", String(!hidden))
+    const card = this.cardFor(event)
+    const hidden = card?.querySelector("[data-block-body]")?.classList.toggle("hidden")
+    if (hidden === undefined) return
+
+    event.currentTarget.setAttribute("aria-expanded", String(!hidden))
+    // A collapsed card's form is closed: what it holds is sent now (not left
+    // to the `focusout` the click usually causes), and then whoever holds the
+    // block for this tab lets it go (`admin--editing--hold`), which waits
+    // until none of the card's forms -- a section's panels included -- has a
+    // save left to send.
+    if (hidden) {
+      for (const form of card.querySelectorAll("form[data-controller~='admin--saving--autosave']")) {
+        this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
+      }
+    }
+    this.dispatch("toggled", { detail: { blockId: card.dataset.blockId, hidden } })
   }
 
   // "Move up/down (client-side move, then the same reorder request)" (this
@@ -557,9 +566,7 @@ export default class extends Controller {
   //
   // Queued with every other write on the screen (`saving/queue.js`): the
   // order is read when the request is sent (a Move up/down made while an
-  // autosave was in flight still sends the final order), and the page base
-  // it carries is the freshest one. The answer's page base is written into
-  // the hidden field before the next request goes.
+  // autosave was in flight still sends the final order).
   //
   // WHAT IS SENT is the complete order of ONE container -- the one the item
   // is in now (`to`) -- and, when the server has the item in another one,
@@ -638,6 +645,35 @@ export default class extends Controller {
   // Turbo form). The page's own reorder draws a status line and a toast, and
   // releases its turn at once as before.
   async move(item, from, before = null, { focus = false } = {}) {
+    // Whether a block is in someone's hand is `sayMoving`'s to judge, and it
+    // is judged again on every path out of here (an early return included).
+    try {
+      await this.moveBlock(item, from, before, { focus })
+    } finally {
+      this.sayMoving()
+    }
+  }
+
+  // LIVE REFRESH (`admin--editing--live`) does not draw the list while a block
+  // is in someone's hand or its move has not been answered and drawn. That is
+  // not an edge to relay but a state to judge, because holds overlap (a
+  // second drag begins before the first move is answered): true while ANY of
+  // a drag (`dragging`), a keyboard pick-up (`picked`) or a move in the queue
+  // (`moveHolds`, counted in `queueMove`) is open, false only when none is;
+  // the event is sent when the answer changes. Every place one of the three
+  // ends calls this: `onEnd`, `clearPicked`, `move`'s end, the end of a
+  // queued move, a lane destroyed under a drag (SortableJS does not call
+  // `onEnd` for `destroy()`), `disconnect`.
+  sayMoving() {
+    // A card picked up and then taken out of the document by a redraw is not in anyone's hand.
+    if (this.picked && !this.picked.isConnected) this.picked = null
+    const moving = Boolean(this.dragging || this.picked || this.moveHolds > 0)
+    if (moving === Boolean(this.saidMoving)) return
+    this.saidMoving = moving
+    this.dispatch("moving", { detail: { moving } })
+  }
+
+  async moveBlock(item, from, before, { focus }) {
     this.refreshMoveState()
     const to = item ? item.parentElement : this.listTarget
     // An element that is in no container has no order to send: one the
@@ -694,8 +730,10 @@ export default class extends Controller {
   // and nothing is swallowed: an error is reported where the system tests'
   // collector and a developer's console see it.
   queueMove(move) {
+    this.moveHolds = (this.moveHolds || 0) + 1
     return enqueue((isCurrent) => this.sendMove(move, isCurrent), { generation: this.generation })
       .catch((error) => console.error(error))
+      .finally(() => { this.moveHolds = Math.max(0, this.moveHolds - 1); this.sayMoving() })
   }
 
   // One move's turn in the queue, and its bookkeeping: unless the move has
@@ -821,7 +859,7 @@ export default class extends Controller {
         "Content-Type": "application/json",
         Accept: "text/vnd.turbo-stream.html",
         "X-CSRF-Token": csrfToken,
-        "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
+        [TAB_HEADER]: TAB
       },
       body: JSON.stringify({
         ids: sent.map((element) => element.dataset.blockId),
@@ -838,7 +876,6 @@ export default class extends Controller {
     // `renderKeepingForms`.
     const keepForms = answer.outcome === "answered" && !answer.ok && this.formsHoldText()
     if (answer.outcome === "answered") {
-      syncBases(answer.text, [ this.constructor.pageBaseId ])
       if (keepForms) this.renderKeepingForms(answer.text)
       else Turbo.renderStreamMessage(answer.text)
       if (answer.ok) {
@@ -1044,6 +1081,7 @@ export default class extends Controller {
   pickUp(card) {
     if (this.picked && this.picked !== card) this.cancel(this.picked, { refocus: false })
     this.picked = card
+    this.sayMoving()
     this.originNext = card.nextElementSibling
     this.orderBeforePick = this.itemsOf(this.listTarget)
     card.dataset.picked = "true"
@@ -1068,7 +1106,8 @@ export default class extends Controller {
   }
 
   drop(card) {
-    this.clearPicked(card)
+    // Not said yet: the move that follows holds on (no false in between).
+    this.clearPicked(card, { say: false })
     this.announce(`Dropped ${this.titleOf(card)}. ${this.positionOf(card)}`)
     return this.reorder(this.orderBeforePick)
   }
@@ -1092,10 +1131,11 @@ export default class extends Controller {
     this.announce(`Cancelled. ${this.titleOf(card)} is back where it was.`)
   }
 
-  clearPicked(card) {
+  clearPicked(card, { say = true } = {}) {
     delete card.dataset.picked
     card.classList.remove("admin-drag-chosen")
     this.picked = null
+    if (say) this.sayMoving()
   }
 
   focusHandle(card) {
