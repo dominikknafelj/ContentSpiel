@@ -1,4 +1,3 @@
-# app/models/publishing/version.rb
 module Publishing
   # One published copy of a page or post. Written once by `take!` and never
   # updated (`readonly?`); the only row ever removed is one whose `live_at`
@@ -21,41 +20,61 @@ module Publishing
     # Copies waiting for their time: at most one per record.
     scope :pending, ->(now = Time.current) { where(arel_table[:live_at].gt(now)) }
 
-    # The current copy of each record: the newest in force. `unscoped` on
-    # purpose, so the choice of "newest" never depends on what else the
-    # caller narrowed by (a `where(lists_posts: true)` must filter the
-    # current copies, not pick the newest copy that lists posts).
+    # The copies of these records (a list of Page/Post, or unsaved stand-ins
+    # with an id): the record condition is a part of THIS relation, so it can
+    # be put inside a subquery as well.
+    def self.among(records)
+      records.group_by { |record| record.class.polymorphic_name }
+        .map { |type, list| unscoped.where(record_type: type, record_id: list.map(&:id)) }
+        .reduce(:or) || none
+    end
+
+    # `{ [record_type, record_id] => Version }`: the newest copy in force of
+    # each record, in one statement whose subquery is narrowed to those
+    # records (the index serves it) and whose answer does not depend on what
+    # else a caller narrows by afterwards.
+    def self.current_for(records, now: Time.current)
+      newest = among(records).in_force(now).group(:record_type, :record_id).select(arel_table[:id].maximum)
+      unscoped.where(id: newest).index_by { |version| [ version.record_type, version.record_id ] }
+    end
+
+    # The newest copy in force of EVERY record, whole table: for a sweep. A
+    # record or a list asks `Publishing.current` / `current_for`.
     def self.current(now = Time.current)
       where(id: unscoped.in_force(now).group(:record_type, :record_id).select(arel_table[:id].maximum))
     end
 
-    # Takes a copy of `record` from its rows. The caller holds the record's
-    # row lock inside an open transaction (a save service after its `save`,
-    # `Publishing::PublishChanges` after `lock`). `live_at` in the past means
-    # now. A pending copy is replaced; its number is not given out again.
+    # Takes a copy of `record`, from its ROWS as they are at this moment: the
+    # first statement locks the record's row (the page's row first, the same
+    # first lock every block write takes, `ContentBlocks::Structure#lock_owner`;
+    # a post's row, which `Posts::Save` already holds by its own UPDATE and
+    # `Trash::Purge` takes after a post's destroy, never ahead of it) and the
+    # fields, blocks and tags are read after it. The object in memory is not
+    # read and not changed: a colleague's autosave committed since this
+    # request loaded it is in the copy. The caller has an open transaction (a
+    # save service after its `save`, `Publishing::PublishChanges`).
+    # `live_at` in the past means now. A pending copy is replaced; its number
+    # is not given out again.
     def self.take!(record, live_at: nil, by: nil, now: Time.current)
+      row = record.class.lock.find(record.id)
       live_at = [ live_at || now, now ].max
-      mine = of(record)
+      mine = of(row)
       number = (mine.maximum(:number) || 0) + 1
       mine.pending(now).delete_all
-      data = Snapshot.of(record)
-      version = create!(record_type: record.class.polymorphic_name, record_id: record.id, number: number, live_at: live_at,
+      data = Snapshot.of(row, row: row)
+      version = create!(record_type: row.class.polymorphic_name, record_id: row.id, number: number, live_at: live_at,
         snapshot: data.except("blocks"), blocks: data.fetch("blocks", []), lists_posts: Snapshot.lists_posts?(data),
         tag_ids: data.fetch("tags", []).map { |tag| tag["id"] }.sort, created_by_id: by&.id, created_at: now)
       # A scheduled record shows nothing yet, so its copy changes nothing the
       # public can see (the moment it goes live is the content version's own
       # publication-time lookup, as for the record itself).
-      PublicSite.bump_version! if record.live?
+      # INTERIM, until Task 5: a scheduled CHANGE (a future `live_at` on a
+      # live record) bumps now and not when it comes into force, so between
+      # Task 2 and Task 5 a conditional GET keeps answering 304 with the old
+      # page at that moment. Task 5 adds the part of the content version that
+      # follows copies by the clock.
+      PublicSite.bump_version! if row.live?
       version
-    end
-
-    # The first copy of every published or scheduled record that has none:
-    # what the migration runs. Answers how many it took.
-    def self.take_first_copies!
-      [ Page, Post ].sum do |model|
-        missing = model.where.not(published_at: nil).where.not(id: where(record_type: model.polymorphic_name).select(:record_id))
-        missing.find_each.count { |record| transaction { take!(record) } }
-      end
     end
 
     def readonly? = persisted?

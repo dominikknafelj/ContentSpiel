@@ -107,4 +107,89 @@ class Publishing::SnapshotTest < ActiveSupport::TestCase
 
     assert_equal({}, copy.translated_settings)
   end
+
+  test "a rebuilt page, block and tag refuse every method that writes or reloads them" do
+    page = create_page(title: "Locked", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Tagged", tags: %w[ruby])
+    view = Publishing::Snapshot.rebuild(Publishing.current(page), page.reload)
+    block = view.content_blocks.to_a.sole
+    tag_view = Publishing::Snapshot.rebuild(Publishing.current(post), post.reload)
+
+    calls = {
+      save: [], save!: [], update: [ { position: 1 } ], update!: [ { position: 1 } ], update_attribute: [ :position, 1 ],
+      update_column: [ :position, 1 ], update_columns: [ { position: 1 } ], touch: [], delete: [], destroy: [], destroy!: [],
+      reload: [], lock!: [], with_lock: [], increment!: [ :position ], decrement!: [ :position ], toggle!: [ :position ]
+    }
+    [ view, block, tag_view.tags.first ].each do |object|
+      calls.each do |name, args|
+        next if object.is_a?(Tag) && args.first.is_a?(Hash)
+
+        assert_raises(ActiveRecord::ReadOnlyRecord, "#{object.class.name}##{name}") { object.public_send(name, *args) { } }
+      end
+    end
+
+    assert Page.exists?(page.id)
+    assert ContentBlock.exists?(block.id)
+    assert_equal 1, ContentBlock.where(owner: page).count
+  end
+
+  test "the loaded collections of a rebuilt page and post refuse to write or reload" do
+    page = create_page(title: "Collections", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Tagged", tags: %w[ruby])
+    page_view = Publishing::Snapshot.rebuild(Publishing.current(page), page.reload)
+    post_view = Publishing::Snapshot.rebuild(Publishing.current(post), post.reload)
+    extra = Tag.create!(name: "other")
+
+    {
+      "content_blocks.delete_all" => -> { page_view.content_blocks.delete_all },
+      "content_blocks.destroy_all" => -> { page_view.content_blocks.destroy_all },
+      "content_blocks.create" => -> { page_view.content_blocks.create(block_type: "rich_text") },
+      "content_blocks.create!" => -> { page_view.content_blocks.create!(block_type: "rich_text") },
+      "content_blocks.build" => -> { page_view.content_blocks.build(block_type: "rich_text") },
+      "content_blocks <<" => -> { page_view.content_blocks << ContentBlock.new(block_type: "rich_text") },
+      "content_blocks.delete" => -> { page_view.content_blocks.delete(page_view.content_blocks.first) },
+      "content_blocks.reload" => -> { page_view.content_blocks.reload },
+      "content_blocks=" => -> { page_view.content_blocks = [] },
+      "tags.clear" => -> { post_view.tags.clear },
+      "tags <<" => -> { post_view.tags << extra },
+      "tags=" => -> { post_view.tags = [ extra ] },
+      "tag_ids=" => -> { post_view.tag_ids = [ extra.id ] },
+      "tags.reload" => -> { post_view.tags.reload }
+    }.each { |name, call| assert_raises(ActiveRecord::ReadOnlyRecord, name, &call) }
+
+    assert_equal 1, ContentBlock.where(owner: page).count
+    assert_equal %w[ruby], post.reload.tags.map(&:name)
+    assert_equal 1, page_view.content_blocks.size
+    assert_equal %w[ruby], post_view.tags.map(&:name)
+  end
+
+  test "a rebuilt block's section is the copy's section, not the row's" do
+    page = create_page(title: "Sections", published: false)
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 1 })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    view = Publishing::Snapshot.rebuild(Publishing.current(page), page.reload)
+
+    inner = view.content_blocks.find { |block| block.section_id }
+
+    assert inner.association(:section).loaded?
+    assert_same view.content_blocks.find { |block| block.id == section.id }, inner.section
+  end
+
+  test "a copy carries the translation marks of a page, a post and a block" do
+    page = create_page(title: "Marked", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Marked too")
+
+    [ Publishing.current(page).snapshot, Publishing.current(post).snapshot ].each do |snapshot|
+      assert snapshot.fetch("fields").key?("translation_sources")
+      assert snapshot.fetch("fields").key?("translation_original_changed_at")
+    end
+    assert Publishing.current(page).blocks.first.key?("translation_sources")
+  end
 end

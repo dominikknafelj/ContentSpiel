@@ -1,4 +1,3 @@
-# app/models/publishing.rb
 # Drafts of live content (drafts spec). Autosave writes the rows of a page or
 # post; the public site shows a COPY taken when someone publishes
 # (`Publishing::Version`, built and rebuilt by `Publishing::Snapshot`).
@@ -15,9 +14,56 @@
 # `Admin::Publishing` is never defined: it would shadow this module for every
 # bare `Publishing::` inside `module Admin`.
 module Publishing
+  # EVERY COLUMN OF THE THREE TABLES HAS A PLACE, in exactly one of three
+  # lists, and `test/models/publishing_test.rb` reads the real columns from
+  # the schema and fails for a column in none of them or in two: adding a
+  # column to `pages`, `posts` or `content_blocks` means deciding here
+  # whether the public sees it from the copy or from the rows.
+  #
+  # IN THE COPY. Includes `translation_sources` and
+  # `translation_original_changed_at` of all three models: nothing public
+  # draws them (a copy is never public as such), but "Discard changes" must
+  # put back a translated field together with the marks that say whether the
+  # translation is current, or the marks would be wrong afterwards.
   CONTENT = {
-    "Page" => %w[title subtitle meta_title meta_description hero_alt hero_media_asset_id page_type],
-    "Post" => %w[title excerpt body metadata translated_metadata]
+    "Page" => %w[title subtitle meta_title meta_description hero_alt hero_media_asset_id page_type
+                 translation_sources translation_original_changed_at],
+    "Post" => %w[title excerpt body metadata translated_metadata translation_sources translation_original_changed_at],
+    # A block's copy is the whole row (`Snapshot.blocks_of`).
+    "ContentBlock" => %w[id alt block_type caption created_at owner_id owner_type position settings translated_settings
+                         updated_at body media_asset_id translation_sources translation_original_changed_at
+                         section_id section_column]
+  }.freeze
+
+  # LEFT ON THE ROWS ON PURPOSE: immediate as before, each with its reason.
+  ROWS = {
+    "Page" => {
+      "slug" => "an address is immediate (drafts spec §3)",
+      "parent_id" => "the place in the tree is immediate",
+      "position" => "the place in the tree is immediate",
+      "published_at" => "publishing and scheduling are immediate",
+      "trashed_at" => "the trash is immediate",
+      "trashed_by_id" => "the trash is immediate",
+      "trash_root_id" => "the trash is immediate",
+      "settings_changed_at" => "editor state: when the settings last changed; no public reader"
+    },
+    "Post" => {
+      "slug" => "an address is immediate",
+      "content_type" => "a post's type is immediate",
+      "published_at" => "publishing and scheduling are immediate",
+      "trashed_at" => "the trash is immediate",
+      "trashed_by_id" => "the trash is immediate",
+      "author_id" => "no public component draws the author"
+    },
+    "ContentBlock" => {}
+  }.freeze
+
+  # NEVER STORED: the record's identity and bookkeeping; a rebuilt record has
+  # the row's (`updated_at` feeds the ETag and the sitemap, which read rows).
+  NEVER_STORED = {
+    "Page" => { "id" => "the record itself", "created_at" => "bookkeeping", "updated_at" => "bookkeeping" },
+    "Post" => { "id" => "the record itself", "created_at" => "bookkeeping", "updated_at" => "bookkeeping" },
+    "ContentBlock" => {}
   }.freeze
 
   module_function
@@ -26,8 +72,14 @@ module Publishing
     CONTENT.fetch(record.is_a?(Class) ? record.polymorphic_name : record.class.polymorphic_name)
   end
 
-  # The copy the public sees now (or at `now`), or nil.
-  def current(record, now: Time.current) = Version.of(record).current(now).first
+  # The copy the public sees now (or at `now`), or nil: one statement, served
+  # by the `(record_type, record_id, live_at)` index. `id` breaks a tie of
+  # `live_at`; ids and times rise together (`Version`).
+  def current(record, now: Time.current) = Version.of(record).in_force(now).order(live_at: :desc, id: :desc).first
+
+  # The current copy of each of these records in ONE statement:
+  # `{ [record_type, record_id] => Version }`, a record with none left out.
+  def current_for(records, now: Time.current) = Version.current_for(records, now: now)
 
   # The newest copy, pending or current: what "Discard changes" returns to
   # and what the overview compares the rows with.

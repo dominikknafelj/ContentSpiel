@@ -107,7 +107,7 @@ module Posts
         Translations::StateIndex.refresh(@post)
         # Published or scheduled for the first time, or again after an
         # unpublish: the copy the public site will show (drafts spec §4.3).
-        # Taken after the tags and related posts are written.
+        # Taken after the tags are written (related posts are not part of a copy).
         Publishing::Version.take!(@post, by: actor_user) if was_unpublished && @post.published_at.present?
         record_events(related_before)
         true

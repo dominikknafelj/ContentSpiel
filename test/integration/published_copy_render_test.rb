@@ -6,29 +6,33 @@ require "test_helper"
 # found), and the two documents must be the same text. Strict on purpose: the
 # whole response body is compared, not a few strings in it.
 class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
-  # Swaps the record the resolver found for one rebuilt from its current copy
-  # while the flag is up; nothing else of the request changes.
+  # Swaps the record the resolver found for one rebuilt from its current copy.
+  # Extended onto the resolver instances of ONE request (`from_copy`), so no
+  # production class is patched beyond the block.
   module RebuildFromCopy
     def call(**)
       result = super
-      return result unless Thread.current[:rebuild_from_copy] && result.status == :found
+      return result unless result.status == :found
 
       version = Publishing.current(result.record)
-      Thread.current[:rebuilt_from_copy] = Thread.current[:rebuilt_from_copy].to_i + 1 if version
-      version ? PublicSite::Resolver::Result.found(Publishing::Snapshot.rebuild(version, result.record)) : result
+      return result unless version
+
+      Thread.current[:rebuilt_from_copy] += 1
+      PublicSite::Resolver::Result.found(Publishing::Snapshot.rebuild(version, result.record))
     end
   end
-  PublicSite::Resolver.prepend(RebuildFromCopy)
 
   def body_of(path, from_copy:)
-    Thread.current[:rebuild_from_copy] = from_copy
     Thread.current[:rebuilt_from_copy] = 0
-    get path
-    assert_equal 1, Thread.current[:rebuilt_from_copy], "#{path} was not drawn from a copy" if from_copy
+    if from_copy
+      original = PublicSite::Resolver.method(:new)
+      with_singleton_override(PublicSite::Resolver, :new, ->(**options) { original.call(**options).extend(RebuildFromCopy) }) { get path }
+      assert_equal 1, Thread.current[:rebuilt_from_copy], "#{path} was not drawn from a copy"
+    else
+      get path
+    end
     assert_response :success, "#{path} (#{from_copy ? "copy" : "rows"})"
     response.body.gsub(/<meta name="csrf-token"[^>]*>|<meta name="csp-nonce"[^>]*>/, "")
-  ensure
-    Thread.current[:rebuild_from_copy] = false
   end
 
   def assert_same_page(path, rows_html = nil)
@@ -39,7 +43,7 @@ class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
   def main_of(html) = html[%r{<main.*?</main>}m]
 
   def add_block(page, translations: {}, **attributes)
-    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: attributes, translations: translations)
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }.merge(attributes), translations: translations)
     assert result.ok?, result.errors.to_sentence
     result.record
   end
@@ -158,5 +162,119 @@ class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
     publish_changes(page)
 
     assert_same_page PublicSite::Urls.new.path_for(page.reload, :en)
+  end
+
+  # The rows move on after the copy; the page is the copy's. The whole
+  # document is compared (the menu names pages, and nothing here renames one).
+  def assert_copy_keeps(path)
+    published_html = body_of(path, from_copy: false)
+    yield
+    assert_equal published_html, body_of(path, from_copy: true), "#{path} follows the rows instead of its copy"
+    assert_not_equal published_html, body_of(path, from_copy: false), "the rows did not change what #{path} would draw: the test proves nothing"
+  end
+
+  test "an image block changed in the rows after the copy keeps its image, caption and alt" do
+    other = create_media_asset
+    page = create_page(title: "Gallery")
+    block = add_block(page, block_type: "image", media_asset_id: @asset.id, translations: { "en" => { caption: "Before", alt: "Alt before" } })
+    publish_changes(page)
+
+    assert_copy_keeps(PublicSite::Urls.new.path_for(page.reload, :en)) do
+      assert ContentBlocks::Save.call(block, attributes: { media_asset_id: other.id }, translations: { "en" => { caption: "After", alt: "Alt after" } }).ok?
+    end
+  end
+
+  test "a section changed in the rows after the copy keeps its layout and the blocks in their columns" do
+    page = create_page(title: "Bands")
+    section = add_block(page, block_type: "section", settings: { "layout" => "two" })
+    left = add_block(page, section_id: section.id, section_column: 1, translations: { "en" => { body: rich_doc("Left") } })
+    add_block(page, section_id: section.id, section_column: 2, translations: { "en" => { body: rich_doc("Right") } })
+    publish_changes(page)
+
+    assert_copy_keeps(PublicSite::Urls.new.path_for(page.reload, :en)) do
+      assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one" } }).ok?
+      assert ContentBlocks::Save.call(left, translations: { "en" => { body: rich_doc("Left, edited") } }).ok?
+    end
+  end
+
+  test "a post changed in the rows after its copy keeps its title, body, tags and fields at its address" do
+    list = create_page(title: "Writing")
+    add_block(list, block_type: "post_list", settings: { "content_type" => "blog" })
+    publish_changes(list)
+    post = @post.reload
+    publish_changes(post)
+
+    assert_copy_keeps(PublicSite::Urls.new.path_for(post, :en)) do
+      assert Posts::Save.call(post, attributes: { tag_names: %w[other] },
+        translations: { "en" => { title: "Changed", excerpt: "Changed too", body: rich_doc("Changed body") } }).ok?
+    end
+  end
+
+  test "a second language changed in the rows after the copy keeps the copy's text" do
+    page = create_page(title: "Languages", translations: { "de" => { title: "Sprachen", slug: "sprachen" } })
+    block = add_block(page, translations: { "en" => { body: rich_doc("English") }, "de" => { body: rich_doc("Deutsch") } })
+    publish_changes(page)
+
+    assert_copy_keeps(PublicSite::Urls.new.path_for(page.reload, :de)) do
+      assert ContentBlocks::Save.call(block, translations: { "de" => { body: rich_doc("Deutsch, geaendert") } }).ok?
+    end
+  end
+
+  test "an empty page draws the same" do
+    page = create_page(title: "Nothing here")
+
+    assert_same_page PublicSite::Urls.new.path_for(page, :en)
+  end
+
+  test "an image deleted for good after the copy draws nothing and does not fail" do
+    page = create_page(title: "Gone image")
+    gone = create_media_asset
+    block = add_block(page, block_type: "image", media_asset_id: gone.id, translations: { "en" => { alt: "A vanished picture" } })
+    publish_changes(page)
+    assert ContentBlocks::Destroy.call(block).ok?
+    delete_for_good(gone)
+
+    html = body_of(PublicSite::Urls.new.path_for(page.reload, :en), from_copy: true)
+
+    assert_not_includes html, "A vanished picture"
+  end
+
+  test "a language disabled after the copy is not served, from the rows or the copy, and drawn as before once enabled again" do
+    page = create_page(title: "Only English")
+    add_block(page, translations: { "en" => { body: rich_doc("English only") } })
+    publish_changes(page)
+    en_path = PublicSite::Urls.new.path_for(page.reload, :en)
+    es_path = "/es#{en_path}"
+    all = [ { "code" => "en" }, { "code" => "de", "fallbacks" => [ "en" ] }, { "code" => "es", "fallbacks" => [ "de" ] } ]
+
+    site_settings(:default).update!(locales: all.first(2))
+    PublicSite::Paths.rebuild!
+    get es_path
+    assert_response :not_found
+
+    site_settings(:default).update!(locales: all)
+    PublicSite::Paths.rebuild!
+    assert_same_page es_path
+    assert_same_page en_path
+  end
+
+  test "a language enabled after the copy draws the copy's fallback, not what the rows say in it since" do
+    site_settings(:default).update!(locales: [ { "code" => "en" } ])
+    PublicSite::Paths.rebuild!
+    page = create_page(title: "Before German")
+    block = add_block(page, translations: { "en" => { body: rich_doc("Written in English") } })
+    publish_changes(page)
+    site_settings(:default).update!(locales: [ { "code" => "en" }, { "code" => "de", "fallbacks" => [ "en" ] } ])
+    PublicSite::Paths.rebuild!
+    assert Pages::Save.call(page, translations: { "de" => { title: "Vor Deutsch", slug: "vor-deutsch" } }).ok?
+    assert ContentBlocks::Save.call(block, translations: { "de" => { body: rich_doc("Auf Deutsch") } }).ok?
+    path = PublicSite::Urls.new.path_for(page.reload, :de)
+
+    html = main_of(body_of(path, from_copy: true))
+
+    assert_includes html, "Written in English"
+    assert_includes html, "Before German"
+    assert_not_includes html, "Auf Deutsch"
+    assert_includes main_of(body_of(path, from_copy: false)), "Auf Deutsch"
   end
 end

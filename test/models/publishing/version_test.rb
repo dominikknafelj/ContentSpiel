@@ -20,7 +20,8 @@ class Publishing::VersionTest < ActiveSupport::TestCase
     assert_equal 1, version.number
     assert_equal [ section.id, inner.id, last.id ], version.blocks.map { |block| block["id"] }
     assert_equal({ "en" => "Pricing" }, version.snapshot.dig("fields", "title"))
-    assert_equal Publishing::CONTENT.fetch("Page").sort, version.snapshot.fetch("fields").keys.sort
+    assert_equal %w[hero_alt hero_media_asset_id meta_description meta_title page_type subtitle title translation_original_changed_at translation_sources],
+      version.snapshot.fetch("fields").keys.sort
     assert_not version.lists_posts
     assert_operator version.live_at, :<=, Time.current
   end
@@ -51,7 +52,8 @@ class Publishing::VersionTest < ActiveSupport::TestCase
     assert_equal ids, version.tag_ids
     assert_equal ids, version.snapshot.fetch("tags").map { |tag| tag["id"] }
     assert_equal %w[rails ruby], version.snapshot.fetch("tags").map { |tag| tag["name"] }.sort
-    assert_equal Publishing::CONTENT.fetch("Post").sort, version.snapshot.fetch("fields").keys.sort
+    assert_equal %w[body excerpt metadata title translated_metadata translation_original_changed_at translation_sources],
+      version.snapshot.fetch("fields").keys.sort
   end
 
   test "saving a published record again, and pressing Publish on a live one, take no copy" do
@@ -137,21 +139,69 @@ class Publishing::VersionTest < ActiveSupport::TestCase
     assert_empty Publishing::Version.where(record_type: "Page", record_id: page.id)
   end
 
-  test "the migration gives every published and scheduled record its first copy, from the rows as they are, and leaves a draft without one" do
-    live = create_page(title: "Live", published: false)
-    scheduled = create_post(title: "Scheduled", published: false)
-    draft = create_page(title: "Draft", published: false)
-    copied = create_page(title: "Has one")
-    block = ContentBlocks::Save.call(ContentBlock.new(owner: live), attributes: { block_type: "rich_text" }).record
-    live.update_columns(published_at: 1.day.ago)        # as a record published before this table existed
-    scheduled.update_columns(published_at: 1.day.from_now)
+  test "a post deleted for good takes its copies with it" do
+    post = create_post(title: "Gone")
+    assert Publishing.copied?(post)
 
-    assert_equal 2, Publishing::Version.take_first_copies!
+    delete_for_good(post)
 
-    assert_equal [ block.id ], Publishing.current(live).blocks.map { |row| row["id"] }
-    assert_equal Publishing::Version.of(scheduled).sole, Publishing.current(scheduled)
-    assert_not Publishing.copied?(draft)
-    assert_equal 1, Publishing::Version.of(copied).count
-    assert_equal 0, Publishing::Version.take_first_copies!, "a second run finds nothing to do"
+    assert_empty Publishing::Version.where(record_type: "Post", record_id: post.id)
+  end
+
+  test "a copy of a live record moves the public content version, and one of a scheduled record does not" do
+    live = create_page(title: "Live")
+    scheduled = create_post(title: "Later", published: false)
+    assert Posts::Save.call(scheduled, attributes: { published_at: 3.days.from_now }).ok?
+
+    before = PublicSite::Version.current
+    publish_changes(live)
+    assert_operator PublicSite::Version.current, :>, before, "a copy of a live record must move the version"
+
+    before = PublicSite::Version.current
+    publish_changes(scheduled)
+    assert_equal before, PublicSite::Version.current
+  end
+
+  test "a copy is taken from the row as it is, not from the object the caller loaded earlier" do
+    page = create_page(title: "Old", published: false)
+    stale = Page.find(page.id)
+    Page.find(page.id).update_columns(title: { "en" => "A colleague's title" }) # version: none (the test plays a colleague's committed save)
+
+    version = Publishing::Version.take!(stale)
+
+    assert_equal({ "en" => "A colleague's title" }, version.snapshot.dig("fields", "title"))
+    assert_equal "Old", Mobility.with_locale(:en) { stale.title }, "the caller's object is not changed under it"
+  end
+
+  test "the first statement of a copy locks the record's row, then nothing is read before it" do
+    page = create_page(title: "Locked")
+    post = create_post(title: "Locked too")
+
+    [ page, post ].each do |record|
+      statements = capture_sql { Publishing::Version.transaction { Publishing::Version.take!(record) } }
+      first = statements.reject { |sql| sql.match?(/\A\s*(BEGIN|COMMIT|SAVEPOINT|RELEASE)/i) }.first
+      table = record.class.table_name
+
+      assert_match(/FROM "#{table}" WHERE "#{table}"\."id" = \$1 LIMIT \$2 FOR UPDATE/, first, record.class.name)
+    end
+  end
+
+  test "the current copy of one record is one statement, and of fifty records is one statement" do
+    pages = Array.new(3) { |index| create_page(title: "Page #{index}") }
+    later = Publishing::Version.take!(pages.first, live_at: 2.days.from_now)
+    stand_ins = Array.new(47) { |index| Post.new(id: 9_000_000 + index) }
+
+    one_answer = nil
+    one = capture_sql { one_answer = Publishing.current(pages.first) }
+    assert_equal Publishing::Version.of(pages.first).order(:number).first, one_answer
+    batch = nil
+    statements = capture_sql { batch = Publishing.current_for(pages + stand_ins) }
+
+    assert_equal 1, one.size
+    assert_equal 1, statements.size
+    assert_equal pages.map { |page| [ "Page", page.id ] }.sort, batch.keys.sort
+    assert_equal Publishing::Version.of(pages.first).order(:number).first, batch[[ "Page", pages.first.id ]]
+    assert_equal later, Publishing.current_for(pages, now: 3.days.from_now)[[ "Page", pages.first.id ]]
+    assert_empty Publishing.current_for([])
   end
 end
