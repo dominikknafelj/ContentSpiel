@@ -40,6 +40,9 @@ class PreviewController < ApplicationController
 
   private
 
+  # Preview shows the working version (drafts spec D4).
+  def as_published(record) = record
+
   # Preview reads go through the actor's read scope (access-control design
   # spec §3.3 "Scopes for reading"): a draft page outside a branch editor's
   # branch, or a post an author may not read, is the same 404 as a path

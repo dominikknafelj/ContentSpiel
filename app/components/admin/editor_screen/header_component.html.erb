@@ -49,6 +49,11 @@
         <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
       <% end %>
 
+      <% if can_publish_changes? %>
+        <%= button_to t(".publish_changes"), publish_changes_url, method: :post, class: setup_secondary_link_class,
+              form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
+      <% end %>
+
       <% if can_edit_schedule? %>
         <%= render Admin::Ui::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
       <% end %>

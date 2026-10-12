@@ -330,6 +330,10 @@ Rails.application.routes.draw do
       # The asking tab leaves, or stops asking: its own request goes.
       post "withdraw", to: "editing#withdraw", as: :editing_withdraw
     end
+    # Publishing a record's changes and discarding them (drafts spec §4.3).
+    scope "publishing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
+      post "publish", to: "publishing#publish", as: :publishing_publish
+    end
     # Notes on content (notes spec §3.4, §4). Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
     # `/notes/media/5` -- so a controller finds the container through the read

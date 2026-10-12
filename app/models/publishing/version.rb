@@ -33,9 +33,12 @@ module Publishing
     # each record, in one statement whose subquery is narrowed to those
     # records (the index serves it) and whose answer does not depend on what
     # else a caller narrows by afterwards.
-    def self.current_for(records, now: Time.current)
+    #
+    # `columns:` narrows what is read (a list of names): a copy read without
+    # its `blocks` has them as a missing attribute.
+    def self.current_for(records, now: Time.current, columns: nil)
       newest = among(records).in_force(now).group(:record_type, :record_id).select(arel_table[:id].maximum)
-      unscoped.where(id: newest).index_by { |version| [ version.record_type, version.record_id ] }
+      unscoped.where(id: newest).select(*(columns || column_names)).index_by { |version| [ version.record_type, version.record_id ] }
     end
 
     # The newest copy in force of EVERY record, whole table: for a sweep. A

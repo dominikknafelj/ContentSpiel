@@ -89,6 +89,8 @@ module StarterContents
 
         StarterContent.raise!(ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list",
           settings: { "content_type" => section[:content_type] } }))
+        # The copy taken at publication has no list block yet (see `EnsureHome`).
+        StarterContent.raise!(Publishing::PublishChanges.call(page, actor: actor))
 
         page
       end

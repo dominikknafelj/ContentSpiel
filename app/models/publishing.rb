@@ -68,6 +68,32 @@ module Publishing
 
   module_function
 
+  # What the public sees of `record`, with a page's blocks: a read-only
+  # record rebuilt from its current copy, or `record` itself when it is a
+  # draft or has no copy (see the head of this file).
+  def published(record, now: Time.current) = published_all([ record ], now: now, with_blocks: true).first
+
+  # The same for several records at once, in the order given, in one query
+  # per record type. Without blocks unless asked: a menu, a list of subpages
+  # and a post list read titles and excerpts, and a page's blocks are most
+  # of a copy's weight. A view rebuilt without blocks must not be asked for
+  # them: its `content_blocks` would query the rows.
+  def published_all(records, now: Time.current, with_blocks: false)
+    records = records.to_a
+    using = records.select { |record| record.published_at.present? }
+    return records if using.empty?
+
+    columns = with_blocks ? Version.column_names : Version.column_names - [ "blocks" ]
+    copies = using.group_by { |record| record.class.polymorphic_name }.values.reduce({}) do |all, group|
+      all.merge(Version.current_for(group, now: now, columns: columns))
+    end
+
+    records.map do |record|
+      version = copies[[ record.class.polymorphic_name, record.id ]] if record.published_at.present?
+      version ? Snapshot.rebuild(version, record, with_blocks: with_blocks) : record
+    end
+  end
+
   def content_columns(record)
     CONTENT.fetch(record.is_a?(Class) ? record.polymorphic_name : record.class.polymorphic_name)
   end

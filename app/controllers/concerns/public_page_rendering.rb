@@ -61,17 +61,22 @@ module PublicPageRendering
   # afterwards). The images a rendered page reads are `preload_page_images`,
   # which each controller calls once it knows it will render
   # (`PagesController` only after `stale?`, so a 304 never pays for them).
+  # `as_published` is the including controller's: the public site answers the
+  # record rebuilt from its published copy (`Publishing.published`), the
+  # preview the record itself. The address was resolved from the ROW either
+  # way: slug, tree and publish state are not in a copy.
   def assign_record(record)
     if record.is_a?(Post)
-      @page = PublicSite::Paths.canonical_page(record)
-      return false if @page.nil?
+      page = PublicSite::Paths.canonical_page(record)
+      return false if page.nil?
 
-      @post = record
+      @page = as_published(page)
+      @post = as_published(record)
       outline = BlockOutline.new(@page.content_blocks)
       @block_outlines = { @page => outline }
       @post_list_block = outline.reading_order.find { |block| block.lists?(record) }
     else
-      @page = record
+      @page = as_published(record)
     end
     true
   end
@@ -92,14 +97,13 @@ module PublicPageRendering
   # each asset's processed-variant digests without a further query per
   # image, the same reasoning `Media::Asset.with_variants` documents for a
   # plain asset listing.
+  # Two calls, not one nested: a page rebuilt from a copy has its blocks set
+  # as a loaded association, and the blocks themselves are what the second
+  # call is handed, so it never depends on how a preloader treats a target
+  # that was set by hand.
   def preload_page_images(page)
-    ActiveRecord::Associations::Preloader.new(
-      records: [ page ],
-      associations: [
-        { hero_media_asset: Media::Asset::VARIANT_INCLUDES },
-        { content_blocks: { media_asset: Media::Asset::VARIANT_INCLUDES } }
-      ]
-    ).call
+    ActiveRecord::Associations::Preloader.new(records: [ page ], associations: { hero_media_asset: Media::Asset::VARIANT_INCLUDES }).call
+    ActiveRecord::Associations::Preloader.new(records: page.content_blocks.to_a, associations: { media_asset: Media::Asset::VARIANT_INCLUDES }).call
   end
 
   def render_in_requested_locale(&block)

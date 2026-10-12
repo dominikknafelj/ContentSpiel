@@ -2,34 +2,20 @@ require "test_helper"
 
 # A copy must draw exactly what the rows drew (drafts spec §4.2): the public
 # page is rendered twice, once from the rows and once from objects rebuilt
-# from the copy (`Publishing::Snapshot.rebuild`, in place of what the resolver
-# found), and the two documents must be the same text. Strict on purpose: the
+# from the copy (`Publishing::Snapshot.rebuild`), and the two documents must be
+# the same text. Strict on purpose: the
 # whole response body is compared, not a few strings in it.
 class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
-  # Swaps the record the resolver found for one rebuilt from its current copy.
-  # Extended onto the resolver instances of ONE request (`from_copy`), so no
-  # production class is patched beyond the block.
-  module RebuildFromCopy
-    def call(**)
-      result = super
-      return result unless result.status == :found
-
-      version = Publishing.current(result.record)
-      return result unless version
-
-      Thread.current[:rebuilt_from_copy] += 1
-      PublicSite::Resolver::Result.found(Publishing::Snapshot.rebuild(version, result.record))
-    end
-  end
-
+  # The page as the public site draws it (from the copy, since the public page
+  # reads copies) or, `from_copy: false`, as it drew it before it did: from the
+  # rows. The second is the public controller with `Publishing.published` held
+  # to answer the record itself, the way `PreviewController#as_published` does,
+  # so the two bodies differ in nothing but where the content comes from.
   def body_of(path, from_copy:)
-    Thread.current[:rebuilt_from_copy] = 0
     if from_copy
-      original = PublicSite::Resolver.method(:new)
-      with_singleton_override(PublicSite::Resolver, :new, ->(**options) { original.call(**options).extend(RebuildFromCopy) }) { get path }
-      assert_equal 1, Thread.current[:rebuilt_from_copy], "#{path} was not drawn from a copy"
-    else
       get path
+    else
+      with_singleton_override(Publishing, :published, ->(record, **) { record }) { get path }
     end
     assert_response :success, "#{path} (#{from_copy ? "copy" : "rows"})"
     response.body.gsub(/<meta name="csrf-token"[^>]*>|<meta name="csp-nonce"[^>]*>/, "")

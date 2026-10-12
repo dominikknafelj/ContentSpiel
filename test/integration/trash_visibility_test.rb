@@ -17,6 +17,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     site_settings(:default).update!(setup_completed_at: Time.current)
     @blog = create_page(title: "Blog")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: @blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(@blog) # the list block was added after the page went live: the public page draws the copy
     @kept_post = create_post(title: "Kept post")
     @gone_post = create_post(title: "Gone post")
     @kept_page = create_page(title: "Kept page")
@@ -136,6 +137,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
     block = @kept_page.content_blocks.create!(block_type: :rich_text, position: 0)
     block.update_columns(body: { "en" => body })
+    publish_changes(@kept_page) # the block was written around the services, after the page went live
 
     get "/kept-page"
     assert_response :ok
@@ -778,6 +780,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     section = page.content_blocks.create!(block_type: "section", position: 0)
     inside = page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, media_asset: asset)
     Media::UsageIndex.refresh(inside)
+    publish_changes(page) # the blocks were written around the services, after the page went live
 
     result = Trash::Move.call(asset, actor: nil)
 

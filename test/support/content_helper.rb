@@ -40,8 +40,10 @@ module ContentHelper
 
   # Makes the rows of a published record what the public sees, as "Publish
   # changes" does.
-  def publish_changes(record)
-    Publishing::Version.transaction { Publishing::Version.take!(record.reload) }
+  def publish_changes(record, at: nil)
+    result = Publishing::PublishChanges.call(record.reload, at: at)
+    assert result.ok?, result.errors.to_sentence
+    record
   end
 
   def create_page(title:, parent: root_page, published: true, translations: {})

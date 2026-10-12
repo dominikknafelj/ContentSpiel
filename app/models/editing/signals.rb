@@ -26,7 +26,7 @@ module Editing
     GONE = "gone".freeze
 
     MAP = {
-      "page.updated" => SAVED, "page.published" => SAVED, "page.unpublished" => SAVED, "page.moved" => SAVED,
+      "page.updated" => SAVED, "page.published" => SAVED, "page.changes_published" => SAVED, "post.changes_published" => SAVED, "page.unpublished" => SAVED, "page.moved" => SAVED,
       "page.translation_confirmed" => SAVED, "page.trashed" => GONE, "page.purged" => GONE,
       "post.updated" => SAVED, "post.published" => SAVED, "post.unpublished" => SAVED, "post.scheduled" => SAVED,
       "post.translation_confirmed" => SAVED, "post.trashed" => GONE, "post.purged" => GONE,

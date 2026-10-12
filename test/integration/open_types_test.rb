@@ -17,6 +17,7 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
       result = ContentBlocks::Save.call(page.content_blocks.build, attributes: { block_type: "test/quote", settings: { cite: "https://example.org" } },
         translations: { "en" => { settings: { text: "Hello" } } })
       assert result.ok?, result.errors.to_sentence
+      publish_changes(page) # the block was added after the page went live
 
       get "/quotes"
 

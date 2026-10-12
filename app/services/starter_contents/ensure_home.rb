@@ -46,6 +46,12 @@ module StarterContents
 
     private
 
+    def publish_what_was_written(home)
+      return if home.reload.published_at.nil?
+
+      StarterContent.raise!(Publishing::PublishChanges.call(home, actor: actor))
+    end
+
     def ensure_home!
       home = Page.find_by(parent_id: nil) ||
         StarterContent.raise!(Pages::Save.call(attributes: { published: true }, translations: { @locale => { title: "Home", slug: "" } }))
@@ -53,6 +59,10 @@ module StarterContents
       if home.content_blocks.none?
         StarterContent.raise!(ContentBlocks::Save.call(ContentBlock.new(owner: home), attributes: { block_type: "rich_text" },
           translations: { @locale => { body: StarterContent.document(StarterContent::WELCOME_MARKDOWN) } }))
+        # The copy taken when the homepage was published is empty: the visitor
+        # sees a live page as it was last published, so publish what was just
+        # written (a homepage that is not live has nothing on the site to change).
+        publish_what_was_written(home)
       end
 
       home

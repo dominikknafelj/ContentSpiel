@@ -71,7 +71,7 @@ class PagesController < PublicController
       # that still matches costs the resolver's lookup, the version and the
       # settings row, nothing else.
       expires_in 0, public: true, must_revalidate: true
-      if stale?(etag: [ result.record, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year ], public: true)
+      if stale?(etag: [ *[ @page, @post ].compact.map { |record| published_key(record) }, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year ], public: true)
         preload_page_images(@page)
         render :show
       end
@@ -83,6 +83,16 @@ class PagesController < PublicController
   end
 
   private
+
+  def as_published(record) = Publishing.published(record)
+
+  # What of a record the ETag depends on: its copy, or, for a record served
+  # from its rows, the row. The rows' `updated_at` moves with every autosave,
+  # which the public does not see.
+  def published_key(record)
+    version = record.published_version
+    version ? [ record.class.name, record.id, version.id ] : record
+  end
 
   def read_content_version_first
     PublicSite.current_content_version

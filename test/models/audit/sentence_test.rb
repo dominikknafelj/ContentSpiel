@@ -46,6 +46,8 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     "app/services/translations/confirm.rb" => %w[page.translation_confirmed post.translation_confirmed block.translation_confirmed
       media.translation_confirmed settings.translation_confirmed],
     # "#{PREFIX.fetch(subject class)}.taken_over": a block, a page's settings or a post
+    # "#{prefix}.changes_published": a page or a post
+    "app/services/publishing/publish_changes.rb" => %w[page.changes_published post.changes_published],
     "app/services/editing/take_over.rb" => %w[page.taken_over post.taken_over block.taken_over]
   }.freeze
 
@@ -400,6 +402,21 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     texts = [ sentence.subject_label, *sentence.parts.map(&:text) ]
     assert(texts.none? { |text| text.html_safe? })
     assert_includes texts, "<b>Bold</b>"
+  end
+
+  test "a publish of changes reads 'published changes to Pricing'" do
+    page = create_page(title: "Pricing")
+    post = as(@me) { create_post(title: "Hello", published: false) }
+
+    assert_equal "You published changes to “Pricing”", read(sentence_for(event("page.changes_published", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: { "number" => 2, "live_at" => Time.current.iso8601, "scheduled" => false })))
+    assert_equal "You published changes to “Hello”", read(sentence_for(event("post.changes_published", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
+  end
+
+  test "one given a time reads 'scheduled changes to Pricing for 14 Oct'" do
+    page = create_page(title: "Pricing")
+    metadata = { "number" => 2, "live_at" => Time.utc(2026, 10, 14, 9).iso8601, "scheduled" => true }
+
+    assert_equal "You scheduled changes to “Pricing” for 14 Oct", read(sentence_for(event("page.changes_published", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: metadata)))
   end
 
   test "a take-over reads as having taken over editing, of a block on its page, of a page, of a post" do

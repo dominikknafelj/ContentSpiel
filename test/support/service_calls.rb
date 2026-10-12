@@ -386,6 +386,12 @@ module ServiceCalls
         permission: "pages.edit", on: page }
     },
 
+    "Publishing::PublishChanges" => lambda {
+      page = create_page(title: "Live")
+      Pages::Save.call(page, translations: { "en" => { title: "Edited" } })
+      { call: -> { Publishing::PublishChanges.call(page) }, permission: "pages.publish", on: page }
+    },
+
     "Posts::Save" => lambda {
       post = create_post(title: "Edit me", published: false, tags: [ "kept" ])
       { call: -> { Posts::Save.call(post, attributes: { published: true, tag_names: [ "other" ] }, translations: { "en" => { title: "Edited" } }) },

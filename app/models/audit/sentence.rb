@@ -50,12 +50,13 @@ module Audit
       "trashed" => [ "moved ", " to the trash" ], "restored" => [ "restored ", "" ],
       "purged" => [ "permanently deleted ", "" ], "uploaded" => [ "uploaded ", "" ],
       "translation_confirmed" => [ "marked a translation of ", " as up to date" ],
-      "taken_over" => [ "took over editing ", "" ]
+      "taken_over" => [ "took over editing ", "" ],
+      "changes_published" => [ "published changes to ", "" ]
     }.freeze
 
     CONTENT_ACTIONS = {
-      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over],
-      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over],
+      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published],
+      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published],
       "media" => %w[uploaded updated trashed restored purged translation_confirmed],
       "settings" => %w[translation_confirmed]
     }.freeze
@@ -227,6 +228,9 @@ module Audit
           after = "#{after} for #{date}"
         elsif verb == "unpublished" && schedule_removed?
           before = "removed the schedule from "
+        elsif verb == "changes_published" && (date = changes_scheduled_date)
+          before = "scheduled changes to "
+          after = " for #{date}"
         elsif verb == "taken_over" && handed_over?
           before = "handed over editing "
         elsif verb == "updated" && @action == "media.updated" && alt_only?
@@ -250,6 +254,15 @@ module Audit
 
         time = self.class.parse_time(was)
         time.present? && time > event.occurred_at
+      end
+
+      # A publish of changes that was given a time (`metadata["scheduled"]`):
+      # the day they go live, as `scheduled_date` words a post's.
+      def changes_scheduled_date
+        metadata = event.metadata
+        return nil unless metadata.is_a?(Hash) && metadata["scheduled"] == true
+
+        self.class.parse_time(metadata["live_at"])&.in_time_zone&.strftime("%-d %b")
       end
 
       def alt_only?

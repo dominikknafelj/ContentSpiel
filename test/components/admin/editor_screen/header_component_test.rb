@@ -85,6 +85,23 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu] [role=separator]", visible: :all
   end
 
+  test "a live and a scheduled record offer Publish changes to someone who may publish, and a draft does not" do
+    live = create_page(title: "About", published: true)
+    render_header(live)
+    assert_selector "header form[action='/cs-studio/publishing/page/#{live.id}/publish'] button", text: "Publish changes"
+
+    post = create_post(title: "Later", published: false)
+    as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
+    render_header(post.reload)
+    assert_selector "header button", text: "Publish changes"
+
+    render_header(create_page(title: "Draft", published: false))
+    assert_no_selector "header button", text: "Publish changes"
+
+    render_header(create_post(title: "Read me"), actor: users(:reader))
+    assert_no_selector "header button", text: "Publish changes"
+  end
+
   test "a viewer who can only read sees View only and nothing that writes" do
     post = create_post(title: "Read me")
     render_header(post, actor: users(:reader))

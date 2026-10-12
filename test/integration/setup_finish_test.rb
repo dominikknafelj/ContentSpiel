@@ -32,4 +32,22 @@ class SetupFinishTest < ActionDispatch::IntegrationTest
     get setup_path
     assert_response :not_found
   end
+
+  # Both starter services publish a page and then add its blocks, so the copy
+  # taken at publication was empty until they published what they wrote.
+  test "after setup a visitor sees the homepage's text and each section page's list" do
+    patch setup_step_path("review")
+    assert as(nil, channel: :setup) { StarterContents::Add.call }.ok?
+
+    get "/"
+    assert_includes response.body, "Welcome to your new site"
+
+    StarterContent.sections.each do |section|
+      get PublicSite::Urls.new.path_for(StarterContent.find_section_page(Page.find_by(parent_id: nil), section), "en")
+      assert_response :success
+      # A content type draws its list its own way: by title, or by body alone.
+      sample = [ section[:sample][:title], section[:sample][:body] ].compact
+      assert sample.any? { |text| css_select("main").text.include?(text) }, "#{section[:section][:title]} lists its sample post"
+    end
+  end
 end
