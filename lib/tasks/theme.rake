@@ -1,13 +1,31 @@
+require "shellwords"
+
 # What a theme's author runs (theming spec, "What a person gets"). The work
 # is Theme::Scaffold's and Theme::Check's; these say it to a person.
 #
 # The path is a rake argument, so the shell needs the quotes:
 #   bin/rails 'theme:new[../my-site/theme]'
 #   bin/rails 'theme:check[../my-site/theme]'    or, with THEME_PATH set:  bin/rails theme:check
+# A space in the path is carried by those quotes. A COMMA IS NOT: rake cuts
+# a task's arguments at every comma and trims around them, so
+# `[/a b/c, d/theme]` arrives as `/a b/c` and `d/theme`, and what was between
+# them cannot be put back. Such a path is given in a variable instead, and a
+# path that arrives in pieces is refused with that sentence, never used by
+# its first piece:
+#   THEME_NEW_PATH='/sites/a, b/theme' bin/rails theme:new
+#   THEME_PATH='/sites/a, b/theme' bin/rails theme:check
 namespace :theme do
-  desc "Write a copy of the default theme into a new folder: bin/rails 'theme:new[PATH]'"
+  # The folder may hold a repository, dot files and a README already
+  # (`Theme::Scaffold`). The second line it prints is a shell's word: the
+  # path quoted as a shell needs it, so it pastes.
+  desc "Write a copy of the default theme into a new folder: bin/rails 'theme:new[PATH]', or THEME_NEW_PATH"
   task :new, [ :path ] => :environment do |_task, arguments|
+    if arguments.extras.any?
+      abort "The path arrived in pieces: rake cuts an argument at a comma. Give a path with a comma in it as " \
+            "THEME_NEW_PATH='…' bin/rails theme:new"
+    end
     path = arguments[:path].to_s.strip
+    path = ENV["THEME_NEW_PATH"].to_s.strip if path.empty?
     abort "Say where: bin/rails 'theme:new[PATH]'" if path.empty?
 
     begin
@@ -18,7 +36,7 @@ namespace :theme do
 
     target = File.expand_path(path)
     puts "Wrote #{written.size} files to #{target}."
-    puts "Start the site with THEME_PATH=#{target} and it is drawn by that folder. It looks as before until a file there changes."
+    puts "Start the site with THEME_PATH=#{Shellwords.escape(target)} and it is drawn by that folder. It looks as before until a file there changes."
   end
 
   # What an integrator runs, and what a site's image build runs with
@@ -39,10 +57,15 @@ namespace :theme do
   # trace: a path that is no directory, something at the folder's top that
   # is no part of a theme, a file that cannot be read, a link out of the
   # folder (`ThemeFolder::Invalid`: the folder cannot be read as a theme at
-  # all, so there is no list to make), and in production with a real secret
-  # a stylesheet built for another theme.
+  # all, so there is no list to make; everything at the top that is no part
+  # of a theme is said together), and in production with a real secret a
+  # stylesheet built for another theme.
   desc "Say what is wrong with a theme folder: THEME_PATH, or bin/rails 'theme:check[PATH]'"
   task :check, [ :path ] do |_task, arguments|
+    if arguments.extras.any?
+      abort "The path arrived in pieces: rake cuts an argument at a comma. Give a path with a comma in it as " \
+            "THEME_PATH='…' bin/rails theme:check"
+    end
     path = arguments[:path].to_s.strip
 
     begin
@@ -59,7 +82,18 @@ namespace :theme do
       puts "#{folder.path}: #{folder.templates.size} templates, no problems."
     else
       problems.each.with_index(1) { |problem, number| warn "#{number.to_s.rjust(problems.size.to_s.size)}. #{problem}" }
-      abort "#{folder.path}: #{problems.size} #{problems.size == 1 ? "problem" : "problems"}."
+      warn "#{folder.path}: #{problems.size} #{problems.size == 1 ? "problem" : "problems"}."
     end
+
+    # The application was started under THEME_PATH's folder whatever folder
+    # was asked about, and inside `checking` a refusal of THAT folder is
+    # kept, not raised. Saying nothing of it would end 0 in a process whose
+    # every public page raises.
+    other = path.empty? ? nil : Theme.current.refusal
+    if other
+      warn "#{ThemeFolder::VARIABLE} names another folder, which was NOT checked here and is refused: the application does " \
+           "not start under it. Run bin/rails theme:check with no path to hear why."
+    end
+    exit 1 if problems.any? || other
   end
 end

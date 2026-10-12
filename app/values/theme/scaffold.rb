@@ -23,16 +23,30 @@ class Theme
 
     def write(to, root: Rails.root)
       target = Pathname(File.expand_path(to.to_s))
-      if target.exist? && !(target.directory? && target.children.empty?)
-        raise Refused, "#{target} exists and is not empty: theme:new writes into a new or an empty folder."
+      if target.exist? && !(target.directory? && target.children.all? { |entry| passed_over?(entry) })
+        raise Refused, "#{target} exists and is not empty: theme:new writes into a new or an empty folder " \
+                       "(a repository, dot files and a README may be there already)."
       end
+      own_readme = target.directory? && target.children.any? { |entry| entry.basename.to_s.match?(README) }
 
       written = Contract::TEMPLATES.keys.map { |path| copy(Pathname(root).join("app/views", path), target, "views/#{path}") }
       written += Contract::COMPONENTS.keys.map { |path| copy(Pathname(root).join("app/components/#{path}.html.erb"), target, "components/#{path}.html.erb") }
       written << put(target, "assets/stylesheets/theme.css", stylesheet)
       EMPTY.each { |folder| put(target, "#{folder}/.keep", "") }
-      written << put(target, "README.md", readme)
+      written << put(target, "README.md", readme) unless own_readme
       written
+    end
+
+    # What a theme folder passes over at its top (`ThemeFolder#ignored?`): a
+    # dot file or dot folder (`.git`, `.gitignore`, `.DS_Store`) and a
+    # README. An integrator makes the repository first, and a folder that
+    # holds nothing else is empty for this command; all of it is left as it
+    # is, their README included.
+    README = /\AREADME(\.[^\/]*)?\z/i
+
+    def passed_over?(entry)
+      name = entry.basename.to_s
+      name.start_with?(".") || name.match?(README)
     end
 
     def copy(source, target, relative) = put(target, relative, source.read)

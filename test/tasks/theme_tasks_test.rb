@@ -1,6 +1,7 @@
 require "test_helper"
 require "rake"
 require "open3"
+require "shellwords"
 
 # `theme:new` and `theme:check` (lib/tasks/theme.rake): what a person types
 # and what they are told. The work itself is Theme::Scaffold's and
@@ -37,6 +38,51 @@ class ThemeTasksTest < ActiveSupport::TestCase
       assert_includes said, "is not empty"
       assert_equal before, Dir.glob("#{dir}/**/*").sort
     end
+  end
+
+  # Rake cuts a task's arguments at every comma and trims around them, so a
+  # path with one cannot be given in the brackets: `[/a b/c, d/theme]` was
+  # written into `/a b/c`. Each task takes such a path from a variable, and
+  # says so instead of using half a path.
+  test "a path with a comma is refused in the brackets with the way to give it, and taken from THEME_NEW_PATH" do
+    Dir.mktmpdir("theme") do |dir|
+      _, said = capture_io { assert_raises(SystemExit) { @new.invoke(File.join(dir, "a"), "b") } }
+
+      assert_includes said, "THEME_NEW_PATH"
+      assert_includes said, "comma"
+      assert_empty Dir.children(dir), "half a path is not written into"
+
+      target = File.join(dir, "our site, v2", "theme")
+      @new.reenable
+      output = with_env("THEME_NEW_PATH" => target) { capture_io { @new.invoke }.first }
+
+      assert File.file?(File.join(target, "views/pages/show.html.erb"))
+      assert_includes output, "THEME_PATH=#{Shellwords.escape(target)}", "the next step pastes into a shell"
+      assert_equal [ "THEME_PATH=#{target}" ], Shellwords.split(output[/THEME_PATH=.*?(?= and it is drawn)/])
+
+      @check.reenable
+      _, said = capture_io { assert_raises(SystemExit) { @check.invoke(File.join(dir, "a"), "b") } }
+      assert_includes said, "comma"
+      assert_includes said, "THEME_PATH="
+    end
+  end
+
+  # With the path given, the application is started under THEME_PATH's
+  # folder all the same, and a refusal of THAT folder is kept for the length
+  # of the task (`ThemeFolder.checking`). Saying nothing of it and ending 0
+  # would call a process sound whose every public page raises.
+  test "theme:check of a path while the theme the application started under is refused says so and ends 1" do
+    refused = Theme.new(refusal: ThemeFolder::Invalid.new("THEME_PATH (/srv/other) is not a theme this version can draw"))
+
+    status = nil
+    out, said = Theme.with(refused) do
+      capture_io { status = assert_raises(SystemExit) { @check.invoke(ThemeTestHelper::PLAIN.to_s) }.status }
+    end
+
+    assert_equal 1, status
+    assert_match(/#{Regexp.escape(ThemeTestHelper::PLAIN.to_s)}: \d+ templates, no problems\./, out)
+    assert_includes said, "THEME_PATH names another folder, which was NOT checked here and is refused"
+    assert_includes said, "bin/rails theme:check"
   end
 
   test "theme:check of a sound folder says so and how many templates it has" do
@@ -97,6 +143,14 @@ class ThemeTasksTest < ActiveSupport::TestCase
 
   private
     BOOT_SECONDS = 90
+
+    def with_env(variables)
+      before = variables.keys.index_with { |name| ENV[name] }
+      variables.each { |name, value| ENV[name] = value }
+      yield
+    ensure
+      before.each { |name, value| ENV[name] = value }
+    end
 
     # A task in a process of its own, started as the image build starts it
     # (`test/lib/production_boot_test.rb` says why no database is asked and

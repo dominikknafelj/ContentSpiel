@@ -75,6 +75,50 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # An integrator makes the repository first: `mkdir theme && cd theme &&
+  # git init`, perhaps a README and a .gitignore. None of that is a theme's
+  # file (`ThemeFolder` passes each over), so the folder is still empty for
+  # this command, which leaves all of it as it is.
+  test "a folder that holds only a repository, dot files and a README is empty: it is written into, and the README is kept" do
+    Dir.mktmpdir("theme") do |dir|
+      FileUtils.mkdir_p(File.join(dir, ".git/objects"))
+      File.write(File.join(dir, ".git/HEAD"), "ref: refs/heads/main\n")
+      File.write(File.join(dir, ".gitignore"), "node_modules\n")
+      File.write(File.join(dir, ".DS_Store"), "x")
+      File.write(File.join(dir, "README.md"), "# Our site's theme\n")
+
+      written = Theme::Scaffold.write(dir)
+
+      assert_not_includes written, "README.md"
+      assert_equal "# Our site's theme\n", File.read(File.join(dir, "README.md"))
+      assert_equal "ref: refs/heads/main\n", File.read(File.join(dir, ".git/HEAD"))
+      assert_equal ThemeFolder.new(dir).files.sort, written.sort
+      assert_empty Theme::Check.problems(ThemeFolder.new(dir), deep: true)
+
+      File.write(File.join(dir, "notes.txt"), "x")
+      FileUtils.rm_rf(File.join(dir, "views"))
+      assert_raises(Theme::Scaffold::Refused) { Theme::Scaffold.write(dir) }
+    end
+  end
+
+  # Equal bodies are also what a copy that is never looked at gives. So in a
+  # copy of its own (templates are cached by their path in this environment)
+  # one template and one component are changed, and the change is drawn:
+  # the site is drawn BY the copy.
+  test "a template and a component changed in the folder it writes are what the site is drawn with" do
+    scaffolded do |target, _written|
+      page = target.join("views/pages/show.html.erb")
+      page.write("<p id=\"copied-page\">drawn by the copy</p>\n#{page.read}")
+      target.join("components/blocks/rich_text_component.html.erb").write("<p id=\"copied-block\">drawn by the copy</p>\n")
+
+      Theme.with(Theme.load(ThemeFolder.new(target))) do
+        assert_includes body_of("/"), %(<p id="copied-page">drawn by the copy</p>)
+        assert_includes body_of("/"), %(<p id="copied-block">drawn by the copy</p>)
+      end
+      assert_not_includes body_of("/"), "drawn by the copy"
+    end
+  end
+
   test "it writes into an empty folder, and refuses one that holds anything or a path that is a file" do
     Dir.mktmpdir("theme") do |dir|
       assert_operator Theme::Scaffold.write(dir).size, :>, 10
