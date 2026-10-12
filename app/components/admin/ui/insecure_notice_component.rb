@@ -11,9 +11,10 @@ module Admin
     # the app (`HostSettings.apply` turns on `force_ssl`). The sentence is
     # right for both: `PUBLIC_HOST` set to an https address is the fix.
     #
-    # Shared by two layouts, so it lives here: `product` (sign-in and the
-    # password reset pages, where a password is typed: shown to everyone)
-    # and `admin` (the shell: shown to whoever could do something about it,
+    # Shared by three layouts, so it lives here: `product` (sign-in and the
+    # password reset pages, where a password is typed: shown to everyone),
+    # `setup` (the wizard, which takes the first account's password: shown
+    # to everyone too) and `admin` (the shell: shown to whoever could do something about it,
     # which the layout decides, not this component). `request.ssl?` is asked,
     # never the address, because it is what the proxy in front said about
     # THIS request. `production:` is handed in so a test can say it; outside

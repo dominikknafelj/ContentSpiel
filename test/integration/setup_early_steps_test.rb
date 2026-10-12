@@ -51,6 +51,38 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The admin step takes a password, and nobody is signed in: the notice is
+  # for everyone, as on the sign-in page.
+  test "in production over plain HTTP every wizard page says the connection is not encrypted, and nothing says so otherwise" do
+    notice = "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address."
+
+    %w[system_check admin].each do |step|
+      get setup_step_path(step)
+
+      assert_response :success
+      assert_select "#insecure-notice", count: 0
+    end
+
+    was = Rails.env
+    begin
+      Rails.env = "production"
+      %w[system_check admin].each do |step|
+        get setup_step_path(step)
+
+        assert_response :success
+        assert_select "main p#insecure-notice[role=alert]", text: notice, count: 1
+      end
+
+      https!
+      get setup_step_path("admin")
+
+      assert_response :success
+      assert_select "#insecure-notice", count: 0
+    ensure
+      Rails.env = was
+    end
+  end
+
   test "the step list marks the current step, done steps and optional ones" do
     get setup_step_path("admin")
 
