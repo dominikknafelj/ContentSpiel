@@ -39,8 +39,9 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     check = result("Site address", run_check(address: SiteAddress.parse(nil), reset_link_from_request: true))
 
     assert_equal :warning, check.status
-    assert_equal "No site address is set. Any host name is accepted, and addresses in pages and in password reset mails " \
-      "follow the request.", check.message
+    # No word of which hosts are accepted: test answers any, development keeps
+    # Rails' own list (localhost, .test, IP addresses).
+    assert_equal "No site address is set. Addresses in pages and in password reset mails follow the request.", check.message
     assert_equal "PUBLIC_HOST=https://www.example.org", check.command
   end
 
@@ -55,6 +56,29 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       check = result("Site address", run_check(reset_link_from_request: from_request))
 
       assert_equal "This site answers at https://cms.example.org.", check.message
+    end
+  end
+
+  # A proxy ends TLS and the address still says http: the pages' canonical
+  # links, the sitemap and the reset mail carry http, no cookie is Secure and
+  # no HSTS is sent, while the HTTPS row beside this one says OK.
+  test "an http address reached over HTTPS is a warning that says which to change, and names the address" do
+    check = result("Site address", run_check(address: SiteAddress.parse("http://docs.example.org"), request_ssl: true))
+
+    assert_equal :warning, check.status
+    assert_equal "This site answers at http://docs.example.org. The address is http but this page was reached over HTTPS: " \
+      "set PUBLIC_HOST to the https address.", check.message
+    assert_equal "PUBLIC_HOST=https://www.example.org", check.command
+  end
+
+  test "the address is OK as it is when it is https, when the page came over plain HTTP, and when nobody said how it came" do
+    [ [ "https://docs.example.org", true ], [ "https://docs.example.org", false ],
+      [ "http://docs.example.org", false ], [ "http://docs.example.org", nil ] ].each do |address, request_ssl|
+      check = result("Site address", run_check(address: SiteAddress.parse(address), request_ssl: request_ssl))
+
+      assert check.ok?, [ address, request_ssl ].inspect
+      assert_equal "This site answers at #{address}.", check.message
+      assert_nil check.command
     end
   end
 

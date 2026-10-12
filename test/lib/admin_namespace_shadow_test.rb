@@ -34,7 +34,7 @@ require "test_helper"
 # under `Admin`, and a bare reference from inside `Admin` still reaches the
 # top-level constant.
 class AdminNamespaceShadowTest < ActiveSupport::TestCase
-  ROOTS = %w[app/models app/services app/queries app/values app/constraints].freeze
+  ROOTS = %w[app/models app/services app/queries app/values app/constraints lib].freeze
 
   # Not a domain name: `concerns` is no namespace (Rails collapses it:
   # `concerns/trashable.rb` is `Trashable`). There is no `admin` here on purpose:

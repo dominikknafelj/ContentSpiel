@@ -54,7 +54,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
   test "the system check says of reset mails what is true where it runs: from the request here, not sent in production" do
     with_site_address(nil) do
       get setup_step_path("system_check")
-      assert_select "li.admin-system-check[data-status=warning]", text: /in password reset mails\s+follow the request\./
+      assert_select "li.admin-system-check[data-status=warning]", text: /Addresses in pages and in password reset mails follow the request\./
 
       was = Rails.env
       begin

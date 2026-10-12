@@ -117,13 +117,25 @@ module Setup
       # sends no reset mail at all (`PasswordsMailer`: a link taken from the
       # request could be made to point anywhere). In development and test
       # the mail is sent with the request's origin, so the warning has two
-      # wordings and shows the one that is true where it is read.
+      # wordings and shows the one that is true where it is read. The one
+      # for development and test says nothing of hosts: test answers any,
+      # development keeps Rails' own list (localhost, `.test`, IP addresses).
+      #
+      # An http address on a page that was reached over HTTPS (a proxy ends
+      # TLS and nobody changed the variable) is a warning too. Everything
+      # built from the address is still http then (canonical links, the
+      # sitemap, the reset mail's link), no cookie is `Secure` and no HSTS is
+      # sent, and without this the row would say OK beside an "HTTPS" row
+      # that says OK as well, neither telling the person what to change.
       def site_address
-        if @address.configured?
+        if @address.configured? && !@address.https? && @request_ssl
+          warning("Site address", "This site answers at #{@address.origin}. The address is http but this page was reached " \
+            "over HTTPS: set PUBLIC_HOST to the https address.", command: SITE_ADDRESS_COMMAND)
+        elsif @address.configured?
           ok("Site address", "This site answers at #{@address.origin}.")
         elsif @reset_link_from_request
-          warning("Site address", "No site address is set. Any host name is accepted, and addresses in pages and in " \
-            "password reset mails follow the request.", command: SITE_ADDRESS_COMMAND)
+          warning("Site address", "No site address is set. Addresses in pages and in password reset mails follow the request.",
+            command: SITE_ADDRESS_COMMAND)
         else
           warning("Site address", "No site address is set. Any host name is accepted, addresses in pages follow the request, " \
             "and password reset mails are not sent until it is set.", command: SITE_ADDRESS_COMMAND)

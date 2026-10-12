@@ -165,7 +165,7 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
     with_site_address(nil) do
       get "/cs-studio/system_status"
 
-      assert_select "li.admin-system-check[data-status=warning]", text: /in password reset mails\s+follow the request\./
+      assert_select "li.admin-system-check[data-status=warning]", text: /Addresses in pages and in password reset mails follow the request\./
       assert_select "li.admin-system-check", text: /reset mails are not sent/, count: 0
 
       as_production do
@@ -174,6 +174,20 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
         assert_select "li.admin-system-check[data-status=warning]", text: /password reset mails are not sent until it is set\./
         assert_select "li.admin-system-check", text: /follow the request\./, count: 0
       end
+    end
+  end
+
+  # The two rows would otherwise disagree and neither would say what to do:
+  # "HTTPS: OK" beside "Site address: OK, http://…".
+  test "System status reached over HTTPS under an http address says so in the Site address row" do
+    sign_in_as(users(:one))
+    https!
+
+    with_site_address("http://www.example.com") do
+      get "/cs-studio/system_status"
+
+      assert_select "li.admin-system-check[data-status=warning]",
+        text: /Site address\s+This site answers at http:\/\/www\.example\.com\. The address is http but this page was reached over HTTPS/
     end
   end
 

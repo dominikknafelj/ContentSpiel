@@ -253,6 +253,21 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
 
   # A page left while its check is on the way is not thrown to the expired
   # state from wherever the person has gone.
+  #
+  # WHAT THIS PINS: the one line of `check` that returns when the page is no
+  # longer this form (`!this.element.isConnected || this.tokenTarget.value !==
+  # token`). With the line taken out the test fails: the late 410 replaces
+  # the sign-in page with "This link has expired" (seen, three runs of
+  # three). It does not tell the line's two halves apart: leaving by a Turbo
+  # visit disconnects the element AND empties the field
+  # (`turbo:before-cache`), so either half alone passes here. The second
+  # half is for a page the browser put away without disconnecting anything
+  # (`pagehide`) while its check was out; no test pins that half alone.
+  #
+  # What would go wrong is a `location.replace`, which commits some time
+  # after the script asked for it, and when the guard works nothing happens
+  # at all: so there is no condition to wait for, and the test holds still
+  # for as long as such a navigation takes before it looks.
   test "an answer that arrives after the page was left moves nothing" do
     visit admin_sign_in_path
     assert_selector "h1", text: "Sign in"
@@ -263,10 +278,12 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
     press "CONTENT·SPIEL"
     assert_selector "h1", text: "Sign in"
     page.execute_script("window.answerCheck()")
-    await_frames
+    sleep 1 # sleep: a navigation the guard failed to stop needs time to commit, and when the guard works nothing happens to wait for
 
+    assert_no_selector "h1", text: "This link has expired"
     assert_selector "h1", text: "Sign in"
     assert_current_path admin_sign_in_path
+    assert_equal 1, page.evaluate_script("window.checksAsked")
   end
 
   # Writing a hidden field's value writes its attribute, so a copy of the

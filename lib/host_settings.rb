@@ -4,7 +4,9 @@ require_relative "site_address"
 # configuration in one place: which host names are answered, whether HTTPS is
 # forced, the address in mailed links, and what the boot says about it.
 # `config/environments/production.rb` calls `apply` and sets none of these
-# itself; development and test never call it, so they answer any host.
+# itself. Development and test never call it: test answers any host, and
+# development keeps Rails' own list (`.localhost`, `.test` and IP
+# addresses), so a made-up name is refused there too.
 #
 # Required by `config/application.rb` beside `site_address`, although `lib/`
 # is autoloaded: the environment file runs before any autoloading is set up.
@@ -66,6 +68,12 @@ module HostSettings
   # two settings then say opposite things, and what the site does is a
   # mixture of both (`apply`: `force_ssl` from the address, `assume_ssl`
   # from the variable) that nobody chose.
+  #
+  # An https address without ASSUME_SSL=1 gets a line about a redirect loop.
+  # It is the likeliest way to lock everyone out with a RIGHT address: a
+  # proxy that ends TLS and sends no `X-Forwarded-Proto` makes every request
+  # look plain, each is redirected to the address it asked for, no screen
+  # can be reached, and this log is all the person has.
   def self.announcement(address, env = ENV)
     lines = []
     if !address.configured?
@@ -82,6 +90,10 @@ module HostSettings
       else
         "[ContentSpiel] Only the exact host name #{address.host} is answered."
       end
+    end
+    if address.https? && !assume_ssl?(env)
+      lines << "[ContentSpiel] If every request is redirected to itself, the proxy in front ends TLS and does not say so " \
+               "(no X-Forwarded-Proto: https): set ASSUME_SSL=1."
     end
     if assume_ssl?(env)
       lines << "[ContentSpiel] ASSUME_SSL=1: every request is taken as HTTPS, whatever the proxy says."
@@ -100,6 +112,21 @@ module HostSettings
   # such as `localhost`.
   def self.subdomains?(host) = host.include?(".") && !host.start_with?("[") && !host.match?(/\A[0-9.]+\z/)
   private_class_method :subdomains?
+
+  # What the boot says, at warn, when production's log level is debug, nil
+  # otherwise. At debug Action Mailer writes every mail it delivers into the
+  # log, whole (`ActionMailer::LogSubscriber`): the password reset mail with
+  # its link, and so the one token this application otherwise keeps out of
+  # every address and every log line. That is Rails' behaviour and nothing
+  # here changes it; the line is so that nobody runs a public site that way
+  # without having been told. The level is read where `production.rb` reads
+  # it, from RAILS_LOG_LEVEL.
+  def self.log_level_warning(env = ENV)
+    return nil unless env["RAILS_LOG_LEVEL"].to_s.strip.downcase == "debug"
+
+    "[ContentSpiel] RAILS_LOG_LEVEL=debug: Rails logs every mail it sends in full, a password reset link and its " \
+      "token included. Use info or above on a site other people use."
+  end
 
   HOW_TO_SET = "Make a value with `bin/rails secret` and set it as the environment variable SECRET_KEY_BASE; " \
                "keep it the same across restarts."

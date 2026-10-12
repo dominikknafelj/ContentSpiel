@@ -103,8 +103,8 @@ module Admin
         # redirect could carry it only in an address or in the session. It
         # is in the hidden field of this one response, to the person who
         # just sent it (and it is the token `set_user_by_token` verified, so
-        # a String). `no_store` (below) keeps the response out of every
-        # cache.
+        # a String). `no_store` (Rails' own, the `before_action` above)
+        # keeps the response out of every cache.
         @token = params[:token]
         flash.now[:alert] = result.errors.to_sentence
         render :edit, status: :unprocessable_entity

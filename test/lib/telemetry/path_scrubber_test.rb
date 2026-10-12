@@ -23,7 +23,7 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
   end
 
   test "the routes that carry no token are left as they are" do
-    [ "/#{ADMIN}/password/edit", "/#{ADMIN}/password/new", "/#{ADMIN}/password",
+    [ "/#{ADMIN}/password/edit", "/#{ADMIN}/password/new", "/#{ADMIN}/password/check", "/#{ADMIN}/password/check/", "/#{ADMIN}/password",
       "/#{ADMIN}/password/", "/#{ADMIN}/password/new?email=x", "/#{ADMIN}/password/edit/" ].each do |path|
       assert_equal path, scrub(path)
       assert_same path, scrub(path), "an unchanged path is the same string"

@@ -123,6 +123,8 @@ module ContentSpiel
         # `require_secret!`'s to turn into its own message.
         HostSettings.require_secret!(ENV, credentials: Rails.application.credentials) unless ENV["SECRET_KEY_BASE_DUMMY"]
         HostSettings.announcement(SiteAddress.current, ENV).each { |line| Rails.logger.info line }
+        # At debug the log holds every mail in full, a reset link included.
+        HostSettings.log_level_warning(ENV)&.then { |line| Rails.logger.warn line }
       end
     end
 

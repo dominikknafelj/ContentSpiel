@@ -15,16 +15,19 @@ module Telemetry
   # The rule is wider than the two routes, because a path is recorded before
   # the router has said whether it is one of ours: the segment that follows
   # `<admin>/password/` is filtered wherever something follows it, and where
-  # it is the last one unless it is `new` or `edit`, the two addresses of
-  # that shape that carry no token. So a link a mail program has spoilt
+  # it is the last one unless it is `new`, `edit` or `check`, the addresses
+  # of that shape that carry no token. So a link a mail program has spoilt
   # (a bracket taken into it, a slash doubled) is filtered too, and a path
   # that is filtered without need costs a reader nothing.
   module PathScrubber
     FILTERED = "[FILTERED]".freeze
 
-    # Under `<admin>/password/`, as a last segment: the request form and the
-    # reset form. Neither is a token.
-    NOT_A_TOKEN = %w[new edit].freeze
+    # Under `<admin>/password/`, as a last segment: the request form, the
+    # reset form and the address the reset form's script asks whether its
+    # link is still good (the token is in that request's body). None is a
+    # token, and a span that read `password/[FILTERED]` for them would tell
+    # its reader a secret had been in the path of every reset.
+    NOT_A_TOKEN = %w[new edit check].freeze
 
     # The attributes that hold a request's address or a part of it, in the
     # stable HTTP conventions (`url.*`) and in the older ones (`http.*`):

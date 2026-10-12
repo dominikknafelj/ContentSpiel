@@ -87,7 +87,9 @@ class HostSettingsTest < ActiveSupport::TestCase
   test "the boot lines say what is served, that the match is exact, and what is refused" do
     assert_equal [
       "[ContentSpiel] Serving https://docs.example.org. Other host names are refused; plain HTTP is redirected.",
-      "[ContentSpiel] Only the exact host name docs.example.org is answered: not www.docs.example.org, not any other subdomain."
+      "[ContentSpiel] Only the exact host name docs.example.org is answered: not www.docs.example.org, not any other subdomain.",
+      "[ContentSpiel] If every request is redirected to itself, the proxy in front ends TLS and does not say so " \
+        "(no X-Forwarded-Proto: https): set ASSUME_SSL=1."
     ], HostSettings.announcement(SiteAddress.parse("https://docs.example.org"), {})
 
     assert_equal [
@@ -108,7 +110,7 @@ class HostSettingsTest < ActiveSupport::TestCase
       lines = HostSettings.announcement(SiteAddress.parse(address), {})
 
       assert_equal "[ContentSpiel] Only the exact host name #{host} is answered.", lines[1], address
-      assert_equal 2, lines.size, address
+      assert_equal address.start_with?("https") ? 3 : 2, lines.size, address
       assert_no_match(/www\.|subdomain/, lines.join("\n"), address)
     end
 
@@ -137,6 +139,39 @@ class HostSettingsTest < ActiveSupport::TestCase
     [ [ "https://docs.example.org", { "ASSUME_SSL" => "1" } ], [ nil, { "ASSUME_SSL" => "1" } ],
       [ "http://localhost:3030", {} ], [ "http://localhost:3030", { "ASSUME_SSL" => "true" } ] ].each do |address, env|
       assert_empty HostSettings.announcement(SiteAddress.parse(address), env).grep(/contradicts/), [ address, env ].inspect
+    end
+  end
+
+  # The likeliest way to lock everyone out with a RIGHT address: a proxy that
+  # ends TLS and does not say so. Every request is then redirected to the
+  # address it asked for, no screen can be reached, and the log is all a
+  # person has.
+  test "under an https address the boot says what a redirect loop means, unless ASSUME_SSL=1 already answers it" do
+    loop_line = "[ContentSpiel] If every request is redirected to itself, the proxy in front ends TLS and does not say so " \
+                "(no X-Forwarded-Proto: https): set ASSUME_SSL=1."
+
+    lines = HostSettings.announcement(SiteAddress.parse("https://docs.example.org"), {})
+    assert_equal 3, lines.size
+    assert_equal loop_line, lines.last
+
+    [ [ "https://docs.example.org", { "ASSUME_SSL" => "1" } ], [ "http://localhost:3030", {} ], [ nil, {} ] ].each do |address, env|
+      assert_empty HostSettings.announcement(SiteAddress.parse(address), env).grep(/redirected to itself/), [ address, env ].inspect
+    end
+    # A value that is not "1" turns nothing on, so the line is still needed.
+    assert_includes HostSettings.announcement(SiteAddress.parse("https://docs.example.org"), { "ASSUME_SSL" => "true" }), loop_line
+  end
+
+  # Action Mailer writes every mail it delivers into the log at debug, whole:
+  # the reset mail's link and its token with it.
+  test "a log level of debug gets a warning that names what it writes, and no other level does" do
+    warning = "[ContentSpiel] RAILS_LOG_LEVEL=debug: Rails logs every mail it sends in full, a password reset link and its " \
+              "token included. Use info or above on a site other people use."
+
+    [ "debug", "DEBUG", " debug " ].each do |level|
+      assert_equal warning, HostSettings.log_level_warning({ "RAILS_LOG_LEVEL" => level }), level.inspect
+    end
+    [ nil, "", "info", "warn", "error", "0", "debugging" ].each do |level|
+      assert_nil HostSettings.log_level_warning({ "RAILS_LOG_LEVEL" => level }), level.inspect
     end
   end
 
