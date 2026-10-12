@@ -382,4 +382,255 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     assert_equal few, copies.call(capture_sql { get "/" })
   end
+
+  # --- Publishing never leaves a live record without an address (Task 4, fix round 1) ---
+
+  def list_titles = css_select(".content-block--post-list a").map { |link| link.text.strip }
+  def list_hrefs = css_select(".content-block--post-list a").map { |link| link["href"] }
+
+  # A page "Topic" that filters by the tag, with a child page at the address
+  # a post "Hello" would have under it.
+  def topic_with_child(tag)
+    topic = listing_page("Topic", tag: tag)
+    create_page(title: "Hello", parent: topic)
+    topic
+  end
+
+  test "publishing a post's tags that would put it on an address another record holds is refused, and nothing is written" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic_with_child("topic")
+    post = create_post(title: "Hello")
+    assert_equal "/blog/hello", path_of(post)
+    assert Posts::Save.call(post, attributes: { tag_names: %w[topic] }).ok?
+    assert_equal "/blog/hello", path_of(post.reload), "a live post's tags move nothing until they are published"
+    copies = Publishing::Version.count
+    events = Audit::Event.count
+    counter = PublicSite::Version.current
+    addresses = PublicPath.order(:id).pluck(:id, :path, :current)
+
+    result = Publishing::PublishChanges.call(post.reload)
+
+    assert_not result.ok?
+    assert_equal [ "Slug en gives the address /topic/hello, which is already taken in EN" ], result.errors.grep(/EN\z/)
+    assert_equal [ copies, events, counter ], [ Publishing::Version.count, Audit::Event.count, PublicSite::Version.current ]
+    assert_equal addresses, PublicPath.order(:id).pluck(:id, :path, :current)
+    get "/blog/hello"
+    assert_response :success
+    assert_select "h1", text: "Hello"
+
+    assert_not Publishing::PublishChanges.call(post.reload, at: 2.days.from_now).ok?, "a scheduled change is asked the same, when it is scheduled"
+    assert_nil Publishing.pending(post)
+  end
+
+  test "publishing a post's tags that move it to a free address succeeds, and the old address redirects" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    listing_page("Topic", tag: "topic")
+    post = create_post(title: "Hello")
+    assert Posts::Save.call(post, attributes: { tag_names: %w[topic] }).ok?
+
+    result = Publishing::PublishChanges.call(post.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "/topic/hello", path_of(post.reload)
+    get "/blog/hello"
+    assert_redirected_to "/topic/hello"
+  end
+
+  test "a new live post whose brand-new tag would put it on a taken address is refused as before, and so is a draft" do
+    listing_page("Blog")
+    topic_with_child("fresh") # no tag "fresh" exists: the new post's save creates it
+    tags = Tag.count
+
+    [ true, false ].each do |published|
+      result = Posts::Save.call(attributes: { content_type: "blog", published: published, tag_names: %w[fresh] }, translations: { "en" => { title: "Hello" } })
+
+      assert_not result.ok?, "published: #{published}"
+      assert_includes result.errors, "Slug en gives the address /topic/hello, which is already taken in EN"
+      assert_equal [ 0, tags ], [ Post.count, Tag.count ], "the save is rolled back, its new tag included"
+    end
+
+    free = Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: %w[fresh] }, translations: { "en" => { title: "Other" } })
+    assert free.ok?, free.errors.to_sentence
+    assert_equal "/topic/other", path_of(free.record)
+  end
+
+  test "a post published again after an unpublish is refused when the tags it got as a draft would put it on a taken address" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = listing_page("Topic", tag: "topic")
+    post = create_post(title: "Hello")
+    assert Posts::Save.call(post, attributes: { published: false }).ok?
+    assert Posts::Save.call(post.reload, attributes: { tag_names: %w[topic] }).ok?
+    assert_equal "/topic/hello", path_of(post.reload), "a draft follows its rows"
+    # The post gives the address up, and a page takes it.
+    assert Posts::Save.call(post.reload, attributes: { tag_names: [] }).ok?
+    create_page(title: "Hello", parent: topic)
+    PostTag.insert_all([ { post_id: post.id, tag_id: Tag.find_by!(name: "topic").id } ]) # version: none (a test tags a draft around the save, which would refuse it)
+
+    result = Posts::Save.call(post.reload, attributes: { published: true })
+
+    assert_not result.ok?
+    assert_includes result.errors, "Slug en gives the address /topic/hello, which is already taken in EN"
+    assert_nil post.reload.published_at
+  end
+
+  # --- The tag services on records WITH copies, as a visitor sees them ---------
+
+  # A page whose copy filters by `tag` (which exists, so the copy records its
+  # id), an unfiltered page, and a post carrying the tag.
+  def tagged_listing(tag)
+    Tag.create!(name: tag)
+    everything = listing_page("Everything")
+    tagged = listing_page("Tagged", tag: tag)
+    post = create_post(title: "Carrier", tags: [ tag ])
+    assert_equal "/tagged/carrier", path_of(post)
+    [ tagged, everything, post ]
+  end
+
+  def assert_listed_at_tagged
+    get "/tagged"
+    assert_equal [ [ "Carrier" ], [ "/tagged/carrier" ] ], [ list_titles, list_hrefs ]
+    get "/tagged/carrier"
+    assert_response :success
+  end
+
+  test "renaming a tag moves nothing public; publishing the page then takes the post out of its list and to the next one, whatever the post publishes" do
+    tagged, _, post = tagged_listing("ruby")
+
+    assert Tags::Rename.call(Tag.find_by!(name: "ruby"), name: "rubies").ok?
+    assert_listed_at_tagged
+
+    # The post's copy holds the tag's id and nothing about it changed.
+    publish_changes(post)
+    assert_listed_at_tagged
+
+    # The page's rows still filter by the old NAME: published, its copy names
+    # a tag nobody has, and the post goes to the list that still holds it.
+    publish_changes(tagged)
+    get "/tagged"
+    assert_empty list_titles
+    assert_equal "/everything/carrier", path_of(post.reload)
+    get "/tagged/carrier"
+    assert_redirected_to "/everything/carrier"
+    get "/everything"
+    assert_equal [ "/everything/carrier" ], list_hrefs
+  end
+
+  test "merging a tag changes no public list and no address, with no publish, and publishing the page and the posts afterwards changes nothing either" do
+    tagged, _, post = tagged_listing("ruby")
+
+    assert Tags::Merge.call(Tag.find_by!(name: "ruby"), into: Tag.create!(name: "gems")).ok?
+
+    assert_listed_at_tagged
+    kept = Tag.find_by!(name: "gems").id
+    assert_equal [ kept ], Publishing.current(post).tag_ids
+    assert_equal %w[ruby], Publishing.current(post).snapshot["tags"].map { |tag| tag["name"] }, "the name a visitor reads is the copy's until the post is published"
+
+    [ tagged, post ].each do |record|
+      publish_changes(record)
+      assert_listed_at_tagged
+    end
+    get "/everything"
+    assert_equal [ "/tagged/carrier" ], list_hrefs
+  end
+
+  # The other direction is the merge itself: two tags are one from now on,
+  # in the copies as in the rows, so the merged tag's carriers are in the
+  # kept tag's lists at once.
+  test "merging a tag INTO one a published list filters by brings the merged tag's posts into that list at once, each at an address that answers" do
+    tagged, _, post = tagged_listing("ruby")
+    other = create_post(title: "Other carrier", tags: %w[rb])
+    assert_equal "/everything/other-carrier", path_of(other)
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rb"), into: Tag.find_by!(name: "ruby")).ok?
+
+    get "/tagged"
+    assert_equal %w[/tagged/carrier /tagged/other-carrier], list_hrefs.sort
+    get "/tagged/other-carrier"
+    assert_response :success
+    get "/everything/other-carrier"
+    assert_redirected_to "/tagged/other-carrier"
+
+    [ tagged, post, other ].each { |record| publish_changes(record) }
+    get "/tagged"
+    assert_equal %w[/tagged/carrier /tagged/other-carrier], list_hrefs.sort
+  end
+
+  test "a merge reaches a pending copy too: a scheduled change keeps its posts when its time comes" do
+    tagged, _, post = tagged_listing("ruby")
+    assert Pages::Save.call(tagged, translations: { "en" => { subtitle: "Scheduled" } }).ok?
+    publish_changes(tagged, at: 2.days.from_now)
+    assert Posts::Save.call(post, translations: { "en" => { excerpt: "Scheduled" } }).ok?
+    publish_changes(post, at: 2.days.from_now)
+
+    assert Tags::Merge.call(Tag.find_by!(name: "ruby"), into: Tag.create!(name: "gems")).ok?
+
+    kept = Tag.find_by!(name: "gems").id
+    assert_equal [ kept ], Publishing.pending(post).tag_ids
+    assert_equal [ kept ], Publishing.pending(tagged).blocks.filter_map { |block| block["listed_tag_id"] }
+    assert_equal %w[ruby], Publishing.pending(tagged).blocks.filter_map { |block| block.dig("settings", "tag") }, "the name in the copy is as it was taken"
+    travel_to 3.days.from_now do
+      PublicSite::Paths.sync_went_live(since: 2.days.ago)
+      assert_listed_at_tagged
+    end
+  end
+
+  test "deleting a tag moves nothing public while the copies hold its id; publishing the post then takes it out of the list, to the next one or to no address" do
+    tagged, everything, post = tagged_listing("ruby")
+
+    assert Tags::Destroy.call(Tag.find_by!(name: "ruby")).ok?
+    assert_listed_at_tagged
+
+    # The page published: its copy names a tag nobody has, and lists nothing.
+    publish_changes(tagged)
+    get "/tagged"
+    assert_empty list_titles
+    assert_equal "/everything/carrier", path_of(post.reload)
+
+    # With no other list the post is "not listed", by design: no address.
+    assert Trash::Move.call(everything).ok?
+    publish_changes(post)
+    assert_nil path_of(post.reload)
+    get "/everything/carrier"
+    assert_response :not_found
+  end
+
+  # --- The preview's links (it shows the rows; addresses follow the copies) ----
+
+  test "in the preview a post in a list that is only in a live page's rows links to its own preview there, which shows it" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    page = create_page(title: "Blog")
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    post = create_post(title: "Hello")
+    assert_nil path_of(post), "no published copy lists it"
+    sign_in_as users(:one)
+
+    get "/preview/blog"
+
+    assert_equal [ "/preview/blog/hello" ], list_hrefs
+    get "/preview/blog/hello"
+    assert_response :success
+    assert_select "h1", text: "Hello"
+
+    reset! # a visitor: no session
+    get "/blog/hello"
+    assert_response :not_found
+    get "/blog"
+    assert_empty list_hrefs
+  end
+
+  test "in the preview a post that has an address is linked at it, on whatever page lists it" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    listing_page("Blog")
+    teaser = create_page(title: "Teaser")
+    ContentBlocks::Save.call(ContentBlock.new(owner: teaser), attributes: { block_type: "post_list", settings: {} })
+    create_post(title: "Hello")
+    sign_in_as users(:one)
+
+    get "/preview/teaser"
+
+    assert_equal [ "/preview/blog/hello" ], list_hrefs
+  end
 end

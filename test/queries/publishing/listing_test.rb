@@ -161,10 +161,24 @@ class Publishing::ListingTest < ActiveSupport::TestCase
   end
 
   test "blocks loads the copies that list posts and no other, in the same statements for 2 pages as for 8" do
+    published_block(title: "The one listing", content_type: "blog")
     2.times { |index| create_page(title: "Plain #{index}") }
     few = capture_sql { Publishing::Listing.blocks }.size
     6.times { |index| create_page(title: "More #{index}") }
+    # A page that listed posts once and no longer does: its newest copy is
+    # looked at by the grouping and not loaded.
+    former = create_page(title: "Former listing", published: false)
+    block = list_block(former, content_type: "blog")
+    assert Pages::Save.call(former, attributes: { published: true }).ok?
+    assert ContentBlocks::Destroy.call(block).ok?
+    publish_changes(former)
 
-    assert_equal few, capture_sql { Publishing::Listing.blocks }.size
+    loaded = 0
+    counting = ->(*, payload) { loaded += payload[:record_count] if payload[:class_name] == "Publishing::Version" }
+    statements = ActiveSupport::Notifications.subscribed(counting, "instantiation.active_record") { capture_sql { Publishing::Listing.blocks } }
+
+    assert_equal few, statements.size
+    assert_equal 1, loaded, "copies that list no posts were loaded"
+    assert_operator Publishing::Version.where(record_type: "Page").count, :>, 10
   end
 end

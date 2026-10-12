@@ -65,9 +65,12 @@ module PublicPageRendering
   # record rebuilt from its published copy (`Publishing.published`), the
   # preview the record itself. The address was resolved from the ROW either
   # way: slug, tree and publish state are not in a copy.
-  def assign_record(record)
+  #
+  # `listing_page:` is the preview's, for a post that has no address yet:
+  # the page whose rows list it (`PublicSite::Resolver#listing_fallback`).
+  def assign_record(record, listing_page: nil)
     if record.is_a?(Post)
-      page = PublicSite::Paths.canonical_page(record)
+      page = listing_page || PublicSite::Paths.canonical_page(record)
       return false if page.nil?
 
       @page = as_published(page)

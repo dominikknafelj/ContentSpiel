@@ -5,12 +5,15 @@
 # missing record: a miss is a Result like any other.
 module PublicSite
   class Resolver
-    Result = Data.define(:status, :record, :location, :http_status) do
-      def self.found(record) = new(status: :found, record:, location: nil, http_status: 200)
+    # `listing_page` is set for one answer only: a post found in the PREVIEW
+    # under a page whose rows list it while the post has no address (see
+    # `listing_fallback`). It is the page to draw the post on.
+    Result = Data.define(:status, :record, :location, :http_status, :listing_page) do
+      def self.found(record, listing_page: nil) = new(status: :found, record:, location: nil, http_status: 200, listing_page:)
       # `record` is what the redirect points at -- the preview checks the
       # actor may read it before disclosing where it lives now.
-      def self.redirect(location, http_status = 301, record: nil) = new(status: :redirect, record:, location:, http_status:)
-      def self.not_found = new(status: :not_found, record: nil, location: nil, http_status: 404)
+      def self.redirect(location, http_status = 301, record: nil) = new(status: :redirect, record:, location:, http_status:, listing_page: nil)
+      def self.not_found = new(status: :not_found, record: nil, location: nil, http_status: 404, listing_page: nil)
     end
 
     # The record and every ancestor page must be published -- for a post,
@@ -71,7 +74,13 @@ module PublicSite
       return nil if post.nil? || !visible?(post)
 
       target = @urls.path_for(post, locale)
-      target && Result.redirect(target, record: post)
+      return Result.redirect(target, record: post) if target
+
+      # No address at all, in the preview: the page's ROWS list the post and
+      # no published copy does yet (a list block added to a live page and not
+      # published). The preview shows the rows, so it shows the post here,
+      # on the page that lists it; a visitor gets the 404 below.
+      Result.found(post, listing_page: page_row.record) if @scope == :preview
     end
 
     # Whether `page` lists `post`: for a visitor by the page's copy and the

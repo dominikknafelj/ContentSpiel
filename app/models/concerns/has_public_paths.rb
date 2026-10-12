@@ -13,6 +13,14 @@
 # What a record's URLs depend on that is NOT one of its own columns is
 # synced by whoever writes it, never by this condition, and each of them
 # calls `PublicSite::Paths` itself:
+# FOR A PUBLISHED OR SCHEDULED RECORD THAT HAS A COPY, the list blocks of a
+# page and the tags of a post are read from that copy, not from the rows
+# (`PublicSite::Paths.canonical_pages`, drafts spec §5): the block's and the
+# join row's syncs named below then find nothing to move, and the address
+# moves when the copy is taken (the method that takes it announces it:
+# `PublicSite::Paths.published`) or comes into force by the clock
+# (`sync_copies_went_live`). The entries below are as written for every
+# other record: a draft, and one written around the services.
 # - a tag's *name*, which is what a listing block's `tag` setting matches,
 #   and join rows written around the association: `Tags::Rename`,
 #   `Tags::Merge` and `Tags::Destroy` (a post's own tags coming and going
@@ -88,6 +96,19 @@ module HasPublicPaths
     new_record? || url_input_names.any? { |name| will_save_change_to_attribute?(name) }
   end
 
+  # Whether the addresses this record WOULD have are free, asked by a service
+  # where the validation below cannot answer: it runs before the save, when a
+  # tag made by this very save has no id yet (so no tag-filtered list holds
+  # the post), and it judges a published post by its copy's tags, not by the
+  # tags about to be published. `Posts::Save` asks once the tags are written,
+  # `Publishing::PublishChanges` before it takes a post's copy; a taken
+  # address is the validation's own error, on the slug that gives it, and
+  # the caller rolls its transaction back. A page's address depends on
+  # neither, so for a page this is the validation again.
+  def address_free_as_typed?
+    add_taken_address_errors(PublicSite::Paths.compute(self, rows: true).compact)
+  end
+
   private
 
   def remember_url_inputs_change
@@ -120,16 +141,21 @@ module HasPublicPaths
   def public_paths_are_available
     return unless url_inputs_changed?
 
-    paths = PublicSite::Paths.compute(self).compact
-    return if paths.empty?
+    add_taken_address_errors(PublicSite::Paths.compute(self).compact)
+  end
+
+  # One error per language whose path (`{ locale => path }`) is another
+  # record's current address; true when there is none.
+  def add_taken_address_errors(paths)
+    return true if paths.empty?
 
     taken = PublicPath.current.where(path: paths.values.uniq)
       .where.not(record_type: self.class.polymorphic_name, record_id: id).pluck(:locale, :path).to_set
-    paths.each do |locale, path|
-      next unless taken.include?([ locale.to_s, path ])
-
+    clashing = paths.select { |locale, path| taken.include?([ locale.to_s, path ]) }
+    clashing.each do |locale, path|
       errors.add(Mobility.normalize_locale_accessor(:slug, locale), :taken,
         message: "gives the address #{path}, which is already taken in #{locale.upcase}")
     end
+    clashing.empty?
   end
 end

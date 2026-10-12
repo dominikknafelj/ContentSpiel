@@ -37,8 +37,19 @@ module Tags
     # matter). `content_type.presence` folds a blank filter to `nil`, which
     # `sync_posts` reads as "every content type"; `map` + `uniq`, never
     # `filter_map`, because that `nil` is a meaningful answer here.
-    def affected_content_types(*names)
-      listing_blocks_naming(*names).map { |block| block.settings_object.content_type.presence }.uniq
+    #
+    # The rows' blocks AND the current published copies' (drafts spec §5): a
+    # published page lists what its copy lists, and a copy's block that
+    # recorded no tag id finds its tag by name when it is read, so a name
+    # that only a copy still filters by is affected like one a row names
+    # (`Publishing::Listing.copied_types_naming`). Both, since a page is
+    # judged by one or the other depending on a state these services do not
+    # ask about; a type too many is a sync that writes nothing.
+    # `tag_ids:` adds the copies' blocks that RECORDED one of these ids,
+    # whatever name they hold (`Tags::Merge`: the two ids become one).
+    def affected_content_types(*names, tag_ids: [])
+      (listing_blocks_naming(*names).map { |block| block.settings_object.content_type.presence } +
+        Publishing::Listing.copied_types_naming(names, tag_ids: tag_ids)).uniq
     end
 
     # An open post form resends every tag chip on every autosave, so a post

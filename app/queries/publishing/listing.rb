@@ -112,10 +112,35 @@ module Publishing
         current_copies_listing(now).where(record_id: page_ids).flat_map { |version| types_of(version) }
       end
 
-      # The content types one copy's list blocks name (`nil`: every type).
+      # The content types the list blocks of the site's CURRENT copies name
+      # when the block's own filter is one of these tag names (trimmed,
+      # whatever the case), with or without a recorded id, or recorded one of
+      # `tag_ids` (a merge makes two ids one, so a block that recorded either
+      # lists the carriers of both afterwards): what a tag service
+      # has to re-derive beside the rows' blocks (`Tags::Listings
+      # #affected_content_types`). A copy that recorded no id for its filter
+      # finds the tag by NAME at read time (`tag_id_of`), so a rename away
+      # from that name, or onto it, changes what that copy lists although no
+      # row of the page says so any more.
+      def copied_types_naming(names, tag_ids: [], now: Time.current)
+        names = Array(names).map { |name| name.to_s.strip.downcase }.compact_blank
+        return [] if names.empty? && tag_ids.empty?
+
+        current_copies_listing(now).flat_map do |version|
+          types_of(version) do |block|
+            names.include?(block.dig("settings", "tag").to_s.strip.downcase) || tag_ids.include?(block["listed_tag_id"])
+          end
+        end
+      end
+
+      # The content types one copy's list blocks name (`nil`: every type);
+      # with a block, of the list blocks it answers true for.
       def types_of(version)
         version.blocks.filter_map do |block|
-          [ block.dig("settings", "content_type").presence ] if BlockTypes.find(block["block_type"])&.capability?(:lists_posts)
+          next unless BlockTypes.find(block["block_type"])&.capability?(:lists_posts)
+          next if block_given? && !yield(block)
+
+          [ block.dig("settings", "content_type").presence ]
         end.flatten(1)
       end
 

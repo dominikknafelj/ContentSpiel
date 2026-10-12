@@ -110,6 +110,11 @@ class Post < ApplicationRecord
   # `after_commit`, with or without a save of the post; a tag removed
   # through the association with no save of the post afterwards is synced
   # by nothing until the next sync that reaches the post.
+  #
+  # For a published or scheduled post that has a copy, the tags that count
+  # are the COPY's (`PublicSite::Paths.canonical_pages`): each of these syncs
+  # still runs and finds nothing to move, and the address follows when the
+  # post's changes are published (`PublicSite::Paths.published`).
   url_inputs_are :slug, :content_type, :published_at, :trashed_at
   after_save :sync_public_paths
 

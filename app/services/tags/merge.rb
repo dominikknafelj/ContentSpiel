@@ -76,12 +76,18 @@ module Tags
         # Read before anything changes: which listings are affected is decided by
         # the blocks as they stand now (a block naming either tag, whichever
         # content types they list).
-        content_types = affected_content_types(source.name, into.name)
+        content_types = affected_content_types(source.name, into.name, tag_ids: [ source.id, into.id ])
         blocks = listing_blocks_naming(source.name)
 
         give_target_to_carriers(into, carrier_ids)
         touch_carrying_posts(source)
         repoint_blocks(blocks, source, into)
+        # The published copies too, after the page locks above: a merge is
+        # immediate everywhere, as a slug is. The copies reference the tag by
+        # id and `source`'s is about to stop existing, so the lists and the
+        # addresses the public has stay exactly what they are
+        # (`Publishing::Version.repoint_tag!`).
+        Publishing::Version.repoint_tag!(from: source, to: into)
         PostTag.where(tag_id: source.id).delete_all
         source.destroy!
         # Join rows and block settings were written around the callbacks

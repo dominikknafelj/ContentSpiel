@@ -27,10 +27,16 @@ module PublicSite
     # A fixed number of queries either way: one for a page (its parent's
     # rows, every language at once), `canonical_pages`' own plus one for a
     # post.
-    def compute(record)
+    #
+    # `rows: true` judges a post by the tags of its ROWS, whatever copy it
+    # has: the address it WOULD have once those tags are published. That is
+    # what `Publishing::PublishChanges` and `Posts::Save` ask before they take
+    # a copy, so that a clash is refused instead of found afterwards
+    # (`Post#address_free_as_typed?`).
+    def compute(record, rows: false)
       case record
       when Page then page_paths(record, current_paths("Page", [ record.parent_id ].compact).fetch(record.parent_id, {}))
-      when Post then post_paths([ record ]).fetch(record)
+      when Post then post_paths([ record ], rows: rows).fetch(record)
       else Locales.enabled.index_with { nil }
       end
     end
@@ -208,7 +214,13 @@ module PublicSite
     # The same clock moves a second thing: a published copy taken with a time
     # ("Publish changes" at a time) comes into force when that time passes,
     # and with it the list blocks and tags addresses are derived from:
-    # `sync_copies_went_live`, over the same window.
+    # `sync_copies_went_live`, over the same window. For those a late or
+    # missing run costs more than a delay: the public list is drawn from the
+    # copy the moment its time has come, so until the sweep a post a new list
+    # block lists has no address there (its link in that list leads nowhere
+    # new), and one a removed block listed keeps an address that answers 404.
+    # Where nothing sweeps (development, test) `bin/rails
+    # public_paths:rebuild` is what catches up.
     def sync_went_live(since:, now: Time.current)
       sync_posts_listed_under(Page.kept.where(Page.arel_table[:published_at].gt(since)).where(published_at: ..now).to_a)
       sync_copies_went_live(since: since, now: now)
@@ -264,7 +276,14 @@ module PublicSite
       came.each do |version|
         next if version.record.nil? || version.record.trashed?
 
-        published(version.record, version, Publishing::Version.of(version.record).where(versions[:number].lt(version.number)).order(number: :desc).first)
+        previous = Publishing::Version.of(version.record).where(versions[:number].lt(version.number)).order(number: :desc).first
+        # A page with no copy before this one (written around the services)
+        # listed what its ROWS list until this copy's time came, and those
+        # rows may have changed since the copy was taken: the posts of the
+        # types the rows name are looked at too, or a post only the rows
+        # listed would keep an address nothing gives it any more.
+        sync_posts_listed_under([ version.record ]) if previous.nil? && version.record.is_a?(Page)
+        published(version.record, version, previous)
       end
     end
 
@@ -326,8 +345,8 @@ module PublicSite
     # `{ post => { locale => path } }` for several posts in one pass: their
     # canonical pages together (`canonical_pages`), then those pages' current
     # paths in one query.
-    def post_paths(posts)
-      pages = canonical_pages(posts)
+    def post_paths(posts, rows: false)
+      pages = canonical_pages(posts, rows: rows)
       listing_paths = current_paths("Page", pages.values.compact.map(&:id).uniq)
 
       posts.index_with do |post|
@@ -417,7 +436,7 @@ module PublicSite
     # constant number of queries however many posts, blocks or pages there
     # are), then each post is ranked among the blocks that list it. The
     # New post dialog asks for every creatable type's listing page at once.
-    def canonical_pages(posts)
+    def canonical_pages(posts, rows: false)
       # The list blocks AS PUBLISHED (`Publishing::Listing.blocks`, drafts
       # spec §5): a published or scheduled page that has a copy lists what
       # its current copy lists, so a list block changed, added or deleted in
@@ -446,7 +465,8 @@ module PublicSite
       # draft, an unsaved one, one written around the services) by its rows'.
       # Only the tags: the post's type, slug, publication and trash state are
       # read from `post` itself by everything else here.
-      views = posts.zip(Publishing.published_all(posts)).each_with_object({}.compare_by_identity) { |(post, view), all| all[post] = view }
+      # (`rows: true`: every post by its rows' tags, see `compute`.)
+      views = posts.zip(rows ? posts : Publishing.published_all(posts)).each_with_object({}.compare_by_identity) { |(post, view), all| all[post] = view }
 
       posts.index_with do |post|
         view = views.fetch(post)
@@ -627,8 +647,16 @@ module PublicSite
     #
     # The record's own save never gets this far with such a path --
     # `HasPublicPaths#public_paths_are_available` turns it into a validation
-    # error first (spec §5.2) -- so a hit here means the sync was triggered
-    # by a *different* record's write: a post_list block saved or destroyed
+    # error first (spec §5.2), and where the validation cannot see the path
+    # yet, the service asks again before it lets the write stand
+    # (`HasPublicPaths#address_free_as_typed?`: `Posts::Save`, once a new
+    # tag has its id and before a first copy is taken, and
+    # `Publishing::PublishChanges`, before the copy that publishes a post's
+    # tags) -- so a hit here means the sync was triggered by a *different*
+    # record's write, or by the clock (a copy of a post that came into force
+    # at its time, `sync_copies_went_live`: it was asked when it was
+    # scheduled, and an address taken since cannot be refused by a sweep):
+    # a post_list block saved or destroyed
     # (`ContentBlock#sync_listed_post_paths`), a page saved, moved or
     # reordered (`Page#sync_public_paths`, including a cascade into its
     # descendants), a tag added or removed (`PostTag#sync_post_paths`), or a

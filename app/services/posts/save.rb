@@ -98,6 +98,7 @@ module Posts
         raise ActiveRecord::Rollback if refused
 
         (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
+        address_free?(was_unpublished) || raise(ActiveRecord::Rollback)
         touch_for_join_rows(related_before)
         # The body's `image` nodes, every locale (media library design spec
         # §5.1) -- recomputed from the saved post, so an image removed from
@@ -125,6 +126,24 @@ module Posts
     end
 
     private
+
+    # The address clash the post's own validation could not see, asked now
+    # that the tags are written (`HasPublicPaths#address_free_as_typed?`):
+    # a tag this save made had no id when the validation ran, so a list that
+    # filters by it did not count; and a post published again after an
+    # unpublish was validated by the tags of its older copy. Refused with the
+    # validation's own error, the whole save rolled back, instead of a post
+    # that is saved, published and has no address.
+    #
+    # Asked only where the rows' tags decide the address after this save: a
+    # draft whose tags this call set, and a post this call publishes or
+    # schedules (the copy taken below is the rows). A live post's tags move
+    # nothing until `Publishing::PublishChanges`, which asks the same.
+    def address_free?(was_unpublished)
+      return true unless @post.published_at.nil? ? @attributes.key?(:tag_names) : was_unpublished
+
+      @post.address_free_as_typed?
+    end
 
     # Tags and related posts are join rows: changing only those saves no
     # column of the post, so its `updated_at` would not move -- and

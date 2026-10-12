@@ -108,6 +108,13 @@ class ContentBlock < ApplicationRecord
   # matches. `sync_posts` re-derives each post's canonical page from scratch,
   # so it's called for both the block's current content type (after_save) and,
   # when a save or destroy changes which type that was, the previous one too.
+  #
+  # On a published or scheduled page that has a copy this sync finds nothing
+  # to move: the page lists what its COPY lists (`PublicSite::Paths
+  # .canonical_pages`), so the block's change gives and takes addresses when
+  # the page's changes are published (`PublicSite::Paths.published`). It
+  # still runs, for a draft page and one written around the services, whose
+  # rows are what is listed.
   after_save :sync_listed_post_paths
   after_destroy :sync_listed_post_paths
 

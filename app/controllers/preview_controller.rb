@@ -23,7 +23,7 @@ class PreviewController < ApplicationController
 
     case result.status
     when :found
-      return render("pages/not_found", status: :not_found) unless assign_record(result.record)
+      return render("pages/not_found", status: :not_found) unless assign_record(result.record, listing_page: result.listing_page)
       # A post is shown on its listing page -- that page's title, SEO meta
       # and other blocks -- so the page must be readable too.
       return render("pages/not_found", status: :not_found) if @post && !readable?(@page)

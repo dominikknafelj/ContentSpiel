@@ -33,6 +33,37 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     assert_empty writers.keys
   end
 
+  # The model's own file is exempt above, so its writers are named here:
+  # `take!`, which writes a copy and removes a pending one, and
+  # `repoint_tag!`, the one write to a copy after it is taken (a merged tag's
+  # id is a reference that is about to name nothing; drafts fix round, Task 4).
+  WRITERS_IN_THE_MODEL = %w[take! repoint_tag!].freeze
+  REPOINTERS = { "app/services/tags/merge.rb" => "a merge replaces the merged tag's id in the copies" }.freeze
+
+  test "inside Publishing::Version only take! and repoint_tag! write a row, and only Tags::Merge repoints" do
+    writing = []
+    method = nil
+    Rails.root.join("app/models/publishing/version.rb").read.each_line do |line|
+      method = line[/def (?:self\.)?([a-z_]+[!?]?)/, 1] || method
+      next if line.strip.start_with?("#")
+
+      writing << method if line.match?(/#{WRITES}|\bcreate!?\(/)
+    end
+    assert_equal WRITERS_IN_THE_MODEL.sort, writing.uniq.sort
+
+    callers = sources("app", "lib").select { |path, source| path != "app/models/publishing/version.rb" && source.lines.any? { |line| !line.strip.start_with?("#") && line.include?("repoint_tag!") } }.keys
+    assert_equal REPOINTERS.keys, callers
+  end
+
+  test "a copy still refuses every write of its own: update, destroy and a changed attribute saved" do
+    page = create_page(title: "Kept as taken")
+    copy = Publishing.current(page)
+
+    assert_raises(ActiveRecord::ReadOnlyRecord) { copy.update!(tag_ids: [ 1 ]) }
+    assert_raises(ActiveRecord::ReadOnlyRecord) { copy.destroy! }
+    assert_raises(ActiveRecord::ReadOnlyRecord) { copy.tap { |row| row.blocks = [] }.save! }
+  end
+
   test "the writes guard sees a bare Version inside module Publishing and a relation of a record's copies" do
     assert_match(/\bVersion\b[^\n]*#{WRITES}/, "Version.where(id: 1).delete_all")
     assert_match(/\bpublished_versions\b[^\n]*#{WRITES}/, "page.published_versions.update_all(live_at: nil)")

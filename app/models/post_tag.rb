@@ -12,6 +12,10 @@ class PostTag < ApplicationRecord
   # `post.tags = [...]` -- is a plain `DELETE` that runs no callback here;
   # `Post` counts it as a changed URL input of its next save instead.)
   #
+  # A post that is published or scheduled and has a copy is listed by its
+  # COPY's tags, so for it this sync finds nothing to move: its address
+  # follows when its changes are published (`PublicSite::Paths.published`).
+  #
   # `after_commit`, not `after_save`/`after_destroy`: a join row is written
   # inside whatever transaction its caller opened (a CS Studio save, a
   # console `<<`), and syncing before that transaction either commits or

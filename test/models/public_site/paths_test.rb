@@ -780,6 +780,35 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_equal "/writing/blog/hello", current(hello)
       assert_parity "deleting a tag"
 
+      # A name only a page's COPY still filters by. The copy recorded no id
+      # (no such tag when it was taken), so it finds the tag by name when it
+      # is read, while the page's rows have moved on to another name: a
+      # rename away from that name, and one onto it, must look at the copy.
+      press = service_page("Press", published: false)
+      press_block = service_listing(press, content_type: "blog", tag: "press")
+      ok! Pages::Save.call(press, attributes: { published: true })
+      wire = service_post("Wire", tags: %w[press])
+      assert_equal "/press/wire", current(wire)
+      ok! ContentBlocks::Save.call(press_block.reload, attributes: { settings: { content_type: "blog", tag: "other" } })
+      assert_parity "pointing a live page's listing block at another tag, in its rows"
+      ok! Tags::Rename.call(Tag.find_by!(name: "press"), name: "media")
+      assert_equal "/writing/blog/wire", current(wire), "the copy's filter names a tag nobody has any more"
+      assert_parity "renaming a tag away from a name only a page's copy filters by"
+      ok! Tags::Rename.call(Tag.find_by!(name: "media"), name: "press")
+      assert_equal "/press/wire", current(wire)
+      assert_parity "renaming a tag onto a name only a page's copy filters by"
+
+      # A merge is immediate in the copies too: the id they hold is replaced.
+      ok! Tags::Merge.call(Tag.find_by!(name: "press"), into: Tag.create!(name: "newsroom"))
+      assert_equal "/press/wire", current(wire), "the list and the address are what they were"
+      assert_parity "merging a tag the copies hold"
+      publish_changes(wire)
+      assert_equal "/press/wire", current(wire)
+      assert_parity "publishing a post after a merge"
+      publish_changes(press)
+      assert_equal "/writing/blog/wire", current(wire), "the page's rows filter by another tag"
+      assert_parity "publishing the page whose rows had moved on"
+
       # -- languages -----------------------------------------------------------
       ok! Locales::Disable.call("es")
       assert_parity "turning a language off"
@@ -1035,6 +1064,27 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       # few milliseconds after it.
       PublicSite::Paths.sync_went_live(since: 2.days.ago)
       assert_nil PublicSite::Paths.current_path(post, "en")
+      assert_parity "the sweep of a page's copy that came into force"
+    end
+  end
+
+  # A live page written around the services has no copy and lists what its
+  # rows list. Its first copy, taken with a time, is in force when that time
+  # comes, and from then on the rows count for nothing: the posts the rows
+  # listed in the meantime are looked at too.
+  test "a page with no copy whose scheduled change comes into force takes back the posts of its copy and gives up the ones only its rows listed" do
+    page = listing(@root, "Blog", "blog", published_at: 3.days.ago)
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 3.days.ago)
+    job = Post.create!(content_type: :resume_entry, title: "Job", published_at: 3.days.ago)
+    publish_changes(page, at: 1.hour.from_now)
+    page.content_blocks.sole.update!(settings: { "content_type" => "resume_entry" })
+    assert_equal [ nil, "/blog/job" ], [ current(post), current(job) ], "until the copy's time the rows decide"
+
+    travel_to 2.hours.from_now do
+      PublicSite::Paths.sync_went_live(since: 1.day.ago)
+
+      assert_equal [ "/blog/hello", nil ], [ current(post), current(job) ]
+      assert_parity "the sweep of the first copy of a page that had none"
     end
   end
 
@@ -1055,6 +1105,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     travel_to 3.days.from_now do
       PublicSite::Paths.sync_went_live(since: 2.days.ago)
       assert_nil current(post)
+      assert_parity "the sweep of a post's copy that came into force"
 
       sql = capture_sql { PublicSite::Paths.sync_went_live(since: 2.days.ago) }
       assert_empty writes_to_public_paths(sql), "a second run wrote:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
