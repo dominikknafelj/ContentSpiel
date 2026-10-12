@@ -1,0 +1,101 @@
+# Safe on a public address
+
+Date: 2026-10-12. Status: design, approved in conversation; the plan follows.
+
+## Why
+
+The dry run of the documentation site (2026-10-11, `contentspiel-docs` `GAPS.md`) found 25 gaps between `main` and a site a stranger can put on a public address. They are worked in four parts: this one, then mail, then the sitemap and starting up, then the setup wizard. Theming, a published image and loading content are their own work.
+
+This part closes the gaps that make a public address unsafe: T-06 (telemetry prints every span to the production log, and a password-reset token is in it), T-07 (the `Host` header is trusted), T-08 (no HTTPS settings), T-13 (the setup token in the log), P-08 (CS Studio works over plain HTTP with no notice), T-03 (a misleading error without `SECRET_KEY_BASE`) and T-14 (a stale comment).
+
+## What a person gets
+
+- An administrator sets one variable, `PUBLIC_HOST`, to the site's address with its scheme (`https://docs.example.org`). Everything below follows from it.
+- A visitor, a search engine and a link preview see the site's own address in every absolute address a page prints, whatever `Host` a request carried.
+- A request for another host is refused.
+- With an `https://` address: plain HTTP is redirected, the session cookie is `Secure`, HSTS is sent.
+- The production log holds no spans and no credential that this application can keep out of it.
+- Someone who reaches CS Studio over plain HTTP in production is told.
+
+## Decisions
+
+1. **The site's address is an environment variable, not a setting.** Refusing hosts and the HTTPS settings are decided when the application starts, before the database is read; a wrong value typed into a Settings screen could lock everyone out with no screen left to fix it. The wizard (part four) will show the value read-only and say where it comes from. (Owner's decision, 2026-10-12.)
+2. **HTTPS follows the address's scheme.** No `FORCE_SSL` variable: one fact, one place.
+3. **A production start without `PUBLIC_HOST` works as today** (any host accepted, addresses follow the request), because the wizard must be reachable on a fresh server. System status and the wizard's system check say so as a warning.
+4. **The reset token leaves the URL's path and query.** Rails' log, the spans and the proxy's own access log each record a request's path, and the proxy's log is not this application's to filter. The token travels after a `#`, which a browser never sends.
+5. **Telemetry prints nothing by default, in development too.** `OTEL_CONSOLE=1` turns the console exporter on.
+
+## 1. The site's address
+
+`PublicSite::Urls.configured_host` stays the one reader of the variable (`PUBLIC_HOST`, else `SITEMAP_HOST` as the old name). A new value object, `SiteAddress` (`app/values/site_address.rb`), parses it once: `origin` (scheme, host, port), `host`, `https?`, `configured?`. A value that is not an absolute `http` or `https` address with a host stops the boot in production with a message naming the variable and an example; a trailing slash or path is dropped.
+
+Used for:
+
+- **Host authorisation.** `config.hosts` is the address's host when one is configured, in production only. The health check `/up` is excluded (the proxy asks it by IP). The refusal is Rails' own (a 403 from `ActionDispatch::HostAuthorization`); its response in production carries no detail.
+- **Head tags.** `og:url` (`app/views/pages/_seo_meta.html.erb`, today `request.original_url`), the `hreflang` alternates in the public layout, and a new `<link rel="canonical">` are built from `PublicSite::Urls` with the configured origin; with none configured they fall back to the request's origin, as CS Studio's "Copy address" does today. The canonical link is the page's or post's own address in the language being shown, without query string; a page that is not found has none.
+- **Mail links.** `config.action_mailer.default_url_options` in production comes from the address (host, port, protocol) instead of the literal `example.com` it is today. With none configured, the controller hands the origin of the request that asked for the mail to the mailer as an argument (the one mail that exists, the password reset, is asked for by a request and delivered later by a job, which has no request of its own); a mail with neither is not sent, and a line in the log says why.
+- **The sitemap** already reads it.
+
+`Setup::SystemCheck` gains a check "Site address": ok with the address; a warning "No site address is set. Any host name is accepted, and addresses in pages and mails follow the request." with the variable's name as its command. It appears on System status and in the wizard's system check, which both render the same results.
+
+## 2. HTTPS
+
+When the address is `https`:
+
+- `config.force_ssl = true` with `/up` excluded from the redirect; this gives the redirect, the `Secure` cookie and HSTS (Rails' defaults: one year, subdomains not included unless the host opts in later).
+- `config.assume_ssl = true` only when `ASSUME_SSL=1`, for a proxy that ends TLS and does not send `X-Forwarded-Proto`. Kamal's proxy and Thruster send it, so the default is off.
+
+When the address is `http` or absent, nothing is forced. In production, a CS Studio page (the shell and the sign-in page) then shows a notice when `request.ssl?` is false: "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address." It is shown to everyone on the sign-in page and in the shell to people with the settings permission. Development and test never show it.
+
+`Setup::SystemCheck` gains "HTTPS": ok when the request arrived over HTTPS; a warning otherwise, production only.
+
+## 3. Telemetry
+
+`config/initializers/opentelemetry.rb` picks, in order: test → in-memory (unchanged); `OTEL_EXPORTER_OTLP_ENDPOINT` set → OTLP, batched (unchanged); `OTEL_CONSOLE=1` → console; otherwise no exporter and the SDK is not configured at all (no instrumentation installed, so no cost).
+
+A span must not carry a credential even when exported. The Rack instrumentation's `url.path` (and `http.target`, `url.full` where present) is scrubbed by a span processor that replaces the token segment of the two password routes with `[FILTERED]`; after section 4 no route carries a token in its path, and the scrubber stays for the old route's redirect (below).
+
+## 4. The password-reset link
+
+Today: `GET /cs-studio/password/<token>/edit`, `PATCH /cs-studio/password/<token>`.
+
+New:
+
+- The mail's link is `/cs-studio/password/edit#<token>`.
+- `GET password/edit` renders the form with no token and no lookup. A Stimulus controller (`admin--shell--reset-token`, `app/javascript/controllers/admin/shell/reset_token_controller.js`) reads `location.hash`, puts it in a hidden field `token`, and removes the fragment from the address with `history.replaceState`. With no fragment the page says the link is incomplete and offers to request a new one.
+- `PATCH password` carries `token` in the body. `token` joins `filter_parameters`. An invalid or expired token is answered as today ("link is invalid or has expired"), after the form is sent, not before.
+- The old `GET password/:token/edit` redirects to `password/edit` WITHOUT the token (a redirect cannot carry a fragment the server never saw, and must not log more than it has to): the page then says the link is incomplete. Reset links live 15 minutes, so links mailed before a deploy are an accepted loss. The old `PATCH password/:token` is removed.
+- The same audit, session and rate-limit behaviour as today (`Users::UpdatePassword`).
+
+The cost: resetting a password needs JavaScript. CS Studio needs it everywhere else. The page says so in a `<noscript>`.
+
+## 5. Small things
+
+- **Setup token.** When `SETUP_TOKEN` is set by the host, the log line names no token ("…enter the setup token you set in SETUP_TOKEN"). Otherwise it is printed as today: that is how a stranger gets it, and it is gone once setup is finished.
+- **`SECRET_KEY_BASE`.** A production start without it stops with a message that names the variable and how to make a value (`bin/rails secret`), instead of pointing at credentials.
+- **`config/initializers/admin_path.rb`**: the comment about `/cable` says what is true.
+- **`config.hosts` in development and test** is untouched.
+
+## What this does not do
+
+Mail delivery and its test (part two). The sitemap being built by the application, the four database addresses, the entrypoint, background jobs (part three). The wizard asking for or showing the address beyond the system check (part four). `Content-Security-Policy` changes. Scrubbing a proxy's own log.
+
+## Risks
+
+- **Locking out by a wrong address.** A typo in `PUBLIC_HOST` refuses every request. Mitigations: the boot stops on a value that does not parse; `/up` stays reachable; the refusal page in production says nothing, so the guide page and the boot log line ("Serving https://… ; other host names are refused") are where a person finds out. The boot log line is part of this work.
+- **HSTS is sticky.** A browser that saw it refuses plain HTTP for a year. That is the point, and the guide page says it.
+- **A fragment is not sent to the server**, so nothing on the server can tell a truncated link from a missing one. The page's message covers both.
+
+## Testing
+
+- `SiteAddress`: parsing, the refusals, `https?`.
+- Integration, production-like configuration built in the test: a request for another host is refused and `/up` is not; `og:url`, `hreflang` and `canonical` carry the configured origin under a foreign `Host`; with none configured they follow the request.
+- HTTPS: the cookie's `Secure` flag, the HSTS header and the redirect under an `https` address, none under `http`; the notice appears on the sign-in page and in the shell only when it should.
+- Telemetry: no exporter and no output without the variables; the scrubber replaces the token of the old route.
+- The reset flow as a browser test: the mailed link, the fragment gone from the address, a new password set, and no logged line (captured Rails log) holding the token; an integration test that the old route redirects without it.
+- The system checks' results in each state.
+- Guards: nothing under `app/views` or `app/components` of the public site reads `request.original_url`, `request.base_url` or `request.host` for an address it prints (a source guard with named exceptions, in the style of `test/lib/public_readers_test.rb` on the drafts branch).
+
+## Documentation
+
+New guide page in `contentspiel-docs`, administrators: "What ContentSpiel asks of its host", with `PUBLIC_HOST`, `ASSUME_SSL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_CONSOLE`, `SETUP_TOKEN`, `SECRET_KEY_BASE`, what each does and what happens without it. Affected: the install page (draft), "Signing in" (the reset link), the System status page. In this repository: `docs/reference/` gains what a change here can break silently, and `CLAUDE.md` its rules (absolute addresses only through `PublicSite::Urls`; no token in a path).
