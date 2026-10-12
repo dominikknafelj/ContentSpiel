@@ -78,12 +78,14 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
     assert Pages::Save.call(listing, attributes: { published: true }).ok?
     child = create_page(title: "Copied child", parent: listing)
+    menu = create_page(title: "Copied menu")
     post = create_post(title: "Copied post")
     page_path = PublicSite::Urls.new.path_for(child, "en")
     post_path = PublicSite::Urls.new.path_for(post, "en")
     assert Publishing.copied?(child) && Publishing.copied?(post)
 
     assert Trash::Move.call(child).ok?
+    assert Trash::Move.call(menu).ok?
     assert Trash::Move.call(post).ok?
 
     get page_path
@@ -92,6 +94,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     get PublicSite::Urls.new.path_for(listing, "en")
     assert_not_includes response.body, "Copied child"
+    assert_not_includes response.body, "Copied menu"
     assert_not_includes response.body, "Copied post"
   end
 

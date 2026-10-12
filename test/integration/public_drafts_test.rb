@@ -312,19 +312,30 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
   test "a permalink no block of the page's copy lists is not found" do
     page = create_page(title: "No list yet")
-    post = create_post(title: "Orphan")
+    create_post(title: "Orphan")
     ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
-    address = PublicSite::Paths.current_path(post.reload, "en")
 
-    get(address) if address
+    get "/no-list-yet/orphan"
 
-    assert_response :not_found if address
-    assert_nil address unless address # after Task 4 the unpublished list block gives the post no address at all
+    assert_response :not_found
+  end
+
+  test "a list for a tag that did not exist when its page was published lists the first post that carries it, at an address that answers" do
+    page = listing_page("News", tag: "news")
+    post = create_post(title: "First news", tags: %w[news])
+
+    get path_of(page)
+    assert_select ".content-block--post-list a", text: "First news"
+
+    get path_of(post)
+    assert_response :success
   end
 
   test "the preview's menu, subpages and lists show the rows" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     page = listing_page
+    child = create_page(title: "Subpage", parent: page)
+    assert Pages::Save.call(child, translations: { "en" => { title: "Typed subpage" } }).ok?
     post = create_post(title: "Hello")
     assert Posts::Save.call(post, translations: { "en" => { title: "Typed post" } }).ok?
     assert Pages::Save.call(page, translations: { "en" => { title: "Typed page" } }).ok?
@@ -334,6 +345,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     assert_select "nav[aria-label=Main] a", text: "Typed page"
     assert_select ".content-block--post-list a", text: "Typed post"
+    assert_select "nav.page-children a", text: "Typed subpage"
   end
 
   test "the menu reads its pages' copies in one statement, for 2 pages as for 6" do

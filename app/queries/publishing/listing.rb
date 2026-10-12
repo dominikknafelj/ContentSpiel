@@ -23,15 +23,20 @@ module Publishing
       # copies: a fixed number of statements, rows bounded by the limit.
       def posts(block, limit: nil, now: Time.current)
         settings = block.settings_object
-        scope = Post.published.kept.where(content_type: ContentTypes.names).includes(:tags)
+        scope = Post.where(published_at: ..now).kept.where(content_type: ContentTypes.names)
         scope = scope.where(content_type: settings.content_type) if settings.content_type.present?
         if settings.tag.to_s.strip.present?
-          tag_id = block.listed_tag_id or return []
+          tag_id = tag_id_of(block) or return []
           scope = scope.merge(carrying(tag_id, now))
         end
         scope = scope.order(published_at: :desc, id: :desc)
         scope = scope.limit(limit) if limit.present?
-        Publishing.published_all(scope.to_a, now: now)
+        views = Publishing.published_all(scope.to_a, now: now)
+        # Only a post served from its rows needs its rows' tags; a rebuilt one
+        # has the copy's.
+        from_rows = views.reject(&:published_version)
+        ActiveRecord::Associations::Preloader.new(records: from_rows, associations: :tags).call if from_rows.any?
+        views
       end
 
       # Whether `block` lists `post`: a post as published, or a row.
@@ -42,7 +47,7 @@ module Publishing
         return false if settings.content_type.present? && settings.content_type != post.content_type
         return true if settings.tag.to_s.strip.blank?
 
-        (tag_id = block.listed_tag_id) ? tag_ids(post).include?(tag_id) : false
+        (tag_id = tag_id_of(block)) ? tag_ids(post).include?(tag_id) : false
       end
 
       # A post's tags as the public sees them: its copy's, or its rows' when
@@ -51,8 +56,21 @@ module Publishing
 
       private
 
+      # The tag a list block's filter names, by id. A block rebuilt from a copy
+      # answers the id the copy recorded, and that id decides: a tag renamed
+      # since changes nothing. A recorded nil means no tag of that name existed
+      # when the copy was taken (it cannot be a rename), so the name is looked
+      # up as it is now, once per call; a name no tag has lists nothing. A row
+      # block already asks by name, and asking again is the same answer.
+      def tag_id_of(block)
+        block.listed_tag_id || Tag.named(block.settings_object.tag.to_s.strip).order(:id).pick(:id)
+      end
+
       def carrying(tag_id, now)
-        current = Version.current(now).where(record_type: "Post")
+        # Narrowed to posts INSIDE the grouping, so the index serves it and
+        # pages' copies are never grouped.
+        newest = Version.unscoped.in_force(now).where(record_type: "Post").group(:record_id).select(Version.arel_table[:id].maximum)
+        current = Version.unscoped.where(id: newest)
         copied = current.where(SqlNodes.array_contains(Version.arel_table[:tag_ids], [ tag_id ])).select(:record_id)
         bare = PostTag.where(tag_id: tag_id).where.not(post_id: current.select(:record_id)).select(:post_id)
         Post.where(id: copied).or(Post.where(id: bare))

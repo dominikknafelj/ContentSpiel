@@ -5,8 +5,8 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: settings.stringify_keys }).record
   end
 
-  def published_block(**settings)
-    page = create_page(title: "Listing", published: false)
+  def published_block(title: "Listing", **settings)
+    page = create_page(title: title, published: false)
     list_block(page, **settings)
     assert Pages::Save.call(page, attributes: { published: true }).ok?
     Publishing.published(page).content_blocks.to_a.sole
@@ -109,5 +109,36 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     assert post_selects.any?, many.inspect
     assert post_selects.all? { |sql| sql.include?("LIMIT") }, "a statement selected posts without a LIMIT: #{post_selects.inspect}"
     assert_equal 3, titles(Publishing::Listing.posts(block, limit: 3)).size
+  end
+
+  test "a filter whose tag did not exist when the copy was taken finds the tag by its name now, and a name no tag has lists nothing" do
+    block = published_block(content_type: "blog", tag: "news")
+    assert_nil block.listed_tag_id
+    news = create_post(title: "First news", tags: %w[news])
+    create_post(title: "Other", tags: %w[ruby])
+
+    assert_equal [ "First news" ], titles(Publishing::Listing.posts(block))
+    assert Publishing::Listing.lists?(block, Publishing.published(news))
+    assert_empty Publishing::Listing.posts(published_block(title: "Second", content_type: "blog", tag: "never-existing"))
+  end
+
+  test "the id the copy recorded decides, whatever tag now carries the name" do
+    original = create_post(title: "Original", tags: %w[ruby])
+    block = published_block(content_type: "blog", tag: "ruby")
+    Tag.find_by!(name: "ruby").update!(name: "rubies")
+    newcomer = create_post(title: "Newcomer", tags: %w[ruby])
+
+    assert_equal %w[Original], titles(Publishing::Listing.posts(block))
+    assert Publishing::Listing.lists?(block, Publishing.published(original.reload))
+    assert_not Publishing::Listing.lists?(block, Publishing.published(newcomer.reload))
+  end
+
+  test "now governs the posts' own publication as well as the copies" do
+    post = create_post(title: "Later")
+    post.update_columns(published_at: 1.hour.from_now)
+    block = published_block(content_type: "blog")
+
+    assert_empty Publishing::Listing.posts(block)
+    assert_equal %w[Later], titles(Publishing::Listing.posts(block, now: 2.hours.from_now))
   end
 end
