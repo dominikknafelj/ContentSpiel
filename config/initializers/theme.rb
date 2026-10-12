@@ -27,10 +27,15 @@ folder.asset_paths.each { |directory| Rails.application.config.assets.paths << d
 # why: a raise in a reload's prepare chain leaves the registries of the
 # blocks after this one unprepared). `after_initialize` runs once, after the
 # boot's own prepare, so `booted` is false for exactly that first run.
+#
+# `bin/rails theme:check` is the one boot that does not raise either
+# (`ThemeFolder.checking`): it starts the application to say what is wrong
+# with the folder, the whole list and no trace.
 booted = false
 Rails.application.config.after_initialize { booted = true }
 
 Rails.application.config.to_prepare do
-  Theme.current = Theme.prepare(ThemeFolder.current, reload: booted)
-  Rails.logger.error("[ContentSpiel] #{Theme.current.refusal.message}") if Theme.current.refusal
+  Theme.current = Theme.prepare(ThemeFolder.current, reload: booted || ThemeFolder.checking?)
+  # Not under `theme:check`, which says the list itself, once and whole.
+  Rails.logger.error("[ContentSpiel] #{Theme.current.refusal.message}") if Theme.current.refusal && !ThemeFolder.checking?
 end

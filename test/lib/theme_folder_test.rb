@@ -321,4 +321,17 @@ class ThemeFolderTest < ActiveSupport::TestCase
     assert_match %r{/assets/controllers/hello_controller-\h+\.js\z}, imports.fetch("controllers/theme/hello_controller")
     assert Rails.application.assets.load_path.find("plain-mark.svg")
   end
+
+  # `bin/rails theme:check` starts the application inside this block, and
+  # the initializer then keeps a refusal of the folder where a boot raises
+  # it (config/initializers/theme.rb; the whole of it is tried in a process
+  # of its own in test/tasks/theme_tasks_test.rb).
+  test "checking is so for the length of its block and no longer, also when the block raises" do
+    assert_not ThemeFolder.checking?
+    assert_equal :done, ThemeFolder.checking { ThemeFolder.checking? ? :done : :not }
+    assert_not ThemeFolder.checking?
+
+    assert_raises(ThemeFolder::Invalid) { ThemeFolder.checking { raise ThemeFolder::Invalid, "x" } }
+    assert_not ThemeFolder.checking?
+  end
 end

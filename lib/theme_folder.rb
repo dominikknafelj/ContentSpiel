@@ -91,6 +91,25 @@ class ThemeFolder
     @current = nil
   end
 
+  # For `bin/rails theme:check` alone (lib/tasks/theme.rake): the length of
+  # a block in which the application is started TO SAY what is wrong with a
+  # folder. A folder the contract refuses stops the boot
+  # (`config/initializers/theme.rb`), which is right for a server and wrong
+  # for the one command whose work is to list the problems: it would never
+  # be reached, and its reader would get an exception's trace and the
+  # boot's half of the list. Inside the block the initializer keeps the
+  # refusal as it does on a reload (`Theme.prepare`), and the task says the
+  # whole list. Nothing else is let through: a path that is no folder and a
+  # stylesheet built for another theme stop this boot like any other.
+  def self.checking
+    @checking = true
+    yield
+  ensure
+    @checking = false
+  end
+
+  def self.checking? = @checking == true
+
   # `base` is what a relative value is relative to: the directory the
   # process was started in.
   def self.from_env(env, base: Dir.pwd)

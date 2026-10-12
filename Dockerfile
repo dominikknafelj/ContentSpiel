@@ -52,6 +52,18 @@ COPY . .
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
+#
+# This builds the DEFAULT theme's stylesheet and stamps it "default"
+# (lib/theme_css.rb). A site with a theme of its own builds an image FROM
+# this one, copies its theme folder beside the application, sets THEME_PATH,
+# runs `./bin/rails theme:check` and then this same command again (after
+# `assets:clobber`, so the default theme's digested files do not stay): the
+# stylesheet, the digested assets and the import map are all made here, at
+# build time, which is why a theme is an image layer and never a mounted
+# volume (docs/reference/theming.md, "Deployment"). The check goes first: it
+# says everything that is wrong with the folder in sentences, where the
+# precompile under a folder the application does not start under ends in an
+# exception's trace.
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
 
