@@ -1,0 +1,601 @@
+# Theming: the folder, the four seams and the contract
+
+> Describes: `lib/theme_folder.rb`, `lib/theme_css.rb`, `lib/tasks/theme_css.rake`, `lib/tasks/theme.rake`, `app/values/theme.rb`, `app/values/theme/` (`contract.rb`, `check.rb`, `scaffold.rb`), `config/initializers/theme.rb`, `config/application.rb` (the `content_spiel.host_announcement` initializer), `config/importmap.rb`, `app/javascript/site.js`, `app/javascript/controllers/index.js`, `app/controllers/public_controller.rb`, `app/controllers/concerns/public_page_rendering.rb`, `app/views/layouts/application.html.erb`, `app/views/layouts/public/`, `app/views/pages/`, `app/queries/public_site/branch.rb`, `app/helpers/theme_helper.rb`, `app/helpers/pages_helper.rb` (`document_title`, `themed_title`), `app/models/setup/system_check.rb` (the "Theme" row), `bin/theme-build-check`, the comment above `assets:precompile` in the `Dockerfile`, `test/fixtures/themes/plain`, `test/support/theme_test_helper.rb`.
+
+Spec: `docs/superpowers/specs/2026-10-12-theming-design.md` (its last section, "As built", lists where the code departed from it). What a host sets and how a site's image is built is also in `docs/reference/hosting.md`; the guide for a theme's author lives in `contentspiel-docs`, not here.
+
+## What a theme is
+
+A folder in the site's own repository, named by one variable, `THEME_PATH`. Whatever the folder does not hold comes from the default theme, which is the CMS's own templates where Rails and ViewComponent put them (`app/views`, beside each component) and the styles under `app/assets/tailwind/themes/default/`.
+
+```
+<theme>/
+  views/layouts/public/   _frame, _head, _title, _icons, _header, _footer, _language_switcher, _theme_toggle
+  views/pages/            show, not_found
+  views/theme/            the theme's own partials, any names, at any depth: render "theme/name"
+  components/             a contract component's template, by the component's path:
+                          components/blocks/image_component.html.erb
+  assets/stylesheets/theme.css
+  assets/images/          png jpg jpeg gif svg webp avif ico
+  assets/fonts/           woff2 woff ttf otf
+  javascript/controllers/ **/*_controller.js
+```
+
+At the top the folder holds those four folders and nothing else; dot files, dot folders (`.git`, `.github`) and a `README*` are passed over there. An empty folder is a theme that replaces nothing.
+
+**No Ruby** (decision 8): no helper, no component class, no initializer, no `lib`. What a template needs to compute is a CMS helper. Autoloading a theme's `lib/` was rejected because every internal class of the CMS would become something a theme can depend on. "No Ruby" is a statement about what the CMS promises to keep working, not a sandbox: a theme's templates are ERB with the application's whole reach, and a theme is **trusted exactly as the deployment is**. It comes only from the image, and is never uploaded, edited in CS Studio or read from the database.
+
+**A theme brings no block types and no settings** (decision 5): a block type is data, and a switched theme could leave blocks nothing renders.
+
+## THEME_PATH
+
+`ThemeFolder` (`lib/theme_folder.rb`) is plain Ruby with nothing of Rails in it, required by `config/application.rb` itself as `site_address` is, because the boot's initializer and `config/importmap.rb` read it before any application class is loaded. `ThemeFolder.current` is `from_env(ENV)`, memoised for the life of the process (the file is not reloaded in development: an edit of it needs a restart). A blank value is the default theme. A relative value is relative to the directory the process was started in.
+
+**The test environment ignores the variable** (`from_env` answers the default folder when `RAILS_ENV` is `test`), and `test/test_helper.rb` deletes it before the application loads, so a developer's shell never changes a test run and a child process a test starts gets the theme the test names. See "In tests".
+
+Everything that must agree about which theme draws the site starts at `ThemeFolder.current`: the view path, the component templates, the stylesheet's build, the asset path, the import map, the ETag, the boot line and System status. Nothing else reads the variable (`lib/tasks/theme.rake` reads it through `from_env`).
+
+A folder answers `configured?`, `path`, `name` (the base name), `files` (every file, relative, sorted; walked, not globbed), `templates` (the `.erb` files under `views/` and `components/`), `hidden_templates`, `fingerprint`, `glance` (names, sizes and times, no file read), `read(relative)`, `stylesheet`, `controllers_path`, `asset_paths`, `pins` and `built?(root)`. Nothing is memoised but `current`: `files` and `fingerprint` read the disk each time, so a development reload sees the folder as it is now, and `Theme` keeps the fingerprint it was loaded with.
+
+### The fingerprint
+
+SHA-256 over the relative path and the content of every file, in order, each path and each content closed with a NUL (so bytes cannot move from one file's end into the next file's name and keep the digest), read file by file through `Digest#file` so a font is never held in memory whole. Without a folder it is the word `default`. Two folders with the same files have the same fingerprint wherever they are, which is why the fingerprint computed on a laptop equals the stamp inside the image. It is used in three places: the public ETag, the stylesheet's stamp, and (its first eight characters) the boot line and System status.
+
+### The folder is checked in two places
+
+Because the contract is application code and the folder is read before any is loaded.
+
+1. **`ThemeFolder.new`, while the application is configured** (the `content_spiel.host_announcement` initializer reads `ThemeFolder.current` in every environment). It refuses, with `ThemeFolder::Invalid`: a path that is no directory; anything at the top that is not one of the four folders (every such entry in one refusal, a line each); a file or folder that cannot be read (never a bare `Errno::EACCES` from somewhere in the boot: `Dir.glob` would have skipped an unreadable folder in silence and the site would have been drawn without the templates in it); a link whose target is outside the folder, a link to nothing, and a link to a folder it is itself in (a theme reaches a container as one copied folder and must be whole; a link that stays inside is the file it names); and a dot directory below the top (what is in `views/theme/.drafts/` would be outside the check and the fingerprint and still be there to render). The whole folder is walked once here, so these stop the boot where the variable is read and not at the first question somebody asks later. Unlike `SiteAddress`, the message repeats the value: it is a path, and the path is what the person has to go and look at.
+2. **`Theme.load`, in the `to_prepare` of `config/initializers/theme.rb`**, whose first run is the boot. It runs `Theme::Check.problems(folder)` at its plain depth and raises `ThemeFolder::Invalid` with every problem, one line each. This is the check against `Theme::Contract` ("Checking a folder", below).
+
+A folder problem (1) stops the boot before the boot's lines are printed; a contract problem (2) after them.
+
+### What the boot says
+
+One line, logged at info in production beside the address's lines and in development too (where a theme is written), never in test, by `ThemeFolder.announcement`:
+
+- `[ContentSpiel] Theme: the default theme (THEME_PATH is not set)`
+- `[ContentSpiel] Theme: /rails/site-theme (14 templates, fingerprint 3fa9c1d2)`
+- `[ContentSpiel] Theme: /rails/site-theme holds no file of a theme and replaces nothing: the default theme draws the site (fingerprint 3fa9c1d2)`
+
+With `RAILS_LOG_LEVEL=warn` none is printed. The refusals are in `docs/reference/hosting.md` ("The theme"), word for word.
+
+### System status
+
+`Setup::SystemCheck` has a "Theme" row after the address and HTTPS (`theme:` defaults to `Theme.current`, `stylesheet_probe:` to `Setup::SystemCheck.stylesheet_probe(theme)`, which reads the build's stamp: one small file). It names the folder's **base name, never its path**, the number of templates and eight characters of the fingerprint: the page is shown to anyone who may view it, and where a server keeps its files is nobody's business there. The probe has three answers, and the row a sentence for each:
+
+- **true** (the stamp is the theme's fingerprint): OK, "The theme “site-theme” draws the site (14 templates, fingerprint 3fa9c1d2)." or "The default theme draws the site (THEME_PATH is not set)."
+- **false** (the stamp is another theme's, or an earlier state's of this one): a warning that the site is drawn with the wrong styles. In production it says to build the site's image again and carries no command (the boot already refuses such a stylesheet, so it is seen only in a process started with `SECRET_KEY_BASE_DUMMY`). Everywhere else nothing refuses, so this row is the one place that says it, and it names the usual cause: a test run builds the default theme's stylesheet into the same place. It carries the command `bin/rails tailwindcss:build` (`Setup::SystemCheck::STYLESHEET_COMMAND`, a fixed string).
+- **nil** (no stamp at all): "has not been built, or its last build failed", with the same command outside production. Nothing "was built for another theme" in a fresh checkout or after a failed build.
+
+A probe that raises is the "false" warning and its message is never shown. A theme refused on a development reload (below) is shown here as the default theme: the public site is an error page at that moment and the log has the line.
+
+`test/models/setup/system_check_test.rb` ("without a theme folder the row says the default theme draws the site", "with a theme folder the row names it, its templates and the start of its fingerprint, and not its path", "in production a stylesheet built for another theme is a warning that says to build again", "outside production a stylesheet built for another theme is a warning with the command that builds it", "with no stamp at all the row says the stylesheet was not built or its build failed, for either theme, with the command", "a probe that raises is a stylesheet that was not built for the theme, and never a path"); `test/integration/admin/system_status_test.rb` ("the theme row names the theme that draws the site and no path of the server, and warns when the stylesheet is another theme's").
+
+## `Theme`, the runtime side
+
+`Theme` (`app/values/theme.rb`) is what the application asks. `Theme.current` is built in `to_prepare`, as every registry is, and answers `configured?`, `path`, `name`, `fingerprint`, `template_count`, `views_path`, `views_directory`, `component_for(definition, role)`, `template_for(component)` and `refusal`. Without a folder every question is answered with the CMS's own.
+
+- **`Theme.load(folder)` is the one door** from a folder to a theme: it checks. `Theme.new(path:)` checks nothing, has the fingerprint `default` and counts no templates, and nothing in the application calls it for a folder (`test/lib/theme_guards_test.rb`: "the application makes a theme of a folder through Theme.load only, so no folder goes unchecked").
+- **`Theme.prepare(folder, reload:)` is what the initializer calls.** At boot it is `load` and raises, and the application does not start. **On a development reload it does not raise.** An exception in a reload's prepare chain stops the chain where it is raised: the type registries, filled by a block that runs after the theme's (`config/initializers/types.rb`), would stay empty, the reloader would count the reload as done, and the request after the error page would be drawn by the default theme with no block types. So a refusal is kept: the answer is a theme that brings nothing and carries `refusal`, the initializer logs it at error (`[ContentSpiel] ` and the check's message), and `PublicPageRendering#look_in_the_theme_first` raises it on every public and preview request until a reload finds the folder sound. CS Studio is untouched. The initializer tells boot from reload by a flag set in `after_initialize` (`test/integration/theme_pages_test.rb`: "a theme refused on a reload leaves the registries prepared and CS Studio working, and every public page says why until it is corrected"; `test/values/theme_test.rb`: "prepare is load at boot, and on a reload a refused folder is a theme that remembers why and brings nothing").
+- **`Theme.with(theme) { … }` and `Theme.current=` are for tests and the initializer's one assignment, and nothing else.** `current` is one variable of the PROCESS, not of a request or a thread: a swap made while a request is answered draws every other request of the process with the other theme and puts its fingerprint into their ETags. That is what a test wants (a system test's server runs in the test's process and must see the swap) and what the application must never do (`test/lib/theme_guards_test.rb`: "nothing in the application swaps the theme: Theme.with and Theme.current= are the tests' and the initializer's", with "the guard can fail: a swap in a controller, a view, a job or a second one in the initializer is named with its line").
+
+`config.watchable_dirs` gains the folder (`erb css js`) when one is configured, so a change under it reloads the application in development as a change under `app/` does: `to_prepare` then builds a new `Theme` with the folder's new fingerprint and new subclasses of the freshly loaded components.
+
+## The four seams
+
+Each has one place that knows it.
+
+### Page templates: the view path
+
+`PublicPageRendering#look_in_the_theme_first`, a `before_action` of the concern `PagesController` and `PreviewController` include, prepends `Theme.current.views_directory` to the view path **of that request's controller instance**, so `Theme.current` can differ between two requests of one process. Only those two controllers do it: no CS Studio controller, not sign-in, not setup, no mailer. `views_directory` asks the filesystem once per `Theme` (it is asked on every public request).
+
+What the path lets a theme replace is not "any template": the folder is checked against `Theme::Contract::TEMPLATES` when the application starts, and one that holds the layout, `pages/_seo_meta`, `shared/_theme_head` or the preview bar does not start.
+
+A template the theme does not hold is the default theme's, silently and by design. **A theme's template that raises is an error that names the theme's file, never a fallback** (decision 14): rescuing it with the default template would draw a page half of one theme and half of another, and hide a bug nobody sees (`test/integration/theme_pages_test.rb`: "a theme's page template that raises is an error that names the theme's file, not a fallback"; `test/values/theme_test.rb`: "a theme's block template that raises names the theme's file").
+
+### Block and post templates: `Theme#component_for`
+
+ViewComponent finds a template beside its class file and never asks the view path, so putting the folder on a path does not reach `components/blocks/image_component.html.erb`. `Theme#component_for(definition, role = :component)` is already where the public site gets a block's, a post list's and a post's component from (`ThemeHelper#render_block`, `Blocks::PostListComponent#list_component`; the roles are `:component`, `:list_component` and `:detail_component`). For a component whose template the folder holds it answers a **subclass generated once per theme**: `Class.new(component)` whose `sidecar_files` answers the theme's file for `erb` and the component's own otherwise. The template is therefore compiled into a class of the theme's own, calls everything the default template calls (private readers included, as any subclass may), and the CMS's class keeps its own template, so one process can hold two themes and a test can draw both.
+
+Three things the subclass has to say because it is anonymous, each read from view_component 4.15.0:
+
+- `name`: `ViewComponent::Template#safe_method_name` calls `@component.name.underscore`, and an anonymous class has none. It answers the CMS component's name, so anything keyed on the name (the contract's lookup, a log line) sees the CMS's component, and `name.constantize` is the parent, not the subclass;
+- `virtual_path`: `ViewComponent::Base.inherited` derives it from the name at a moment the class has none yet;
+- `identifier`: `inherited` takes it from the call stack, which is `theme.rb`; with the component's own, every question but the template's is answered as the component's. One consequence: with `annotate_rendered_view_with_filenames` on, the comment around a themed block names the CMS's `.rb` file, not the theme's template (read from the gem, not observed).
+
+**The rejected way** is the spike's: an override of `ApplicationComponent.sidecar_files`, which compiles the theme's template into the CMS's own class, so a process holds one theme and no test draws two. The spec kept it as the fallback had the gem refused the subclass; it did not. `test/values/theme_test.rb` is the proof ("the same block is drawn by two themes and by the default in one process, in any order", "the component's own class keeps its own template after a theme's class was drawn", "a template the theme does not hold is the definition's own class, and a held one is a class of its own", "the other roles go through the same seam: a post list's and a post's component"), and it is the guard of a ViewComponent upgrade: it fails on the day the gem changes how a class finds its template.
+
+The subclasses live as long as their `Theme` does (`@components`, a `Concurrent::Map`); a reload builds a new `Theme`. ViewComponent's `CompileCache` holds every compiled class strongly, which is nothing for one theme per process and leaves a class behind for each `plain_theme` a test draws with.
+
+So the replaceable components are exactly those the type registries hand out, each one line of `Theme::Contract::COMPONENTS`. `Media::PictureComponent` is called by templates and is not replaceable; `RichText::ImageComponent` and `RichText::YoutubeComponent` are rich text ("Rich text", below). A plugin's component (a type registered under a name with a slash) is never required in the contract and never replaceable.
+
+### The stylesheet: `ThemeCss`
+
+**One public stylesheet, `app/assets/builds/theme.css`, built once, for one theme** (decision 11), from an entry file `ThemeCss.write_entry` writes to `tmp/theme/entry.css`:
+
+```
+@import "<default theme>/theme.css";              tokens, base, prose, sections, the default templates' utilities
+@import "<theme>/assets/stylesheets/theme.css";   the theme's own styles
+@source "<default theme>";                        for the watch alone
+@source "<theme>/assets/stylesheets";             for the watch alone
+@source "<theme>/views";                          so utilities in the theme's templates are built
+@source "<theme>/components";
+```
+
+Without a theme only the first and the third line are there. A line is left out for what the theme does not have. Both imports come before the `@source` lines: an `@import` after another rule is not an import. What follows from the order:
+
+- **A theme changes a token by declaring it again, and copies nothing.**
+- **A template the theme does not replace is still styled**, because the default theme's styles are always in the build. That is what makes the fallback real, and why the preview bar keeps its look under any theme. A build that left them out would unstyle every template a theme does not replace.
+- A theme may write plain CSS or Tailwind utilities in its templates: both go through the same executable, and the theme's templates are scanned.
+- The cost is the default templates' utilities in every site's stylesheet, a few kilobytes a site does not use.
+
+Three things about the cascade that a theme's author meets, none of them enforced:
+
+- **A token declared only under `:root` also replaces the DARK value.** The default tokens are unlayered, `:root, [data-theme="light"] { … }` then `[data-theme="dark"] { … }`, and a theme's `:root { --th-accent: … }` comes later at equal specificity. A theme declares a themed token under both selectors, as `theme:new`'s stylesheet comment shows.
+- **A theme's unlayered CSS beats utilities.** Tailwind's utilities are in `@layer utilities`; the theme's `theme.css` is imported unlayered, and an unlayered rule wins over a layered one whatever their order. A class of the theme's own on the same element as a utility wins.
+- **`--th-` is the CMS's prefix.** A theme's own custom properties take another (`--plain-gap` in the second theme). Nothing checks a theme's stylesheet for it.
+
+**The two `@source` lines that name a folder of stylesheets add nothing to the build** (Tailwind reads no class name out of a `.css` file: the output with them is byte for byte the output without, compared for both themes) and are there for `theme_css:watch`. Tailwind's watcher watches the folder the entry file is in and the folders its `@source` lines name, and not the folder of a file the entry imports. While the entry WAS the default theme's `theme.css`, that folder was watched for being the entry's own; with the entry in `tmp/theme`, a change to `tokens.css`, `prose.css` or a theme's `theme.css` was built by nobody, with no word in the log. So every folder a stylesheet is imported from is a source too (`test/lib/theme_css_test.rb`: "every folder a stylesheet is imported from is watched: it is a source too").
+
+**Paths are relative to the entry file**, so the entry reads the same on a laptop and in an image, and the theme is named by where it REALLY is (`realpath`): the watcher reports a changed file by its real path, so a theme reached through a link (on macOS every temporary folder is: `/var` is a link to `/private/var`) was built once and a changed template of it never again. **A double quote or a backslash in the theme's path breaks the entry**, whose paths are written between double quotes with no escaping; nothing refuses such a path.
+
+**When: at image build, never at boot.** `assets:precompile` runs `tailwindcss:build`, which is enhanced to run `theme_css:build` (`lib/tasks/theme_css.rake`), with `THEME_PATH` set by the site's Dockerfile. `ThemeCss.build(folder, root:, executable:)` is the one build both tasks run: the fingerprint is read, **the stamp is taken away**, the entry is written, the executable runs, and the stamp is written with the fingerprint read BEFORE the build. A build that fails leaves no stamp, an earlier build's included; a file of the theme changed while the executable ran may or may not be in the output, so the folder then no longer matches its stamp. Outside `ThemeCss` nothing runs the executable on this entry or writes the stamp (the watch's keeper, below, is the one other writer): a build made around it would leave a stylesheet nobody vouches for.
+
+**The stamp** is `app/assets/builds/.theme.stamp` (`ThemeFolder::STAMP`): the fingerprint of the theme the stylesheet was built for, beside the stylesheet it vouches for, so it is in the image with it and ignored by git and by the Docker context as that folder is. **A dot file, and not the spec's `theme.stamp`**: `app/assets/builds` is on Propshaft's load path, where every file is an asset, copied to `public/assets` by `assets:precompile`, listed in `public/assets/.manifest.json` (itself a static file, so the digested name need not be guessed) and served. The first build's stamp was exactly that: the asset list held `theme.stamp` and the manifest `theme-a099327b.stamp`. Propshaft leaves dot files out (`Propshaft::LoadPath#without_dotfiles`, read in 1.3.2), so under this name the stamp is read by the application and by nobody else (`test/lib/theme_css_test.rb`: "the stamp is a dot file beside the stylesheet, and no asset: not found, not listed, not served").
+
+**Production does not start under a stylesheet stamped for another theme** (`ThemeFolder#built?`, asked in the `content_spiel.host_announcement` initializer of `config/application.rb`): the right templates drawn with the wrong styles, and nobody told, is worse than not starting. Both ways round, a theme over a stylesheet built without it and no theme over one built with it, and with no stamp at all (a sentence of its own). **It is not asked under `SECRET_KEY_BASE_DUMMY`**, as the secret is not: that is the image build's own `assets:precompile`, which starts production BEFORE the stylesheet it is about to build exists. The check applies to every production process, a console, a runner, `db:prepare` and the job process included; in an image the stamp is always there. Development and test refuse nothing; System status says it (`test/lib/production_boot_test.rb`: "production under a theme whose stylesheet was not built for it does not start, and says how to build"; `test/lib/theme_css_test.rb`: "the build's stamp is the theme's fingerprint, and a folder is built when the stamp is its own", "a build stamps after the executable succeeded; a failed one leaves no stamp, an earlier one's included", "the stamp is the fingerprint read before the build: a file changed while it ran is not vouched for", "the refusal says which way round it is and how to build", "with no stamp the refusal says the stylesheet was not built, for a theme and for none, and how to build").
+
+**In development: `theme_css:watch`**, one of the three processes of `bin/dev` (`Procfile.dev`), is `ThemeCss.watch`: a loop of one whole build, stamped when it succeeded, then Tailwind's watcher on the same entry.
+
+- **It does not end because the stylesheet does not build.** Foreman stops every process of `bin/dev` when one ends, so a watch that raised at its first build took the web server with it, and a person with a half-written `@import` could not start the application they were writing the theme in. Tailwind's own watcher does not stay either: started on an entry that does not build it prints the error and exits (seen with 4.3.3; one already running when the stylesheet breaks reports and stays). So a failure is said in one line under Tailwind's own words for it, and the watch waits until a file of the theme or of the default theme's styles has changed (`sources_glance`: names, sizes, times), then tries again from the whole build. The watcher ending well ends the watch.
+- **A folder that cannot be listed** (renamed, deleted, a file made unreadable, a link to nothing) is waited out a turn at a time: nothing is built, the watch says it once by the error's class and without a path, and looks again every second. Every wait sleeps BEFORE it looks: a wait that compared first, with a look that could never equal the last, went round thousands of times a second and printed its line each time.
+- **The keeper** (`ThemeCss.keep_stamped`) is a thread that runs only beside Tailwind's watcher, and only for a theme folder (the default theme's fingerprint never changes). Tailwind's watcher rebuilds on a change by itself, but nobody hears whether that build succeeded, and the folder's fingerprint changes with every edit, so a stamp written once at the watch's start would make System status warn after the first edit about a stylesheet that is right. Every second the keeper glances at the folder and reads the stamp, and hashes the folder only when one of the two changed. On a change, while the stamp is still its own, it writes the entry again if it is no longer the folder's (a theme that gained its stylesheet or its `components` folder), **builds once itself**, quietly, and stamps the fingerprint it read; a build that fails takes the stamp away. The price is one extra build of about 50 ms per change. A stamp somebody else wrote since (a test run) is left as it is, because the stylesheet is then theirs too; when the stamp is the folder's fingerprint again the keeper takes it for its own. An error of any kind in a turn is said once, by its class and without a path, and the turn is tried again.
+
+`test/lib/theme_css_test.rb` holds all of it with a stand-in executable ("the watch goes on when the stylesheet does not build: it says so, and builds, stamps and watches once the file is mended", "while the theme folder cannot be listed the watch waits a turn at a time and says so once, and goes on when the folder is back", "while it is kept stamped, a changed theme is built and stamped with its new fingerprint; the default theme needs no keeping", "the keeper stamps the fingerprint it read, and so still knows its own stamp at the next change", "an error of any kind in a turn is said once, without a path, and the keeper goes on"). No test runs the real build: `bin/theme-build-check` does ("Deployment").
+
+**Development and test share the output and the entry.** `bin/rails test` builds the default theme's stylesheet into the same `app/assets/builds`, from the same `tmp/theme/entry.css`, also while a watch runs for a theme: the site in development is then drawn with the default stylesheet until `bin/rails tailwindcss:build` is run with `THEME_PATH` set, or the watch is started again. System status says so, and so does the test build itself, on stderr, when it replaces a stamp that was not `default`. An output per environment is not built (the roadmap has the row).
+
+### Assets and scripts: the load path and the `site` entry point
+
+**Images and fonts.** `config/initializers/theme.rb` appends `ThemeFolder#asset_paths` (the theme's `assets/images`, `assets/fonts` and `javascript`, those that exist at boot) to Propshaft's load path. A theme names an image or a font **by its bare file name**, in its stylesheet (`url("mark.svg")`) and in its templates (`image_path("mark.svg")`): Tailwind leaves the `url()` as written and Propshaft writes the digested address when the stylesheet is served (`url("/assets/mark-<digest>.svg")`). Never a relative path into the folder. The CMS's two font families reach a theme through `--th-font` and `--th-mono`, not through their file names.
+
+**By extension, and nothing else** (`Theme::Check::ASSET_EXTENSIONS`): a folder on the load path is published whole under `/assets`, so a `.rb`, an `.erb`, a second stylesheet or a script put under `assets/images` would be served as it is. `assets/images` takes `png jpg jpeg gif svg webp avif ico`, `assets/fonts` takes `woff2 woff ttf otf`, case ignored, at any depth. A PDF or a video cannot be a theme's asset today; that is a contract change.
+
+**A theme adds assets, it does not replace one.** A file that would be served under the same name as one of the CMS's own stops the boot (`Theme::Check.shadowing`): the CMS's roots inside the application (`CMS_ASSET_ROOTS`: `app/assets/images`, `app/assets/fonts`, `app/assets/stylesheets`, `app/javascript`, `vendor/javascript`) and every root of the configured load path outside it, which are the gems' (Turbo, Stimulus, Action Cable). `app/assets/builds` is on the load path and deliberately not asked: its content depends on whether a build has run, and a check must say the same in a fresh checkout as after one. **The theme's own folders are never among the roots**: the initializer puts them on the load path before the check runs, and a real site's theme is outside the application, so, taken for a gem's, each of its own three folders "held" every file of the theme and every image, font and controller was refused. For one round no site with a theme outside the application started, and everything was green because the fixture theme is inside it. The folders of the theme the application STARTED with are left out too (`started:`), so `theme:check` of a second copy of the running theme does not find each asset in the running theme's folders (`test/values/theme/check_test.rb`: "a theme outside the application whose own asset folders are on the load path shadows nothing: an image, a font, a controller", "every root of the asset load path is one the check asks, or is named here with its reason", "what the check says of an asset does not depend on whether a build has run").
+
+**Scripts.** A theme's Stimulus controllers are pinned by `config/importmap.rb` from `ThemeFolder#pins`: every file under `javascript/controllers` as `controllers/theme/<name>`, served as `controllers/<name>.js` from the theme's `javascript` folder, `preload: "site"`. So `copy_controller.js` is the identifier `theme` joined to `copy` by two hyphens and cannot be one of the CMS's; one in a subfolder (`docs/copy_controller.js`) carries the folder as a further part. A controller imports `@hotwired/stimulus` and nothing else: a theme adds no pin of its own and no third-party script.
+
+They are registered by a third entry point, **`site`** (`app/javascript/site.js`: `application` plus `controllers/theme/*`), which the public layout alone loads, as CS Studio's layout alone loads `admin`. `controllers/index.js`, imported by `application`, registers everything under `controllers/` EXCEPT `controllers/admin/*` and `controllers/theme/*`. `application` could not carry a theme's controllers itself because sign-in and setup load it too. So a theme's script is never imported on a CS Studio screen, on sign-in or in setup (`test/integration/public_javascript_test.rb`: "only the public layout loads the site entry point, and with it the theme's controllers", "the site's own registration leaves CS Studio's and a theme's controllers to their entry points", "a theme adds pins under controllers/theme/ and nowhere else, and changes no pin of the CMS's", "the site entry point is named by the public layout and by no other layout or view", "no script of the CMS's imports the site entry point or a theme's controller"; `test/system/theme_script_test.rb`: "a theme's controller connects on a public page under the theme", "the sign-in page registers the site's controllers and not the theme's").
+
+**One place a theme's script does run inside a signed-in session: the preview.** `PreviewController` draws through the public layout, so the theme's controllers are loaded in CS Studio's preview of a page, in the editor's session. That is consistent with the trust above and worth knowing before a theme's script reads the document.
+
+## The head
+
+`layouts/application.html.erb` is the CMS's and no theme replaces it (decision 10): a folder that holds it does not start. **The head is split by who answers for a tag.** The rejected way was the spike's, replacing the layout whole, which made the theme copy the CSP tag, the light/dark script, hreflang and the import map, and lose every tag the CMS adds later.
+
+The CMS writes these, each a line of the layout, each **once and before the theme's**:
+
+1. the `<title>` element (its text is the theme's pattern, below);
+2. `<meta name="viewport">`;
+3. the content security policy's tag (`csp_meta_tag`);
+4. the script that picks light or dark before the first paint (`shared/_theme_head`);
+5. the description and the Open Graph tags (`pages/_seo_meta`), when a page is found;
+6. the canonical link and the language links (`hreflang`, `x-default`), when a page is found;
+7. then the theme's `_icons` and `_head`;
+8. the stylesheet link (`theme`) and the import map with the `site` entry point.
+
+And as a decision and not a tag: **no CSRF token on a public page** ("The public site commits no session", below).
+
+The theme has four partials under `views/layouts/public/`, each with the default theme's as the fallback:
+
+- **`_title`, the pattern of the page title.** Locals `page_title` (the page's or the post's own title; nil on the homepage and on a 404) and `site_title`. What it prints, squeezed to one line (`PagesHelper#themed_title`: a theme's author never has to write the pattern on one line), is the text of `<title>`; it is escaped once. The default prints "Page – Site", and the site's title alone without a page title. Two things stay the CMS's: **a meta title an editor typed for a page is taken as written and the pattern is not asked** (`PagesHelper#document_title`), and the Open Graph title is the page's own without the site's name. A 404's title is the site's title through the pattern, where the layout once printed the literal "ContentSpiel".
+- **`_icons`**: the favicon and the touch icon. A theme links its own from `assets/images` with `image_path`.
+- **`_head`**: every other tag of the theme's own: fonts to preload, `<meta name="theme-color">`, a verification tag. It is rendered with `@page` and `@post` available and receives no locals. The default holds the three "installable app" metas (`application-name` among them), so a site whose theme brings its own `_head` no longer announces itself as "ContentSpiel".
+- **`_frame`**: everything inside `<body>` but the preview bar; `yield` is the page. It is a partial layout (`render layout: "layouts/public/frame"`), so the page template has already been rendered when the frame runs.
+
+**The layout reads no slot.** `content_for(:title)` and `content_for(:head)` are not read on the public side: `content_for` appends, the page template is rendered before the layout, and a theme's template that wrote to either slot had its text put in front of the page's ("HijackAbout – Site") or its tags among the CMS's, ahead of the description. The layout asks `document_title` itself and renders `pages/_seo_meta` in place (`test/integration/theme_pages_test.rb`: "a theme's template that writes to the title's slot changes no title: on a page, on a 404 and with a meta title", "a theme's template that writes to the head's slot puts nothing into the head: on a page, in a block and on a 404").
+
+**`pages/show` holds no CMS line any more.** It carried two (the head tags of `pages/_seo_meta` and the preview bar); both moved into the layout, so a theme that replaces the page template cannot lose them ("a theme that replaces the page template still gets the description, the Open Graph tags and the preview bar"). While `pages/show` rendered the tags, not rendering `pages/show` was what kept them off a 404. That guard went with the move, and **a 404 can have a record in hand**: `assign_record` assigns the page and the post before it finds that no block lists the post, and the preview answers 404 for a post whose listing page the editor may not read. Such a 404 had the post's title in `<title>` and, as its description, the listing page's meta description, of a page the editor may not read. So the layout decides by the response's status, never by `@page` (`page_found?`): a 404 has the site's title, no description, no Open Graph tag, no canonical link and no language link ("a 404 that had a record in hand describes none: the site's title and no description or Open Graph tag", "a 404 that had a record in hand names no canonical address and no other language's, in the preview and in public").
+
+**What a theme cannot do, and what it still can.** It cannot remove or replace a CMS tag: each is a line of the layout. The renderer does not stop a theme's `_head` printing MORE markup, a tag of the same name included; the folder check refuses the ones that contradict the CMS's ("Checking a folder"), and what holds for a spelling the check does not see is that the CMS's own are there once, unchanged and first ("every tag the CMS writes into the head is there exactly once under both themes, ahead of the theme's own", "a theme whose head prints a canonical link, a CSP tag and a CSRF tag of its own takes none of the CMS's away: each is there once, unchanged and first"). **And one thing is not held at all**: the layout decides the title, the description, the links and the preview bar from `@page`, `@post`, `@preview_record` and the response's status, after the page template ran in the same view. An assignment to an instance variable is refused by the check; a record changed in memory (`@page.title = …`) and a status set on the response (`response.status = …`) are not seen, and either changes the CMS's head. The stronger fix (the controller keeps the head's facts where a view cannot reach them) is not built; the roadmap has the row.
+
+**Scripts and styles from another host are not held by the content security policy.** `config/initializers/content_security_policy.rb` sets `frame-src`, `object-src` and `base-uri` only: no `script-src`, no `style-src`. A second stylesheet link is refused by the folder check because of decision 11 (one stylesheet), not by the policy; a `<script src>` or an `@import` from another host is held by nothing, and the check does not look for `<script`. The spec's sentence that "the content security policy is the CMS's" promises more than exists (the roadmap has the row).
+
+The body's classes are the default theme's and read tokens only, so a theme changes the page's ground and type by its tokens, or by a `body` rule of its own. The preview bar is product UI on a public page: the layout renders it and no theme replaces it.
+
+## The public site commits no session and mints no token
+
+`PublicController` always answered the same cookie-less response to every visitor, and that was a convention while every public template was the CMS's own. A theme's templates are not: a `form_with` or a `button_to` in a theme's footer, `csrf_meta_tags` in its head or a `form_authenticity_token` anywhere asks Rails for the token, Rails reads the session to mint it, and the response, which says `Cache-Control: public`, leaves with a `Set-Cookie`. It did, in the test that now pins this. So it is a wall, in three lines of `PublicController`:
+
+- the session of a public request is never committed (`request.session_options[:skip] = true`, which the session middleware asks before it writes the cookie), whatever a template read or wrote in it;
+- `protect_against_forgery?` answers false, which is what `csrf_meta_tags` and every form helper ask before they print a token;
+- `form_authenticity_token`, which mints one without asking, answers nil.
+
+Both overrides are private, so neither is an action. Nothing public needs either: every public route is a GET to `pages#show` and no action reads the session. A theme's GET form (a search box) works, and a plain `<form method="post">` to another service posts without a token of this application, which that service could not have checked anyway. A signed-in editor who reads a public page keeps their session: no cookie is set and none is taken away. **`PreviewController` is not a `PublicController` and keeps both**: it is signed in, private and never cached.
+
+**A later feature that wants a cookie, a session value or a form that posts to this application from a public page meets these three lines first**, and needs its own design: such a response is no longer the same for every visitor, so it also has to leave `Cache-Control: public` and the ETag's assumptions behind, most simply in a controller that is not a `PublicController`, as the preview is.
+
+`test/integration/theme_pages_test.rb`: "a public page drawn under a theme sets no cookie and carries no token: a form, the CSRF tags, a token asked for and a write to the session" (with forgery protection switched ON as production has it, on a page and on a 404), "a signed-in editor reads a public page under a grasping theme and is still signed in: no cookie set, none taken away", "the preview, which is private and signed in, keeps its token: the wall is the public controller's alone"; `test/integration/public_caching_test.rb`: "public pages set no cookies and are publicly cacheable".
+
+## Rich text
+
+**How a text looks is entirely the theme's** (decision 12). A rendered body is plain elements under a wrapper, and the theme styles every one of them, three ways, and may use all three:
+
+- the tokens the default rules read (`--th-ink`, `--th-accent`, `--th-mono`, `--th-sunken`, `--th-radius`, the type sizes), which restyle a text without a rule;
+- its own CSS under its own wrapper: the Rich text block's template and the post's are the theme's (`blocks/rich_text_component`, `posts/detail_component`), so the wrapper's element and class are too, and a theme that does not write `cs-prose` on it gets none of the default rules and starts from bare elements;
+- rules under `.cs-prose`, which come after the default theme's in the one stylesheet and so win.
+
+**The one limit: a theme does not replace the HTML structure a text is rendered to.** It cannot turn a heading into another element, add a class or an attribute to one, add a node, or bring its own template for the image and the video inside a text. The reason is that a body is rendered once and used in three places: it is cached by its document's digest (the cache key holds no theme and no component class) and is the same HTML in CS Studio's preview, in the MCP server's Markdown round trip and on the site, so a theme inside that render would be a theme inside the editor, and every theme change would have to empty the render cache. **The limit was raised with the owner on 2026-10-12, was not objected to, and is not confirmed.** If it goes, the way in is a hook on the renderer that a theme's template fills, with the theme's fingerprint in the render cache's key; nothing here closes it. Heading ids (`with_heading_ids`) are put on a copy of the rendered page for the same reason and never into the cached render.
+
+**Struck text reaches the page since this work.** The editor's `strike` mark renders `<s>`, and `RichTextScrubber` started from Rails' safe list, which has `del` and no `s`: a struck text was shown struck in the editor and arrived plain on the site. The contract's own test found it; `s` is on the scrubber's list now and in `Theme::Contract::RICH_TEXT` (`test/values/theme/contract_test.rb`: "a rendered text is the elements the contract lists, under no class of its own").
+
+## The contract
+
+`Theme::Contract` (`app/values/theme/contract.rb`) is **the one list**, read by all of: the check when the application starts and `bin/rails theme:check` (`Theme::Check`), `bin/rails theme:new` (`Theme::Scaffold`), the tests (`test/values/theme/contract_test.rb`) and this file, which `test/lib/theming_reference_test.rb` holds to it both ways (a name added to the contract fails until its row is here; a row the contract does not hold fails too). The lists are data and name no class: a component is written as its path, which is also where a theme puts its template, so this value knows no component.
+
+**What is on these lists is stable, and a change is said in the release notes.** Everything that is not may change freely, and a theme that uses it is on its own. The list is kept short on purpose: every name on it is one the CMS can no longer rename quietly.
+
+**A block type added later joins by one entry per thing it brings** (decision 18): its component's line in `COMPONENTS`, with the methods its template may call, which makes its template replaceable and `theme:new` copy it, and its tokens' lines in `THEMED_TOKENS` or `FIXED_TOKENS`. Nothing else in the mechanism names a block, and the type cannot be added without them: the contract test fails for a component a type registry hands out that `COMPONENTS` does not hold, and for a `--th-` token that `tokens.css` defines and no list names, each with the missing entry in its message. The Code block is the first to join, in the next pull request.
+
+### Tokens
+
+Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothing and names no block. A theme changes one by declaring it again in its own stylesheet. The first group (`THEMED_TOKENS`, `--th-paper` to `--th-on-band-strong-accent`) has a value for the light scheme and one for the dark, and is declared again under both `:root, [data-theme="light"]` and `[data-theme="dark"]`; the rest (`FIXED_TOKENS`) have one value.
+
+| Token | What it is |
+|---|---|
+| `--th-paper` | the page's ground |
+| `--th-surface` | a raised surface: a menu, a card |
+| `--th-sunken` | a sunken surface: a code block, a tinted band |
+| `--th-ink` | body text |
+| `--th-dim` | secondary text |
+| `--th-meta` | labels, dates, captions |
+| `--th-line` | a hairline |
+| `--th-line-strong` | a stronger line: a quote's rule, a button's border |
+| `--th-accent` | links and the one accent colour |
+| `--th-accent-hover` | the accent under the pointer |
+| `--th-accent-tint` | a ground tinted with the accent |
+| `--th-on-accent` | text on the accent |
+| `--th-ok` | success |
+| `--th-ok-ink` | success as text |
+| `--th-ok-tint` | a ground tinted with success |
+| `--th-warn` | warning |
+| `--th-warn-ink` | warning as text |
+| `--th-warn-tint` | a ground tinted with warning |
+| `--th-danger` | danger |
+| `--th-danger-ink` | danger as text |
+| `--th-danger-tint` | a ground tinted with danger |
+| `--th-shadow-menu` | the shadow under a menu |
+| `--th-band-tinted` | a section's tinted band |
+| `--th-band-strong` | a section's strong band |
+| `--th-on-band-strong` | text on the strong band |
+| `--th-on-band-strong-dim` | secondary text on the strong band |
+| `--th-on-band-strong-accent` | links on the strong band |
+| `--th-font` | the text face |
+| `--th-mono` | the monospaced face |
+| `--th-t-display` | the homepage's title size |
+| `--th-t-h1` | a page title's size |
+| `--th-t-h2` | a heading's size |
+| `--th-t-h3` | a small heading's size |
+| `--th-t-body` | body size |
+| `--th-t-small` | small text |
+| `--th-t-label` | labels |
+| `--th-track-mono` | letter spacing of monospaced labels |
+| `--th-track-wide` | wider letter spacing |
+| `--th-sp-1` | spacing step 1 |
+| `--th-sp-2` | spacing step 2 |
+| `--th-sp-3` | spacing step 3 |
+| `--th-sp-4` | spacing step 4 |
+| `--th-sp-5` | spacing step 5 |
+| `--th-sp-6` | spacing step 6 |
+| `--th-sp-7` | spacing step 7 |
+| `--th-radius` | the corner radius |
+| `--th-radius-pill` | a pill's radius |
+| `--th-ease` | the easing of transitions |
+
+`--th-preview-bg`, `--th-preview-ink`, `--th-ph-a` and `--th-ph-b` are the CMS's own (the preview bar, the image placeholder; `Theme::Contract::OWN_TOKENS`) and not in the contract. The default theme's styles and templates hold no colour literal: `tokens.css` is the one place.
+
+### Templates
+
+Under the theme's `views/`. The default is the file of the same path under `app/views`.
+
+| Template | What it is |
+|---|---|
+| `layouts/public/_frame.html.erb` | everything inside `<body>` but the preview bar; `yield` is the page |
+| `layouts/public/_title.html.erb` | the pattern of the page title; locals `page_title` (nil on the homepage and a 404) and `site_title` |
+| `layouts/public/_icons.html.erb` | the favicon and the touch icon links |
+| `layouts/public/_head.html.erb` | the theme's own head tags, after the CMS's and before the stylesheet |
+| `layouts/public/_header.html.erb` | the site's header: its title, logo and menu |
+| `layouts/public/_footer.html.erb` | the site's footer: the copyright line, the social links, the light/dark switch |
+| `layouts/public/_language_switcher.html.erb` | the links to the shown page in the other languages |
+| `layouts/public/_theme_toggle.html.erb` | the light/dark switch; its script is the CMS's `theme` controller |
+| `pages/show.html.erb` | a page: its heading, hero and blocks, and the list of its subpages |
+| `pages/not_found.html.erb` | the page for an address that is nobody's |
+
+A theme's own partials go under `views/theme/`, by any name ending in `.html.erb`, at any depth (`Theme::Contract::OWN_PARTIALS`). Not replaceable: the layout, `pages/_seo_meta`, `shared/_theme_head`, `layouts/public/_preview_banner`.
+
+### Components
+
+Under the theme's `components/`, as `<path>.html.erb`. The methods are what the template may call, each safe for an empty block (`alt` and `caption` answer nil without an image); a method not listed is the CMS's to change. Beside its own methods every component's template may also call `translated`, `rich_text`, `post_date`, `resume_period`, `post_url_path`, `page_url_path`, `render_block` and `helpers`. Through `helpers` the rest of the helpers table is reached.
+
+| Component | Its template may call |
+|---|---|
+| `blocks/rich_text_component` | `block`, `page` |
+| `blocks/image_component` | `block`, `page`, `asset`, `alt`, `caption`, `sizes` |
+| `blocks/post_list_component` | `block`, `page`, `list_component` |
+| `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width` |
+| `posts/blog_list_component` | `posts`, `page` |
+| `posts/resume_list_component` | `posts`, `page` |
+| `posts/now_list_component` | `posts`, `page` |
+| `posts/detail_component` | `post` |
+
+### Helpers
+
+What a page or layout template may call (`ThemeHelper`, `PagesHelper`). `public_urls.preview?` is the one question a template may ask of `public_urls`. "What a template may ask", below, has the signatures of the last seven.
+
+| Helper | What it answers |
+|---|---|
+| `theme_site` | the settings row: title, tagline, logo |
+| `translated(record, attribute)` | a translated attribute in the language shown, with the fallback |
+| `rich_text(record)` | a record's body, rendered |
+| `render_block(block)` | one block, drawn by its type's component |
+| `block_outline(page)` | the page's blocks: `top_level`, a section's columns |
+| `published_views(records)` | records as the public sees them (their copies) |
+| `navigation_pages` | the homepage's published subpages, as published |
+| `language_links(record)` | the shown record in each enabled language |
+| `safe_social_links` | the footer's links, http, https and mailto only |
+| `home_url_path` | the homepage's address in the language shown |
+| `page_url_path(page)` | a page's address |
+| `post_url_path(post)` | a post's address |
+| `post_date(post)` | a post's publication date |
+| `resume_period(post)` | a resume entry's years |
+| `page_found?` | whether a page is shown: there is one, and the answer is not a 404 |
+| `page_ancestors(page)` | the pages above a page, the homepage first, as nodes |
+| `page_section(page)` | the page's branch directly under the homepage, as its tree; nil for the homepage |
+| `page_tree(top)` | the branch under and including `top`, as nested nodes |
+| `pages_in_reading_order(node)` | a branch flattened: a page, then its subpages |
+| `neighbouring_pages(tree)` | the shown page's previous and next |
+| `with_heading_ids(html)` | rendered blocks with an id on each heading, and the headings |
+
+### Rich text selectors
+
+What a rendered text is made of (`Theme::Contract::RICH_TEXT`): the elements, and the two things a text embeds with their class names. How each looks is the theme's; that it is this element is the CMS's.
+
+| Selector | What it is |
+|---|---|
+| `h2` | a heading |
+| `h3` | a smaller heading |
+| `h4` | the smallest heading |
+| `p` | a paragraph |
+| `ul` | a bulleted list |
+| `ol` | a numbered list |
+| `li` | a list's item |
+| `blockquote` | a quote |
+| `a` | a link, to another address or to a page or post of the site |
+| `strong` | bold text |
+| `em` | italic text |
+| `s` | struck text |
+| `code` | inline code |
+| `pre` | a code block |
+| `pre code` | a code block's text |
+| `hr` | a rule |
+| `br` | a line break |
+| `figure.content-block--image` | an image in a text |
+| `figure` | the same element, by its name alone |
+| `img` | its picture |
+| `figcaption` | its caption |
+| `.content-block--youtube-embed` | an embedded video |
+| `.youtube-embed__frame` | the video's frame, which keeps its proportions |
+| `div` | the element of both of those |
+| `iframe` | the video itself |
+
+## What a template may ask
+
+The helpers of the page tree and the article (`ThemeHelper`, theming spec §7). Each is read-only and memoised for the render, answers only what the public sees, and reads none of `params`, `request`, `cookies` or `session`: "the shown page" is the page the controller resolved (`@page`), never the request's path.
+
+**What a template gets is a node, never a page.** A `Page` in a template's hand, even one rebuilt from its copy, answers `.children`, `.parent` and `.content_blocks` from the ROWS, and no guard reads a theme's templates for that walk. The first version of these helpers answered pages; the review sent it back.
+
+**None raises, and a 404 is nowhere.** With no page (`nil`), and on every answer that says "not found", each answers empty: no pages above, no section, no tree, no neighbours. So a frame may ask for the section on every page without a condition of its own. One consequence: a theme cannot draw a section's tree on its "not found" page with these helpers; `navigation_pages` still works there.
+
+| Helper | Answers |
+|---|---|
+| `page_found?` | `true` when there is a page and the answer is not a 404. What a frame asks before it prints something OF `@page` (its title in a bar). |
+| `page_ancestors(page)` | Array of `Node`, the homepage first, the parent last. `[]` for the homepage, for `nil` and on a 404. A page above that is not published or is in the trash is left out (only a preview can show a page under one). |
+| `page_section(page)` | The `Node` of the page's section (the page whose parent is the homepage; a page directly under the homepage is its own) WITH ITS WHOLE TREE and `page` marked current. `nil` for the homepage, for `nil`, on a 404, and when the section or the homepage is not shown. |
+| `page_tree(top, current: <the shown page>)` | `Node` or `nil`. `top` is a node or a page. `nil` for `nil`, on a 404, and when `top` is not shown or has no address in this language. `page_tree(page_section(@page))` is the same object as `page_section(@page)` and reads nothing. |
+| `pages_in_reading_order(node)` | Array of `Node`: a page, then its subpages, each followed by its own. `[]` for `nil`. |
+| `neighbouring_pages(tree, skip: nil)` | `[previous, next]`, each a `Node` or `nil`; `[nil, nil]` for `nil` or a tree with no current page. `skip` is a callable `(node) -> true/false` naming pages the walk passes over (a theme hands in "the pages that only group others"); the shown page is never skipped. |
+| `with_heading_ids(html, levels: 2..3)` | `[html, headings]`: the html (html-safe) with an `id` on each heading of the levels, and an Array of `ThemeHelper::Heading`. `["", []]` for `nil`. |
+
+`page` and `current` are `@page` or a node (anything with an `id`); what a helper does with something that is neither is not defined.
+
+**`PublicSite::Branch::Node`** (a `Data`; `app/queries/public_site/branch.rb`):
+
+| Method | Value |
+|---|---|
+| `id` | Integer, the page's id: what tells two nodes apart (`node.id == other.id`), and what `page_tree` takes a top by. |
+| `title` | String, as published, in the language shown, falling back as the site does. |
+| `subtitle` | String or nil, as published, same fallback. |
+| `slug` | String: the last part of the page's stored address in this language; `""` for the homepage. |
+| `path` | String: the address, with the language's prefix and, in the preview, `/preview`. |
+| `depth` | Integer: 0 for the homepage, 1 for a page directly under it. |
+| `children` | Array of `Node`, in the tree's order. **Empty for a node that was not read as part of a branch**: the homepage in `page_ancestors` (its branch is the whole site, so `leaf?` is true of it there), and, in a preview only, a page above that the section's tree does not hold. |
+| `current?` | this is the shown page. |
+| `open?` | the shown page is somewhere below (false for the shown page itself; true for every node of `page_ancestors`). |
+| `leaf?` | no children. |
+| `reading_order` | Array of `Node`: itself, then its subpages, each followed by its own. |
+
+Because it is a `Data` it also answers `current` and `open` (the same without the question mark), `to_h` and `==` by value. Nothing else: no `parent`, `content_blocks`, `attributes`, `ancestors`, `descendants`, `page`, `record`, `published_at`, `reload` or `save`, and every field but `children` is a String, an Integer, nil or a boolean (`test/queries/public_site/branch_test.rb`: "a node is a value: it answers what is documented and no way to a record or its rows"). A node is not a page: `node.title` and `node.path`, never `translated(node, :title)`. There is no `summary`: a summary field is outside this work (decision 7).
+
+**`ThemeHelper::Heading`** (a `Data`): `id` (String), `text` (the heading's words: markup removed, a space for a line break, white space squished), `level` (Integer, 2 for `h2`).
+
+### `PublicSite::Branch`
+
+It answers data and knows no helper, no view and no theme. **Which pages are in a branch and in what order is the rows' to say** (the tree is not in a copy): kept and published pages only, the rule of every public listing; a page with no address in the language shown is left out with everything under it, because there is nowhere to link it; a published page under an unpublished one is in no branch. **A title is content, and content of a published page comes from its copy** (`Publishing.published_all`), never from its rows: the spike this replaces read the rows, and a sidebar would have shown a title nobody had published. In a preview the rows are what is shown, as for `published_views`. The order is the tree's own: by position, a page without one last, then by id, as the menu, the subpage list and CS Studio's tree have it.
+
+**The statements, whatever the branch's size** (counted at 4 pages and at 30):
+
+- `page_tree(top)`: **four** (the pages above the top, which say how deep the branch sits; the branch's pages; their stored addresses, through `PublicSite::Paths.current_paths`, one of the reads the entry guard allows; their copies). **Three when the top is the homepage.** One more when `top` is handed over as a node other than the section already read (its row is looked up).
+- `page_section` and `page_ancestors` together: **four** for a page in a section, from one read, with none per page above; one for the homepage; three when the section is not shown.
+- **A page that draws its tree, its crumbs and previous and next: four in all.**
+
+The spec said three for a branch and one more for the ancestors; `depth` counts from the homepage, which is the fourth.
+
+`test/queries/public_site/branch_test.rb` ("a branch costs four statements at 4 pages and at 30, the homepage's three, and what is around a page four with none per page above", "titles are the published ones, and in a preview the rows'", "an unpublished page leaves with its branch", "a page in the trash is in no branch and above no page, although its address is still stored", "pages are in the tree's own order, one without a position last: as the menu's and CS Studio's tree"); `test/helpers/theme_helper_test.rb` ("page_tree, page_section and page_ancestors read a branch once per render, as published, and answer nodes", "with no page every helper answers empty and none raises", "on a 404 that has a page in hand the page is not found, and nothing of it is answered"). The default theme draws none of this, so the public canary and the trash test ask the site under the second theme (`test/integration/public_canary_test.rb`: "under a theme that draws the page tree, the crumbs and previous and next, rows overwritten without publishing reach none of them"; `test/integration/trash_visibility_test.rb`: "a theme's page tree and previous and next leave out a trashed page whose address is still stored, publicly and in preview", "a theme's crumbs leave out a trashed page above, publicly and in preview"). A trashed page loses its address, and a page with no address is left out anyway, so the first trash tests could not fail for a missing `.kept`; these two trash the page around the callbacks and assert that its address row is still there.
+
+**In the preview of a draft page the tree, the crumbs and the neighbours hold published pages only**, as the menu does: the draft has no entry in the sidebar, nothing is marked current, there is no previous or next, and a draft directly under the homepage has no section at all. Whether a preview's tree should include drafts was not decided (the roadmap has the row).
+
+**What still hands a template a page.** `navigation_pages`, `published_views` and `@page` itself answer `Page` objects, as they did before this work, and a template can read rows from them (`@page.children`, `@page.parent.root?`). `test/lib/public_readers_test.rb` does not scan a theme's templates and the folder check does not look for the walk; the canary under the second theme is what holds for the fixture (the roadmap has the row).
+
+### Heading ids
+
+`with_heading_ids(html, levels: 2..3)` is handed the rendered blocks of a page, as a `capture` of them, and gives each heading of the levels an `id` and lists them: what a table of contents and a link to a heading need.
+
+- **Made on the RENDERED page, from each heading's words, not stored in the document** (decision 17): an id must be unique on the whole page, and a page's text is several blocks, each rendered and cached alone. **Rewording a heading changes its id**, and a link to it from elsewhere then opens the page at its top. Accepted with that consequence; the later alternative is an anchor stored on the heading, which is rich-text work (the roadmap has it).
+- **Letters of any script are kept** (`ThemeHelper::Heading.id_from`). For Latin text the id is what `parameterize` answers ("Über uns" is `uber-uns`). `parameterize` alone answers nothing for Greek, Arabic, Cyrillic, Japanese or Hindi, and a page in one of them would have got `section`, `section-2`, …: ids that follow a heading's PLACE and move when a heading is added above, which is a worse consequence than the one accepted. So for every other script the id is the words themselves, lower case, with a hyphen for each run of anything that is not a letter, a mark or a digit (`εγκατάσταση-και-ρύθμιση`, `インストール-手順`). A Latin letter the transliteration does not know loses its marks and stays a letter (`huong-dan-cai-dat`, where `parameterize` puts a hyphen into the word). Only a letter that is not ASCII is asked of the transliteration, which follows `I18n.locale` as `parameterize` does.
+- **Invisible characters are dropped**: format characters (a zero-width joiner or space, a soft hyphen), the variation selectors and the marks that combine with a symbol, and a mark that follows no letter or digit. So an id never starts with a character nobody can see or type: "⚠️ Warning" is `warning`.
+- **A heading with no letter and no digit is `section`**, numbered like any other.
+- **Duplicates are numbered**: `intro`, `intro-2`. An id a heading already has is kept and never given to another.
+- **Which headings are the article's.** The article is what the template hands in, less the pieces that list or link OTHER content or are the page's furniture: a heading inside `nav`, `aside`, `header`, `footer`, a list item (`li`) or a link (`a`) is neither listed nor given an id (`ThemeHelper::NOT_THE_ARTICLE`): a post list's titles, a card that is one link. A post's own text, which its template wraps in `article`, and a text in a section's column are listed. No default component draws an `h2` or `h3` of its own today.
+- **What comes in is made safe first.** Rendered blocks (a `capture`) are html-safe and pass as they are; anything else is escaped, or the helper would be the way to print a typed title as markup. A text with no heading of the levels comes back as the same object, unparsed where it holds no heading at all.
+- **After the render cache, never in it**: the ids are put on a copy of what `rich_text` answered ("heading ids are on the page a theme draws and not in the cached render of the text").
+- **The cost** is one more parse of the article for a request that is not a 304, paid only by a template that calls the helper. The page is written out again by Nokogiri's HTML5 serialiser, which normalises markup as a browser would (`allowfullscreen` becomes `allowfullscreen=""`, a `table` without `tbody` gains one).
+- **An id may hold non-ASCII letters.** `href="#<%= heading.id %>"` works as written; a theme's script that builds a CSS selector from an id uses `CSS.escape` or `getElementById`. **And an id can equal an id the theme's own frame uses** (`taken` is collected from what the helper was handed, which is the article, not the frame): a heading "Menu" under a frame with `id="menu"` is two elements with one id. Nothing guards it (the roadmap has the row).
+
+`test/helpers/theme_helper_test.rb` ("with_heading_ids gives each heading of the levels asked for an id made from its words, and lists them", "two headings alike, an empty one, one in another script and one with markup each get an id of their own", "a heading in another script keeps its letters: its id is its words, not its place on the page", "an emoji leaves nothing in an id: no selector, no joiner, no keycap, and a heading of emoji alone is section", "only the article's own headings are listed and given an id: not a list's titles, a card's, or the furniture's", "a string that is not markup comes back escaped: with_heading_ids is no way to print a title as markup").
+
+## The render cache and the ETag
+
+The public ETag and the rich-text render cache are keyed on `RichText.code_revision` (`KAMAL_VERSION`, else a `REVISION` file, else a value chosen at boot). A site's image rebuilt on the same CMS image with a changed theme moves none of the three in a way that is promised. So **`Theme.current.fingerprint` is one of the ETag's keys** in `PagesController#show`: a changed theme is never answered 304 (`test/integration/public_caching_test.rb`: "another theme, and the same theme with one byte changed, answer 200 where the same theme answers 304", in both directions). That is the whole change: the stylesheet's and the scripts' addresses are digested and printed in the page, and the rich-text cache needs nothing, because a theme styles a rendered body and does not change its HTML.
+
+A page's ETag also moves when another page of its tree is published under a new title (the content version), so a sidebar is never confirmed stale ("a page a visitor has is asked for again when another page of its tree is published under a new title").
+
+**What the ETag cannot see is what a template reads beyond the contract.** A public page is one cookie-less answer for every visitor, so a theme's template reads the page, the tree, the site and the language, and never `params`, `request`, `cookies`, `session`, `flash` or the clock. `theme:check` refuses a template that names one of the first five; the clock and a query of a template's own it cannot see, and a theme that reads what the ETag does not cover serves stale pages to returning visitors.
+
+## Checking a folder
+
+`Theme::Check.problems(folder, deep: false)` answers sentences; an empty answer is a sound folder. Each starts with the file, says what is wrong and ends with what to do: it is read in a boot log, or in a build's log, by whoever started it.
+
+**Strict on purpose** (decision 14). A file the contract does not name is a problem, not something to ignore: a misspelt `pages/shwo.html.erb` would otherwise silently never be used, and a theme that holds `layouts/application.html.erb` would replace the CMS's head, since the view path finds whatever is there.
+
+**THIS IS A FENCE AGAINST MISTAKES, NOT A SANDBOX.** The reading of a template's source looks for names and literal tags, so a tag built from a string at run time, or a name reached another way, is not seen, and nothing here is meant to stop an author who wants to get past it. It is for the honest mistake: a `_head` copied from another project with its canonical link and its `csrf_meta_tags` still in it. What holds whatever a theme writes is elsewhere and narrower: the CMS's head tags are lines of the layout, and the public site commits no session.
+
+### The plain depth: at boot, and on every development reload
+
+1. **A file with no place** (`misplaced`): under `views`, anything but a template of `TEMPLATES` or a `.html.erb` under `views/theme/`; under `components`, anything but `<a component of COMPONENTS>.html.erb`; under `assets`, anything but `stylesheets/theme.css` and an image or font by its extension; under `javascript`, anything but `controllers/**/*_controller.js`. Such a file is ONE problem, and nothing else is said of it: whether its name is also one of the CMS's, and what it says inside, is nothing its author can use before it has a place.
+2. **A hidden template**: a dot file that is an `.erb` under `views/` or `components/`. The folder passes dot files over (`.DS_Store`, `.keep`), and a template is on the view path all the same, unchecked and outside the fingerprint.
+3. **An asset named like one of the CMS's own** ("Assets and scripts", above).
+4. **A template that is not UTF-8**: one problem, and nothing else is said of that file.
+5. **What a template's source says** (`written`), with ERB comments not read:
+   - one of the CMS's head tags, in ANY template of the theme (a partial is rendered from anywhere): a canonical link; a language link, which is a `<link>` (literal, or built by `tag.link`, `tag(:link` or `content_tag(:link`) with `rel="alternate"` AND `hreflang`; `og:url`; the CSP tag (`csp_meta_tag`, `csp-nonce`, a literal `Content-Security-Policy`); the import map; a stylesheet link (`stylesheet_link_tag`, `rel="stylesheet"`, whatever it links). An attribute is seen in every spelling (`rel="canonical"`, `rel: :canonical`, `:rel => "canonical"`, and among other values);
+   - the CSRF token asked for (`csrf_meta_tags`, `csrf-token`, `csrf-param`, `form_authenticity_token`);
+   - a form that is sent with a token: `form_with`, `form_tag`, `form_for` or `button_to`, unless the same ERB tag says `method: :get`;
+   - a write to the head's slot (`content_for :head`, `provide :head`);
+   - an assignment to an instance variable, in any form (`@page = …`, `||=`, `+=`, `<<=`, `instance_variable_set`);
+   - a `_frame` that never prints the page: no printing tag (`<%=`, `<%==`) holds `yield` without a name after it;
+   - a `_title` that prints nothing.
+
+**Let through on purpose**: `hreflang` and `rel="alternate"` on an `<a>` (`link_to name, path, hreflang: code, rel: "alternate"` is how a language switcher in the page is written, and the default one has it); a feed's `<link rel="alternate">`; `rel="preload"`; a second `<title>`, a viewport, a description and the other `og:` tags (extra markup after the CMS's, not refused); a GET form and a plain `<form>` tag; a frame that hands `yield` on (`<%= tag.main yield %>`, `<%= render "theme/body", content: yield %>`); a word in text or in a comment.
+
+### The deep depth: `theme:check`, the build's gate
+
+`deep: true` does the above and two things more:
+
+- **It compiles every template**, inside a method as Action View does (a frame yields, and `yield` at the top level is a syntax error), so a syntax error is found at the build and not by a visitor. The message is one sentence worded from Prism's first error: the line and what Ruby found there; a block that is never closed, said as that and not as a line after the template's last; one `<% end %>` too many, said as that with its own line.
+- **It reads each template for `params`, `request`, `cookies`, `session` and `flash`**: the bare name, and the name asked of `helpers.`, `controller.` and `self.`. Not a method of something else (`text.request_id`), not a symbol, not a Hash key.
+
+**How a template is read.** The Ruby of a template is read by Ruby's own lexer (`Ripper.lex`), **one ERB tag at a time**, and the fences ask their patterns of a tag's CODE: what is left when its comments and the words of its strings are taken away. Telling the three apart is the lexer's work and not a pattern's. An earlier reading took comments away first ("a space, a hash, to the line's end") and strings second, so `style: "color: #123456"` lost its closing quote, the quote left over paired with the opening quote of the NEXT string, and from there to the template's end words were read as code and code as words: `link_to "Our cookies", "/cookies"` was refused at a site's build as "reads cookies", and a real `@page = nil` between two such strings was not seen. Not read: comments, the words of every string form (quotes, `%q`, `%Q`, `%w`, `%i`, heredocs, regular expressions, a character). Read: everything else, and what a string interpolates, at any depth. Per tag, because a tag is where ERB itself cuts and a tag is a fragment (`end`, `}`, `items.each do |item|`), which the lexer reads.
+
+**The deep check gates a site's build, so where it is unsure it lets through.** A wrong refusal blocks a deploy. What it therefore misses, all of it known:
+
+- a name reached by `send`, through a local alias (`r = controller; r.request`), with `&.` (`helpers&.request`), by a keyword's shorthand (`render "theme/x", params:`), or through a helper of another name;
+- **a fenced name the template binds itself** (`bound_in`): a block's parameter (`sessions.each do |session|`), a lambda's, or a local that is assigned, anywhere in the template. From then on the name is the theme's own variable, and a template that lists a conference's sessions is not told to "take session out". The price: once a name is bound ANYWHERE in a template, no read of the view's method of that name is seen in it, before the binding or after (`request = request.path` hides both), and a default value in a parameter list binds what it names (`|a, b = params|`);
+- a read written after one of three spellings Ruby reads by whether the name in front is a local, which one tag does not know (`width /2, "/cookies"`, `ok ?"cookies" : "session"`, `list <<name`): the tag is read both ways and a fence speaks only when both readings hold what it looks for (`reads?`);
+- `response` and `headers`, which are not fenced at all (the status is not "per visitor", so the fence's sentence would not be true of it);
+- an `end` too many FOLLOWED by a block never closed, which compiles (the two cancel out inside the wrapper);
+- a walk of rows from a page (`@page.children`), a `<script src>` from another host, the clock, and a query of the template's own.
+
+`test/values/theme/check_test.rb` holds each rule and each thing let through (among them "a file the contract does not name is refused by name: a misspelt template, a backup file, a layout", "a file with no place in a theme is one problem, whatever it holds and whatever it is named like", "a template that prints one of the CMS's own head tags is refused, by its file and by the tag", "the reading is not fooled: a comment, a word in text, a language link in the page, a feed link, another slot", "a string that holds a hash sign, or a quote inside quotes or a regex, does not turn the reading of what follows inside out", "a block parameter, a lambda's parameter and a local named like a fenced word are the theme's own, in every tag after", "a tag that is a fragment of Ruby is read like any other: the words of its strings are not"); the boot is `test/lib/production_boot_test.rb` ("production with a theme folder that holds a file the contract does not name does not start, and names the file": the one proof that the contract is checked when the application starts).
+
+## `theme:new` and `theme:check`
+
+The path is a rake argument, so the shell needs the quotes:
+
+```sh
+bin/rails 'theme:new[../my-site/theme]'
+bin/rails 'theme:check[../my-site/theme]'     # or, with THEME_PATH set:  bin/rails theme:check
+```
+
+A space in the path is carried by those quotes. **A comma is not**: rake cuts a task's arguments at every comma and trims around them, so what was between the pieces cannot be put back. A path that arrives in pieces is refused with that sentence, never used by its first piece, and is given in a variable instead: **`THEME_NEW_PATH`** for `theme:new` (read when the bracket is empty, and by nothing else), `THEME_PATH` for `theme:check`.
+
+**`theme:new`** (`Theme::Scaffold.write`) writes the default theme into a folder of a theme's shape (decision 15: the default theme's templates stay where Rails and ViewComponent put them, and this copy is how they are "the example to copy"). **What is copied is the contract**: every template of `TEMPLATES` and every component template of `COMPONENTS`, so a line added to either is copied from that day on and nothing the contract does not name can be; plus `assets/stylesheets/theme.css` (a comment that names every token and declares nothing), a `.keep` in each folder a theme may fill, and a `README.md`. A site under the written folder is drawn byte for byte as before; its author then deletes what they do not want to own, because a file the folder does not hold comes from the default theme and follows it through upgrades. It writes into a new folder or an empty one, and a folder is empty when everything at its top is what a theme folder passes over (a repository, dot files, a README, which is kept and ours not written). It prints how many files it wrote and the next step with the path quoted as a shell needs it, so the line pastes (`test/values/theme/scaffold_test.rb`: "the folder it writes has no problem, checked deeply, and loads", "a site under the folder it writes is drawn byte for byte as under the default theme", "a folder that holds only a repository, dot files and a README is empty: it is written into, and the README is kept").
+
+**`theme:check`** runs the deep check and says every problem as one numbered line on stderr, then `<path>: N problems.`, and ends 1; a sound folder is one line, `<path>: N templates, no problems.`, and 0. Never an exception's trace for a folder that is refused: this output is read in a build's log. It needs no stylesheet, no database and no secret.
+
+**It is not `=> :environment`: the task starts the application itself, inside `ThemeFolder.checking { … }`.** Under a `THEME_PATH` whose folder the contract refuses the application does not start, so as a prerequisite the boot ended the command before the task's body ran, with rake's "aborted!", a trace and the boot's half of the list only, and the deep half (a template that does not compile) came to light one build later. Inside `checking` the initializer keeps a refusal as it does on a reload and does not log it, and the task says the whole list. It is the one boot of a refused theme that does not raise.
+
+What still ends it before the list, each as one sentence with no trace and exit 1: a path that is no directory, something at the folder's top that is no part of a theme (all of them together), a file that cannot be read, a link out of the folder, a hidden folder inside the theme (`ThemeFolder::Invalid`: the folder cannot be read as a theme at all, so there is no list to make; these three come one at a time, since the walk stops where it cannot go on), and in production with a real secret a stylesheet built for another theme. And when a path is checked while `THEME_PATH` names another folder that is refused, the task says so after its own report and ends 1: saying nothing would end 0 in a process whose every public page raises (`test/tasks/theme_tasks_test.rb`: "theme:check names every problem, the deep ones too, and exits 1", "theme:check under a THEME_PATH the application does not start under names every problem, the deep ones too, with no trace", "theme:check of a path while the theme the application started under is refused says so and ends 1", "a path with a comma is refused in the brackets with the way to give it, and taken from THEME_NEW_PATH").
+
+## Deployment
+
+**A theme reaches a container as an image layer on the CMS image, never as a mounted volume** (decision 16). The stylesheet, the digested images and fonts and the import map's pins are all made at build time; a volume could change without a build. For a person: **changing the theme of a running site is a build and a deploy**, and in development you edit a file in the folder and reload the page.
+
+A site's `Dockerfile`, as built and run by hand for this work (`docs/reference/hosting.md`, "How a site's image is built", has each line's reason):
+
+```dockerfile
+FROM <the CMS image>
+ENV THEME_PATH=/rails/site-theme
+COPY --chown=1000:1000 theme/ /rails/site-theme/
+RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails theme:check && \
+    SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:clobber assets:precompile
+```
+
+**`theme:check` goes BEFORE `assets:precompile`**, where the spec had it after: `assets:precompile` starts the application, which does not start under a refused folder, so with the precompile first a refused theme ended the build in rake's trace with the boot's half of the list, and `theme:check` was reached only for a folder the application starts under. Check first, the build's log is the numbered list.
+
+**`bin/theme-build-check`** is the two halves of "a site's image on top of the CMS's" that are the CMS's own, tried with the second theme **copied to a folder outside the application** with an image, a font and a controller in it. That is what every real site's theme is, and a check that only ever saw the fixture inside the application was green while no such site started. It builds the stylesheet with `THEME_PATH` set and finds in it the default theme's tokens, a default utility, the theme's accent and own rule, a utility used only in the theme's templates and the theme's image by its bare name; starts production under the theme with a real secret and requires the boot line, the stamp, the theme's controller in the import map, its image and font on the load path, the image at its digested address in the served stylesheet and the stamp being no asset; and runs the **deep check** under production, after showing it awake (a copy with one broken template must be refused). CI runs it as a step of the `test` job after the unit tests. **It is not in the test suite and is never run while tests or a watch run**: it writes `app/assets/builds`, which every other test reads. On its way out it builds the DEFAULT stylesheet again, whatever `THEME_PATH` the shell has, and ends non-zero when that rebuild fails.
+
+**CI builds no image** (a run is billed, and there is no Docker job). The image on top was built once by hand, and "As built" in the spec records what it proved, down to a public page drawn by the site image under its theme.
+
+**No CMS image is published yet**, and publishing one is its own work. Until then a site builds the CMS image itself from the revision it pins and builds its own on top.
+
+## In development
+
+A change to a file of the theme reloads the application at the next request, as a change under `app/` does (`watchable_dirs`), and `theme_css:watch` rebuilds the stylesheet. What needs more than a reload:
+
+- **A template FILE added to or removed from the theme is seen by the next request.** The watched folder has changed, the reload builds a new `Theme`, and the new theme answers the new file's subclass (or the CMS's class again). Observed with a development runner: a component template added under a running theme made the reloader report a change, and the theme built by that reload held it. `Theme` remembers per component whether the folder has its template (`@components`), which is why it is a new `Theme`, and never the old one, that sees the file; in the test environment nothing reloads, so a test that adds a file builds a new theme ("In tests").
+- **A theme's first controller file may need a restart.** The import map is drawn when the application starts; `ThemeFolder#pins` is nil without a `javascript/controllers` folder, so the first file of that folder is in no map until a restart. A file added to a folder that was there at boot is re-expanded with the map and probably needs none (read from importmap-rails, not observed); a changed one is reloaded.
+- **An asset folder that did not exist at boot** (`assets/images`, `assets/fonts`, `javascript`) is not on the load path until a restart: the paths are appended once.
+- **Something new at the folder's TOP is not seen on a reload**: `ThemeFolder.current` checked the top once, when the process started.
+- **A refused folder is said on every public page** until it is corrected, and CS Studio keeps working.
+
+## In tests
+
+- **The test environment ignores `THEME_PATH`**, and `test/test_helper.rb` deletes it. No test sets `ENV["THEME_PATH"]` in its own process; a test of a child process hands it to the child (`test/lib/production_boot_test.rb`, `test/tasks/theme_tasks_test.rb`).
+- **`with_plain_theme { … }`** (`test/support/theme_test_helper.rb`, included in every test case) is the one way a test is drawn by a theme: `Theme.with(plain_theme, &block)`, where `plain_theme` is `Theme.load(ThemeFolder.new(PLAIN))`. A system test's server runs in the test's process, so the swap reaches it. `Theme.with` is process-wide: two tests in one process must not run under different themes at once (the suite's parallelism is by process).
+- **`with_theme_copy { |dir| … }`** yields a copy of the second theme in a directory of its own, for a test that adds, changes or removes a file. Load it with `Theme.load(ThemeFolder.new(dir))`: a theme made with `Theme.new(path:)` is unchecked and has the fingerprint `default`, so the ETag does not tell it from the default theme. **One `Theme` does not re-read a changed template in the test environment** (ViewComponent compiles once, and Action View caches a template by its path): a test that edits a file builds a new theme, in a copy of its own.
+- **The second theme, `test/fixtures/themes/plain`**: plain CSS, no utilities but one. It replaces `_frame`, `_title`, `_icons`, `_head`, `pages/show`, the Rich text block's template and one post list (`posts/blog_list_component`); it changes `--th-accent` for both schemes; it brings two partials under `views/theme/`, one controller (`hello_controller.js`) and one image. Its frame and page draw the section's tree, the crumbs, a table of contents and previous and next on every page, which is why the canary and the trash test can ask it. **It deliberately does not replace the header, the footer, the Image block or the 404**, so every test of it is also a test of the fallback. Any file added to it changes its fingerprint; no test pins the value.
+- **The second theme's assets and controller are on the test environment's paths from the start** (`config/environments/test.rb`, `test/fixtures/themes/importmap.rb`): Propshaft's load path and the import map are fixed when the application starts and the suite swaps themes in-process. So `image_path("plain-mark.svg")` resolves under the default theme too, and "the default theme has no theme controller in its map" cannot be shown in the suite; the browser test shows the other half, that it is not REGISTERED off the public site.
+- **The suite's stylesheet is the default theme's.** System status' Theme row therefore WARNS under `with_plain_theme` (the stamp is `default`): a test that wants the OK row under a theme hands `stylesheet_probe: -> { true }` to `Setup::SystemCheck`.
+- **Never run a build while tests run.** A build takes the stamp away for its duration (`ThemeCss.build`), and two tests read the working tree's stamp (`test/models/setup/system_check_test.rb`: "the row's own probe reads the build's stamp: this suite's stylesheet is the default theme's"; `test/integration/admin/system_status_test.rb`: "the theme row names the theme that draws the site and no path of the server, and warns when the stylesheet is another theme's"); every public integration test needs `app/assets/builds/theme.css`, which a fresh worktree does not have until `bin/rails tailwindcss:build` (or the full `bin/rails test`) has run. `bin/rails tailwindcss:build`, `bin/dev`'s watch and `bin/theme-build-check` are all builds.
+- **Development and test share the built stylesheet and its entry**: a test run leaves the default theme's behind, also under a running `bin/dev` (above).
+- The unreadable-file tests of `test/lib/theme_folder_test.rb` skip when run as root, who reads everything.
+
+## What is not built
+
+New blocks (the Code block is the next pull request; Note and Table are the catalogue's). A theme's own HTML for rich text. Stored heading ids, list variants, a language on code blocks, tables in rich text. Search. A summary field, a navigation title or "show in menus" on a page. A group heading that is not a page. A link in the menu that leaves the site. The frame option on images. The product's version in a template. A template per page type. The content width as a token from which image `sizes` are made (a theme with another width passes its own `sizes` to `Media::PictureComponent`). Appearance settings in CS Studio. Several themes in one site, or a theme chosen per page or language. A published CMS image. A stylesheet per environment. A `script-src` or `style-src` in the public content security policy. A preview tree that holds drafts. A content API.
+
+## What a change can break silently
+
+- **A name on `Theme::Contract` renamed or removed as a cleanup** breaks themes that live outside this repository, and nothing here fails once the default template and this file are changed with it. It is a release-note change. The lists are held to the code (`test/values/theme/contract_test.rb`: "every component a type registry hands out is on the list, and the list holds nothing else", "every listed component has its default template and every method its template may call", "every listed template has its default under app/views, and says what it is", "every listed helper is one a template can call", "every token is defined, a themed one for light and for dark, and no other --th- name is") and to this file (`test/lib/theming_reference_test.rb`).
+- **A second place that puts the theme's views on a path**, or `prepend_view_path` in `ApplicationController`, lets a theme's file named like an admin view be drawn in CS Studio (`test/integration/theme_pages_test.rb`: "nothing of a theme reaches sign-in: a theme's file named as the product layout or the sign-in view is never drawn", "nothing of a theme reaches CS Studio: a theme's file named as the admin layout or the dashboard is never drawn", "nothing of a theme reaches setup: a theme's file named as the setup layout or a step is never drawn"). No mail is sent in those tests: a mailer that rendered through a public controller would be new ground.
+- **A tag a site breaks without, moved into a theme's partial**, is lost by every theme that replaces the partial; **a tag that is look or voice, written into the layout**, cannot be changed by any (`test/values/theme/contract_test.rb`: "what the layout renders of the theme's is on the list, and what is the CMS's is not").
+- **A `content_for` slot read by the public layout** is a way for any theme template to write among the CMS's head tags.
+- **`Theme::Check` loosened to "ignore what it does not know"**, or a theme's failing template rescued with the default one.
+- **The fingerprint taken out of the ETag**, or a new public action whose ETag does not hold it.
+- **A build that leaves the default theme's styles out, or imports the theme's first.**
+- **A public helper that reads a page's rows**: `page.children`, `page.ancestors` or `self_and_descendants` in a helper, where `PublicSite::Branch` reads the copies.
+- **A session, a cookie or a token on a `PublicController` response**: the wall is three lines, and a response that is no longer the same for everyone still says `Cache-Control: public`.
+- **A check or a test that only ever sees a theme INSIDE the application.** The boot test and `bin/theme-build-check` both copy the theme outside first, because one Critical defect was green for a round for exactly that reason.
+- **A file in `app/assets/builds` that is not a dot file** is an asset: listed in the manifest and served.
+- **A new root on the asset load path** that `Theme::Check::CMS_ASSET_ROOTS` does not know fails its test; a theme's file named like one of that root's would otherwise shadow it or be shadowed by an order nobody chose.
+- **Something that lets a theme into the rich-text render** (a class from a theme on an element, a template for a node) without the theme's fingerprint in the render cache's key serves one theme's HTML under another, and puts the theme into CS Studio's preview and MCP's Markdown.

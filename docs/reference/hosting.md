@@ -1,17 +1,18 @@
 # Hosting: the site's address, HTTPS, telemetry and the reset link
 
-> Describes: `lib/site_address.rb`, `lib/host_settings.rb`, `lib/telemetry.rb`, `lib/telemetry/path_scrubber.rb`, `config/environments/production.rb`, `config/application.rb` (the `content_spiel.host_announcement` initializer), `config/initializers/opentelemetry.rb`, `config/initializers/setup_token.rb`, `app/models/setup/token.rb`, `app/models/setup/system_check.rb`, `app/mailers/passwords_mailer.rb`, `app/controllers/admin/passwords_controller.rb`, `app/javascript/controllers/reset_token_controller.js`, `app/controllers/public_controller.rb` (`public_urls`, `origin_etag_key`), `app/components/admin/ui/insecure_notice_component.rb`.
+> Describes: `lib/site_address.rb`, `lib/host_settings.rb`, `lib/telemetry.rb`, `lib/telemetry/path_scrubber.rb`, `config/environments/production.rb`, `config/application.rb` (the `content_spiel.host_announcement` initializer), `config/initializers/opentelemetry.rb`, `config/initializers/setup_token.rb`, `app/models/setup/token.rb`, `app/models/setup/system_check.rb`, `app/mailers/passwords_mailer.rb`, `app/controllers/admin/passwords_controller.rb`, `app/javascript/controllers/reset_token_controller.js`, `app/controllers/public_controller.rb` (`public_urls`, `origin_etag_key`), `app/components/admin/ui/insecure_notice_component.rb`; and, for the theme a site is drawn with, `lib/theme_folder.rb` (the boot's line and refusals) and the comment above `assets:precompile` in the `Dockerfile`, whose mechanism is `docs/reference/theming.md`.
 
 Spec: `docs/superpowers/specs/2026-10-12-safe-on-a-public-address-design.md` (its last section, "As built", lists where the code departed from it). This is the first of four parts that make a site a stranger can put on a public address; mail, the sitemap and starting up, and the setup wizard follow (`docs/roadmap.md`).
 
 ## What a host sets
 
-Seven variables. None is required for the application to start outside production; in production `SECRET_KEY_BASE` (or a secret in the credentials) is.
+Eight variables. None is required for the application to start outside production; in production `SECRET_KEY_BASE` (or a secret in the credentials) is.
 
 | Variable | What it does | Without it |
 |---|---|---|
 | `PUBLIC_HOST` | The site's address with its scheme, `https://docs.example.org`. Everything in "The site's address" and "HTTPS" below follows from it. | Any host name is answered, nothing is forced to HTTPS, addresses in pages follow the request, and outside development and test no password reset mail is sent. System status and the wizard's system check say so as a warning. |
 | `ASSUME_SSL` | `1`, and no other value, makes every request count as HTTPS (`config.assume_ssl`). Only for a proxy that ends TLS and does not send `X-Forwarded-Proto`. | The proxy's `X-Forwarded-Proto` is believed. Kamal's proxy sends it and Thruster passes it on. |
+| `THEME_PATH` | The site's theme folder (`docs/reference/theming.md`). Read when the application starts; a path that is no folder, a folder with anything at its top but `views`, `components`, `assets` and `javascript`, or a folder that holds a file the theme contract does not name, stops the boot with a message that names the variable and the file ("The theme", below). In production the public stylesheet must have been built for this theme: `assets:precompile` with the variable set, in the site's image build. | The default theme draws the site. The boot log and System status ("Theme") say which. |
 | `SECRET_KEY_BASE` | Signs sessions and tokens. | Production does not start, unless the credentials file that `RAILS_MASTER_KEY` opens holds a `secret_key_base`. |
 | `SETUP_TOKEN` | The one-time code `/setup` asks for, chosen by the host. | It is derived from `secret_key_base` and printed to the boot log while setup is not complete. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Where spans are sent (OTLP, batched). | No telemetry at all, unless one of the two below is set. |
@@ -49,7 +50,7 @@ The file lives in `lib/` and uses nothing of Rails, and `config/application.rb` 
 
 The middleware order is Rails' own (`HostAuthorization`, then `AssumeSSL`, then `SSL`), which is why plain HTTP for a foreign host is a 403 with no `Location` and never a redirect to that host: there is no open redirect. `test/lib/host_settings_test.rb` holds the configuration and `test/integration/host_settings_test.rb` the behaviour, through a stack built in Rails' order ("plain HTTP for another host is refused, never redirected to that host", "under an https address another host is refused, www. and a subdomain included", "behind a proxy that does not say so, a plain request is redirected unless ASSUME_SSL=1", "the health check is answered over plain HTTP by IP: no redirect, no refusal, no Secure cookie", "under an https address its own host is answered, with HSTS of one year and nothing more").
 
-**What the boot says.** A wrong `PUBLIC_HOST` refuses every request with a 403 whose page says nothing in production, so the log is where a person finds out: the boot's lines say which address is answered, and for each refusal Rails itself logs `Blocked hosts: <name>` at error, which is what is left to read when the boot's lines are not printed. The initializer `content_spiel.host_announcement` in `config/application.rb` runs in production only and logs each line of `HostSettings.announcement(address, env)` (an Array of lines, not one string) at info:
+**What the boot says.** A wrong `PUBLIC_HOST` refuses every request with a 403 whose page says nothing in production, so the log is where a person finds out: the boot's lines say which address is answered, and for each refusal Rails itself logs `Blocked hosts: <name>` at error, which is what is left to read when the boot's lines are not printed. The initializer `content_spiel.host_announcement` in `config/application.rb` logs, in production only, each line of `HostSettings.announcement(address, env)` (an Array of lines, not one string) at info (the same initializer reads the theme folder in every environment and logs the theme's line outside test, "The theme" below):
 
 - `[ContentSpiel] Serving https://docs.example.org. Other host names are refused; plain HTTP is redirected.`
 - or `[ContentSpiel] Serving http://localhost:3030. Other host names are refused. The connection is not encrypted.`
@@ -61,7 +62,7 @@ The middleware order is Rails' own (`HostAuthorization`, then `AssumeSSL`, then 
 
 With `RAILS_LOG_LEVEL=warn` none of these is printed. One line is logged at warn, when `RAILS_LOG_LEVEL` is `debug` (`HostSettings.log_level_warning`): `[ContentSpiel] RAILS_LOG_LEVEL=debug: Rails logs every mail it sends in full, a password reset link and its token included. Use info or above on a site other people use.` ("The reset link", below, says why.) The initializer runs for every production process, `bin/rails runner`, a console and a rake task included.
 
-**The wiring is tested by booting production.** Every other test of hosts, HTTPS and HSTS hands `HostSettings.apply` a config of its own or builds its own middleware stack, so the one line of `production.rb` that calls it and the initializer that prints the lines could both be deleted with all of them green, and the site would answer any host over plain HTTP while its log, computed from the address, said otherwise. `test/lib/production_boot_test.rb` boots production in a child process three times (about three seconds each; `SECRET_KEY_BASE_DUMMY=1`, no database, `DATABASE_URL` taken away): with an https address ("production with an https address answers that host alone, forces HTTPS, mails the address and says so at boot"), with none and a debug log level ("production with no address refuses and forces nothing, says so, and warns about a debug log level"), and with a value that is no address ("production with a PUBLIC_HOST that is no address does not start, and says which variable without repeating it"). It fails when `HostSettings.apply(config)` is removed from `production.rb`, when a `config.force_ssl = false` is written under it, and when either line of the initializer is removed (each tried). The secret check is not booted for: its tests are `require_secret!`'s.
+**The wiring is tested by booting production.** Every other test of hosts, HTTPS and HSTS hands `HostSettings.apply` a config of its own or builds its own middleware stack, so the one line of `production.rb` that calls it and the initializer that prints the lines could both be deleted with all of them green, and the site would answer any host over plain HTTP while its log, computed from the address, said otherwise. `test/lib/production_boot_test.rb` boots production in a child process seven times (about three seconds each; `SECRET_KEY_BASE_DUMMY=1` in all but one, no database, `DATABASE_URL` taken away; four of the seven are the theme's, "The theme" below). The address's three: with an https address ("production with an https address answers that host alone, forces HTTPS, mails the address and says so at boot"), with none and a debug log level ("production with no address refuses and forces nothing, says so, and warns about a debug log level"), and with a value that is no address ("production with a PUBLIC_HOST that is no address does not start, and says which variable without repeating it"). It fails when `HostSettings.apply(config)` is removed from `production.rb`, when a `config.force_ssl = false` is written under it, and when either line of the initializer is removed (each tried). The secret check is not booted for: its tests are `require_secret!`'s.
 
 **The secret check.** The same initializer calls `HostSettings.require_secret!(ENV, credentials: Rails.application.credentials)` first, unless `SECRET_KEY_BASE_DUMMY` is set (the Dockerfile's asset precompilation, which has no secret and needs none). Rails' own error for a missing secret sends the reader to `bin/rails credentials:edit`, which a container has no key for; `HostSettings::MissingSecret` names the variable and `bin/rails secret`, and never holds a value. It decides as Rails does, in Rails' order:
 
@@ -72,6 +73,89 @@ With `RAILS_LOG_LEVEL=warn` none of these is printed. One line is logged at warn
 Credentials that cannot be read (a master key that does not open the file, a key of the wrong length, a file that is not YAML) are "could not be read": the message adds the error's class, never its text, and says to check `RAILS_MASTER_KEY`; `MissingSecret` has no cause. The rescue is every `StandardError` around the one call `credentials.secret_key_base`, which keeps `lib/` free of Rails' error classes and fails closed: its outcome is always a refusal. The cost is a vaguer message for someone whose master key is what is wrong.
 
 The initializer is `after: :initialize_logger, before: :initialize_cache`. `after:` alone does not place it early (an application's own initializers are sorted after every engine's unless a `before:` pulls them forward), and Rails first reads `secret_key_base` at the very end of boot today, but any initializer or gem that asked for a key generator earlier would raise Rails' message first. The environment file, which parses `PUBLIC_HOST`, loads before `initialize_logger`, so a value that is not an address stops the boot earlier still.
+
+## The theme
+
+`THEME_PATH` names the folder a site is drawn with; what a theme is and how each part works is `docs/reference/theming.md`. This section is what a host meets: what the boot says, what stops it, and how a site's image is built.
+
+**Why a variable and not a setting**, as for the address: the stylesheet, the digested assets and the import map are made when the image is built, for one theme, and a theme chosen in a Settings screen could not have been built for.
+
+**What the boot says.** One line, at info, in production after the address's lines and in development too (`ThemeFolder.announcement`, logged by the same initializer, `content_spiel.host_announcement`):
+
+- `[ContentSpiel] Theme: the default theme (THEME_PATH is not set)`
+- `[ContentSpiel] Theme: /rails/site-theme (14 templates, fingerprint 3fa9c1d2)`
+- `[ContentSpiel] Theme: /rails/site-theme holds no file of a theme and replaces nothing: the default theme draws the site (fingerprint 3fa9c1d2)`
+
+With `RAILS_LOG_LEVEL=warn` it is not printed; System status' "Theme" row says the same fact with the folder's name in place of its path.
+
+**What stops the boot**, each a `ThemeFolder::Invalid`. Unlike `PUBLIC_HOST`'s refusal these repeat the value: it is a path, and the path is what the person has to go and look at. `<path>` is the variable's value made absolute.
+
+While the application is configured, before any of the boot's lines (`lib/theme_folder.rb`):
+
+- `THEME_PATH names no directory: <path>. Set THEME_PATH to the folder that holds the site's theme (its views, components, assets and javascript folders), or unset it to draw the site with the default theme.`
+- `THEME_PATH: <path>/<entry> is not part of a theme. A theme folder holds the folders views, components, assets and javascript, and nothing else (dot files and a README are ignored). Move it out of the folder or delete it.` One such line for every entry at the top that is no part of a theme, in one refusal.
+- `THEME_PATH: <file> cannot be read (<the system's reason>). The user the application runs as must be able to read every file and folder of the theme: correct the permissions of the folder, or of the step that copies it into the image.`
+- `THEME_PATH: <file> is a link to <target>, which is outside the theme folder. A theme is copied into the site's image as one folder and must be whole. Copy what it links to into the theme in place of the link.`
+- `THEME_PATH: <file> is a link to nothing. Delete the link, or put the file it should name into the theme.`
+- `THEME_PATH: <file> is a link to a folder it is in (<target>). A theme is copied into the site's image as one folder and must be whole. Copy what it links to into the theme in place of the link.`
+- `THEME_PATH: <folder> is a hidden folder inside the theme. What is in it would be left out of the check and of the theme's fingerprint, and could still be rendered or served. Move it out of the theme, or rename it without the dot.`
+
+In production with a real secret, in the same initializer (not asked under `SECRET_KEY_BASE_DUMMY`):
+
+- `THEME_PATH: the stylesheet was built for another theme: run assets:precompile with THEME_PATH set (SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile). The build's stamp is <fingerprint>, this theme's fingerprint is <fingerprint>.` ("without THEME_PATH" when no theme is set over a stylesheet built with one.)
+- `THEME_PATH: the public stylesheet was not built, or its build failed: there is no stamp of a build (app/assets/builds/.theme.stamp). Run assets:precompile with THEME_PATH set (SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile) when the image is built, and keep app/assets/builds in the image.` The last clause is for a site that builds in a stage of its own and copies only `public/assets` into its last stage: the stamp is not under `public`.
+
+When the application is prepared, after the boot's lines (`Theme.load`, against the theme contract):
+
+```
+THEME_PATH (<path>) is not a theme this version can draw:
+  - <problem>
+  - <problem>
+Correct the folder, or unset THEME_PATH to start with the default theme.
+```
+
+where each problem is one sentence of `Theme::Check`, with `<file>` relative to the folder:
+
+- `<file> is not part of the theme contract (<what that folder holds>). Rename it to a name the contract has, or take it out of the folder.` The parenthesis is one of `views holds the templates Theme::Contract::TEMPLATES names and the theme's own partials under views/theme/`, `components holds <component path>.html.erb for the components Theme::Contract::COMPONENTS names`, `assets holds stylesheets/theme.css, images/ (png, jpg, jpeg, gif, svg, webp, avif, ico) and fonts/ (woff2, woff, ttf, otf)`, `javascript holds controllers/**/*_controller.js`.
+- `<file> is a hidden file and a template: it is left out of the check and of the theme's fingerprint, and a render that names it would still find it. Rename it without the dot, or take it out of the folder.`
+- `<file> is named like an asset of the CMS's own (<root>/<name>): a theme adds assets, it does not replace one. Give it a name of its own.`
+- `<file> is not UTF-8 text, so it cannot be read or drawn. Save the file as UTF-8.`
+- `<file> prints <tag>: that tag is the CMS's own, it is in the head of every public page already, and a second one contradicts it. Delete it from the template.` The tag is one of `a canonical link`, `a language link (rel="alternate" with hreflang)`, `the og:url tag`, `the content security policy's tag`, `the import map`, `a stylesheet link`.
+- `<file> asks for the CSRF token: a public page is one answer for every visitor and carries none, because asking for the token starts a session and sets a cookie on a page a cache may keep. Delete it from the template.`
+- ``<file> has a form that is sent with a CSRF token (form_with, form_tag, form_for or button_to without `method: :get`): a public page is one answer for every visitor and is given no token, so the form would be sent without one. Write a search form with `method: :get`, and a form that posts to another service as a plain <form> tag.``
+- `<file> writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, so the tag would never be printed. Put the tag into views/layouts/public/_head.html.erb, which is the theme's part of the head.`
+- ``<file> assigns an instance variable: a template is rendered before the layout, which reads the page, the post and the preview from instance variables to write the title and the head's tags. Use a local variable (`name = …`), or pass the value to a partial as a local.``
+- ``views/layouts/public/_frame.html.erb never prints the page: `yield` is the page, and without it every address of the site shows the frame alone. Add <%= yield %> where the page goes.``
+- ``views/layouts/public/_title.html.erb prints nothing: what it prints is the text of every page's <title>. Print the title from its two locals, `page_title` and `site_title`, or delete the file to get the default pattern.``
+
+`bin/rails theme:check` says the same sentences and three kinds more (a template that does not compile, one that reads the request, and its own lines); they are in `docs/reference/theming.md` ("`theme:new` and `theme:check`") and are seen in a build's log, never at boot.
+
+The theme's four boots in `test/lib/production_boot_test.rb`: "production under a theme folder outside the application says which at boot, and the application's theme is that folder", "production with a THEME_PATH that names no folder does not start, and says which variable and which path", "production with a theme folder that holds a file the contract does not name does not start, and names the file", and, the one boot with a real secret, "production under a theme whose stylesheet was not built for it does not start, and says how to build".
+
+### How a site's image is built
+
+A theme reaches a container as an image layer on the CMS image, never as a mounted volume: changing the theme of a running site is a build and a deploy. A site's `Dockerfile`, as built and run by hand on 2026-10-12 (the comment above `assets:precompile` in the CMS's own `Dockerfile` prints the same lines):
+
+```dockerfile
+FROM <the CMS image>
+ENV THEME_PATH=/rails/site-theme
+COPY --chown=1000:1000 theme/ /rails/site-theme/
+RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails theme:check && \
+    SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:clobber assets:precompile
+```
+
+- **No `USER` line.** The CMS image ends as uid 1000 and `/rails` is that user's; the `RUN` writes `tmp/theme/entry.css`, `app/assets/builds/theme.css`, `app/assets/builds/.theme.stamp` and `public/assets`. `--chown=1000:1000` on the `COPY` is what makes the theme readable by it; without it the boot's "cannot be read" sentence is what the build prints.
+- **`theme:check` BEFORE `assets:precompile`.** The precompile starts the application, which does not start under a folder the contract refuses, so with the precompile first a refused theme ends the build in rake's "aborted!", a trace and the boot's half of the problems. `theme:check` starts the application itself, without stopping at a refusal, and prints every problem as a numbered line, then `<path>: N problems.`, exit 1; a sound folder is `<path>: N templates, no problems.`, exit 0. It needs no stylesheet, no database and no secret.
+- **`SECRET_KEY_BASE_DUMMY=1` on both commands.** Each starts production, and a build has no secret. It is also what lets the precompile start production before the stylesheet it is about to build is stamped: the stamp is not asked under it.
+- **`assets:clobber` first.** The base image's `public/assets` holds the default theme's digested `theme-….css`, which would otherwise stay beside the new one.
+- A theme names its images and fonts in `theme.css` by bare file name (`url("mark.svg")`); the served stylesheet has `url("/assets/mark-<digest>.svg")`.
+- The result is the CMS image plus two small layers (the theme, and the build's output) and builds in seconds once the base exists. No CMS image is published yet: a site builds the CMS image itself from the revision it pins, and its own on top.
+
+**A production build with a real secret, outside the Dockerfile, is refused by the stamp check.** On a host that is not an image build (a buildpack, a plain server: `RAILS_ENV=production bin/rails assets:precompile` with `SECRET_KEY_BASE` in the environment) the first build of a fresh checkout has no stamp, and a rebuild after `THEME_PATH` changed has another theme's, so production does not start to run the task that would write the stamp. Run the build as the refusal's own sentence says, `SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile`: the stamp is not asked under that variable. No other production command is affected once the stylesheet is built.
+
+**What was proven by hand, and how** (CI builds no image; the spec's "As built" has the detail): the site image, built from those five lines on the CMS image, started under its own entrypoint and command against a throwaway Postgres on a private Docker network, drew the homepage with the theme's frame, page template and block template and the CMS's head, linked its stylesheet by a digested name with the theme's image and font at digested addresses inside it, served the theme's image, font and controller, answered a second request 304, `/up` 200, a missing page 404 inside the theme's frame, and a foreign `Host` 403; and it refused to start with the stamp removed and with `THEME_PATH` emptied over the theme's stylesheet.
+
+**The image reaches its four databases only through libpq's `PGHOST` today.** `config/database.yml`'s production block names four databases (primary, cache, queue, cable), a user and a password from `CONTENT_SPIEL_DATABASE_PASSWORD`, and no host for any of them; `DATABASE_URL` moves the primary alone and leaves the other three on a local socket, so `PGHOST`, which libpq reads because the file names no host, is the one thing that moves all four. That it works is an accident of the file, not a documented way: giving the four databases an address is part three of hosting (`docs/roadmap.md`, "Hosting and the dry run").
 
 ## Addresses a public page prints
 
@@ -141,10 +225,11 @@ While setup is not complete the boot logs `Setup::Token.log_line` (`config/initi
 
 ## What a person is told
 
-**System status and the wizard's system check** (`Setup::SystemCheck`, `docs/reference/cs-studio-shell-and-dashboard.md`) begin with two checks. `Setup::SystemCheck.new(address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?, reset_link_from_request: false)`; both screens hand over `request_ssl: request.ssl?` and `reset_link_from_request: PasswordsMailer.request_origin_used?`, a boolean, so the model knows no mailer.
+**System status and the wizard's system check** (`Setup::SystemCheck`, `docs/reference/cs-studio-shell-and-dashboard.md`) begin with two checks about the address, and a third about the theme. `Setup::SystemCheck.new(address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?, reset_link_from_request: false)`; both screens hand over `request_ssl: request.ssl?` and `reset_link_from_request: PasswordsMailer.request_origin_used?`, a boolean, so the model knows no mailer.
 
 - **Site address**: OK with the origin, or a warning with `PUBLIC_HOST=https://www.example.org` to copy. With no address the warning has two wordings and shows the one that is true where it is read: where a reset mail takes its link from the request (development and test) it says addresses in pages and in reset mails follow the request, and nothing of hosts, since development refuses a made-up name by Rails' own list; everywhere else, and when nobody said (the console), that any host name is accepted and reset mails are not sent until it is set. And an http address on a page that was reached over HTTPS is a warning as well, "This site answers at http://…. The address is http but this page was reached over HTTPS: set PUBLIC_HOST to the https address.": a proxy ends TLS and nobody changed the variable, so everything built from the address is still http (canonical links, the sitemap, the reset mail), no cookie is `Secure` and no HSTS is sent, and the row would otherwise say OK beside an "HTTPS" row that says OK too (`test/models/setup/system_check_test.rb`: "an http address reached over HTTPS is a warning that says which to change, and names the address").
 - **HTTPS**: in production only, and only when the caller said how the request came. "Reached over an encrypted connection" is what `request.ssl?` says, and the application sees no connection but the proxy's: it is true when the proxy said so or when `ASSUME_SSL=1` says it for every request, and a proxy that claims HTTPS for a plain connection makes the row say OK about a connection that is not encrypted. Nothing in the application can tell.
+- **Theme**, after those two: which theme draws the site, by the folder's name and never its path, and a warning when the public stylesheet was built for another theme or not at all, with the command that builds it outside production (`docs/reference/theming.md`, "System status").
 - **Outgoing mail** counts as configured only with a host for mailed links, which in production is the site's address: a site with a mail server and no address is told that the address is what is missing, in one sentence ahead of the console fallback (`Setup::SystemCheck::MAIL_NEEDS_ADDRESS`). The Mail part replaces this check.
 
 **The plain-HTTP notice** (`Admin::Ui::InsecureNoticeComponent`): in production, on a request that is not `request.ssl?`, "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address." It can only show where the address is an http one or missing, since an https address redirects plain HTTP before it reaches the application. Three layouts draw it: `product` (sign-in and the password pages) and `setup` (every wizard page; the spec did not ask for the wizard, which takes the setup token and the first account's password) for everyone, and `admin` at the top of `<main>`, outside `#content`, for someone who holds `settings.manage` or `system_status.view`, each of which is enough alone (`Admin::BaseController::INSECURE_NOTICE_PERMISSIONS`; `test/integration/admin/insecure_notice_test.rb`: "in the shell settings.manage alone is enough to be told", "in the shell system_status.view alone is enough to be told", "in the shell someone who holds neither right is told nothing").
@@ -163,3 +248,5 @@ While setup is not complete the boot logs `Setup::Token.log_line` (`config/initi
 - **Making the early check the rule** (dropping `update`'s own lookup, or showing the expired state when the check could not be made) either lets a lapsed token through or costs a good link on a bad connection.
 - **A second job or web container without `PUBLIC_HOST`** sends no reset mail and says so only in its own log.
 - **`includeSubDomains` or `preload` added to HSTS** cannot be taken back for a browser that has seen it.
+- **A site image whose last stage leaves `app/assets/builds` behind**, or whose `assets:precompile` ran without `THEME_PATH`, does not start, and says so; one that mounts its theme as a volume is refused at the first start after the volume's content differs from what the stylesheet was built with. A theme is a layer.
+- **`theme:check` moved after `assets:precompile`** in a site's Dockerfile still fails a refused theme's build, with a trace in place of the list. Nothing fails here: the order is a comment in the `Dockerfile` and the paragraph above.
