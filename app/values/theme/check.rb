@@ -1,3 +1,6 @@
+require "ripper"
+require "prism"
+
 class Theme
   # What is wrong with a theme folder, as sentences (theming spec §8). An
   # empty answer is a sound folder. Each sentence starts with the file,
@@ -158,30 +161,58 @@ class Theme
     # box, which carries none). On a public page it gets no token
     # (`PublicController`), so one that posts to this application would be
     # refused by it, and the author should hear that at the check.
-    # Asked of one ERB tag's Ruby, with its comments and the words inside
-    # its strings taken away (`link_to "About form_with", …` is no form).
+    # FORM is asked of one ERB tag's code (`code_of`: no comment, no word of
+    # a string, so `link_to "About form_with", …` is no form), GET of the
+    # same tag with its strings left in (`method: "get"`) and its comments
+    # out.
     FORM = /\b(?:form_with|form_tag|form_for|button_to)\b/
     GET = /\bmethod["']?\s*(?:=>|:)\s*["':]+get\b/i
 
     # An assignment to an instance variable, in the code of a template (the
     # comment at the top says what the layout reads): `@page = …`,
     # `@post ||= …`, `@x += 1`, `@x |= y`, `@x <<= y` and every other
-    # compound form, and the same by name. Asked of the Ruby without its
-    # comments and strings (`title: "@home = here"` assigns nothing).
+    # compound form, and the same by name. Asked of each tag's code
+    # (`code_of`: `title: "@home = here"` assigns nothing).
     ASSIGNMENT = /@\w+\s*(?:\|\||&&|\*\*|<<|>>|[-+*\/%|&^])?=(?![=~>])|\binstance_variable_set\b/
 
-    # A Ruby comment inside an ERB tag: a `#` at the start of a line or
-    # after a space, that does not open an interpolation, to the line's end.
-    COMMENT = /(^|\s)#(?!\{)[^\n]*/
+    # THE RUBY OF A TEMPLATE IS READ BY RUBY'S OWN LEXER (`Ripper.lex`), ONE
+    # ERB TAG AT A TIME. What the fences above ask is asked of a tag's CODE:
+    # what is left when its comments and the words of its strings are taken
+    # away. Telling the three apart is the lexer's work and not a pattern's:
+    # an earlier reading took comments away first ("a space, a hash, to the
+    # line's end") and strings second, so `style: "color: #123456"` lost its
+    # closing quote, the quote left over paired with the opening quote of
+    # the NEXT string, and from there to the template's end words were read
+    # as code and code as words: `link_to "Our cookies", "/cookies"` was
+    # refused at a site's build as "reads cookies", and a real `@page = nil`
+    # between two such strings was not seen. `'"'`, `/"/`, `%w[flash]` and a
+    # heredoc did the same. The lexer knows every literal Ruby has (single
+    # and double quotes, `%q`, `%Q`, `%w`, `%i`, heredocs, regular
+    # expressions, symbols in quotes, a character), gives what one
+    # interpolates (`"\#{…}"`, at any depth) as the code it is, and a comment
+    # as a comment.
+    #
+    # Per tag, because a tag is where ERB itself cuts: each is lexed from
+    # Ruby's opening state, so whatever one tag holds (a quote never closed,
+    # a block opened here and closed three tags on) costs that tag and no
+    # other. A tag is a fragment (`end`, `}`, `else`, `items.each do |item|`)
+    # and the lexer reads fragments: it is not asked whether the Ruby is
+    # sound, which is the deep check's compile.
+    #
+    # Still a fence against mistakes and not a sandbox (the comment at the
+    # top): the reading is now right about what is a string, and it still
+    # knows a name only where it is written.
+    #
+    # An ERB tag that holds Ruby: `<%`, `<%=`, `<%==` and `<%-`, up to `%>`
+    # or `-%>`. Not `<%#` (a comment) and not `<%%` (a literal `<%`).
+    TAG = /<%(?![#%])(?:==?|-)?(.*?)-?%>/m
 
-    # A string literal, with what it interpolates kept apart: the words in
-    # a string are text (`link_to "Cookies", "/cookies"`), what `\#{…}`
-    # holds is code (`"/x?q=\#{params[:q]}"`). One level of braces, no
-    # heredoc, no `%q`: a fence's reading, and what it misses it misses
-    # towards letting a template through.
-    DOUBLE_QUOTED = /"((?:\\.|\#\{[^}]*\}|[^"\\])*)"/m
-    SINGLE_QUOTED = /'(?:\\.|[^'\\])*'/m
-    INTERPOLATION = /\#\{([^}]*)\}/
+    # What the lexer calls the parts of a tag that are not code. A string's
+    # words are `tstring_content` whatever opened it (a quote, `%w[`, a
+    # heredoc, a `/`, a backtick); `CHAR` is `?a`. The delimiters stay: they
+    # are no word.
+    COMMENTS = %i[on_comment on_embdoc_beg on_embdoc on_embdoc_end].freeze
+    WORDS = %i[on_tstring_content on_CHAR].freeze
 
     # A write to the slot the CMS's head once read. The layout reads none
     # now, so the tag would be lost without a word.
@@ -292,10 +323,9 @@ class Theme
     # one what it does not do.
     def written(file, source)
       code = source.gsub(/<%#.*?%>/m, "")
-      # The Ruby of the template, one ERB tag after the other with a `;`
-      # between: without it `<%= @page %>` followed by `<%= x %>` would read
-      # as `@page = x`.
-      ruby = code.scan(/<%={0,2}(.*?)%>/m).flatten.join("\n;\n")
+      # The Ruby of the template, tag by tag (`TAG`), each read by itself:
+      # `<%= @page %>` followed by `<%= x %>` is not `@page = x`.
+      tags = code.scan(TAG).flatten
       found = CMS_HEAD.filter_map do |tag, pattern|
         next unless pattern === code
 
@@ -306,8 +336,7 @@ class Theme
         found << "#{file} asks for the CSRF token: a public page is one answer for every visitor and carries none, because asking " \
                  "for the token starts a session and sets a cookie on a page a cache may keep. Delete it from the template."
       end
-      tags = code.scan(/<%={0,2}(.*?)%>/m).flatten.map { |tag| tag.gsub(COMMENT, '\1') }
-      if tags.any? { |tag| without_strings(tag).match?(FORM) && !tag.match?(GET) }
+      if tags.any? { |tag| code_of(tag).match?(FORM) && !code_of(tag, strings: true).match?(GET) }
         found << "#{file} has a form that is sent with a CSRF token (form_with, form_tag, form_for or button_to without " \
                  "`method: :get`): a public page is one answer for every visitor and is given no token, so the form would be " \
                  "sent without one. Write a search form with `method: :get`, and a form that posts to another service as a " \
@@ -317,7 +346,7 @@ class Theme
         found << "#{file} writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, " \
                  "so the tag would never be printed. Put the tag into #{HEAD}, which is the theme's part of the head."
       end
-      if without_strings(ruby.gsub(COMMENT, '\1')).match?(ASSIGNMENT)
+      if tags.any? { |tag| code_of(tag).match?(ASSIGNMENT) }
         found << "#{file} assigns an instance variable: a template is rendered before the layout, which reads the page, the post " \
                  "and the preview from instance variables to write the title and the head's tags. Use a local variable " \
                  "(`name = …`), or pass the value to a partial as a local."
@@ -341,29 +370,62 @@ class Theme
       code.scan(/<%==?(.*?)%>/m).flatten.any? { |printed| printed.match?(/\byield\b(?!\s*\(?\s*:\w)/) }
     end
 
-    # The Ruby without the words inside its string literals; what a string
-    # interpolates stays, as code.
-    def without_strings(ruby)
-      ruby.gsub(DOUBLE_QUOTED) { " #{$1.scan(INTERPOLATION).flatten.join(" ; ")} " }.gsub(SINGLE_QUOTED, " ")
+    # One tag's Ruby as the lexer reads it, with a space where a comment
+    # was and where the words of a string were (`COMMENTS`, `WORDS`); with
+    # `strings:` only the comments go. What a string interpolates is code to
+    # the lexer and stays. A line's end stays where a comment ended a line.
+    #
+    # The lexer hands back every character of what it was given, also for a
+    # fragment and for Ruby that is wrong; should it ever not, the tag is
+    # read as it was written, which errs towards refusing.
+    def code_of(tag, strings: false)
+      away = strings ? COMMENTS : COMMENTS + WORDS
+      tokens = Ripper.lex(tag)
+      return tag unless tokens.sum { |_, _, text, _| text.size } == tag.size
+
+      tokens.map { |_, kind, text, _| away.include?(kind) ? (text.end_with?("\n") ? " \n" : " ") : text }.join
+    end
+
+    # What is wrong with a template Ruby will not compile, as one sentence.
+    # Ruby's own message is a drawing of the COMPILED template over several
+    # lines (the output buffer's calls, the method it was wrapped in), under
+    # a first line that says "syntax errors found"; in a build's log that is
+    # noise around one fact. The fact is asked of the parser (Prism, which
+    # is what compiled it): the first thing it found, by its place.
+    #
+    # A block that is never closed is found where the template ends, on a
+    # line the template does not have, and Ruby's words for it are about the
+    # end of the input: that case gets a sentence of its own.
+    def syntax_error(compiled, source, error)
+      found = Prism.parse(compiled).errors.reject { |problem| problem.message.include?("to close the `def` statement") }
+      first = found.min_by { |problem| [ problem.location.start_line, problem.location.start_column ] }
+      return "#{error.message.lines.first.to_s.strip}. Correct the template." unless first
+
+      if first.location.start_line > source.lines.size || first.message.include?("end-of-input")
+        "it ends before something it opened is closed (an `if`, a `do … end` block, a bracket). " \
+          "Close it where it should end, a block with <% end %>."
+      else
+        "line #{first.location.start_line}, #{first.message}. Correct the template at that line."
+      end
     end
 
     def unsound(file, source)
       found = []
+      # Inside a method, as Action View compiles a template: `yield` at the
+      # top level of a file is a syntax error, and a frame yields. On the
+      # template's first line, so a line Ruby names is the template's.
+      compiled = "def __theme_template__; #{ActionView::Template::Handlers::ERB::Erubi.new(source).src}\nend"
       begin
-        # Inside a method, as Action View compiles a template: `yield` at the
-        # top level of a file is a syntax error, and a frame yields. On the
-        # template's first line, so a line the error names is the template's.
-        compiled = ActionView::Template::Handlers::ERB::Erubi.new(source).src
-        RubyVM::InstructionSequence.compile("def __theme_template__; #{compiled}\nend", file)
+        RubyVM::InstructionSequence.compile(compiled, file)
       rescue SyntaxError => error
-        found << "#{file} does not compile: #{error.message.lines.first.to_s.strip}. Correct the template at that line."
+        found << "#{file} does not compile: #{syntax_error(compiled, source, error)}"
       end
       # Comments and the words inside strings are not read: the five names
       # are English words, a site writes them in its links and file names
       # (`link_to "Cookies", "/cookies"`, `image_tag "flash.svg"`), and this
       # check is a gate of a site's build, where a wrong refusal blocks a
       # deploy.
-      code = without_strings(source.scan(/<%(?!#)(.*?)%>/m).flatten.join("\n").gsub(COMMENT, '\1'))
+      code = source.gsub(/<%#.*?%>/m, "").scan(TAG).flatten.map { |tag| code_of(tag) }.join("\n;\n")
       asked = REQUEST_RECEIVERS.map { |receiver| "(?<=\\b#{receiver}\\.)" }.join("|")
       FORBIDDEN.each do |name|
         # Not a method of something else (`text.request_id`, `post.session`),

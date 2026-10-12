@@ -406,6 +406,27 @@ class Theme::CheckTest < ActiveSupport::TestCase
     assert_empty problems_with("views/theme/_broken.html.erb" => "<% if true %>"), "syntax is the deep check's, not the boot's"
   end
 
+  # What Ruby says of a syntax error is a drawing of the compiled template
+  # over several lines, and its first line is "syntax errors found". An
+  # integrator reads one sentence in a build log: the line of THEIR file,
+  # what Ruby found there, and what to do.
+  test "a template that does not compile is named with the line of the template and what Ruby found there" do
+    problems = problems_with({ "views/theme/_broken.html.erb" => "<p>a</p>\n<p>b</p>\n<%= link_to \"x\", %>\n<p>c</p>\n" }, deep: true)
+
+    assert_equal 1, problems.size, problems.inspect
+    assert_equal "views/theme/_broken.html.erb does not compile: line 3, unexpected ')'; expected an argument. " \
+      "Correct the template at that line.", problems.first
+    assert_no_match(/\n|syntax errors found|__theme_template__|output_buffer/, problems.first)
+  end
+
+  test "a block that is never closed is said as that, and not as a line after the template's last" do
+    problems = problems_with({ "views/theme/_broken.html.erb" => "<p>fine</p>\n<% if true %>\n<p>never closed</p>\n" }, deep: true)
+
+    assert_equal 1, problems.size, problems.inspect
+    assert_equal "views/theme/_broken.html.erb does not compile: it ends before something it opened is closed (an `if`, a " \
+      "`do … end` block, a bracket). Close it where it should end, a block with <% end %>.", problems.first
+  end
+
   test "the deep check refuses a template that reads the request, the parameters, the cookies, the session or the flash" do
     %w[params request cookies session flash].each do |name|
       problems = problems_with({ "views/theme/_x.html.erb" => "<p><%= #{name}[:q] %></p>\n" }, deep: true)
@@ -455,6 +476,86 @@ class Theme::CheckTest < ActiveSupport::TestCase
       <%= link_to "x", "/x", data: { session: "1", request: "2" } %>
       <%= translated(theme_site, :title).to_s.then { |text| text.request_id rescue text } %>
       <%= link_to "y", "/y", data: { params: "1", cookies: "2", flash: "3" }, class: post.session ? "a" : "b" %>
+    ERB
+  end
+
+  # R1 of the re-review. The reading took comments away BEFORE strings, and a
+  # comment was "a space, a hash, to the line's end": a hex colour in a
+  # string lost its closing quote, which then paired with the opening quote
+  # of the next string, and from there on words were read as code and code
+  # as words, across every later tag. Each row here was refused (or let
+  # through) wrongly before the reading became Ruby's own lexer, per tag.
+  test "a string that holds a hash sign, or a quote inside quotes or a regex, does not turn the reading of what follows inside out" do
+    {
+      "a hex colour" => [ '<%= tag.span "x", style: "color: #123456" %>', '<%= link_to "Our cookies", "/cookies" %>' ],
+      "a number sign" => [ '<%= link_to "Issue #12", "/i" %>', '<%= link_to "new session", "/s" %>' ],
+      "a double quote in single quotes" => [ %q(<%= title.delete('"') %>), '<%= link_to "our cookies", "/cookies" %>' ],
+      "a double quote in a regex" => [ '<%= title.gsub(/"/, "") %>', '<%= link_to "flash sale", "/sale" %>' ],
+      "both on one line" => [ '<%= tag.span "a #b", title: "request" %><%= link_to "params", "/params" %>' ]
+    }.each do |what, lines|
+      assert_empty problems_with({ "views/theme/_x.html.erb" => "<% title = \"t\" %>\n#{lines.join("\n")}\n" }, deep: true), what
+    end
+  end
+
+  test "the words of a %w and a %i list, of a %q string and of a heredoc are not read, and what a %Q string or a heredoc interpolates is" do
+    assert_empty problems_with({ "views/theme/_x.html.erb" => <<~'ERB' }, deep: true)
+      <%= tag.div class: %w[flash notice] %>
+      <%= { session: 1 }.slice(*%i[session cookies]).size %>
+      <%= %q(the request's params) %><%= %(no cookies) %><%= :"flash".to_s %>
+      <%= <<~TEXT
+        We keep no cookies and no session.
+      TEXT
+      %>
+    ERB
+
+    { '<%= %Q(a #{request.path} b) %>' => "request", "<%= <<~TEXT\n  Hello \#{params[:name]}\nTEXT\n%>" => "params",
+      '<%= %W[a #{flash[:x]}].join %>' => "flash" }.each do |markup, name|
+      problems = problems_with({ "views/theme/_x.html.erb" => "#{markup}\n" }, deep: true)
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_x.html.erb reads #{name}:"
+    end
+  end
+
+  test "a read after a string that ends in a hash sign, and one two braces deep in an interpolation, are still read" do
+    { '<%= link_to "x #", params[:q] %>' => "params", '<%= "#{ { a: 1 }.then { cookies[:x] } }" %>' => "cookies",
+      "<%= tag.span \"x\", style: \"color: #123456\" %>\n<%= session[:id] %>" => "session" }.each do |markup, name|
+      problems = problems_with({ "views/theme/_x.html.erb" => "#{markup}\n" }, deep: true)
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_x.html.erb reads #{name}:"
+    end
+  end
+
+  # The same inversion reached the check the application starts with.
+  test "after a string with a hash sign an assignment in a string is still none, and a real one is still seen" do
+    colour = '<%= tag.span "x", style: "color: #123456" %>'
+
+    assert_empty problems_with("views/theme/_x.html.erb" => "#{colour}\n<%= link_to \"@x = y\", \"/x\" %>\n")
+
+    problems = problems_with("views/theme/_x.html.erb" => "#{colour}\n<% @page = nil %>\n#{colour}\n")
+    assert_equal 1, problems.size, problems.inspect
+    assert_includes problems.first, "views/theme/_x.html.erb assigns an instance variable"
+  end
+
+  test "a GET form is one whatever its strings hold, and `method: :get` in a comment makes none" do
+    assert_empty problems_with("views/theme/_x.html.erb" =>
+      "<%= form_with url: \"/search #results\", method: :get do |form| %><% end %>\n" \
+      "<%= form_with(url: \"/s\", data: { note: 'a \"quoted\" word' }, method: \"get\") { } %>\n")
+
+    problems = problems_with("views/theme/_x.html.erb" => "<%= form_with(url: \"/x\") { } # not method: :get %>\n")
+    assert_equal 1, problems.size, problems.inspect
+    assert_includes problems.first, "has a form that is sent with a CSRF token"
+  end
+
+  # A tag is a fragment of Ruby (`end`, `}`, a block's opening line), and a
+  # reading that asked for whole Ruby would read every such tag as written,
+  # strings and all.
+  test "a tag that is a fragment of Ruby is read like any other: the words of its strings are not" do
+    assert_empty problems_with({ "views/theme/_x.html.erb" => <<~'ERB' }, deep: true)
+      <% [ "cookies", "flash" ].each do |word| %>
+        <%= link_to "cookies #{word}", "/cookies" %>
+      <% end.then { |words| "params" } %>
+      <%- if "request".present? -%><%= tag.p "session" %><%- end -%>
+      <%= [ "a" ].map { |word| %><%= word %> flash<% }.push("session").size %>
     ERB
   end
 
