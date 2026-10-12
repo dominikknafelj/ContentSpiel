@@ -301,23 +301,22 @@ module PublicSite
     end
 
     # A scheduled copy of a POST has come into force (the sweep's half of
-    # `published`). The check that can REFUSE a clash runs when the change is
-    # scheduled (`Publishing::PublishChanges`, `HasPublicPaths
-    # #address_free_as_typed?`); this is what remains when another record
-    # took the address in between, and a sweep can refuse nothing. The post
-    # must not end without an address in silence, so in a language where the
-    # address it would move to is another record's it KEEPS the one it has
-    # (its rows are left as they are), and the clash is reported once per
-    # copy, through `Rails.error.report`, with the record and the address
-    # and nothing of its content. Where the post had no address, the report
-    # is all there is. Every other language moves as usual.
+    # `published`): its address is derived again, as `sync` does. The check
+    # that can REFUSE a clash runs when the change is scheduled
+    # (`Publishing::PublishChanges`, `HasPublicPaths#address_free_as_typed?`);
+    # this is what remains when another record took the address in between.
+    # A sweep can refuse nothing, and `public_paths` equals a full rebuild
+    # whatever happens, so the post YIELDS like any other clash
+    # (`yield_to_holder`) and has no address until someone resolves it: a
+    # slug, a tag or the other record changed. What is added here is that the
+    # person running the site learns of it: the clash is reported once per
+    # copy through `Rails.error.report`, with the record and the address it
+    # wanted, and nothing of its content. (Not the address it lost: another
+    # sync of the same run may have taken that already.)
     #
     # "Once" is kept by the cache, since the sweep looks at the same copy
     # every five minutes for a day: where the cache keeps nothing, each run
-    # reports again. The keeping itself is `write_all`'s (`keeps_address?`),
-    # so that every later sync that reaches the post (the same sweep's pages,
-    # a list block's save, a page's move) leaves the address too, for as long
-    # as the copy in force is that scheduled one.
+    # in which the post still wants the taken address reports again.
     def copy_of_post_came_into_force(post, version)
       desired = compute(post)
       stored = current_rows("Post", [ post.id ])
@@ -330,7 +329,7 @@ module PublicSite
 
       Rails.error.report(AddressTaken.new("a scheduled change came into force onto an address another record holds"), handled: true,
         context: { record_type: "Post", record_id: post.id, version_id: version.id,
-                   addresses: clashing.map { |change| { locale: change.locale, wanted: change.to, kept: change.from } } })
+                   addresses: clashing.map { |change| { locale: change.locale, wanted: change.to } } })
     end
 
     # `published` for the copies no write announces: every copy that was
@@ -680,9 +679,6 @@ module PublicSite
         given = Set.new
         moved, rest = changes.partition { |change| change.to && !held.key?([ change.locale, change.to ]) && given.add?([ change.locale, change.to ]) }
         gone, yielding = rest.partition { |change| change.to.nil? }
-        # A post brought onto a taken address by the clock keeps the address
-        # it has: its row is neither moved nor deleted (`keeps_address?`).
-        yielding = yielding.reject { |change| keeps_address?(change) }
         yielding.each { |change| yield_to_holder(change) }
 
         delete_rows(gone)
@@ -749,24 +745,6 @@ module PublicSite
         .each_with_object({}) do |(row_id, locale, path, type, id), held|
           held[[ locale, path ]] = [ type, id ] if !leaving.include?(row_id) && pairs.include?([ locale, path ])
         end
-    end
-
-    # The one yielder that keeps its address: a post that HAS one, whose copy
-    # in force was taken with a time. Its tags were published by the clock,
-    # and the check that refuses a publish onto a taken address ran when the
-    # change was scheduled (`Publishing::PublishChanges`); the address was
-    # taken in between, nobody is at a screen to be told, and a live post
-    # must not drop off the site in silence. So its row stays as it is, in
-    # every sync that reaches it, until its changes are published again
-    # (which is asked, and refused while the clash stands). Reported by
-    # `copy_of_post_came_into_force`. A post with no row has nothing to keep,
-    # and `rebuild!`, which deletes every row first, keeps none. One query,
-    # on a path that is itself an exception.
-    def keeps_address?(change)
-      return false unless change.row_id && change.record.is_a?(Post)
-
-      copy = Publishing.current(change.record)
-      copy.present? && scheduled?(copy)
     end
 
     # The record that did not ask for this sync goes without a URL in this

@@ -843,11 +843,30 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_equal "/press/wire", current(wire)
       ok! ContentBlocks::Destroy.call(press_block.reload)
       publish_changes(press, at: 1.hour.from_now)
+      # And a post whose scheduled tags will put it on an address a page
+      # takes before their time: the sweep cannot refuse, the post yields,
+      # and the table is still what a rebuild writes. Set up here and swept
+      # below, after the publish above was looked at, because both need the
+      # same moved clock and a sweep before that publish would do its work.
+      Tag.create!(name: "desk")
+      desk = service_page("Desk", published: false)
+      service_listing(desk, content_type: "blog", tag: "desk")
+      ok! Pages::Save.call(desk, attributes: { published: true })
+      late = service_post("Late")
+      assert_equal "/journal/late", current(late)
+      ok! Posts::Save.call(late.reload, attributes: { tag_names: %w[desk] })
+      publish_changes(late, at: 1.hour.from_now)
+      service_page("Late", parent: desk)
+      assert_parity "a page taking the address a post's scheduled change will want"
       travel_to 2.hours.from_now do
         assert_equal "/press/wire", current(wire), "time passing writes nothing"
         publish_changes(press)
         assert_equal "/journal/wire", current(wire)
         assert_parity "publishing a page whose scheduled change was in force and unswept"
+
+        PublicSite::Paths.sync_went_live(since: 1.day.ago)
+        assert_nil current(late), "it yields to the page that holds /desk/late"
+        assert_parity "the sweep of a post's scheduled change onto a taken address"
       end
     end
   end
