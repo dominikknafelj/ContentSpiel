@@ -28,6 +28,12 @@ Bundler.require(*Rails.groups)
 require_relative "../lib/site_address"
 require_relative "../lib/host_settings"
 
+# And these two for another reason: config/initializers/opentelemetry.rb
+# hands their objects to the OpenTelemetry SDK for the life of the process
+# (lib/telemetry.rb says the rest).
+require_relative "../lib/telemetry"
+require_relative "../lib/telemetry/path_scrubber"
+
 module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.

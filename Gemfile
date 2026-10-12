@@ -112,9 +112,9 @@ gem "closure_tree", "~> 9.8"
 gem "sitemap_generator", "~> 7.1"
 
 # OpenTelemetry tracing (config/initializers/opentelemetry.rb). The otlp
-# exporter is bundled now, dormant, so switching from the console exporter
-# used in dev/test to a real backend later is an env var
-# (OTEL_EXPORTER_OTLP_ENDPOINT), not a new gem.
+# exporter is bundled now, dormant, so sending the spans to a real backend
+# later is an env var (OTEL_EXPORTER_OTLP_ENDPOINT), not a new gem. Without
+# it nothing is exported or printed (OTEL_CONSOLE=1 prints to the terminal).
 gem "opentelemetry-sdk", "~> 1.13"
 
 gem "opentelemetry-instrumentation-all", "~> 0.98"
