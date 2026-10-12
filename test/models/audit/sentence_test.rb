@@ -45,9 +45,9 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     # "#{EVENT.fetch(record class)}.translation_confirmed": page post block media settings
     "app/services/translations/confirm.rb" => %w[page.translation_confirmed post.translation_confirmed block.translation_confirmed
       media.translation_confirmed settings.translation_confirmed],
-    # "#{PREFIX.fetch(subject class)}.taken_over": a block, a page's settings or a post
     # "#{prefix}.changes_published": a page or a post
     "app/services/publishing/publish_changes.rb" => %w[page.changes_published post.changes_published],
+    # "#{PREFIX.fetch(subject class)}.taken_over": a block, a page's settings or a post
     "app/services/editing/take_over.rb" => %w[page.taken_over post.taken_over block.taken_over]
   }.freeze
 

@@ -169,7 +169,7 @@ module Admin
         body
       end
 
-      def live_hint = "This #{type} is live. Changes appear on the site as soon as they’re saved."
+      def live_hint = t(".live_hint", type: type)
 
       # Whether the ⋯ menu has anything to hold (a viewer who can only read
       # gets no empty menu).

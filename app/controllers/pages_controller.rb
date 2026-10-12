@@ -66,10 +66,11 @@ class PagesController < PublicController
       # - the year, which the footer prints: a 304 on 1 January would
       #   otherwise confirm last year's copyright line.
       #
-      # The blocks, their images and the images' variants are loaded only
-      # past it, for a response that is actually rendered: a conditional GET
-      # that still matches costs the resolver's lookup, the version and the
-      # settings row, nothing else.
+      # The page's COPY is read and rebuilt before `stale?` (`as_published`, in
+      # `assign_record`), blocks included, so a 304 pays for that read too. The
+      # images and their variants are loaded only past it, for a response that
+      # is actually rendered. Whether a 304 gets a lighter read (the copy's id
+      # first, the rebuild after `stale?`) is for Task 5, which owns the cache.
       expires_in 0, public: true, must_revalidate: true
       if stale?(etag: [ *[ @page, @post ].compact.map { |record| published_key(record) }, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year ], public: true)
         preload_page_images(@page)

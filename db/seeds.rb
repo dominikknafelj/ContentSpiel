@@ -191,6 +191,18 @@ if root.hero_media_asset_id.blank?
   raise "seeds: #{hero_result.errors.to_sentence}" unless hero_result.ok?
 end
 
+# The public site draws a page's or post's published copy, and a page's copy
+# was taken when it was published, before its blocks and hero were added
+# above: publish what the seed built. Only a record whose one copy is the
+# first (a second run of the seed finds more and adds none), through the same
+# trusted actor the services above ran as.
+[ *Page.where.not(published_at: nil), *Post.where.not(published_at: nil) ].each do |record|
+  next unless Publishing::Version.of(record).count == 1
+
+  published = Publishing::PublishChanges.call(record)
+  raise "seeds: #{published.errors.to_sentence}" unless published.ok?
+end
+
 PublicSite::Paths.rebuild!
 # The site settings row above is written around the services, so it has no
 # stored translation state yet; this fills every row from what exists.

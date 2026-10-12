@@ -330,7 +330,7 @@ Rails.application.routes.draw do
       # The asking tab leaves, or stops asking: its own request goes.
       post "withdraw", to: "editing#withdraw", as: :editing_withdraw
     end
-    # Publishing a record's changes and discarding them (drafts spec §4.3).
+    # Publishing a record's changes (drafts spec §4.3).
     scope "publishing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
       post "publish", to: "publishing#publish", as: :publishing_publish
     end

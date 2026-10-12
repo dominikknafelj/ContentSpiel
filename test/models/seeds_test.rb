@@ -32,6 +32,17 @@ class SeedsTest < ActiveSupport::TestCase
       end
       assert_equal [ "dQw4w9WgXcQ", "dQw4w9WgXcQ" ], youtube_ids
 
+      # The public site draws published copies: the seed publishes what it
+      # built, so a seeded page has its blocks and a seeded post its body.
+      site_settings(:default).update!(setup_completed_at: Time.current)
+      about = Page.i18n.where(slug: "about").first
+      post = Post.i18n.where(slug: "software-engineer").first
+      integration = ActionDispatch::Integration::Session.new(Rails.application)
+      integration.get PublicSite::Urls.new.path_for(about, :en)
+      assert_includes integration.response.body, "I write about Rails, i18n"
+      integration.get PublicSite::Urls.new.path_for(post, :en)
+      assert_includes Nokogiri::HTML(integration.response.body).at_css("main").text, "Widgets Inc's customer-facing API"
+
       assert_no_difference [ "User.count", "Page.count", "Post.count", "PostRelation.count" ] do
         TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end

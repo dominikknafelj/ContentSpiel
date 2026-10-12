@@ -209,4 +209,36 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
       assert_select "h1", text: "After"
     end
   end
+
+  test "a live post stays in the list slot its published tags put it in, and moves only when its changes are published" do
+    listing = create_page(title: "Blog", published: false)
+    [ { "content_type" => "blog", "tag" => "ruby" }, nil, { "content_type" => "blog" } ].each do |settings|
+      if settings
+        ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: settings })
+      else
+        text_block(listing, "Between the lists")
+      end
+    end
+    assert Pages::Save.call(listing, attributes: { published: true }).ok?
+    post = Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: %w[ruby] },
+      translations: { "en" => { title: "Slotted", body: rich_doc("Slotted body") } }).record
+    publish_changes(listing)
+    publish_changes(post)
+    get path_of(post)
+    before = main_html
+    assert_operator before.index("Slotted body"), :<, before.index("Between the lists"), "the article is in the first (ruby) slot"
+
+    assert Posts::Save.call(post, attributes: { tag_names: %w[rails] }).ok?
+    get path_of(post.reload)
+
+    # The article's place, not the whole of `main`: the lists beside it read the
+    # rows until Task 3.
+    assert_operator main_html.index("Slotted body"), :<, main_html.index("Between the lists"), "an unpublished tag change moved the article"
+    assert_select "article li", text: "ruby"
+
+    publish_changes(post)
+    get path_of(post)
+
+    assert_operator main_html.index("Slotted body"), :>, main_html.index("Between the lists"), "the article moved to the unfiltered slot"
+  end
 end

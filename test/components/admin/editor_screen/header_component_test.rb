@@ -40,7 +40,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     # and its confirm button is (rightly) primary; rack_test treats a closed
     # <dialog>'s content as visible.
     assert_no_selector "header button.bg-accent"
-    assert_selector "[role=status]", text: "This page is live. Changes appear on the site as soon as they’re saved."
+    assert_selector "[role=status]", text: "This page is live. Changes are published with “Publish changes”."
     assert_selector "[role=menu] button", text: "Unpublish", visible: :all
     assert_selector "a[href='/about']", text: "View on site"
   end
@@ -109,16 +109,16 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: /Publish|Unpublish|Schedule|Move to trash/, visible: :all
   end
 
-  # Task 19's f2: the "changes appear as soon as they're saved" hint is about
+  # Task 19's f2: the "changes are published with Publish changes" hint is about
   # the viewer's own edits.
   test "a view-only viewer of a live record is not told their changes go live" do
     post = create_post(title: "Read me", published: true)
     render_header(post, actor: users(:reader))
-    assert_no_text "Changes appear on the site"
+    assert_no_text "Changes are published with"
     assert_selector "[data-view-only-hint]"
 
     render_header(post)
-    assert_text "Changes appear on the site as soon as they’re saved."
+    assert_text "Changes are published with “Publish changes”."
   end
 
   test "a post shows its type and, unlisted, says so" do

@@ -12,7 +12,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", "About"
     assert_select "[data-status='live']"
-    assert_includes response.body, "This page is live. Changes appear on the site as soon as they’re saved."
+    assert_includes response.body, "This page is live. Changes are published with “Publish changes”."
     assert_select "form[data-controller~='admin--saving--autosave'] input[name='page[title]'][value='About']"
   end
 

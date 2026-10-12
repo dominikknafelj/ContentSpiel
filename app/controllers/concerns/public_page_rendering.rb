@@ -74,7 +74,7 @@ module PublicPageRendering
       @post = as_published(record)
       outline = BlockOutline.new(@page.content_blocks)
       @block_outlines = { @page => outline }
-      @post_list_block = outline.reading_order.find { |block| block.lists?(record) }
+      @post_list_block = outline.reading_order.find { |block| block.lists?(@post) }
     else
       @page = as_published(record)
     end

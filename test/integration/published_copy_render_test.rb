@@ -14,12 +14,18 @@ class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
   def body_of(path, from_copy:)
     if from_copy
       get path
+      # The page was drawn from a rebuilt record: the template was handed one
+      # that carries its copy, so a `Publishing.published` that answered the
+      # record itself fails here instead of comparing rows with rows.
+      assert assigns_page_with_copy?, "#{path} was not drawn from a copy"
     else
       with_singleton_override(Publishing, :published, ->(record, **) { record }) { get path }
     end
     assert_response :success, "#{path} (#{from_copy ? "copy" : "rows"})"
     response.body.gsub(/<meta name="csrf-token"[^>]*>|<meta name="csp-nonce"[^>]*>/, "")
   end
+
+  def assigns_page_with_copy? = controller.instance_variable_get(:@page)&.published_version.present?
 
   def assert_same_page(path, rows_html = nil)
     rows_html ||= body_of(path, from_copy: false)

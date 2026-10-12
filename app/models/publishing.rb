@@ -59,7 +59,7 @@ module Publishing
   }.freeze
 
   # NEVER STORED: the record's identity and bookkeeping; a rebuilt record has
-  # the row's (`updated_at` feeds the ETag and the sitemap, which read rows).
+  # the row's (`updated_at` feeds the sitemap (the ETag names the copy's id for a record that has one), which read rows).
   NEVER_STORED = {
     "Page" => { "id" => "the record itself", "created_at" => "bookkeeping", "updated_at" => "bookkeeping" },
     "Post" => { "id" => "the record itself", "created_at" => "bookkeeping", "updated_at" => "bookkeeping" },

@@ -42,6 +42,16 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     post admin_publishing_publish_path(kind: "page", id: draft.id)
 
     assert_redirected_to admin_page_path(draft)
+    assert_equal "There is nothing on the site to change: publish it first", flash[:alert]
     assert_empty Publishing::Version.of(draft)
+  end
+
+  test "someone who may read but not publish is refused, and nothing is published" do
+    sign_in_as users(:reader)
+
+    post admin_publishing_publish_path(kind: "page", id: @page.id)
+
+    assert_response :forbidden
+    assert_equal 1, Publishing::Version.of(@page).count
   end
 end
