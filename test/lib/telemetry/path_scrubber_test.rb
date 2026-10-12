@@ -82,7 +82,7 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
     assert_equal "/#{ADMIN}/password/abc123/edit", exported.attributes["other"], "only the address attributes are rewritten"
   end
 
-  test "scrub itself keeps a query: it is the request line's rule too, and the router needs the query" do
+  test "scrub itself keeps a query: cutting it is the attributes' rule" do
     assert_equal "/#{ADMIN}/password/#{FILTERED}/edit?from=mail", scrub("/#{ADMIN}/password/abc123/edit?from=mail")
     assert_equal "/up?x=1", scrub("/up?x=1")
   end
