@@ -158,13 +158,30 @@ class Theme
     # box, which carries none). On a public page it gets no token
     # (`PublicController`), so one that posts to this application would be
     # refused by it, and the author should hear that at the check.
-    FORM = /<%(?:(?!%>).)*?\b(?:form_with|form_tag|form_for|button_to)\b(?:(?!%>).)*%>/m
+    # Asked of one ERB tag's Ruby, with its comments and the words inside
+    # its strings taken away (`link_to "About form_with", …` is no form).
+    FORM = /\b(?:form_with|form_tag|form_for|button_to)\b/
     GET = /\bmethod["']?\s*(?:=>|:)\s*["':]+get\b/i
 
     # An assignment to an instance variable, in the code of a template (the
     # comment at the top says what the layout reads): `@page = …`,
-    # `@post ||= …`, `@x += 1`, and the same by name.
-    ASSIGNMENT = /@\w+\s*(?:\|\||&&|[-+*\/%])?=(?![=~>])|\binstance_variable_set\b/
+    # `@post ||= …`, `@x += 1`, `@x |= y`, `@x <<= y` and every other
+    # compound form, and the same by name. Asked of the Ruby without its
+    # comments and strings (`title: "@home = here"` assigns nothing).
+    ASSIGNMENT = /@\w+\s*(?:\|\||&&|\*\*|<<|>>|[-+*\/%|&^])?=(?![=~>])|\binstance_variable_set\b/
+
+    # A Ruby comment inside an ERB tag: a `#` at the start of a line or
+    # after a space, that does not open an interpolation, to the line's end.
+    COMMENT = /(^|\s)#(?!\{)[^\n]*/
+
+    # A string literal, with what it interpolates kept apart: the words in
+    # a string are text (`link_to "Cookies", "/cookies"`), what `\#{…}`
+    # holds is code (`"/x?q=\#{params[:q]}"`). One level of braces, no
+    # heredoc, no `%q`: a fence's reading, and what it misses it misses
+    # towards letting a template through.
+    DOUBLE_QUOTED = /"((?:\\.|\#\{[^}]*\}|[^"\\])*)"/m
+    SINGLE_QUOTED = /'(?:\\.|[^'\\])*'/m
+    INTERPOLATION = /\#\{([^}]*)\}/
 
     # A write to the slot the CMS's head once read. The layout reads none
     # now, so the tag would be lost without a word.
@@ -289,7 +306,8 @@ class Theme
         found << "#{file} asks for the CSRF token: a public page is one answer for every visitor and carries none, because asking " \
                  "for the token starts a session and sets a cookie on a page a cache may keep. Delete it from the template."
       end
-      if code.scan(FORM).any? { |form| !form.match?(GET) }
+      tags = code.scan(/<%={0,2}(.*?)%>/m).flatten.map { |tag| tag.gsub(COMMENT, '\1') }
+      if tags.any? { |tag| without_strings(tag).match?(FORM) && !tag.match?(GET) }
         found << "#{file} has a form that is sent with a CSRF token (form_with, form_tag, form_for or button_to without " \
                  "`method: :get`): a public page is one answer for every visitor and is given no token, so the form would be " \
                  "sent without one. Write a search form with `method: :get`, and a form that posts to another service as a " \
@@ -299,7 +317,7 @@ class Theme
         found << "#{file} writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, " \
                  "so the tag would never be printed. Put the tag into #{HEAD}, which is the theme's part of the head."
       end
-      if ruby.match?(ASSIGNMENT)
+      if without_strings(ruby.gsub(COMMENT, '\1')).match?(ASSIGNMENT)
         found << "#{file} assigns an instance variable: a template is rendered before the layout, which reads the page, the post " \
                  "and the preview from instance variables to write the title and the head's tags. Use a local variable " \
                  "(`name = …`), or pass the value to a partial as a local."
@@ -323,6 +341,12 @@ class Theme
       code.scan(/<%==?(.*?)%>/m).flatten.any? { |printed| printed.match?(/\byield\b(?!\s*\(?\s*:\w)/) }
     end
 
+    # The Ruby without the words inside its string literals; what a string
+    # interpolates stays, as code.
+    def without_strings(ruby)
+      ruby.gsub(DOUBLE_QUOTED) { " #{$1.scan(INTERPOLATION).flatten.join(" ; ")} " }.gsub(SINGLE_QUOTED, " ")
+    end
+
     def unsound(file, source)
       found = []
       begin
@@ -334,7 +358,12 @@ class Theme
       rescue SyntaxError => error
         found << "#{file} does not compile: #{error.message.lines.first.to_s.strip}. Correct the template at that line."
       end
-      code = source.scan(/<%(?!#)(.*?)%>/m).flatten.join("\n")
+      # Comments and the words inside strings are not read: the five names
+      # are English words, a site writes them in its links and file names
+      # (`link_to "Cookies", "/cookies"`, `image_tag "flash.svg"`), and this
+      # check is a gate of a site's build, where a wrong refusal blocks a
+      # deploy.
+      code = without_strings(source.scan(/<%(?!#)(.*?)%>/m).flatten.join("\n").gsub(COMMENT, '\1'))
       asked = REQUEST_RECEIVERS.map { |receiver| "(?<=\\b#{receiver}\\.)" }.join("|")
       FORBIDDEN.each do |name|
         # Not a method of something else (`text.request_id`, `post.session`),

@@ -36,7 +36,7 @@ module PublicPageRendering
     #
     # What the path lets a theme replace is not "any template": the folder
     # is checked against `Theme::Contract` when the application starts
-    # (`Theme::Check`, run by `Theme.load` in the `to_prepare` of
+    # (`Theme::Check`, run by `Theme.prepare` in the `to_prepare` of
     # `config/initializers/theme.rb`, whose first run is the boot), and one
     # that holds the layout, `pages/_seo_meta`, `shared/_theme_head` or the
     # preview bar does not start (`test/lib/production_boot_test.rb`:
@@ -137,6 +137,9 @@ module PublicPageRendering
   # every public page, with the check's own message, until the folder is
   # sound again: the alternative is the default theme drawn in silence over
   # the mistake the check found. At boot such a folder never gets this far.
+  # It is the same exception object each time, so the trace an error page
+  # shows is the reload's that refused the folder (`Theme.load`), not the
+  # request's: where the folder was refused is the useful place.
   def look_in_the_theme_first
     raise Theme.current.refusal if Theme.current.refusal
 

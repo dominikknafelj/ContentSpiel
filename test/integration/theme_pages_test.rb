@@ -243,6 +243,39 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The same wall, followed by someone who is signed in: an editor reads the
+  # public site in the browser they work in. The public page must neither
+  # set a cookie nor take one away (a session that is not committed is not
+  # dropped either), and CS Studio must still know them afterwards.
+  test "a signed-in editor reads a public page under a grasping theme and is still signed in: no cookie set, none taken away" do
+    with_theme_copy do |dir|
+      dir.join("views/layouts/public/_head.html.erb").write(GRASPING)
+
+      with_forgery_protection do
+        get admin_sign_in_path
+        token = css_select("input[name=authenticity_token]").first["value"]
+        post admin_sign_in_path, params: { email_address: users(:one).email_address, password: "password", authenticity_token: token }
+        assert cookies[:session_id].present?, "signed in"
+        get "/cs-studio"
+        assert_response :success
+        before = cookies.to_hash
+
+        Theme.with(Theme.new(path: dir)) do
+          [ "/about", "/no-such-page" ].each do |address|
+            get address
+
+            assert_nil response.headers["Set-Cookie"], "#{address} set or cleared a cookie"
+            assert_equal before, cookies.to_hash, "#{address} changed the browser's cookies"
+          end
+        end
+
+        get "/cs-studio"
+        assert_response :success
+        assert_select "nav[aria-label='Modules']"
+      end
+    end
+  end
+
   # The preview is the other controller that draws a theme, and it is none
   # of the above: signed in, private, never cached. A form there carries its
   # token, as any form of CS Studio does.
@@ -276,6 +309,15 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       bad = ThemeFolder.new(dir)
 
       with_singleton_override(ThemeFolder, :current, -> { bad }) do
+        # The registries are emptied first, as a code reload leaves them
+        # (their classes are loaded anew): `prepare!` alone clears nothing,
+        # so without this the three assertions below would hold whether or
+        # not the blocks after the theme's ran. The theme's block is before
+        # the registries' (config/initializers/theme.rb, types.rb).
+        [ BlockTypes, ContentTypes ].each(&:reset!)
+        AccessControl::Permissions.reset!
+        assert_empty BlockTypes.all
+
         Rails.application.reloader.prepare!
 
         assert_includes Theme.current.refusal.message, "views/pages/shwo.html.erb is not part of the theme contract"

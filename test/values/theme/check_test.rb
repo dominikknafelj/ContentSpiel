@@ -352,13 +352,32 @@ class Theme::CheckTest < ActiveSupport::TestCase
   # reads @page, @post and @preview_record for the title and the head.
   test "a template that assigns an instance variable is refused, however it is written" do
     [ "<% @post = nil %>", "<% @page = Page.first %>", "<% @preview_record ||= @page %>", "<% @count += 1 %>",
-      "<% instance_variable_set(:@page, nil) %>", "<%= (@title = \"x\") %>", "<% @a, b = 1, 2 %><% @page =\n  nil %>" ].each do |markup|
+      "<% instance_variable_set(:@page, nil) %>", "<%= (@title = \"x\") %>", "<% @a, b = 1, 2 %><% @page =\n  nil %>",
+      "<% @flags |= 1 %>", "<% @list <<= 1 %>", "<% @n >>= 1 %>", "<% @n ^= 1 %>", "<% @n &= 1 %>", "<% @n **= 2 %>", "<% @n -= 1 %>" ].each do |markup|
       problems = problems_with("views/theme/_x.html.erb" => "#{markup}\n")
 
       assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
       assert_includes problems.first, "views/theme/_x.html.erb assigns an instance variable"
       assert_includes problems.first, "Use a local variable"
     end
+  end
+
+  test "an instance variable's name in a string, a comparison, a match and a shovel are no assignment" do
+    assert_empty problems_with("views/theme/_x.html.erb" => <<~ERB)
+      <%= link_to "@home = here", home_url_path, title: '@page = x' %>
+      <% if @page == @post || @page != nil || @page =~ /x/ || @page >= @post %><% end %>
+      <% list = [] %><% list << @page %><%= { page: @page }.size %>
+      <% # @page = nil would change the head %>
+    ERB
+  end
+
+  test "a form helper named in a Ruby comment or in a string is no form" do
+    assert_empty problems_with("views/theme/_x.html.erb" => <<~ERB)
+      <% # form_with would need a token here %>
+      <% x = 1 # button_to, later %>
+      <%= link_to "About form_with and button_to", "/form_for" %>
+    ERB
+    assert_equal 1, problems_with("views/theme/_x.html.erb" => "<%= form_with(url: \"/x\") { } # a comment after it %>\n").size
   end
 
   test "a form that is sent with a token is refused, and a GET form and a plain form tag are not" do
@@ -407,6 +426,25 @@ class Theme::CheckTest < ActiveSupport::TestCase
 
       assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
       assert_includes problems.first, "views/theme/_x.html.erb reads #{name}"
+    end
+  end
+
+  # The deep check is a gate of a site's build: a refusal that is wrong
+  # blocks a deploy. The five names are English words a site writes in its
+  # links and file names.
+  test "the deep check does not read the five names inside a string, and still reads them in an interpolation" do
+    assert_empty problems_with({ "views/theme/_x.html.erb" => <<~'ERB' }, deep: true)
+      <%= link_to "Cookies", "/cookies" %>
+      <%= image_tag "flash.svg", alt: 'a flash of light' %>
+      <%= link_to "new session", "/session", title: "request #{1 + 1} params" %>
+      <% # params, request, cookies, session and flash are not read %>
+    ERB
+
+    { '<%= link_to "x", "/x?q=#{params[:q]}" %>' => "params", "<%= cookies[:x] %>" => "cookies", "<%= flash[:notice] %>" => "flash",
+      '<%= "#{session[:id]}" %>' => "session", "<%= request.path %>" => "request" }.each do |markup, name|
+      problems = problems_with({ "views/theme/_x.html.erb" => "#{markup}\n" }, deep: true)
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_x.html.erb reads #{name}:"
     end
   end
 
