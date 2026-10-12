@@ -69,8 +69,11 @@ en:
         delete_block_dialog:
           title: "Delete this block?"
           body: "Blocks don’t go to the trash. This can’t be undone."
-          # One more sentence on a published or scheduled page (drafts spec §9).
-          published_notes: "Its notes are deleted with it and do not come back if the changes are discarded."
+          # The body on a published or scheduled page, INSTEAD of the one
+          # above (drafts spec §9): there the delete is an unpublished change
+          # like any other, so "can't be undone" would be untrue of the block
+          # and is true only of its notes.
+          published_body: "Blocks don’t go to the trash. The block is removed from the site only when the changes are published; until then “Discard changes…” brings it back. Its notes are deleted now and do not come back."
           confirm: "Delete block"
         # The heading of a block's form under a section's lanes.
         panel_title:

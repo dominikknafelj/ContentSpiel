@@ -8,13 +8,19 @@ class Admin::EditorScreen::DeleteBlockDialogComponentTest < ViewComponent::TestC
     as(users(:one)) { render_inline Admin::EditorScreen::DeleteBlockDialogComponent.new(page: owner, block: block) }
   end
 
-  test "on a live page the delete dialog says its notes do not come back with a discard; on a draft it does not" do
+  LIVE = "Blocks don’t go to the trash. The block is removed from the site only when the changes are published; until then “Discard changes…” brings it back. Its notes are deleted now and do not come back.".freeze
+
+  # A hand test found the live page's dialog saying "This can't be undone"
+  # above a header whose "Discard changes…" undoes exactly that.
+  test "on a live page the dialog says the block leaves the site only with a publish and comes back with a discard, its notes not; a draft's says it can't be undone" do
     dialog(create_page(title: "Live"))
-    assert_text "Blocks don’t go to the trash. This can’t be undone. Its notes are deleted with it and do not come back if the changes are discarded."
+    assert_text LIVE
+    assert_no_text "This can’t be undone"
 
     dialog(create_page(title: "Draft", published: false))
     assert_text "Blocks don’t go to the trash. This can’t be undone."
-    assert_no_text "do not come back if the changes are discarded"
+    assert_no_text "Discard changes"
+    assert_no_text "do not come back"
   end
 
   test "a scheduled page says it too: its changes can be discarded as well" do
@@ -23,6 +29,7 @@ class Admin::EditorScreen::DeleteBlockDialogComponentTest < ViewComponent::TestC
 
     dialog(scheduled.reload)
 
-    assert_text "do not come back if the changes are discarded"
+    assert_text LIVE
+    assert_no_text "This can’t be undone"
   end
 end

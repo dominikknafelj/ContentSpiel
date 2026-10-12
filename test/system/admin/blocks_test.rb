@@ -60,7 +60,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     find("#{card_for(first)} button[aria-label='Block actions']").click
     within(card_for(first)) { press "Delete block…" }
     assert_text "Delete this block?"
-    assert_text "Blocks don’t go to the trash. This can’t be undone."
+    assert_text "Blocks don’t go to the trash."
     within("dialog[open]") { press "Delete block" }
 
     assert_no_selector card_for(first)

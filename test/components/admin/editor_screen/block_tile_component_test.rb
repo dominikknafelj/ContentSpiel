@@ -48,7 +48,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='delete-block-#{@block.id}']", text: "Delete block…", visible: :all
     assert_selector ".admin-block-tile > dialog#delete-block-#{@block.id}[data-destructive]", visible: :all
-    assert_selector "dialog#delete-block-#{@block.id}", text: "Blocks don’t go to the trash. This can’t be undone.", visible: :all
+    assert_selector "dialog#delete-block-#{@block.id}", text: "Blocks don’t go to the trash.", visible: :all
     assert_selector "dialog form[action$='/content_blocks/#{@block.id}'] input[name='_method'][value='delete']", visible: :all
     assert_selector "dialog form[action$='/content_blocks/#{@block.id}'] button[type=submit]", text: "Delete block", visible: :all
   end

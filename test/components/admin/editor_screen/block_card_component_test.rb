@@ -124,7 +124,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='delete-block-#{block.id}']", text: "Delete block…", visible: :all
     assert_selector "dialog#delete-block-#{block.id}", visible: :all
     assert_text "Delete this block?", normalize_ws: true
-    assert_text "Blocks don’t go to the trash. This can’t be undone.", normalize_ws: true
+    assert_text "Blocks don’t go to the trash.", normalize_ws: true
     assert_selector "dialog form[method='post'] button", text: "Delete block", visible: :all
   end
 

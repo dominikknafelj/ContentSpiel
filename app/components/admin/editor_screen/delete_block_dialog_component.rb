@@ -67,10 +67,14 @@ module Admin
 
       def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)
 
-      # On a published or scheduled page a deleted block can come back
-      # ("Discard changes…" creates it again), and its notes do not: the
-      # dialog says so there (drafts spec §9).
-      def body = [ t(".body"), (t(".published_notes") if page.published_at.present?) ].compact.join(" ")
+      # A draft's block is gone for good. On a published or scheduled page
+      # the delete is an unpublished change: the site keeps the block until
+      # the changes are published and "Discard changes…" creates it again
+      # (`Publishing::DiscardChanges`), so "This can't be undone" would be
+      # untrue there. What does not come back is its notes, which are
+      # deleted now (`ContentBlocks::Destroy`): the dialog says both
+      # (drafts spec §9).
+      def body = page.published_at.present? ? t(".published_body") : t(".body")
 
       private
 
