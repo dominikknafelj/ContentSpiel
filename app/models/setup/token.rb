@@ -12,6 +12,19 @@ module Setup
         Rails.application.key_generator.generate_key(PURPOSE, 12).unpack1("H*")
     end
 
+    # What the boot says while setup is still required
+    # (`config/initializers/setup_token.rb`). The derived token can be read
+    # nowhere but here, so the line holds it. One the operator set in
+    # SETUP_TOKEN is not repeated: they have it already, and a log is kept,
+    # shipped and read by more people than the environment is.
+    def self.log_line
+      if ENV["SETUP_TOKEN"].present?
+        "[ContentSpiel] Setup is not complete. Open /setup and enter the setup token you set in SETUP_TOKEN."
+      else
+        "[ContentSpiel] Setup is not complete. Open /setup and enter this setup token: #{value}"
+      end
+    end
+
     def self.valid?(candidate)
       ActiveSupport::SecurityUtils.secure_compare(candidate.to_s.strip, value)
     end

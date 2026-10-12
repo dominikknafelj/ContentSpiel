@@ -21,9 +21,10 @@ module ContentSpiel
   # - "lookbook" -- the component browser, development only;
   # - "assets" -- compiled asset URLs (`config.assets.prefix`'s own
   #   default);
-  # - "cable" -- ActionCable's own conventional mount path, even though
-  #   nothing in this app mounts it there today -- a later change that does
-  #   shouldn't also have to remember this file;
+  # - "cable" -- Action Cable's endpoint: Rails mounts it at `/cable`
+  #   itself (`config.action_cable.mount_path`'s default; no line in
+  #   `routes.rb` does it), and notes, presence and live editing all
+  #   connect there, so an admin path of that name would take their socket;
   # - "sitemap.xml" -- `config/sitemap.rb`'s own output, served as a plain
   #   file under `public/`, never through the router at all -- listed
   #   anyway since a request for it still has to resolve to the sitemap, not
