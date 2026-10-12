@@ -181,4 +181,119 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_not_nil @token.reload.last_used_at
     assert_equal "127.0.0.1", @token.last_used_ip
   end
+
+  # -- drafts of live content (Task 7) -------------------------------------------
+
+  def call_tool(name, **arguments)
+    mcp_post(jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: name, arguments: arguments })
+    assert_response :success
+    response.parsed_body["result"]
+  end
+
+  def tool_data(result) = JSON.parse(result["content"].first["text"])
+
+  def live_post(title = "Live post")
+    Current.set(actor: @user) do
+      Posts::Save.call(attributes: { content_type: "blog", published: true }, translations: { "en" => { title: title, body: rich_doc("As published") } }).record
+    end
+  end
+
+  test "update_post on a live post leaves the site as it was and answers unpublished_changes: true" do
+    record = live_post
+
+    result = call_tool("update_post_tool", id: record.id, title: "Edited by a token")
+
+    assert_equal false, result["isError"]
+    assert_equal true, tool_data(result)["unpublished_changes"]
+    assert_equal "Edited by a token", tool_data(result)["title"]
+    assert_equal "Live post", Mobility.with_locale(:en) { Publishing.published(record.reload).title }, "the site shows what was published"
+    assert_equal 1, Publishing::Version.of(record).count
+  end
+
+  test "update_post with publish_changes: true publishes in the same call and answers unpublished_changes: false" do
+    record = live_post
+
+    result = call_tool("update_post_tool", id: record.id, title: "Edited and published", publish_changes: true)
+
+    assert_equal false, result["isError"]
+    assert_equal false, tool_data(result)["unpublished_changes"]
+    assert_equal "Edited and published", Mobility.with_locale(:en) { Publishing.published(record.reload).title }
+    assert_equal 2, Publishing.current(record).number
+    assert_equal "mcp", Audit::Event.where(action: "post.changes_published", subject: record).sole.channel
+
+    again = call_tool("update_post_tool", id: record.id, title: "Edited and published", publish_changes: true)
+    assert_equal false, again["isError"], "a second identical call finds nothing to publish"
+    assert_equal 2, Publishing::Version.of(record).count
+  end
+
+  test "publish_changes on a draft is ignored: it is published with published: true" do
+    record = Current.set(actor: @user) { Posts::Save.call(attributes: { content_type: "blog" }, translations: { "en" => { title: "Draft" } }).record }
+
+    result = call_tool("update_post_tool", id: record.id, title: "Still a draft", publish_changes: true)
+
+    assert_equal false, result["isError"]
+    assert_equal "draft", tool_data(result)["status"]
+    assert_equal false, tool_data(result)["unpublished_changes"]
+    assert_empty Publishing::Version.of(record)
+
+    result = call_tool("update_post_tool", id: record.id, published: true)
+    assert_equal "live", tool_data(result)["status"]
+    assert_equal 1, Publishing::Version.of(record).count
+  end
+
+  test "a token that may edit and publish posts needs no further right for publish_changes; one that may not publish is refused the whole call's publication and the edit of a live post as before" do
+    record = live_post
+    group = AccessControl::Group.create!(name: "Post editors and publishers")
+    %w[posts.read posts.edit posts.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    @token, @raw_token = ApiToken.generate!(@user, group: group)
+
+    result = call_tool("update_post_tool", id: record.id, title: "By a narrow token", publish_changes: true)
+    assert_equal false, result["isError"]
+    assert_equal 2, Publishing.current(record).number
+
+    editors = AccessControl::Group.create!(name: "Post editors")
+    %w[posts.read posts.edit].each { |key| AccessControl::Grant.create!(group: editors, permission: key, scope: {}) }
+    @token, @raw_token = ApiToken.generate!(@user, group: editors)
+
+    result = call_tool("update_post_tool", id: record.id, title: "Not allowed", publish_changes: true)
+    assert_equal true, result["isError"]
+    assert_match(/permission to publish posts/i, result["content"].first["text"])
+    assert_equal "By a narrow token", Mobility.with_locale(:en) { record.reload.title }, "nothing was saved"
+    assert_equal 2, Publishing::Version.of(record).count
+  end
+
+  test "when the publication is refused the edit stays saved and the answer says both" do
+    record = live_post
+    refusal = ->(*, **) { ApplicationService::Result.failure(record, [ "The post “Live post” would get the address /x, which is already taken in EN" ]) }
+
+    result = with_singleton_override(Publishing::PublishChanges, :call, refusal) do
+      call_tool("update_post_tool", id: record.id, title: "Saved only", publish_changes: true)
+    end
+
+    assert_equal true, result["isError"]
+    assert_equal "The post was saved, but its changes were not published: The post “Live post” would get the address /x, which is already taken in EN", result["content"].first["text"]
+    assert_equal "Saved only", Mobility.with_locale(:en) { record.reload.title }
+    assert record.unpublished_changes?
+  end
+
+  test "get_post and list_posts say unpublished_changes" do
+    changed = live_post("Changed")
+    Current.set(actor: @user) { assert Posts::Save.call(changed, translations: { "en" => { title: "Changed since" } }).ok? }
+    clean = live_post("Clean")
+
+    assert_equal true, tool_data(call_tool("get_post_tool", id: changed.id))["unpublished_changes"]
+    assert_equal false, tool_data(call_tool("get_post_tool", id: clean.id))["unpublished_changes"]
+    assert_equal "Changed since", tool_data(call_tool("get_post_tool", id: changed.id))["title"], "the tools read the working version"
+
+    listed = tool_data(call_tool("list_posts_tool")).index_by { |entry| entry["id"] }
+    assert_equal [ true, false ], listed.values_at(changed.id, clean.id).map { |entry| entry["unpublished_changes"] }
+  end
+
+  test "the update_post_tool schema offers publish_changes, a boolean, and its description says a live post's edit is not public" do
+    mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
+    tool = response.parsed_body["result"]["tools"].find { |entry| entry["name"] == "update_post_tool" }
+
+    assert_equal "boolean", tool["inputSchema"]["properties"]["publish_changes"]["type"]
+    assert_match(/Editing a live or scheduled post does not change the site/, tool["description"])
+  end
 end

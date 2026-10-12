@@ -21,7 +21,8 @@ module Mcp
         "site's own pages/posts are [text](cs:page/<id>) / [text](cs:post/<id>). The response includes both `published` " \
         "(boolean, kept for compatibility) and `status` (\"draft\", \"scheduled\", or \"live\") -- " \
         "a scheduled post (a future published_at) has published: true but status: \"scheduled\", " \
-        "and is not yet visible on the public site."
+        "and is not yet visible on the public site. `unpublished_changes` is true when a live or scheduled " \
+        "post has edits the site does not show yet: what this tool returns is the working version."
       input_schema(
         properties: {
           id: { type: "integer" },

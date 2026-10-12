@@ -67,7 +67,8 @@ module ServiceCalls
   # contract also runs the call as a token on the :mcp channel, once with each
   # half of the intersection (group and user) lacking the right.
   MCP_REACHABLE = {
-    "Posts::Save" => "the create_post and update_post tools"
+    "Posts::Save" => "the create_post and update_post tools",
+    "Publishing::PublishChanges" => "the update_post tool's publish_changes argument"
   }.freeze
 
   # `ApplicationService` subclasses that are not services of their own (a
