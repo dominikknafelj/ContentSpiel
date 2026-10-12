@@ -335,6 +335,12 @@ Rails.application.routes.draw do
     # Publishing a record's changes (drafts spec §4.3).
     scope "publishing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
       post "publish", to: "publishing#publish", as: :publishing_publish
+      # What a publish would change, for the dialog: a POST, sent through the
+      # tab's write queue, because part of the answer is found by trying
+      # (`Publishing::Changes.lost_addresses` takes the record's row lock).
+      post "changes", to: "publishing#changes", as: :publishing_changes
+      post "discard", to: "publishing#discard", as: :publishing_discard
+      post "cancel_scheduled_change", to: "publishing#cancel_scheduled_change", as: :publishing_cancel_scheduled_change
     end
     # Notes on content (notes spec §3.4, §4). Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,

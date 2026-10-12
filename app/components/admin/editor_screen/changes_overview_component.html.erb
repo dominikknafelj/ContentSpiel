@@ -1,0 +1,58 @@
+<%= tag.div data: { publishing_overview: "", nothing: (none? ? "" : nil) } do %>
+  <% if none? %>
+    <p class="text-sm text-dim"><%= t(".none") %></p>
+  <% else %>
+    <% if scheduled_baseline? %>
+      <p class="mb-3 text-[13px] text-dim"><%= t(".compared_with_scheduled", time: baseline_time) %></p>
+    <% end %>
+    <% if blocks.any? %>
+      <h3 class="<%= setup_label_class %>"><%= t(".blocks") %></h3>
+      <ul class="mt-1 divide-y divide-line border-y border-line">
+        <% blocks.each do |entry| %>
+          <%= tag.li class: "flex min-w-0 items-baseline gap-3 py-2 text-sm", data: { change: entry.kind } do %>
+            <span class="w-20 shrink-0 font-cs-mono text-[11px] uppercase tracking-mono text-meta"><%= kind_label(entry) %></span>
+            <span class="shrink-0 font-medium text-ink"><%= type_label(entry) %></span>
+            <% if (line = summary(entry)) %>
+              <span class="min-w-0 truncate text-dim"><%= line %></span>
+            <% end %>
+          <% end %>
+        <% end %>
+      </ul>
+    <% end %>
+    <% if field_labels.any? %>
+      <h3 class="mt-4 <%= setup_label_class %>"><%= t(".fields.#{type}") %></h3>
+      <p class="mt-1 text-sm text-ink" data-changed-fields><%= field_labels.to_sentence %></p>
+    <% end %>
+    <% if language_names.any? %>
+      <h3 class="mt-4 <%= setup_label_class %>"><%= t(".languages") %></h3>
+      <p class="mt-1 text-sm text-ink" data-changed-languages><%= language_names.to_sentence %></p>
+    <% end %>
+  <% end %>
+
+  <% if own_lost %>
+    <%= tag.p t(".own_address.#{type}", path: own_lost.path, languages: lost_languages(own_lost)), role: "alert",
+          class: "mt-4 rounded-cs bg-danger-tint px-3 py-2 text-[13px] text-danger-ink", data: { publishing_own_address: "" } %>
+  <% end %>
+  <% if others_lost.any? || hidden_lost.to_i.positive? %>
+    <%= tag.section class: "mt-4 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink", data: { publishing_lost_addresses: "" } do %>
+      <h3 class="font-medium"><%= t(".lost_addresses.heading") %></h3>
+      <p class="mt-1"><%= t(".lost_addresses.body.#{type}") %></p>
+      <ul class="mt-1 list-disc pl-5">
+        <% others_lost.each do |entry| %>
+          <li data-lost-address>
+            <%= link_to lost_title(entry), lost_url(entry), class: "underline hover:text-ink", data: { turbo_frame: "_top" } %>
+            <span class="font-cs-mono text-[12px]"><%= entry.path %></span>
+            <span>(<%= lost_languages(entry) %>)</span>
+          </li>
+        <% end %>
+        <% if hidden_lost.to_i.positive? %>
+          <li><%= t(".lost_addresses.hidden", count: hidden_lost) %></li>
+        <% end %>
+      </ul>
+    <% end %>
+  <% end %>
+
+  <% holders.each do |user| %>
+    <%= tag.p t(".held.#{type}", name: ::PersonName.of(user)), class: "mt-4 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink", data: { publishing_held: "" } %>
+  <% end %>
+<% end %>

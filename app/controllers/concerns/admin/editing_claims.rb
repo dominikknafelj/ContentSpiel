@@ -137,6 +137,25 @@ module Admin
       t("#{scope}.#{noun}", name: ::PersonName.of(hold.user))
     end
 
+    # A discard writes every part of a page (its settings and each of its
+    # blocks) or the whole post, so it is refused while ANOTHER tab holds any
+    # of them (drafts spec §4.3; live-editing's rule: a write to a held
+    # subject from another tab is refused). It would overwrite text someone
+    # is typing. Nothing is written, audited or signalled. A request with no
+    # tab id is not refused, as everywhere. It reads the holds
+    # (`Editing::Holds`) and runs no statement of a reservation's.
+    def refuse_discard_under_hold(record, to:)
+      tab = Current.editing_tab
+      return false unless tab && Current.user
+
+      holds = ::Editing::Holds.on(record, viewer: Current.user, tab: tab)
+      subjects = [ record, *(record.is_a?(::Page) ? ::ContentBlock.where(owner: record).to_a : []) ]
+      subject = subjects.find { |candidate| holds.other(candidate) } or return false
+
+      redirect_to to, status: :see_other, alert: held_refusal_text(subject, holds.other(subject))
+      true
+    end
+
     # Publish / Unpublish / Schedule: back to the editor with the sentence.
     # Nothing is written, audited or signalled. Returns true after redirecting.
     def refuse_instant_redirect(subject, to:)

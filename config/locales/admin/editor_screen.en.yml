@@ -247,5 +247,58 @@ en:
         # What the redirect says once the copy is taken.
         publishing:
           published: "Changes published"
+          # A copy that waits for its time.
+          scheduled: "Changes scheduled for %{time}"
           # The press found the rows and the newest copy the same.
           nothing: "Nothing to publish"
+          discarded: "Changes discarded"
+          cancelled: "Scheduled change cancelled"
+          # "At the scheduled time" was chosen, and nothing is scheduled any
+          # more (cancelled in another tab, or its time has come).
+          not_scheduled: "These changes are no longer scheduled. Nothing was published."
+        # The overview in the publish dialog (`ChangesOverviewComponent`).
+        changes_overview:
+          none: "Nothing to publish. This is the same as what is published."
+          compared_with_scheduled: "Compared with the changes scheduled for %{time}."
+          blocks: "Blocks"
+          fields:
+            page: "Page"
+            post: "Post"
+          languages: "Languages"
+          kinds:
+            changed: "Changed"
+            added: "Added"
+            removed: "Removed"
+            moved: "Moved"
+          # The record's own fields, by the names their forms give them.
+          field_names:
+            title: "Title"
+            subtitle: "Subtitle"
+            meta_title: "Meta title"
+            meta_description: "Meta description"
+            hero_alt: "Hero image alt text"
+            hero_media_asset_id: "Hero image"
+            page_type: "Page type"
+            excerpt: "Excerpt"
+            body: "Body"
+            metadata: "Fields"
+            translated_metadata: "Fields"
+            tags: "Tags"
+          untitled: "(untitled)"
+          held:
+            page: "%{name} is editing this page. Only what has been saved is published."
+            post: "%{name} is editing this post. Only what has been saved is published."
+          # Other live records that a publish leaves without an address:
+          # information, nothing is refused for it.
+          lost_addresses:
+            heading: "Addresses"
+            body:
+              page: "When this page is published, these lose their address and show “not found” on the site:"
+              post: "When this post is published, these lose their address and show “not found” on the site:"
+            hidden:
+              one: "1 more that you can’t open"
+              other: "%{count} more that you can’t open"
+          # The record's own address: the one thing a publish is refused for.
+          own_address:
+            page: "This page would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
+            post: "This post would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
