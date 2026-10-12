@@ -46,6 +46,18 @@ module ContentHelper
     record
   end
 
+  # Removes every published copy taken so far, so that the records built up
+  # to here are served and judged from their ROWS, as records written around
+  # the services are (`Publishing`): for a test of something that acts on the
+  # rows at once, such as a tag service's own sync of the addresses. With
+  # their copies, a list block and a tag move no address until the record's
+  # changes are published (`PublicSite::Paths.canonical_pages`). The posts'
+  # addresses are derived again, since they were derived from the copies.
+  def follow_rows!
+    Publishing::Version.delete_all # version: none (a test takes the copies away; nothing public is read from them here)
+    PublicSite::Paths.sync_posts(nil)
+  end
+
   def create_page(title:, parent: root_page, published: true, translations: {})
     result = Pages::Save.call(attributes: { parent: parent, published: published },
       translations: { Locales.default => { title: title } }.merge(translations))

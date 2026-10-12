@@ -5,6 +5,7 @@ class Tags::RenameTest < ActiveSupport::TestCase
     listing = create_page(title: "Rails posts")
     ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "rails" } })
     post = create_post(title: "Hi", tags: [ "rails" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/rails-posts/hi", post.full_path("en")
 
     result = Tags::Rename.call(Tag.find_by!(name: "rails"), name: "ruby")
@@ -48,6 +49,7 @@ class Tags::RenameTest < ActiveSupport::TestCase
     listing = create_page(title: "Rails posts")
     ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { tag: "rails" } })
     post = create_post(title: "Hi", content_type: "blog", tags: [ "rails" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/rails-posts/hi", post.full_path("en")
 
     result = Tags::Rename.call(Tag.find_by!(name: "rails"), name: "ruby")
@@ -62,6 +64,7 @@ class Tags::RenameTest < ActiveSupport::TestCase
     listing = create_page(title: "Ruby posts")
     ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "ruby" } })
     post = create_post(title: "Hi", tags: [ "rails" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_nil post.full_path("en")
 
     result = Tags::Rename.call(Tag.find_by!(name: "rails"), name: "ruby")

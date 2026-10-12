@@ -65,6 +65,9 @@ module Publishing
         row = record.class.lock.find(record.id)
         live_at = [ live_at || now, now ].max
         mine = of(row)
+        # The copy this one follows, read before anything is written: what
+        # the public saw until now.
+        previous = mine.in_force(now).order(id: :desc).first
         number = (mine.maximum(:number) || 0) + 1
         mine.pending(now).delete_all
         data = Snapshot.of(row, row: row)
@@ -80,6 +83,12 @@ module Publishing
         # page at that moment. Task 5 adds the part of the content version that
         # follows copies by the clock.
         PublicSite.bump_version! if row.live?
+        # The addresses this copy can change, in this transaction (derived
+        # rows are refreshed with the write, after the record's row was
+        # locked above: the order every sync from a save has). A copy with a
+        # time changes none yet: the sweep does when its time has come
+        # (`PublicSite::Paths.sync_copies_went_live`).
+        PublicSite::Paths.published(row, version, previous) if live_at <= now
         version
       end
     end

@@ -11,6 +11,7 @@ class Posts::ResumeListComponentTest < ActiveSupport::TestCase
     # `post_url_path` against, and `link_to(title, nil)` raises rather than
     # rendering a blank href.
     page.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
+    publish_changes(page)
     post = Post.new(content_type: "resume_entry", title: "Staff Engineer", published_at: 1.day.ago)
     post.assign_fields({ "company" => "Acme", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" }, locale: "en")
     post.save!

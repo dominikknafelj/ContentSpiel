@@ -115,6 +115,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "rails" } })
     post = create_post(title: "Hi", tags: [ "rails" ])
     tag = Tag.find_by!(name: "rails")
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/rails-posts/hi", post.full_path("en")
 
     patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "ruby" }, base_updated_at: tag.updated_at.iso8601(6) }, as: :turbo_stream
@@ -220,6 +221,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "rails" } })
     post = create_post(title: "Hi", tags: [ "rails" ])
     tag = Tag.find_by!(name: "rails")
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/rails-posts/hi", post.full_path("en")
 
     delete "/cs-studio/tags/#{tag.id}", as: :turbo_stream

@@ -312,11 +312,37 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
   test "a permalink no block of the page's copy lists is not found" do
     page = create_page(title: "No list yet")
-    create_post(title: "Orphan")
+    post = create_post(title: "Orphan")
     ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
 
+    # The unpublished list block gives the post no address at all.
+    assert_nil PublicSite::Paths.current_path(post.reload, "en")
     get "/no-list-yet/orphan"
+    assert_response :not_found
+  end
 
+  # A list and the addresses it links to agree: both read the post's copy.
+  test "a post whose tag was taken off in the rows keeps its address and the list's link to it until the post is published" do
+    page = listing_page("Ruby posts", tag: "ruby")
+    post = create_post(title: "About Ruby", tags: %w[ruby])
+    publish_changes(page)
+    assert_equal "/ruby-posts/about-ruby", path_of(post)
+
+    assert Posts::Save.call(post, attributes: { tag_names: [] }).ok?
+
+    assert_equal "/ruby-posts/about-ruby", path_of(post.reload), "the address follows the post's published tags"
+    get path_of(page)
+    assert_select ".content-block--post-list a[href='/ruby-posts/about-ruby']", text: "About Ruby"
+    get "/ruby-posts/about-ruby"
+    assert_response :success
+    assert_select "h1", text: "About Ruby"
+
+    publish_changes(post)
+
+    assert_nil path_of(post.reload)
+    get path_of(page)
+    assert_select ".content-block--post-list a", text: "About Ruby", count: 0
+    get "/ruby-posts/about-ruby"
     assert_response :not_found
   end
 

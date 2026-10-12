@@ -117,6 +117,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_a, tag: "a")
     only_a = create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_operator for_b.position, :<, for_a.position
     assert_equal "/a-posts/only-a", only_a.full_path("en")
     assert_equal :found, resolve("/a-posts/only-a").status
@@ -142,6 +143,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_b, tag: "b")
     create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/b-posts/only-b", only_b.full_path("en")
 
     assert Tags::Merge.call(tag("a"), into: tag("b")).ok?
@@ -158,6 +160,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_a, tag: "a")
     create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_nil only_b.full_path("en")
     assert_equal :not_found, resolve("/a-posts/only-b").status
 
@@ -215,6 +218,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_b, tag: "b")
     only_a = create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/a-posts/only-a", only_a.full_path("en")
     assert_equal "/b-posts/only-b", only_b.full_path("en")
 
@@ -231,6 +235,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(listing, tag: "b")
     only_a = create_post(title: "Only A", tags: [ "a" ])
     Tag.create!(name: "b")
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_nil only_a.full_path("en")
 
     assert Tags::Merge.call(tag("a"), into: tag("b")).ok?

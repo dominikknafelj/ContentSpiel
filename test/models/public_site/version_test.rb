@@ -73,6 +73,7 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
   test "a draft post that a live listing gives an address still stays" do
     listing = create_page(title: "Blog")
     block_on(listing, block_type: "post_list", settings: { "content_type" => "blog" })
+    publish_changes(listing)
 
     post = nil
     assert_stays("a draft post getting its address") { post = create_post(title: "Listed draft", published: false) }
@@ -311,6 +312,7 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
   test "a sync called with no transaction open writes the rows before it moves the counter" do
     listing = create_page(title: "Blog")
     block_on(listing, block_type: "post_list", settings: { "content_type" => "blog" })
+    publish_changes(listing)
     post = create_post(title: "Hello")
     post.update_columns(slug: { "en" => "renamed" }) # around the callbacks, so the sync below is the only writer of its address
     assert_empty ActiveRecord.all_open_transactions, "the case needs no joinable transaction open"
@@ -328,9 +330,12 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
   # The same order for the callers that sync after their own commit.
   test "a tag service's sync after its commit moves a live post, rows before the counter" do
     post = tagged_post_with_listing("old")
-    assert_equal "/listing-old/tagged-old", post.full_path("en")
     other = create_page(title: "Everything")
     block_on(other, block_type: "post_list", settings: { "content_type" => "blog" })
+    # Judged by their rows, where a tag's rename moves an address at once
+    # (with their copies it moves none until they are published again).
+    follow_rows!
+    assert_equal "/listing-old/tagged-old", post.full_path("en")
 
     before = counter
     statements = capture_sql { ok(Tags::Rename.call(tag_named("old"), name: "new")) }
@@ -345,6 +350,9 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     listing = create_page(title: "Tagged")
     block_on(listing, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "news" })
     tag = Tag.create!(name: "news")
+    # A live post with no copy is judged by its rows' tags; one that has a
+    # copy by the copy's, and a join row then moves nothing.
+    follow_rows!
     assert_nil post.full_path("en")
 
     statements = capture_sql { post.tags << tag }
@@ -363,6 +371,7 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     ok(Pages::Save.call(listing, attributes: { published_at: 1.hour.from_now }))
     # The live listing wins while the other is only scheduled.
     block_on(fallback, block_type: "post_list", settings: { "content_type" => "blog" })
+    publish_changes(fallback)
     assert_equal "/archive/hello", post.full_path("en")
 
     travel_to 2.hours.from_now do

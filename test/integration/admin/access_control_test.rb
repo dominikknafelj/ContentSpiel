@@ -384,6 +384,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   test "previewing a readable post listed on an unreadable page is not found (I2)" do
     blog = create_page(title: "Blog")
     ContentBlocks::Save.call(blog.content_blocks.new, attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    publish_changes(blog)
     Posts::Save.call(@other_post, attributes: { published: true })
     grant_branch("pages.read")
     AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})

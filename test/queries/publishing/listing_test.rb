@@ -141,4 +141,30 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     assert_empty Publishing::Listing.posts(block)
     assert_equal %w[Later], titles(Publishing::Listing.posts(block, now: 2.hours.from_now))
   end
+
+  test "blocks is every list block of the site as published: a copied page's from its copy, another's from its rows, none of a trashed page" do
+    copied = create_page(title: "Copied", published: false)
+    list_block(copied, content_type: "blog")
+    assert Pages::Save.call(copied, attributes: { published: true }).ok?
+    list_block(copied, content_type: "resume_entry") # in the rows only
+    draft = create_page(title: "Draft", published: false)
+    list_block(draft, content_type: "now_update")
+    trashed = create_page(title: "Trashed", published: false)
+    list_block(trashed, content_type: "blog")
+    assert Trash::Move.call(trashed).ok?
+
+    blocks = Publishing::Listing.blocks
+
+    assert_equal [ [ copied.id, "blog" ], [ draft.id, "now_update" ] ], blocks.map { |block| [ block.owner.id, block.settings_object.content_type ] }.sort
+    assert blocks.none? { |block| block.owner.readonly? }, "the owner is the page's row"
+    assert_equal [ copied.id ], Publishing::Listing.blocks(page_ids: [ copied.id ]).map { |block| block.owner.id }
+  end
+
+  test "blocks loads the copies that list posts and no other, in the same statements for 2 pages as for 8" do
+    2.times { |index| create_page(title: "Plain #{index}") }
+    few = capture_sql { Publishing::Listing.blocks }.size
+    6.times { |index| create_page(title: "More #{index}") }
+
+    assert_equal few, capture_sql { Publishing::Listing.blocks }.size
+  end
 end

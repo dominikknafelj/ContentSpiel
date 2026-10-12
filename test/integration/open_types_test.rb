@@ -31,6 +31,7 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
       listing = create_page(title: "Events")
       block_result = ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "test/event" } })
       assert block_result.ok?, block_result.errors.to_sentence
+      publish_changes(listing)
 
       ok = Posts::Save.call(attributes: { content_type: "test/event", published: true, fields: { venue: "Hall", speakers: [ { name: "Ada" } ] } },
         translations: { "en" => { title: "Launch" } })

@@ -142,10 +142,12 @@ module PublicSite
     # `ContentBlock#listed_posts` warns against.
     #
     # A batch at a time, each in a fixed number of statements: the posts and
-    # their tags (`includes(:tags)`, which `ContentBlock#lists?`'s tag check
-    # reads for every listing block), `canonical_pages` for the whole batch
-    # at once, those pages' current paths, the posts' stored rows, and then
-    # the writes for whatever differs.
+    # their tags (`includes(:tags)`, which the tag check of `Publishing
+    # ::Listing.lists?` reads for a post that is judged by its rows; one with
+    # a published copy is judged by the copy's, read for the whole batch in
+    # one statement), `canonical_pages` for the whole batch at once, those
+    # pages' current paths, the posts' stored rows, and then the writes for
+    # whatever differs.
     def sync_posts(content_type)
       scope = content_type ? Post.where(content_type: content_type) : Post.all
       scope.includes(:tags).find_in_batches { |posts| write_all(post_paths(posts)) }
@@ -165,6 +167,20 @@ module PublicSite
 
       subtree_ids = Page.hierarchy_class.where(ancestor_id: pages.map(&:id)).select(:descendant_id)
       types = ContentBlock.listing.where(owner_type: Page.polymorphic_name, owner_id: subtree_ids).map { |block| block.settings_object.content_type }
+      # And the types these pages' current COPIES list (drafts spec §5): a
+      # published page lists what its copy lists, not what its rows do
+      # (`canonical_pages`), so the posts to re-derive are the copies'. Both
+      # are taken, for every page of the subtrees whatever its state, and not
+      # `Publishing::Listing.blocks` (what is listed NOW): this is called from
+      # the save that just changed the state, and the posts to look at are
+      # the ones listed until a moment ago as much as the ones listed from now
+      # on. Unpublishing a page moves its listing from the copy to the rows,
+      # publishing it again moves it back (to the older copy, until
+      # the copy taken by that save is announced: `published`), and a
+      # trashed page lists nothing while its posts must be given to another.
+      # Too many types is a sync that finds nothing to write; one too few is
+      # a post left at an address nothing lists.
+      types += Publishing::Listing.copied_types(page_ids: subtree_ids)
       types.include?(nil) ? sync_posts(nil) : types.uniq.each { |type| sync_posts(type) }
     end
 
@@ -188,8 +204,68 @@ module PublicSite
     # `since` with no run in between (the job only runs where Solid Queue is
     # the adapter) is caught by the next sync that reaches its posts, or by
     # `rebuild!`.
+    #
+    # The same clock moves a second thing: a published copy taken with a time
+    # ("Publish changes" at a time) comes into force when that time passes,
+    # and with it the list blocks and tags addresses are derived from:
+    # `sync_copies_went_live`, over the same window.
     def sync_went_live(since:, now: Time.current)
       sync_posts_listed_under(Page.kept.where(Page.arel_table[:published_at].gt(since)).where(published_at: ..now).to_a)
+      sync_copies_went_live(since: since, now: now)
+    end
+
+    # A copy of `record` has come into force (`version`; `previous` is the
+    # copy it follows, or nil): re-derive what it can change (drafts spec §5).
+    # Called by `take!` of `Publishing::Version` for a copy in force at once,
+    # inside its transaction, and by the sweep below for one whose time has
+    # come. Nothing else announces a copy: a list block or a tag written in
+    # the rows of a published record is not an input of any address until
+    # then (`canonical_pages`), which is why a block's own sync
+    # (`ContentBlock#sync_listed_post_paths`) and a tag's (`PostTag`) find
+    # nothing to move for such a record.
+    #
+    # A post: its own address (its published tags decide which list holds
+    # it). A page: the posts of every content type its list blocks name, in
+    # this copy and in the one before, since a type the older copy listed and
+    # this one does not is exactly a post that has to leave; a block with no
+    # type lists every type, so every post. A page neither of whose copies
+    # lists posts changes no address.
+    #
+    # In a save that publishes (`Pages::Save`, `Posts::Save`), the record's
+    # own `after_save` sync ran BEFORE the copy was taken: for a first
+    # publication it read the rows (there was no copy), and for a publication
+    # after an unpublish the older copy, which was in force again from the
+    # moment `published_at` was set. This call is what corrects that second
+    # case with the new copy.
+    def published(record, version, previous)
+      return sync(record) if record.is_a?(Post)
+      return unless version.lists_posts || previous&.lists_posts
+
+      types = [ version, previous ].compact.flat_map { |copy| Publishing::Listing.types_of(copy) }
+      types.include?(nil) ? sync_posts(nil) : types.uniq.each { |type| sync_posts(type) }
+    end
+
+    # `published` for the copies no write announces: every copy that was
+    # taken with a time of its own (`live_at` after `created_at`; a copy in
+    # force at once was announced by `take!`, and has the two equal) and
+    # whose time is in `(since, now]`. Each is compared with the copy before
+    # it, by number.
+    #
+    # Idempotent and unmarked like the sweep above, and for the same reason:
+    # a copy swept before finds nothing to write. A run in which no copy came
+    # into force reads `published_versions` once and nothing else. A trashed
+    # record's copy is skipped: it has no address and its blocks are no
+    # candidates, and restoring it re-derives both from the copy then in
+    # force.
+    def sync_copies_went_live(since:, now: Time.current)
+      versions = Publishing::Version.arel_table
+      came = Publishing::Version.where(versions[:live_at].gt(since)).where(live_at: ..now)
+        .where(versions[:live_at].gt(versions[:created_at])).includes(:record).order(:id)
+      came.each do |version|
+        next if version.record.nil? || version.record.trashed?
+
+        published(version.record, version, Publishing::Version.of(version.record).where(versions[:number].lt(version.number)).order(number: :desc).first)
+      end
     end
 
     # Bumps the public content version whatever it finds: this is the repair
@@ -309,7 +385,9 @@ module PublicSite
     #    teaser (unfiltered, and on the root, which always comes first in tree
     #    order) from taking every post's URL away from /blog. (A block that
     #    names a *different* type or a tag the post lacks isn't a candidate at
-    #    all -- `lists?` already said no.)
+    #    all -- `lists?` already said no.) Which blocks there are and which
+    #    tags the post carries are both read AS PUBLISHED: see
+    #    `canonical_pages`.
     #
     # 3. tree order -- depth-first by sibling position, as the tiebreak. That
     #    is the page whose own position, then its parent's, and so on up to
@@ -328,27 +406,51 @@ module PublicSite
     #
     # Every post_list block is checked, not just the ones on already-synced
     # pages: this is also what a block's own save/destroy calls (via
-    # `sync_posts`), where nothing about the page tree changed at all.
+    # `sync_posts`), where nothing about the page tree changed at all. (On a
+    # published page that has a copy that call now finds nothing to move:
+    # the block is no candidate until the page's changes are published.)
     def canonical_page(post) = canonical_pages([ post ]).fetch(post)
 
     # `canonical_page` for several posts in ONE pass: `{ post => page or nil }`.
-    # The listing blocks, their owners and every candidate's ancestry are loaded
-    # once (a constant number of queries however many posts, blocks or pages
-    # there are), then each post is ranked among the blocks that list it. The
+    # The listing blocks, their owners, every candidate's ancestry, the tags
+    # the blocks filter by and the posts' published copies are loaded once (a
+    # constant number of queries however many posts, blocks or pages there
+    # are), then each post is ranked among the blocks that list it. The
     # New post dialog asks for every creatable type's listing page at once.
     def canonical_pages(posts)
-      # `ContentBlock.listing` is every block whose type has the
-      # `lists_posts` capability -- only a `Page` owner is a candidate at
-      # all (open-types spec §4.1 lets other records own blocks too, but
-      # none render a listing of their own posts today).
-      # A block on a trashed page isn't a candidate either (trash spec §5.2):
-      # its posts move to the next-best listing, or lose their URL, and
-      # come back here when the page is restored.
-      candidates = ContentBlock.listing.includes(:owner).select { |block| block.owner.is_a?(Page) && !block.owner.trashed? }
+      # The list blocks AS PUBLISHED (`Publishing::Listing.blocks`, drafts
+      # spec §5): a published or scheduled page that has a copy lists what
+      # its current copy lists, so a list block changed, added or deleted in
+      # its rows moves no address until the page is published -- the public
+      # list is drawn from that same copy, and a post in it must open. Every
+      # other page (a draft, a page written around the services) lists what
+      # its rows do, as before.
+      #
+      # Every block whose type has the `lists_posts` capability -- only a
+      # `Page` owner is a candidate at all (open-types spec §4.1 lets other
+      # records own blocks too, but none render a listing of their own posts
+      # today). A block on a trashed page isn't a candidate either (trash spec
+      # §5.2): its posts move to the next-best listing, or lose their URL,
+      # and come back here when the page is restored.
+      #
+      # Each block's `owner` is the page's ROW, read now, whichever of the
+      # two its blocks came from: publication, the tree and the trash are
+      # immediate (they are not in a copy), and they are what the ranking
+      # below reads -- and the row is what this method answers.
+      candidates = Publishing::Listing.blocks
       chains = ancestry_chains(candidates.map(&:owner).uniq)
+      # The tag each filtered block names, by id, found once for all of them.
+      tags = Publishing::Listing.filter_tags(candidates)
+      # Each post is judged by its tags as published, for the same reason: a
+      # published post that has a copy by the copy's tags, any other (a
+      # draft, an unsaved one, one written around the services) by its rows'.
+      # Only the tags: the post's type, slug, publication and trash state are
+      # read from `post` itself by everything else here.
+      views = posts.zip(Publishing.published_all(posts)).each_with_object({}.compare_by_identity) { |(post, view), all| all[post] = view }
 
       posts.index_with do |post|
-        best = candidates.select { |block| block.lists?(post) }.min_by do |block|
+        view = views.fetch(post)
+        best = candidates.select { |block| Publishing::Listing.lists?(block, view, tags: tags) }.min_by do |block|
           chain = chains.fetch(block.owner.id, [])
           settings = block.settings_object
           [

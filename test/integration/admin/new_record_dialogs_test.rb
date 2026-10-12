@@ -312,6 +312,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_select "input[value=blog][data-path]", count: 0
 
     ContentBlock.create!(owner: @services, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    publish_changes(@services)
     get "/cs-studio/posts/new", headers: { "Turbo-Frame" => "new-post-form-frame" }
     assert_select "input[value=blog][data-path='/services']"
     assert_select "p[data-admin--editor--new-record-target=url]", text: "URL: /services/"

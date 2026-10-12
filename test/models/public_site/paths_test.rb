@@ -430,6 +430,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
   test "canonical_pages ranks a listing page that has no closure rows like a page with an empty ancestry, never raising" do
     blog = create_page(title: "Blog")
     ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    publish_changes(blog)
     post = create_post(title: "Hello")
     PageHierarchy.where(descendant_id: blog.id).delete_all
 
@@ -440,6 +441,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
   test "canonical_pages answers every post at once" do
     blog = create_page(title: "Blog")
     ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    publish_changes(blog)
     listed = create_post(title: "Listed")
     other = Post.new(content_type: "now_update")
 
@@ -530,6 +532,12 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       news_block = service_listing(news, content_type: "now_update")
       service_listing(drafts, content_type: "resume_entry")
       assert_parity "adding listing blocks"
+      # The four live pages were published before their list blocks were
+      # added, so their copies list nothing yet (the homepage of this file is
+      # written around the services and has no copy: its rows are read, as
+      # are the draft's).
+      [ blog, journal, archive, news ].each { |page| publish_changes(page) }
+      assert_parity "publishing the list blocks added to live pages"
 
       hello = service_post("Hello")
       second = service_post("Second")
@@ -643,10 +651,15 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_parity "an excerpt-only post save and a bare touch"
 
       ok! Posts::Save.call(second.reload, attributes: { tag_names: %w[old] })
+      assert_equal "/writing/blog/second", current(second), "a live post's tag moves nothing until the post is published"
+      assert_parity "adding a tag to a live post's rows"
+      publish_changes(second)
       assert_equal "/archive/second", current(second), "a tag-filtered listing is more specific"
       assert_parity "adding a tag that changes a post's listing page"
 
       ok! Posts::Save.call(second.reload, attributes: { tag_names: [] })
+      assert_parity "removing that tag from the rows"
+      publish_changes(second)
       assert_equal "/writing/blog/second", current(second)
       assert_parity "removing that tag"
 
@@ -659,11 +672,58 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
       # -- listing blocks ------------------------------------------------------
       ok! ContentBlocks::Save.call(news_block.reload, attributes: { settings: { content_type: "blog" } })
+      assert_equal "/news/second", current(second), "a live page's list block moves nothing until the page is published"
+      assert_parity "changing a live page's listing block in its rows"
+      publish_changes(news)
       assert_equal "/second", current(second), "only the homepage teaser lists it"
       assert_parity "changing a listing block's content type"
 
       ok! ContentBlocks::Save.call(news_block.reload, attributes: { settings: { content_type: "now_update" } })
+      publish_changes(news)
+      assert_equal "/news/second", current(second)
       assert_parity "changing it back"
+
+      # A page unpublished, its list block changed, and published again: its
+      # own sync runs before the new copy is taken and reads the older copy,
+      # which is in force again from the moment the page has a time, and the
+      # copy's announcement corrects it (`PublicSite::Paths.published`).
+      ok! Pages::Save.call(archive.reload, attributes: { published: false })
+      assert_equal "/writing/blog/old", current(old), "a draft listing loses to a live one"
+      assert_parity "unpublishing a page whose copy lists posts"
+      ok! ContentBlocks::Save.call(archive_block.reload, attributes: { settings: { content_type: "now_update", tag: "" } })
+      assert_parity "changing a draft page's listing block, read from its rows at once"
+      ok! Pages::Save.call(archive.reload, attributes: { published: true })
+      assert_equal "/archive/now", current(update), "the new copy lists the other type, and Archive comes before News"
+      assert_equal "/writing/blog/old", current(old), "and no longer the type the older copy listed"
+      assert_parity "publishing again a page whose listing block changed while it was unpublished"
+      ok! ContentBlocks::Save.call(archive_block.reload, attributes: { settings: { content_type: "blog", tag: "old" } })
+      publish_changes(archive)
+      assert_equal [ "/news/now", "/archive/old" ], [ current(update), current(old) ]
+      assert_parity "putting that listing block back"
+
+      # A live page whose rows list another type than its copy does. The
+      # posts it holds are the copy's while it is live, the rows' while it is
+      # a draft and nobody's while it is in the trash, so each of those
+      # writes has to look at the posts of the type only the COPY names.
+      ok! ContentBlocks::Save.call(news_block.reload, attributes: { settings: { content_type: "resume_entry" } })
+      assert_equal "/news/now", current(update)
+      assert_parity "changing a live page's listing block to a type its copy does not list"
+      ok! Trash::Move.call(news.reload)
+      assert_equal "/now", current(update), "only the homepage teaser lists it now"
+      assert_parity "trashing a page whose copy lists a type its rows do not"
+      ok! Trash::Restore.call(news.reload)
+      assert_equal "/news/now", current(update)
+      assert_parity "restoring it"
+      ok! Pages::Save.call(news.reload, attributes: { published: false })
+      assert_equal "/now", current(update), "a draft lists what its rows list"
+      assert_parity "unpublishing a page whose copy lists a type its rows do not"
+      ok! Pages::Save.call(news.reload, attributes: { published: true })
+      assert_equal "/now", current(update), "the copy taken now is the rows"
+      assert_parity "publishing it again"
+      ok! ContentBlocks::Save.call(news_block.reload, attributes: { settings: { content_type: "now_update" } })
+      publish_changes(news)
+      assert_equal "/news/now", current(update)
+      assert_parity "putting its listing block back"
 
       ok! ContentBlocks::Destroy.call(teaser.reload)
       assert_parity "removing a listing block"
@@ -688,21 +748,35 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       ok! ContentBlocks::Duplicate.call(band.reload)
       assert_parity "duplicating a section that holds a listing block"
 
+      publish_changes(news)
+      assert_parity "publishing a page whose listing blocks were copied and moved into a section"
+
       # -- tags ----------------------------------------------------------------
       ok! Tags::Rename.call(Tag.find_by!(name: "old"), name: "vintage")
+      assert_equal "/archive/old", current(old), "the page's copy and the post's both hold the tag's id: a rename moves nothing"
+      assert_parity "renaming a tag both copies hold"
+      # Published again, the page's copy names a tag nobody has.
+      publish_changes(archive)
       assert_equal "/writing/blog/old", current(old), "the block still names the old tag, so the post falls out of it"
       assert_parity "renaming a tag"
 
       ok! ContentBlocks::Save.call(archive_block.reload, attributes: { settings: { content_type: "blog", tag: "vintage" } })
+      publish_changes(archive)
       assert_equal "/archive/old", current(old)
       assert_parity "changing a listing block's tag"
 
       ok! Posts::Save.call(hello.reload, attributes: { tag_names: %w[classic] })
       ok! Tags::Merge.call(Tag.find_by!(name: "classic"), into: Tag.find_by!(name: "vintage"))
+      assert_equal "/writing/blog/hello", current(hello), "the post's copy carries neither tag yet"
+      assert_parity "merging a tag a live post carries in its rows only"
+      publish_changes(hello)
       assert_equal "/archive/hello", current(hello)
       assert_parity "merging a tag into a listed one"
 
       ok! Tags::Destroy.call(Tag.find_by!(name: "vintage"))
+      assert_equal "/archive/hello", current(hello), "both copies still hold the deleted tag's id, and the public list still shows the post"
+      assert_parity "deleting a tag both copies hold"
+      publish_changes(hello)
       assert_equal "/writing/blog/hello", current(hello)
       assert_parity "deleting a tag"
 
@@ -745,16 +819,19 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
       listing = ok! ContentBlocks::Save.call(ContentBlock.new(owner: blog),
         attributes: { block_type: "post_list", settings: { "content_type" => "blog" }, section_id: section.id, section_column: 3 })
+      publish_changes(blog)
       assert_equal "/blog/hello", current(post)
       assert_parity "creating a listing block in a column"
 
       ok! ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one" } })
       assert_equal [ section.id, 1 ], listing.reload.then { |block| [ block.section_id, block.section_column ] }
+      publish_changes(blog)
       assert_equal "/blog/hello", current(post)
       assert_parity "folding the section's columns"
 
       ok! ContentBlocks::Destroy.call(section.reload)
       assert_not ContentBlock.exists?(listing.id)
+      publish_changes(blog)
       assert_nil current(post)
       assert_parity "deleting the section with its blocks"
     end
@@ -862,5 +939,161 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     PublicSite::Paths.sync_went_live(since: 24.hours.ago)
 
     assert_equal "/section/fresh/hello", current(post)
+  end
+
+  # -- addresses follow the published copy (drafts spec §5, Task 4) -------------
+  #
+  # A list block is part of its PAGE's copy and a post's tags of the POST's:
+  # for a published or scheduled record that has a copy, an address is derived
+  # from the copy, so it moves when the record's changes are published and
+  # not when they are typed. The pages and posts here are built through the
+  # services, which take the copies; the tests above build theirs around them
+  # (`Page.create!`), have no copy, and follow the rows as before.
+
+  test "changing a live page's list block to another type moves no address until the page is published" do
+    page = create_page(title: "Blog", published: false)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Hello")
+    address = PublicSite::Paths.current_path(post, "en")
+    assert address
+
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "content_type" => "resume_entry" } }).ok?
+    assert_equal address, PublicSite::Paths.current_path(post, "en")
+    assert ContentBlocks::Destroy.call(block.reload).ok?
+    assert_equal address, PublicSite::Paths.current_path(post, "en")
+
+    publish_changes(page)
+    assert_nil PublicSite::Paths.current_path(post, "en")
+  end
+
+  test "a list block added to a live page gives no post an address until the page is published" do
+    page = create_page(title: "Blog")
+    post = create_post(title: "Hello")
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert_nil PublicSite::Paths.current_path(post, "en")
+
+    publish_changes(page)
+
+    assert PublicSite::Paths.current_path(post, "en")
+  end
+
+  test "a tag changed in a live post's rows moves it to another listing only when the post is published" do
+    ruby = create_page(title: "Ruby", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: ruby), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "ruby" } })
+    rails = create_page(title: "Rails", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: rails), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "rails" } })
+    post = create_post(title: "Hello", tags: %w[ruby], published: false)
+    Tag.create!(name: "rails")
+    [ ruby, rails ].each { |page| assert Pages::Save.call(page, attributes: { published: true }).ok? }
+    assert Posts::Save.call(post, attributes: { published: true }).ok?
+    assert_equal ruby, PublicSite::Paths.canonical_page(post)
+
+    assert Posts::Save.call(post, attributes: { tag_names: %w[rails] }).ok?
+    assert_equal ruby, PublicSite::Paths.canonical_page(post.reload)
+
+    publish_changes(post)
+    assert_equal rails, PublicSite::Paths.canonical_page(post.reload)
+    assert_includes PublicSite::Paths.current_path(post, "en"), "rails"
+  end
+
+  test "a draft page and a draft post are listed by their rows, as before" do
+    page = create_page(title: "Draft listing", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    post = create_post(title: "Draft post", published: false)
+
+    assert_equal page, PublicSite::Paths.canonical_page(post)
+  end
+
+  test "canonical_pages answers rows, never a page rebuilt from a copy" do
+    page = create_page(title: "Blog", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Hello")
+
+    answer = PublicSite::Paths.canonical_page(post)
+
+    assert_equal page, answer
+    assert_not answer.readonly?
+    assert_nil answer.published_version
+  end
+
+  test "a scheduled change to a list block moves the addresses when the sweep runs after its time, and not before" do
+    page = create_page(title: "Blog", published: false)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Hello")
+    assert ContentBlocks::Destroy.call(block).ok?
+    publish_changes(page, at: 2.days.from_now)
+
+    PublicSite::Paths.sync_went_live(since: 1.day.ago)
+    assert PublicSite::Paths.current_path(post, "en"), "moved before its time"
+
+    travel_to 3.days.from_now do
+      # Two days back, not one: the copy's time was read a moment before
+      # this block's clock, so a window of exactly one day would begin a
+      # few milliseconds after it.
+      PublicSite::Paths.sync_went_live(since: 2.days.ago)
+      assert_nil PublicSite::Paths.current_path(post, "en")
+    end
+  end
+
+  test "a scheduled change to a post's tags moves its address when the sweep runs after its time, once, and a copy in force at once is not swept" do
+    ruby = create_page(title: "Ruby", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: ruby), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "ruby" } })
+    assert Pages::Save.call(ruby, attributes: { published: true }).ok?
+    post = create_post(title: "Hello", tags: %w[ruby])
+    assert_equal "/ruby/hello", current(post)
+
+    sql = capture_sql { PublicSite::Paths.sync_copies_went_live(since: 1.day.ago) }
+    assert_empty sql.grep(/"posts"|"public_paths"/), "copies in force from the moment they were taken were swept:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
+
+    assert Posts::Save.call(post, attributes: { tag_names: [] }).ok?
+    publish_changes(post, at: 2.days.from_now)
+    assert_equal "/ruby/hello", current(post), "a copy with a time changes nothing yet"
+
+    travel_to 3.days.from_now do
+      PublicSite::Paths.sync_went_live(since: 2.days.ago)
+      assert_nil current(post)
+
+      sql = capture_sql { PublicSite::Paths.sync_went_live(since: 2.days.ago) }
+      assert_empty writes_to_public_paths(sql), "a second run wrote:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
+    end
+  end
+
+  test "a copy that came into force before the window, and one of a trashed page, are not swept" do
+    page = create_page(title: "Blog", published: false)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    post = create_post(title: "Hello")
+    assert ContentBlocks::Destroy.call(block).ok?
+    publish_changes(page, at: 1.hour.from_now)
+
+    travel_to 3.days.from_now do
+      PublicSite::Paths.sync_went_live(since: 1.day.ago)
+      assert_equal "/blog/hello", current(post), "outside the window: the next sync that reaches the post, or a rebuild, moves it"
+    end
+
+    travel_to 2.hours.from_now do
+      page.update_columns(trashed_at: Time.current) # version: none (a test puts a page in the trash around its sync)
+      sql = capture_sql { PublicSite::Paths.sync_copies_went_live(since: 1.day.ago) }
+      assert_empty sql.grep(/"posts"|"public_paths"/)
+    end
+  end
+
+  test "syncing every post against tag-filtered listings, rows and copies, costs the same number of statements for 5 posts as for 50" do
+    listing(@root, "By rows", "blog", tag: "rows")
+    copied = create_page(title: "By copy", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: copied), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "copy" } })
+    assert Pages::Save.call(copied, attributes: { published: true }).ok?
+    5.times { |index| create_post(title: "Post #{index}", tags: [ index.even? ? "rows" : "copy" ]) }
+    PublicPath.where(record_type: "Post").delete_all
+    few = capture_sql { PublicSite::Paths.sync_posts("blog") }
+    45.times { |index| create_post(title: "More #{index}", tags: [ index.even? ? "rows" : "copy" ]) }
+    PublicPath.where(record_type: "Post").delete_all
+    many = capture_sql { PublicSite::Paths.sync_posts("blog") }
+
+    assert_equal 50 * Locales.enabled.size, PublicPath.current.where(record_type: "Post").count
+    assert_equal few.size, many.size, "the statements grew with the posts:\n#{many.map { |sql| sql.first(160) }.join("\n")}"
   end
 end

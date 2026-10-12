@@ -117,6 +117,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
   test "the path under the title is the post's public path, or Not listed" do
     blog = create_page(title: "Blog")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(blog)
     create_post(title: "Listed one")
     create_post(title: "Unlisted one", content_type: "resume_entry")
     get "/cs-studio/posts"

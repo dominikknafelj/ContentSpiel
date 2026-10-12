@@ -98,6 +98,33 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Copied post"
   end
 
+  # The addresses read list blocks as published (`Publishing::Listing.blocks`):
+  # a trashed page's copy still lists posts, and must give none an address.
+  test "a trashed page's published copy lists nothing for an address: its list blocks are no candidates, and its posts go to the next listing" do
+    first = create_page(title: "First listing", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: first), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } })
+    assert Pages::Save.call(first, attributes: { published: true }).ok?
+    second = create_page(title: "Second listing", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: second), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } })
+    assert Pages::Save.call(second, attributes: { published: true }).ok?
+    post = create_post(title: "Update", content_type: "now_update")
+    assert_equal "/first-listing/update", PublicSite::Paths.current_path(post, "en")
+    assert Publishing.current(first).lists_posts
+
+    assert Trash::Move.call(first).ok?
+
+    assert_not_includes Publishing::Listing.blocks.map { |block| block.owner.id }, first.id
+    assert_equal second, PublicSite::Paths.canonical_page(post.reload)
+    assert_equal "/second-listing/update", PublicSite::Paths.current_path(post, "en")
+    get "/first-listing/update"
+    assert_redirected_to "/second-listing/update"
+
+    # Restored (to the end of its siblings, so the other listing stays the
+    # post's), its copy's list block is a candidate again.
+    assert Trash::Restore.call(first.reload).ok?
+    assert_includes Publishing::Listing.blocks.map { |block| block.owner.id }, first.id
+  end
+
   test "a page's list of subpages leaves out a trashed subpage, publicly and in preview" do
     kept_child = create_page(title: "Kept child", parent: @kept_page)
     gone_child = create_page(title: "Gone child", parent: @kept_page)

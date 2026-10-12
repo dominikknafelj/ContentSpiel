@@ -218,6 +218,12 @@ class ContentBlock < ApplicationRecord
     name.present? ? Tag.named(name).order(:id).pick(:id) : nil
   end
 
+  # The id a published copy recorded for this block's filter, and nothing
+  # else: nil for a row (which records nothing), and nil for a copy taken
+  # when no tag had that name. Never a query: `Publishing::Listing` decides
+  # from it whether the name has to be looked up.
+  def recorded_tag_id = @listed_tag_id
+
   private
 
   # "Live" is the owner's own publication (`Publishable#live?`), as it stands
