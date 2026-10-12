@@ -136,8 +136,8 @@ module Admin
       # Why a record that is readable cannot be changed -- one whole string per
       # case. The editing right is there but the record is published (or
       # scheduled) and the viewer cannot publish: `can_edit?`'s own rule
-      # ("editing a published record needs publish too", the interim rule
-      # until revisions exist).
+      # ("editing a published record needs publish too": the person who may
+      # change it is the person who may publish it, drafts spec D5).
       def view_only_hint
         hint = "You can view this #{type} but not change it."
         return hint unless can?("#{type}s.edit", record) && record.published_at.present?

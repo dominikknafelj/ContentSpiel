@@ -63,7 +63,7 @@ module Publishable
   # cheap read every list makes, a column and no comparison. A draft has no
   # unpublished changes, whatever mark it kept from before. It is
   # `Publishing::State#changes?`, asked of the record
-  # (`test/models/publishing/state_test.rb` holds that the two agree); the
+  # (`test/values/publishing/state_test.rb` holds that the two agree); the
   # scope below is the same fact in SQL.
   def unpublished_changes? = Publishing::State.of(self).changes?
 

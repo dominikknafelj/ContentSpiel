@@ -30,9 +30,10 @@ module AccessControlHelper
 
   # May the actor change this post's or page's content right now -- the
   # editor's fields, its blocks, autosave? `edit`, plus `publish` when the
-  # record is published (live or scheduled): the interim rule the services
-  # enforce (design spec §3.3, `Pages::Save`/`Posts::Save`), since autosave
-  # writes straight to live content. A readable record this says no to is
+  # record is published (live or scheduled): the rule the services
+  # enforce (design spec §3.3, `Pages::Save`/`Posts::Save`), because the
+  # person who may change a published record is the person who may publish
+  # it (drafts spec D5; a save is not a publication). A readable record this says no to is
   # rendered "View only" (§5).
   def can_edit?(record)
     prefix = permission_prefix(record)

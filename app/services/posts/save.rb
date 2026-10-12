@@ -7,12 +7,13 @@ module Posts
   #
   # 1. Before anything is assigned, against the post as stored: `posts.edit`
   #    to touch an existing post at all, plus `posts.publish` when it's
-  #    already published (live or scheduled). The second is the spec §8
-  #    interim rule: autosave writes live content straight to the public
-  #    site (there are no pending revisions until Phase 3), so editing a
-  #    published post *is* publishing, and needs the same right. A
-  #    scheduled post counts too -- it will go live with whatever it says
-  #    by then, without anyone with `publish` having seen it. A call that
+  #    already published (live or scheduled). The second is the rule
+  #    that the person who may change a published post is the person who
+  #    may publish it (drafts spec D5): a save writes the rows, which the
+  #    site shows only once "Publish changes" has taken a copy, but nobody
+  #    without `publish` is to prepare what someone else then publishes
+  #    blind. A scheduled post counts too -- it goes live with the copy
+  #    taken when it was scheduled, and later changes wait for a publish. A call that
   #    asks for nothing but a publish-state change needs `posts.publish`
   #    alone instead (`#publish_only?`).
   # 2. After assigning, inside the transaction, against the post as it

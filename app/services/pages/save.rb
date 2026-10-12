@@ -9,8 +9,9 @@ module Pages
   #
   # 1. Before assigning, against the stored page: `pages.edit`, plus
   #    `pages.publish` when it's already published (live or scheduled) --
-  #    the spec §8 interim rule that editing live content needs the right
-  #    to publish it, until pending revisions (Phase 3). A publish-state-
+  #    the rule that editing a published record needs the right to publish
+  #    it (drafts spec D5: the person who may change it is the person who
+  #    may publish it; a save is not a publication). A publish-state-
   #    only call needs `pages.publish` alone (`#publish_only?`).
   # 2. After assigning, inside the transaction: a new page needs
   #    `pages.create` on its *parent's* branch (the checker reads the
