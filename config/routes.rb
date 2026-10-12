@@ -32,9 +32,25 @@ Rails.application.routes.draw do
     # fragment for the palette's turbo-frame, read-only, open to every
     # signed-in user (each row is already narrowed to what they may read).
     get "jump", to: "jump#show", as: :jump
+    # The password reset. The token of the mailed link is in NO address a
+    # server sees: the link is `password/edit#<token>`, a browser keeps what
+    # follows the "#" to itself, and the form sends the token in its body,
+    # where `filter_parameters` masks it (`Admin::PasswordsController`).
+    #
+    # Written out rather than added to the `resource`, which would give the
+    # same two paths under other names (`edit_admin_password`, and
+    # `admin_password` for the PATCH, which is the request form's POST name
+    # already) and a PUT nobody sends.
+    #
+    # `password/:token/edit` is the link as it was mailed before: it answers
+    # with a redirect to the page, without the token (`#legacy`). The old
+    # form's address, PATCH `password/:token`, is gone and has no route. The
+    # token of either never reaches this file: the middleware
+    # `OldResetAddress` has replaced it by then, so that no log line holds it.
     resource :password, only: %i[new create]
-    get "password/:token/edit", to: "passwords#edit", as: :edit_password
-    patch "password/:token", to: "passwords#update", as: :update_password
+    get "password/edit", to: "passwords#edit", as: :edit_password
+    patch "password", to: "passwords#update", as: :update_password
+    get "password/:token/edit", to: "passwords#legacy", as: nil
 
     # The Pages module (cs-studio spec §4.1/§5.1). `member` adds the three
     # publish-state actions the record header's own buttons post to

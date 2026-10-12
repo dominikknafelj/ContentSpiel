@@ -60,8 +60,14 @@ class PasswordsMailer < ApplicationMailer
   #
   # Memoised, so the two parts carry one link: every call of
   # `password_reset_token` signs a new token.
+  #
+  # THE TOKEN IS THE FRAGMENT (`anchor:`), not a segment of the path and not
+  # a parameter: a browser sends what follows the "#" to no server, so the
+  # token is in no request line, no span and no proxy's log. The page's
+  # script moves it into the form, which sends it in its body
+  # (`controllers/reset_token_controller.js`).
   def reset_url
-    @reset_url ||= admin_edit_password_url(@user.password_reset_token, port: nil, **@url_options)
+    @reset_url ||= admin_edit_password_url(port: nil, **@url_options, anchor: @user.password_reset_token)
   end
 
   def link_origin(origin)

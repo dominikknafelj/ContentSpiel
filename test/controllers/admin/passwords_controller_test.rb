@@ -1,6 +1,11 @@
 require "test_helper"
 
 class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
+  # `capture_log(REQUEST_LOGGERS)`: everything a request logs.
+  include LogCapture
+
+  ADMIN = "/#{ContentSpiel::ADMIN_PATH}".freeze
+
   setup { @user = User.take }
 
   test "new" do
@@ -21,7 +26,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   # site name above the heading, and a back link that underlines on hover only.
   test "every state sits directly on the page, with the site name above the heading and an ununderlined back link" do
     [ new_admin_password_path, new_admin_password_path(sent: "1"), new_admin_password_path(expired: "1"),
-      admin_edit_password_path(token: users(:one).password_reset_token) ].each do |path|
+      admin_edit_password_path ].each do |path|
       get path
       assert_select "main div.bg-surface.border", count: 0, message: "no card on #{path}"
       assert_select ".admin-site-name + h1"
@@ -81,12 +86,12 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   test "the mail that create enqueues links to the configured address, and without one to the request's origin" do
     with_site_address("https://docs.example.org") do
       perform_enqueued_jobs { post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" } }
-      assert_match %r{^https://docs\.example\.org/cs-studio/password/}, ActionMailer::Base.deliveries.last.text_part.body.to_s
+      assert_match %r{^https://docs\.example\.org/cs-studio/password/edit#\S+$}, ActionMailer::Base.deliveries.last.text_part.body.to_s
     end
 
     with_site_address(nil) do
       perform_enqueued_jobs { post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "here.example:3010" } }
-      assert_match %r{^http://here\.example:3010/cs-studio/password/}, ActionMailer::Base.deliveries.last.text_part.body.to_s
+      assert_match %r{^http://here\.example:3010/cs-studio/password/edit#\S+$}, ActionMailer::Base.deliveries.last.text_part.body.to_s
     end
   end
 
@@ -122,37 +127,100 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "This link has expired"
   end
 
-  test "an expired or invalid reset link shows the expired state with a way to ask again" do
-    get admin_edit_password_path(token: "not-a-token")
-    follow_redirect! if response.redirect?
+  # The token is not in the address, so the page cannot know whether the
+  # link is good: a bad, used or lapsed one is answered when the form is
+  # sent, not before.
+  test "an expired or invalid reset link shows the expired state with a way to ask again, once the form is sent" do
+    patch admin_update_password_path, params: { token: "not-a-token", password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    assert_redirected_to new_admin_password_path(expired: 1)
+
+    follow_redirect!
     assert_select "h1", text: "This link has expired"
     assert_select "main", text: /Reset links work for 15 minutes and only once\./
     assert_select "a", text: "Send a new link"
   end
 
   test "the reset form uses the password field with the meter" do
-    get admin_edit_password_path(token: users(:one).password_reset_token)
+    get admin_edit_password_path
     assert_select "[data-controller='password-field'] [data-password-field-target=bar]", count: 4
   end
 
-  test "edit" do
-    get admin_edit_password_path(@user.password_reset_token)
+  # THE PAGE AS A SERVER DRAWS IT: no token and no lookup. The form is there
+  # but hidden until the script has moved the token out of the address
+  # (`reset-token`), the "incomplete" message is hidden beside it, and
+  # someone without JavaScript is told that the page needs it.
+  test "edit draws the form hidden and empty of a token, with the script's three targets and a line for no JavaScript" do
+    get admin_edit_password_path
     assert_response :success
+
+    assert_select "main [data-controller='reset-token']" do
+      assert_select "form[hidden][method=post][action='#{ADMIN}/password'][data-reset-token-target=form]", count: 1 do
+        assert_select "input[type=hidden][name=_method][value=patch]"
+        assert_select "input[type=hidden][name=token][data-reset-token-target=token]", count: 1
+        assert_select "input[name=token][value]:not([value=''])", count: 0
+        assert_select "button[type=submit]", text: "Set password"
+      end
+      assert_select "div[hidden][data-reset-token-target=incomplete]", count: 1 do
+        assert_select "p[role=alert]", text: "This link is incomplete. Open the link in the email again, or ask for a new one."
+        assert_select "a[href='#{ADMIN}/password/new']", text: "Send a new link"
+      end
+      assert_select "noscript", text: /Setting a new password needs JavaScript\. Turn it on in your browser and open the link again\./
+    end
   end
 
-  test "edit with invalid password reset token" do
-    get admin_edit_password_path("invalid token")
-    assert_redirected_to new_admin_password_path(expired: 1)
+  test "edit reads no user: the page is the same with no account at all behind it" do
+    statements = capture_sql { get admin_edit_password_path }
 
-    follow_redirect!
-    assert_notice "This link has expired"
+    assert_response :success
+    assert_empty statements.grep(/"users"/)
+  end
+
+  test "edit ignores a token handed to it as a parameter: it reaches neither the form nor a redirect" do
+    token = @user.password_reset_token
+    get admin_edit_password_path(token: token)
+
+    assert_response :success
+    assert_not_includes response.body, token
+  end
+
+  # THE OLD ADDRESS, which mails sent before this change still carry for
+  # their fifteen minutes: answered, with a redirect that names no token (a
+  # server cannot hand a browser a fragment it was never sent, and must not
+  # repeat the token in another address). The page then says the link is
+  # incomplete.
+  test "the old address redirects to the page with no token in the Location, whatever stood in its place" do
+    [ @user.password_reset_token, "not-a-token", "edit", "new" ].each do |word|
+      get "#{ADMIN}/password/#{word}/edit?from=mail"
+
+      assert_response :found
+      assert_equal "http://www.example.com#{ADMIN}/password/edit", response.location, word
+      assert_not_includes response.body, word unless %w[edit new].include?(word)
+    end
+  end
+
+  # The old PATCH is gone, and is nobody's address any more: the same
+  # not-found as any other address CS Studio does not have, for someone
+  # signed in and for someone who is not, and no password changes.
+  test "the old address of the form answers nothing: it is not found like any unknown address, and changes no password" do
+    token = @user.password_reset_token
+
+    assert_no_changes -> { @user.reload.password_digest } do
+      patch "#{ADMIN}/password/#{token}", params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    end
+    unknown = [ response.status, response.location ]
+    patch "#{ADMIN}/no-such-address-here"
+
+    assert_equal [ response.status, response.location ], unknown
+    assert_not_includes response.location.to_s, token
+    assert_not_includes response.body, token
   end
 
   test "update" do
     assert_changes -> { @user.reload.password_digest } do
-      patch admin_update_password_path(@user.password_reset_token), params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+      patch admin_update_password_path, params: { token: @user.password_reset_token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
       assert_redirected_to admin_sign_in_path
     end
+    assert @user.reload.authenticate("a-new-password-1")
 
     follow_redirect!
     assert_notice "Password has been reset"
@@ -166,41 +234,215 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     sign_in_as(@user)
     here = Current.session
 
-    patch admin_update_password_path(@user.password_reset_token), params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    patch admin_update_password_path, params: { token: @user.password_reset_token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
 
     assert_redirected_to admin_sign_in_path
     assert_not Session.exists?(elsewhere.id)
     assert_not Session.exists?(here.id)
   end
 
+  test "update is audited as the user's own password change, as before" do
+    assert_difference -> { Audit::Event.where(action: "user.updated", subject: @user, actor_id: @user.id).count }, 1 do
+      patch admin_update_password_path, params: { token: @user.password_reset_token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    end
+  end
+
+  # A token is good once: it is signed over the password it was mailed for.
+  test "a token that has reset the password once resets nothing a second time" do
+    token = @user.password_reset_token
+    patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+
+    assert_no_changes -> { @user.reload.password_digest } do
+      patch admin_update_password_path, params: { token: token, password: "a-new-password-2", password_confirmation: "a-new-password-2" }
+    end
+    assert_redirected_to new_admin_password_path(expired: 1)
+  end
+
+  test "a tampered, lapsed, blank or missing token, and one that is no string, changes nothing and is the expired state" do
+    lapsed = @user.password_reset_token
+    session = @user.sessions.create!
+    good = @user.password_reset_token
+
+    cases = { "tampered" => "#{good[0..-6]}AAAAA", "another's words" => "invalid token", "blank" => "", "missing" => nil,
+              "a list" => [ good ], "a hash" => { "a" => good } }
+    cases.each do |name, token|
+      assert_no_changes -> { @user.reload.password_digest }, name do
+        patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }.compact
+      end
+      assert_redirected_to new_admin_password_path(expired: 1), name
+    end
+
+    travel 16.minutes do
+      assert_no_changes -> { @user.reload.password_digest } do
+        patch admin_update_password_path, params: { token: lapsed, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+      end
+      assert_redirected_to new_admin_password_path(expired: 1)
+    end
+    assert Session.exists?(session.id)
+
+    follow_redirect!
+    assert_notice "This link has expired"
+  end
+
   test "a refused update ends no session" do
     session = @user.sessions.create!
 
-    patch admin_update_password_path(@user.password_reset_token), params: { password: "a-new-password-1", password_confirmation: "another" }
+    patch admin_update_password_path, params: { token: @user.password_reset_token, password: "a-new-password-1", password_confirmation: "another" }
 
     assert Session.exists?(session.id)
   end
 
-  test "update with non matching passwords" do
+  # A REFUSED PASSWORD is answered on the form (422), not with a redirect:
+  # the page a redirect led to would have no token, and the token must not go
+  # into an address to get there. It is in the hidden field of this one
+  # response, to the person who sent it, and the response is kept by no
+  # cache.
+  test "update with non matching passwords answers the form again, with the token in its field and in no address" do
     token = @user.password_reset_token
     assert_no_changes -> { @user.reload.password_digest } do
-      patch admin_update_password_path(token), params: { password: "long-enough-pw-1", password_confirmation: "long-enough-pw-2" }
-      assert_redirected_to admin_edit_password_path(token)
+      patch admin_update_password_path, params: { token: token, password: "long-enough-pw-1", password_confirmation: "long-enough-pw-2" }
     end
 
-    follow_redirect!
-    assert_notice "Password confirmation doesn't match Password"
+    assert_response :unprocessable_entity
+    assert_nil response.location
+    assert_select "#alert[role=alert]", text: "Password confirmation doesn't match Password"
+    assert_select "form:not([hidden])[data-reset-token-target=form] input[type=hidden][name=token]", count: 1 do |fields|
+      assert_equal token, fields.first["value"]
+    end
+    assert_select "div[hidden][data-reset-token-target=incomplete]"
+    assert_equal 1, response.body.scan(token).size, "the token is in the response once: the field"
+    assert_select "input[type=password][value]", count: 0
   end
 
   test "update with a blank password says so" do
     token = @user.password_reset_token
     assert_no_changes -> { @user.reload.password_digest } do
-      patch admin_update_password_path(token), params: { password: "", password_confirmation: "" }
-      assert_redirected_to admin_edit_password_path(token)
+      patch admin_update_password_path, params: { token: token, password: "", password_confirmation: "" }
     end
 
-    follow_redirect!
+    assert_response :unprocessable_entity
     assert_notice "Password can't be blank"
+    assert_select "input[type=hidden][name=token]" do |fields|
+      assert_equal token, fields.first["value"]
+    end
+  end
+
+  test "update with a password that is too short answers 422 and keeps the token in the form" do
+    token = @user.password_reset_token
+    assert_no_changes -> { @user.reload.password_digest } do
+      patch admin_update_password_path, params: { token: token, password: "short", password_confirmation: "short" }
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#alert[role=alert]", text: "Use at least 12 characters."
+    assert_select "input[type=hidden][name=token]" do |fields|
+      assert_equal token, fields.first["value"]
+    end
+  end
+
+  # The token the form came back with is still the one that was mailed: the
+  # second try is the same request with a password the rule takes.
+  test "the token of a refused form sets the password on the next try" do
+    patch admin_update_password_path, params: { token: @user.password_reset_token, password: "short", password_confirmation: "short" }
+    token = css_select("input[name=token]").first["value"]
+
+    assert_changes -> { @user.reload.password_digest } do
+      patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    end
+    assert_redirected_to admin_sign_in_path
+  end
+
+  # NO CACHE KEEPS A PAGE OF THIS FORM: the one that carries the token (the
+  # 422) above all, and the empty one too, so that no cache can hand out
+  # the one for the other and the browser's own back/forward cache keeps
+  # neither.
+  test "the form's page is kept by no cache: the empty one, the refused one and the redirects" do
+    get admin_edit_password_path
+    assert_equal "no-store", response.headers["Cache-Control"]
+
+    patch admin_update_password_path, params: { token: @user.password_reset_token, password: "short", password_confirmation: "short" }
+    assert_response :unprocessable_entity
+    assert_equal "no-store", response.headers["Cache-Control"]
+
+    patch admin_update_password_path, params: { token: "not-a-token", password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    assert_equal "no-store", response.headers["Cache-Control"]
+
+    get "#{ADMIN}/password/#{@user.password_reset_token}/edit"
+    assert_equal "no-store", response.headers["Cache-Control"]
+  end
+
+  # NO LOGGED LINE HOLDS THE TOKEN. In the form's body it is a parameter
+  # named `token`, which `filter_parameters` masks; that is the whole flow
+  # now. `REQUEST_LOGGERS` is everyone who writes during a request, at debug.
+  test "nothing logged for the form's requests holds the token: accepted, refused, and with a bad password" do
+    token = @user.password_reset_token
+
+    log = capture_log(REQUEST_LOGGERS) do
+      get admin_edit_password_path
+      patch admin_update_password_path, params: { token: token, password: "short", password_confirmation: "short" }
+      patch admin_update_password_path, params: { token: "#{token}x", password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+      patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    end
+
+    assert_redirected_to admin_sign_in_path
+    assert_not_includes log, token
+    assert_not_includes log, "a-new-password-1"
+    # What makes this able to fail: the capture holds these requests' own
+    # lines, the parameters among them, masked.
+    assert_includes log, %(Started PATCH "#{ADMIN}/password")
+    assert_includes log, "Processing by Admin::PasswordsController#update"
+    assert_match(/Parameters: \{.*"token" ?=> ?"\[FILTERED\]"/, log)
+  end
+
+  # The old addresses DID carry the token in their path, and for fifteen
+  # minutes after a deploy a mail, and a form left open, still do. Rails
+  # writes a request's path down before the router is asked: in the first
+  # line of every request, and in the error line of one that has no route
+  # (the old form's). The middleware `OldResetAddress` has replaced the
+  # token by then.
+  test "nothing logged for a request to the old addresses holds the token" do
+    token = @user.password_reset_token
+
+    log = capture_log(REQUEST_LOGGERS) do
+      get "#{ADMIN}/password/#{token}/edit"
+      patch "#{ADMIN}/password/#{token}", params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    end
+
+    assert_not_includes log, token
+    assert_includes log, %(Started GET "#{ADMIN}/password/[FILTERED]/edit")
+    assert_includes log, %(Started PATCH "#{ADMIN}/password/[FILTERED]")
+    assert_includes log, "Processing by Admin::PasswordsController#legacy"
+    assert_includes log, "Redirected to http://www.example.com#{ADMIN}/password/edit"
+    assert_includes log, %(ActionController::RoutingError (No route matches [PATCH] "#{ADMIN}/password/[FILTERED]"))
+  end
+
+  # The same, for the shapes a mail program or a hand makes of the old link,
+  # and for what a request can say about its own address afterwards.
+  test "the old address's token is gone from the request before Rails reads it, in every spelling" do
+    token = @user.password_reset_token
+
+    [ "#{ADMIN}/password/#{token}/edit", "#{ADMIN}/password/#{token}/edit/", "#{ADMIN}//password//#{token}/edit?a=1",
+      "#{ADMIN}/password/#{token}", "#{ADMIN}/password/#{token}/edit)" ].each do |path|
+      log = capture_log(REQUEST_LOGGERS) { get path }
+
+      assert_not_includes log, token, path
+      assert_includes log, "[FILTERED]", path
+      assert_not_includes request.original_url, token, path
+      assert_not_includes request.fullpath, token, path
+      assert_not_includes response.location.to_s, token, path
+      assert_not_includes response.body, token, path
+    end
+  end
+
+  test "the form's own addresses pass the door untouched" do
+    log = capture_log(REQUEST_LOGGERS) do
+      get admin_edit_password_path
+      get new_admin_password_path
+    end
+
+    assert_includes log, %(Started GET "#{ADMIN}/password/edit")
+    assert_includes log, %(Started GET "#{ADMIN}/password/new")
+    assert_not_includes log, "[FILTERED]"
   end
 
   private

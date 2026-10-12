@@ -34,6 +34,10 @@ require_relative "../lib/host_settings"
 require_relative "../lib/telemetry"
 require_relative "../lib/telemetry/path_scrubber"
 
+# And this one because a middleware is named below, while the application is
+# being configured.
+require_relative "../lib/old_reset_address"
+
 module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
@@ -97,6 +101,11 @@ module ContentSpiel
     # payload (written around the model) is an error, never read as
     # plaintext.
     config.active_record.encryption.support_unencrypted_data = false
+
+    # Ahead of every middleware of Rails, so that not even the request's
+    # first log line holds the token of an old reset link
+    # (lib/old_reset_address.rb).
+    config.middleware.insert_before 0, OldResetAddress
 
     # Production says at boot which address it serves, and stops without
     # SECRET_KEY_BASE with a message of its own (lib/host_settings.rb).

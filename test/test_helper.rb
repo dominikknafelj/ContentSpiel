@@ -26,6 +26,7 @@ require_relative "support/content_helper"
 require_relative "support/component_test_helper"
 require_relative "support/test_types"
 require_relative "support/site_address_helper"
+require_relative "support/log_capture"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise

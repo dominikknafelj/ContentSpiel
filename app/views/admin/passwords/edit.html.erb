@@ -1,16 +1,43 @@
 <%# The reset flow's "form" state: new password with the strength meter and a
-    confirmation. A bad or used link never gets here (the controller sends it
-    to the "expired" state on the request page). %>
-<div class="flex flex-col gap-[18px]">
+    confirmation.
+
+    THE TOKEN (safe-address spec §4). The mailed link is this page's address
+    with the token after a "#", which no server is sent, so the page is drawn
+    without one: the form hidden and its `token` field empty. The script
+    (`reset-token`, controllers/reset_token_controller.js) moves the token
+    from the address into the field, takes it out of the address bar and
+    shows the form; with no token it shows the "incomplete" message instead.
+    Whether the link is good is answered when the form is sent: a bad, used
+    or lapsed one goes to the "expired" state of the request page.
+
+    `@token` is set only on the 422 of a refused password, where the form
+    comes back with the token it was sent with, so it is drawn open.
+
+    Without JavaScript neither is shown, and the <noscript> line says why. %>
+<div class="flex flex-col gap-[18px]" data-controller="reset-token">
   <%= render "admin/shared/auth_heading", title: "Update your password" %>
 
   <% if flash[:alert] %>
     <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
   <% end %>
 
-  <%= form_with url: admin_update_password_path(params[:token]), method: :patch, class: "flex flex-col gap-[18px]" do |form| %>
+  <noscript>
+    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink"><%= t(".noscript") %></p>
+  </noscript>
+
+  <%= form_with url: admin_update_password_path, method: :patch, class: "flex flex-col gap-[18px]",
+        data: { reset_token_target: "form" }, html: { hidden: @token.blank? } do |form| %>
+    <%= hidden_field_tag :token, @token, id: "reset-token", autocomplete: "off", data: { reset_token_target: "token" } %>
     <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, autofocus: true) %>
     <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Repeat new password") %>
     <%= render Admin::Ui::ButtonComponent.new(label: "Set password", type: "submit", class: "w-full", data: { password_submit: true }) %>
   <% end %>
+
+  <%# The same shape as the request page's "expired" state: what is wrong,
+      the way to a new link, the way back. %>
+  <div class="flex flex-col gap-[18px]" data-reset-token-target="incomplete" hidden>
+    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert"><%= t(".incomplete") %></p>
+    <%= link_to t(".request_new"), new_admin_password_path, class: "#{setup_primary_button_class} w-full text-center" %>
+    <p><%= link_to t(".back"), admin_sign_in_path, class: "text-[13px] text-accent hover:text-accent-hover hover:underline" %></p>
+  </div>
 </div>

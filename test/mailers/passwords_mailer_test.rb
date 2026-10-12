@@ -10,6 +10,10 @@ class PasswordsMailerTest < ActionMailer::TestCase
   SITE = "https://docs.example.org".freeze
   NOT_SENT = "[ContentSpiel] A password reset mail was not sent: no site address is known. Set PUBLIC_HOST.".freeze
 
+  # `capture_log`: the Rails, Action Mailer and Active Job loggers, which is
+  # everyone who writes on this path (test/support/log_capture.rb).
+  include LogCapture
+
   setup { @user = users(:one) }
 
   test "with an address configured the link starts with it, whatever origin the request had" do
@@ -102,7 +106,23 @@ class PasswordsMailerTest < ActionMailer::TestCase
       text, html = links_of(PasswordsMailer.reset(@user))
 
       assert_equal text, html
-      assert_equal @user, User.find_by_password_reset_token!(URI.parse(text).path.delete_prefix("/cs-studio/password/").delete_suffix("/edit"))
+      assert_equal @user, User.find_by_password_reset_token!(URI.parse(text).fragment)
+    end
+  end
+
+  # The token is after the "#", which a browser sends to no server: the part
+  # of the link that IS sent (its path, and a query it does not have) is the
+  # same for every mail.
+  test "the token is the link's fragment: the address a server is asked for holds none" do
+    with_site_address(SITE) do
+      links_of(PasswordsMailer.reset(@user)).each do |link|
+        assert_match %r{\A#{SITE}/cs-studio/password/edit#\S+\z}, link
+        uri = URI.parse(link)
+        assert_equal "/cs-studio/password/edit", uri.path
+        assert_nil uri.query
+        assert_match(/\A#{TOKEN.source}\z/, uri.fragment, "nothing in it needs an escape: the script reads it as it stands")
+        assert_no_match TOKEN, link.split("#", 2).first
+      end
     end
   end
 
@@ -190,22 +210,6 @@ class PasswordsMailerTest < ActionMailer::TestCase
     yield
   ensure
     ActionMailer::Base.default_url_options = was
-  end
-
-  # Everything logged in the block, by anyone on this path. `Rails.logger`
-  # alone is not it: Action Mailer and Active Job were handed the logger
-  # object at boot and keep it, so all three are swapped.
-  LOGGERS = [ Rails, ActionMailer::Base, ActiveJob::Base ].freeze
-
-  def capture_log
-    were = LOGGERS.map(&:logger)
-    io = StringIO.new
-    logger = ActiveSupport::Logger.new(io)
-    LOGGERS.each { |owner| owner.logger = logger }
-    yield
-    io.string
-  ensure
-    LOGGERS.zip(were) { |owner, was| owner.logger = was }
   end
 
   # A reset token is a signed message: a long run of URL-safe characters

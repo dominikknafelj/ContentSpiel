@@ -14,7 +14,7 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
   setup { site_settings(:default).update!(setup_completed_at: Time.current) }
 
   test "in the test environment sign-in, the password pages and CS Studio show nothing" do
-    [ "/cs-studio/sign-in", new_admin_password_path, admin_edit_password_path(users(:one).password_reset_token) ].each do |path|
+    [ "/cs-studio/sign-in", new_admin_password_path, admin_edit_password_path ].each do |path|
       get path
 
       assert_response :success
@@ -32,7 +32,7 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
   test "in production over plain HTTP sign-in and both password pages say so, to everyone" do
     as_production do
       [ "/cs-studio/sign-in", new_admin_password_path, new_admin_password_path(sent: 1),
-        admin_edit_password_path(users(:one).password_reset_token) ].each do |path|
+        admin_edit_password_path ].each do |path|
         get path
 
         assert_response :success
