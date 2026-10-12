@@ -21,7 +21,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "the theme build carries theme tokens and no product tokens or product-only classes" do
-    css = stylesheet("theme-default.css")
+    css = stylesheet("theme.css")
 
     assert_includes css, "--th-paper"
     assert_includes css, "cs-prose"
@@ -47,7 +47,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
     light, dark = [ luminance.(background), luminance.(ink) ].minmax.reverse
     assert_operator (light + 0.05) / (dark + 0.05), :>=, 4.5
-    assert_includes stylesheet("theme-default.css"), ".bg-preview-bg"
+    assert_includes stylesheet("theme.css"), ".bg-preview-bg"
   end
 
   # Sections spec §5.3: the two bands and what is written on the strong one,
@@ -86,7 +86,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "the theme build carries the section grid, its container queries and the body's clip" do
-    css = stylesheet("theme-default.css")
+    css = stylesheet("theme.css")
 
     assert_includes css, ".content-section__grid--one_two"
     assert_includes css, ".content-section--full"
@@ -99,7 +99,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     font_path = helpers.asset_path("archivo-latin-400-normal.woff2")
 
     assert_includes stylesheet("tailwind.css"), font_path
-    assert_includes stylesheet("theme-default.css"), font_path
+    assert_includes stylesheet("theme.css"), font_path
     get font_path
     assert_response :success
   end
@@ -108,7 +108,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     get "/"
 
-    assert_select "link[rel=stylesheet][href*='theme-default']"
+    assert_select "link[rel=stylesheet][href*='/theme-']"
     assert_select "link[rel=stylesheet][href*='/tailwind-']", count: 0
   end
 
@@ -116,7 +116,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     get admin_sign_in_path
 
     assert_select "link[rel=stylesheet][href*='/tailwind-']"
-    assert_select "link[rel=stylesheet][href*='theme-default']", count: 0
+    assert_select "link[rel=stylesheet][href*='/theme-']", count: 0
     assert_includes response.body, 'localStorage.getItem("cs-theme")'
   end
 

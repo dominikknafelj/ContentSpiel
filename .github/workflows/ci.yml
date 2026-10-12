@@ -124,6 +124,16 @@ jobs:
           # REDIS_URL: redis://localhost:6379/0
         run: bin/rails db:test:prepare test
 
+      # The stylesheet built with THEME_PATH set, and production started
+      # under that theme (bin/theme-build-check). After the tests, because
+      # it writes app/assets/builds. A step of this job and not a job of its
+      # own: a job is billed by the started minute and would set up Ruby
+      # again; here it is three boots of the application.
+      - name: Build the stylesheet under a theme and start production under it
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+        run: bin/theme-build-check
+
       - name: Keep the coverage report
         uses: actions/upload-artifact@v7
         if: always()

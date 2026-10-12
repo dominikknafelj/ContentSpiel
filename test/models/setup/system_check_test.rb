@@ -133,6 +133,59 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_not_includes check.message, ThemeTestHelper::PLAIN.dirname.to_s
   end
 
+  test "in production a stylesheet built for another theme is a warning that says to build again" do
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    check = result("Theme", run_check(theme: theme, production: true, request_ssl: true, stylesheet_probe: -> { false }))
+
+    assert_equal :warning, check.status
+    assert_equal "The theme “plain” is set, but the stylesheet was built for another theme, so the site is drawn with the wrong styles. " \
+      "Build the site's image again: assets:precompile with THEME_PATH set.", check.message
+    assert_nil check.command
+  end
+
+  test "in production the default theme under a stylesheet built with a theme is the same warning, the other way round" do
+    check = result("Theme", run_check(theme: Theme.new, production: true, request_ssl: true, stylesheet_probe: -> { false }))
+
+    assert_equal :warning, check.status
+    assert_equal "The default theme is set, but the stylesheet was built for another theme, so the site is drawn with the wrong styles. " \
+      "Build the site's image again: assets:precompile without THEME_PATH.", check.message
+  end
+
+  # Outside production no boot refuses a stylesheet built for another theme
+  # (a development server starts under anything), so this row is the one
+  # place that says it, with the command that builds it.
+  test "outside production a stylesheet built for another theme is a warning with the command that builds it" do
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    check = result("Theme", run_check(theme: theme, production: false, stylesheet_probe: -> { false }))
+
+    assert_equal :warning, check.status
+    assert_equal "The theme “plain” is set, but the stylesheet was built for another theme or for an earlier state of this one, " \
+      "so the site is drawn with the wrong styles. Build it again with THEME_PATH set as the server has it: " \
+      "bin/dev keeps it built while it runs, and this command builds it once.", check.message
+    assert_equal "bin/rails tailwindcss:build", check.command
+    assert Setup::SystemCheck::STYLESHEET_COMMAND.frozen?
+
+    default = result("Theme", run_check(theme: Theme.new, production: false, stylesheet_probe: -> { false }))
+    assert_equal :warning, default.status
+    assert_includes default.message, "The default theme is set, but the stylesheet was built for another theme"
+    assert_includes default.message, "Build it again without THEME_PATH:"
+  end
+
+  test "a probe that raises is a stylesheet that was not built for the theme, and never a path" do
+    check = result("Theme", run_check(theme: Theme.new, stylesheet_probe: -> { raise Errno::EACCES, "/rails/app/assets/builds/theme.stamp" }))
+
+    assert_equal :warning, check.status
+    assert_not_includes check.message, "/rails"
+  end
+
+  test "the row's own probe reads the build's stamp: this suite's stylesheet is the default theme's" do
+    assert_equal "default", ThemeFolder.stamp(Rails.root), "bin/rails tailwindcss:build stamps the stylesheet the tests read"
+    assert result("Theme", Setup::SystemCheck.run(theme: Theme.new)).ok?
+
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    assert_equal :warning, result("Theme", Setup::SystemCheck.run(theme: theme)).status
+  end
+
   test "the real storage probe works against the test disk service" do
     assert_no_difference "ActiveStorage::Blob.count" do
       assert result("File storage", Setup::SystemCheck.run).ok?
@@ -264,12 +317,11 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "only the site address and the mail warnings carry a command, each a fixed string" do
     results = run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
       storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
-      mail_host: "example.com")
+      mail_host: "example.com", stylesheet_probe: -> { false })
 
-    # Every row that can warn does; the theme's row only states a fact (a
-    # folder that is no theme stops the boot and never reaches this page).
-    assert results.reject { |check| check.label == "Theme" }.none?(&:ok?)
-    assert results.find { |check| check.label == "Theme" }.ok?
+    # Every row that can warn does. The theme's carries no command in
+    # production, where the build is the image's and no one command.
+    assert results.none?(&:ok?)
     assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Outgoing mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
       results.select(&:command).to_h { |check| [ check.label, check.command ] })
     assert Setup::SystemCheck::SITE_ADDRESS_COMMAND.frozen?
@@ -287,7 +339,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       defaults = {
         storage_probe: -> { true }, image_probe: -> { true }, worker_alive_probe: -> { true },
         queue_adapter: "async", mail_delivery_method: :smtp, mail_smtp_address: "smtp.example.org",
-        mail_host: "cms.example.org", address: SiteAddress.parse("https://cms.example.org")
+        mail_host: "cms.example.org", address: SiteAddress.parse("https://cms.example.org"), stylesheet_probe: -> { true }
       }
       Setup::SystemCheck.run(**defaults.merge(overrides))
     end

@@ -11,6 +11,13 @@ folder = ThemeFolder.current
 # every view path.)
 Rails.application.config.watchable_dirs[folder.path.to_s] = %w[erb css js] if folder.configured?
 
+# The theme's images and fonts are named in its stylesheet and templates by
+# file name, and Propshaft writes the digested address; its `javascript`
+# folder is where a controller is served from (`ThemeFolder#pins`). Appended,
+# never put first: a theme adds assets, and one named like an asset of the
+# CMS's own stops the boot before the order could matter (`Theme::Check`).
+folder.asset_paths.each { |directory| Rails.application.config.assets.paths << directory.to_s }
+
 # Inside `to_prepare`, as every registry is (config/initializers/types.rb):
 # its first run is the boot, so a folder that is not a theme stops the boot;
 # and after a code reload the Theme is built again, against the freshly

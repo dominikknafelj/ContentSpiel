@@ -133,6 +133,17 @@ module ContentSpiel
         # the variable is not set, and what reading them can raise is
         # `require_secret!`'s to turn into its own message.
         HostSettings.require_secret!(ENV, credentials: Rails.application.credentials) unless ENV["SECRET_KEY_BASE_DUMMY"]
+        # The stylesheet is built when the image is built, for one theme
+        # (lib/theme_css.rb), and stamped with that theme's fingerprint. A
+        # site started under another theme than its stylesheet was built for
+        # would draw the right templates with the wrong styles and nobody
+        # would be told, so it does not start. Not asked under
+        # SECRET_KEY_BASE_DUMMY, as the secret is not: that is the image
+        # build's own `assets:precompile`, which starts production BEFORE the
+        # stylesheet it is about to build exists.
+        unless ENV["SECRET_KEY_BASE_DUMMY"] || theme_folder.built?(Rails.root)
+          raise ThemeFolder::Invalid, ThemeFolder.not_built_message(theme_folder, Rails.root)
+        end
         HostSettings.announcement(SiteAddress.current, ENV).each { |line| Rails.logger.info line }
         # At debug the log holds every mail in full, a reset link included.
         HostSettings.log_level_warning(ENV)&.then { |line| Rails.logger.warn line }

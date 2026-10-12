@@ -20,11 +20,12 @@ require "fileutils"
 # without a secret; the secret check has its tests in `host_settings_test.rb`
 # and is not booted for here.
 #
-# Each boot is about three seconds, so there are six and no more: an https
+# Each boot is about three seconds, so there are seven and no more: an https
 # address, none, and a value that is no address; and for the theme, a
-# folder, a path that is none, and a folder with a file the contract does
+# folder, a path that is none, a folder with a file the contract does
 # not name (`Theme::Check`, run by `Theme.load` in `to_prepare`: the one
-# proof that the contract is checked when the application starts).
+# proof that the contract is checked when the application starts), and a
+# folder the stylesheet was not built for.
 class ProductionBootTest < ActiveSupport::TestCase
   SCRIPT = <<~'RUBY'.freeze
     config = Rails.application.config
@@ -109,6 +110,19 @@ class ProductionBootTest < ActiveSupport::TestCase
       assert_includes printed, "views/pages/shwo.html.erb is not part of the theme contract"
       assert_no_match(/^hosts:/, printed)
     end
+  end
+
+  # The one boot here with a real secret: with SECRET_KEY_BASE_DUMMY the
+  # stylesheet's stamp is not asked, because that is how the image's own
+  # `assets:precompile` starts production before the stylesheet exists.
+  test "production under a theme whose stylesheet was not built for it does not start, and says how to build" do
+    plain = Rails.root.join("test/fixtures/themes/plain")
+    printed, status = boot_production("THEME_PATH" => plain.to_s, "SECRET_KEY_BASE_DUMMY" => nil, "SECRET_KEY_BASE" => "x" * 64)
+
+    assert_not status.success?, printed
+    assert_includes printed, "ThemeFolder::Invalid"
+    assert_includes printed, "the stylesheet was built for another theme: run assets:precompile with THEME_PATH set"
+    assert_no_match(/^hosts:/, printed)
   end
 
   private

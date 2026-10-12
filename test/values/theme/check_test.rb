@@ -152,7 +152,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
       %(<meta name="csp-nonce" content="x">) => "the content security policy's tag",
       %(<%= javascript_importmap_tags %>) => "the import map",
       %(<script type="importmap">{}</script>) => "the import map",
-      %(<%= stylesheet_link_tag "theme-default" %>) => "a stylesheet link",
+      %(<%= stylesheet_link_tag "theme" %>) => "a stylesheet link",
       %(<link rel="stylesheet" href="/other.css">) => "a stylesheet link"
     }.each do |markup, tag|
       problems = problems_with(HEAD => "<meta name=\"theme-color\" content=\"x\">\n#{markup}\n")

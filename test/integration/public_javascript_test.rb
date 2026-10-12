@@ -25,8 +25,39 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     ADMIN_ONLY.each do |name|
       assert preloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a public page: #{preloads.grep(/#{Regexp.escape(name)}/).inspect}"
     end
-    assert_includes entry_point_script, %(import "application")
+    assert_includes entry_point_script, %(import "site")
     assert_not_includes entry_point_script, %(import "admin")
+    assert preloads.none? { |href| href.include?("controllers/admin/") }
+  end
+
+  # Theming spec §4, "Scripts": a theme's controllers are registered by the
+  # `site` entry point, which the public layout alone loads. CS Studio and
+  # sign-in load `admin` and `application`, and `controllers/index.js`
+  # registers neither CS Studio's controllers nor a theme's by itself.
+  test "only the public layout loads the site entry point, and with it the theme's controllers" do
+    create_page(title: "About")
+    get "/"
+    assert modulepreloads.any? { |href| href.include?("hello_controller") }, "the theme's controller is preloaded on a public page"
+
+    get admin_sign_in_path
+    assert_not_includes entry_point_script, %(import "site")
+    assert modulepreloads.none? { |href| href.include?("hello_controller") }
+
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    get "/cs-studio"
+    assert_includes entry_point_script, %(import "admin")
+    assert_not_includes entry_point_script, %(import "site")
+    assert modulepreloads.none? { |href| href.include?("hello_controller") }
+  end
+
+  test "the site's own registration leaves CS Studio's and a theme's controllers to their entry points" do
+    index = Rails.root.join("app/javascript/controllers/index.js").read
+    site = Rails.root.join("app/javascript/site.js").read
+
+    assert_includes index, %(registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/")))
+    assert_includes site, %(import "application")
+    assert_includes site, %(registerControllers((path) => path.startsWith("controllers/theme/")))
   end
 
   test "CS Studio loads the admin entry point and preloads the editor stack" do
@@ -181,6 +212,38 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     # person's two settings as data.
     assert_select "body[data-controller~='admin--notes--alert'][data-action~='admin--notes--inbox:delivery@document->admin--notes--alert#delivery'][data-admin--notes--alert-sound-value=true][data-admin--notes--alert-desktop-value=false][data-admin--notes--alert-person-value='#{users(:one).id}']"
     assert modulepreloads.any? { |href| href.include?("controllers/admin/notes/alert_controller") }
+  end
+
+  # A theme brings controllers and nothing else to the import map: no pin
+  # of its own, no third-party script, and no name outside
+  # `controllers/theme/`, so none of its files can stand where a module of
+  # the CMS's is looked up (Tiptap, the editor's modules, an admin
+  # controller). The suite's map is config/importmap.rb plus the second
+  # theme's pins (test/fixtures/themes/importmap.rb), drawn as a real
+  # theme's are (`ThemeFolder#pins`); what the theme added is the difference.
+  test "a theme adds pins under controllers/theme/ and nowhere else, and changes no pin of the CMS's" do
+    names = Object.new
+    def names.path_to_asset(path) = path
+    imports = ->(map, key) { JSON.parse(map.to_json(resolver: names, cache_key: key))["imports"] }
+
+    own = imports.(Importmap::Map.new.draw(Rails.root.join("config/importmap.rb")), :public_javascript_test_own)
+    with_theme = imports.(Rails.application.importmap, :public_javascript_test_theme)
+
+    assert_equal [ "controllers/theme/hello_controller" ], with_theme.keys - own.keys
+    assert_equal own, with_theme.slice(*own.keys), "a pin of the CMS's own points elsewhere with the theme"
+    assert_equal "controllers/hello_controller.js", with_theme["controllers/theme/hello_controller"]
+  end
+
+  # The other fence: which layout asks for which entry point is one word in
+  # each layout, and `site` is in the public one alone.
+  test "the site entry point is named by the public layout and by no other layout or view" do
+    naming = Dir[Rails.root.join("app/{views,components,helpers}/**/*.{erb,rb}")].select do |file|
+      File.read(file).match?(/javascript_importmap_tags\s*\(?\s*["']site["']/)
+    end
+
+    assert_equal [ "app/views/layouts/application.html.erb" ], naming.map { |file| Pathname(file).relative_path_from(Rails.root).to_s }
+    every = Dir[Rails.root.join("app/views/layouts/*.html.erb")].select { |file| File.read(file).include?("javascript_importmap_tags") }
+    assert_operator every.size, :>=, 3, "the public layout, CS Studio's and the product's each load an entry point"
   end
 
   private

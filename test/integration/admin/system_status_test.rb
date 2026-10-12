@@ -26,7 +26,14 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
   # The page is shown to anyone with `system_status.view`: it names the
   # theme's folder and never where the server keeps it (theming spec §1).
-  test "the theme row names the theme that draws the site, and no path of the server" do
+  #
+  # And it says when the stylesheet is not that theme's, with the stamp the
+  # build wrote (`ThemeFolder.stamp`), read for real here: this suite's
+  # stylesheet is built for the default theme, so the default theme's row is
+  # OK and the second theme's is the warning, with the command that builds
+  # it. (The OK wording under a theme is the model's test: making it true
+  # here would mean writing app/assets/builds, which every other test reads.)
+  test "the theme row names the theme that draws the site and no path of the server, and warns when the stylesheet is another theme's" do
     sign_in_as(users(:one))
 
     get "/cs-studio/system_status"
@@ -35,9 +42,12 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     with_plain_theme do
       get "/cs-studio/system_status"
 
-      assert_select "li[data-status=ok]", text: /Theme.*The theme “plain” draws the site \(\d+ templates, fingerprint \h{8}\)\./m
+      assert_select "li[data-status=warning]", text: /Theme.*The theme “plain” is set, but the stylesheet was built for another theme/m
+      assert_select "li[data-status=warning]", text: /Theme.*#{Regexp.escape(Setup::SystemCheck::STYLESHEET_COMMAND)}/m
       assert_not_includes response.body, ThemeTestHelper::PLAIN.dirname.to_s
       assert_not_includes response.body, Theme.current.fingerprint
+      assert_not_includes response.body, Theme.current.fingerprint[0, 9]
+      assert_not_includes response.body, ThemeFolder::STAMP
     end
   end
 

@@ -91,9 +91,12 @@
     <%= render "layouts/public/icons" %>
     <%= render "layouts/public/head" %>
 
-    <%# The public theme only (spec §9) -- never the product stylesheet. %>
-    <%= stylesheet_link_tag "theme-default", "data-turbo-track": "reload" %>
-    <%= javascript_importmap_tags %>
+    <%# The one public stylesheet (theming spec §4): the default theme's
+        styles and then the theme's, built together (`ThemeCss`) -- never the
+        product stylesheet. `site` is the public site's entry point:
+        `application` plus the theme's controllers (app/javascript/site.js). %>
+    <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags "site" %>
   </head>
 
   <%# In a preview the bar (layouts/public/_preview_banner) is fixed to the

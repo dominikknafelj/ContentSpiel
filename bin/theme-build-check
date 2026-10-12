@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# The two halves of "a site's image on top of the CMS's" that are the CMS's
+# own (theming spec §4 and §9), tried with the second theme:
+#
+#   1. the stylesheet builds with THEME_PATH set, and holds the default
+#      theme's styles, the theme's styles and the utilities of the theme's
+#      templates;
+#   2. production starts under that theme with that stylesheet (the stamp is
+#      the theme's), says which theme at boot, and has the theme's
+#      controller in its import map and its image on the asset path.
+#
+# Not in the test suite: it writes app/assets/builds, which every other test
+# reads. CI runs it after the unit tests (.github/workflows/ci.yml). On the
+# way out it builds the default stylesheet again, so a laptop is left as it
+# was.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+theme="$PWD/test/fixtures/themes/plain"
+css="app/assets/builds/theme.css"
+secret="$(printf 'x%.0s' $(seq 1 64))"
+
+restore() {
+  env -u THEME_PATH bin/rails theme_css:build > /dev/null 2>&1 ||
+    echo "theme-build-check: the default stylesheet could not be built again: run bin/rails tailwindcss:build" >&2
+}
+trap restore EXIT
+
+need() {
+  if ! grep -q -- "$1" "$css"; then
+    echo "theme-build-check: the built stylesheet lacks $2 ($1)" >&2
+    exit 1
+  fi
+}
+
+THEME_PATH="$theme" RAILS_ENV=production SECRET_KEY_BASE_DUMMY=1 bin/rails theme_css:build
+
+need '--th-paper' "the default theme's tokens"
+need 'max-w-3xl' "a utility of the default theme's templates"
+need 'cs-prose' "the default theme's rich-text rules"
+need '#123456' "the theme's accent"
+need 'plain-frame' "the theme's own rule"
+need 'mt-\\\[7px\\\]' "a utility used only in the theme's templates"
+need 'plain-mark.svg' "the theme's image, named by its file name"
+
+printed="$(THEME_PATH="$theme" RAILS_ENV=production SECRET_KEY_BASE="$secret" bin/rails runner '
+  names = Struct.new(:nothing) { def path_to_asset(path) = path }.new
+  imports = JSON.parse(Rails.application.importmap.to_json(resolver: names, cache_key: :theme_build_check))["imports"]
+  puts "theme: #{Theme.current.name}"
+  puts "built: #{ThemeFolder.current.built?(Rails.root)}"
+  puts "pin: #{imports["controllers/theme/hello_controller"]}"
+  puts "script: #{Rails.application.assets.load_path.find("controllers/hello_controller.js") ? "found" : "missing"}"
+  puts "image: #{Rails.application.assets.load_path.find("plain-mark.svg") ? "found" : "missing"}"
+' 2>&1)"
+
+for line in "Theme: $theme (" "theme: plain" "built: true" "pin: controllers/hello_controller.js" "script: found" "image: found"; do
+  if ! grep -qF -- "$line" <<< "$printed"; then
+    echo "theme-build-check: production under the theme did not print \"$line\":" >&2
+    echo "$printed" >&2
+    exit 1
+  fi
+done
+
+echo "theme-build-check: ok"

@@ -49,6 +49,12 @@ module Setup
     # site is published at and no secret.
     SITE_ADDRESS_COMMAND = "PUBLIC_HOST=https://www.example.org".freeze
 
+    # What the "Theme" warning offers to copy outside production: the build
+    # of both stylesheets, which reads THEME_PATH as the server does. A
+    # fixed string, like the two above. In production the build is the
+    # image's, which is no one command, and the warning carries none.
+    STYLESHEET_COMMAND = "bin/rails tailwindcss:build".freeze
+
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
     # uploading -- if the upload fails (the case this probe exists to catch),
@@ -89,14 +95,16 @@ module Setup
     # a developer's machine.
     #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
-    # a test can say it.
+    # a test can say it. `stylesheet_probe` answers whether the public
+    # stylesheet was built for that theme: by default, whether the build's
+    # stamp is the theme's fingerprint (`ThemeFolder.stamp`, one small file).
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       mail_delivery_method: ActionMailer::Base.delivery_method,
       mail_smtp_address: ActionMailer::Base.smtp_settings[:address],
       mail_host: ActionMailer::Base.default_url_options[:host],
       address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
-      reset_link_from_request: false, theme: Theme.current)
+      reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -109,6 +117,7 @@ module Setup
       @production = production
       @reset_link_from_request = reset_link_from_request
       @theme = theme
+      @stylesheet_probe = stylesheet_probe || -> { ThemeFolder.stamp(Rails.root) == theme.fingerprint }
     end
 
     def run
@@ -174,14 +183,45 @@ module Setup
 
       # Which theme draws the site (theming spec §1): the fact the boot line
       # says, for someone who does not read the log. The folder's NAME and
-      # not its path: this page is shown to anyone who may view it, and where
-      # a server keeps its files is nobody's business there.
+      # not its path, and of the fingerprint its first eight characters:
+      # this page is shown to anyone who may view it, and where a server
+      # keeps its files is nobody's business there.
+      #
+      # And whether the stylesheet is that theme's: the build stamps its
+      # output with the fingerprint of the theme it was built for
+      # (`ThemeCss.stamp!`), and a stamp that is another's, or none, means
+      # the right templates are drawn with the wrong styles. Two wordings,
+      # because what a person does about it differs:
+      # - in production the boot already refuses such a stylesheet
+      #   (config/application.rb), so the warning is seen only where that
+      #   check was passed over (a process started with
+      #   SECRET_KEY_BASE_DUMMY), and the remedy is the image's build;
+      # - everywhere else nothing refuses (a development server starts under
+      #   anything), so this row is the one place that says it: THEME_PATH
+      #   set or unset since the last build, or a theme's file changed with
+      #   no `theme_css:watch` running to build and stamp again. It names
+      #   the command, which is a fixed string.
+      # It costs one small file read. A probe that raises is a stylesheet
+      # that was not built, and its message is not shown.
       def theme
-        if @theme.configured?
-          ok("Theme", "The theme “#{@theme.name}” draws the site (#{@theme.template_count} templates, " \
-            "fingerprint #{@theme.fingerprint[0, 8]}).")
+        described = @theme.configured? ? "The theme “#{@theme.name}”" : "The default theme"
+        with = @theme.configured? ? "with THEME_PATH set" : "without THEME_PATH"
+
+        if probe(@stylesheet_probe)
+          if @theme.configured?
+            ok("Theme", "#{described} draws the site (#{@theme.template_count} templates, fingerprint #{@theme.fingerprint[0, 8]}).")
+          else
+            ok("Theme", "#{described} draws the site (THEME_PATH is not set).")
+          end
+        elsif @production
+          warning("Theme", "#{described} is set, but the stylesheet was built for another theme, so the site is drawn " \
+            "with the wrong styles. Build the site's image again: assets:precompile #{with}.")
         else
-          ok("Theme", "The default theme draws the site (THEME_PATH is not set).")
+          earlier = @theme.configured? ? " or for an earlier state of this one" : ""
+          how = @theme.configured? ? "#{with} as the server has it" : with
+          warning("Theme", "#{described} is set, but the stylesheet was built for another theme#{earlier}, so the site is drawn " \
+            "with the wrong styles. Build it again #{how}: bin/dev keeps it built while it runs, and this command builds it once.",
+            command: STYLESHEET_COMMAND)
         end
       end
 

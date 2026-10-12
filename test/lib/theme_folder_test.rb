@@ -279,4 +279,25 @@ class ThemeFolderTest < ActiveSupport::TestCase
       ThemeFolder.announcement(folder)
     assert_equal "[ContentSpiel] Theme: the default theme (THEME_PATH is not set)", ThemeFolder.announcement(ThemeFolder.new(nil))
   end
+
+  test "a theme's controllers are pinned under controllers/theme, served from controllers, and preloaded for the site entry point alone" do
+    pins = ThemeFolder.new(PLAIN).pins
+
+    assert_equal({ dir: PLAIN.join("javascript/controllers").to_s, under: "controllers/theme", to: "controllers", preload: "site" }, pins)
+    assert_nil ThemeFolder.new(nil).pins
+
+    map = Importmap::Map.new
+    map.pin_all_from(pins[:dir], under: pins[:under], to: pins[:to], preload: pins[:preload])
+    resolver = Object.new
+    def resolver.path_to_asset(path) = "/assets/#{path}"
+
+    assert_equal({ "controllers/theme/hello_controller" => "/assets/controllers/hello_controller.js" }, JSON.parse(map.to_json(resolver: resolver))["imports"])
+  end
+
+  test "the test environment's import map holds the second theme's controller, and its script is on the asset path" do
+    imports = JSON.parse(Rails.application.importmap.to_json(resolver: ActionController::Base.helpers, cache_key: :theme_folder_test))["imports"]
+
+    assert_match %r{/assets/controllers/hello_controller-\h+\.js\z}, imports.fetch("controllers/theme/hello_controller")
+    assert Rails.application.assets.load_path.find("plain-mark.svg")
+  end
 end

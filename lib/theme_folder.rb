@@ -60,6 +60,10 @@ class ThemeFolder
 
   DEFAULT_FINGERPRINT = "default".freeze
 
+  # Where the stylesheet's build writes the fingerprint of the theme it was
+  # built for (`ThemeCss.stamp!`), relative to the application's root.
+  STAMP = "app/assets/builds/theme.stamp".freeze
+
   attr_reader :path
 
   def self.current = @current ||= from_env(ENV)
@@ -86,6 +90,26 @@ class ThemeFolder
     else
       "[ContentSpiel] Theme: #{folder.path} (#{folder.templates.size} templates, fingerprint #{folder.fingerprint[0, 8]})"
     end
+  end
+
+  # The fingerprint the public stylesheet was built for, or nil when no
+  # build has stamped one.
+  def self.stamp(root)
+    file = File.join(root.to_s, STAMP)
+    File.file?(file) ? File.read(file).strip : nil
+  end
+
+  # What the boot says when it refuses to start under a stylesheet built for
+  # another theme (theming spec §4). Both ways round: a theme set over a
+  # stylesheet built without it, and no theme over a stylesheet built with
+  # one. The command is the image build's own: it carries
+  # SECRET_KEY_BASE_DUMMY, which is also what lets that build start
+  # production before the stylesheet it is about to make exists.
+  def self.not_built_message(folder, root)
+    how = folder.configured? ? "with #{VARIABLE} set" : "without #{VARIABLE}"
+    "#{VARIABLE}: the stylesheet was built for another theme: run assets:precompile #{how} " \
+      "(SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile). The build's stamp is #{stamp(root) || "missing"}, " \
+      "this theme's fingerprint is #{folder.fingerprint}."
   end
 
   def initialize(path)
@@ -157,6 +181,22 @@ class ThemeFolder
   # the stylesheet and the templates by file name, and `javascript`, from
   # which a controller is served as `controllers/<name>_controller.js`.
   def asset_paths = %w[assets/images assets/fonts javascript].filter_map { |folder| existing_directory(folder) }
+
+  # Whether the public stylesheet in app/assets/builds was built for this
+  # theme: the build's stamp is this folder's fingerprint ("default" without
+  # a folder). No stamp is no build.
+  def built?(root) = self.class.stamp(root) == fingerprint
+
+  # How the theme's Stimulus controllers are pinned (`config/importmap.rb`):
+  # every file under javascript/controllers as `controllers/theme/<name>`,
+  # so `copy_controller.js` is the identifier `theme--copy` and cannot be
+  # one of the CMS's own; served as `controllers/<name>.js` from the theme's
+  # `javascript` folder on the asset path; preloaded for the `site` entry
+  # point alone, which only the public layout loads. nil without controllers.
+  def pins
+    directory = controllers_path
+    directory && { dir: directory.to_s, under: "controllers/theme", to: "controllers", preload: "site" }
+  end
 
   private
 

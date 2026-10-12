@@ -1,10 +1,13 @@
 # Pin npm packages by running ./bin/importmap
 #
-# Two entry points (final fix wave, D): `application` (the public site,
-# setup and sign-in -- Turbo plus the site's own controllers) and `admin`
+# Three entry points (final fix wave, D; theming spec §4): `application`
+# (setup and sign-in -- Turbo plus the site's own controllers), `admin`
 # (CS Studio's layout only -- `application` plus `controllers/admin/*`, see
-# app/javascript/admin.js). Layouts pick theirs with
-# `javascript_importmap_tags` / `javascript_importmap_tags "admin"`.
+# app/javascript/admin.js) and `site` (the public layout only --
+# `application` plus a theme's `controllers/theme/*`, see
+# app/javascript/site.js). Layouts pick theirs with
+# `javascript_importmap_tags` / `javascript_importmap_tags "admin"` /
+# `javascript_importmap_tags "site"`.
 #
 # `preload: "admin"` modulepreloads a module only on pages whose entry point
 # is `admin` (importmap-rails' per-entry-point preloading): CS Studio's own
@@ -19,9 +22,22 @@
 
 pin "application"
 pin "admin", preload: "admin"
+# The public site's entry point: `application` plus the theme's controllers
+# (app/javascript/site.js). Only layouts/application.html.erb asks for it.
+pin "site", preload: "site"
 pin "@hotwired/turbo-rails", to: "turbo.min.js"
 pin "@hotwired/stimulus", to: "stimulus.min.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
+# A theme's Stimulus controllers, from <theme>/javascript/controllers
+# (theming spec §4): `ThemeFolder#pins` says how. Under `controllers/theme/`,
+# so `copy_controller.js` is the identifier `theme--copy` and cannot be one
+# of the CMS's; preloaded for the `site` entry point alone. A theme adds no
+# pin of its own and no third-party script: a controller imports
+# `@hotwired/stimulus` and nothing else. The map is drawn when the
+# application starts, so a new controller file needs a restart in development.
+ThemeFolder.current.pins&.then do |pins|
+  pin_all_from pins[:dir], under: pins[:under], to: pins[:to], preload: pins[:preload]
+end
 pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", preload: "admin"
 # The Tiptap editor's own extensions/schema (tiptap spec §4.1), imported by
 # `controllers/admin/rich_text/editor_controller.js` as `rich_text/...`.
