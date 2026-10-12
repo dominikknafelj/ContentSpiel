@@ -2,8 +2,8 @@ require "test_helper"
 
 # Where the link in the reset mail points (safe-address spec, "Mail"). The
 # site's configured address when there is one, whatever the request said;
-# without one, and outside production only, the origin of the request that
-# asked, which the controller hands over; otherwise no mail at all and one
+# without one, and in development and test only, the origin of the request
+# that asked, which the controller hands over; otherwise no mail at all and one
 # log line. The mail is delivered by a job, so the origin travels as a plain
 # string.
 class PasswordsMailerTest < ActionMailer::TestCase
@@ -17,9 +17,15 @@ class PasswordsMailerTest < ActionMailer::TestCase
       mail = PasswordsMailer.reset(@user, origin: "http://evil.example:8080")
 
       assert_equal [ @user.email_address ], mail.to
-      links_of(mail).each { |link| assert_operator link, :start_with?, "#{SITE}/cs-studio/password/" }
+      # On the links themselves, not on the encoded mail: that holds a
+      # random Message-ID, a random boundary and the signed token, in which
+      # four given digits turn up by chance now and then.
+      links_of(mail).each do |link|
+        assert_operator link, :start_with?, "#{SITE}/cs-studio/password/"
+        uri = URI.parse(link)
+        assert_equal [ "https", "docs.example.org", 443 ], [ uri.scheme, uri.host, uri.port ]
+      end
       assert_not_includes mail.encoded, "evil.example"
-      assert_not_includes mail.encoded, "8080"
     end
   end
 
@@ -31,9 +37,10 @@ class PasswordsMailerTest < ActionMailer::TestCase
     end
   end
 
-  # IN PRODUCTION THE REQUEST'S ORIGIN IS NEVER USED. It is whatever Host the
-  # request named, and a production site with no address configured answers
-  # every host: a reset asked for under a made-up one would mail the account's
+  # WHERE THE REQUEST'S ORIGIN IS NOT USED (production, and every
+  # environment that is not development or test: `in_production` below). It
+  # is whatever Host the request named, and a site with no address
+  # configured answers every host: a reset asked for under a made-up one would mail the account's
   # owner a valid token on a link to that host.
   test "in production with no address configured no mail is built, whatever origin is handed over, and the log says why" do
     in_production do
@@ -63,10 +70,14 @@ class PasswordsMailerTest < ActionMailer::TestCase
     end
   end
 
-  test "the request's origin is used in development and in test, and not in production" do
+  # An allow-list: an environment nobody thought of (staging, a preview, a
+  # demo) is exactly the kind that sits on a public address without
+  # `PUBLIC_HOST`, and it must not take the link from the request.
+  test "the request's origin is used in development and in test, and in no other environment" do
     assert PasswordsMailer.request_origin_used?(ActiveSupport::EnvironmentInquirer.new("development"))
     assert PasswordsMailer.request_origin_used?(ActiveSupport::EnvironmentInquirer.new("test"))
     assert_not PasswordsMailer.request_origin_used?(ActiveSupport::EnvironmentInquirer.new("production"))
+    assert_not PasswordsMailer.request_origin_used?(ActiveSupport::EnvironmentInquirer.new("staging"))
     assert PasswordsMailer.request_origin_used?, "this suite runs in test, where it is used"
   end
 
@@ -95,14 +106,33 @@ class PasswordsMailerTest < ActionMailer::TestCase
     end
   end
 
+  # The whole path, as the controller starts it: the mailer and the job that
+  # runs it, with everything the three loggers write on the way.
   test "with neither an address nor an origin no mail is delivered, and the log says why without a token" do
     with_site_address(nil) do
       log = capture_log do
-        assert_no_emails { PasswordsMailer.reset(@user).deliver_now }
+        assert_no_emails { perform_enqueued_jobs { PasswordsMailer.reset(@user).deliver_later } }
       end
 
       assert_equal [ NOT_SENT ], log.lines.map(&:strip).grep(/ContentSpiel/)
+      assert_includes log, "ActionMailer::MailDeliveryJob", "the job's own lines are in the capture"
       assert_no_token_in log
+    end
+  end
+
+  # What makes `assert_no_token_in` able to fail: the same capture around a
+  # mail that IS sent holds the token and the address, because Action Mailer
+  # writes a delivered mail to the log at debug. A capture that saw only
+  # `Rails.logger` held neither, whatever the code did.
+  test "the capture sees what Action Mailer and Active Job log: a mail that is sent is in it, token and address" do
+    with_site_address(SITE) do
+      log = capture_log do
+        perform_enqueued_jobs { PasswordsMailer.reset(@user).deliver_later }
+      end
+
+      assert_includes log, "ActionMailer::MailDeliveryJob"
+      assert_includes log, @user.email_address
+      assert_match TOKEN, log
     end
   end
 
@@ -148,6 +178,8 @@ class PasswordsMailerTest < ActionMailer::TestCase
     [ text, html ].each { |link| assert link.present?, "a part of the mail has no link" }
   end
 
+  # An environment in which the request's origin is not used: production,
+  # and any other that is not development or test.
   def in_production(&)
     with_singleton_override(PasswordsMailer, :request_origin_used?, ->(*) { false }, &)
   end
@@ -160,19 +192,28 @@ class PasswordsMailerTest < ActionMailer::TestCase
     ActionMailer::Base.default_url_options = was
   end
 
+  # Everything logged in the block, by anyone on this path. `Rails.logger`
+  # alone is not it: Action Mailer and Active Job were handed the logger
+  # object at boot and keep it, so all three are swapped.
+  LOGGERS = [ Rails, ActionMailer::Base, ActiveJob::Base ].freeze
+
   def capture_log
-    was = Rails.logger
+    were = LOGGERS.map(&:logger)
     io = StringIO.new
-    Rails.logger = ActiveSupport::Logger.new(io)
+    logger = ActiveSupport::Logger.new(io)
+    LOGGERS.each { |owner| owner.logger = logger }
     yield
     io.string
   ensure
-    Rails.logger = was
+    LOGGERS.zip(were) { |owner, was| owner.logger = was }
   end
 
-  # A reset token is a signed message: a long run of URL-safe characters.
+  # A reset token is a signed message: a long run of URL-safe characters
+  # (a job's id, the longest other run on this path, is 36).
+  TOKEN = /[A-Za-z0-9_=-]{40,}/
+
   def assert_no_token_in(log)
-    assert_no_match(/[A-Za-z0-9_=-]{40,}/, log)
+    assert_no_match(TOKEN, log)
     assert_not_includes log, @user.email_address
   end
 end

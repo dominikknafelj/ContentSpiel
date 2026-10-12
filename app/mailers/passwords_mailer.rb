@@ -8,26 +8,33 @@ class PasswordsMailer < ApplicationMailer
   #
   # - The site's configured address (`PUBLIC_HOST`) whenever there is one,
   #   whatever `origin` says.
-  # - Otherwise, OUTSIDE PRODUCTION ONLY (`request_origin_used?`), `origin`:
+  # - Otherwise, IN DEVELOPMENT AND TEST ONLY (`request_origin_used?`), `origin`:
   #   the origin of the request that asked for the reset
   #   (`Admin::PasswordsController#create`), which is where the person was a
   #   moment ago. It is a String because the mail is delivered by a job. It
   #   is parsed as an address and nothing else of it is used: a value that
-  #   is not an origin is no origin, and it is never written anywhere
-  #   unparsed, the log included.
+  #   is not an origin is no origin, and the mailer never logs it. (Active
+  #   Job logs a job's arguments, so in development the origin is in the
+  #   job's own lines and in the queue's row: an address, never a token.)
   # - Otherwise no mail: `mail` is not called, so Action Mailer delivers
   #   nothing, and the log says what to set. The line names no person and
   #   holds no token.
   #
-  # WHY NOT IN PRODUCTION. The request's origin is whatever `Host` the
-  # request named, and a production site with no address configured refuses
-  # no host. Anyone could then ask for a reset of an address they know under
-  # a host of their own, and the account's owner would be mailed a valid
-  # token on a link to that host (password-reset poisoning). On a
-  # developer's machine the request's origin is the only address there is,
-  # and the only one asking is the developer.
+  # WHY NOWHERE ELSE. The request's origin is whatever `Host` the request
+  # named, and a site with no address configured refuses no host. Anyone
+  # could then ask for a reset of an address they know under a host of their
+  # own, and the account's owner would be mailed a valid token on a link to
+  # that host (password-reset poisoning). On a developer's machine the
+  # request's origin is the only address there is, and the only one asking
+  # is the developer.
+  #
+  # An ALLOW-list (`local?` is Rails' own "development or test"), never
+  # `!env.production?`: a staging, preview or demo environment is exactly
+  # the kind that sits on a public address without `PUBLIC_HOST`, and host
+  # authorisation is set up from `production.rb` alone, so an environment
+  # nobody named here must fail closed.
   def self.request_origin_used?(env = Rails.env)
-    !env.production?
+    env.local?
   end
 
   def reset(user, origin: nil)

@@ -99,8 +99,8 @@ module Setup
 
     private
       # Without an address the app accepts any Host header and builds the
-      # addresses in its pages from it, and in production sends no reset
-      # mail at all (`PasswordsMailer`: a link taken from the request could
+      # addresses in its pages from it, and outside development and test
+      # sends no reset mail at all (`PasswordsMailer`: a link taken from the request could
       # be made to point anywhere).
       def site_address
         if @address.configured?

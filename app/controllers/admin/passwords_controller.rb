@@ -15,11 +15,11 @@ module Admin
       if user = User.find_by(email_address: params[:email_address])
         # The link in the mail is the site's configured address when there
         # is one, and then the request's origin is not handed over at all
-        # (it is whatever Host this request named). Without one, and outside
-        # production only (`PasswordsMailer.request_origin_used?`, which
-        # says why), this request's origin is the only address anybody
+        # (it is whatever Host this request named). Without one, and in
+        # development and test only (`PasswordsMailer.request_origin_used?`,
+        # which says why), this request's origin is the only address anybody
         # knows: a String, because a job delivers the mail, which
-        # `PasswordsMailer` parses before it uses any of it. In production
+        # `PasswordsMailer` parses before it uses any of it. Anywhere else
         # without an address the mailer builds no mail and logs why; the
         # answer below is the same words either way.
         PasswordsMailer.reset(user, **reset_mail_origin).deliver_later
