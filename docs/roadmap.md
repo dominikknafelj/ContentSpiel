@@ -14,7 +14,7 @@ Decided by the owner on 2026-10-11: the first stable version is the focus, and e
 2. **Theming as a real mechanism.** Shipped 2026-10-12 ("Shipped"): a site keeps a theme folder in its own repository, sets `THEME_PATH`, and is drawn by it, with the default theme behind whatever the folder does not hold and a written contract. The Code block joined the contract on 2026-10-12 ("Shipped"), the first block type to do so after it was written. Still open, each its own work: a published CMS image, and the documentation theme's move from the spike's shape to the contract's (in `contentspiel-docs`; "Next", item 9, has the list).
 3. **It can be hosted properly.** The items under "Before the first deploy" move ahead of features, beginning with the gaps the dry run found ("Hosting and the dry run" there). The first of its four parts, "safe on a public address", shipped 2026-10-12 (under "Shipped"); mail, the sitemap and starting up, and the setup wizard follow in that order.
 4. **The documentation site runs in public.** `contentspiel-docs` ("Next", item 9) is the first real integration, and is used as the prototype that finds the gaps in 2 and 3.
-5. **Pages as nodes in the mind graph** (the owner's decision): the graph shows posts and tags today; pages join it.
+5. **Pages as nodes in the mind graph** (the owner's decision): the graph shows posts and tags today; pages join it. Designed in two steps (`docs/superpowers/specs/2026-10-12-pages-in-the-mind-graph-design.md`): step one is pages, the tree and what a page lists; step two, links in the text, is under "Dashboard and CS Studio".
 
 ## Decisions already made
 
@@ -324,6 +324,8 @@ All Could (trash spec §10).
 | A "sample" marker on starter content | Could | |
 | A post's neighbourhood in the post editor (an embedded mind graph panel) | Could | Mind graph spec §2, §10 |
 | WebGL rendering for sites beyond the mind graph's cap (2,000 posts) | Could | Mind graph spec §2, §10 |
+| Mind graph, pages, step two: links in the text as lines (read out of every rich-text document and kept as derived rows), the legend toggle "Links in text" (off by default), the list filter "Not linked from anywhere", and "the pages and posts that link to it" in a page's local view | Should | `2026-10-12-pages-in-the-mind-graph-design.md`, "What this does not do"; the owner's split of 2026-10-12 |
+| Mind graph: saved positions, so a large graph opens at rest; only if step one's measurement shows more than three seconds to rest | Could | Same spec, decision 7 |
 
 ### Found while writing the guides
 
