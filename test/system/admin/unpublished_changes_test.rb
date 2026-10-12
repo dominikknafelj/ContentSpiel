@@ -2,8 +2,9 @@ require "application_system_test_case"
 
 # What a live record's header, the page tree, the posts list and the dashboard
 # say once its rows have moved on from what is published (drafts plan, task 6).
-# The answer to a save carries the header's two publishing parts, so the mark
-# appears with the first change and not at the next reload.
+# The answer to a save carries the header's chip part, so the mark and the
+# two buttons it shows appear with the first change and not at the next
+# reload. The dialog those buttons open is `drafts_test.rb`'s.
 class UnpublishedChangesSystemTest < ApplicationSystemTestCase
   HEADER = "header.admin-editor-header".freeze
 
@@ -21,7 +22,7 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     assert_selector "#{HEADER} #publishing-chip", visible: :all
     assert_selector "#{HEADER} #publishing-actions", visible: :all
     assert_no_selector "#{HEADER} [data-unpublished-changes]"
-    assert_no_button "Publish changes"
+    assert_no_button "Publish changes…"
     assert_no_selector "li[data-page-id='#{@live.id}'] [data-unpublished-changes]"
 
     # One value set in one go, then Tab: the field's own blur saves at once.
@@ -30,12 +31,14 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     title.send_keys(:tab)
 
     assert_selector "#{HEADER} #publishing-chip [data-unpublished-changes]", text: "Unpublished changes"
-    assert_selector "#{HEADER} #publishing-actions button", text: "Publish changes"
+    assert_selector "#{HEADER} #publishing-actions button", text: "Publish changes…"
+    assert_selector "#{HEADER} #publishing-actions button", text: "Discard changes…"
     assert_selector "li[data-page-id='#{@live.id}'] [data-unpublished-changes][aria-label='Unpublished changes']"
     assert @live.reload.unpublished_changes?
     assert_equal "Live page", Publishing.current(@live).snapshot.dig("fields", "title", "en"), "the site still shows what was published"
 
-    press "Publish changes"
+    press "Publish changes…"
+    within("dialog[open]") { press "Publish changes" }
 
     assert_no_selector "#{HEADER} [data-unpublished-changes]", wait: 10
     assert_no_selector "#{HEADER} #publishing-actions button"
@@ -93,7 +96,7 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
 
   def send_delayed = page.execute_script("window.__delayed(); window.__delayed = null")
 
-  test "Publish changes pressed while a block's autosave is still out is sent once, after the save, and the copy holds the typed text" do
+  test "Publish changes pressed in its dialog while a block's autosave is still out is sent once, after the save, and the copy holds the typed text" do
     page_record = nil
     Current.set(actor: users(:one)) do
       page_record = create_page(title: "Press", published: false)
@@ -104,7 +107,7 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
     visit admin_page_path(page_record)
     await_notes_live
-    assert_selector "#{HEADER} #publishing-actions button", text: "Publish changes"
+    assert_selector "#{HEADER} #publishing-actions button", text: "Publish changes…"
     copies = Publishing::Version.of(page_record).count
 
     delay_next("PATCH", "/content_blocks/#{@block.id}")
@@ -112,7 +115,9 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     find("#content_block_#{@block.id} .ProseMirror").send_keys("Z")
     await_delayed
 
-    press "Publish changes"
+    press "Publish changes…"
+    within("dialog[open]") { press "Publish changes" }
+    await_frames
     assert_equal copies, Publishing::Version.of(page_record).count, "the press waits for the save that is out"
     send_delayed
 
@@ -136,7 +141,7 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
       visit admin_page_path(@live)
       await_notes_live
       assert_no_selector "#{HEADER} [data-unpublished-changes]"
-      assert_no_button "Publish changes"
+      assert_no_button "Publish changes…"
     end
 
     title = find_field("Title")
@@ -146,16 +151,18 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
 
     using_session(:dana) do
       assert_selector "#{HEADER} #publishing-chip [data-unpublished-changes]", wait: LIVE
-      assert_selector "#{HEADER} #publishing-actions button", text: "Publish changes", wait: LIVE
+      assert_selector "#{HEADER} #publishing-actions button", text: "Publish changes…", wait: LIVE
+      assert_selector "#{HEADER} #publishing-actions button", text: "Discard changes…", wait: LIVE
     end
 
     assert_writes_settled
-    press "Publish changes"
+    press "Publish changes…"
+    within("dialog[open]") { press "Publish changes" }
     assert_no_selector "#{HEADER} [data-unpublished-changes]", wait: 10
 
     using_session(:dana) do
       assert_no_selector "#{HEADER} [data-unpublished-changes]", wait: LIVE
-      assert_no_button "Publish changes"
+      assert_no_button "Publish changes…"
     end
   end
 end
