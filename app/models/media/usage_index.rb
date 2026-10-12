@@ -50,6 +50,15 @@ class Media::UsageIndex
         # when a copy is taken. A destroyed owner takes both (`role` is never
         # NULL, so `where.not(role: nil)` is every row).
         Media::Usage.where(owner: owner).where.not(role: (owner.destroyed? ? nil : PUBLISHED)).delete_all
+        # The copy's rows exist only while the record is live or scheduled
+        # (the public reads no copy of a draft: `Publishing`'s head), so an
+        # unpublish releases them in the same transaction. Publishing again
+        # takes a new copy, whose own refresh writes them again. A TRASHED
+        # record keeps them: it is not public, but restoring it makes the
+        # same copy public again, and the image it shows must still be
+        # there (`Media::Usage.by_kept_owner` already leaves a trashed
+        # owner out of "used by something kept").
+        Media::Usage.where(owner: owner, role: PUBLISHED).delete_all if !owner.destroyed? && owner.respond_to?(:published_at) && owner.published_at.nil?
         insert_rows(rows)
       end
     end
@@ -61,7 +70,9 @@ class Media::UsageIndex
     # pending one replaced by the clock keeps its rows until the next copy is
     # taken: more protection than needed, never less.
     def refresh_published(record, now: Time.current)
-      copies = [ Publishing.current(record, now: now), Publishing.pending(record, now: now) ].compact
+      # The copies as readers see them: none for a record that is not
+      # published (`Publishing.published_all`).
+      copies = record.published_at.nil? ? [] : [ Publishing.current(record, now: now), Publishing.pending(record, now: now) ].compact
       ids = copies.flat_map { |version| asset_ids_in(version) }.uniq
       stamp = Time.current
       rows = Media::Asset.where(id: ids).pluck(:id).map { |id| row(asset_id: id, owner: record, role: PUBLISHED, locale: nil, now: stamp) }

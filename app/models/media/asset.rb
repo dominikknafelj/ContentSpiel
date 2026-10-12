@@ -312,12 +312,32 @@ class Media::Asset < ApplicationRecord
     loaded = usages.includes(:owner).to_a
     self.class.preload_usage_places(loaded.map(&:owner))
 
-    loaded.group_by { |usage| [ usage.owner_type, usage.owner_id ] }.map do |_key, group|
+    entries = loaded.group_by { |usage| [ usage.owner_type, usage.owner_id ] }.map do |_key, group|
       {
         owner: group.first.owner,
         roles: group.map(&:role).uniq,
         locales: group.filter_map(&:locale).uniq
       }
+    end
+    # A record counts once. The published copy's row (`published`) says "the
+    # site still shows this image" and is named only when nothing in the rows
+    # shows it any more: it is left out of a group that has another role, and
+    # a group of it alone is left out when the same page or post (itself or
+    # through one of its blocks) has another group.
+    entries.each { |entry| entry[:roles] -= [ "published" ] if entry[:roles].size > 1 }
+    covered = entries.reject { |entry| entry[:roles] == [ "published" ] }.filter_map { |entry| usage_place_of(entry[:owner]) }
+    entries.reject { |entry| entry[:roles] == [ "published" ] && covered.include?(usage_place_of(entry[:owner])) }
+  end
+
+  # `{ asset id => [place, ...] }` for these assets: the pages and posts that
+  # use each by a kept owner, every place once however many ways it uses the
+  # image (hero, blocks, bodies, the published copy). The one place the MCP
+  # tools' `usage_count`s come from, so `list_media` and `get_media` agree.
+  def self.usage_places_for(asset_ids)
+    usages = Media::Usage.where(media_asset_id: asset_ids).by_kept_owner.includes(:owner).to_a
+    preload_usage_places(usages.map(&:owner))
+    usages.group_by(&:media_asset_id).transform_values do |rows|
+      rows.filter_map { |usage| usage.owner.is_a?(ContentBlock) ? usage.owner.owner : usage.owner }.uniq
     end
   end
 

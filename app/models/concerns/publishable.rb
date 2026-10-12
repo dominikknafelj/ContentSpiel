@@ -103,11 +103,11 @@ module Publishable
   # not change when the rows do, and taking the next copy bumps
   # (publishing the changes), or, for a change with a time of its own,
   # the part of `PublicSite.content_version` that follows the copies by the
-  # clock. Without a copy the rows are what the site shows, and every write
+  # clock. Without a copy in force the rows are what the site shows, and every write
   # moves it, as it always did. A `touch` (a block's write) notes nothing, so
   # it moves the version only without a copy.
   def bump_public_version_when_live
-    PublicSite.bump_version! if live_before_or_after_save? && (@immediate_change || !Publishing.copied?(self))
+    PublicSite.bump_version! if live_before_or_after_save? && (@immediate_change || !Publishing.in_force?(self))
   ensure
     forget_live_before_change
   end

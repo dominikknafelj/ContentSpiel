@@ -325,13 +325,10 @@ module Admin
       # types), so `entry[:roles]` isn't guaranteed to be a single-element
       # Array the way it usually is in practice.
       #
-      # `published` is named only when it is all there is: when the rows still
-      # use the image as well, "Hero image, Published version" says the same
-      # thing twice; it is the entry that stays after the rows dropped it.
-      def role_label(roles)
-        shown = roles.size > 1 ? roles - [ "published" ] : roles
-        shown.map { |role| ROLE_LABELS.fetch(role, role) }.join(", ")
-      end
+      # `published` is already left out of a group that has another role and
+      # out of the list when the same place has another group
+      # (`Media::Asset#usages_summary`), so it is only ever named alone.
+      def role_label(roles) = roles.map { |role| ROLE_LABELS.fetch(role, role) }.join(", ")
     end
   end
 end

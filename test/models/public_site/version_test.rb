@@ -279,8 +279,9 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
   end
 
   # A move is written with `update_columns` and a duplicate through saves
-  # and a reorder: each touches the page, whose `after_commit` moves the
-  # version of a live one.
+  # and a reorder: each touches the page. The touch moves the version only of
+  # a live page that has no copy in force; with one, the site shows the copy
+  # and the next publish moves it.
   test "a live page's block moved between containers or duplicated stays, as a draft's does" do
     [ create_page(title: "Live"), create_page(title: "Draft", published: false) ].each do |page|
       expectation = :assert_stays
@@ -331,7 +332,28 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
 
     assert_stays("a live post gaining a tag") { ok(Posts::Save.call(post, attributes: { tag_names: %w[one two] })) }
     assert_stays("a live post losing a tag") { ok(Posts::Save.call(post, attributes: { tag_names: %w[two] })) }
+    assert_stays("a tag put on a live post around the service") { post.tags << Tag.create!(name: "three") }
     assert_moves("publishing the changes") { publish_changes(post) }
+  end
+
+  test "a tag put on a live post that has no copy moves, around the service too" do
+    post = create_post(title: "Bare", tags: [ "one" ])
+    Publishing::Version.of(post).delete_all # version: none (a test takes the copy away: this post is served from its rows)
+
+    assert_moves("a tag put on a live post with no copy") { post.tags << Tag.create!(name: "four") }
+  end
+
+  # A change published with a time on a record that had no copy leaves it
+  # shown from its rows until that time: its autosaves are still public.
+  test "a live record whose only copy is pending still moves on every write" do
+    page = create_page(title: "Waiting")
+    Publishing::Version.of(page).delete_all # version: none (a test takes the copy away)
+    publish_changes(page, at: 2.days.from_now)
+    assert_not Publishing.in_force?(page)
+    assert Publishing.pending(page)
+
+    assert_moves("a title") { ok(Pages::Save.call(page.reload, translations: { "en" => { title: "Waiting, edited" } })) }
+    assert_moves("a block") { block_on(page) }
   end
 
   # --- Addresses ---------------------------------------------------------------

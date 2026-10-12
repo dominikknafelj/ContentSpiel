@@ -59,7 +59,7 @@ module Publishing
   }.freeze
 
   # NEVER STORED: the record's identity and bookkeeping; a rebuilt record has
-  # the row's (`updated_at` feeds the sitemap (the ETag names the copy's id for a record that has one), which read rows).
+  # the row's (`updated_at` dates a record with no copy in the sitemap; a record with one is dated by its copy, and the ETag names the copy's id).
   NEVER_STORED = {
     "Page" => { "id" => "the record itself", "created_at" => "bookkeeping", "updated_at" => "bookkeeping" },
     "Post" => { "id" => "the record itself", "created_at" => "bookkeeping", "updated_at" => "bookkeeping" },
@@ -115,6 +115,11 @@ module Publishing
   def pending(record, now: Time.current) = Version.of(record).pending(now).first
 
   def copied?(record) = Version.of(record).exists?
+
+  # Whether the public sees a copy of this record now: one is in force. A
+  # record with only a pending copy (a change published with a time, on a
+  # record that had no copy) is still shown from its rows until that time.
+  def in_force?(record, now: Time.current) = Version.of(record).in_force(now).exists?
 
   # THE ONE CHECK THAT REFUSES A SAVE OR A PUBLISH FOR AN ADDRESS, after the
   # slug's validation (`HasPublicPaths#public_paths_are_available`), which

@@ -133,6 +133,25 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The headline, on a page's own URL: rows change, a conditional GET still
+  # answers 304; publishing the changes answers 200 with them.
+  test "a page's autosave leaves its conditional GET a 304, and publishing the changes answers 200 with them" do
+    page = Pages::Save.call(attributes: { parent: @root, published: true }, translations: { "en" => { title: "Headline before" } }).record
+    path = PublicSite::Urls.new.path_for(page.reload, :en)
+    get path
+    etag = response.headers["ETag"]
+    assert_includes response.body, "Headline before"
+
+    assert Pages::Save.call(page, translations: { "en" => { title: "Headline after" } }).ok?
+    get path, headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+
+    publish_changes(page)
+    get path, headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_includes response.body, "Headline after"
+  end
+
   test "a 304 for a page reads its copy's id and not its blocks" do
     page = Pages::Save.call(attributes: { parent: @root, published: true }, translations: { "en" => { title: "Light" } }).record
     assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("Heavy") } }).ok?

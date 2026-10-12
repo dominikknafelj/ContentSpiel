@@ -117,7 +117,7 @@ class SitemapTest < ActiveSupport::TestCase
 
   # The date of a record with a copy is the copy's, not the row's: an autosave
   # of live content is not a change a crawler can see.
-  test "a live page's date is when its copy came into force, or when it went live if that was later, and an autosave does not move it" do
+  test "a live page's date is when its copy came into force, and an autosave does not move it" do
     page = create_page(title: "Dated")
     first = lastmod_of("/dated")
 

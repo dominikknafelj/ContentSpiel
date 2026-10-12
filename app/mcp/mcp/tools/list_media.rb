@@ -78,7 +78,7 @@ module Mcp
       # whether an image is "still used" shouldn't be told yes because of a
       # reference that's itself in the trash.
       def self.usage_counts(assets)
-        Media::Usage.where(media_asset_id: assets.map(&:id)).by_kept_owner.group(:media_asset_id).count
+        Media::Asset.usage_places_for(assets.map(&:id)).transform_values(&:size)
       end
       private_class_method :usage_counts
 

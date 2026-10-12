@@ -45,6 +45,6 @@ class PostTag < ApplicationRecord
   def bump_public_version_when_post_live
     # A post that has a copy shows the copy's tags: its tags change what the
     # public sees when the changes are published (taking the next copy bumps).
-    PublicSite.bump_version! if post&.live? && !Publishing.copied?(post)
+    PublicSite.bump_version! if post&.live? && !Publishing.in_force?(post)
   end
 end

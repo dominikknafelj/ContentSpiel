@@ -242,7 +242,7 @@ class ContentBlock < ApplicationRecord
   def bump_public_version_when_owner_live
     return if owner.respond_to?(:live?) && !owner.live?
     # A block of a record that has a copy is not what the site shows.
-    return if owner.respond_to?(:published_versions) && Publishing.copied?(owner)
+    return if owner.respond_to?(:published_versions) && Publishing.in_force?(owner)
 
     PublicSite.bump_version!
   end

@@ -88,7 +88,7 @@ module Mcp
       # `pages.read`/`posts.read` grant actually governs. `.uniq` folds
       # together e.g. a page's hero and one of its own image blocks, which
       # would otherwise be two owner groups resolving to the same page.
-      # `place_for` drops a stale index entry (an owner already gone) or an
+      # `Media::Asset.usage_places_for` drops a stale index entry (an owner already gone) or an
       # orphaned block with no page/post of its own -- neither is
       # something this can name.
       #
@@ -99,18 +99,9 @@ module Mcp
       # `usage_count` and `usages` below come from this one already-filtered
       # list, so neither counts nor names a trashed owner.
       def self.usage_places(asset)
-        usages = asset.usages.by_kept_owner.includes(:owner).to_a
-        Media::Asset.preload_usage_places(usages.map(&:owner))
-        usages.filter_map { |usage| place_for(usage.owner) }.uniq
+        Media::Asset.usage_places_for([ asset.id ]).fetch(asset.id, [])
       end
       private_class_method :usage_places
-
-      def self.place_for(owner)
-        return nil if owner.nil?
-
-        owner.is_a?(ContentBlock) ? owner.owner : owner
-      end
-      private_class_method :place_for
 
       def self.kind_of(place) = place.is_a?(Post) ? "post" : "page"
       private_class_method :kind_of
