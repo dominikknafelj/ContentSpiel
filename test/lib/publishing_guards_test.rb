@@ -62,6 +62,38 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     assert_equal SETTLERS.keys, callers_of("settle!")
   end
 
+  # "A live record has a copy" is not enforced by the database or by a
+  # callback: a record written around the services is served, listed and
+  # given its address from its ROWS (`Publishing.published_all`,
+  # `Publishing::Listing.blocks`). What keeps that a case of tests and a
+  # console is that the application sets a publication time in two places
+  # only, each of which takes the copy in the same transaction. A third place
+  # would publish records with no copy from CS Studio itself.
+  PUBLISHERS = {
+    "app/services/pages/save.rb" => "publishes, schedules and unpublishes a page, and takes its copy",
+    "app/services/posts/save.rb" => "publishes, schedules and unpublishes a post, and takes its copy",
+    "app/models/concerns/publishable.rb" => "publish_now! and unpublish!: called by nothing under app/ or lib/ (tests and a console)",
+    "app/services/starter_contents/add.rb" => "unsaved stand-ins to ask the rights for; the records are written by the save services"
+  }.freeze
+  ASSIGNS_PUBLISHED_AT = /\.published_at\s*=(?![=~])|\b(?:update!?|update_columns?|update_all|assign_attributes|new|create!?|insert_all!?|upsert_all)\b[^\n]*\bpublished_at:/
+
+  test "published_at is assigned only in the two save services" do
+    assigning = sources("app", "lib").select { |_path, source| source.lines.any? { |line| !line.strip.start_with?("#") && line.match?(ASSIGNS_PUBLISHED_AT) } }.keys
+
+    assert_equal PUBLISHERS.keys.sort, assigning.sort, "a new place that sets published_at must take the copy too (drafts spec §4.1): read Pages::Save before adding it here"
+    assert_empty sources("app", "lib").select { |_path, source| source.lines.any? { |line| !line.strip.start_with?("#") && line.match?(/\.(?:publish_now!|unpublish!)/) } }.keys,
+      "publish_now! and unpublish! take no copy: publish through Pages::Save or Posts::Save"
+  end
+
+  test "the published_at guard sees a setter, an update and a new record, and not a condition" do
+    [ "page.published_at = now", "post.update!(published_at: nil)", "Page.new(parent: home, published_at: now)", "scope.update_all(published_at: now)" ].each do |line|
+      assert_match ASSIGNS_PUBLISHED_AT, line
+    end
+    [ "Post.where(published_at: ..now)", "page.published_at == nil", "Pages::Save.call(page, attributes: { published_at: at })" ].each do |line|
+      assert_no_match ASSIGNS_PUBLISHED_AT, line
+    end
+  end
+
   test "a copy still refuses every write of its own: update, destroy and a changed attribute saved" do
     page = create_page(title: "Kept as taken")
     copy = Publishing.current(page)

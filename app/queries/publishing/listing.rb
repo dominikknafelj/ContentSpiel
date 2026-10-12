@@ -103,15 +103,6 @@ module Publishing
         rows + copied
       end
 
-      # The content types the list blocks of these pages' CURRENT copies name,
-      # whatever the pages' publication or trash state: `nil` for a block that
-      # names none (it lists every type). For `PublicSite::Paths
-      # .sync_posts_listed_under`, which re-derives the posts a page's copy may
-      # have been listing until the write it is called from.
-      def copied_types(page_ids:, now: Time.current)
-        current_copies_listing(now).where(record_id: page_ids).flat_map { |version| types_of(version) }
-      end
-
       # The content types the list blocks of the site's CURRENT copies name
       # when the block's own filter is one of these tag names (trimmed,
       # whatever the case), with or without a recorded id, or recorded one of

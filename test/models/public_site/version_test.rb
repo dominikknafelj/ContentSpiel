@@ -318,7 +318,7 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_empty ActiveRecord.all_open_transactions, "the case needs no joinable transaction open"
 
     before = counter
-    statements = capture_sql { PublicSite::Paths.sync(post.reload) }
+    statements = capture_sql { PublicSite::Paths.refresh(posts: [ post.reload ]) }
 
     assert_equal "/blog/renamed", post.full_path("en")
     assert_equal before + 1, counter

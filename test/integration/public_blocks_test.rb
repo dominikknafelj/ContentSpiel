@@ -212,7 +212,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 2, position: 0, settings: { "content_type" => "blog" })
     post = create_post(title: "In a column")
     other = create_post(title: "Another post")
-    PublicSite::Paths.sync_posts("blog")
+    PublicSite::Paths.refresh(posts: Post.where(content_type: "blog"))
 
     get "/blog/#{post.slug}"
 
@@ -243,7 +243,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_operator top_level.position, :<, in_column.position
     post = create_post(title: "Listed twice")
     other = create_post(title: "Another post")
-    PublicSite::Paths.sync_posts("blog")
+    PublicSite::Paths.refresh(posts: Post.where(content_type: "blog"))
 
     3.times do
       get "/blog/#{post.slug}"
@@ -267,7 +267,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 0, settings: { "content_type" => "blog" })
     post = create_post(title: "Counted")
-    PublicSite::Paths.sync_posts("blog")
+    PublicSite::Paths.refresh(posts: Post.where(content_type: "blog"))
     built = 0
     original = BlockOutline.method(:new)
 

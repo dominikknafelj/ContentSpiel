@@ -115,7 +115,7 @@ module Publishing
     # (nearly always) this is one statement on a partial index that is empty.
     def self.settle!(now = Time.current)
       due = unscoped.where(settled_at: nil, live_at: ..now).order(:id).lock.pluck(:id, :record_type, :record_id)
-      unscoped.where(id: due.map(&:first)).update_all(settled_at: now) if due.any? # version: none (a mark on a copy, not content: an address that moves bumps in `PublicSite::Paths.write_all`)
+      unscoped.where(id: due.map(&:first)).update_all(settled_at: now) if due.any? # version: none (a mark on a copy, not content: the refresh that follows bumps for an address that moves)
       due
     end
 

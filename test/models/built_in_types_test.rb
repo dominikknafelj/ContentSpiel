@@ -59,7 +59,7 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     post = create_post(title: "Hello")
     post.update_column(:content_type, "gallery")
 
-    assert_nothing_raised { PublicSite::Paths.sync(post) }
+    assert_nothing_raised { PublicSite::Paths.refresh(posts: [ post ]) }
     assert_nil post.reload.full_path("en")
     assert_nil block.reload.definition
     assert_empty page.content_blocks.listing

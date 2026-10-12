@@ -14,7 +14,7 @@ class PostTag < ApplicationRecord
   #
   # A post that is published or scheduled and has a copy is listed by its
   # COPY's tags, so for it this sync finds nothing to move: its address
-  # follows when its changes are published (`PublicSite::Paths.published`).
+  # follows when its changes are published (the copy's own refresh).
   #
   # `after_commit`, not `after_save`/`after_destroy`: a join row is written
   # inside whatever transaction its caller opened (a CS Studio save, a
@@ -38,7 +38,7 @@ class PostTag < ApplicationRecord
   # this fires, after the whole transaction commits, the post row is gone, so
   # the lazily-loaded association finds nothing left to sync.
   def sync_post_paths
-    PublicSite::Paths.sync(post) if post
+    PublicSite::Paths.refresh(posts: [ post ]) if post
   end
 
   # No post (it was destroyed with this row): its own `after_commit` decides.

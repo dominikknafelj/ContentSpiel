@@ -107,7 +107,7 @@ module Tags
       # canonical page depends on its tags only through listing blocks that
       # filter by tag, and every block that names either tag is in
       # `content_types`, which this re-derives from scratch.
-      content_types.each { |content_type| PublicSite::Paths.sync_posts(content_type) }
+      refresh_posts_of(content_types)
       success(merged)
     end
 

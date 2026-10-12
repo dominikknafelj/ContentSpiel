@@ -33,7 +33,7 @@ module Tags
       end
       return failure(@tag) unless destroyed
 
-      content_types.each { |content_type| PublicSite::Paths.sync_posts(content_type) }
+      refresh_posts_of(content_types)
       success(@tag)
     end
 

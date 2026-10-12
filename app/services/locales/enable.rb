@@ -55,14 +55,11 @@ module Locales
         # first (spec §5.4), which threw away every redirect row -- the old
         # URLs of renamed or moved pages and posts, in *every* language --
         # the moment any language was enabled (spec §9.2 promises old URLs
-        # keep 301ing). Syncing the tree top-down and then every post only
-        # adds the new language's rows (and corrects any other stale ones
-        # the same way a save would), leaving existing redirects in place.
-        # Pages before posts, since a post's path is read off its canonical
-        # page's freshly written row.
-        root = Page.find_by(parent_id: nil)
-        PublicSite::Paths.sync_subtree(root) if root
-        PublicSite::Paths.sync_posts(nil)
+        # keep 301ing). Refreshing everything (the tree top-down, then every
+        # post) only adds the new language's rows (and corrects any other
+        # stale ones the same way a save would), leaving existing redirects
+        # in place.
+        PublicSite::Paths.refresh(everything: true)
         # Which languages are targets changed, so every stored translation
         # state (`translation_states`) is recomputed. Synchronous and
         # proportional to the site's size; fine while sites are small, and

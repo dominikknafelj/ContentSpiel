@@ -238,7 +238,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_equal team, PublicPath.current.find_by(locale: "en", path: "/blog/team").record
 
     Locales.enabled.each { |locale| Mobility.with_locale(locale) { team.update!(slug: "crew") } }
-    PublicSite::Paths.sync(post)
+    PublicSite::Paths.refresh(posts: [ post ])
     assert_equal "/blog/team", current(post)
   end
 
@@ -297,7 +297,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     # Around the callbacks, so that one sync sees both changes at once.
     blogs.content_blocks.first.update_columns(settings: { "content_type" => "now_update" })
     updates.content_blocks.first.update_columns(settings: { "content_type" => "blog" })
-    PublicSite::Paths.sync_posts(nil)
+    PublicSite::Paths.refresh(posts: Post.all)
 
     assert_equal [ "/second/same", "/first/same" ], [ current(post), current(update) ]
     assert_empty PublicPath.redirects.where(locale: "en", path: %w[/first/same /second/same]), "a redirect can't sit on a live address"
@@ -686,7 +686,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       # A page unpublished, its list block changed, and published again: its
       # own sync runs before the new copy is taken and reads the older copy,
       # which is in force again from the moment the page has a time, and the
-      # copy's announcement corrects it (`PublicSite::Paths.published`).
+      # copy's own refresh corrects it (`Publishing::Version.take!`).
       ok! Pages::Save.call(archive.reload, attributes: { published: false })
       assert_equal "/writing/blog/old", current(old), "a draft listing loses to a live one"
       assert_parity "unpublishing a page whose copy lists posts"
@@ -934,10 +934,10 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     listing(@root, "Blog", "blog")
     5.times { |index| Post.create!(content_type: :blog, title: "Post #{index}", published_at: 1.day.ago) }
     PublicPath.where(record_type: "Post").delete_all
-    few = capture_sql { PublicSite::Paths.sync_posts("blog") }
+    few = capture_sql { PublicSite::Paths.refresh(posts: Post.where(content_type: "blog")) }
     45.times { |index| Post.create!(content_type: :blog, title: "More #{index}", published_at: 1.day.ago) }
     PublicPath.where(record_type: "Post").delete_all
-    many = capture_sql { PublicSite::Paths.sync_posts("blog") }
+    many = capture_sql { PublicSite::Paths.refresh(posts: Post.where(content_type: "blog")) }
 
     assert_equal 50 * Locales.enabled.size, PublicPath.current.where(record_type: "Post").count
     assert_equal few.size, many.size, "the statements grew with the posts:\n#{many.map { |sql| sql.first(160) }.join("\n")}"
@@ -1188,10 +1188,10 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert Pages::Save.call(copied, attributes: { published: true }).ok?
     5.times { |index| create_post(title: "Post #{index}", tags: [ index.even? ? "rows" : "copy" ]) }
     PublicPath.where(record_type: "Post").delete_all
-    few = capture_sql { PublicSite::Paths.sync_posts("blog") }
+    few = capture_sql { PublicSite::Paths.refresh(posts: Post.where(content_type: "blog")) }
     45.times { |index| create_post(title: "More #{index}", tags: [ index.even? ? "rows" : "copy" ]) }
     PublicPath.where(record_type: "Post").delete_all
-    many = capture_sql { PublicSite::Paths.sync_posts("blog") }
+    many = capture_sql { PublicSite::Paths.refresh(posts: Post.where(content_type: "blog")) }
 
     assert_equal 50 * Locales.enabled.size, PublicPath.current.where(record_type: "Post").count
     assert_equal few.size, many.size, "the statements grew with the posts:\n#{many.map { |sql| sql.first(160) }.join("\n")}"

@@ -52,6 +52,10 @@ module Tags
         Publishing::Listing.copied_types_naming(names, tag_ids: tag_ids)).uniq
     end
 
+    def refresh_posts_of(content_types)
+      PublicSite::Paths.refresh(posts: content_types.include?(nil) ? Post.all : Post.where(content_type: content_types))
+    end
+
     # An open post form resends every tag chip on every autosave, so a post
     # that carried `tag` and is being edited right now would put the tag
     # straight back (`Posts::Save#build_tag` creates a name it can't find).

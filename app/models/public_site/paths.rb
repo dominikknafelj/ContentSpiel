@@ -275,12 +275,6 @@ module PublicSite
       write_all(post_paths(posts, hosts: hosts), hosts: hosts)
     end
 
-    # The old names, each a thin call of `refresh` until its callers pass
-    # what they touched themselves.
-    def sync(record) = refresh(posts: [ record ])
-    def sync_posts(content_type) = refresh(posts: content_type ? Post.where(content_type: content_type) : Post.all)
-    def sync_posts_listed_under(pages) = refresh(pages: pages)
-
     # THE ONE TIME WINDOW LEFT. A scheduled page becomes live
     # (`Publishable#live?`) when `published_at` passes, and no row is written
     # at that moment -- but a live chain is the first thing `canonical_page`
@@ -331,8 +325,8 @@ module PublicSite
     #
     # A trashed page or post has no URL either (trash spec §5.2). Returning
     # nil here, rather than deleting rows from the trash services, is what
-    # keeps every other writer -- `rebuild!`, `sync_posts`, an ancestor's
-    # `sync_subtree` -- from ever giving it one back; a record whose path
+    # keeps every refresh -- of the record, of an ancestor, of everything --
+    # from ever giving it one back; a record whose path
     # comes out nil loses its current row *and* its redirects for that
     # locale (`write_all`). A trashed page's descendants follow without a
     # check of their own: `page_path` is handed no path for their parent and
@@ -443,7 +437,8 @@ module PublicSite
     #
     # Every post_list block is checked, not just the ones on already-synced
     # pages: this is also what a block's own save/destroy calls (via
-    # `sync_posts`), where nothing about the page tree changed at all. (On a
+    # `refresh` with the block's page), where nothing about the page tree
+    # changed at all. (On a
     # published page that has a copy that call now finds nothing to move:
     # the block is no candidate until the page's changes are published.)
     def canonical_page(post) = canonical_pages([ post ]).fetch(post)
@@ -549,12 +544,6 @@ module PublicSite
       return nil if above.nil? || segment.blank?
 
       above == "/" ? "/#{segment}" : "#{above}/#{segment}"
-    end
-
-    # Moves one record's current row to `path` in `locale`; see `write_all`,
-    # which this is for a single address.
-    def write(record, locale, path)
-      write_all({ record => { locale => path } })
     end
 
     # Brings the current rows of `desired` (`{ record => { locale => path or

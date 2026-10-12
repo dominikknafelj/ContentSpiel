@@ -58,7 +58,7 @@ module Tags
     # resync a content type that turns out unaffected than to work out in
     # advance which of the two names a given block's posts actually needed.
     def resync(old_name, new_name)
-      affected_content_types(old_name, new_name).each { |content_type| PublicSite::Paths.sync_posts(content_type) }
+      refresh_posts_of(affected_content_types(old_name, new_name))
     end
   end
 end

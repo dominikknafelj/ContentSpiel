@@ -55,7 +55,7 @@ module ContentHelper
   # addresses are derived again, since they were derived from the copies.
   def follow_rows!
     Publishing::Version.delete_all # version: none (a test takes the copies away; nothing public is read from them here)
-    PublicSite::Paths.sync_posts(nil)
+    PublicSite::Paths.refresh(posts: Post.all)
   end
 
   def create_page(title:, parent: root_page, published: true, translations: {})

@@ -201,7 +201,7 @@ class Page < ApplicationRecord
 
   # Declared *after* `has_closure_tree`, so it runs after closure_tree's own
   # `after_save` -- which is what creates and rebuilds the hierarchy rows
-  # `PublicSite::Paths.sync_subtree` reads back to assemble the path.
+  # `PublicSite::Paths.refresh` reads back to find what is below the page.
   #
   # Only for a save that changed one of the page's URL inputs
   # (`url_inputs_are` above; a new page always). That is asked in a
@@ -260,30 +260,18 @@ class Page < ApplicationRecord
     parent_id.present?
   end
 
+  # The page says that it was touched, and nothing more. What depends on it
+  # is `PublicSite::Paths.refresh`'s to know: its own path and its subtree's,
+  # and the posts this subtree hosts or can list, since a save can hand a
+  # list block a new place in the tree or a newly (un)published chain without
+  # the block changing at all, and chain publication and tree order are what
+  # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3). The
+  # same for every kind of save that gets here: a slug, the publish state, a
+  # move, a reorder or the trash.
   def sync_public_paths
     return unless url_inputs_changed_by_save?
 
-    PublicSite::Paths.sync_subtree(self)
-    resync_listed_posts
-  end
-
-  # A page's own save can hand a post_list block a new position in the tree,
-  # or a newly (un)published page chain, without the block itself changing at
-  # all -- `sync_subtree` above already rewrote this page's (and its
-  # descendants') paths for that, but every post any of *their* post_list
-  # blocks list also needs its canonical page re-derived, since chain
-  # publication and tree order -- not just this page's own path -- are what
-  # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3).
-  #
-  # Scoped to this subtree's own post_list blocks
-  # (`PublicSite::Paths.sync_posts_listed_under`, which says why that is
-  # enough), for every kind of save that gets here -- a slug, publish state,
-  # a move, a reorder or the trash alike. The posts they list are re-derived
-  # from scratch against every candidate in the tree, which covers both
-  # "moved ahead of another listing, now canonical" and "moved behind it,
-  # gave the posts back".
-  def resync_listed_posts
-    PublicSite::Paths.sync_posts_listed_under([ self ])
+    PublicSite::Paths.refresh(pages: [ self ])
   end
 
   # Checked per enabled locale, the same granularity
