@@ -12,7 +12,7 @@ Decided by the owner on 2026-10-11: the first stable version is the focus, and e
 
 1. **Editing is safe.** Live editing (shipped, PR #66) and drafts of live content (shipped 2026-10-12, under "Shipped"): two people can work on one page, and nothing typed into a live page reaches visitors by itself.
 2. **Theming as a real mechanism.** A site is its own repository with a theme folder layered onto the CMS image ("Next", item 2, D9 and D10). `THEME_PATH` exists only on a throwaway branch (the spike), not in the CMS.
-3. **It can be hosted properly.** The items under "Before the first deploy" move ahead of features, beginning with the gaps the dry run found ("Hosting and the dry run" there).
+3. **It can be hosted properly.** The items under "Before the first deploy" move ahead of features, beginning with the gaps the dry run found ("Hosting and the dry run" there). The first of its four parts, "safe on a public address", shipped 2026-10-12 (under "Shipped"); mail, the sitemap and starting up, and the setup wizard follow in that order.
 4. **The documentation site runs in public.** `contentspiel-docs` ("Next", item 9) is the first real integration, and is used as the prototype that finds the gaps in 2 and 3.
 5. **Pages as nodes in the mind graph** (the owner's decision): the graph shows posts and tags today; pages join it.
 
@@ -51,6 +51,7 @@ Decided by the owner on 2026-10-11: the first stable version is the focus, and e
 | Source layout cleanup: every CS Studio screen has one shape (components in `Admin::Ui` or a screen folder, scripts in `controllers/admin/<topic>/` with their modules in `app/javascript/<topic>/`, one locale file per component folder); no behaviour changed, guarded by `test/lib/source_layout_test.rb` | `2026-10-10-source-layout-cleanup-design.md` |
 | Live refresh and edit reservations (step 3 of "Collaboration on content"): what someone saves appears in every other open editor of that page or post without a reload, fetched part by part and merged around every form that holds unsaved text, with "Updated by …" on the card for a few seconds; and a block, a page's settings or a post that someone is changing is theirs for two minutes after their last saved change, read-only for everyone else with a strip that names them, who can take it over without anybody's text being lost (the holder's tab sends what it has and lets go; a tab that does not answer in five seconds is passed over and keeps its text for copying). The page settings form got a base of its own, so a colleague's block save no longer refuses it; the holder's avatar on a section's tile and the notes marker moved onto a slot on the block | `2026-10-11-live-editing-design.md` (§10 "As built" lists where the build left the spec, with the wording nobody designed; the look is `2026-10-11-live-editing-handoff.md`; `docs/reference/live-editing.md`) |
 | Drafts of live content: nothing typed into a published or scheduled page or post reaches the public site by itself. Autosave writes the rows; the site draws a published copy taken by "Publish changes…" (now or at a time, with an overview of what changes) and "Discard changes…" returns the rows to it; a scheduled change can be cancelled. A live page's slug is its own confirmed form. Addresses, the content version, the sitemap's dates and the images in use follow the copy, and two guards hold that nothing public reads a live record's rows. Every publish keeps its copy | `2026-10-11-drafts-of-live-content-design.md` ("As built" says where the code departed from it; `docs/reference/publishing.md` carries the lifecycle table) |
+| Safe on a public address (the first of four parts of "Hosting and the dry run"): one variable, `PUBLIC_HOST`, is the site's address, and from it follow which host names are answered (the others are refused), forced HTTPS with HSTS and a `Secure` cookie for an https address, and the address in every absolute address a public page prints (`og:url`, `hreflang`, a new canonical link) and in the reset mail. Telemetry prints and sends nothing unless asked, and no span carries a query string. The password-reset token left the address: it travels after the `#` of the mailed link and in the form's body. CS Studio, sign-in and the wizard say when they are reached over plain HTTP in production; System status and the wizard's check name the site's address and the connection. A production start without a secret says which variable to set, and a setup token the host chose is no longer printed | `2026-10-12-safe-on-a-public-address-design.md` ("As built" lists where the code departed from it; `docs/reference/hosting.md`) |
 
 ## Next, in order
 
@@ -93,10 +94,10 @@ Everything here is Must. Three sub-projects; none is scheduled against the list 
 
 | Item | Ref |
 |---|---|
-| Pre-launch checklist: SSL and hosts, mailer host and sender, deploy secrets, error reporting, backups, no console span exporter in production | L1–L4 |
+| Pre-launch checklist: mailer sender (`ApplicationMailer` still sends from the literal `from@example.com`), deploy secrets, error reporting, backups. SSL and hosts, the mailer host and "no console span exporter in production" shipped 2026-10-12 with "safe on a public address" | L1–L4 |
 | `Settings::Save` assigns the attributes it is handed; give it an allow-list as `Pages::Save` and `Posts::Save` have | S21 |
 | Access control, unregistered permission keys: `can_assign_group?`, `can_manage_group?` and `Groups::Save`'s added-member check skip a grant whose permission is no longer registered (a removed plugin's key). It grants nothing meanwhile, but someone who never held it can hand it on with a membership or a token, and it revives if the key is registered again. Judge it as stored, as a removed content type's name is | Technical cleanup §10 |
-| The cable, which notes are the first to use: the `cable` database (`content_spiel_production_cable`, named in `config/database.yml`) exists and has its schema loaded from `db/cable_schema.rb` (there is no `db/cable_migrate` directory, although `database.yml` names one as its migrations path); the proxy passes WebSocket upgrades on `/cable`; and a same-origin handshake has been tried through the real proxy (`assume_ssl`, `force_ssl` and the proxy's `ssl` are still commented out). Without it CS Studio works as without push | Notes §6.5, §12 |
+| The cable, which notes are the first to use: the `cable` database (`content_spiel_production_cable`, named in `config/database.yml`) exists and has its schema loaded from `db/cable_schema.rb` (there is no `db/cable_migrate` directory, although `database.yml` names one as its migrations path); the proxy passes WebSocket upgrades on `/cable`; and a same-origin handshake has been tried through the real proxy (`force_ssl` and `assume_ssl` follow `PUBLIC_HOST` and `ASSUME_SSL` since 2026-10-12; the proxy's `ssl` and `host` in `config/deploy.yml` are still commented out, and no handshake has been tried). Without it CS Studio works as without push | Notes §6.5, §12 |
 | A cable outage costs every notes write a timeout per person and per record told: `Notes::Signals` sends one synchronous broadcast for each (the failure is swallowed, the note is saved, the request is slow). Send them from a job, or with a short timeout, before the cable is relied on | Notes, final review |
 | Nothing in front of the app limits the size of an upload: a body of any size is received in full before `Notes::Files` (or the media library) refuses it, and a read-only account has an upload form now, the notes composer's. Set a body limit at the proxy | Notes §12 |
 
@@ -123,18 +124,25 @@ Then, Should: caching as a per-instance setting under Settings (the shared lifet
 
 A dry run of hosting the documentation site (`contentspiel-docs`: `GAPS.md` and `hosting/research.md` hold the detail) found what a stranger would meet. The CMS's Kamal files are Rails' boilerplate and go when the real deploy files exist in `contentspiel-docs`: the CMS stays agnostic of deploy details, and what it asks of its host becomes a page of the administrators' guide, with the value and a comment in code as that page's source. The blockers, in the order they were ranked (all Must, like the rest of this section):
 
+They are worked in four parts, in this order (`docs/superpowers/specs/2026-10-12-safe-on-a-public-address-design.md`, "Why"); theming, a published image and loading content are their own work:
+
+1. **Safe on a public address.** Shipped 2026-10-12 ("Shipped"). Of the gap list it closed T-06 (telemetry prints every span to the production log, a reset token in it), T-07 (the `Host` header is trusted), T-08 (no HTTPS settings), T-13 (the setup token in the log), T-03 (a misleading error without `SECRET_KEY_BASE`), T-14 (a stale comment about `/cable`) and P-08 (CS Studio works over plain HTTP with no notice). What it left is under "Safe on a public address" in the known gaps.
+2. **Mail.** Delivery that can be configured and tested, a sender that is not `from@example.com`, and a reset request page that says when no mail can be sent (today it says a link was sent, also on a production site without `PUBLIC_HOST`, which sends none). The "Outgoing mail" check is replaced, and "site address set" counts into "mail can be sent" in production. The same part gives a sentence, not a 500, to whatever needs encryption keys that are not there.
+3. **The sitemap and starting up.** The sitemap built by the application and served at `/sitemap.xml`; the four database addresses; the entrypoint; background jobs.
+4. **The setup wizard.** It shows the site's address read-only and says where it comes from, tests mail and the live connection, and ends by saying what is left.
+
 | Item |
 |---|
 | Themes from outside exist only on a throwaway branch (`THEME_PATH`); the CMS cannot load a site's theme folder ("Next", item 2) |
-| The `Host` header is trusted: `og:url` and `hreflang` follow whatever host the request names; the site's address should be a setting |
-| No HTTPS settings: the session cookie is not `Secure`, there is no HSTS (`assume_ssl`, `force_ssl` and the proxy's `ssl` are commented out) |
-| Telemetry prints every span to the log in production when no exporter is set, and the request's full address reaches it: a note's quote travels in a URL, and a password-reset token appeared in the log |
-| Mail is unconfigured, and the reset screen says a link was sent when delivery failed ("Next", item 4) |
-| The sitemap is built by hand, is lost when the container is recreated, and `/sitemap.xml` answers 404 |
-| The four databases (primary, cache, queue, cable) need four addresses, which nothing documents |
+| **Done 2026-10-12 (part 1).** The `Host` header is trusted: `og:url` and `hreflang` follow whatever host the request names; the site's address should be a setting (it became a variable, `PUBLIC_HOST`, not a setting: the owner's decision, in the spec) |
+| **Done 2026-10-12 (part 1).** No HTTPS settings: the session cookie is not `Secure`, there is no HSTS (`assume_ssl`, `force_ssl` and the proxy's `ssl` are commented out) |
+| **Done 2026-10-12 (part 1).** Telemetry prints every span to the log in production when no exporter is set, and the request's full address reaches it: a note's quote travels in a URL, and a password-reset token appeared in the log |
+| Mail is unconfigured, and the reset screen says a link was sent when delivery failed ("Next", item 4). Part 2 |
+| The sitemap is built by hand, is lost when the container is recreated, and `/sitemap.xml` answers 404. Part 3 |
+| The four databases (primary, cache, queue, cable) need four addresses, which nothing documents. Part 3 |
 | No published image and no version number: an installation cannot say which ContentSpiel it runs, and a guide page cannot say which version it was checked against |
 | No supported way to load content into a running site (the demo site is loaded by a script of the docs repository) |
-| The setup wizard never asks for the site's address, tests no mail and no live connection, and ends without saying what is left; it is meant to help a stranger with exactly this |
+| The setup wizard never asks for the site's address, tests no mail and no live connection, and ends without saying what is left; it is meant to help a stranger with exactly this. Part 4 (since part 1 its system check names the address and the connection) |
 
 ## Product backlog (Phase 3)
 
@@ -490,6 +498,21 @@ Left by drafts of live content (spec "As built"; `docs/reference/publishing.md`)
 - **The readers guard is a list and a pattern**; the canary is the real guard (`docs/reference/publishing.md`). The mark's guard is per file.
 - **Wording that nobody designed** is in use (the pull request lists each string and place): to put to the design project in one go.
 
+Found by the guide's writer after drafts merged (2026-10-12), and only what is not above. Each is to be confirmed on the screen when it is picked up.
+
+- **Bug: the section's delete dialog on a published page still says "Blocks don't go to the trash. This can't be undone."** (`section_card.delete_body`), although "Discard changes…" brings the section and its blocks back. Only the block's dialog got the new body.
+- **A tag that is renamed or deleted** marks every live post that carries it with "Unpublished changes" (above: there is no way to publish them together), and a Post list block keeps the old name and lists nothing once its page is next published.
+- **Discard is all or nothing**: getting one deleted block back drops every other unpublished change of the record, and the block's notes are gone anyway (above).
+- **The publish buttons appear about a second after the first keystroke** on a clean live page.
+- **"Discard changes" names two different buttons**: the confirm of the discard dialog, and the button of the "Leave without saving?" dialog on the Settings screens.
+- **Freeing an image needs a publish**: it stays "in use" as "Published version", and the grey "Move to trash…" does not say that a publish is the missing step.
+- **Bulk Publish says "1 was already live."** and not that the post's unpublished changes stay unpublished.
+- **"No address"**: the chip says what is wrong, not what to do; and a post that lost its address to another post does not get it back when that post leaves (above, "Addresses").
+- **The chip that is on with nothing to publish** (above, "The mark outlives typing and typing back"): the writer found only "Publish changes", in a dialog that says nothing is to publish, clearing it. To confirm whether a discard does.
+- **Rights, as the guide has to describe them**: saving a live record needs Publish although a save is no longer public, so an Author gets "View only" on their own live post and cannot prepare a change (the decision is "Who prepares and who approves" under "Release management").
+- **To confirm for the guide**: whether a new slug always gives a record with "No address" an address again, also a post that lost it to another post. Untested.
+- **Untested**: that a live post's old address redirects after its slug changes.
+
 ### The write queue and Turbo
 
 Small follow-up fixes to `app/javascript/saving/queue.js` and its neighbours; none loses saved data.
@@ -654,6 +677,26 @@ Left by the live-editing sub-project (spec §10; `docs/reference/live-editing.md
 - **Small things the final review named and left**: `Editing::Reservation::FREE` is a SQL fragment in a plain constant, which the `# sql:` guard neither sees nor lets be marked; `admin--saving--autosave#announce` serialises the whole form on every input event (fine for today's forms, worth knowing for a long rich-text body); `Editing::TakeOver#take` retries a lost race up to three times where the row lock makes a second loss all but impossible; and `holdTurboRequest`'s `before` and `baseIds` options (`saving/queue_core.js`) have no caller since the tree's base forwarding went.
 - **What the guide's writer found hard to explain because it is hard to use** (2026-10-12): the first change claims a block but nothing shows the claim to its owner; a claim lapses after two minutes with no sign to either side; whether a take-over saves the other person's text depends on their tab, and the requester cannot tell; "You're editing this in another tab" can stand for two minutes after a reload with one tab open; there are three different rules for what a hold refuses (a save, an instant action, a discard); and one conflict appears in three wordings.
 - **The tests that were not written** are in the Tests table under "Technical health" ("Live editing, tests that were not written").
+
+### Safe on a public address
+
+Left by the first part of hosting (spec "As built"; `docs/reference/hosting.md`). The first two are closed by the Mail part.
+
+- **A production site without `PUBLIC_HOST` sends no reset mail, and the request page still says a link was sent.** The mail is not built on purpose (a link taken from the request could be made to point at a stranger's host); the log, System status and the wizard's check say so, the page does not until the Mail part.
+- **Saving an AI key on a site without encryption keys is a 500.** The Mail part will say a sentence instead, where its own secret cannot be stored; the AI card should say the same.
+- **`config/deploy.yml` sets no `PUBLIC_HOST`**: a Kamal deploy from it as it stands answers any host and forces nothing. Its comment says so; the file goes when the real deploy files exist in `contentspiel-docs`.
+- **The localised homepage answers at both `/de` and `/de/`.** Its canonical link, `og:url`, `hreflang` and the sitemap all name `/de/`; nothing redirects one to the other. A redirect is a routing change. The default homepage's sitemap `<loc>` is the bare origin while its canonical link ends in a slash: one address, two spellings.
+- **The canonical link of a paginated list** is to be page N's own address when pagination exists; there is none today, so a list's canonical link is the page's.
+- **A redirect's `Location` follows the request**, not the configured address. With an address a foreign host is refused first; without one the request's host is all there is. Left as it is by a ruling.
+- **Only the exact host is answered.** A site that wants `www.` as well has no way to say so (one address, one host); a redirect from the other name is the proxy's to make.
+- **The boot's lines are logged at info**: with `RAILS_LOG_LEVEL=warn` none is printed, and a wrong `PUBLIC_HOST` then refuses every request with nothing in the log to say which host is answered. The initializer that logs them and checks the secret runs in production only and has no automated test.
+- **A wrong `RAILS_MASTER_KEY`** with no `SECRET_KEY_BASE` is told the secret is missing, with the error's class; beside a good `SECRET_KEY_BASE` the boot still stops later, with Rails' own decryption error, wherever else the credentials are read.
+- **Resetting a password needs JavaScript**, and a link opened twice, reloaded or come back to says it is incomplete: the token is kept nowhere but the page that received it.
+- **The proxy's access log** still holds the token of a reset link mailed before the change, for the fifteen minutes it is good, and whatever a client goes on sending to the old address.
+- **`ASSUME_SSL=1` in front of nothing**, or a proxy that claims HTTPS for a plain connection, makes the "HTTPS" check say OK and hides the notice. Nothing in the application can tell.
+- **No query string is visible in a trace** (a note's quote travels in one); `http.route` says which address was asked for.
+- **A host label or name longer than DNS allows** is accepted by `SiteAddress`; it matches no request.
+- **Wording that nobody designed**: the four strings of the incomplete-link page, the notice, the two checks' sentences and the boot's lines (the pull request lists each string and place).
 
 ### Accepted as they are
 
