@@ -34,7 +34,7 @@ namespace :theme do
     named = ENV[ThemeFolder::VARIABLE].to_s.strip
     if !named.empty? && !File.directory?(File.expand_path(named))
       puts "#{ThemeFolder::VARIABLE} names no folder yet and is not read by this command."
-      ENV.delete(ThemeFolder::VARIABLE)
+      ENV[ThemeFolder::VARIABLE] = nil # taken out of this process: assigning nil to a variable of the environment deletes it
       ThemeFolder.reset!
     end
     Rake::Task["environment"].invoke
