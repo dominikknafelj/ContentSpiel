@@ -182,6 +182,29 @@ class ThemeTest < ActiveSupport::TestCase
     end
   end
 
+  # On a reload nothing may leave `prepare`: an exception there stops the
+  # chain of prepare blocks and leaves the application half prepared. So
+  # whatever the check raises, a fault of its own included, is kept as the
+  # refusal. At boot a fault of the check is loud, as it is.
+  test "on a reload prepare keeps whatever the check raises as the refusal, with what was raised in the message; at boot it is raised as it is" do
+    with_theme_copy do |dir|
+      folder = ThemeFolder.new(dir)
+
+      [ KeyError.new("key not found: \"notes.txt\""), NoMethodError.new("undefined method 'start_with?' for nil"),
+        Errno::ENOENT.new("views/pages/show.html.erb") ].each do |fault|
+        with_singleton_override(Theme::Check, :problems, ->(*, **) { raise fault }) do
+          assert_same fault, assert_raises(fault.class) { Theme.prepare(folder, reload: false) }
+
+          refused = Theme.prepare(folder, reload: true)
+          assert_instance_of ThemeFolder::Invalid, refused.refusal
+          assert_includes refused.refusal.message, "THEME_PATH (#{dir}) could not be checked"
+          assert_includes refused.refusal.message, "#{fault.class}: #{fault.message}"
+          assert_not refused.configured?, "a folder that could not be checked draws nothing"
+        end
+      end
+    end
+  end
+
   test "the application's theme is loaded when it is prepared, and under test it is the default" do
     assert_instance_of Theme, Theme.current
     assert_not Theme.current.configured?

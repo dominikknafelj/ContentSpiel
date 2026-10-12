@@ -65,6 +65,12 @@ class ThemeFolder
   # `config`, no `.rb` file anywhere: a theme holds no Ruby (decision 8).
   ENTRIES = %w[views components assets javascript].freeze
 
+  # What is said of an entry at the top that is none of them, after its
+  # name: here with the variable and the whole path (the boot's refusal),
+  # in `Theme::Check`'s list with the name alone, as every line there.
+  STRANGER = "is not part of a theme. A theme folder holds the folders views, components, assets and javascript, " \
+             "and nothing else (dot files and a README are ignored). Move it out of the folder or delete it.".freeze
+
   DEFAULT_FINGERPRINT = "default".freeze
 
   # Where the stylesheet's build writes the fingerprint of the theme it was
@@ -183,6 +189,23 @@ class ThemeFolder
     return [] unless configured?
 
     walk("", [ real(path.to_s) ]).sort
+  end
+
+  # What is at the folder's top NOW and is no part of a theme, by name,
+  # sorted: a file, a folder that is none of the four (with or without
+  # anything in it), and a FILE named like one of the four. Dot files, dot
+  # folders and a README are passed over.
+  #
+  # Asked when the folder object is made (`check_shape!`, which refuses with
+  # these), and again by `Theme::Check` every time the folder is checked:
+  # `current` is made once per process, and a note saved beside the
+  # templates while a development server runs appears after that.
+  def strangers
+    return [] unless configured?
+
+    readable(path.to_s) { Dir.children(path.to_s) }.sort.reject do |entry|
+      ignored?(entry) || (ENTRIES.include?(entry) && path.join(entry).directory?)
+    end
   end
 
   # The dot files below the top that are templates
@@ -362,16 +385,8 @@ class ThemeFolder
     # Every entry that is no part of a theme, in one refusal with a line
     # each: a folder with three of them is corrected in one go, not in three
     # starts (the documentation site's theme was the case).
-    strangers = readable(path.to_s) { Dir.children(path.to_s) }.sort.reject do |entry|
-      ignored?(entry) || (ENTRIES.include?(entry) && path.join(entry).directory?)
-    end
-    if strangers.any?
-      raise Invalid, strangers.map { |entry|
-        "#{VARIABLE}: #{path.join(entry)} is not part of a theme. A theme folder holds the folders " \
-          "views, components, assets and javascript, and nothing else (dot files and a README are ignored). " \
-          "Move it out of the folder or delete it."
-      }.join("\n")
-    end
+    found = strangers
+    raise Invalid, found.map { |entry| "#{VARIABLE}: #{path.join(entry)} #{STRANGER}" }.join("\n") if found.any?
 
     # The whole folder is walked once here, so that a folder that cannot be
     # read and a link that leaves the theme stop the boot where the variable

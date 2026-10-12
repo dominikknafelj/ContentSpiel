@@ -285,12 +285,27 @@ class Theme
     def problems(folder, deep: false, root: Rails.root, paths: Rails.application.config.assets.paths, started: ThemeFolder.current)
       return [] unless folder.configured?
 
+      # WHAT IS AT THE FOLDER'S TOP AND IS NO PART OF A THEME, FIRST, each
+      # as one problem with the folder's own sentence, whatever it is and
+      # whatever is in it: a file, a folder (`lib` with thirty files is one
+      # line), an empty folder, a file named `views`. The folder object
+      # refused these when it was made (`ThemeFolder#check_shape!`), which
+      # is once per process, so on a development reload this is the first
+      # place that meets a note saved beside the templates since. Nothing
+      # below is asked about a file under one of them: `misplaced` knows
+      # the four folders and nothing else (it raised `KeyError` for
+      # `notes.txt` and `NoMethodError` for a file named `views`, out of the
+      # reloader's prepare, before these were taken out here).
+      strangers = folder.strangers
+      found = strangers.map { |entry| "#{entry} #{ThemeFolder::STRANGER}" }
+      files = folder.files.reject { |file| strangers.include?(file.split("/", 2).first) }
+
       # A file that has no place in a theme is said once, as that: whether
       # its name is also one of the CMS's, and what it says inside, is
       # nothing its author can use before it has a place.
-      out_of_place, placed = folder.files.partition { |file| misplaced(file) }
-      found = out_of_place.map { |file| misplaced(file) }
-      found += folder.hidden_templates.map { |file| hidden(file) }
+      out_of_place, placed = files.partition { |file| misplaced(file) }
+      found += out_of_place.map { |file| misplaced(file) }
+      found += folder.hidden_templates.reject { |file| strangers.include?(file.split("/", 2).first) }.map { |file| hidden(file) }
       found += shadowing(placed, cms_asset_roots(Pathname(root), paths: paths, folder: folder, started: started))
       # A template in another encoding (Latin-1 from an old editor) cannot be
       # asked anything: every pattern raises on its bytes, and Rails would
@@ -322,6 +337,7 @@ class Theme
         end
       return if allowed
 
+      # `area` is one of the four: `problems` took everything else out.
       "#{file} is not part of the theme contract (#{MAY_HOLD.fetch(area)}). Rename it to a name the contract has, or take it out of the folder."
     end
 

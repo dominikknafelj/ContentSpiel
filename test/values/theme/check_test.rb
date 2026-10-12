@@ -76,6 +76,42 @@ class Theme::CheckTest < ActiveSupport::TestCase
     end
   end
 
+  # A `ThemeFolder` is made once per process and refuses a stranger at its
+  # top THEN. Whatever appears there afterwards (a note saved beside the
+  # templates while `bin/dev` runs) meets this check on the next reload, and
+  # was a `KeyError`, or a `NoMethodError` for a file named `views`, out of
+  # the reloader's prepare.
+  test "whatever appears at a folder's top after it was read is one problem each, with the folder's own sentence, and never an exception" do
+    with_theme_copy do |dir|
+      folder = ThemeFolder.new(dir)
+      assert_empty Theme::Check.problems(folder)
+
+      dir.join("notes.txt").write("to do")                              # a file
+      dir.join("lib").mkpath                                            # a folder with files in it
+      dir.join("lib/helper.rb").write("x")
+      dir.join("lib/more/deep.html.erb").tap { |file| file.dirname.mkpath }.write("<%= cookies[:x] = 1 %>")
+      dir.join("config").mkpath                                         # an empty folder
+      dir.join("sample.html.erb").mkpath                                # a folder named like a file
+      dir.join("sample.html.erb/x.txt").write("x")
+      FileUtils.rm_r(dir.join("javascript"))
+      dir.join("javascript").write("not a folder")                      # a file named like a theme's folder
+
+      [ false, true ].each do |deep|
+        problems = Theme::Check.problems(folder, deep: deep)
+
+        assert_equal %w[config javascript lib notes.txt sample.html.erb], problems.map { |problem| problem.split(" ").first }, problems.inspect
+        problems.each do |problem|
+          assert_includes problem, "is not part of a theme. A theme folder holds the folders views, components, assets and javascript, " \
+            "and nothing else (dot files and a README are ignored). Move it out of the folder or delete it."
+        end
+      end
+
+      error = assert_raises(ThemeFolder::Invalid) { Theme.load(folder) }
+      assert_includes error.message, "  - notes.txt is not part of a theme."
+      assert_includes Theme.prepare(folder, reload: true).refusal.message, "  - javascript is not part of a theme."
+    end
+  end
+
   test "a file with no place in a theme is one problem, whatever it holds and whatever it is named like" do
     problems = problems_with({ "views/layouts/application.html.erb" => "<%= csp_meta_tag %><%= csrf_meta_tags %>\n<% if params[:q] %>" }, deep: true)
 

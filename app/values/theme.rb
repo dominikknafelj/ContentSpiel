@@ -106,12 +106,42 @@ class Theme
     # until a reload finds the folder sound. CS Studio is untouched, as it
     # is by any theme (`test/integration/theme_pages_test.rb`: "a theme
     # refused on a reload leaves the registries prepared…").
+    #
+    # WHAT IS RESCUED. At boot nothing: a refusal (`ThemeFolder::Invalid`)
+    # stops the boot with its message, and anything else is a fault and
+    # stops it as loudly. On a reload EVERYTHING the check can raise
+    # (`StandardError`), and not the refusal alone: the reason for keeping
+    # a refusal is that nothing may leave a reload's prepare, and that
+    # holds for a fault as much as for a finding. The check reads a folder
+    # somebody is saving into while it reads (a file listed and then gone
+    # is an `Errno::ENOENT`), and a fault of its own did get out this way
+    # once (a `KeyError` for a note saved at the folder's top). Such an
+    # error is kept as a refusal that says what was raised, so the public
+    # page shows it and the next save reads the folder again. Narrower
+    # than `StandardError` would be a list of what the check raises today,
+    # which is the list that was wrong. Not `Exception`: a `SyntaxError` in
+    # the application's own code, an interrupt and an exhausted memory are
+    # not the folder's and are not to be kept.
     def prepare(folder, reload:)
       load(folder)
     rescue ThemeFolder::Invalid => error
       raise unless reload
 
       new(refusal: error)
+    rescue StandardError => error
+      raise unless reload
+
+      new(refusal: unchecked(folder, error))
+    end
+
+    private
+
+    def unchecked(folder, error)
+      ThemeFolder::Invalid.new(
+        "#{ThemeFolder::VARIABLE} (#{folder.path}) could not be checked: #{error.class}: #{error.message}. The folder may have " \
+        "changed while it was read: save a file of the theme to have it read again. If this is said again, it is a fault of " \
+        "the check and not of the folder."
+      ).tap { |refusal| refusal.set_backtrace(error.backtrace) }
     end
   end
 

@@ -359,6 +359,37 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     Rails.application.reloader.prepare!
   end
 
+  # The same, for what the check did not expect: a note saved at the theme's
+  # top while a development server runs. It was a `KeyError` out of the
+  # reloader's prepare, which left the registries empty: the failure the
+  # test above is about, reached by another way.
+  test "a file that appears at a theme folder's top is a refusal on the next reload, not an exception: the registries are prepared and the public page names the file" do
+    with_theme_copy do |dir|
+      folder = ThemeFolder.new(dir)
+      dir.join("notes.txt").write("to do")
+      FileUtils.rm_r(dir.join("javascript"))
+      dir.join("javascript").write("not a folder")
+
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        [ BlockTypes, ContentTypes ].each(&:reset!)
+        AccessControl::Permissions.reset!
+
+        Rails.application.reloader.prepare!
+
+        assert_includes Theme.current.refusal.message, "  - notes.txt is not part of a theme."
+        assert_includes Theme.current.refusal.message, "  - javascript is not part of a theme."
+        assert_equal %w[image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
+        assert_not_empty ContentTypes.all
+        assert_includes assert_raises(ThemeFolder::Invalid) { get "/about" }.message, "notes.txt is not part of a theme"
+        sign_in_as users(:one)
+        get "/cs-studio"
+        assert_response :success
+      end
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   test "an empty theme draws the homepage as the default theme does" do
     get "/"
     default = response.body
