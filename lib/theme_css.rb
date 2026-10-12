@@ -49,6 +49,15 @@ require "fileutils"
 # development `theme_css:watch` (Procfile.dev) builds the same entry as the
 # theme is written and keeps the stamp its own (`keep_stamped`); nothing
 # refuses there, and System status says when the stamp is another's.
+#
+# DEVELOPMENT AND TEST SHARE THE OUTPUT AND THE ENTRY. `bin/rails test`
+# builds the default theme's stylesheet (the test environment ignores
+# THEME_PATH) into the same app/assets/builds, from the same
+# tmp/theme/entry.css, also while a watch runs for a theme: the site in
+# development is then drawn with the default stylesheet until
+# `bin/rails tailwindcss:build` is run with THEME_PATH set, or the watch is
+# started again. System status says so, and so does the test build itself
+# (lib/tasks/theme_css.rake). An output per environment is not built.
 module ThemeCss
   DEFAULT = "app/assets/tailwind/themes/default/theme.css".freeze
   ENTRY = "tmp/theme/entry.css".freeze
@@ -87,45 +96,111 @@ module ThemeCss
     [ executable, "-i", File.join(root.to_s, ENTRY), "-o", File.join(root.to_s, OUTPUT), "--minify" ]
   end
 
-  def stamp!(folder, root:)
+  # `fingerprint` is handed in by a caller that has read it already and
+  # must have THAT value written (`build`, `keep_stamped`): the folder can
+  # change between two readings.
+  def stamp!(folder, root:, fingerprint: folder.fingerprint)
     path = Pathname(root).join(ThemeFolder::STAMP)
     FileUtils.mkdir_p(path.dirname)
-    path.write("#{folder.fingerprint}\n")
+    path.write("#{fingerprint}\n")
   end
 
-  # For the watch (lib/tasks/theme_css.rake): a thread that asks the folder
-  # for its fingerprint once every `every` seconds and, when it has changed,
-  # writes the stamp again. Tailwind's watcher rebuilds the stylesheet on a
-  # change by itself; this keeps what the stamp says true, so that System
-  # status warns in development only about a stylesheet nobody is building.
+  def unstamp!(root:)
+    FileUtils.rm_f(Pathname(root).join(ThemeFolder::STAMP))
+  end
+
+  # The build both tasks run (lib/tasks/theme_css.rake). THE STAMP VOUCHES
+  # FOR A BUILD THAT SUCCEEDED, AND FOR NOTHING ELSE: it is taken away
+  # before the executable starts and written after it ended well, so a build
+  # that fails (a CSS error, a killed process) leaves no stamp, an earlier
+  # build's included. And it is the fingerprint read BEFORE the build: a
+  # file of the theme changed while the executable ran may or may not be in
+  # the output, so the folder then no longer matches its stamp.
+  def build(folder, root:, executable:)
+    fingerprint = folder.fingerprint
+    unstamp!(root: root)
+    write_entry(folder, root: root)
+    system(*command(root: root, executable: executable), exception: true)
+    stamp!(folder, root: root, fingerprint: fingerprint)
+  end
+
+  # For the watch (lib/tasks/theme_css.rake): a thread that keeps the stamp
+  # true while a theme is written. Tailwind's watcher rebuilds the
+  # stylesheet on a change by itself, but nobody hears whether that build
+  # succeeded, and the folder's fingerprint changes with every edit. So when
+  # the folder has changed, the keeper builds once itself (`build`, a
+  # callable that answers whether it succeeded) and stamps what it built; a
+  # build that fails takes the stamp away. System status then warns in
+  # development only about a stylesheet that is not this folder's.
   #
-  # It follows the folder and nothing else: the stamp is rewritten only
-  # while it is still the one this watch last knew. A stamp somebody else
-  # wrote since (`bin/rails test` builds the default theme's stylesheet into
-  # the same app/assets/builds, entry file and all) is left as it is, because
-  # the stylesheet is then theirs too, and System status goes on saying so
-  # until it is built again for the theme.
+  # Every `every` seconds it GLANCES at the folder (names, sizes, times:
+  # `ThemeFolder#glance`) and reads the stamp, and hashes the folder only
+  # when one of the two changed: a theme with large images costs a listing
+  # a second, not a read of every file.
+  #
+  # It follows the folder and nothing else. It builds only while the stamp
+  # is still its own (the last it wrote, or none after its own failed
+  # build). A stamp somebody else wrote since (`bin/rails test` builds the
+  # default theme's stylesheet into the same app/assets/builds, entry file
+  # and all) is left as it is, because the stylesheet is then theirs too,
+  # and System status goes on saying so. When the stamp is the folder's
+  # fingerprint again (`bin/rails tailwindcss:build` with THEME_PATH set),
+  # the keeper takes it for its own and goes on.
+  #
+  # The fingerprint is read ONCE a turn and that value is the one written
+  # and remembered: a keeper that stamped a second reading while it
+  # remembered the first took its own stamp for somebody else's after the
+  # next change, and never wrote again.
+  #
+  # The entry file is written again before a build when it is no longer the
+  # folder's (a theme that gained its stylesheet or its components folder
+  # since the watch started); Tailwind's watcher watches tmp/theme and
+  # follows.
   #
   # nil without a theme folder: the default theme's fingerprint never
-  # changes. A folder that cannot be read for a moment (a file half
-  # written, a link not yet made) is asked again at the next turn.
-  def keep_stamped(folder, root:, every: 1)
+  # changes. An error of any kind in a turn (a file half written, a link
+  # not yet made, anything else) is said once, by its class and without a
+  # path, and the turn is tried again: a thread that died would leave the
+  # watch running with a stamp nobody keeps.
+  def keep_stamped(folder, root:, build:, every: 1, log: ->(line) { warn line })
     return nil unless folder.configured?
 
-    known = folder.fingerprint
+    mine = ThemeFolder.stamp(root)
+    seen = [ folder.glance, mine ]
+    said = false
+
     Thread.new do
       loop do
         sleep every
         begin
-          now = folder.fingerprint
-          next if now == known
+          stamp = ThemeFolder.stamp(root)
+          look = folder.glance
+          next if seen == [ look, stamp ]
 
-          stamp!(folder, root: root) if ThemeFolder.stamp(root) == known
-          known = now
-        rescue ThemeFolder::Invalid, SystemCallError
-          next
+          fingerprint = folder.fingerprint
+          if stamp == fingerprint
+            mine = stamp
+          elsif stamp == mine
+            write_entry(folder, root: root) unless current_entry?(folder, root: root)
+            if build.call
+              stamp!(folder, root: root, fingerprint: fingerprint)
+              mine = fingerprint
+            else
+              unstamp!(root: root)
+              mine = nil
+            end
+          end
+          seen = [ look, ThemeFolder.stamp(root) ]
+        rescue StandardError => error
+          log.call("theme_css:watch: the stylesheet's stamp could not be kept (#{error.class}); it will be tried again") unless said
+          said = true
         end
       end
     end
+  end
+
+  def current_entry?(folder, root:)
+    path = Pathname(root).join(ENTRY)
+    path.file? && path.read == entry(folder, root: root)
   end
 end

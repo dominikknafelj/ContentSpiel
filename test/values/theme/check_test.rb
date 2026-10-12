@@ -91,6 +91,22 @@ class Theme::CheckTest < ActiveSupport::TestCase
     )
   end
 
+  # A dot file is an operating system's or an editor's and is passed over
+  # (`.DS_Store`, `.keep`), which leaves it out of the check and of the
+  # fingerprint. One that is a template is still on the view path, where a
+  # render that names it would find it: so it is refused, by its name.
+  test "a hidden file that is a template is refused: it would be unchecked, outside the fingerprint and still there to render" do
+    %w[views/theme/.x.html.erb views/pages/.show.html.erb components/blocks/.rich_text_component.html.erb].each do |file|
+      problems = problems_with(file => "<%= params[:q] %>")
+
+      assert_equal 1, problems.size, file
+      assert_equal "#{file} is a hidden file and a template: it is left out of the check and of the theme's fingerprint, and a " \
+                   "render that names it would still find it. Rename it without the dot, or take it out of the folder.", problems.first
+    end
+
+    assert_empty problems_with("views/pages/.DS_Store" => "x", "views/theme/.keep" => "", "assets/images/.thumbs.erb" => "x", ".editor.erb" => "x")
+  end
+
   test "an asset named like one of the CMS's own is refused: a font, and a controller" do
     font = problems_with("assets/fonts/archivo-latin-400-normal.woff2" => "x")
     assert_equal 1, font.size

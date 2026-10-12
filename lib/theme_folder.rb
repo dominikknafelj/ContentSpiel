@@ -36,7 +36,8 @@ require "digest"
 # and the asset folders are paths Rails finds templates and serves files
 # from, so what is in `views/theme/.drafts/` would be outside the check and
 # the fingerprint and still be there to render. A dot FILE is passed over
-# anywhere (`.DS_Store`, `.keep`).
+# anywhere (`.DS_Store`, `.keep`); one that is a template is refused by
+# `Theme::Check` (`hidden_templates`).
 # An EMPTY folder is not refused (a theme may start as one, and a folder of
 # a README alone is one): the boot line says that it replaces nothing.
 #
@@ -67,8 +68,20 @@ class ThemeFolder
   DEFAULT_FINGERPRINT = "default".freeze
 
   # Where the stylesheet's build writes the fingerprint of the theme it was
-  # built for (`ThemeCss.stamp!`), relative to the application's root.
-  STAMP = "app/assets/builds/theme.stamp".freeze
+  # built for (`ThemeCss.stamp!`), relative to the application's root:
+  # beside the stylesheet it vouches for, so it is in the image with it and
+  # ignored by git and by the Docker context as that folder is.
+  #
+  # A DOT FILE, and not the spec's `theme.stamp`: app/assets/builds is on
+  # Propshaft's load path, where every file is an asset, copied to
+  # public/assets by `assets:precompile`, listed in public/assets/.manifest.json
+  # (itself a static file, so the digested name need not be guessed) and
+  # served. Propshaft leaves dot files out (`Propshaft::LoadPath#without_dotfiles`,
+  # which is why `.keep` there is no asset), so under this name the stamp is
+  # read by the application and by nobody else
+  # (`test/lib/theme_css_test.rb`: "the stamp is a dot file beside the
+  # stylesheet, and no asset").
+  STAMP = "app/assets/builds/.theme.stamp".freeze
 
   attr_reader :path
 
@@ -142,6 +155,26 @@ class ThemeFolder
     return [] unless configured?
 
     walk("", [ real(path.to_s) ]).sort
+  end
+
+  # The dot files below the top that are templates
+  # (`views/theme/.x.html.erb`). `files` passes every dot file over, which
+  # is right for `.DS_Store` and `.keep`; a template is still on the view
+  # path, so `Theme::Check` refuses these by name.
+  def hidden_templates
+    return [] unless configured?
+
+    walk("", [ real(path.to_s) ], dot_files: true).select { |file| file.end_with?(".erb") && file.start_with?("views/", "components/") }.sort
+  end
+
+  # What the folder looks like without reading a file: every file's name,
+  # size and time of change. For the watch (`ThemeCss.keep_stamped`), which
+  # asks every second and hashes the folder only when this has changed.
+  def glance
+    files.map do |relative|
+      status = readable(path.join(relative).to_s) { File.stat(path.join(relative).to_s) }
+      [ relative, status.size, status.mtime.to_f ]
+    end
   end
 
   # The templates a theme brings: for the boot line's count and for
@@ -229,7 +262,10 @@ class ThemeFolder
   # folder itself). `above` is the real path of every folder this one is in,
   # which is how a link to a folder it is itself in is told: followed, it
   # would never end.
-  def walk(directory, above)
+  #
+  # With `dot_files:` the answer is the other half: the dot files (not
+  # folders) below the top, which the plain walk passes over.
+  def walk(directory, above, dot_files: false)
     here = directory.empty? ? path.to_s : path.join(directory).to_s
 
     readable(here) { Dir.children(here) }.flat_map do |entry|
@@ -239,17 +275,19 @@ class ThemeFolder
                        "out of the check and of the theme's fingerprint, and could still be rendered or served. " \
                        "Move it out of the theme, or rename it without the dot."
       end
-      next [] if ignored?(relative)
+      if ignored?(relative)
+        next dot_files && !directory.empty? && !File.directory?(File.join(here, entry)) ? [ relative ] : []
+      end
 
       target = target_of(relative)
       if File.directory?(target)
         raise Invalid, "#{VARIABLE}: #{path.join(relative)} is a link to a folder it is in (#{target}). #{WHOLE}" if above.include?(target)
 
-        walk(relative, above + [ target ])
+        walk(relative, above + [ target ], dot_files: dot_files)
       else
         raise Invalid, unreadable(path.join(relative), "Permission denied") unless File.readable?(target)
 
-        File.file?(target) ? [ relative ] : []
+        File.file?(target) && !dot_files ? [ relative ] : []
       end
     end
   end

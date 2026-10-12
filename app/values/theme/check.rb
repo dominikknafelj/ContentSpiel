@@ -180,11 +180,20 @@ class Theme
       # nothing its author can use before it has a place.
       out_of_place, placed = folder.files.partition { |file| misplaced(file) }
       found = out_of_place.map { |file| misplaced(file) }
+      found += folder.hidden_templates.map { |file| hidden(file) }
       found += shadowing(placed, Pathname(root))
       templates = folder.templates & placed
       found += templates.flat_map { |file| written(file, folder.read(file)) }
       found += templates.flat_map { |file| unsound(file, folder.read(file)) } if deep
       found
+    end
+
+    # A dot file is passed over by the folder (`ThemeFolder#files`): an
+    # operating system's or an editor's. One that is a template is on the
+    # view path all the same, unchecked and outside the fingerprint.
+    def hidden(file)
+      "#{file} is a hidden file and a template: it is left out of the check and of the theme's fingerprint, and a " \
+        "render that names it would still find it. Rename it without the dot, or take it out of the folder."
     end
 
     def misplaced(file)

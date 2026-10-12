@@ -127,44 +127,242 @@ class ThemeCssTest < ActiveSupport::TestCase
     end
   end
 
-  # The watch's half (lib/tasks/theme_css.rake): Tailwind rebuilds on a
-  # change, and the stamp follows the folder, so System status does not say
-  # "built for another theme" about a stylesheet the watch has just built.
-  test "while it is kept stamped, a changed theme's stamp becomes its new fingerprint; the default theme needs no keeping" do
+  # The stamp is never served: it is a dot file, which Propshaft leaves out
+  # of its load path (`Propshaft::LoadPath#without_dotfiles`), so it is no
+  # asset, is not copied to public/assets and is not in the manifest, and
+  # System status' eight characters are all anyone is shown of it.
+  test "the stamp is a dot file beside the stylesheet, and no asset: not found, not listed, not served" do
+    assert_equal "app/assets/builds/.theme.stamp", ThemeFolder::STAMP
+    assert Rails.root.join(ThemeFolder::STAMP).file?, "bin/rails tailwindcss:build stamps the stylesheet the tests read"
+
+    load_path = Rails.application.assets.load_path
+    assert load_path.find("theme.css"), "the stylesheet beside it is an asset"
+    assert_empty load_path.assets.map { |asset| asset.logical_path.to_s }.grep(/stamp/)
+    assert_empty load_path.manifest.to_json.scan(/[^"]*stamp[^"]*/)
+    assert_not Rails.root.join("app/assets/builds/theme.stamp").exist?, "a stamp under the old name would be served"
+  end
+
+  # `ThemeCss.build` is the build both tasks run (lib/tasks/theme_css.rake):
+  # the stamp is written AFTER the executable succeeded and taken away
+  # before it starts, so a stamp never vouches for a build that failed.
+  test "a build stamps after the executable succeeded; a failed one leaves no stamp, an earlier one's included" do
     Dir.mktmpdir("root") do |root|
-      assert_nil ThemeCss.keep_stamped(ThemeFolder.new(nil), root: root)
+      plain = ThemeFolder.new(PLAIN)
+
+      ThemeCss.build(plain, root: root, executable: "true")
+      assert_equal plain.fingerprint, ThemeFolder.stamp(root)
+      assert_equal ThemeCss.entry(plain, root: root), Pathname(root).join(ThemeCss::ENTRY).read
+
+      assert_raises(RuntimeError) { ThemeCss.build(plain, root: root, executable: "false") }
+      assert_nil ThemeFolder.stamp(root)
+    end
+  end
+
+  test "the stamp is the fingerprint read before the build: a file changed while it ran is not vouched for" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        folder = ThemeFolder.new(dir)
+        before = folder.fingerprint
+        script = File.join(root, "tailwind")
+        File.write(script, "#!/bin/sh\necho changed >> #{dir.join("assets/stylesheets/theme.css")}\n")
+        File.chmod(0o755, script)
+
+        ThemeCss.build(folder, root: root, executable: script)
+
+        assert_equal before, ThemeFolder.stamp(root)
+        assert_not folder.built?(root)
+      end
+    end
+  end
+
+  # The watch's half (lib/tasks/theme_css.rake). Tailwind's watcher builds
+  # on a change by itself, but nobody hears whether it succeeded, so the
+  # keeper builds once itself (`build`) and stamps what it built.
+  test "while it is kept stamped, a changed theme is built and stamped with its new fingerprint; the default theme needs no keeping" do
+    Dir.mktmpdir("root") do |root|
+      assert_nil ThemeCss.keep_stamped(ThemeFolder.new(nil), root: root, build: -> { flunk "nothing to build" })
 
       with_theme_copy do |dir|
         folder = ThemeFolder.new(dir)
         ThemeCss.stamp!(folder, root: root)
         before = folder.fingerprint
-        keeper = ThemeCss.keep_stamped(folder, root: root, every: 0.01)
+        builds = 0
 
-        begin
+        keeping(folder, root: root, build: -> { builds += 1 }) do |keeper|
+          let_it_ask(keeper)
+          assert_equal 0, builds, "nothing changed, nothing is built"
+
           dir.join("assets/stylesheets/theme.css").write(".changed { color: red; }\n")
           assert_not_equal before, folder.fingerprint
-          deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
-          Thread.pass until folder.built?(root) || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+          await { folder.built?(root) }
 
           assert_equal folder.fingerprint, ThemeFolder.stamp(root)
+          assert_equal 1, builds
 
           # A stamp another build wrote since is that build's, and stays.
           ThemeCss.stamp!(ThemeFolder.new(nil), root: root)
-          changed = folder.fingerprint
+          let_it_ask(keeper)
           dir.join("assets/stylesheets/theme.css").write(".changed { color: blue; }\n")
-          assert_not_equal changed, folder.fingerprint
           let_it_ask(keeper)
           assert_equal "default", ThemeFolder.stamp(root)
+          assert_equal 1, builds
+
+          # Until somebody builds for the theme again (bin/rails
+          # tailwindcss:build with THEME_PATH set): that stamp is the
+          # folder's, the keeper takes it for its own and goes on keeping.
+          ThemeCss.stamp!(folder, root: root)
+          let_it_ask(keeper)
+          dir.join("assets/stylesheets/theme.css").write(".changed { color: green; }\n")
+          await { folder.built?(root) }
+          assert_equal folder.fingerprint, ThemeFolder.stamp(root)
+          assert_equal 2, builds
           assert keeper.alive?
-        ensure
-          keeper.kill
-          keeper.join
+        end
+      end
+    end
+  end
+
+  test "a build that fails while the theme is kept takes the stamp away, and the next change that builds puts it back" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        folder = ThemeFolder.new(dir)
+        ThemeCss.stamp!(folder, root: root)
+        succeeds = false
+
+        keeping(folder, root: root, build: -> { succeeds }) do
+          dir.join("assets/stylesheets/theme.css").write(".broken {\n")
+          await { ThemeFolder.stamp(root).nil? }
+          assert_nil ThemeFolder.stamp(root)
+
+          succeeds = true
+          dir.join("assets/stylesheets/theme.css").write(".mended { color: red; }\n")
+          await { folder.built?(root) }
+          assert_equal folder.fingerprint, ThemeFolder.stamp(root)
+        end
+      end
+    end
+  end
+
+  # A theme that gains its stylesheet or its components folder while the
+  # watch runs is in no line of the entry the watch started with.
+  test "a theme that gains a folder while it is kept gets its entry written again before the build" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        FileUtils.rm_r(dir.join("components"))
+        folder = ThemeFolder.new(dir)
+        ThemeCss.write_entry(folder, root: root)
+        ThemeCss.stamp!(folder, root: root)
+        entry = Pathname(root).join(ThemeCss::ENTRY)
+        assert_no_match(/components/, entry.read)
+        at_build = nil
+
+        keeping(folder, root: root, build: -> { at_build = entry.read }) do
+          dir.join("components/blocks").mkpath
+          dir.join("components/blocks/rich_text_component.html.erb").write("<div></div>\n")
+          await { folder.built?(root) }
+
+          assert_match(/@source ".*\/components";/, at_build)
+        end
+      end
+    end
+  end
+
+  # The folder is hashed only when a glance at it (names, sizes, times) says
+  # something changed: a theme with large images costs a listing a second.
+  test "a kept theme is listed every turn and hashed only when the listing changed" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        folder = ThemeFolder.new(dir)
+        ThemeCss.stamp!(folder, root: root)
+        hashed = 0
+        glanced = 0
+        real_fingerprint = folder.method(:fingerprint)
+        real_glance = folder.method(:glance)
+        folder.define_singleton_method(:fingerprint) { hashed += 1; real_fingerprint.call }
+        folder.define_singleton_method(:glance) { glanced += 1; real_glance.call }
+
+        keeping(folder, root: root, build: -> { true }) do |keeper|
+          let_it_ask(keeper)
+          assert_operator glanced, :>, 3
+          assert_equal 0, hashed
+
+          dir.join("assets/images/plain-mark.svg").write("<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n")
+          await { ThemeFolder.stamp(root) == real_fingerprint.call }
+          let_it_ask(keeper)
+          assert_equal 1, hashed
+        end
+      end
+    end
+  end
+
+  # The stamp written is the fingerprint the keeper READ, not one read a
+  # second time: the folder can change between the two (a checkout, a
+  # "save all"), and a keeper that remembered one value and wrote another
+  # took its own stamp for somebody else's from then on and never wrote
+  # again.
+  test "the keeper stamps the fingerprint it read, and so still knows its own stamp at the next change" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        folder = ThemeFolder.new(dir)
+        ThemeCss.stamp!(folder, root: root)
+        answers = %w[first second third fourth]
+        asked = 0
+        folder.define_singleton_method(:fingerprint) { answers.fetch(asked).tap { asked += 1 } }
+
+        keeping(folder, root: root, build: -> { true }) do
+          dir.join("assets/stylesheets/theme.css").write(".one { color: red; }\n")
+          await { asked >= 1 && !ThemeFolder.stamp(root).match?(/\A\h{64}\z/) }
+          assert_equal "first", ThemeFolder.stamp(root), "the value read, not a second reading"
+          assert_equal 1, asked
+
+          dir.join("assets/stylesheets/theme.css").write(".two { color: blue; } /* longer */\n")
+          await { ThemeFolder.stamp(root) == "second" }
+          assert_equal "second", ThemeFolder.stamp(root), "the keeper still takes the stamp for its own"
+        end
+      end
+    end
+  end
+
+  test "an error of any kind in a turn is said once, without a path, and the keeper goes on" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        folder = ThemeFolder.new(dir)
+        ThemeCss.stamp!(folder, root: root)
+        said = []
+        raises = true
+        build = -> { raises ? raise(IOError, "closed stream #{dir}") : true }
+
+        keeping(folder, root: root, build: build, log: ->(line) { said << line }) do |keeper|
+          dir.join("assets/stylesheets/theme.css").write(".one { color: red; }\n")
+          await { said.any? }
+          let_it_ask(keeper)
+          assert keeper.alive?
+          assert_equal [ "theme_css:watch: the stylesheet's stamp could not be kept (IOError); it will be tried again" ], said
+
+          raises = false
+          dir.join("assets/stylesheets/theme.css").write(".two { color: blue; } /* longer */\n")
+          await { folder.built?(root) }
+          assert_equal folder.fingerprint, ThemeFolder.stamp(root)
+          assert_equal 1, said.size
         end
       end
     end
   end
 
   private
+    def keeping(folder, root:, build:, **options)
+      keeper = ThemeCss.keep_stamped(folder, root: root, build: build, every: 0.01, **options)
+      yield keeper
+    ensure
+      keeper&.kill
+      keeper&.join
+    end
+
+    def await
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
+      sleep 0.01 until yield || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+    end
+
     # Long enough for a keeper that asks every hundredth of a second to have
     # asked several times.
     def let_it_ask(keeper)

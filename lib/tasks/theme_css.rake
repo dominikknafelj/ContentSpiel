@@ -10,29 +10,29 @@ require "tailwindcss/ruby"
 namespace :theme_css do
   desc "Build the public stylesheet: the default theme's styles, then the theme's (THEME_PATH)"
   task build: :environment do
-    folder = ThemeFolder.current
-    ThemeCss.write_entry(folder, root: Rails.root)
-    system(*ThemeCss.command(root: Rails.root, executable: Tailwindcss::Ruby.executable), exception: true)
-    ThemeCss.stamp!(folder, root: Rails.root)
+    # The test environment builds the default theme's stylesheet into the
+    # place development uses (lib/theme_css.rb). Said here, in the terminal
+    # of whoever ran the tests, when it replaces a theme's.
+    replaced = ThemeFolder.stamp(Rails.root)
+    ThemeCss.build(ThemeFolder.current, root: Rails.root, executable: Tailwindcss::Ruby.executable)
+    if Rails.env.test? && replaced && replaced != ThemeFolder::DEFAULT_FINGERPRINT
+      warn "[ContentSpiel] The public stylesheet was built for a theme and is now the default theme's (the tests build it). " \
+           "For development under the theme, run bin/rails tailwindcss:build with THEME_PATH set, or start bin/dev again."
+    end
   end
 
-  # The entry is written once, when the watch starts: a `components` folder
-  # or a stylesheet a theme GAINS while it runs is in no line of it, and
-  # needs the watch started again (as a new controller needs the server
-  # started again, config/importmap.rb).
-  #
-  # The stamp is kept the theme's while the watch runs (`keep_stamped`):
-  # Tailwind's own watcher builds again when a file of the theme changes,
-  # and the folder's fingerprint changes with it, so a stamp written once
-  # would say "built for another theme" on System status after the first
-  # edit, about a stylesheet that is the theme's.
+  # One whole build first, stamped when it succeeded (`ThemeCss.build`), and
+  # then Tailwind's watcher on the same entry. While it runs, the stamp is
+  # kept true by `ThemeCss.keep_stamped`: when the theme's folder changed it
+  # builds once more itself, quietly, and stamps what it built, because the
+  # watcher's own rebuild tells nobody whether it succeeded.
   desc "Watch and rebuild the public stylesheet"
   task watch: :environment do
     folder = ThemeFolder.current
-    ThemeCss.write_entry(folder, root: Rails.root)
-    ThemeCss.stamp!(folder, root: Rails.root)
-    ThemeCss.keep_stamped(folder, root: Rails.root)
-    system(*ThemeCss.command(root: Rails.root, executable: Tailwindcss::Ruby.executable), "-w", exception: true)
+    command = ThemeCss.command(root: Rails.root, executable: Tailwindcss::Ruby.executable)
+    ThemeCss.build(folder, root: Rails.root, executable: Tailwindcss::Ruby.executable)
+    ThemeCss.keep_stamped(folder, root: Rails.root, build: -> { system(*command, out: File::NULL, err: File::NULL) })
+    system(*command, "-w", exception: true)
   end
 end
 

@@ -160,15 +160,18 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
     assert_equal :warning, check.status
     assert_equal "The theme “plain” is set, but the stylesheet was built for another theme or for an earlier state of this one, " \
-      "so the site is drawn with the wrong styles. Build it again with THEME_PATH set as the server has it: " \
-      "bin/dev keeps it built while it runs, and this command builds it once.", check.message
+      "so the site is drawn with the wrong styles. A test run does that, also while bin/dev runs: it builds the default " \
+      "theme's stylesheet into the same place. Build the theme's again with THEME_PATH set as the server has it: " \
+      "run this command, or start bin/dev again.", check.message
     assert_equal "bin/rails tailwindcss:build", check.command
     assert Setup::SystemCheck::STYLESHEET_COMMAND.frozen?
 
     default = result("Theme", run_check(theme: Theme.new, production: false, stylesheet_probe: -> { false }))
     assert_equal :warning, default.status
     assert_includes default.message, "The default theme is set, but the stylesheet was built for another theme"
-    assert_includes default.message, "Build it again without THEME_PATH:"
+    assert_equal "The default theme is set, but the stylesheet was built for another theme, so the site is drawn with the wrong " \
+      "styles. Build it again without THEME_PATH: run this command, or start bin/dev again.", default.message
+    assert_no_match(/keeps it built/, check.message + default.message)
   end
 
   test "a probe that raises is a stylesheet that was not built for the theme, and never a path" do

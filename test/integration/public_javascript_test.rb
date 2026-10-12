@@ -246,6 +246,24 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_operator every.size, :>=, 3, "the public layout, CS Studio's and the product's each load an entry point"
   end
 
+  # And inside the scripts: `site` is imported by a layout and by no script
+  # of the CMS's, so neither CS Studio's entry point nor the one sign-in and
+  # setup load can pull a theme's controllers in behind the layouts' backs.
+  # (`admin` importing `site` would leave every layout test above green.)
+  test "no script of the CMS's imports the site entry point or a theme's controller" do
+    scripts = Dir[Rails.root.join("app/javascript/**/*.js")].to_h { |file| [ Pathname(file).relative_path_from(Rails.root).to_s, File.read(file) ] }
+    assert_operator scripts.size, :>, 50
+    code = scripts.transform_values { |text| text.gsub(%r{^\s*//.*$}, "") }
+
+    importing = code.select { |_, text| text.match?(/\bimport\b[^\n]*["']site["']|\bimport\s*\(\s*["']site["']/) }.keys
+    assert_empty importing, "imports the site entry point"
+    naming = code.select { |_, text| text.include?("controllers/theme/") }.keys
+    assert_equal %w[app/javascript/controllers/index.js app/javascript/site.js], naming.sort,
+      "controllers/theme/ is named where the site's registration leaves it out and where `site` takes it in"
+    assert_match(/\Aimport "application"\nimport \{ registerControllers \} from "controllers"\n\nregisterControllers\(\(path\) => path\.startsWith\("controllers\/admin\/"\)\)\n\z/,
+      code.fetch("app/javascript/admin.js").lstrip, "CS Studio's entry point registers controllers/admin/ and nothing else")
+  end
+
   private
 
   def modulepreloads = css_select("link[rel=modulepreload]").map { |link| link["href"] }

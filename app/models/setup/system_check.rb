@@ -198,9 +198,12 @@ module Setup
       #   SECRET_KEY_BASE_DUMMY), and the remedy is the image's build;
       # - everywhere else nothing refuses (a development server starts under
       #   anything), so this row is the one place that says it: THEME_PATH
-      #   set or unset since the last build, or a theme's file changed with
-      #   no `theme_css:watch` running to build and stamp again. It names
-      #   the command, which is a fixed string.
+      #   set or unset since the last build, a theme's file changed with no
+      #   `theme_css:watch` running to build and stamp again, or, the usual
+      #   cause, a test run: development and test share the built
+      #   stylesheet, and the tests build the default theme's, also under a
+      #   running watch (lib/theme_css.rb). So the sentence does not say
+      #   that bin/dev keeps it built. It names the command, a fixed string.
       # It costs one small file read. A probe that raises is a stylesheet
       # that was not built, and its message is not shown.
       def theme
@@ -217,11 +220,16 @@ module Setup
           warning("Theme", "#{described} is set, but the stylesheet was built for another theme, so the site is drawn " \
             "with the wrong styles. Build the site's image again: assets:precompile #{with}.")
         else
-          earlier = @theme.configured? ? " or for an earlier state of this one" : ""
-          how = @theme.configured? ? "#{with} as the server has it" : with
-          warning("Theme", "#{described} is set, but the stylesheet was built for another theme#{earlier}, so the site is drawn " \
-            "with the wrong styles. Build it again #{how}: bin/dev keeps it built while it runs, and this command builds it once.",
-            command: STYLESHEET_COMMAND)
+          remedy = "run this command, or start bin/dev again."
+          if @theme.configured?
+            warning("Theme", "#{described} is set, but the stylesheet was built for another theme or for an earlier state of " \
+              "this one, so the site is drawn with the wrong styles. A test run does that, also while bin/dev runs: it builds " \
+              "the default theme's stylesheet into the same place. Build the theme's again #{with} as the server has it: #{remedy}",
+              command: STYLESHEET_COMMAND)
+          else
+            warning("Theme", "#{described} is set, but the stylesheet was built for another theme, so the site is drawn with " \
+              "the wrong styles. Build it again #{with}: #{remedy}", command: STYLESHEET_COMMAND)
+          end
         end
       end
 
