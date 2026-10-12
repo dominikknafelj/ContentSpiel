@@ -220,18 +220,52 @@ module ThemeCss
   # The watcher ending well (its input closed, bin/dev stopped) ends the
   # watch; the watcher ending badly is taken as a build that failed, since
   # that is the one way it does by itself.
+  #
+  # A FOLDER THAT CANNOT BE LISTED IS WAITED OUT TOO, A TURN AT A TIME. The
+  # theme's folder renamed or deleted, a file made unreadable, a link to
+  # nothing: states that last until a person acts. Nothing is built then
+  # (the build would fail before the executable started); the watch says it
+  # once, by the error's class and without a path, and looks again every
+  # `every` seconds. Every wait here sleeps BEFORE it looks: a wait that
+  # compared first, with a look that could never equal the last, went round
+  # thousands of times a second and printed its line each time.
+  #
+  # The stamp's keeper runs only beside the watcher, where nobody else hears
+  # whether a build succeeded. While this loop builds and waits it is the
+  # only builder and the only voice.
   def watch(folder, root:, executable:, every: 1, log: ->(line) { warn line })
     command = command(root: root, executable: executable)
-    keeper = keep_stamped(folder, root: root, every: every, log: log, build: -> { system(*command, out: File::NULL, err: File::NULL) })
+    unreadable = nil
 
     loop do
       seen = sources_glance(folder, root: root)
-      break if build_for_watch(folder, root: root, executable: executable) && system(*command, "-w")
+      if seen.first == UNREADABLE
+        unless unreadable == seen
+          log.call("theme_css:watch: the theme folder cannot be read (#{seen.last}). The watch goes on, and looks again " \
+                   "until it can be.")
+        end
+        unreadable = seen
+        sleep every
+        next
+      end
+      unreadable = nil
+
+      break if build_for_watch(folder, root: root, executable: executable) && watched(folder, command, root: root, every: every, log: log)
 
       log.call("theme_css:watch: the public stylesheet did not build; what Tailwind said of it is above. The watch goes on, " \
                "and builds again when a file of the theme or of the default theme's styles changes.")
-      sleep every while sources_glance(folder, root: root) == seen
+      loop do
+        sleep every
+        break unless sources_glance(folder, root: root) == seen
+      end
     end
+  end
+
+  # Tailwind's watcher, with the stamp kept true beside it for as long as it
+  # runs. Answers how the watcher ended, as `system` does.
+  def watched(folder, command, root:, every:, log:)
+    keeper = keep_stamped(folder, root: root, every: every, log: log, build: -> { system(*command, out: File::NULL, err: File::NULL) })
+    system(*command, "-w")
   ensure
     keeper&.kill
   end
@@ -247,8 +281,11 @@ module ThemeCss
 
   # What the build reads, without reading a file: the theme's folder
   # (`ThemeFolder#glance`) and the default theme's stylesheets, by name,
-  # size and time. A folder that cannot be listed at this moment (a file
-  # half written, a link not yet made) is a look that differs from the last.
+  # size and time. A folder that cannot be listed is `[UNREADABLE, the
+  # error's class]`: the same answer for as long as the same thing is wrong,
+  # so two looks at it are equal and a wait on it waits.
+  UNREADABLE = :unreadable
+
   def sources_glance(folder, root:)
     styles = Dir.glob(Pathname(root).join(DEFAULT).dirname.join("**/*").to_s).sort.filter_map do |file|
       status = File.stat(file)
@@ -256,7 +293,7 @@ module ThemeCss
     end
     [ folder.glance, styles ]
   rescue SystemCallError, ThemeFolder::Invalid => error
-    [ error.class, Process.clock_gettime(Process::CLOCK_MONOTONIC) ]
+    [ UNREADABLE, error.class ]
   end
 
   def current_entry?(folder, root:)

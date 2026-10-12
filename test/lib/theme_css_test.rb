@@ -127,6 +127,22 @@ class ThemeCssTest < ActiveSupport::TestCase
     end
   end
 
+  # No stamp is no build (a build that failed takes it away, an image whose
+  # last stage left app/assets/builds behind has none): nothing "was built
+  # for another theme" then.
+  test "with no stamp the refusal says the stylesheet was not built, for a theme and for none, and how to build" do
+    Dir.mktmpdir("root") do |root|
+      themed = ThemeFolder.not_built_message(ThemeFolder.new(PLAIN), root)
+      assert_equal "THEME_PATH: the public stylesheet was not built, or its build failed: there is no stamp of a build " \
+        "(app/assets/builds/.theme.stamp). Run assets:precompile with THEME_PATH set " \
+        "(SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile) when the image is built, and keep app/assets/builds in the image.", themed
+
+      default = ThemeFolder.not_built_message(ThemeFolder.new(nil), root)
+      assert_includes default, "Run assets:precompile without THEME_PATH"
+      assert_no_match(/another theme/, themed + default)
+    end
+  end
+
   # The stamp is never served: it is a dot file, which Propshaft leaves out
   # of its load path (`Propshaft::LoadPath#without_dotfiles`), so it is no
   # asset, is not copied to public/assets and is not in the manifest, and
@@ -398,6 +414,54 @@ class ThemeCssTest < ActiveSupport::TestCase
           assert_equal folder.fingerprint, ThemeFolder.stamp(root)
           assert_equal 1, said.size, "said once for one failure"
         ensure
+          watch.kill
+          watch.join
+        end
+      end
+    end
+  end
+
+  # The wait between two tries compared one look at the folder with the
+  # next, and a folder that cannot be listed gave a look that is never the
+  # last one's (it held the time). So with the stylesheet broken AND the
+  # folder gone (renamed, deleted, a file made unreadable) the loop never
+  # slept: thousands of rounds and lines a second under bin/dev.
+  test "while the theme folder cannot be listed the watch waits a turn at a time and says so once, and goes on when the folder is back" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        stylesheet = dir.join("assets/stylesheets/theme.css")
+        stylesheet.write("broken\n")
+        script = File.join(root, "tailwind")
+        File.write(script, <<~SH)
+          #!/bin/sh
+          echo run >> "#{root}/runs"
+          if grep -q broken "#{stylesheet}"; then exit 1; fi
+        SH
+        File.chmod(0o755, script)
+        folder = ThemeFolder.new(dir)
+        away = "#{dir}-away"
+        said = []
+        runs = -> { File.exist?("#{root}/runs") ? File.readlines("#{root}/runs").size : 0 }
+
+        watch = Thread.new { ThemeCss.watch(folder, root: root, executable: script, every: 0.05, log: ->(line) { said << line }) }
+        begin
+          await { said.any? }
+          File.rename(dir.to_s, away)
+          sleep 0.6 # twelve turns of the watch with the folder gone
+
+          assert watch.alive?
+          assert_equal [ "did not build", "cannot be read" ], said.map { |line| line[/did not build|cannot be read/] }, said.inspect
+          assert_includes said.last, "theme_css:watch: the theme folder cannot be read (Errno::ENOENT). The watch goes on, and looks again"
+          assert_operator runs.call, :<=, 2, "the executable is not started for a folder that is not there"
+
+          File.rename(away, dir.to_s)
+          stylesheet.write(".mended { color: red; }\n")
+          await { !watch.alive? }
+
+          assert_equal folder.fingerprint, ThemeFolder.stamp(root)
+          assert_equal 2, said.size, said.inspect
+        ensure
+          File.rename(away, dir.to_s) if File.directory?(away)
           watch.kill
           watch.join
         end

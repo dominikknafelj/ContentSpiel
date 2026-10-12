@@ -207,6 +207,29 @@ class ThemeFolderTest < ActiveSupport::TestCase
     end
   end
 
+  # The real documentation theme had a `samples.md` at its top and eighteen
+  # files with no place below it, and `theme:check` took two runs to say so.
+  # Everything at the top that is no part of a theme is said in one refusal,
+  # each with the sentence it had alone.
+  test "every entry at the top that is no part of a theme is named in one refusal, a line each" do
+    Dir.mktmpdir("theme") do |dir|
+      FileUtils.mkdir_p(File.join(dir, "views"))
+      FileUtils.mkdir_p(File.join(dir, "lib"))
+      File.write(File.join(dir, "samples.md"), "x")
+      File.write(File.join(dir, "assets"), "a file named like a folder")
+
+      error = assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }
+      lines = error.message.lines(chomp: true)
+
+      assert_equal 3, lines.size, error.message
+      assert_equal %w[assets lib samples.md], lines.map { |line| line[%r{/([^/ ]+) is not part of a theme}, 1] }
+      lines.each do |line|
+        assert line.start_with?("THEME_PATH: #{File.realpath(dir)}/") || line.start_with?("THEME_PATH: #{dir}/"), line
+        assert line.end_with?("Move it out of the folder or delete it."), line
+      end
+    end
+  end
+
   test "dot files anywhere and a README at the top are not the theme's files" do
     folder_with("README.md" => "about", ".DS_Store" => "x", ".git/config" => "x", "views/.DS_Store" => "x",
       "views/pages/.keep" => "", "views/pages/show.html.erb" => "page") do |dir|

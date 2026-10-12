@@ -145,6 +145,15 @@ class ThemeFolder
   # production before the stylesheet it is about to make exists.
   def self.not_built_message(folder, root)
     how = folder.configured? ? "with #{VARIABLE} set" : "without #{VARIABLE}"
+    # No stamp is no build, and nothing "was built for another theme" then:
+    # the build failed (it takes the stamp away before it starts), was never
+    # run, or the image's last stage left app/assets/builds behind.
+    if stamp(root).nil?
+      return "#{VARIABLE}: the public stylesheet was not built, or its build failed: there is no stamp of a build (#{STAMP}). " \
+             "Run assets:precompile #{how} (SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile) when the image is built, " \
+             "and keep app/assets/builds in the image."
+    end
+
     "#{VARIABLE}: the stylesheet was built for another theme: run assets:precompile #{how} " \
       "(SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile). The build's stamp is #{stamp(root) || "missing"}, " \
       "this theme's fingerprint is #{folder.fingerprint}."
@@ -350,13 +359,18 @@ class ThemeFolder
                      "(its views, components, assets and javascript folders), or unset it to draw the site with the default theme."
     end
 
-    readable(path.to_s) { Dir.children(path.to_s) }.sort.each do |entry|
-      next if ignored?(entry)
-      next if ENTRIES.include?(entry) && path.join(entry).directory?
-
-      raise Invalid, "#{VARIABLE}: #{path.join(entry)} is not part of a theme. A theme folder holds the folders " \
-                     "views, components, assets and javascript, and nothing else (dot files and a README are ignored). " \
-                     "Move it out of the folder or delete it."
+    # Every entry that is no part of a theme, in one refusal with a line
+    # each: a folder with three of them is corrected in one go, not in three
+    # starts (the documentation site's theme was the case).
+    strangers = readable(path.to_s) { Dir.children(path.to_s) }.sort.reject do |entry|
+      ignored?(entry) || (ENTRIES.include?(entry) && path.join(entry).directory?)
+    end
+    if strangers.any?
+      raise Invalid, strangers.map { |entry|
+        "#{VARIABLE}: #{path.join(entry)} is not part of a theme. A theme folder holds the folders " \
+          "views, components, assets and javascript, and nothing else (dot files and a README are ignored). " \
+          "Move it out of the folder or delete it."
+      }.join("\n")
     end
 
     # The whole folder is walked once here, so that a folder that cannot be
