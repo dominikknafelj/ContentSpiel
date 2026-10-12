@@ -2,6 +2,7 @@ require "test_helper"
 
 class HostSettingsTest < ActiveSupport::TestCase
   Request = Struct.new(:path)
+  Credentials = Struct.new(:secret_key_base)
 
   test "an https address: its host is the only one answered, HTTPS is forced and mailed links carry it" do
     config = apply("https://docs.example.org")
@@ -78,8 +79,26 @@ class HostSettingsTest < ActiveSupport::TestCase
     end
   end
 
-  test "a SECRET_KEY_BASE that is there is accepted, and its value is not in anything returned" do
-    assert_nil HostSettings.require_secret!("SECRET_KEY_BASE" => "x" * 64)
+  test "a SECRET_KEY_BASE that is there is accepted, with or without credentials" do
+    assert_nil HostSettings.require_secret!({ "SECRET_KEY_BASE" => "x" * 64 })
+    assert_nil HostSettings.require_secret!({ "SECRET_KEY_BASE" => "x" * 64 }, credentials: Credentials.new(nil))
+  end
+
+  test "a secret in the credentials is accepted as Rails accepts it, with no variable set" do
+    assert_nil HostSettings.require_secret!({}, credentials: Credentials.new("y" * 64))
+    assert_nil HostSettings.require_secret!({ "SECRET_KEY_BASE" => "" }, credentials: Credentials.new("y" * 64))
+  end
+
+  test "credentials that hold no secret, a blank one, or that could not be read are refused like none" do
+    [ Credentials.new(nil), Credentials.new(""), Credentials.new("  "), nil ].each do |credentials|
+      error = assert_raises(HostSettings::MissingSecret, credentials.inspect) do
+        HostSettings.require_secret!({}, credentials: credentials)
+      end
+
+      assert_includes error.message, "SECRET_KEY_BASE"
+      assert_includes error.message, "bin/rails secret"
+      assert_no_match(/credentials/i, error.message)
+    end
   end
 
   private

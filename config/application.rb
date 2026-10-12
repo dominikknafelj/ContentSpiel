@@ -110,7 +110,26 @@ module ContentSpiel
     # does this.
     initializer "content_spiel.host_announcement", after: :initialize_logger, before: :initialize_cache do
       if Rails.env.production?
-        HostSettings.require_secret!(ENV) unless ENV["SECRET_KEY_BASE_DUMMY"]
+        unless ENV["SECRET_KEY_BASE_DUMMY"]
+          # Rails takes the secret from the variable or from the encrypted
+          # credentials, and so does this. With no master key the credentials
+          # read as empty and nothing raises; a key that does not open the
+          # file, or a file that is not what it should be, raises one of
+          # these, and is "no secret there" here, so the person reads our
+          # message and not a decryption error.
+          credentials = begin
+            Rails.application.credentials.tap(&:config)
+          rescue ActiveSupport::EncryptedFile::MissingKeyError,
+                 ActiveSupport::EncryptedFile::MissingContentError,
+                 ActiveSupport::EncryptedFile::InvalidKeyLengthError,
+                 ActiveSupport::EncryptedConfiguration::InvalidContentError,
+                 ActiveSupport::EncryptedConfiguration::InvalidKeyError,
+                 ActiveSupport::MessageEncryptor::InvalidMessage,
+                 ArgumentError # a master key of the wrong length: OpenSSL's "key must be 16 bytes"
+            nil
+          end
+          HostSettings.require_secret!(ENV, credentials: credentials)
+        end
         Rails.logger.info HostSettings.announcement(SiteAddress.current)
       end
     end

@@ -56,13 +56,22 @@ module HostSettings
 
   # Rails' own error for a missing secret sends the reader to
   # `bin/rails credentials:edit`, which a container has no key for. This one
-  # names the variable and how to make a value. The value itself is never
-  # read into a message.
-  def self.require_secret!(env)
-    return unless env["SECRET_KEY_BASE"].to_s.strip.empty?
+  # names the variable and how to make a value. It is no stricter than Rails:
+  # a secret in the encrypted credentials file (read with RAILS_MASTER_KEY)
+  # is accepted as Rails accepts it, so `credentials` is anything that
+  # answers `secret_key_base`, or nil when there is none or it cannot be
+  # read; the caller decides what "cannot be read" is. The value itself is
+  # never read into a message.
+  def self.require_secret!(env, credentials: nil)
+    return if present?(env["SECRET_KEY_BASE"]) || present?(credentials&.secret_key_base)
 
     raise MissingSecret, "SECRET_KEY_BASE is not set. ContentSpiel signs sessions and tokens with it and " \
                          "does not start in production without one. Make a value with `bin/rails secret` and " \
-                         "set it as the environment variable SECRET_KEY_BASE; keep it the same across restarts."
+                         "set it as the environment variable SECRET_KEY_BASE; keep it the same across restarts. " \
+                         "(A secret_key_base in the encrypted file that RAILS_MASTER_KEY opens is accepted too; " \
+                         "none could be read.)"
   end
+
+  def self.present?(value) = !value.to_s.strip.empty?
+  private_class_method :present?
 end
