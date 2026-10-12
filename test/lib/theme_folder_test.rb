@@ -52,7 +52,121 @@ class ThemeFolderTest < ActiveSupport::TestCase
     [ "/no/such/theme/anywhere", PLAIN.join("views/pages/show.html.erb").to_s ].each do |path|
       error = assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(path) }
 
-      assert_equal "THEME_PATH names no directory: #{path}", error.message
+      assert_equal "THEME_PATH names no directory: #{path}. Set THEME_PATH to the folder that holds the site's theme " \
+                   "(its views, components, assets and javascript folders), or unset it to draw the site with the default theme.", error.message
+    end
+  end
+
+  test "every refusal says what to do about it" do
+    folder_with("lib/helper.rb" => "x") do |dir|
+      assert_includes assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }.message, "Move it out of the folder or delete it."
+    end
+  end
+
+  # A process that runs as root reads everything, so there is nothing to see.
+  def unreadable(path)
+    skip "root reads every file" if Process.uid.zero?
+    mode = File.stat(path).mode
+    File.chmod(0o000, path)
+    yield
+  ensure
+    File.chmod(mode, path) if mode
+  end
+
+  test "a folder that cannot be read is a THEME_PATH problem, named with its path and what to do, at the top and below it" do
+    folder_with("views/pages/show.html.erb" => "page") do |dir|
+      [ dir, File.join(dir, "views"), File.join(dir, "views/pages") ].each do |locked|
+        unreadable(locked) do
+          error = assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }
+
+          assert_includes error.message, "THEME_PATH: #{locked} cannot be read (Permission denied)"
+          assert_includes error.message, "must be able to read every file and folder of the theme"
+        end
+      end
+    end
+  end
+
+  test "a file that cannot be read is a THEME_PATH problem too, and never a bare system error" do
+    folder_with("views/pages/show.html.erb" => "page") do |dir|
+      file = File.join(dir, "views/pages/show.html.erb")
+      folder = ThemeFolder.new(dir)
+      unreadable(file) do
+        [ -> { ThemeFolder.new(dir) }, -> { folder.fingerprint }, -> { folder.read("views/pages/show.html.erb") } ].each do |ask|
+          error = assert_raises(ThemeFolder::Invalid, &ask)
+
+          assert_includes error.message, "THEME_PATH: #{file} cannot be read (Permission denied)"
+        end
+      end
+      assert_equal "page", folder.read("views/pages/show.html.erb")
+    end
+  end
+
+  test "a link that leaves the folder stops it, a file's or a folder's, and the message names both ends" do
+    Dir.mktmpdir("elsewhere") do |outside|
+      File.write(File.join(outside, "show.html.erb"), "page")
+
+      folder_with("views/pages/.keep" => "") do |dir|
+        link = File.join(dir, "views/pages/show.html.erb")
+        File.symlink(File.join(outside, "show.html.erb"), link)
+        error = assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }
+
+        assert_includes error.message, "THEME_PATH: #{link} is a link to " \
+                                       "#{File.realpath(File.join(outside, "show.html.erb"))}, which is outside the theme folder"
+        assert_includes error.message, "Copy what it links to into the theme in place of the link."
+      end
+
+      folder_with do |dir|
+        File.symlink(outside, File.join(dir, "views"))
+
+        assert_includes assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }.message, "is a link to #{File.realpath(outside)}, which is outside the theme folder"
+      end
+    end
+  end
+
+  test "a link to nothing and a link to a folder it is in stop it; a link that stays inside the folder is the file it names" do
+    folder_with("views/pages/show.html.erb" => "page") do |dir|
+      File.symlink(File.join(dir, "views/pages/show.html.erb"), File.join(dir, "views/pages/not_found.html.erb"))
+      folder = ThemeFolder.new(dir)
+
+      assert_equal %w[views/pages/not_found.html.erb views/pages/show.html.erb], folder.files
+      assert_equal "page", folder.read("views/pages/not_found.html.erb")
+
+      File.symlink(File.join(dir, "views/gone.html.erb"), File.join(dir, "views/pages/_lost.html.erb"))
+      assert_includes assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }.message, "views/pages/_lost.html.erb is a link to nothing"
+      File.delete(File.join(dir, "views/pages/_lost.html.erb"))
+
+      File.symlink(File.join(dir, "views"), File.join(dir, "views/pages/again"))
+      assert_includes assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }.message, "views/pages/again is a link to a folder it is in"
+    end
+  end
+
+  test "a dot directory is not walked: what is in it is neither read nor followed" do
+    Dir.mktmpdir("elsewhere") do |outside|
+      folder_with("views/pages/show.html.erb" => "page", ".git/objects/pack" => "x") do |dir|
+        File.symlink(outside, File.join(dir, ".git/hooks"))
+        File.symlink(File.join(dir, "nothing"), File.join(dir, ".git/broken"))
+        File.symlink(outside, File.join(dir, ".cache"))
+        asked = []
+        children = Dir.method(:children)
+
+        with_singleton_override(Dir, :children, ->(directory) { asked << directory.to_s; children.call(directory) }) do
+          assert_equal [ "views/pages/show.html.erb" ], ThemeFolder.new(dir).files
+        end
+        assert_not_empty asked
+        assert_empty asked.grep(/\.git|\.cache/), "a dot directory was listed"
+      end
+    end
+  end
+
+  test "the fingerprint is read file by file and never as one string" do
+    folder_with("assets/fonts/site.woff2" => "font" * 1000) do |dir|
+      folder = ThemeFolder.new(dir)
+      expected = Digest::SHA256.hexdigest("assets/fonts/site.woff2\0#{"font" * 1000}\0")
+
+      whole = ->(*) { flunk "a file of the theme was read whole" }
+      with_singleton_override(File, :binread, whole) do
+        with_singleton_override(File, :read, whole) { assert_equal expected, folder.fingerprint }
+      end
     end
   end
 
@@ -101,6 +215,15 @@ class ThemeFolderTest < ActiveSupport::TestCase
       assert_empty folder.templates
       assert_match(/\A\h{64}\z/, folder.fingerprint)
       assert_not_equal "default", folder.fingerprint
+    end
+  end
+
+  test "the boot line of a folder that holds nothing of a theme says that it replaces nothing" do
+    folder_with("README.md" => "about", ".keep" => "") do |dir|
+      folder = ThemeFolder.new(dir)
+
+      assert_equal "[ContentSpiel] Theme: #{folder.path} holds no file of a theme and replaces nothing: the default theme draws " \
+                   "the site (fingerprint #{folder.fingerprint[0, 8]})", ThemeFolder.announcement(folder)
     end
   end
 
