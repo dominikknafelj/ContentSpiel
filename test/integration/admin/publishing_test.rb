@@ -36,6 +36,24 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_equal 1, Publishing::Version.of(@page).count
   end
 
+  test "a publish that would take a live post's address away goes back to the editor with one sentence that names the post and the address" do
+    blog = create_page(title: "Blog", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert Pages::Save.call(blog, attributes: { published: true }).ok?
+    Tag.create!(name: "one")
+    create_page(title: "Hello", parent: @page)
+    record = create_post(title: "Hello", tags: %w[one])
+    ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "one" } })
+    copies = Publishing::Version.count
+
+    post admin_publishing_publish_path(kind: "page", id: @page.id)
+
+    assert_redirected_to admin_page_path(@page)
+    assert_equal "The post “Hello” would get the address /one/hello, which is already taken in EN, DE, and ES", flash[:alert]
+    assert_equal copies, Publishing::Version.count
+    assert_equal "/blog/hello", record.reload.full_path("en")
+  end
+
   test "a draft goes back to the editor with the reason, and nothing is published" do
     draft = create_page(title: "Draft", published: false)
 

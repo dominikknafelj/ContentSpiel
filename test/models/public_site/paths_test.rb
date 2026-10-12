@@ -206,7 +206,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
   end
 
   # Moves and reorders reach the post through the moved page's own
-  # subtree-scoped resync (`Page#resync_listed_posts`): the listing page that
+  # refresh (`PublicSite::Paths.refresh`, its subtree's posts): the listing page that
   # moved is the only one whose rank relative to the others changed.
   test "moving a listing page ahead of another listing makes it canonical" do
     listing(@root, "Blog", "blog")
@@ -545,10 +545,13 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       update = service_post("Now", content_type: "now_update")
       job = service_post("Job", content_type: "resume_entry")
       assert_equal "/writing/blog/hello", current(hello)
-      assert_equal "/archive/old", current(old)
+      assert_equal "/writing/blog/old", current(old), "Archive's copy was taken when no tag was called old: it recorded none, and lists nothing"
       assert_equal "/news/now", current(update)
       assert_equal "/job", current(job), "the live homepage teaser beats a typed listing on a draft page"
       assert_parity "creating posts"
+      publish_changes(archive)
+      assert_equal "/archive/old", current(old)
+      assert_parity "publishing again a page whose list named a tag nobody had"
 
       # -- a page's own inputs -------------------------------------------------
       ok! Pages::Save.call(about, translations: { "de" => { slug: "ueber-uns" } })
@@ -781,29 +784,30 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_parity "deleting a tag"
 
       # A name only a page's COPY still filters by. The copy recorded no id
-      # (no such tag when it was taken), so it finds the tag by name when it
-      # is read, while the page's rows have moved on to another name: a
-      # rename away from that name, and one onto it, must look at the copy.
+      # (no such tag when it was taken), so it lists nothing, whatever tag
+      # comes to carry that name afterwards, while the page's rows have moved
+      # on to another name: a rename away from that name, and one onto it,
+      # move nothing.
       press = service_page("Press", published: false)
       press_block = service_listing(press, content_type: "blog", tag: "press")
       ok! Pages::Save.call(press, attributes: { published: true })
       wire = service_post("Wire", tags: %w[press])
-      assert_equal "/press/wire", current(wire)
+      assert_equal "/writing/blog/wire", current(wire)
       ok! ContentBlocks::Save.call(press_block.reload, attributes: { settings: { content_type: "blog", tag: "other" } })
       assert_parity "pointing a live page's listing block at another tag, in its rows"
       ok! Tags::Rename.call(Tag.find_by!(name: "press"), name: "media")
       assert_equal "/writing/blog/wire", current(wire), "the copy's filter names a tag nobody has any more"
       assert_parity "renaming a tag away from a name only a page's copy filters by"
       ok! Tags::Rename.call(Tag.find_by!(name: "media"), name: "press")
-      assert_equal "/press/wire", current(wire)
+      assert_equal "/writing/blog/wire", current(wire)
       assert_parity "renaming a tag onto a name only a page's copy filters by"
 
       # A merge is immediate in the copies too: the id they hold is replaced.
       ok! Tags::Merge.call(Tag.find_by!(name: "press"), into: Tag.create!(name: "newsroom"))
-      assert_equal "/press/wire", current(wire), "the list and the address are what they were"
+      assert_equal "/writing/blog/wire", current(wire), "the list and the address are what they were"
       assert_parity "merging a tag the copies hold"
       publish_changes(wire)
-      assert_equal "/press/wire", current(wire)
+      assert_equal "/writing/blog/wire", current(wire)
       assert_parity "publishing a post after a merge"
       publish_changes(press)
       assert_equal "/writing/blog/wire", current(wire), "the page's rows filter by another tag"
@@ -1125,6 +1129,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
   end
 
   test "a scheduled change to a post's tags moves its address when a refresh runs after its time, once, and a copy in force at once is never due" do
+    Tag.create!(name: "ruby")
     ruby = create_page(title: "Ruby", published: false)
     ContentBlocks::Save.call(ContentBlock.new(owner: ruby), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "ruby" } })
     assert Pages::Save.call(ruby, attributes: { published: true }).ok?
@@ -1183,6 +1188,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
   test "syncing every post against tag-filtered listings, rows and copies, costs the same number of statements for 5 posts as for 50" do
     listing(@root, "By rows", "blog", tag: "rows")
+    Tag.create!(name: "copy")
     copied = create_page(title: "By copy", published: false)
     ContentBlocks::Save.call(ContentBlock.new(owner: copied), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "copy" } })
     assert Pages::Save.call(copied, attributes: { published: true }).ok?

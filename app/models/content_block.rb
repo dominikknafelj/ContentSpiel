@@ -223,11 +223,13 @@ class ContentBlock < ApplicationRecord
     name.present? ? Tag.named(name).order(:id).pick(:id) : nil
   end
 
-  # The id a published copy recorded for this block's filter, and nothing
-  # else: nil for a row (which records nothing), and nil for a copy taken
-  # when no tag had that name. Never a query: `Publishing::Listing` decides
-  # from it whether the name has to be looked up.
-  def recorded_tag_id = @listed_tag_id
+  # Whether a published copy speaks for this block's filter: true for a
+  # block rebuilt from a copy, which then answers `listed_tag_id` without a
+  # query, also when the answer is "no tag had that name". Such a block
+  # lists nothing until its page is published again; the name is never
+  # looked up on a copy's behalf, so a tag renamed or deleted since cannot
+  # come back through a published list.
+  def tag_recorded? = instance_variable_defined?(:@listed_tag_id)
 
   private
 

@@ -31,29 +31,19 @@ module Tags
       tag.present? && names.include?(tag.downcase)
     end
 
-    # The content types a `PublicSite::Paths.sync_posts` has to re-derive after
-    # a change to `names`: those of the blocks that filter by any of them (see
-    # `Tags::Rename#resync` for why both the vacated and the arrived-at name
-    # matter). `content_type.presence` folds a blank filter to `nil`, which
-    # `sync_posts` reads as "every content type"; `map` + `uniq`, never
-    # `filter_map`, because that `nil` is a meaningful answer here.
+    # WHAT A TAG SERVICE TOUCHED, for `PublicSite::Paths.refresh`: the pages
+    # whose list blocks refer to a tag. Only a tag service can know them, so
+    # this finder is theirs; which posts follow from those pages is the
+    # refresh's to know.
     #
-    # The rows' blocks AND the current published copies' (drafts spec §5): a
-    # published page lists what its copy lists, and a copy's block that
-    # recorded no tag id finds its tag by name when it is read, so a name
-    # that only a copy still filters by is affected like one a row names
-    # (`Publishing::Listing.copied_types_naming`). Both, since a page is
-    # judged by one or the other depending on a state these services do not
-    # ask about; a type too many is a sync that writes nothing.
-    # `tag_ids:` adds the copies' blocks that RECORDED one of these ids,
-    # whatever name they hold (`Tags::Merge`: the two ids become one).
-    def affected_content_types(*names, tag_ids: [])
-      (listing_blocks_naming(*names).map { |block| block.settings_object.content_type.presence } +
-        Publishing::Listing.copied_types_naming(names, tag_ids: tag_ids)).uniq
-    end
-
-    def refresh_posts_of(content_types)
-      PublicSite::Paths.refresh(posts: content_types.include?(nil) ? Post.all : Post.where(content_type: content_types))
+    # A ROW refers to a tag by name (a draft's blocks, and those of a page
+    # written around the services): the owners of the row blocks that filter
+    # by one of `names`. A published COPY refers to it by the id it
+    # recorded, and never by name: the pages one of whose copies recorded one
+    # of `ids`. A rename changes no id, so it passes names only.
+    def pages_listing(names: [], ids: [])
+      rows = listing_blocks_naming(*names).select { |block| block.owner_type == Page.polymorphic_name }.map(&:owner_id)
+      (rows + Publishing::Version.listing_tag(ids).pluck(:record_id)).uniq
     end
 
     # An open post form resends every tag chip on every autosave, so a post

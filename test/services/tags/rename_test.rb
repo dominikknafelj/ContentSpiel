@@ -42,7 +42,7 @@ class Tags::RenameTest < ActiveSupport::TestCase
 
   # A block with no content type filter (only a tag) is "every content
   # type" (BlockTypes::PostList's own reading, mirrored by
-  # `PublicSite::Paths.sync_posts`'s `nil` argument) -- renaming the tag it
+  # `PublicSite::Paths.posts_listed_by`) -- renaming the tag it
   # filters by has to resync every post, not just one type, since the block
   # itself never named one to narrow that down to.
   test "renaming a tag filtered by an untyped listing resyncs every content type" do

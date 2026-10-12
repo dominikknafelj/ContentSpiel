@@ -111,15 +111,45 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     assert_equal 3, titles(Publishing::Listing.posts(block, limit: 3)).size
   end
 
-  test "a filter whose tag did not exist when the copy was taken finds the tag by its name now, and a name no tag has lists nothing" do
+  # A copy speaks for its filter: the id it recorded, or that no tag had the
+  # name. The name is never looked up for a copy afterwards (Task 4b), so a
+  # tag made later under that name, or made again after a delete, is another
+  # tag to it until the page is published again.
+  test "a filter whose tag did not exist when the copy was taken lists nothing, also once a tag has that name, until the page is published again" do
     block = published_block(content_type: "blog", tag: "news")
     assert_nil block.listed_tag_id
     news = create_post(title: "First news", tags: %w[news])
     create_post(title: "Other", tags: %w[ruby])
 
-    assert_equal [ "First news" ], titles(Publishing::Listing.posts(block))
-    assert Publishing::Listing.lists?(block, Publishing.published(news))
-    assert_empty Publishing::Listing.posts(published_block(title: "Second", content_type: "blog", tag: "never-existing"))
+    assert_empty Publishing::Listing.posts(block)
+    assert_not Publishing::Listing.lists?(block, Publishing.published(news))
+    assert_nil Publishing::Listing.filter_tags([ block ])[block]
+
+    page = Page.find(block.owner_id)
+    publish_changes(page)
+    again = Publishing.published(page.reload).content_blocks.sole
+    assert_equal [ "First news" ], titles(Publishing::Listing.posts(again))
+    assert Publishing::Listing.lists?(again, Publishing.published(news))
+    assert_equal Tag.find_by!(name: "news").id, Publishing::Listing.filter_tags([ again ])[again]
+  end
+
+  test "a tag deleted and made again under the same name is another tag to a copy" do
+    create_post(title: "Original", tags: %w[ruby])
+    block = published_block(content_type: "blog", tag: "ruby")
+    assert Tags::Destroy.call(Tag.find_by!(name: "ruby")).ok?
+    newcomer = create_post(title: "Newcomer", tags: %w[ruby])
+
+    assert_not Publishing::Listing.lists?(block, Publishing.published(newcomer)), "the copy holds the deleted tag's id"
+    assert_not_includes titles(Publishing::Listing.posts(block)), "Newcomer"
+  end
+
+  test "a row's filter is asked by name, now: a draft page lists the posts of a tag made after its block" do
+    page = create_page(title: "Draft list", published: false)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "later" } }).record
+    post = create_post(title: "Later", tags: %w[later])
+
+    assert Publishing::Listing.lists?(block, Publishing.published(post))
+    assert_equal Tag.find_by!(name: "later").id, Publishing::Listing.filter_tags([ block ])[block]
   end
 
   test "the id the copy recorded decides, whatever tag now carries the name" do

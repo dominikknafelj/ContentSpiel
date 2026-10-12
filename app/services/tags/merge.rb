@@ -54,7 +54,7 @@ module Tags
       return failure(@source, [ self.class.same_tag ]) if @into.id == @source.id
 
       problem = nil
-      content_types = []
+      pages = posts = []
       merged = Tag.transaction do
         # Both rows locked, in id order, so two merges running the other way round
         # (A into B, B into A) queue up instead of deadlocking, and a tag deleted
@@ -73,10 +73,13 @@ module Tags
         # also the "posts that had the tag" number the event records.
         carrier_ids = source.post_tags.pluck(:post_id)
 
-        # Read before anything changes: which listings are affected is decided by
-        # the blocks as they stand now (a block naming either tag, whichever
-        # content types they list).
-        content_types = affected_content_types(source.name, into.name, tag_ids: [ source.id, into.id ])
+        # Read before anything changes: what the merge touches is decided by
+        # the blocks and the join rows as they stand now. The two tags become
+        # one, so the pages whose lists refer to EITHER and the posts that
+        # carry either are touched: a list that filtered by the merged tag
+        # holds the kept tag's posts from now on, and the other way round.
+        pages = pages_listing(names: [ source.name, into.name ], ids: [ source.id, into.id ])
+        posts = PostTag.where(tag_id: [ source.id, into.id ]).distinct.pluck(:post_id)
         blocks = listing_blocks_naming(source.name)
 
         give_target_to_carriers(into, carrier_ids)
@@ -84,8 +87,8 @@ module Tags
         repoint_blocks(blocks, source, into)
         # The published copies too, after the page locks above: a merge is
         # immediate everywhere, as a slug is. The copies reference the tag by
-        # id and `source`'s is about to stop existing, so the lists and the
-        # addresses the public has stay exactly what they are
+        # id and `source`'s is about to stop existing, so its id is replaced
+        # by the kept tag's and the lists that held its posts still hold them
         # (`Publishing::Version.repoint_tag!`).
         Publishing::Version.repoint_tag!(from: source, to: into)
         PostTag.where(tag_id: source.id).delete_all
@@ -103,11 +106,9 @@ module Tags
       return failure(@source, [ problem ]) if problem
 
       # Join rows were written without callbacks (`insert_all`/`delete_all`), so
-      # `PostTag#sync_post_paths` didn't run per post -- and needn't: a post's
-      # canonical page depends on its tags only through listing blocks that
-      # filter by tag, and every block that names either tag is in
-      # `content_types`, which this re-derives from scratch.
-      refresh_posts_of(content_types)
+      # `PostTag#sync_post_paths` didn't run per post: the merge says what it
+      # touched, after its commit.
+      PublicSite::Paths.refresh(pages: pages, posts: posts)
       success(merged)
     end
 

@@ -102,19 +102,6 @@ module HasPublicPaths
     new_record? || url_input_names.any? { |name| will_save_change_to_attribute?(name) }
   end
 
-  # Whether the addresses this record WOULD have are free, asked by a service
-  # where the validation below cannot answer: it runs before the save, when a
-  # tag made by this very save has no id yet (so no tag-filtered list holds
-  # the post), and it judges a published post by its copy's tags, not by the
-  # tags about to be published. `Posts::Save` asks once the tags are written,
-  # `Publishing::PublishChanges` before it takes a post's copy; a taken
-  # address is the validation's own error, on the slug that gives it, and
-  # the caller rolls its transaction back. A page's address depends on
-  # neither, so for a page this is the validation again.
-  def address_free_as_typed?
-    add_taken_address_errors(PublicSite::Paths.compute(self, rows: true).compact)
-  end
-
   private
 
   def remember_url_inputs_change
@@ -144,24 +131,24 @@ module HasPublicPaths
   # Skipped for a stored record none of whose URL inputs is about to change:
   # its paths are the ones it already holds, so it cannot newly clash, and a
   # title-only save computes no path and asks `public_paths` nothing.
+  #
+  # What this cannot see is an address that follows from a PUBLISH: a tag
+  # made by the very save that carries it has no id yet, and a published
+  # post is judged by its copy's tags, not by the ones about to be
+  # published. Those are refused after the fact, by rolling the publish back
+  # (`Publishing::KeepsAddresses`); this stays the check that marks the slug
+  # field before anything is written.
   def public_paths_are_available
     return unless url_inputs_changed?
 
-    add_taken_address_errors(PublicSite::Paths.compute(self).compact)
-  end
-
-  # One error per language whose path (`{ locale => path }`) is another
-  # record's current address; true when there is none.
-  def add_taken_address_errors(paths)
-    return true if paths.empty?
+    paths = PublicSite::Paths.compute(self).compact
+    return if paths.empty?
 
     taken = PublicPath.current.where(path: paths.values.uniq)
       .where.not(record_type: self.class.polymorphic_name, record_id: id).pluck(:locale, :path).to_set
-    clashing = paths.select { |locale, path| taken.include?([ locale.to_s, path ]) }
-    clashing.each do |locale, path|
+    paths.select { |locale, path| taken.include?([ locale.to_s, path ]) }.each do |locale, path|
       errors.add(Mobility.normalize_locale_accessor(:slug, locale), :taken,
         message: "gives the address #{path}, which is already taken in #{locale.upcase}")
     end
-    clashing.empty?
   end
 end

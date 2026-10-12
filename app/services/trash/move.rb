@@ -4,8 +4,8 @@ module Trash
   # `trashed_at`, so `Trash::Restore` is a column update. Saving the flag is
   # what frees the URLs -- `PublicSite::Paths` computes no path for a
   # trashed record, so the model callbacks delete its `public_paths` rows,
-  # redirects included, and resync every post a trashed listing page gave a
-  # URL (`Page#resync_listed_posts`). Tags, blocks, relations and
+  # redirects included, and re-derive every post a trashed listing page gave
+  # a URL (`PublicSite::Paths.refresh`, the hosted posts). Tags, blocks, relations and
   # `media_usages` rows all stay as they are, so a restore needs to rebuild
   # nothing but URLs.
   #

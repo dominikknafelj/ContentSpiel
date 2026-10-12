@@ -47,6 +47,7 @@ module Pages
   # would land in whatever locale happens to be ambient.
   class Save < ApplicationService
     include Media::Choosing
+    include Publishing::KeepsAddresses
 
     TRANSLATED = %i[title slug subtitle meta_title meta_description hero_alt].freeze
     # Everything `attributes:` may carry. `parent` (a `Page`, never
@@ -81,6 +82,7 @@ module Pages
       return hero_refusal if hero_refusal
 
       refused = nil
+      lost = []
       # `requires_new`: a nested call (starter content) gets its own
       # savepoint, so the FK refusal rescued below can't leave a caller's
       # transaction aborted.
@@ -104,12 +106,21 @@ module Pages
         # unpublish: the copy the public site will show (drafts spec §4.3).
         # A save of a record that already has a time takes none: its changes
         # wait for `Publishing::PublishChanges`.
-        Publishing::Version.take!(@page, by: actor_user) if was_unpublished && @page.published_at.present?
+        if was_unpublished && @page.published_at.present?
+          version = Publishing::Version.take!(@page, by: actor_user)
+          # The page's list blocks are public from here on. A live post they
+          # would leave without an address refuses the publish, and the whole
+          # save with it (`Publishing::KeepsAddresses`): what the page's own
+          # save made yield, and what its copy did.
+          lost = lost_addresses(@page, @page.address_yields + version.yields)
+          raise ActiveRecord::Rollback if lost.any?
+        end
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end
 
       return denied(refused, @page) if refused
+      return failure(@page, lost) if lost.any?
       return failure(@page) unless saved
 
       success(@page)

@@ -40,25 +40,14 @@ module Tags
 
       return failure(@tag) unless saved
 
-      resync(old_name, @tag.name)
+      # A list block's `tag` setting is a plain string: the ROW blocks that
+      # filter by the name the tag left have lost its posts, and the ones
+      # that filter by the name it arrived at have gained them (two tags
+      # effectively meeting under one list). Their pages are what was
+      # touched. A published copy holds the tag's id, which a rename does
+      # not change, so no copy's list moves.
+      PublicSite::Paths.refresh(pages: pages_listing(names: [ old_name, @tag.name ]))
       success(@tag)
-    end
-
-    private
-
-    # Every content type a post_list block filtering by the tag's old *or*
-    # new name could have handed a post's canonical page to, or taken one
-    # away from (mirrors `ContentBlock#sync_listed_post_paths`'s own
-    # before-and-after shape, but for the tag rather than the block): the
-    # old name, because a post carrying this tag may have just fallen out of
-    # a block that still names it; the new name, because the rename may have
-    # just walked this tag straight into a block that already filtered by
-    # it (two tags effectively merging under one listing). Both directions
-    # matter regardless of which one actually changed anything -- cheaper to
-    # resync a content type that turns out unaffected than to work out in
-    # advance which of the two names a given block's posts actually needed.
-    def resync(old_name, new_name)
-      refresh_posts_of(affected_content_types(old_name, new_name))
     end
   end
 end

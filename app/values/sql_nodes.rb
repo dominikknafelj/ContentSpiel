@@ -28,6 +28,10 @@ module SqlNodes
       .then { |array| Arel::Nodes::InfixOperation.new("@>", array, cast([ value ].to_json, "jsonb")) }
   end
 
+  # `column @> '<value as json>'::jsonb`: whether a jsonb column contains
+  # `value` (an array column holding an object with these pairs, for one).
+  def json_contains(column, value) = Arel::Nodes::InfixOperation.new("@>", column, cast(value.to_json, "jsonb"))
+
   # `COALESCE(a, b)`: the first that is not NULL.
   def coalesce(*values) = function("COALESCE", *values)
 

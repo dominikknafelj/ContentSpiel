@@ -54,6 +54,7 @@ module Posts
   # dropping the key is what makes such a caller find out. A translated
   # attribute belongs in `translations:`.
   class Save < ApplicationService
+    include Publishing::KeepsAddresses
     include Media::Choosing
 
     TRANSLATED = %i[title slug excerpt body].freeze
@@ -88,6 +89,7 @@ module Posts
       end
 
       refused = nil
+      lost = []
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = Post.transaction(requires_new: true) do
@@ -98,7 +100,6 @@ module Posts
         raise ActiveRecord::Rollback if refused
 
         (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
-        address_free?(was_unpublished) || raise(ActiveRecord::Rollback)
         touch_for_join_rows(related_before)
         # The body's `image` nodes, every locale (media library design spec
         # §5.1) -- recomputed from the saved post, so an image removed from
@@ -106,10 +107,12 @@ module Posts
         Media::UsageIndex.refresh(@post)
         # The post's stored translation state (`translation_states`).
         Translations::StateIndex.refresh(@post)
-        # Published or scheduled for the first time, or again after an
-        # unpublish: the copy the public site will show (drafts spec §4.3).
-        # Taken after the tags are written (related posts are not part of a copy).
-        Publishing::Version.take!(@post, by: actor_user) if was_unpublished && @post.published_at.present?
+        # The copy of a post published or scheduled by this save is taken
+        # here, and a post this save would leave without an address refuses
+        # it (`#address_yields`).
+        lost = lost_addresses(@post, address_yields(was_unpublished, related_before))
+        raise ActiveRecord::Rollback if lost.any?
+
         record_events(related_before)
         true
       end
@@ -118,6 +121,7 @@ module Posts
         discard_refused_changes
         return denied(refused, @post)
       end
+      return failure(@post, lost) if lost.any?
       return failure(@post) unless saved
 
       success(@post)
@@ -127,22 +131,25 @@ module Posts
 
     private
 
-    # The address clash the post's own validation could not see, asked now
-    # that the tags are written (`HasPublicPaths#address_free_as_typed?`):
-    # a tag this save made had no id when the validation ran, so a list that
-    # filters by it did not count; and a post published again after an
-    # unpublish was validated by the tags of its older copy. Refused with the
-    # validation's own error, the whole save rolled back, instead of a post
-    # that is saved, published and has no address.
+    # What the addresses answered where this save decides the post's own:
+    # the changes that had to yield (`Publishing::KeepsAddresses` refuses
+    # the save for one of the post itself).
     #
-    # Asked only where the rows' tags decide the address after this save: a
-    # draft whose tags this call set, and a post this call publishes or
-    # schedules (the copy taken below is the rows). A live post's tags move
+    # A save that publishes or schedules takes the copy the public site will
+    # show (drafts spec §4.3), after the tags are written (related posts are
+    # not part of a copy), and the copy's own refresh answers. A DRAFT is
+    # asked only when its tag set really changed: its slug's clash is the
+    # validation's, but a tag this very save made had no id when the
+    # validation ran, so a list that filters by it did not count yet. Not
+    # for tags that were merely sent again: the editor resends every chip
+    # with every autosave, and a draft that another record's write left
+    # without an address must go on saving its text. A live post's tags move
     # nothing until `Publishing::PublishChanges`, which asks the same.
-    def address_free?(was_unpublished)
-      return true unless @post.published_at.nil? ? @attributes.key?(:tag_names) : was_unpublished
+    def address_yields(was_unpublished, related_before)
+      return Publishing::Version.take!(@post, by: actor_user).yields if was_unpublished && @post.published_at.present?
+      return [] unless @post.published_at.nil? && related_before.key?("tag_names") && related_before["tag_names"] != tag_names
 
-      @post.address_free_as_typed?
+      PublicSite::Paths.refresh(posts: [ @post ])
     end
 
     # Tags and related posts are join rows: changing only those saves no

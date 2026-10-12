@@ -1,16 +1,17 @@
 module Tags
   # Permanently deletes a tag (spec §5.3's "No trash" interim state, global
   # constraints), the same shape `ContentBlocks::Destroy` and
-  # `Trash::Purge` use. Removing the tag's own `post_tags` (`Tag#has_many
-  # :post_tags, dependent: :destroy`) already resyncs each of those posts'
-  # own canonical page individually, through `PostTag#sync_post_paths`'s
-  # `after_commit` -- but a tag-filtered `post_list` block's *other*
-  # candidates (a post this listing didn't win before, now free to, or an
-  # unfiltered listing elsewhere that should pick the post up) are only
-  # correctly re-ranked by re-deriving every post of the affected content
-  # type from scratch, the same `PublicSite::Paths.sync_posts` call
-  # `Tags::Rename` makes -- so this resyncs explicitly too, rather than
-  # leaning on `PostTag`'s callback alone to happen to cover it.
+  # `Trash::Purge` use. Its join rows go with it (`Tag#has_many :post_tags,
+  # dependent: :destroy`), and so does what a list that filtered by it
+  # listed. The service says what it touched, read before the destroy while
+  # there is still something to read it from: the pages whose list blocks
+  # refer to the tag (`Tags::Listings#pages_listing`) and the posts that
+  # carried it. `PublicSite::Paths.refresh` knows the rest, a post an
+  # unfiltered list elsewhere now picks up included.
+  #
+  # While both copies hold the tag's id nothing public changes: a published
+  # list and a published post go on matching by an id nobody else can be
+  # given, until either is published again.
   class Destroy < ApplicationService
     include Tags::Listings
 
@@ -25,7 +26,8 @@ module Tags
     def call
       return denied("tags.manage", @tag) unless authorize!("tags.manage", @tag)
 
-      content_types = affected_content_types
+      pages = pages_listing(names: [ @tag.name ], ids: [ @tag.id ])
+      carriers = @tag.post_tags.pluck(:post_id)
       destroyed = Tag.transaction do
         touch_carrying_posts(@tag)
         record_event("tag.deleted", subject: @tag)
@@ -33,16 +35,8 @@ module Tags
       end
       return failure(@tag) unless destroyed
 
-      refresh_posts_of(content_types)
+      PublicSite::Paths.refresh(pages: pages, posts: carriers)
       success(@tag)
     end
-
-    private
-
-    # Computed *before* the destroy: once `@tag` (and its `post_tags`) are
-    # gone, there is nothing left to look this up from, and a listing
-    # block's own `settings.tag` is a plain string unrelated to the tag row
-    # being removed, so it isn't touched by the destroy either way.
-    def affected_content_types = super(@tag.name)
   end
 end

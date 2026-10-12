@@ -346,13 +346,24 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "a list for a tag that did not exist when its page was published lists the first post that carries it, at an address that answers" do
+  # Reversed in Task 4b: a copy that recorded no id for its filter is no
+  # longer asked by name. No tag is made for it and no name is looked up, so
+  # a renamed or deleted tag cannot come back through a published list.
+  test "a list for a tag that did not exist when its page was published stays empty, and the first post that carries the tag is not addressed under it, until the page is published again" do
     page = listing_page("News", tag: "news")
     post = create_post(title: "First news", tags: %w[news])
 
     get path_of(page)
-    assert_select ".content-block--post-list a", text: "First news"
+    assert_select ".content-block--post-list a", count: 0
+    assert_nil path_of(post), "no published list holds it"
+    get "/news/first-news"
+    assert_response :not_found
 
+    publish_changes(page)
+
+    get path_of(page)
+    assert_select ".content-block--post-list a", text: "First news"
+    assert_equal "/news/first-news", path_of(post.reload)
     get path_of(post)
     assert_response :success
   end
@@ -412,7 +423,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     result = Publishing::PublishChanges.call(post.reload)
 
     assert_not result.ok?
-    assert_equal [ "Slug en gives the address /topic/hello, which is already taken in EN" ], result.errors.grep(/EN\z/)
+    assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
     assert_equal [ copies, events, counter ], [ Publishing::Version.count, Audit::Event.count, PublicSite::Version.current ]
     assert_equal addresses, PublicPath.order(:id).pluck(:id, :path, :current)
     get "/blog/hello"
@@ -421,6 +432,139 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     assert_not Publishing::PublishChanges.call(post.reload, at: 2.days.from_now).ok?, "a scheduled change is asked the same, when it is scheduled"
     assert_nil Publishing.pending(post)
+    assert_equal [ copies, events, counter ], [ Publishing::Version.count, Audit::Event.count, PublicSite::Version.current ]
+    assert_equal addresses, PublicPath.order(:id).pluck(:id, :path, :current)
+  end
+
+  # N1 of the re-review: the same rule for a PAGE's publish. The page's new
+  # list would take a live post from its address onto one a child page
+  # holds; the post would be left with none.
+  def topic_about_to_take_hello
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = create_page(title: "Topic")
+    create_page(title: "Hello", parent: topic)
+    post = create_post(title: "Hello", tags: %w[topic])
+    assert_equal "/blog/hello", path_of(post)
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
+    [ topic, post ]
+  end
+
+  # What a refused publish relies on: everything it did is inside the
+  # savepoint that is rolled back, and what it would have told the world is
+  # deferred to a commit that does not come.
+  def assert_nothing_happened
+    before = [ Publishing::Version.order(:id).pluck(:id, :settled_at), Audit::Event.count, PublicSite::Version.current,
+               PublicPath.order(:id).pluck(:id, :record_type, :record_id, :locale, :path, :current, :listed_on_id) ]
+    announced = []
+    subscription = ActiveSupport::Notifications.subscribe("public_paths.changed") { |*, payload| announced << payload }
+    signals = []
+    with_singleton_override(Live::Signals, :later, ->(*arguments, **options) { signals << [ arguments, options ] }) { yield }
+
+    assert_equal before, [ Publishing::Version.order(:id).pluck(:id, :settled_at), Audit::Event.count, PublicSite::Version.current,
+                           PublicPath.order(:id).pluck(:id, :record_type, :record_id, :locale, :path, :current, :listed_on_id) ],
+      "copies, audit events, the content version and public_paths, in that order"
+    assert_empty announced, "an address change was announced"
+    assert_empty signals, "a live signal was sent"
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscription) if subscription
+  end
+
+  test "the guard of a refused publish can fail: a publish that goes through writes a copy, an event, the version and a signal" do
+    page = create_page(title: "Plain")
+    assert Pages::Save.call(page, translations: { "en" => { subtitle: "Typed" } }).ok?
+
+    error = assert_raises(Minitest::Assertion) { assert_nothing_happened { publish_changes(page) } }
+    assert_match(/copies, audit events, the content version/, error.message)
+
+    signals = []
+    with_singleton_override(Live::Signals, :later, ->(*arguments, **options) { signals << [ arguments, options ] }) do
+      assert Pages::Save.call(page.reload, translations: { "en" => { subtitle: "Again" } }).ok?
+      publish_changes(page)
+    end
+    assert signals.any?, "a publish that goes through is signalled, so an empty list after a refusal means something"
+  end
+
+  test "publishing a page's changes that would take a live post's address away is refused, and nothing is written, announced or signalled" do
+    topic, post = topic_about_to_take_hello
+
+    assert_nothing_happened do
+      result = Publishing::PublishChanges.call(topic.reload)
+
+      assert_not result.ok?
+      assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
+    end
+    get "/blog/hello"
+    assert_response :success
+    assert_equal "/blog/hello", path_of(post.reload)
+  end
+
+  test "a page's scheduled change that would take a live post's address away is refused when it is scheduled, and nothing is written" do
+    topic, = topic_about_to_take_hello
+
+    assert_nothing_happened do
+      assert_not Publishing::PublishChanges.call(topic.reload, at: 2.days.from_now).ok?
+    end
+    assert_nil Publishing.pending(topic)
+  end
+
+  test "a scheduled change that is free is asked as if now, rolled back, and taken with its time: one copy, one event, no address moved yet" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = create_page(title: "Topic")
+    post = create_post(title: "Hello", tags: %w[topic])
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
+    copies = Publishing::Version.of(topic).count
+    events = Audit::Event.where(action: "page.changes_published").count
+    numbers = Publishing::Version.of(topic).maximum(:number)
+    addresses = PublicPath.order(:id).pluck(:id, :path, :current)
+
+    result = Publishing::PublishChanges.call(topic.reload, at: 2.days.from_now)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal copies + 1, Publishing::Version.of(topic).count
+    assert_equal events + 1, Audit::Event.where(action: "page.changes_published").count
+    pending = Publishing.pending(topic)
+    assert_equal [ numbers + 1, nil ], [ pending.number, pending.settled_at ], "the number the trial took was given back with it"
+    assert_equal addresses, PublicPath.order(:id).pluck(:id, :path, :current)
+    assert_equal "/blog/hello", path_of(post.reload)
+  end
+
+  test "publishing a draft page whose list would take a live post's address away is refused, and the page stays a draft" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = create_page(title: "Topic", published: false)
+    create_page(title: "Hello", parent: topic, published: false)
+    post = create_post(title: "Hello", tags: %w[topic])
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
+    assert_equal "/blog/hello", path_of(post), "a draft list loses to a live one"
+
+    result = nil
+    assert_nothing_happened { result = Pages::Save.call(topic.reload, attributes: { published: true }) }
+
+    assert_not result.ok?
+    assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
+    assert_nil topic.reload.published_at
+    assert_equal "/blog/hello", path_of(post.reload)
+  end
+
+  test "a publish answers for itself only: another record's scheduled change that came into force onto a taken address does not refuse it" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = listing_page("Topic", tag: "topic")
+    late = create_post(title: "Hello")
+    assert Posts::Save.call(late, attributes: { tag_names: %w[topic] }).ok?
+    publish_changes(late, at: 1.hour.from_now)
+    create_page(title: "Hello", parent: topic)
+    other = create_page(title: "Other")
+    assert Pages::Save.call(other, translations: { "en" => { subtitle: "Typed" } }).ok?
+
+    travel_to 2.hours.from_now do
+      result = Publishing::PublishChanges.call(other.reload)
+
+      assert result.ok?, result.errors.to_sentence
+      assert_nil path_of(late.reload), "the due copy was settled by this refresh, and its post yields"
+    end
   end
 
   test "publishing a post's tags that move it to a free address succeeds, and the old address redirects" do
@@ -438,16 +582,21 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/topic/hello"
   end
 
+  # The clash the validation cannot see: the tag is made by the very save
+  # that carries it. Only a ROW's filter is asked by name, so the list is a
+  # draft page's (a published copy that named a tag nobody had lists nothing
+  # until it is published again, whoever makes the tag).
   test "a new live post whose brand-new tag would put it on a taken address is refused as before, and so is a draft" do
-    listing_page("Blog")
-    topic_with_child("fresh") # no tag "fresh" exists: the new post's save creates it
+    topic = create_page(title: "Topic", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "fresh" } })
+    create_page(title: "Hello", parent: topic, published: false) # no tag "fresh" exists: the new post's save creates it
     tags = Tag.count
 
     [ true, false ].each do |published|
       result = Posts::Save.call(attributes: { content_type: "blog", published: published, tag_names: %w[fresh] }, translations: { "en" => { title: "Hello" } })
 
       assert_not result.ok?, "published: #{published}"
-      assert_includes result.errors, "Slug en gives the address /topic/hello, which is already taken in EN"
+      assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
       assert_equal [ 0, tags ], [ Post.count, Tag.count ], "the save is rolled back, its new tag included"
     end
 
@@ -472,8 +621,46 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     result = Posts::Save.call(post.reload, attributes: { published: true })
 
     assert_not result.ok?
-    assert_includes result.errors, "Slug en gives the address /topic/hello, which is already taken in EN"
+    assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
     assert_nil post.reload.published_at
+  end
+
+  # N2 of the re-review: the editor resends every tag chip with every
+  # autosave. A draft that wants a taken address (another record's write made
+  # it yield) must go on saving its text; it is refused when its tags really
+  # change onto the taken address, and when it is published.
+  test "a draft post that wants a taken address still autosaves with its tags resent unchanged, and is refused when published" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    Tag.create!(name: "topic")
+    topic = create_page(title: "Topic", published: false)
+    create_page(title: "Hello", parent: topic, published: false)
+    post = create_post(title: "Hello", published: false, tags: %w[topic])
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
+    assert_nil path_of(post.reload), "the draft yields to the page at /topic/hello, by another record's write"
+    sign_in_as users(:one)
+
+    patch admin_post_path(post), as: :turbo_stream,
+      params: { base_updated_at: post.reload.updated_at.iso8601(6), locale: "en", post: { excerpt: "typed more", tag_names: [ "topic", "" ] } }
+
+    assert_response :success
+    assert_equal "typed more", post.reload.excerpt
+
+    result = Posts::Save.call(post.reload, attributes: { published: true })
+    assert_not result.ok?
+    assert_includes result.errors, "Slug en gives the address /topic/hello, which is already taken in EN", "a publication time is a URL input: the validation sees this one"
+  end
+
+  test "a draft post whose tags really change onto a taken address is refused" do
+    Tag.create!(name: "topic")
+    topic = listing_page("Topic", tag: "topic")
+    create_page(title: "Hello", parent: topic)
+    post = create_post(title: "Hello", published: false)
+
+    result = Posts::Save.call(post.reload, attributes: { tag_names: %w[topic] })
+
+    assert_not result.ok?
+    assert_includes result.errors, "Slug en gives the address /topic/hello, which is already taken in EN", "an existing tag is one the validation sees"
+    assert_empty post.reload.tags
   end
 
   # --- The tag services on records WITH copies, as a visitor sees them ---------
@@ -556,6 +743,29 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     [ tagged, post, other ].each { |record| publish_changes(record) }
     get "/tagged"
     assert_equal %w[/tagged/carrier /tagged/other-carrier], list_hrefs.sort
+  end
+
+  # The other direction (N-m6 of the re-review): the two ids are one from the
+  # merge on, so a post of the KEPT tag that nobody touched belongs to the
+  # list that filtered by the merged one as well, and moves there when that
+  # list comes first.
+  test "after a merge a list that filtered by the merged tag holds the kept tag's posts too, and one of them moves there" do
+    %w[a b].each { |name| Tag.create!(name: name) }
+    listing_page("Pa", tag: "a")
+    listing_page("Pb", tag: "b")
+    only_a = create_post(title: "OnlyA", tags: %w[a])
+    only_b = create_post(title: "OnlyB", tags: %w[b])
+    assert_equal [ "/pa/onlya", "/pb/onlyb" ], [ path_of(only_a), path_of(only_b) ]
+
+    assert Tags::Merge.call(Tag.find_by!(name: "a"), into: Tag.find_by!(name: "b")).ok?
+
+    assert_equal [ "/pa/onlya", "/pa/onlyb" ], [ path_of(only_a.reload), path_of(only_b.reload) ]
+    %w[/pa /pb].each do |list|
+      get list
+      assert_equal %w[OnlyA OnlyB], list_titles.sort, list
+    end
+    get "/pb/onlyb"
+    assert_redirected_to "/pa/onlyb"
   end
 
   test "a merge reaches a pending copy too: a scheduled change keeps its posts when its time comes" do
