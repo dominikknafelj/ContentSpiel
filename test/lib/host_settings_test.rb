@@ -92,11 +92,52 @@ class HostSettingsTest < ActiveSupport::TestCase
 
     assert_equal [
       "[ContentSpiel] Serving http://localhost:3030. Other host names are refused. The connection is not encrypted.",
-      "[ContentSpiel] Only the exact host name localhost is answered: not www.localhost, not any other subdomain."
+      "[ContentSpiel] Only the exact host name localhost is answered."
     ], HostSettings.announcement(SiteAddress.parse("http://localhost:3030"), {})
 
     assert_equal [ "[ContentSpiel] PUBLIC_HOST is not set. Any host name is accepted and nothing is forced to HTTPS." ],
                  HostSettings.announcement(SiteAddress.parse(nil), {})
+  end
+
+  # "not www.localhost" and "not www.192.0.2.7" name hosts nobody would try.
+  test "the exact-host line names no www. and no subdomain for a name that has none: an IP address or a single label" do
+    {
+      "http://localhost:3030" => "localhost", "http://192.0.2.7" => "192.0.2.7", "https://192.0.2.7:8443" => "192.0.2.7",
+      "http://[::1]:3000" => "[::1]", "https://[2001:db8::1]" => "[2001:db8::1]", "http://cms" => "cms"
+    }.each do |address, host|
+      lines = HostSettings.announcement(SiteAddress.parse(address), {})
+
+      assert_equal "[ContentSpiel] Only the exact host name #{host} is answered.", lines[1], address
+      assert_equal 2, lines.size, address
+      assert_no_match(/www\.|subdomain/, lines.join("\n"), address)
+    end
+
+    # A name with a dot in it keeps the clause, digits in a label or not.
+    [ "https://example.org", "https://docs.example.org", "https://1.example.org", "http://a.b" ].each do |address|
+      host = SiteAddress.parse(address).host
+
+      assert_equal "[ContentSpiel] Only the exact host name #{host} is answered: not www.#{host}, not any other subdomain.",
+                   HostSettings.announcement(SiteAddress.parse(address), {})[1], address
+    end
+  end
+
+  # The two lines above it would otherwise say "not encrypted" and "taken as
+  # HTTPS" one after the other and leave the reader to work out which holds.
+  test "ASSUME_SSL=1 with an http address: one more line says that the two contradict, and what follows" do
+    contradiction = "[ContentSpiel] ASSUME_SSL=1 contradicts the http address in PUBLIC_HOST: nothing is redirected to HTTPS and " \
+                    "no HSTS is sent, yet every request counts as encrypted, so redirects point to https and System status " \
+                    "reports HTTPS. Set PUBLIC_HOST to the https address, or remove ASSUME_SSL."
+
+    lines = HostSettings.announcement(SiteAddress.parse("http://localhost:3030"), { "ASSUME_SSL" => "1" })
+
+    assert_equal 4, lines.size
+    assert_equal "[ContentSpiel] ASSUME_SSL=1: every request is taken as HTTPS, whatever the proxy says.", lines[2]
+    assert_equal contradiction, lines.last
+
+    [ [ "https://docs.example.org", { "ASSUME_SSL" => "1" } ], [ nil, { "ASSUME_SSL" => "1" } ],
+      [ "http://localhost:3030", {} ], [ "http://localhost:3030", { "ASSUME_SSL" => "true" } ] ].each do |address, env|
+      assert_empty HostSettings.announcement(SiteAddress.parse(address), env).grep(/contradicts/), [ address, env ].inspect
+    end
   end
 
   test "the boot lines say that every request is taken as HTTPS when ASSUME_SSL=1, and only then" do

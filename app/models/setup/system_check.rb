@@ -39,6 +39,10 @@ module Setup
       "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).".freeze
     MAIL_FALLBACK_COMMAND = %(bin/rails runner 'p Users::UpdatePassword.call(User.find_by!(email_address: "you@example.com"), password: "a new password", password_confirmation: "a new password").ok?').freeze
 
+    # Said ahead of `MAIL_FALLBACK_MESSAGE` when a mail server is set and the
+    # site's address is what keeps a reset mail from being sent (`mail`).
+    MAIL_NEEDS_ADDRESS = "A mail server is set, but no site address is, and without one no password reset mail is sent: set PUBLIC_HOST.".freeze
+
     # What the "Site address" warning offers to copy: the variable with a
     # placeholder address, a fixed string like the command above. The check's
     # OK message does name the configured origin, which is the address the
@@ -75,12 +79,21 @@ module Setup
     # connection (`request.ssl?`, which both screens hand over): nil when
     # nobody said, as from the console, and then there is nothing to say
     # about HTTPS. `production` is handed in so a test can say it.
+    #
+    # `reset_link_from_request` is whether a password reset mail takes its
+    # link from the request when no address is set: the mailer's own rule
+    # (`PasswordsMailer.request_origin_used?`, development and test), which
+    # both screens hand over as a boolean so this model knows no mailer. It
+    # chooses between two true sentences and nothing else. Nobody having
+    # said (the console) it is false, the wording of everywhere that is not
+    # a developer's machine.
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       mail_delivery_method: ActionMailer::Base.delivery_method,
       mail_smtp_address: ActionMailer::Base.smtp_settings[:address],
       mail_host: ActionMailer::Base.default_url_options[:host],
-      address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?)
+      address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
+      reset_link_from_request: false)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -91,6 +104,7 @@ module Setup
       @address = address
       @request_ssl = request_ssl
       @production = production
+      @reset_link_from_request = reset_link_from_request
     end
 
     def run
@@ -100,11 +114,16 @@ module Setup
     private
       # Without an address the app accepts any Host header and builds the
       # addresses in its pages from it, and outside development and test
-      # sends no reset mail at all (`PasswordsMailer`: a link taken from the request could
-      # be made to point anywhere).
+      # sends no reset mail at all (`PasswordsMailer`: a link taken from the
+      # request could be made to point anywhere). In development and test
+      # the mail is sent with the request's origin, so the warning has two
+      # wordings and shows the one that is true where it is read.
       def site_address
         if @address.configured?
           ok("Site address", "This site answers at #{@address.origin}.")
+        elsif @reset_link_from_request
+          warning("Site address", "No site address is set. Any host name is accepted, and addresses in pages and in " \
+            "password reset mails follow the request.", command: SITE_ADDRESS_COMMAND)
         else
           warning("Site address", "No site address is set. Any host name is accepted, addresses in pages follow the request, " \
             "and password reset mails are not sent until it is set.", command: SITE_ADDRESS_COMMAND)
@@ -117,6 +136,14 @@ module Setup
       # (`HostSettings.apply`), so the warning is seen only where the address
       # is an http one or missing, and its last sentence is right for both.
       # The same fact raises `Admin::Ui::InsecureNoticeComponent`.
+      #
+      # "Reached over an encrypted connection" is what `request.ssl?` says,
+      # and the app sees no connection but the proxy's: it is true when the
+      # proxy in front said so (`X-Forwarded-Proto: https`) or when
+      # `ASSUME_SSL=1` says it for every request. A proxy that claims HTTPS
+      # for a plain connection, or `ASSUME_SSL=1` in front of none, makes
+      # this row say OK about a connection that is not encrypted, and
+      # nothing in the app can tell.
       def https
         return nil unless @production
         return nil if @request_ssl.nil?
@@ -158,13 +185,22 @@ module Setup
         end
       end
 
+      # "Configured" asks for a mail server and for a host to put in a
+      # mailed link. In production that host is the site's address and
+      # nothing else (`HostSettings.apply`), and the one mail there is, the
+      # password reset, is not sent without it: so a site with a mail server
+      # and no address is told that the address is what is missing, in one
+      # sentence ahead of the console fallback, instead of being sent to
+      # look at SMTP settings that are right. (Interim: the mail part of
+      # this work replaces this check.)
       def mail
-        configured = @mail_delivery_method == "smtp" &&
-          @mail_smtp_address.present? && @mail_smtp_address != "localhost" &&
-          @mail_host.present? && @mail_host != "example.com"
+        server = @mail_delivery_method == "smtp" && @mail_smtp_address.present? && @mail_smtp_address != "localhost"
+        configured = server && @mail_host.present? && @mail_host != "example.com"
 
         if configured
           ok("Outgoing mail", "Outgoing mail is configured.")
+        elsif server && !@address.configured? && !@reset_link_from_request
+          warning("Outgoing mail", "#{MAIL_NEEDS_ADDRESS} #{MAIL_FALLBACK_MESSAGE}", command: MAIL_FALLBACK_COMMAND)
         else
           warning("Outgoing mail", MAIL_FALLBACK_MESSAGE, command: MAIL_FALLBACK_COMMAND)
         end

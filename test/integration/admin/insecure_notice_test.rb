@@ -66,6 +66,37 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Each right alone is enough (`Admin::BaseController::INSECURE_NOTICE_PERMISSIONS`):
+  # the reader holds neither (the test below), so the one grant added here
+  # is the only reason the notice is drawn.
+  %w[settings.manage system_status.view].each do |permission|
+    test "in the shell #{permission} alone is enough to be told" do
+      access_control_groups(:read_only).grants.create!(permission: permission, scope: {})
+      sign_in_as(users(:reader))
+
+      as_production do
+        get "/cs-studio"
+
+        assert_response :success
+        assert_select "main.admin-shell__main > p#insecure-notice[role=alert]", text: NOTICE, count: 1
+      end
+    end
+  end
+
+  test "the two rights are the whole list, and a right that only shows the Settings link is not one of them" do
+    assert_equal %w[settings.manage system_status.view], Admin::BaseController::INSECURE_NOTICE_PERMISSIONS
+
+    access_control_groups(:read_only).grants.create!(permission: "languages.manage", scope: {})
+    sign_in_as(users(:reader))
+
+    as_production do
+      get "/cs-studio"
+
+      assert_response :success
+      assert_select "#insecure-notice", count: 0
+    end
+  end
+
   test "in the shell someone who holds neither right is told nothing" do
     sign_in_as(users(:reader))
 
@@ -121,6 +152,27 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
       assert_select "li.admin-system-check[data-status=warning]", text: /Site address\s+No site address is set\./ do
         assert_select "code", text: "PUBLIC_HOST=https://www.example.org"
         assert_select "button[aria-label='Copy command for Site address']", text: "Copy"
+      end
+    end
+  end
+
+  # The test environment is one where a reset mail takes its link from the
+  # request, and production is one where it does not: each screen hands the
+  # check which it is.
+  test "System status and the wizard say of reset mails what is true where they run" do
+    sign_in_as(users(:one))
+
+    with_site_address(nil) do
+      get "/cs-studio/system_status"
+
+      assert_select "li.admin-system-check[data-status=warning]", text: /in password reset mails\s+follow the request\./
+      assert_select "li.admin-system-check", text: /reset mails are not sent/, count: 0
+
+      as_production do
+        get "/cs-studio/system_status"
+
+        assert_select "li.admin-system-check[data-status=warning]", text: /password reset mails are not sent until it is set\./
+        assert_select "li.admin-system-check", text: /follow the request\./, count: 0
       end
     end
   end

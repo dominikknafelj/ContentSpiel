@@ -24,12 +24,38 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   end
 
   test "no site address is a warning that says what follows from it, with the variable to set" do
-    check = result("Site address", run_check(address: SiteAddress.parse(nil)))
+    check = result("Site address", run_check(address: SiteAddress.parse(nil), reset_link_from_request: false))
 
     assert_equal :warning, check.status
     assert_equal "No site address is set. Any host name is accepted, addresses in pages follow the request, " \
       "and password reset mails are not sent until it is set.", check.message
     assert_equal "PUBLIC_HOST=https://www.example.org", check.command
+  end
+
+  # Development and test: the reset mail IS sent there, with the request's
+  # origin in its link (`PasswordsMailer.request_origin_used?`), so the
+  # sentence that it is not would be false.
+  test "where a reset mail takes its link from the request, the warning says that and not that none is sent" do
+    check = result("Site address", run_check(address: SiteAddress.parse(nil), reset_link_from_request: true))
+
+    assert_equal :warning, check.status
+    assert_equal "No site address is set. Any host name is accepted, and addresses in pages and in password reset mails " \
+      "follow the request.", check.message
+    assert_equal "PUBLIC_HOST=https://www.example.org", check.command
+  end
+
+  test "nobody having said, the warning is the one that fails closed: reset mails are not sent" do
+    check = result("Site address", Setup::SystemCheck.run(address: SiteAddress.parse(nil)))
+
+    assert_includes check.message, "password reset mails are not sent until it is set"
+  end
+
+  test "a configured address reads the same wherever the reset link comes from" do
+    [ true, false ].each do |from_request|
+      check = result("Site address", run_check(reset_link_from_request: from_request))
+
+      assert_equal "This site answers at https://cms.example.org.", check.message
+    end
   end
 
   test "the address defaults to the site's own" do
@@ -117,6 +143,31 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command
     assert_match(/\Abin\/rails runner '.*Users::UpdatePassword/, check.command)
     assert_nil check.docs
+  end
+
+  # Production's mailed links take their host from the site's address
+  # (`HostSettings.apply`), so with none set a mail server that is perfectly
+  # set up still counts as "not configured". The warning says which half is
+  # missing instead of sending the reader to their SMTP settings.
+  test "a mail server without a site address: the warning names the address as what is missing" do
+    check = result("Outgoing mail", run_check(address: SiteAddress.parse(nil), mail_host: "", reset_link_from_request: false))
+
+    assert_equal :warning, check.status
+    assert_equal "A mail server is set, but no site address is, and without one no password reset mail is sent: set PUBLIC_HOST. " +
+      Setup::SystemCheck::MAIL_FALLBACK_MESSAGE, check.message
+    assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command
+  end
+
+  test "the address is not named where it is not the cause: no mail server, a link from the request, an address that is set" do
+    no_server = run_check(address: SiteAddress.parse(nil), mail_host: "", mail_smtp_address: "localhost", reset_link_from_request: false)
+    local = run_check(address: SiteAddress.parse(nil), mail_host: "", reset_link_from_request: true)
+    with_address = run_check(mail_host: "example.com", reset_link_from_request: false)
+
+    [ no_server, local, with_address ].each do |results|
+      assert_equal Setup::SystemCheck::MAIL_FALLBACK_MESSAGE, result("Outgoing mail", results).message
+    end
+    # And with the request's origin for the link, a mail server and a host for it are all it takes.
+    assert result("Outgoing mail", run_check(address: SiteAddress.parse(nil), mail_host: "localhost", reset_link_from_request: true)).ok?
   end
 
   # The command is a static string, so prove it works: put a real address and

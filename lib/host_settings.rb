@@ -59,8 +59,13 @@ module HostSettings
   # request with a 403 that says nothing, so this is where a person reads
   # which address is answered. The second line is there because the match is
   # exact and that is the surprise: an address of `example.org` refuses
-  # `www.example.org`. The last says when the proxy's word about HTTPS is
-  # not asked for.
+  # `www.example.org`; for a name nobody puts `www.` in front of (an IP
+  # address, `localhost`, any single label) it says only that the match is
+  # exact. The ASSUME_SSL line says when the proxy's word about HTTPS is not
+  # asked for, and one more follows it when the address is an http one: the
+  # two settings then say opposite things, and what the site does is a
+  # mixture of both (`apply`: `force_ssl` from the address, `assume_ssl`
+  # from the variable) that nobody chose.
   def self.announcement(address, env = ENV)
     lines = []
     if !address.configured?
@@ -71,12 +76,30 @@ module HostSettings
       else
         "[ContentSpiel] Serving #{address.origin}. Other host names are refused. The connection is not encrypted."
       end
-      lines << "[ContentSpiel] Only the exact host name #{address.host} is answered: " \
-               "not www.#{address.host}, not any other subdomain."
+      lines << if subdomains?(address.host)
+        "[ContentSpiel] Only the exact host name #{address.host} is answered: " \
+          "not www.#{address.host}, not any other subdomain."
+      else
+        "[ContentSpiel] Only the exact host name #{address.host} is answered."
+      end
     end
-    lines << "[ContentSpiel] ASSUME_SSL=1: every request is taken as HTTPS, whatever the proxy says." if assume_ssl?(env)
+    if assume_ssl?(env)
+      lines << "[ContentSpiel] ASSUME_SSL=1: every request is taken as HTTPS, whatever the proxy says."
+      if address.configured? && !address.https?
+        lines << "[ContentSpiel] ASSUME_SSL=1 contradicts the http address in PUBLIC_HOST: nothing is redirected to HTTPS and " \
+                 "no HSTS is sent, yet every request counts as encrypted, so redirects point to https and System status " \
+                 "reports HTTPS. Set PUBLIC_HOST to the https address, or remove ASSUME_SSL."
+      end
+    end
     lines
   end
+
+  # Whether `www.<host>` is a name someone might try: not for an IPv6
+  # literal (brackets), not for an IPv4 address (`SiteAddress` lets a host of
+  # nothing but digits and dots through as one) and not for a single label
+  # such as `localhost`.
+  def self.subdomains?(host) = host.include?(".") && !host.start_with?("[") && !host.match?(/\A[0-9.]+\z/)
+  private_class_method :subdomains?
 
   HOW_TO_SET = "Make a value with `bin/rails secret` and set it as the environment variable SECRET_KEY_BASE; " \
                "keep it the same across restarts."

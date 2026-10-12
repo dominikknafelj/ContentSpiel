@@ -52,7 +52,7 @@ class SetupController < ApplicationController
 
   def show
     case @step
-    when "system_check" then @results = Setup::SystemCheck.run(request_ssl: request.ssl?)
+    when "system_check" then @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?)
     when "admin" then @user = User.new
     when "site", "languages" then @site_setting = Current.site
     when "review"

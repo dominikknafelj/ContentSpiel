@@ -51,6 +51,22 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the system check says of reset mails what is true where it runs: from the request here, not sent in production" do
+    with_site_address(nil) do
+      get setup_step_path("system_check")
+      assert_select "li.admin-system-check[data-status=warning]", text: /in password reset mails\s+follow the request\./
+
+      was = Rails.env
+      begin
+        Rails.env = "production"
+        get setup_step_path("system_check")
+      ensure
+        Rails.env = was
+      end
+      assert_select "li.admin-system-check[data-status=warning]", text: /password reset mails are not sent until it is set\./
+    end
+  end
+
   # The admin step takes a password, and nobody is signed in: the notice is
   # for everyone, as on the sign-in page.
   test "in production over plain HTTP every wizard page says the connection is not encrypted, and nothing says so otherwise" do
