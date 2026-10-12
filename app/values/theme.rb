@@ -83,7 +83,9 @@ class Theme
       if problems.any?
         raise ThemeFolder::Invalid, "#{ThemeFolder::VARIABLE} (#{folder.path}) is not a theme this version can draw:\n" \
                                     "#{problems.map { |problem| "  - #{problem}\n" }.join}" \
-                                    "Correct the folder, or unset #{ThemeFolder::VARIABLE} to start with the default theme."
+                                    "Correct the folder, or unset #{ThemeFolder::VARIABLE} to start with the default theme. " \
+                                    "bin/rails theme:check says these and what only it reads for: a template that does not " \
+                                    "compile, and one that reads the request."
       end
 
       new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size)

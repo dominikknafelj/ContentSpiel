@@ -223,6 +223,23 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_not_includes check.message, "/rails"
   end
 
+  # A theme refused on a development reload has no path (it brings nothing),
+  # so the row said "The default theme draws the site (THEME_PATH is not
+  # set)", OK, while a theme was set and every public page raised.
+  test "a theme that was refused when it was last read is a warning that says so, and never the folder's path or the reason's words" do
+    with_theme_copy do |dir|
+      dir.join("views/pages/shwo.html.erb").write("x")
+      refused = Theme.prepare(ThemeFolder.new(dir), reload: true)
+      check = result("Theme", run_check(theme: refused, production: false))
+
+      assert_equal :warning, check.status
+      assert_equal "The theme folder was refused when it was last read, and the public site answers with the reason until the " \
+        "folder is corrected. bin/rails theme:check says what is wrong with it.", check.message
+      assert_not_includes check.message, dir.to_s
+      assert_not_includes check.message, "shwo"
+    end
+  end
+
   test "the row's own probe reads the build's stamp: this suite's stylesheet is the default theme's" do
     assert_equal "default", ThemeFolder.stamp(Rails.root), "bin/rails tailwindcss:build stamps the stylesheet the tests read"
     assert result("Theme", Setup::SystemCheck.run(theme: Theme.new)).ok?

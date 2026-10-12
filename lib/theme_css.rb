@@ -78,7 +78,10 @@ module ThemeCss
         imports << theme.join(stylesheet)
         sources << theme.join(stylesheet).dirname
       end
-      sources.concat(%w[views components].map { |name| theme.join(name) }.select(&:directory?))
+      # The scripts as well as the templates: a utility that only a
+      # controller writes (`classList.add("hidden")`) is a class like any
+      # other, and one no template happens to use would not be built.
+      sources.concat(%w[views components javascript].map { |name| theme.join(name) }.select(&:directory?))
     end
 
     lines = imports.map { |path| %(@import "#{relative.(path)}";) } + sources.map { |path| %(@source "#{relative.(path)}";) }

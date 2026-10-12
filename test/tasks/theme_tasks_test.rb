@@ -22,7 +22,24 @@ class ThemeTasksTest < ActiveSupport::TestCase
 
       assert File.file?(File.join(target, "views/pages/show.html.erb"))
       assert_includes output, target
-      assert_includes output, "THEME_PATH=#{target}"
+      assert_includes output, "THEME_PATH=#{target} bin/dev", "the next step is the command that also builds the stylesheet"
+    end
+  end
+
+  # An integrator exports THEME_PATH once, for the folder they are about to
+  # make. The application does not start under a path that names no
+  # directory, so as a prerequisite the boot ended this command with rake's
+  # trace before it wrote anything.
+  test "theme:new runs under a THEME_PATH that names the folder it is about to make" do
+    Dir.mktmpdir("theme") do |dir|
+      target = File.join(dir, "site-theme")
+
+      printed, status = run_task("theme:new[#{target}]", "THEME_PATH" => target)
+
+      assert_equal 0, status.exitstatus, printed
+      assert File.file?(File.join(target, "views/pages/show.html.erb")), printed
+      assert_includes printed, "THEME_PATH names no folder yet and is not read by this command"
+      assert_no_match(/aborted!|ThemeFolder::Invalid|\.rb:\d+:in/, printed)
     end
   end
 
@@ -58,7 +75,7 @@ class ThemeTasksTest < ActiveSupport::TestCase
 
       assert File.file?(File.join(target, "views/pages/show.html.erb"))
       assert_includes output, "THEME_PATH=#{Shellwords.escape(target)}", "the next step pastes into a shell"
-      assert_equal [ "THEME_PATH=#{target}" ], Shellwords.split(output[/THEME_PATH=.*?(?= and it is drawn)/])
+      assert_equal [ "THEME_PATH=#{target}", "bin/dev" ], Shellwords.split(output[/THEME_PATH=.*?(?= and it is drawn)/])
 
       @check.reenable
       _, said = capture_io { assert_raises(SystemExit) { @check.invoke(File.join(dir, "a"), "b") } }

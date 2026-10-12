@@ -17,7 +17,7 @@
 #      boot reads names and sources, and only this compiles every template
 #      and reads it for the request, so a template with a syntax error fails
 #      here, at the build, and not at a visitor's request. The check is
-#      shown to be awake first: a copy of the theme with one broken template
+#      then shown to be awake: a copy of the theme with one broken template
 #      must be refused.
 #
 # Not in the test suite: it writes app/assets/builds, which every other test

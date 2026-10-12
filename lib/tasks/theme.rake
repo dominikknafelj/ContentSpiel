@@ -18,12 +18,26 @@ namespace :theme do
   # The folder may hold a repository, dot files and a README already
   # (`Theme::Scaffold`). The second line it prints is a shell's word: the
   # path quoted as a shell needs it, so it pastes.
+  #
+  # NOT `=> :environment`, as `theme:check` is not: an integrator exports
+  # THEME_PATH once, for the folder this command is about to make, and the
+  # application does not start under a path that names no directory. So a
+  # THEME_PATH that names none is taken out of this process before the
+  # application starts, with a line that says so. One that names a folder
+  # is left alone: the application starts under it as it would anywhere.
   desc "Write a copy of the default theme into a new folder: bin/rails 'theme:new[PATH]', or THEME_NEW_PATH"
-  task :new, [ :path ] => :environment do |_task, arguments|
+  task :new, [ :path ] do |_task, arguments|
     if arguments.extras.any?
       abort "The path arrived in pieces: rake cuts an argument at a comma. Give a path with a comma in it as " \
             "THEME_NEW_PATH='…' bin/rails theme:new"
     end
+    named = ENV[ThemeFolder::VARIABLE].to_s.strip
+    if !named.empty? && !File.directory?(File.expand_path(named))
+      puts "#{ThemeFolder::VARIABLE} names no folder yet and is not read by this command."
+      ENV.delete(ThemeFolder::VARIABLE)
+      ThemeFolder.reset!
+    end
+    Rake::Task["environment"].invoke
     path = arguments[:path].to_s.strip
     if path.empty?
       path = ENV["THEME_NEW_PATH"].to_s.strip
@@ -41,7 +55,8 @@ namespace :theme do
 
     target = File.expand_path(path)
     puts "Wrote #{written.size} files to #{target}."
-    puts "Start the site with THEME_PATH=#{Shellwords.escape(target)} and it is drawn by that folder. It looks as before until a file there changes."
+    puts "Start the site with THEME_PATH=#{Shellwords.escape(target)} bin/dev and it is drawn by that folder " \
+         "(bin/dev also builds the stylesheet as you write). It looks as before until a file there changes."
   end
 
   # What an integrator runs, and what a site's image build runs with

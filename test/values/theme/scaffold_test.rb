@@ -17,6 +17,39 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       publish_changes(page)
     end
     create_post(title: "First post")
+    wide_page
+  end
+
+  # A page that every component of the contract draws: the scaffold copies
+  # eight, and a comparison on a text and one blog list would not notice the
+  # day the copy of the image block, the section or the other two lists is
+  # not what the default theme draws. An image, a section of three columns
+  # (tinted, full width) holding a text, an image and a blog list, a resume
+  # list, a "now" list, an image block with no image, a struck text; and a
+  # post of each type, whose own page is the detail component.
+  def wide_page
+    wide = create_page(title: "Wide", translations: { "es" => { title: "Ancho", slug: "ancho" } })
+    asset = create_media_asset
+    add = lambda do |type, attributes = {}, translations = {}|
+      result = ContentBlocks::Save.call(ContentBlock.new(owner: wide), attributes: { block_type: type }.merge(attributes), translations: translations)
+      assert result.ok?, result.errors.to_sentence
+      result.record
+    end
+    add.("image", { media_asset_id: asset.id }, { "en" => { caption: "A picture", alt: "What it shows" } })
+    section = add.("section", { settings: { "layout" => "three", "background" => "tinted", "width" => "full" } })
+    add.("rich_text", { section_id: section.id, section_column: 1 }, { "en" => { body: rich_doc("### In a column\n\nLeft") } })
+    add.("image", { section_id: section.id, section_column: 2, media_asset_id: asset.id })
+    add.("post_list", { section_id: section.id, section_column: 3, settings: { "content_type" => "blog" } })
+    add.("post_list", { settings: { "content_type" => "resume_entry" } })
+    add.("post_list", { settings: { "content_type" => "now_update" } })
+    add.("image")
+    add.("rich_text", {}, { "en" => { body: rich_doc("Kept and ~~struck~~ words, a [link](https://example.com)\n\n- one\n- two\n\n> quoted") } })
+    publish_changes(wide)
+
+    result = Posts::Save.call(attributes: { content_type: "resume_entry", published: true,
+      fields: { company: "Example Co", role_type: "ic", start_date: "2024-01-01", end_date: "" } }, translations: { "en" => { title: "Engineer" } })
+    assert result.ok?, result.errors.to_sentence
+    create_post(title: "Doing now", content_type: "now_update")
   end
 
   def scaffolded
@@ -55,6 +88,17 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "its README says how to run it while writing, where the folder goes and that the templates are code" do
+    scaffolded do |target, _written|
+      readme = target.join("README.md").read
+
+      assert_includes readme, "THEME_PATH=<this folder> bin/dev"
+      assert_includes readme, "No `.rb` file"
+      assert_includes readme, "run with the application's reach"
+      assert_includes readme, "with the site's Dockerfile beside the folder, not in it"
+    end
+  end
+
   test "its stylesheet declares nothing and names every token of the contract" do
     scaffolded do |target, _written|
       css = target.join("assets/stylesheets/theme.css").read
@@ -64,12 +108,26 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a site under the folder it writes is drawn byte for byte as under the default theme" do
-    paths = [ "/", "/blog", "/blog/first-post", "/de/", "/no-such-page" ]
+  test "a site under the folder it writes is drawn byte for byte as under the default theme: every block type, a section, the three lists, a post of each type, a 404 and two more languages" do
+    paths = [ "/", "/blog", "/blog/first-post", "/wide", "/wide/engineer", "/wide/doing-now", "/de/", "/es/ancho", "/no-such-page" ]
     default = paths.index_with { |path| body_of(path) }
+    # What the comparison is ON: each of these is on a compared page.
+    { "/wide" => [ "content-block--image", "<s>struck</s>", "Engineer", "Updated ", "First post", "In a column", "<figcaption" ],
+      "/wide/engineer" => [ "Engineer" ], "/wide/doing-now" => [ "Doing now" ], "/blog/first-post" => [ "First post" ],
+      "/es/ancho" => [ "Ancho" ] }.each do |path, words|
+      get path
+      assert_response :success, path
+      words.each { |word| assert_includes default.fetch(path), word, "#{path} does not draw #{word}: the comparison would be on less than it says" }
+    end
 
     scaffolded do |target, _written|
-      Theme.with(Theme.load(ThemeFolder.new(target))) do
+      theme = Theme.load(ThemeFolder.new(target))
+      definitions = BlockTypes.all.map { |definition| [ definition, :component ] } +
+        ContentTypes.all.flat_map { |definition| [ [ definition, :list_component ], [ definition, :detail_component ] ] }
+      own = definitions.map { |definition, role| theme.component_for(definition, role) }.select { |component| component.sidecar_files([ "erb" ]).first.to_s.start_with?(target.to_s) }
+      assert_equal Theme::Contract::COMPONENTS.keys.sort, own.map { |component| component.name.underscore }.uniq.sort, "every component is drawn by the copy's template"
+
+      Theme.with(theme) do
         paths.each { |path| assert_equal default.fetch(path), body_of(path), "#{path} differs under the copied theme" }
       end
     end

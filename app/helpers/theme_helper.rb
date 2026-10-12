@@ -1,6 +1,9 @@
-# View helpers for the public default theme (spec §9). Everything the public
-# layout shows comes from SiteSetting and the page tree, so editors' settings
-# have a visible effect.
+# The view helpers of the public site, for the default theme and for a
+# site's own alike: the ones `Theme::Contract::HELPERS` names are what a
+# theme's template may call and are kept stable (theming spec §5 to §7);
+# the rest are the CMS's own and say so. Everything the public layout shows
+# comes from SiteSetting and the page tree, so editors' settings have a
+# visible effect.
 module ThemeHelper
   LanguageLink = Data.define(:code, :name, :path, :current)
 

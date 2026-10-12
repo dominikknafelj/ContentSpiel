@@ -797,6 +797,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
       assert_includes error.message, "views/pages/shwo.html.erb"
       assert_includes error.message, "#{HEAD} asks for the CSRF token"
       assert_includes error.message, "Correct the folder, or unset THEME_PATH to start with the default theme."
+      assert_includes error.message, "bin/rails theme:check says these and what only it reads for"
     end
   end
 

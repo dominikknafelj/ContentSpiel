@@ -218,9 +218,22 @@ module Setup
       #   stylesheet, and the tests build the default theme's, also under a
       #   running watch (lib/theme_css.rb). So the sentence does not say
       #   that bin/dev keeps it built. It names the command, a fixed string.
-      # It costs one small file read. A probe that raises is a stylesheet
-      # that was not built, and its message is not shown.
+      # It costs one small file read. A probe that raises or answers false
+      # is a stylesheet built for another theme (`probe` answers false for
+      # both), and its message is not shown; nil is no build at all.
+      #
+      # FIRST, a theme that was refused when it was last read (a development
+      # reload: `Theme.prepare`). Such a theme has no path, since it brings
+      # nothing, and without this branch the row said "The default theme
+      # draws the site (THEME_PATH is not set)", OK, while a theme was set
+      # and every public page raised. Neither the path nor the refusal's
+      # words are shown: the refusal names the server's path.
       def theme
+        if @theme.refusal
+          return warning("Theme", "The theme folder was refused when it was last read, and the public site answers with the " \
+            "reason until the folder is corrected. bin/rails theme:check says what is wrong with it.")
+        end
+
         described = @theme.configured? ? "The theme “#{@theme.name}”" : "The default theme"
         with = @theme.configured? ? "with THEME_PATH set" : "without THEME_PATH"
 

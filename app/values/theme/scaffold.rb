@@ -90,7 +90,9 @@ class Theme
 
         Written by `bin/rails 'theme:new[PATH]'`: a copy of the default theme.
         Set `THEME_PATH` to this folder and the site is drawn by it; it looks
-        as before until a file here is changed.
+        as before until a file here is changed. While you write, start the
+        CMS with `THEME_PATH=<this folder> bin/dev`, which also builds the
+        stylesheet as you save.
 
         - `views/` holds the page templates and the frame; `views/theme/` is for
           partials of your own (`render "theme/name"`).
@@ -103,7 +105,15 @@ class Theme
         Delete every file you do not want to own: what this folder does not
         hold comes from the default theme, and follows it through upgrades.
         A file that is not part of the contract stops the site from starting;
-        `bin/rails theme:check` says which, and why. No Ruby here.
+        `bin/rails theme:check` says which, and why.
+
+        No `.rb` file. The templates are ERB all the same: they are code, they
+        run with the application's reach, and the check finds mistakes in
+        them, it is no sandbox.
+
+        Nothing else belongs at this folder's top (dot files and a README are
+        passed over). Keep the theme as a folder of the site's repository
+        (`theme/`), with the site's Dockerfile beside the folder, not in it.
       TEXT
     end
   end

@@ -16,7 +16,9 @@ class ThemeCssTest < ActiveSupport::TestCase
     CSS
   end
 
-  test "with a theme the entry imports the default first, then the theme's stylesheet, and scans the theme's templates" do
+  # The scripts too: a utility a controller adds (`classList.add("hidden")`)
+  # and no template writes would otherwise be built for nobody, in silence.
+  test "with a theme the entry imports the default first, then the theme's stylesheet, and scans the theme's templates and scripts" do
     assert_equal <<~CSS, ThemeCss.entry(ThemeFolder.new(PLAIN), root: ROOT)
       @import "../../app/assets/tailwind/themes/default/theme.css";
       @import "../../test/fixtures/themes/plain/assets/stylesheets/theme.css";
@@ -24,6 +26,7 @@ class ThemeCssTest < ActiveSupport::TestCase
       @source "../../test/fixtures/themes/plain/assets/stylesheets";
       @source "../../test/fixtures/themes/plain/views";
       @source "../../test/fixtures/themes/plain/components";
+      @source "../../test/fixtures/themes/plain/javascript";
     CSS
   end
 
@@ -302,7 +305,12 @@ class ThemeCssTest < ActiveSupport::TestCase
           assert_operator glanced, :>, 3
           assert_equal 0, hashed
 
-          dir.join("assets/images/plain-mark.svg").write("<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n")
+          # Put in place in ONE step (written beside, then renamed): a plain
+          # write empties the file first, and a keeper that glances between
+          # the two sees two changes and hashes twice, rightly (seen once in
+          # sixteen runs).
+          Pathname(root).join("mark.svg").write("<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n")
+          File.rename(Pathname(root).join("mark.svg"), dir.join("assets/images/plain-mark.svg"))
           await { ThemeFolder.stamp(root) == real_fingerprint.call }
           let_it_ask(keeper)
           assert_equal 1, hashed
