@@ -153,6 +153,35 @@ class ThemeTest < ActiveSupport::TestCase
     assert_equal 0, default.template_count
   end
 
+  test "prepare is load at boot, and on a reload a refused folder is a theme that remembers why and brings nothing" do
+    with_theme_copy do |dir|
+      sound = Theme.prepare(ThemeFolder.new(dir), reload: true)
+      assert sound.configured?
+      assert_nil sound.refusal
+
+      dir.join("views/pages/shwo.html.erb").write("x")
+      folder = ThemeFolder.new(dir)
+      assert_raises(ThemeFolder::Invalid) { Theme.prepare(folder, reload: false) }
+
+      refused = Theme.prepare(folder, reload: true)
+      assert_instance_of ThemeFolder::Invalid, refused.refusal
+      assert_includes refused.refusal.message, "views/pages/shwo.html.erb is not part of the theme contract"
+      assert_not refused.configured?, "a refused folder draws nothing"
+      assert_nil refused.views_directory
+      assert_same Blocks::RichTextComponent, refused.component_for(BlockTypes.fetch("rich_text"))
+    end
+  end
+
+  test "a folder that stops being readable as one is refused the same way on a reload" do
+    with_theme_copy do |dir|
+      folder = ThemeFolder.new(dir)
+      File.symlink("/etc/hosts", dir.join("views/theme/_hosts.html.erb"))
+
+      assert_raises(ThemeFolder::Invalid) { Theme.prepare(folder, reload: false) }
+      assert_includes Theme.prepare(folder, reload: true).refusal.message, "outside the theme folder"
+    end
+  end
+
   test "the application's theme is loaded when it is prepared, and under test it is the default" do
     assert_instance_of Theme, Theme.current
     assert_not Theme.current.configured?

@@ -158,6 +158,27 @@ class ThemeFolderTest < ActiveSupport::TestCase
     end
   end
 
+  # At the top a dot directory is an editor's or a tool's (`.git`) and is
+  # passed over. Below it, the folder is on a path Rails finds templates and
+  # serves assets from: what is in `views/theme/.drafts/` would be neither
+  # checked nor in the fingerprint, and still be there to be rendered.
+  test "a dot directory below the top level is refused: it would be outside the check and the fingerprint, and still on the view path" do
+    %w[views/theme/.drafts/_x.html.erb assets/images/.old/mark.svg components/.backup/blocks/image_component.html.erb].each do |file|
+      folder_with("views/pages/show.html.erb" => "page", file => "x") do |dir|
+        hidden = file[%r{\A.*?/\.[^/]+}]
+        error = assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }
+
+        assert_includes error.message, "THEME_PATH: #{File.join(dir, hidden)} is a hidden folder inside the theme"
+        assert_includes error.message, "Move it out of the theme, or rename it without the dot."
+      end
+    end
+
+    folder_with(".git/hooks/x" => "x", ".github/workflows/x.yml" => "x", "views/pages/.keep" => "", "views/.DS_Store" => "x",
+      "views/pages/show.html.erb" => "page") do |dir|
+      assert_equal [ "views/pages/show.html.erb" ], ThemeFolder.new(dir).files
+    end
+  end
+
   test "the fingerprint is read file by file and never as one string" do
     folder_with("assets/fonts/site.woff2" => "font" * 1000) do |dir|
       folder = ThemeFolder.new(dir)

@@ -103,13 +103,85 @@ class Theme::CheckTest < ActiveSupport::TestCase
     assert_includes controller.first, "app/javascript/controllers/theme_controller.js"
   end
 
-  test "two files of the theme that would be served under one name are refused" do
-    problems = problems_with("assets/images/mark.woff2" => "x", "assets/fonts/mark.woff2" => "y")
+  # A folder on the asset load path is published whole, so each takes its
+  # own kind of file and nothing else: what is refused one folder over
+  # ("a second stylesheet", "a script that is no controller") is refused
+  # here too, and "a theme holds no Ruby" is true of every folder.
+  test "the image and font folders take images and fonts by their extension, and nothing else" do
+    %w[assets/images/helper.rb assets/images/x.erb assets/images/other.css assets/images/application2.js assets/images/page.html
+       assets/images/notes.txt assets/images/site.woff2 assets/images/noextension
+       assets/fonts/helper.rb assets/fonts/x.html.erb assets/fonts/fonts.css assets/fonts/loader.js assets/fonts/mark.svg
+       assets/fonts/licence.txt].each do |file|
+      problems = problems_with(file => "x")
 
-    assert_equal 1, problems.size
-    assert_includes problems.first, "assets/fonts/mark.woff2"
-    assert_includes problems.first, "assets/images/mark.woff2"
-    assert_includes problems.first, "Rename one of them."
+      assert_equal 1, problems.size, "#{file}: #{problems.inspect}"
+      assert_includes problems.first, "#{file} is not part of the theme contract"
+      assert_includes problems.first, "images/ (png, jpg, jpeg, gif, svg, webp, avif, ico) and fonts/ (woff2, woff, ttf, otf)"
+    end
+
+    assert_empty problems_with(
+      "assets/images/a.png" => "x", "assets/images/b.jpg" => "x", "assets/images/c.jpeg" => "x", "assets/images/d.gif" => "x",
+      "assets/images/e.svg" => "x", "assets/images/f.webp" => "x", "assets/images/g.avif" => "x", "assets/images/h.ico" => "x",
+      "assets/images/deep/SHOUT.PNG" => "x",
+      "assets/fonts/a.woff2" => "x", "assets/fonts/b.woff" => "x", "assets/fonts/c.ttf" => "x", "assets/fonts/d.otf" => "x"
+    )
+  end
+
+  test "an asset named like one of a gem's scripts or like a file of the CMS's stylesheets folder is refused" do
+    gems = Theme::Check.cms_asset_roots(Rails.root).map(&:last).reject { |path| path.to_s.start_with?("#{Rails.root}/") }
+    assert_operator gems.size, :>=, 3, "the gems' asset folders are asked"
+    assert gems.any? { |path| path.join("turbo.min.js").file? }, "Turbo's script is in one of them"
+
+    # Nothing a theme may hold can be named like those today (a script is
+    # served as controllers/…_controller.js), so the roots are shown with a
+    # load path of one invented folder.
+    Dir.mktmpdir("gem") do |gem|
+      FileUtils.mkdir_p(File.join(gem, "controllers"))
+      File.write(File.join(gem, "controllers/hello_controller.js"), "x")
+      roots = Theme::Check.cms_asset_roots(Rails.root, paths: [ gem, Rails.root.join("test/fixtures/themes/plain/javascript").to_s ])
+
+      assert_equal Theme::Check::CMS_ASSET_ROOTS + [ gem ], roots.map(&:first), "a root inside the application is the list's, not the load path's"
+    end
+  end
+
+  # The list must be whole, and must not say one thing before a build and
+  # another after it.
+  test "every root of the asset load path is one the check asks, or is named here with its reason" do
+    known = Theme::Check.cms_asset_roots(Rails.root).map { |_, path| path.to_s }
+    reasons = {
+      Rails.root.join(Theme::Check::BUILDS).to_s => "built files: there or not by whether a build has run, and no name a theme may bring",
+      ThemeTestHelper::PLAIN.join("assets/images").to_s => "the second theme's, on the path in the test environment only",
+      ThemeTestHelper::PLAIN.join("javascript").to_s => "the second theme's, on the path in the test environment only"
+    }
+
+    unknown = Rails.application.config.assets.paths.map(&:to_s) - known - reasons.keys
+    assert_empty unknown, "a root of the asset load path that Theme::Check does not ask: add it to CMS_ASSET_ROOTS"
+    assert_not_includes Theme::Check::CMS_ASSET_ROOTS, Theme::Check::BUILDS
+    Theme::Check::CMS_ASSET_ROOTS.each { |relative| assert Rails.root.join(relative).directory?, "#{relative} is gone" }
+  end
+
+  test "what the check says of an asset does not depend on whether a build has run" do
+    Dir.mktmpdir("application") do |root|
+      FileUtils.mkdir_p(File.join(root, "app/assets/builds"))
+      FileUtils.mkdir_p(File.join(root, "app/assets/images"))
+      File.write(File.join(root, "app/assets/images/logo.svg"), "x")
+      folder = lambda do |&block|
+        with_theme_copy do |dir|
+          dir.join("assets/images/logo.svg").write("x")
+          dir.join("assets/images/theme.svg").write("x")
+          block.call(Theme::Check.problems(ThemeFolder.new(dir), root: root))
+        end
+      end
+
+      before = folder.call { |problems| problems }
+      File.write(File.join(root, "app/assets/builds/theme.svg"), "built")
+      File.write(File.join(root, "app/assets/builds/theme.css"), "built")
+      after = folder.call { |problems| problems }
+
+      assert_equal 1, before.size
+      assert_includes before.first, "assets/images/logo.svg is named like an asset of the CMS's own (app/assets/images/logo.svg)"
+      assert_equal before, after
+    end
   end
 
   test "a frame that never yields the page is refused, and says what to add" do
@@ -123,6 +195,13 @@ class Theme::CheckTest < ActiveSupport::TestCase
     end
     assert_empty problems_with(FRAME => "<main>\n  <%=   yield -%>\n</main>\n")
     assert_empty problems_with(FRAME => "<main><%= yield%></main>")
+  end
+
+  test "a frame that prints the page another way is a frame: handed to a tag, to a partial, printed raw" do
+    [ "<%= tag.main yield %>", "<%= tag.main(yield, class: \"x\") %>", "<%= content_tag :main, yield %>", "<main><%== yield %></main>",
+      "<%= render \"theme/body\", content: yield %>", "<%= yield :sidebar %><main><%= yield %></main>" ].each do |frame|
+      assert_empty problems_with(FRAME => "#{frame}\n", "views/theme/_body.html.erb" => "<%= content %>"), frame
+    end
   end
 
   test "a title pattern that prints nothing is refused: empty, a comment alone, code that prints nothing" do
@@ -145,6 +224,12 @@ class Theme::CheckTest < ActiveSupport::TestCase
       %(<link rel="alternate" hreflang="de" href="/de">) => "a language link (rel=\"alternate\" with hreflang)",
       %(<link hreflang="x-default" href="/" rel="alternate">) => "a language link (rel=\"alternate\" with hreflang)",
       %(<%= tag.link rel: "alternate", hreflang: code, href: url %>) => "a language link (rel=\"alternate\" with hreflang)",
+      %(<link rel="alternate" href="<%= url %>" hreflang="<%= code %>">) => "a language link (rel=\"alternate\" with hreflang)",
+      %(<%= tag(:link, :rel => "alternate", :hreflang => code) %>) => "a language link (rel=\"alternate\" with hreflang)",
+      %(<%= tag.link :rel => "canonical", :href => "/" %>) => "a canonical link",
+      %(<%= tag.link "rel" => "canonical", "href" => "/" %>) => "a canonical link",
+      %(<%= tag.script type: :importmap %>) => "the import map",
+      %(<link rel="alternate stylesheet" href="/other.css">) => "a stylesheet link",
       %(<meta property="og:url" content="https://elsewhere.example/">) => "the og:url tag",
       %(<%= tag.meta property: "og:url", content: "/" %>) => "the og:url tag",
       %(<%= csp_meta_tag %>) => "the content security policy's tag",
@@ -199,10 +284,45 @@ class Theme::CheckTest < ActiveSupport::TestCase
     assert_empty problems_with(
       HEAD => "<%# no canonical link, no csrf_meta_tags and no content_for :head here %>\n" \
               "<link rel=\"alternate\" type=\"application/rss+xml\" href=\"/feed\">\n<link rel=\"preload\" href=\"x.woff2\" as=\"font\">\n",
-      "views/layouts/public/_language_switcher.html.erb" => "<%= link_to \"de\", \"/de\", hreflang: \"de\", rel: \"nofollow\" %>\n",
-      "views/pages/show.html.erb" => "<p>The canonical text, in a stylesheet of words.</p>\n<% content_for :sidebar do %>x<% end %>\n" \
-                                     "<% if content_for?(:sidebar) %><% end %>\n"
+      "views/layouts/public/_language_switcher.html.erb" =>
+        "<%= link_to \"de\", \"/de\", hreflang: \"de\", rel: \"alternate\" %>\n" \
+        "<a rel=\"alternate\" hreflang=\"<%= code %>\" href=\"<%= path %>\">de</a>\n" \
+        "<a href=\"/es\" hreflang=\"es\" rel=\"alternate\">es</a>\n",
+      "views/pages/show.html.erb" => "<p>The canonical text, in a stylesheet of words. A form_with a session, @page = it.</p>\n" \
+                                     "<% content_for :sidebar do %>x<% end %>\n<% if content_for?(:sidebar) %><% end %>\n" \
+                                     "<%= @page %><%= translated(@page, :title) %>\n<% if @post == nil || @page != @post %><% end %>\n" \
+                                     "<%= render \"theme/crumb\", page: @page, data: { at: @page.id >= 1 } %>\n"
     )
+  end
+
+  # The layout is rendered after the page template, in the same view, and
+  # reads @page, @post and @preview_record for the title and the head.
+  test "a template that assigns an instance variable is refused, however it is written" do
+    [ "<% @post = nil %>", "<% @page = Page.first %>", "<% @preview_record ||= @page %>", "<% @count += 1 %>",
+      "<% instance_variable_set(:@page, nil) %>", "<%= (@title = \"x\") %>", "<% @a, b = 1, 2 %><% @page =\n  nil %>" ].each do |markup|
+      problems = problems_with("views/theme/_x.html.erb" => "#{markup}\n")
+
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_x.html.erb assigns an instance variable"
+      assert_includes problems.first, "Use a local variable"
+    end
+  end
+
+  test "a form that is sent with a token is refused, and a GET form and a plain form tag are not" do
+    [ "<%= form_with url: \"/newsletter\" do |form| %><% end %>", "<%= form_with(url: \"/x\", method: :post) { } %>",
+      "<%= form_tag \"/x\" do %><% end %>", "<%= button_to \"Vote\", \"/vote\" %>", "<%= form_for @page do |form| %><% end %>" ].each do |markup|
+      problems = problems_with("views/theme/_x.html.erb" => "#{markup}\n")
+
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_x.html.erb has a form that is sent with a CSRF token"
+      assert_includes problems.first, "Write a search form with `method: :get`"
+    end
+
+    assert_empty problems_with("views/theme/_search.html.erb" =>
+      "<%= form_with url: \"/search\", method: :get do |form| %><%= form.search_field :q %><% end %>\n" \
+      "<%= form_tag \"/search\", method: \"get\" do %><% end %>\n<%= button_to \"Go\", \"/search\", :method => :get %>\n" \
+      "<form action=\"https://lists.example.org/join\" method=\"post\"><input name=\"email\"></form>\n" \
+      "<p>A form_with nothing in it.</p>\n")
   end
 
   test "the deep check names a template that does not compile, with its line" do
@@ -214,11 +334,25 @@ class Theme::CheckTest < ActiveSupport::TestCase
     assert_empty problems_with("views/theme/_broken.html.erb" => "<% if true %>"), "syntax is the deep check's, not the boot's"
   end
 
-  test "the deep check refuses a template that reads the request, the parameters, the cookies or the session" do
-    %w[params request cookies session].each do |name|
+  test "the deep check refuses a template that reads the request, the parameters, the cookies, the session or the flash" do
+    %w[params request cookies session flash].each do |name|
       problems = problems_with({ "views/theme/_x.html.erb" => "<p><%= #{name}[:q] %></p>\n" }, deep: true)
 
       assert_equal 1, problems.size, name
+      assert_includes problems.first, "views/theme/_x.html.erb reads #{name}"
+      assert_includes problems.first, "no sandbox"
+    end
+  end
+
+  test "the deep check sees the name asked of the view, the controller and the helpers, and in a ternary" do
+    {
+      "<%= helpers.request.path %>" => "request", "<%= helpers.params[:q] %>" => "params", "<%= controller.params[:q] %>" => "params",
+      "<%= controller.session[:x] %>" => "session", "<%= self.cookies[:x] %>" => "cookies", "<%= signed ? params : nil %>" => "params",
+      "<%= signed ? nil : request %>" => "request", "<% flash.each { } %>" => "flash", "<%= helpers.flash[:notice] %>" => "flash"
+    }.each do |markup, name|
+      problems = problems_with({ "views/theme/_x.html.erb" => "#{markup}\n" }, deep: true)
+
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
       assert_includes problems.first, "views/theme/_x.html.erb reads #{name}"
     end
   end
@@ -229,6 +363,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
       <%# params and request are not read here %>
       <%= link_to "x", "/x", data: { session: "1", request: "2" } %>
       <%= translated(theme_site, :title).to_s.then { |text| text.request_id rescue text } %>
+      <%= link_to "y", "/y", data: { params: "1", cookies: "2", flash: "3" }, class: post.session ? "a" : "b" %>
     ERB
   end
 

@@ -22,6 +22,15 @@ folder.asset_paths.each { |directory| Rails.application.config.assets.paths << d
 # its first run is the boot, so a folder that is not a theme stops the boot;
 # and after a code reload the Theme is built again, against the freshly
 # loaded component classes.
+#
+# The first run raises and every later one does not (`Theme.prepare` says
+# why: a raise in a reload's prepare chain leaves the registries of the
+# blocks after this one unprepared). `after_initialize` runs once, after the
+# boot's own prepare, so `booted` is false for exactly that first run.
+booted = false
+Rails.application.config.after_initialize { booted = true }
+
 Rails.application.config.to_prepare do
-  Theme.current = Theme.load(ThemeFolder.current)
+  Theme.current = Theme.prepare(ThemeFolder.current, reload: booted)
+  Rails.logger.error("[ContentSpiel] #{Theme.current.refusal.message}") if Theme.current.refusal
 end

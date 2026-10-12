@@ -7,7 +7,13 @@
 #      templates;
 #   2. production starts under that theme with that stylesheet (the stamp is
 #      the theme's), says which theme at boot, and has the theme's
-#      controller in its import map and its image on the asset path.
+#      controller in its import map and its image on the asset path;
+#   3. the theme passes the DEEP check (`Theme::Check`, `deep: true`): the
+#      boot reads names and sources, and only this compiles every template
+#      and reads it for the request, so a template with a syntax error fails
+#      here, at the build, and not at a visitor's request. The check is
+#      shown to be awake first: a copy of the theme with one broken template
+#      must be refused.
 #
 # Not in the test suite: it writes app/assets/builds, which every other test
 # reads. CI runs it after the unit tests (.github/workflows/ci.yml). On the
@@ -51,9 +57,19 @@ printed="$(THEME_PATH="$theme" RAILS_ENV=production SECRET_KEY_BASE="$secret" bi
   puts "pin: #{imports["controllers/theme/hello_controller"]}"
   puts "script: #{Rails.application.assets.load_path.find("controllers/hello_controller.js") ? "found" : "missing"}"
   puts "image: #{Rails.application.assets.load_path.find("plain-mark.svg") ? "found" : "missing"}"
+  problems = Theme::Check.problems(ThemeFolder.current, deep: true)
+  puts "deep check: #{problems.empty? ? "sound" : problems.join(" | ")}"
+  require "tmpdir"
+  Dir.mktmpdir("theme") do |copy|
+    FileUtils.cp_r("#{ThemeFolder.current.path}/.", copy)
+    File.write(File.join(copy, "views/theme/_broken.html.erb"), "<% if true %>\n")
+    broken = Theme::Check.problems(ThemeFolder.new(copy), deep: true)
+    puts "deep check of a broken template: #{broken.grep(/_broken\.html\.erb does not compile/).size == 1 && broken.size == 1 ? "refused" : broken.inspect}"
+  end
 ' 2>&1)"
 
-for line in "Theme: $theme (" "theme: plain" "built: true" "pin: controllers/hello_controller.js" "script: found" "image: found"; do
+for line in "Theme: $theme (" "theme: plain" "built: true" "pin: controllers/hello_controller.js" "script: found" "image: found" \
+            "deep check: sound" "deep check of a broken template: refused"; do
   if ! grep -qF -- "$line" <<< "$printed"; then
     echo "theme-build-check: production under the theme did not print \"$line\":" >&2
     echo "$printed" >&2

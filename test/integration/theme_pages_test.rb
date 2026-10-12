@@ -189,6 +189,121 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A PUBLIC PAGE DRAWN UNDER A THEME SETS NO COOKIE, whatever the theme's
+  # templates call (theming spec §2: "no CSRF token on a public page, which
+  # is the same cookie-less answer for every visitor"). The wall is
+  # `PublicController`: it mints no token and commits no session. Forgery
+  # protection is off in the test environment, where every one of these
+  # helpers prints nothing and no test would notice, so it is switched on
+  # here as production has it. The folder is handed to `Theme.new`, which
+  # checks nothing: `Theme::Check` refuses these words with a clear message,
+  # and this is what holds for the spelling it does not see.
+  GRASPING = <<~ERB.freeze
+    <%= csrf_meta_tags %>
+    <meta name="minted" content="<%= form_authenticity_token %>">
+    <% session[:visitor] = "seen" %>
+  ERB
+
+  def with_forgery_protection
+    before = ActionController::Base.allow_forgery_protection
+    ActionController::Base.allow_forgery_protection = true
+    yield
+  ensure
+    ActionController::Base.allow_forgery_protection = before
+  end
+
+  test "a public page drawn under a theme sets no cookie and carries no token: a form, the CSRF tags, a token asked for and a write to the session" do
+    with_theme_copy do |dir|
+      dir.join("views/layouts/public/_head.html.erb").write(GRASPING)
+      dir.join("views/pages/not_found.html.erb").write("<h1>Nothing here</h1>\n")
+      dir.join("views/layouts/public/_frame.html.erb").write(<<~ERB)
+        <main><%= yield %></main>
+        <%= form_with url: "/newsletter", method: :post do |form| %><%= form.submit "Join" %><% end %>
+        <%= button_to "Vote", "/vote" %>
+        <%= form_with url: "/search", method: :get do |form| %><%= form.search_field :q %><% end %>
+      ERB
+
+      with_forgery_protection do
+        Theme.with(Theme.new(path: dir)) do
+          [ "/about", "/no-such-page" ].each do |address|
+            get address
+
+            assert_select "form[action='/newsletter']", count: 1
+            assert_select "form[action='/search'][method=get] input[name=q]", count: 1
+            assert_nil response.headers["Set-Cookie"], "#{address} set a cookie"
+            assert_empty cookies.to_hash, "#{address} left a cookie"
+            assert_select "input[name=authenticity_token]", count: 0
+            assert_select "meta[name=csrf-token], meta[name=csrf-param]", count: 0
+            assert_select "meta[name=minted]" do |tags|
+              assert_empty tags.first["content"].to_s, "a token was minted for a public page"
+            end
+          end
+        end
+      end
+    end
+  end
+
+  # The preview is the other controller that draws a theme, and it is none
+  # of the above: signed in, private, never cached. A form there carries its
+  # token, as any form of CS Studio does.
+  test "the preview, which is private and signed in, keeps its token: the wall is the public controller's alone" do
+    with_theme_copy do |dir|
+      dir.join("views/layouts/public/_frame.html.erb").write(
+        "<main><%= yield %></main>\n<%= form_with url: \"/newsletter\", method: :post do |form| %><%= form.submit \"Join\" %><% end %>\n")
+      sign_in_as users(:one)
+
+      with_forgery_protection do
+        Theme.with(Theme.new(path: dir)) { get "/preview/about" }
+      end
+
+      assert_response :success
+      assert_select "form[action='/newsletter'] input[name=authenticity_token]", count: 1
+    end
+  end
+
+  # A RELOAD THAT REFUSES THE THEME LEAVES THE APPLICATION WHOLE. In
+  # development a changed file of the theme reloads the application, and
+  # the check runs again in `to_prepare`. Raising there (as the boot does,
+  # and should) would stop the chain of prepare blocks half way: the type
+  # registries, which are filled by a block that runs after the theme's,
+  # would stay empty, the reloader would count the reload as done, and the
+  # next request would be drawn by the default theme with no block types,
+  # right after the mistake the check is there to explain. So on a reload
+  # the refusal is kept on the Theme and every public page raises it.
+  test "a theme refused on a reload leaves the registries prepared and CS Studio working, and every public page says why until it is corrected" do
+    with_theme_copy do |dir|
+      dir.join("views/pages/shwo.html.erb").write("x")
+      bad = ThemeFolder.new(dir)
+
+      with_singleton_override(ThemeFolder, :current, -> { bad }) do
+        Rails.application.reloader.prepare!
+
+        assert_includes Theme.current.refusal.message, "views/pages/shwo.html.erb is not part of the theme contract"
+        assert_equal %w[image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
+        assert_not_empty ContentTypes.all
+        assert AccessControl::Permissions.all.any?
+
+        [ "/about", "/", "/no-such-page" ].each do |address|
+          error = assert_raises(ThemeFolder::Invalid) { get address }
+          assert_includes error.message, "views/pages/shwo.html.erb is not part of the theme contract"
+        end
+        sign_in_as users(:one)
+        assert_includes assert_raises(ThemeFolder::Invalid) { get "/preview/about" }.message, "shwo"
+        get "/cs-studio"
+        assert_response :success
+
+        dir.join("views/pages/shwo.html.erb").delete
+        Rails.application.reloader.prepare!
+        assert_nil Theme.current.refusal
+        get "/about"
+        assert_response :success
+        assert_select "article.plain-page"
+      end
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   test "an empty theme draws the homepage as the default theme does" do
     get "/"
     default = response.body

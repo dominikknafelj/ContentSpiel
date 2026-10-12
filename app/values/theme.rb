@@ -88,11 +88,39 @@ class Theme
 
       new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size)
     end
+
+    # `load` for the application's own theme, with the two ways a refusal is
+    # answered (`config/initializers/theme.rb`).
+    #
+    # AT BOOT IT RAISES, and the application does not start.
+    #
+    # ON A RELOAD IT DOES NOT. In development a changed file of the theme
+    # reloads the application and the check runs again in `to_prepare`. An
+    # exception there stops the chain of prepare blocks where it is raised:
+    # the type registries, filled by a block that runs after the theme's
+    # (`config/initializers/types.rb`), stay empty, the reloader counts the
+    # reload as done, and the request after the error page is drawn by the
+    # default theme with no block types. So the refusal is kept: the answer
+    # is a theme that brings nothing and remembers why, and every public
+    # request raises it (`PublicPageRendering#look_in_the_theme_first`)
+    # until a reload finds the folder sound. CS Studio is untouched, as it
+    # is by any theme (`test/integration/theme_pages_test.rb`: "a theme
+    # refused on a reload leaves the registries prepared…").
+    def prepare(folder, reload:)
+      load(folder)
+    rescue ThemeFolder::Invalid => error
+      raise unless reload
+
+      new(refusal: error)
+    end
   end
 
-  attr_reader :path, :fingerprint, :template_count
+  # `refusal` is why the folder was refused on a reload (`Theme.prepare`),
+  # nil for every theme that draws.
+  attr_reader :path, :fingerprint, :template_count, :refusal
 
-  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT, template_count: 0)
+  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT, template_count: 0, refusal: nil)
+    @refusal = refusal
     @path = path && Pathname(path)
     @fingerprint = fingerprint
     @template_count = template_count

@@ -133,7 +133,13 @@ module PublicPageRendering
     ActiveRecord::Associations::Preloader.new(records: page.content_blocks.to_a, associations: { media_asset: Media::Asset::VARIANT_INCLUDES }).call
   end
 
+  # A theme refused on a development reload (`Theme.prepare`) is said on
+  # every public page, with the check's own message, until the folder is
+  # sound again: the alternative is the default theme drawn in silence over
+  # the mistake the check found. At boot such a folder never gets this far.
   def look_in_the_theme_first
+    raise Theme.current.refusal if Theme.current.refusal
+
     views = Theme.current.views_directory
     prepend_view_path(views) if views
   end

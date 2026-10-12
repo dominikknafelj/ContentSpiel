@@ -37,12 +37,14 @@ class RichTextScrubberTest < ActiveSupport::TestCase
     assert_includes html, %(<iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ")
   end
 
-  test "a struck text keeps its element, with no attribute of its own" do
-    html = scrub(%(<p>was <s class="x" onclick="alert(1)">struck</s></p>))
+  # `s` is one more tag on the list and nothing else: attributes are one
+  # list for every tag, so it keeps what any element keeps (`class`) and
+  # loses what any element loses (a handler, an unknown attribute).
+  test "a struck text keeps its element, with the attributes any element may keep and no other" do
+    html = scrub(%(<p>was <s class="x" onclick="alert(1)" data-x="1" style="color:red">struck</s></p>))
 
-    assert_includes html, "<s"
-    assert_includes html, "struck</s>"
-    assert_not_includes html, "onclick"
+    assert_equal %(<p>was <s class="x">struck</s></p>), html
+    assert_equal scrub(%(<p>was <em class="x" onclick="alert(1)" data-x="1" style="color:red">struck</em></p>)).gsub("em>", "s>").gsub("<em", "<s"), html
   end
 
   test "on* event handler attributes are stripped" do

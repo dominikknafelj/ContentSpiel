@@ -31,6 +31,12 @@ require "digest"
 #   the folder, the target stays behind, and what the link named would be
 #   in no image. A link that stays inside the folder is the file or folder
 #   it names; one to nothing, or to a folder it is itself in, is refused.
+# A HIDDEN FOLDER (a dot directory) is passed over at the top, where it is a
+# tool's (`.git`, `.github`), and refused below it: `views`, `components`
+# and the asset folders are paths Rails finds templates and serves files
+# from, so what is in `views/theme/.drafts/` would be outside the check and
+# the fingerprint and still be there to render. A dot FILE is passed over
+# anywhere (`.DS_Store`, `.keep`).
 # An EMPTY folder is not refused (a theme may start as one, and a folder of
 # a README alone is one): the boot line says that it replaces nothing.
 #
@@ -124,9 +130,10 @@ class ThemeFolder
   # Every file of the theme, as a path relative to the folder, sorted. A dot
   # file or anything under a dot directory (`.DS_Store`, `.git/`, `.keep`)
   # and a README at the top are not the theme's: an operating system or an
-  # editor puts the first there, and a person the second. A dot directory is
-  # passed over before it is listed, so a `.git` of ten thousand objects
-  # costs nothing and nothing in it is followed.
+  # editor puts the first there, and a person the second. A dot directory at
+  # the top is passed over before it is listed, so a `.git` of ten thousand
+  # objects costs nothing and nothing in it is followed; one below the top
+  # is refused (the comment at the top).
   #
   # The folder is walked here and not globbed, because the walk is where a
   # folder that cannot be read and a link that leaves the theme are met
@@ -227,6 +234,11 @@ class ThemeFolder
 
     readable(here) { Dir.children(here) }.flat_map do |entry|
       relative = directory.empty? ? entry : "#{directory}/#{entry}"
+      if !directory.empty? && entry.start_with?(".") && File.directory?(File.join(here, entry))
+        raise Invalid, "#{VARIABLE}: #{path.join(relative)} is a hidden folder inside the theme. What is in it would be left " \
+                       "out of the check and of the theme's fingerprint, and could still be rendered or served. " \
+                       "Move it out of the theme, or rename it without the dot."
+      end
       next [] if ignored?(relative)
 
       target = target_of(relative)

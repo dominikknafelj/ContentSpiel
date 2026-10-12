@@ -19,26 +19,75 @@ class Theme
   # error is found at the build and not by a visitor) and reads each for the
   # four names the public ETag cannot see (spec §6).
   #
-  # THE READING OF A TEMPLATE IS A FENCE, NOT A WALL. It looks for names and
-  # literal tags in the source, so a tag built by a helper of the theme's
-  # own invention, or from a string put together at run time, is not seen.
-  # What holds whatever a theme writes is the layout: the CMS's head tags
-  # are lines of `layouts/application.html.erb`, printed once and before the
-  # theme's, and the layout reads no slot a theme can write to
-  # (`test/integration/theme_pages_test.rb`). The fence is for the honest
-  # mistake: a `_head` copied from another project with its canonical link
-  # and its `csrf_meta_tags` still in it.
+  # THE READING OF A TEMPLATE IS A FENCE AGAINST MISTAKES, NOT A SANDBOX. A
+  # theme is code the server runs: its templates are ERB, they call whatever
+  # a view can call, and they are trusted exactly as the deployment that
+  # put them into the image is. The reading looks for names and literal
+  # tags in the source, so a tag built from a string at run time, a name
+  # reached through `send` or a local alias, is not seen, and nothing here
+  # is meant to stop an author who wants to get past it. It is for the
+  # honest mistake: a `_head` copied from another project with its
+  # canonical link and its `csrf_meta_tags` still in it.
+  #
+  # What holds whatever a theme writes is elsewhere, and each is narrower
+  # than "everything":
+  # - the CMS's head tags are lines of `layouts/application.html.erb`,
+  #   printed once and before the theme's, and the layout reads no
+  #   `content_for` slot (`test/integration/theme_pages_test.rb`);
+  # - a public page commits no session and mints no token
+  #   (`PublicController`).
+  # What does NOT hold by itself: the page template is rendered before the
+  # layout and in the same view, and the layout decides the title, the
+  # description, the canonical and language links and the preview bar from
+  # `@page`, `@post`, `@preview_record` and the response's status. A theme's
+  # template that assigned one of those would change the CMS's head, so an
+  # assignment to an instance variable is refused here (`ASSIGNMENT`). A
+  # record changed in memory (`@page.title = …`) and a status set on the
+  # response are not seen: they are the fence's other side.
   module Check
     # A public page is one cookie-less answer for every visitor, and its ETag
     # is made of the record, the content version, the settings, the revision
     # and the theme. A template that reads one of these draws a page that
     # differs by something none of them covers.
-    FORBIDDEN = %w[params request cookies session].freeze
+    #
+    # Seen: the bare name, and the name asked of the three receivers a
+    # template has for it (`helpers.request` in a component's template,
+    # `controller.params`, `self.cookies`). Not seen: the name reached by
+    # `send`, through a local (`r = controller; r.request`) or a helper of
+    # another name. A fence, as the comment above says.
+    FORBIDDEN = %w[params request cookies session flash].freeze
 
-    # Where the CMS's own assets are, each a root of Propshaft's load path:
-    # a file of the theme's that would be served under the same name as one
-    # of these shadows it or is shadowed by it, by an order nobody chose.
-    CMS_ASSET_ROOTS = %w[app/assets/images app/assets/fonts app/assets/builds app/javascript vendor/javascript].freeze
+    # Who a template can ask for one of them.
+    REQUEST_RECEIVERS = %w[helpers controller self].freeze
+
+    # What may be under each of the theme's two asset folders, by extension
+    # and nothing else: a folder on the asset load path is published whole
+    # under /assets, so a `.rb`, an `.erb`, a second stylesheet or a script
+    # put there would be served as it is (and "a theme holds no Ruby",
+    # decision 8, would not be true of it).
+    ASSET_EXTENSIONS = {
+      "images/" => %w[png jpg jpeg gif svg webp avif ico],
+      "fonts/" => %w[woff2 woff ttf otf]
+    }.freeze
+
+    # Where the CMS's own assets are inside the application, each a root of
+    # Propshaft's load path: a file of the theme's that would be served
+    # under the same name as one of these shadows it or is shadowed by it,
+    # by an order nobody chose. The roots outside the application (the gems'
+    # scripts: Turbo, Stimulus, Action Cable) are asked too, from the
+    # configured load path (`cms_asset_roots`).
+    #
+    # `app/assets/builds` is on the load path and not on this list, on
+    # purpose: what is in it depends on whether a build has run, and a check
+    # must say the same in a fresh checkout as after one. It holds
+    # stylesheets and the build's stamp, and nothing a theme may bring can
+    # be named like either (`ASSET_EXTENSIONS`; a script is served as
+    # `controllers/…_controller.js`).
+    # `test/values/theme/check_test.rb` ("every root of the asset load path
+    # is one the check asks, or is named here with its reason") fails for a
+    # root added to the application that this list does not know.
+    CMS_ASSET_ROOTS = %w[app/assets/images app/assets/fonts app/assets/stylesheets app/javascript vendor/javascript].freeze
+    BUILDS = "app/assets/builds".freeze
 
     # The theme's folders that go on the load path (`ThemeFolder#asset_paths`).
     THEME_ASSET_ROOTS = %w[assets/images assets/fonts javascript].freeze
@@ -46,7 +95,8 @@ class Theme
     MAY_HOLD = {
       "views" => "views holds the templates Theme::Contract::TEMPLATES names and the theme's own partials under views/theme/",
       "components" => "components holds <component path>.html.erb for the components Theme::Contract::COMPONENTS names",
-      "assets" => "assets holds stylesheets/theme.css, images/ and fonts/",
+      "assets" => "assets holds stylesheets/theme.css, images/ (#{ASSET_EXTENSIONS.fetch("images/").join(", ")}) " \
+                  "and fonts/ (#{ASSET_EXTENSIONS.fetch("fonts/").join(", ")})",
       "javascript" => "javascript holds controllers/**/*_controller.js"
     }.freeze
 
@@ -54,36 +104,67 @@ class Theme
     TITLE = "views/layouts/public/_title.html.erb".freeze
     HEAD = "views/layouts/public/_head.html.erb".freeze
 
-    # `rel` with a value, as an attribute (`rel="canonical"`) and as a
-    # helper's option (`rel: "canonical"`, `rel: :canonical`).
-    rel = ->(value) { /\brel\s*(?:=|:)\s*["':]*#{value}\b/i }
+    # An attribute or a helper's option with a value, however it is written:
+    # `rel="canonical"`, `rel: "canonical"`, `rel: :canonical`,
+    # `:rel => "canonical"`, `"rel" => "canonical"`, and the value among
+    # others (`rel="alternate stylesheet"`).
+    said = lambda do |name, value|
+      /\b#{name}["']?\s*(?:=>|=|:)\s*["':]*(?:[\w-]+\s+)*#{value}\b/i
+    end
+    LANGUAGE = /\bhreflang\b/i
+    ALTERNATE = said.("rel", "alternate")
+    # A `<link>` written out, up to its own `>`: the `>` that closes an ERB
+    # tag inside it (`href="<%= url %>"`) is not its end.
+    LINK_TAG = /<link\b(?:[^>]|(?<=%)>)*>/im
+    # A `<link>` built by a helper, inside one ERB tag.
+    LINK_HELPER = /<%(?:(?!%>).)*?(?:\btag\s*\.\s*link\b|\b(?:tag|content_tag)\s*\(?\s*[:"']link\b)(?:(?!%>).)*%>/m
+
+    # A language link is a `<link>` with `rel="alternate"` AND `hreflang`.
+    # Not the pair on an `<a>`: `link_to name, path, hreflang: code, rel:
+    # "alternate"` is how a language switcher in the page is written, and it
+    # is the theme's. Not a feed's `<link rel="alternate">` either.
+    language_link = lambda do |code|
+      (code.scan(LINK_TAG) + code.scan(LINK_HELPER)).any? { |link| link.match?(ALTERNATE) && link.match?(LANGUAGE) }
+    end
 
     # The tags the layout writes into <head> for every public page (spec §2:
     # "a theme cannot remove or replace one of them"), each with how a
     # template would write one: the helper's name and the literal tag. A
     # second one from a theme contradicts the CMS's (two canonical links,
     # two policies), so no template of a theme prints one, wherever it is:
-    # a partial is rendered from anywhere.
-    #
-    # A language link is `rel="alternate"` WITH `hreflang`, inside one tag:
-    # a feed's `rel="alternate"` is a theme's to print, and so is `hreflang`
-    # on the links of a language switcher.
+    # a partial is rendered from anywhere. Each value answers `===` for a
+    # template's source.
     CMS_HEAD = {
-      "a canonical link" => rel.("canonical"),
-      "a language link (rel=\"alternate\" with hreflang)" => /#{rel.("alternate")}[^>]*?\bhreflang\b|\bhreflang\b[^>]*?#{rel.("alternate")}/im,
+      "a canonical link" => said.("rel", "canonical"),
+      "a language link (rel=\"alternate\" with hreflang)" => language_link,
       "the og:url tag" => /\bog:url\b/i,
       "the content security policy's tag" => /\bcsp_meta_tag\b|\bcsp-nonce\b|Content-Security-Policy/i,
-      "the import map" => /\bjavascript_importmap_tags\b|\bjavascript_inline_importmap_tag\b|\btype\s*(?:=|:)\s*["']importmap\b/i,
-      "a stylesheet link" => /\bstylesheet_link_tag\b|#{rel.("stylesheet")}/i
+      "the import map" => /\bjavascript_importmap_tags\b|\bjavascript_inline_importmap_tag\b|#{said.("type", "importmap")}/i,
+      "a stylesheet link" => /\bstylesheet_link_tag\b|#{said.("rel", "stylesheet")}/i
     }.freeze
 
     # No CSRF token on a public page is the CMS's decision "and not a tag"
     # (spec §2). Asking for the token is what does the harm, not the tag:
     # Rails reads the session to mint it and so sets a cookie on a response
-    # that is publicly cacheable. (In the test environment forgery
-    # protection is off and `csrf_meta_tags` prints nothing, so no rendering
-    # test would notice: the source is the only place to see it.)
+    # that is publicly cacheable. `PublicController` is the wall (it mints
+    # none and commits no session, whatever a template calls); this is the
+    # sentence that tells an author why their tag prints nothing. (In the
+    # test environment forgery protection is off, so no rendering test
+    # would notice without switching it on.)
     CSRF = /\bcsrf_meta_tags?\b|\bcsrf-(?:token|param)\b|\bform_authenticity_token\b/
+
+    # A form that is sent with a token: `form_with`, `form_tag`, `form_for`
+    # and `button_to`, unless the same ERB tag says `method: :get` (a search
+    # box, which carries none). On a public page it gets no token
+    # (`PublicController`), so one that posts to this application would be
+    # refused by it, and the author should hear that at the check.
+    FORM = /<%(?:(?!%>).)*?\b(?:form_with|form_tag|form_for|button_to)\b(?:(?!%>).)*%>/m
+    GET = /\bmethod["']?\s*(?:=>|:)\s*["':]+get\b/i
+
+    # An assignment to an instance variable, in the code of a template (the
+    # comment at the top says what the layout reads): `@page = …`,
+    # `@post ||= …`, `@x += 1`, and the same by name.
+    ASSIGNMENT = /@\w+\s*(?:\|\||&&|[-+*\/%])?=(?![=~>])|\binstance_variable_set\b/
 
     # A write to the slot the CMS's head once read. The layout reads none
     # now, so the tag would be lost without a word.
@@ -112,12 +193,17 @@ class Theme
         case area
         when "views" then Contract::TEMPLATES.key?(rest) || (rest.start_with?(Contract::OWN_PARTIALS) && rest.end_with?(".html.erb"))
         when "components" then rest.end_with?(".html.erb") && Contract::COMPONENTS.key?(rest.delete_suffix(".html.erb"))
-        when "assets" then rest == "stylesheets/theme.css" || rest.start_with?("images/", "fonts/")
+        when "assets" then rest == "stylesheets/theme.css" || asset?(rest)
         when "javascript" then rest.start_with?("controllers/") && rest.end_with?("_controller.js")
         end
       return if allowed
 
       "#{file} is not part of the theme contract (#{MAY_HOLD.fetch(area)}). Rename it to a name the contract has, or take it out of the folder."
+    end
+
+    def asset?(rest)
+      folder, extensions = ASSET_EXTENSIONS.find { |prefix, _| rest.start_with?(prefix) }
+      !folder.nil? && extensions.include?(File.extname(rest).delete_prefix(".").downcase)
     end
 
     # The name a file of the theme is served under: its path below the
@@ -127,18 +213,30 @@ class Theme
       asset_root && [ file.delete_prefix("#{asset_root}/"), file ]
     end
 
+    # Every root the CMS's own assets are served from, as [what to call it,
+    # where it is]: the application's (`CMS_ASSET_ROOTS`, under `root`) and
+    # those of the load path that are outside the application, which are the
+    # gems'. `paths` is the configured load path; a root of it inside the
+    # application is not taken from there but from the list, so the answer
+    # does not depend on what the environment added (the test environment
+    # puts the second theme's folders on the path).
+    def cms_asset_roots(root, paths: Rails.application.config.assets.paths)
+      inside = CMS_ASSET_ROOTS.map { |relative| [ relative, root.join(relative) ] }
+      outside = paths.map { |path| Pathname(path.to_s) }.reject { |path| path.to_s.start_with?("#{Rails.root}/") }
+      inside + outside.map { |path| [ path.to_s, path ] }
+    end
+
+    # Two files of one theme cannot be served under one name: an image, a
+    # font and a controller never share an extension (`ASSET_EXTENSIONS`),
+    # and inside one folder a name is a path. So only the CMS's are asked.
     def shadowing(files, root)
-      served = files.filter_map { |file| served_as(file) }
-      among_themselves = served.group_by(&:first).values.select { |group| group.size > 1 }.map do |group|
-        "#{group.map(&:last).sort.join(" and ")} would be served under one name (#{group.first.first}). Rename one of them."
-      end
-      against_the_cms = served.filter_map do |name, file|
-        taken = CMS_ASSET_ROOTS.find { |cms_root| root.join(cms_root, name).file? }
+      roots = cms_asset_roots(root)
+      files.filter_map { |file| served_as(file) }.filter_map do |name, file|
+        taken, = roots.find { |_, directory| directory.join(name).file? }
         next unless taken
 
         "#{file} is named like an asset of the CMS's own (#{taken}/#{name}): a theme adds assets, it does not replace one. Give it a name of its own."
       end
-      among_themselves + against_the_cms
     end
 
     # What a template's source says that no page can be drawn with, or that
@@ -146,8 +244,12 @@ class Theme
     # one what it does not do.
     def written(file, source)
       code = source.gsub(/<%#.*?%>/m, "")
+      # The Ruby of the template, one ERB tag after the other with a `;`
+      # between: without it `<%= @page %>` followed by `<%= x %>` would read
+      # as `@page = x`.
+      ruby = code.scan(/<%={0,2}(.*?)%>/m).flatten.join("\n;\n")
       found = CMS_HEAD.filter_map do |tag, pattern|
-        next unless code.match?(pattern)
+        next unless pattern === code
 
         "#{file} prints #{tag}: that tag is the CMS's own, it is in the head of every public page already, and a second one " \
           "contradicts it. Delete it from the template."
@@ -156,11 +258,22 @@ class Theme
         found << "#{file} asks for the CSRF token: a public page is one answer for every visitor and carries none, because asking " \
                  "for the token starts a session and sets a cookie on a page a cache may keep. Delete it from the template."
       end
+      if code.scan(FORM).any? { |form| !form.match?(GET) }
+        found << "#{file} has a form that is sent with a CSRF token (form_with, form_tag, form_for or button_to without " \
+                 "`method: :get`): a public page is one answer for every visitor and is given no token, so the form would be " \
+                 "sent without one. Write a search form with `method: :get`, and a form that posts to another service as a " \
+                 "plain <form> tag."
+      end
       if code.match?(HEAD_SLOT)
         found << "#{file} writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, " \
                  "so the tag would never be printed. Put the tag into #{HEAD}, which is the theme's part of the head."
       end
-      if file == FRAME && !code.match?(/<%=\s*yield\s*-?%>/)
+      if ruby.match?(ASSIGNMENT)
+        found << "#{file} assigns an instance variable: a template is rendered before the layout, which reads the page, the post " \
+                 "and the preview from instance variables to write the title and the head's tags. Use a local variable " \
+                 "(`name = …`), or pass the value to a partial as a local."
+      end
+      if file == FRAME && !yields?(code)
         found << "#{file} never prints the page: `yield` is the page, and without it every address of the site shows the frame " \
                  "alone. Add <%= yield %> where the page goes."
       end
@@ -169,6 +282,14 @@ class Theme
                  "`page_title` and `site_title`, or delete the file to get the default pattern."
       end
       found
+    end
+
+    # Whether a frame prints the page: some tag that prints (`<%=`, `<%==`)
+    # holds `yield` with no name after it, alone or handed to something
+    # (`<%= tag.main yield %>`, `<%= render "theme/body", content: yield %>`).
+    # `yield :sidebar` is a slot's, and `<% yield %>` prints nothing.
+    def yields?(code)
+      code.scan(/<%==?(.*?)%>/m).flatten.any? { |printed| printed.match?(/\byield\b(?!\s*\(?\s*:\w)/) }
     end
 
     def unsound(file, source)
@@ -183,11 +304,17 @@ class Theme
         found << "#{file} does not compile: #{error.message.lines.first.to_s.strip}. Correct the template at that line."
       end
       code = source.scan(/<%(?!#)(.*?)%>/m).flatten.join("\n")
+      asked = REQUEST_RECEIVERS.map { |receiver| "(?<=\\b#{receiver}\\.)" }.join("|")
       FORBIDDEN.each do |name|
-        next unless code.match?(/(?<![.\w@:])#{name}\b(?!\s*:(?!:))/)
+        # Not a method of something else (`text.request_id`, `post.session`),
+        # not a symbol or an instance variable, and not a Hash key
+        # (`data: { session: "1" }`: the colon touches the name; in a ternary,
+        # `ok ? params : nil`, it does not).
+        next unless code.match?(/(?:(?<![.\w@:])|#{asked})#{name}\b(?!:(?!:))/)
 
         found << "#{file} reads #{name}: a public page is one answer for every visitor, and its ETag does not know what a template " \
-                 "reads there. Take #{name} out of the template."
+                 "reads there. Take #{name} out of the template. (This reading finds mistakes and is no sandbox: a theme is code " \
+                 "the server runs, and is trusted as the deployment is.)"
       end
       found
     end
