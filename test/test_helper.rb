@@ -17,7 +17,18 @@ if ENV["COVERAGE"].present? && ENV["COVERAGE"] != "0"
   end
 end
 
+# THE SUITE DOES NOT DEPEND ON THE SHELL'S SITE ADDRESS. Someone who has
+# `PUBLIC_HOST` (or its old name) exported, as the hosting documents tell a
+# person to try locally, would otherwise run every test under that address:
+# head tags, the sitemap and MCP's URLs carry it, and five tests that expect
+# "no address configured" failed that way. Removed here, once, before the
+# application is loaded and so before anything can read or memoise the
+# address; parallel workers fork after this and inherit it. A test that wants
+# an address sets one with `with_site_address` (test/support/site_address_helper.rb).
+%w[PUBLIC_HOST SITEMAP_HOST].each { |name| ENV.delete(name) }
+
 require_relative "../config/environment"
+SiteAddress.reset!
 require "rails/test_help"
 require_relative "test_helpers/session_test_helper"
 require_relative "test_helpers/setup_test_helper"
@@ -25,6 +36,8 @@ require_relative "test_helpers/turbo_stream_test_helper"
 require_relative "support/content_helper"
 require_relative "support/component_test_helper"
 require_relative "support/test_types"
+require_relative "support/site_address_helper"
+require_relative "support/log_capture"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
@@ -73,6 +86,11 @@ module ActiveSupport
     # Builds pages/posts through the write-path services (spec §11) instead
     # of fixtures -- see test/support/content_helper.rb.
     include ContentHelper
+
+    # `with_site_address(value) { ... }`: PUBLIC_HOST for a block, with
+    # `SiteAddress`'s memo dropped on both sides -- see
+    # test/support/site_address_helper.rb.
+    include SiteAddressHelper
 
     # Setup.required? memoizes "setup is done" per process (spec §6.1), reset
     # by SiteSetting after every commit -- but a test that clears the table

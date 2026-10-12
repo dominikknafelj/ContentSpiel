@@ -47,4 +47,48 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
     query_spans = @exporter.finished_spans.select { |span| span.name.start_with?("Page ", "Page.") }
     assert query_spans.any?, "expected a span for the query against Page, got: #{@exporter.finished_spans.map(&:name)}"
   end
+
+  # The two routes that carried a password-reset token in their path. The
+  # word standing for the token is no valid token, which is beside the point:
+  # the path is recorded before anybody asks whether it is one. Every
+  # attribute, name and event of every span of the request is read, so an
+  # instrumentation that starts to write the path somewhere new fails here.
+  test "no span of a request to a reset address carries the token" do
+    word = "not-a-real-token-0123456789"
+
+    get "/#{ContentSpiel::ADMIN_PATH}/password/#{word}/edit?from=mail"
+    patch "/#{ContentSpiel::ADMIN_PATH}/password/#{word}", params: { password: "x", password_confirmation: "x" }
+
+    spans = @exporter.finished_spans
+    paths = spans.filter_map { |span| span.attributes&.[]("url.path") }
+    assert_includes paths, "/#{ContentSpiel::ADMIN_PATH}/password/[FILTERED]/edit"
+    assert_includes paths, "/#{ContentSpiel::ADMIN_PATH}/password/[FILTERED]"
+
+    spans.each do |span|
+      written = [ span.name, span.attributes.to_a, Array(span.events).map { |event| [ event.name, event.attributes.to_a ] } ].flatten.join(" ")
+      assert_not_includes written, word, "span #{span.name.inspect} carries the token"
+    end
+  end
+
+  # A note's quote travels in a query string (`note_quote`), and a note's
+  # text reaches no log line. The first address is answered by a redirect
+  # in the routes, before any controller: nothing has filtered its
+  # parameters, and the span would hold the query as it was sent. The second
+  # reaches a controller under a name nothing filters. Neither query leaves.
+  test "no span carries a query string, of a request answered before a controller or by one" do
+    quote = "some-private-words-of-a-note"
+
+    get "/#{ContentSpiel::ADMIN_PATH}/settings/languages?note_quote=#{quote}"
+    assert_response :moved_permanently
+    get "/up?remark=#{quote}"
+    assert_response :success
+
+    spans = @exporter.finished_spans
+    assert_equal [ "[FILTERED]", "[FILTERED]" ], spans.filter_map { |span| span.attributes&.[]("url.query") }
+
+    spans.each do |span|
+      written = [ span.name, span.attributes.to_a, Array(span.events).map { |event| [ event.name, event.attributes.to_a ] } ].flatten.join(" ")
+      assert_not_includes written, quote, "span #{span.name.inspect} carries the query"
+    end
+  end
 end

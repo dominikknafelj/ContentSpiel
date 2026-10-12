@@ -22,6 +22,18 @@ require "rails/test_unit/railtie"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# Required here although lib/ is autoloaded (`config.autoload_lib` below):
+# config/environments/production.rb calls HostSettings while the application
+# is being configured, before any autoloading is set up.
+require_relative "../lib/site_address"
+require_relative "../lib/host_settings"
+
+# And these two for another reason: config/initializers/opentelemetry.rb
+# hands their objects to the OpenTelemetry SDK for the life of the process
+# (lib/telemetry.rb says the rest).
+require_relative "../lib/telemetry"
+require_relative "../lib/telemetry/path_scrubber"
+
 module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
@@ -85,6 +97,36 @@ module ContentSpiel
     # payload (written around the model) is an error, never read as
     # plaintext.
     config.active_record.encryption.support_unencrypted_data = false
+
+    # Production says at boot which address it serves, and stops without
+    # SECRET_KEY_BASE with a message of its own (lib/host_settings.rb).
+    #
+    # Where it runs matters. Rails raises its own error, the one that points
+    # at `bin/rails credentials:edit`, the first time `secret_key_base` is
+    # read; in this app that is Active Record's `generated_token_verifier` in
+    # an `after_initialize` block, but any initializer, gem or eagerly loaded
+    # class that asks for a key generator or a message verifier earlier would
+    # move it. So the check is placed among Rails' bootstrap initializers:
+    # after the logger exists (the environment file, which sets the logger
+    # and parses PUBLIC_HOST, is loaded before that) and before every
+    # railtie's and every `config/initializers` file's turn. `after:` alone
+    # would not do it: an application's own initializers run after all the
+    # engines' unless a `before:` pulls them forward.
+    #
+    # `SECRET_KEY_BASE_DUMMY` is the Dockerfile's asset precompilation, which
+    # has no secret and needs none; Rails asks only whether it is set, and so
+    # does this.
+    initializer "content_spiel.host_announcement", after: :initialize_logger, before: :initialize_cache do
+      if Rails.env.production?
+        # The credentials are handed over unread: they are decrypted only if
+        # the variable is not set, and what reading them can raise is
+        # `require_secret!`'s to turn into its own message.
+        HostSettings.require_secret!(ENV, credentials: Rails.application.credentials) unless ENV["SECRET_KEY_BASE_DUMMY"]
+        HostSettings.announcement(SiteAddress.current, ENV).each { |line| Rails.logger.info line }
+        # At debug the log holds every mail in full, a reset link included.
+        HostSettings.log_level_warning(ENV)&.then { |line| Rails.logger.warn line }
+      end
+    end
 
     # Configuration for the application, engines, and railties goes here.
     #

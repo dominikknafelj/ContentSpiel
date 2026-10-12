@@ -19,6 +19,14 @@
         page or post currently shown, plus x-default pointing search engines
         at the site's own default language rather than making them guess. %>
     <% if (alternate_record = @post || @page) %>
+      <%# The one address of what is shown: the record's own in this language,
+          on the site's configured address, with no query string -- so
+          `/about?utm=1` and a request under any other `Host` name the same
+          page. Not in a preview (its addresses are not the public's), and
+          not for a 404, where there is no record. %>
+      <% if !public_urls.preview? && (canonical_url = public_urls.url_for(alternate_record)) %>
+        <link rel="canonical" href="<%= canonical_url %>">
+      <% end %>
       <% public_urls.alternates(alternate_record).each do |code, url| %>
         <link rel="alternate" hreflang="<%= code %>" href="<%= url %>">
       <% end %>

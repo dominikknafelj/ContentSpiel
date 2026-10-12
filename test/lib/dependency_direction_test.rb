@@ -30,7 +30,7 @@ require "ripper"
 # Everything else that is allowed is in ALLOWED, with its reason, and an entry
 # that no longer matches anything fails the test, so the list can't rot.
 class DependencyDirectionTest < ActiveSupport::TestCase
-  ROOTS = %w[app/models app/queries app/services app/values app/constraints].freeze
+  ROOTS = %w[app/models app/queries app/services app/values app/constraints lib].freeze
 
   COMPONENT = /(?:\b[A-Z]\w*::)*\b[A-Z]\w*Component\b/
   PATTERNS = {

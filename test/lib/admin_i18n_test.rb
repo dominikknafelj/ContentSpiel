@@ -93,6 +93,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/dialog_component.html.erb
     app/components/admin/ui/confirm_dialog_component.rb
     app/components/admin/ui/confirm_dialog_component.html.erb
+    app/components/admin/ui/insecure_notice_component.rb
+    app/components/admin/ui/insecure_notice_component.html.erb
     app/components/admin/ui/toast_component.rb
     app/components/admin/ui/toast_component.html.erb
     app/components/admin/ui/toast_region_component.rb

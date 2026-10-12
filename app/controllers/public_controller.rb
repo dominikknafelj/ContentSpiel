@@ -35,7 +35,37 @@ class PublicController < ActionController::Base
   # off this same instance, and its per-record path memoization is only
   # worth having across the several links a single response renders, not
   # across requests.
+  #
+  # THE HOST IS THE SITE'S, NOT THE REQUEST'S (safe-address spec, "Head
+  # tags"). `request.base_url` is whatever `Host` -- or, behind a proxy,
+  # `X-Forwarded-Host` -- the client sent, and the absolute addresses built
+  # from this instance are printed into the page: `og:url`, the `hreflang`
+  # alternates, the `canonical` link. This response is the same for every
+  # visitor and publicly cacheable, so one request under a made-up host
+  # would otherwise leave that host in the head for whoever is served the
+  # cached copy, and tell a search engine the page lives there. The
+  # configured address (`PUBLIC_HOST`) is used whenever there is one; the
+  # request's origin is only the fallback of a checkout with none, the same
+  # one CS Studio's "Copy address" takes. `PreviewController` keeps the
+  # request's origin on purpose: a preview is private, never cached, and its
+  # addresses are where the editor is.
+  # `test/integration/public_head_address_test.rb`;
+  # `test/lib/public_address_guard_test.rb` keeps the views from reading the
+  # request's host themselves.
   def public_urls
-    @public_urls ||= PublicSite::Urls.new(host: request.base_url)
+    @public_urls ||= PublicSite::Urls.new(host: PublicSite::Urls.configured_host || request.base_url)
+  end
+
+  # What a public ETag adds for the addresses the head prints (`og:url`, the
+  # canonical link, the hreflang alternates), splatted into the ETag's keys:
+  # nothing when a site address is configured, since they are then the same
+  # under every host and a configured site's ETags stay what they were; the
+  # origin `public_urls` fell back to when none is. Without it a client or a
+  # shared cache that revalidates, under a second name the same checkout
+  # answers to, with an ETag it was given under the first would be told 304
+  # and keep a body whose head names the first.
+  # `test/integration/public_head_address_test.rb`.
+  def origin_etag_key
+    PublicSite::Urls.configured_host ? [] : [ public_urls.host ]
   end
 end

@@ -51,6 +51,11 @@
       </nav>
 
       <main class="min-h-[32rem] rounded-b-cs border border-line bg-surface p-6 md:rounded-r-cs md:rounded-bl-none md:p-10">
+        <%# The wizard takes the setup token and the first account's password,
+            before anyone is signed in: in production over plain HTTP it says
+            so to everyone, as the sign-in page does (the component's own
+            rule; nothing is drawn otherwise). %>
+        <%= render Admin::Ui::InsecureNoticeComponent.new(request: request, class: "mb-6") %>
         <%= render "setup/flash" %>
         <%= yield %>
       </main>

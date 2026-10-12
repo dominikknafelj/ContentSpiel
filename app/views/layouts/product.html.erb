@@ -23,7 +23,14 @@
       <%= render Admin::Ui::ThemeSwitchComponent.new %>
     </header>
     <main class="px-[22px] pb-16 pt-16">
-      <div class="mx-auto w-full max-w-[360px]"><%= yield %></div>
+      <%# A password is typed on every page of this layout (sign-in, the
+          reset request and the new password), so the notice that the
+          connection is plain HTTP is here once, for everyone: nobody is
+          signed in yet. Production only (the component's own rule). %>
+      <div class="mx-auto w-full max-w-[360px]">
+        <%= render Admin::Ui::InsecureNoticeComponent.new(request: request, class: "mb-[18px]") %>
+        <%= yield %>
+      </div>
     </main>
   </body>
 </html>

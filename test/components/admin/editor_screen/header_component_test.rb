@@ -424,8 +424,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
   end
 
   test "Copy uses the configured public host when there is one; View on site stays same-origin" do
-    without_public_host do
-      ENV["PUBLIC_HOST"] = "https://www.my-site.test"
+    with_site_address("https://www.my-site.test") do
       page_record = create_page(title: "About", published: true)
 
       render_header(page_record.reload)
@@ -473,14 +472,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
 
   private
 
-  def without_public_host
-    saved = ENV.to_h.slice("PUBLIC_HOST", "SITEMAP_HOST")
-    ENV.delete("PUBLIC_HOST")
-    ENV.delete("SITEMAP_HOST")
-    yield
-  ensure
-    ENV.delete("PUBLIC_HOST")
-    ENV.delete("SITEMAP_HOST")
-    saved.each { |key, value| ENV[key] = value }
+  def without_public_host(&)
+    with_site_address(nil, &)
   end
 end

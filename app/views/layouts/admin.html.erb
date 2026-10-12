@@ -113,6 +113,10 @@
       <%# `p-6` stays on <main>: the save bar (`sticky bottom-0 -mx-6`) is
           sized against it. %>
       <main class="admin-shell__main min-w-0 p-6">
+        <%# In production over plain HTTP only, and only for someone who runs
+            the site (`insecure_notice_viewer?`). Outside `#content`, so a
+            frame navigation neither drops nor repeats it. %>
+        <%= render Admin::Ui::InsecureNoticeComponent.new(request: request, class: "mb-6") if insecure_notice_viewer? %>
         <turbo-frame id="content" data-turbo-action="advance">
           <%# A frame request's response keeps only this frame, so the flash
               it carries is rendered here (as bare toasts that `admin--ui--toast`
