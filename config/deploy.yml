@@ -16,9 +16,10 @@ servers:
 # Enable SSL auto certification via Let's Encrypt and allow for multiple apps on a single web server.
 # If used with Cloudflare, set encryption mode in SSL/TLS setting to "Full" to enable CF-to-app encryption.
 #
-# Using an SSL proxy like this needs PUBLIC_HOST set to the site's https address (env, below): HTTPS is
-# then forced from it (lib/host_settings.rb), and production.rb sets neither config.force_ssl nor
-# config.assume_ssl itself. ASSUME_SSL=1 is only for a proxy that does not send X-Forwarded-Proto.
+# Using an SSL proxy like this needs PUBLIC_HOST set to the site's https address: uncomment the line under
+# env.clear, below, and write the address. HTTPS is then forced from it (lib/host_settings.rb), and
+# production.rb sets neither config.force_ssl nor config.assume_ssl itself. Until it is set the site answers
+# any host name and forces nothing. ASSUME_SSL=1 is only for a proxy that does not send X-Forwarded-Proto.
 #
 # Don't use this when deploying to multiple web servers (then you have to terminate SSL at your load balancer).
 proxy:
@@ -50,6 +51,10 @@ env:
   secret:
     - RAILS_MASTER_KEY
   clear:
+    # The site's address with its scheme. Required on a public address: only this host name is then
+    # answered, HTTPS is forced, and pages and the password reset mail carry it (docs/reference/hosting.md).
+    # PUBLIC_HOST: https://www.example.org
+
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
     SOLID_QUEUE_IN_PUMA: true
