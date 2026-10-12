@@ -1,6 +1,6 @@
 # Pages in the Mind graph, step one
 
-Date: 2026-10-12. Status: design, the six design answers folded in; the plan follows (one small open design question at the end, which does not hold it).
+Date: 2026-10-12. Status: **approved by the owner on 2026-10-12** ("Yes go"), the six design answers folded in; the plan is `docs/superpowers/plans/2026-10-12-pages-in-the-mind-graph.md`. What the owner confirmed with the approval is listed under "Approved" below. One small design question stays open at the end; it does not hold the plan, which builds a provisional value for it.
 
 ## Why
 
@@ -31,6 +31,19 @@ The owner split the work in two on 2026-10-12. This is step one. Step two is lin
 6. **A node's id in the data and in the tests' attributes is typed** (`post-7`, not `7`), and the screen opens for someone who may read pages and no post.
 7. **A site with very many connections opens around Home**, with "Show everything" (decision 6).
 
+## Approved (the owner, 2026-10-12)
+
+The owner approved this spec as a whole on 2026-10-12 ("Yes go"), and with it these six points, each of which changes what a person sees or is told:
+
+1. **The graph shows content as it is being edited**: the rows, not the published copies (decision 3).
+2. **The screen opens with `pages.read` or `posts.read`** (§2).
+3. **A line kind switched off hides only the lines**, never a node ("What changes", 3; §6).
+4. **Above about 3,000 lines the graph opens around Home, with "Show everything"** (decision 6).
+5. **No layout is saved**, unless the measurement (under "Testing") shows more than three seconds to rest; then saved positions go on the roadmap as their own piece of work, and are not built here (decision 7).
+6. **"Not listed on any page" is true only within the viewer's read scope** (§2, Risks).
+
+Not yet answered, and not the owner's to answer: the look of a retired post type's node ("Open design questions"). The plan builds it with `--cs-dim` as a provisional value behind one named constant, and the design system's owner confirms or replaces it.
+
 ## Decisions
 
 The owner's and the design answer's are named as such. The others are this spec's, each with what it rejected.
@@ -39,9 +52,9 @@ The owner's and the design answer's are named as such. The others are this spec'
 2. **The look is the design answer's**, unchanged (§4).
 3. **The graph shows the rows, not the published copies.** CS Studio is the editors' view: the tree, the posts list and the editors all show the rows. A live page with unpublished changes is drawn with its warn dot, and its lists lines follow the block settings as they are being edited, so a line can show what the public does not see yet; the dot is what says so. Rejected: reading the copies for live records (`Publishing.published_all`), which would draw two sources in one picture and hide the block someone has just added.
 4. **A node's id is its kind and its database id: `page-12`, `post-12`, `tag-12`, `type-blog`, `all-posts`.** One rule for every kind and every place: the payload's `id`, an edge's `source` and `target`, `data-selected`, `data-labelled`, `data-pinned`, a search row. Today a post's id is the bare number and only a tag's is prefixed. The "All posts" node is the one node of its kind, so it has no name to add. Rejected: leaving posts bare and prefixing pages, which keeps two rules and makes every `typeof id` in the script a branch. The address keeps one parameter per kind (`?page=12`, `?post=12`, `?tag=12`), read as decimal numbers as today; `page` wins over `post`, which wins over `tag`.
-5. **Every readable page is drawn, always; the cap stays 2,000 posts.** Pages are few and are the frame the rest hangs on, and a tree with pages missing is not a tree. No cap on pages is built; the measurement (§9) is taken at 200.
+5. **Every readable page is drawn, always; the cap stays 2,000 posts.** Pages are few and are the frame the rest hangs on, and a tree with pages missing is not a tree. No cap on pages is built; the measurement ("Testing") is taken at 200.
 6. **Above 3,000 lines the screen opens in the local view around Home**, with "Show everything" (design answer). The `data` read counts the lines it would answer before it builds any node, and above `PostGraph::OPEN_AROUND_HOME_ABOVE` (3,000) answers `{ open: "page-<home>", edges: N }` and no graph; the script then visits Home's local view with `replace`, where the focus bar offers "Show everything" (`?everything=1`, which is never redirected). Rejected: deciding in the page's own request, which holds no graph data and would have to run the graph's reads twice; and deciding in the script after the whole graph has arrived, which pays for half a megabyte to throw it away.
-7. **No positions are saved.** The design answer asks that the graph "opens settled (only the last ~600ms animated)". That is what the worker does today for a graph above 300 nodes without storing anything: it computes fast and shows the last 600 ms (`FINAL_STRETCH_MS`). What a person waits for before that is the computing, 2.5 seconds at the cap today. Step one keeps this and measures it at 200 pages and 2,000 posts (§9). Rejected for now: saved positions, which need a store (per person or per site, invalidated by every change to the graph, in step with rights) for a wait that decision 6 already avoids on the sites where it is longest. If the measurement shows more than three seconds to rest, saved positions become their own piece of work, on the roadmap.
+7. **No positions are saved.** The design answer asks that the graph "opens settled (only the last ~600ms animated)". That is what the worker does today for a graph above 300 nodes without storing anything: it computes fast and shows the last 600 ms (`FINAL_STRETCH_MS`). What a person waits for before that is the computing, 2.5 seconds at the cap today. Step one keeps this and measures it at 200 pages and 2,000 posts ("Testing"). Rejected for now: saved positions, which need a store (per person or per site, invalidated by every change to the graph, in step with rights) for a wait that decision 6 already avoids on the sites where it is longest. If the measurement shows more than three seconds to rest, saved positions become their own piece of work, on the roadmap.
 8. **The legend's toggles replace the radios**, and the state lives in the page: nothing is stored, a new visit starts from the defaults (everything on), and Back restores what the person had chosen, as it does for the radios today. Rejected: keeping both controls (two filters over the same lines), and remembering the choice per person (a preference store this screen does not have).
 9. **A lists line is made from the block, never from the posts.** One line per distinct target of a page: the tag when the block names a tag, else the post type, else (no filter) the single "All posts" node. Two blocks of one page with the same target are one line.
 10. **"Not listed on any page" is its own read**, not a filter over the drawn nodes. A post with no connection is not drawn today, and a post no page lists is very likely such a post: a filter over the nodes would miss the posts it is for.
@@ -169,7 +182,7 @@ All in `config/locales/admin/`: the legend's in `mind_graph_screen.en.yml`, the 
 - **"Not listed on any page" is true for the viewer, not for the site.** Someone who reads only part of the tree is told a post is unlisted when a page they cannot read lists it. Saying otherwise would disclose that page. The guide says so.
 - **A line that is not public yet.** The rows are shown (decision 3), so a lists line on a live page with changes can be one visitors do not get. The warn dot is the only cue.
 - **The existing graph changes for everyone** (the list near the top), post nodes above all. It ships as one visible change and the guide's page is rewritten with it.
-- **The 3,000-line rule may be the normal case at the size the performance rule names.** 200 pages and 2,000 well-tagged posts can exceed 3,000 lines, and such a site would then always open around Home. Measured in §9 and reported before the build is called done.
+- **The 3,000-line rule may be the normal case at the size the performance rule names.** 200 pages and 2,000 well-tagged posts can exceed 3,000 lines, and such a site would then always open around Home. Measured as "Testing" says and reported before the build is called done.
 - **A stiff tree against tag clusters.** A page that lists a tag is pulled toward that tag's posts and toward its parent at once. The starting values are a guess until seen.
 - **Every system test of the graph reads ids**, and each waits about five seconds per layout; the suite's time grows with every new one.
 
@@ -201,6 +214,6 @@ Guide, in `contentspiel-docs`: the Mind graph's page is rewritten (pages, the tw
 
 ## Open design questions
 
-For the design system's owner; it does not hold the plan.
+For the design system's owner; it does not hold the plan. Until it is answered the plan draws the hub filled with `--cs-dim`, with the inner ring, behind one named constant (`RETIRED_TYPE_HUB` in `mind_graph/renderer.js`), so the answer changes one line.
 
 1. **A post type that is retired but still named by a block.** A retired type has no colour slot, and posts of it are a grey ring. Is its hub the same grey, filled, with the same inner ring?
