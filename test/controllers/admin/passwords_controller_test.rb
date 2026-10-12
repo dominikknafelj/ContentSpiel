@@ -59,6 +59,24 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # In production the request's origin is never used for the link, so it is
+  # not handed over either: no mail is sent, and the page says the same words.
+  test "create in production with no address configured hands over no origin, sends no mail and answers the same" do
+    with_singleton_override(PasswordsMailer, :request_origin_used?, ->(*) { false }) do
+      with_site_address(nil) do
+        post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
+
+        assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user ]
+        assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
+        assert_no_emails { perform_enqueued_jobs }
+        assert_redirected_to new_admin_password_path(sent: 1)
+
+        follow_redirect!
+        assert_notice "If that address belongs to an account"
+      end
+    end
+  end
+
   test "the mail that create enqueues links to the configured address, and without one to the request's origin" do
     with_site_address("https://docs.example.org") do
       perform_enqueued_jobs { post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" } }

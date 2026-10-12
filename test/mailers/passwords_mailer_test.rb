@@ -2,9 +2,10 @@ require "test_helper"
 
 # Where the link in the reset mail points (safe-address spec, "Mail"). The
 # site's configured address when there is one, whatever the request said;
-# without one, the origin of the request that asked, which the controller
-# hands over; with neither, no mail at all and one log line. The mail is
-# delivered by a job, so the origin travels as a plain string.
+# without one, and outside production only, the origin of the request that
+# asked, which the controller hands over; otherwise no mail at all and one
+# log line. The mail is delivered by a job, so the origin travels as a plain
+# string.
 class PasswordsMailerTest < ActionMailer::TestCase
   SITE = "https://docs.example.org".freeze
   NOT_SENT = "[ContentSpiel] A password reset mail was not sent: no site address is known. Set PUBLIC_HOST.".freeze
@@ -28,6 +29,45 @@ class PasswordsMailerTest < ActionMailer::TestCase
 
       links_of(mail).each { |link| assert_operator link, :start_with?, "http://localhost:3000/cs-studio/password/" }
     end
+  end
+
+  # IN PRODUCTION THE REQUEST'S ORIGIN IS NEVER USED. It is whatever Host the
+  # request named, and a production site with no address configured answers
+  # every host: a reset asked for under a made-up one would mail the account's
+  # owner a valid token on a link to that host.
+  test "in production with no address configured no mail is built, whatever origin is handed over, and the log says why" do
+    in_production do
+      with_site_address(nil) do
+        [ "http://evil.example", "http://localhost:3000", nil ].each do |origin|
+          log = capture_log do
+            assert_no_emails { PasswordsMailer.reset(@user, origin: origin).deliver_now }
+          end
+
+          assert_equal [ NOT_SENT ], log.lines.map(&:strip).grep(/ContentSpiel/), origin.inspect
+          assert_not_includes log, "evil.example"
+          assert_no_token_in log
+        end
+        assert_empty ActionMailer::Base.deliveries
+      end
+    end
+  end
+
+  test "in production with an address configured the link is the address's, whatever origin says" do
+    in_production do
+      with_site_address(SITE) do
+        mail = PasswordsMailer.reset(@user, origin: "http://evil.example")
+
+        links_of(mail).each { |link| assert_operator link, :start_with?, "#{SITE}/cs-studio/password/" }
+        assert_not_includes mail.encoded, "evil.example"
+      end
+    end
+  end
+
+  test "the request's origin is used in development and in test, and not in production" do
+    assert PasswordsMailer.request_origin_used?(ActiveSupport::EnvironmentInquirer.new("development"))
+    assert PasswordsMailer.request_origin_used?(ActiveSupport::EnvironmentInquirer.new("test"))
+    assert_not PasswordsMailer.request_origin_used?(ActiveSupport::EnvironmentInquirer.new("production"))
+    assert PasswordsMailer.request_origin_used?, "this suite runs in test, where it is used"
   end
 
   # The environments' own `default_url_options` are literals (a port in
@@ -106,6 +146,10 @@ class PasswordsMailerTest < ActionMailer::TestCase
     text = mail.text_part.body.to_s[%r{https?://\S+}]
     html = Nokogiri::HTML5.fragment(mail.html_part.body.to_s).at_css("a")["href"]
     [ text, html ].each { |link| assert link.present?, "a part of the mail has no link" }
+  end
+
+  def in_production(&)
+    with_singleton_override(PasswordsMailer, :request_origin_used?, ->(*) { false }, &)
   end
 
   def with_default_url_options(options)

@@ -15,10 +15,13 @@ module Admin
       if user = User.find_by(email_address: params[:email_address])
         # The link in the mail is the site's configured address when there
         # is one, and then the request's origin is not handed over at all
-        # (it is whatever Host this request named). Without one, this
-        # request's origin is the only address anybody knows: a String,
-        # because a job delivers the mail, which `PasswordsMailer` parses
-        # before it uses any of it.
+        # (it is whatever Host this request named). Without one, and outside
+        # production only (`PasswordsMailer.request_origin_used?`, which
+        # says why), this request's origin is the only address anybody
+        # knows: a String, because a job delivers the mail, which
+        # `PasswordsMailer` parses before it uses any of it. In production
+        # without an address the mailer builds no mail and logs why; the
+        # answer below is the same words either way.
         PasswordsMailer.reset(user, **reset_mail_origin).deliver_later
       end
 
@@ -52,7 +55,9 @@ module Admin
 
     private
       def reset_mail_origin
-        SiteAddress.current.configured? ? {} : { origin: request.base_url }
+        return {} if SiteAddress.current.configured? || !PasswordsMailer.request_origin_used?
+
+        { origin: request.base_url }
       end
 
       def set_user_by_token
