@@ -190,6 +190,52 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_no_match(/The blog of secrets/, response.body)
   end
 
+  # The same 404s name no address either: a canonical link or an hreflang
+  # alternate on a response that says "not found" tells a search engine that
+  # the missing page is the record's own address in every language. The
+  # preview never prints a canonical, so the public site's 404 is made here
+  # the one way it comes about: the post's stored address outlives the list
+  # that gave it one (`PublicPageRendering#assign_record`), which no write
+  # path leaves behind and a test can only say by answering for the list.
+  test "a 404 that had a record in hand names no canonical address and no other language's, in the preview and in public" do
+    blog = create_page(title: "Blog")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(blog)
+    create_post(title: "Hello")
+
+    get "/blog/hello"
+    assert_response :success
+    assert_select "head link[rel=canonical]", count: 1
+    assert_select "head link[rel=alternate][hreflang]", minimum: 2
+
+    # The address is answered as it is (`PublicSite::Paths.canonical_page`
+    # asks with `tags:`), and the controller's own question, the one that
+    # finds the page and the post in hand with no list between them, "no".
+    listing = Publishing::Listing.method(:lists?)
+    asked = 0
+    Publishing::Listing.define_singleton_method(:lists?) do |block, post, tags: nil|
+      next listing.call(block, post, tags: tags) if tags
+
+      asked += 1
+      false
+    end
+    begin
+      get "/blog/hello"
+    ensure
+      Publishing::Listing.define_singleton_method(:lists?, listing)
+    end
+    assert_equal 1, asked, "the 404 is the controller's, after it assigned the page and the post"
+    assert_response :not_found
+    assert_select "head link[rel=canonical], head link[rel=alternate]", count: 0
+
+    assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
+    sign_in_as users(:one)
+    get "/preview/blog/hello"
+
+    assert_response :not_found
+    assert_select "head link[rel=canonical], head link[rel=alternate]", count: 0
+  end
+
   test "nothing of a theme reaches CS Studio, sign-in or setup" do
     with_plain_theme do
       get admin_sign_in_path
