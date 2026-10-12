@@ -6,13 +6,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
   end
 
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "HTTPS", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -114,6 +114,23 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_nil result("HTTPS", run_check(production: false, request_ssl: true))
     # The default is the environment's, and the tests do not run in production.
     assert_nil result("HTTPS", Setup::SystemCheck.run(request_ssl: false))
+  end
+
+  test "without a theme folder the row says the default theme draws the site" do
+    check = result("Theme", run_check(theme: Theme.new))
+
+    assert check.ok?
+    assert_equal "The default theme draws the site (THEME_PATH is not set).", check.message
+    assert_nil check.command
+  end
+
+  test "with a theme folder the row names it, its templates and the start of its fingerprint, and not its path" do
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    check = result("Theme", run_check(theme: theme))
+
+    assert check.ok?
+    assert_equal "The theme “plain” draws the site (#{theme.template_count} templates, fingerprint #{theme.fingerprint[0, 8]}).", check.message
+    assert_not_includes check.message, ThemeTestHelper::PLAIN.dirname.to_s
   end
 
   test "the real storage probe works against the test disk service" do
@@ -249,7 +266,10 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
       mail_host: "example.com")
 
-    assert results.none?(&:ok?)
+    # Every row that can warn does; the theme's row only states a fact (a
+    # folder that is no theme stops the boot and never reaches this page).
+    assert results.reject { |check| check.label == "Theme" }.none?(&:ok?)
+    assert results.find { |check| check.label == "Theme" }.ok?
     assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Outgoing mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
       results.select(&:command).to_h { |check| [ check.label, check.command ] })
     assert Setup::SystemCheck::SITE_ADDRESS_COMMAND.frozen?

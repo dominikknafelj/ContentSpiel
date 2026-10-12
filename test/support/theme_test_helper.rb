@@ -9,7 +9,7 @@ require "fileutils"
 module ThemeTestHelper
   PLAIN = Rails.root.join("test/fixtures/themes/plain")
 
-  def plain_theme = Theme.new(path: PLAIN)
+  def plain_theme = Theme.load(ThemeFolder.new(PLAIN))
 
   def with_plain_theme(&block) = Theme.with(plain_theme, &block)
 

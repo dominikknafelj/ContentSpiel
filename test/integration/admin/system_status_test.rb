@@ -24,6 +24,23 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/system_status']", text: "System status"
   end
 
+  # The page is shown to anyone with `system_status.view`: it names the
+  # theme's folder and never where the server keeps it (theming spec §1).
+  test "the theme row names the theme that draws the site, and no path of the server" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+    assert_select "li[data-status=ok]", text: /Theme.*The default theme draws the site \(THEME_PATH is not set\)\./m
+
+    with_plain_theme do
+      get "/cs-studio/system_status"
+
+      assert_select "li[data-status=ok]", text: /Theme.*The theme “plain” draws the site \(\d+ templates, fingerprint \h{8}\)\./m
+      assert_not_includes response.body, ThemeTestHelper::PLAIN.dirname.to_s
+      assert_not_includes response.body, Theme.current.fingerprint
+    end
+  end
+
   test "the summary counts passed checks and names the last run in the site time zone" do
     site_settings(:default).update!(time_zone: "Tokyo")
     sign_in_as(users(:one))

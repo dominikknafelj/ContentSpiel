@@ -25,7 +25,10 @@ end
 # application is loaded and so before anything can read or memoise the
 # address; parallel workers fork after this and inherit it. A test that wants
 # an address sets one with `with_site_address` (test/support/site_address_helper.rb).
-%w[PUBLIC_HOST SITEMAP_HOST].each { |name| ENV.delete(name) }
+# THEME_PATH goes the same way: `ThemeFolder` ignores it under test anyway,
+# and a child process a test starts (test/lib/production_boot_test.rb) must
+# get the theme the test names and not the shell's.
+%w[PUBLIC_HOST SITEMAP_HOST THEME_PATH].each { |name| ENV.delete(name) }
 
 require_relative "../config/environment"
 SiteAddress.reset!

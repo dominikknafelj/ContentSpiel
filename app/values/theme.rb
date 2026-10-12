@@ -49,19 +49,28 @@ class Theme
     # `theme` for the length of the block, and the theme that was current
     # before afterwards, also when the block raises.
     def with(theme)
-      before = @current
+      before = current
       @current = theme
       yield
     ensure
       @current = before
     end
+
+    # The theme a folder is (`ThemeFolder`), with the fingerprint and the
+    # number of templates it has at this moment. The application's own is
+    # loaded when it is prepared (`config/initializers/theme.rb`); a test
+    # loads the second theme (`test/support/theme_test_helper.rb`).
+    def load(folder)
+      new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size)
+    end
   end
 
-  attr_reader :path, :fingerprint
+  attr_reader :path, :fingerprint, :template_count
 
-  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT)
+  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT, template_count: 0)
     @path = path && Pathname(path)
     @fingerprint = fingerprint
+    @template_count = template_count
     @components = Concurrent::Map.new
   end
 

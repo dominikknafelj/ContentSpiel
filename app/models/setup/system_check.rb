@@ -87,13 +87,16 @@ module Setup
     # chooses between two true sentences and nothing else. Nobody having
     # said (the console) it is false, the wording of everywhere that is not
     # a developer's machine.
+    #
+    # `theme` is the theme that draws the site (`Theme.current`), handed in so
+    # a test can say it.
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       mail_delivery_method: ActionMailer::Base.delivery_method,
       mail_smtp_address: ActionMailer::Base.smtp_settings[:address],
       mail_host: ActionMailer::Base.default_url_options[:host],
       address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
-      reset_link_from_request: false)
+      reset_link_from_request: false, theme: Theme.current)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -105,10 +108,11 @@ module Setup
       @request_ssl = request_ssl
       @production = production
       @reset_link_from_request = reset_link_from_request
+      @theme = theme
     end
 
     def run
-      [ site_address, https, storage, image_processing, background_jobs, mail ].compact
+      [ site_address, https, theme, storage, image_processing, background_jobs, mail ].compact
     end
 
     private
@@ -165,6 +169,19 @@ module Setup
         else
           warning("HTTPS", "This page was reached over plain HTTP. Passwords and sessions can be read on the way. " \
             "Set PUBLIC_HOST to an https address.")
+        end
+      end
+
+      # Which theme draws the site (theming spec §1): the fact the boot line
+      # says, for someone who does not read the log. The folder's NAME and
+      # not its path: this page is shown to anyone who may view it, and where
+      # a server keeps its files is nobody's business there.
+      def theme
+        if @theme.configured?
+          ok("Theme", "The theme “#{@theme.name}” draws the site (#{@theme.template_count} templates, " \
+            "fingerprint #{@theme.fingerprint[0, 8]}).")
+        else
+          ok("Theme", "The default theme draws the site (THEME_PATH is not set).")
         end
       end
 

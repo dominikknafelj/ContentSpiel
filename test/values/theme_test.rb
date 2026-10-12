@@ -123,4 +123,24 @@ class ThemeTest < ActiveSupport::TestCase
     assert_equal "default", Theme.new.fingerprint
     assert_not Theme.new.configured?
   end
+
+  test "load builds a theme from a folder: its path, its fingerprint and how many templates it brings" do
+    folder = ThemeFolder.new(ThemeTestHelper::PLAIN)
+    theme = Theme.load(folder)
+
+    assert_equal folder.path, theme.path
+    assert_equal folder.fingerprint, theme.fingerprint
+    assert_equal folder.templates.size, theme.template_count
+    assert_operator theme.template_count, :>, 0
+
+    default = Theme.load(ThemeFolder.new(nil))
+    assert_not default.configured?
+    assert_equal "default", default.fingerprint
+    assert_equal 0, default.template_count
+  end
+
+  test "the application's theme is loaded when it is prepared, and under test it is the default" do
+    assert_instance_of Theme, Theme.current
+    assert_not Theme.current.configured?
+  end
 end

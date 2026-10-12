@@ -24,9 +24,12 @@ Bundler.require(*Rails.groups)
 
 # Required here although lib/ is autoloaded (`config.autoload_lib` below):
 # config/environments/production.rb calls HostSettings while the application
-# is being configured, before any autoloading is set up.
+# is being configured, before any autoloading is set up. `theme_folder` for
+# the same reason: the initializer below and `config/importmap.rb` read the
+# theme folder before any application class is loaded.
 require_relative "../lib/site_address"
 require_relative "../lib/host_settings"
+require_relative "../lib/theme_folder"
 
 # And these two for another reason: config/initializers/opentelemetry.rb
 # hands their objects to the OpenTelemetry SDK for the life of the process
@@ -117,6 +120,14 @@ module ContentSpiel
     # has no secret and needs none; Rails asks only whether it is set, and so
     # does this.
     initializer "content_spiel.host_announcement", after: :initialize_logger, before: :initialize_cache do
+      # The theme folder is read here in every environment (test ignores the
+      # variable, `ThemeFolder.from_env`), so a THEME_PATH that names no
+      # folder stops the boot at once with a message that names the variable
+      # and the path, as a PUBLIC_HOST that is no address does. The checks
+      # against the contract follow when the application is prepared
+      # (config/initializers/theme.rb).
+      theme_folder = ThemeFolder.current
+
       if Rails.env.production?
         # The credentials are handed over unread: they are decrypted only if
         # the variable is not set, and what reading them can raise is
@@ -126,6 +137,10 @@ module ContentSpiel
         # At debug the log holds every mail in full, a reset link included.
         HostSettings.log_level_warning(ENV)&.then { |line| Rails.logger.warn line }
       end
+
+      # Which theme draws the site: in production beside the address's
+      # lines, and in development, where a theme is written.
+      Rails.logger.info ThemeFolder.announcement(theme_folder) unless Rails.env.test?
     end
 
     # Configuration for the application, engines, and railties goes here.
