@@ -7,7 +7,8 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     "app/models/publishing/version.rb" => "the method itself",
     "app/services/publishing/publish_changes.rb" => "Publish changes",
     "app/services/pages/save.rb" => "a page published or scheduled for the first time, or again after an unpublish",
-    "app/services/posts/save.rb" => "a post published or scheduled for the first time, or again after an unpublish"
+    "app/services/posts/save.rb" => "a post published or scheduled for the first time, or again after an unpublish",
+    "app/models/public_site/paths.rb" => "foresee: a copy taken inside a savepoint that is rolled back, to say what a publish would take away"
   }.freeze
 
   def sources(*roots) = roots.flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,rake,erb}") }.to_h { |path| [ path.to_s.delete_prefix("#{Rails.root}/"), path.read ] }

@@ -11,8 +11,9 @@
 # on says what it touched; `rebuild!` is the same function handed
 # everything, and the clock's job hands it nothing and lets it settle.
 # Everything else here is read by others (`current_path`, `compute`,
-# `canonical_pages`) or is a step inside `refresh` that nothing outside this
-# file calls (`test/lib/public_paths_entry_test.rb`).
+# `canonical_pages`, and `foresee`, which tries a publish and keeps nothing)
+# or is a step inside `refresh` that nothing outside this file calls
+# (`test/lib/public_paths_entry_test.rb`).
 module PublicSite
   module Paths
     # One address that differs from what is stored: the record's current row
@@ -188,34 +189,23 @@ module PublicSite
     # `write_posts`'.
     def refresh(pages: [], posts: [], everything: false, now: Time.current)
       PublicPath.transaction do
-        settle_due(now)
-        next refresh_all(now) if everything
+        # FIRST, so that no derivation acts on a picture the clock has made
+        # stale: the copies that began to show with no write
+        # (`Publishing::Version.settle!` marks them, once: a change whose
+        # time came, and the copy of a scheduled page or post whose time
+        # came) have their records refreshed like any touched record, which
+        # is the whole of "it went live by the clock". There is no window
+        # and no sweep. A pass of its own, ahead of the caller's: the caller
+        # is answered what ITS records made yield.
+        due = Publishing::Version.settle!(now)
+        of = ->(type) { due.filter_map { |_, record_type, id| id if record_type == type.polymorphic_name } }
+        settled = due.empty? ? [] : refresh_touched(of.call(Page), of.call(Post), now)
 
         post_ids = posts.is_a?(ActiveRecord::Relation) ? posts.select(:id) : ids_of(posts)
-        refresh_touched(ids_of(pages), post_ids, now)
+        yields = everything ? refresh_all(now) : refresh_touched(ids_of(pages), post_ids, now)
+        report_clash(due, settled + yields, now)
+        yields
       end
-    end
-
-    # FIRST IN EVERY REFRESH, so that no derivation acts on a picture the
-    # clock has made stale: the copies that began to show with no write
-    # (`Publishing::Version.settle!` marks them, once: a change whose time
-    # came, and the copy of a scheduled page or post whose time came) have
-    # their records refreshed like any touched record, which is the whole of
-    # "it went live by the clock". There is no window and no sweep. A pass of its own, ahead of the caller's: what yields
-    # here is the clock's doing and is reported; what the caller is answered
-    # is what ITS records made yield, which a publish refuses by.
-    def settle_due(now)
-      due = Publishing::Version.settle!(now)
-      return if due.empty?
-
-      of = ->(type) { due.filter_map { |_, record_type, id| id if record_type == type.polymorphic_name } }
-      yields = refresh_touched(of.call(Page), of.call(Post), now)
-      # What the clock did: an address that was lost in this pass, and a due
-      # record that did not get its own. A record met again that stood
-      # without an address before is not this copy's doing.
-      mine = due.map { |_, type, id| [ type, id ] }
-      clashes = yields.select { |change| change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]) }
-      report_clash(due, clashes) if clashes.any?
     end
 
     def refresh_all(now)
@@ -234,20 +224,62 @@ module PublicSite
       yields + write_posts_in_batches(dependent_posts(page_ids, touched, candidates), candidates, now)
     end
 
-    # A copy came into force BY THE CLOCK and a record had to yield for it.
-    # Nobody asked for that write, so nobody can be refused (a publish that
-    # would do it is, when its copy is taken); the yielder has no
-    # address until someone resolves the clash, and the person running the
-    # site is told: once, because a copy is settled once, after the commit,
-    # with the copies, the records and the addresses they wanted and nothing
-    # of anyone's content. A refresh that is rolled back (a refused publish)
-    # reports nothing and leaves the copies due.
-    def report_clash(due, yields)
-      context = { copies: due.map(&:first),
-                  yielded: yields.map { |change| { record_type: change.record.class.polymorphic_name, record_id: change.record.id, locale: change.locale, wanted: change.to } } }
-      ActiveRecord.after_all_transactions_commit do
-        Rails.error.report(Publishing::AddressTaken.new(yields), handled: true, context: context)
+    # A LIVE RECORD IS LEFT WITHOUT AN ADDRESS by this refresh: it lost the
+    # one it had (to another record's write: a list block published away, a
+    # page published, scheduled, moved or trashed, a tag; or to the clock),
+    # or its own copy came into force by the clock and could not be given
+    # one. Nobody is refused for it (only a record's OWN address refuses its
+    # own save or publish, `Publishing.keep_address!`), so the person running
+    # the site is told: once, because a row is lost once and a copy is
+    # settled once, after the commit, with the due copies, the records and
+    # the addresses they wanted and nothing of anyone's content. A record
+    # met again that stood without an address before is not reported again,
+    # and a refresh that is rolled back (a refused publish, `foresee`)
+    # reports nothing.
+    def report_clash(due, yields, now)
+      mine = due.map { |_, type, id| [ type, id ] }
+      clashes = yields.select do |change|
+        change.record.published_at&.<=(now) && (change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]))
       end
+      return if clashes.empty?
+
+      context = { copies: due.map(&:first),
+                  yielded: clashes.map { |change| { record_type: change.record.class.polymorphic_name, record_id: change.record.id, locale: change.locale, wanted: change.to } } }
+      ActiveRecord.after_all_transactions_commit do
+        Rails.error.report(Publishing::AddressTaken.new(clashes), handled: true, context: context)
+      end
+    end
+
+    # INFORMATION, for the overview of what a publish will change: the
+    # addresses that live records would LOSE if the working rows of
+    # `record` (a published or scheduled page or post) were published at
+    # `now`, as `[{ record_type:, record_id:, locale:, path: }, ...]`, the
+    # record's own among them. Data, never wording, and no service decides
+    # anything by it.
+    #
+    # It tries: inside a savepoint the copy is taken and the addresses
+    # follow, the current rows are compared with what they were, and the
+    # savepoint is rolled back whatever happened, so nothing is kept: no
+    # copy, no settled mark, no address, no content version, no
+    # announcement, no report (each is a row of that savepoint or deferred
+    # to a commit that does not come). It reads every current row twice,
+    # which is why it is asked for one dialog and never on a save path, and
+    # it holds the record's row lock until it is done.
+    def foresee(record, now: Time.current)
+      lost = []
+      PublicPath.transaction(requires_new: true) do
+        before = PublicPath.current.pluck(:record_type, :record_id, :locale, :path)
+        begin
+          Publishing::Version.take!(record, live_at: now, now: now, shown: true)
+        rescue Publishing::AddressTaken
+          # The record's own address: the rows say so already.
+        end
+        kept = PublicPath.current.pluck(:record_type, :record_id, :locale).to_set
+        lost = before.reject { |type, id, locale, _| kept.include?([ type, id, locale ]) }
+        raise ActiveRecord::Rollback
+      end
+      live = lost.group_by(&:first).flat_map { |type, rows| type.constantize.where(id: rows.map(&:second), published_at: ..now).ids.map { |id| [ type, id ] } }
+      lost.filter_map { |type, id, locale, path| { record_type: type, record_id: id, locale: locale, path: path } if live.include?([ type, id ]) }
     end
 
     def ids_of(records)
@@ -400,7 +432,7 @@ module PublicSite
     #    counts as unpublished until its time comes -- and nothing writes a
     #    row at that moment, so posts don't move onto a scheduled listing page
     #    the instant it goes live: the page's copy is due from then on, and
-    #    the first refresh after it settles it (`settle_due`), which
+    #    the first refresh after it settles it (`refresh`), which
     #    `PublicSite::SyncWentLiveJob` makes sure of every five minutes where
     #    Solid Queue is the adapter (production). Until then they stay at the published
     #    listing they already had, which keeps serving them; the ETag already
@@ -668,18 +700,19 @@ module PublicSite
     # slug: `HasPublicPaths#public_paths_are_available` turns it into a
     # validation error first (spec §5.2). A hit here means the refresh was
     # caused by something the validation cannot see:
-    # - a PUBLISH, of this record or of a page that lists it. That one is
-    #   refused: the copy reads what yielded and raises, and the service's
-    #   transaction is rolled back (`take!` of `Publishing::Version`);
+    # - the record's OWN tags, made by its save or made public by its
+    #   publish. That one is refused: `Publishing.keep_address!` reads what
+    #   yielded and raises, and the service's transaction is rolled back;
     # - a *different* record's write: a post_list block saved or destroyed
-    #   on a draft page, a page saved, moved or reordered (including a
-    #   cascade into its descendants), a tag added or removed, a language
-    #   enabled. E.g. page /blog/team plus post "team" living at /team via a
-    #   homepage listing: removing that homepage block moves the post onto
-    #   /blog/team, which the page holds;
-    # - the clock: a copy that came into force at its time. It was asked
-    #   when it was scheduled, an address taken since cannot be refused, and
-    #   the clash is reported (`report_clash`).
+    #   on a draft page, a page's changes published (its list blocks as they
+    #   are from then on), a page saved, published, scheduled, moved,
+    #   trashed or reordered (including a cascade into its descendants), a
+    #   tag added or removed, a language enabled. E.g. page /blog/team plus
+    #   post "team" living at /team via a homepage listing: removing that
+    #   homepage block and publishing moves the post onto /blog/team, which
+    #   the page holds. The post yields, and a live one is reported
+    #   (`report_clash`);
+    # - the clock: a copy that came into force at its time. The same.
     def held_by_others(changes)
       wanted = changes.filter_map(&:to).uniq
       return {} if wanted.empty?

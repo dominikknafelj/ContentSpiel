@@ -115,4 +115,25 @@ module Publishing
   def pending(record, now: Time.current) = Version.of(record).pending(now).first
 
   def copied?(record) = Version.of(record).exists?
+
+  # THE ONE CHECK THAT REFUSES A SAVE OR A PUBLISH FOR AN ADDRESS, after the
+  # slug's validation (`HasPublicPaths#public_paths_are_available`), which
+  # refuses before anything is written wherever it can see the clash. What it
+  # cannot see: a tag the very save made, and the tags a publish makes
+  # public. So this is the record's own refresh, in the caller's
+  # transaction, and it raises `AddressTaken`, which rolls that transaction
+  # back, when THE RECORD ITSELF had to yield: it would be on the site, or
+  # in the preview, with no address. `shown:` (a record that is on the site
+  # already, whose changes are being published): only an address it HAD
+  # counts, so a post that stands without one goes on publishing its text.
+  #
+  # ANOTHER record that has to yield never refuses anything: it yields, as
+  # for any other write (`PublicSite::Paths.refresh` logs and reports it).
+  #
+  # For `take!` of `Version` (every publish) and `Posts::Save` (a draft's tags).
+  def keep_address!(record, now: Time.current, shown: false)
+    touched = { (record.is_a?(Page) ? :pages : :posts) => [ record ] }
+    own = PublicSite::Paths.refresh(**touched, now: now).select { |change| change.record == record && (change.row_id || !shown) }
+    raise AddressTaken.new(own) if own.any?
+  end
 end

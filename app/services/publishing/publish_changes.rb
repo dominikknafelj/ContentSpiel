@@ -29,7 +29,7 @@ module Publishing
         next if @record.class.where(id: @record.id).pick(:published_at).nil?
 
         now = Time.current
-        version = Version.take!(@record, live_at: @at || Publishing.pending(@record, now: now)&.live_at || now, by: actor_user, now: now)
+        version = Version.take!(@record, live_at: @at || Publishing.pending(@record, now: now)&.live_at || now, by: actor_user, now: now, shown: true)
         record_event("#{prefix}.changes_published", subject: @record, coalesce: false,
           metadata: { "number" => version.number, "live_at" => version.live_at.iso8601, "scheduled" => version.live_at > now })
       end

@@ -394,7 +394,34 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal few, copies.call(capture_sql { get "/" })
   end
 
-  # --- Publishing never leaves a live record without an address (Task 4, fix round 1) ---
+  # --- A record's OWN address refuses its save or publish; another record's yields (Task 4b, fix round 2) ---
+
+  # What `Rails.error.report` was told about records left without an address
+  # while the block ran: one `yielded` list per report, by language.
+  def clash_reports
+    reports = []
+    subscriber = Rails.error.subscribe(Class.new { define_method(:report) { |error, context:, **| reports << context[:yielded].sort_by { |row| row[:locale] } if error.is_a?(Publishing::AddressTaken) } }.new)
+    yield
+    reports
+  ensure
+    Rails.error.unsubscribe(subscriber) if subscriber
+  end
+
+  def lost(post, wanted, locales = %w[de en es])
+    locales.map { |locale| { record_type: "Post", record_id: post.id, locale: locale, wanted: wanted } }
+  end
+
+  def assert_addresses_as_rebuilt
+    rows = -> { PublicPath.current.order(:record_type, :record_id, :locale).pluck(:record_type, :record_id, :locale, :path, :listed_on_id) }
+    stored = rows.call
+    rebuilt = nil
+    PublicPath.transaction(requires_new: true) do
+      PublicSite::Paths.rebuild!
+      rebuilt = rows.call
+      raise ActiveRecord::Rollback
+    end
+    assert_equal rebuilt, stored, "public_paths is not what a full rebuild writes"
+  end
 
   def list_titles = css_select(".content-block--post-list a").map { |link| link.text.strip }
   def list_hrefs = css_select(".content-block--post-list a").map { |link| link["href"] }
@@ -430,15 +457,22 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Hello"
 
-    assert_not Publishing::PublishChanges.call(post.reload, at: 2.days.from_now).ok?, "a scheduled change is asked the same, when it is scheduled"
-    assert_nil Publishing.pending(post)
-    assert_equal [ copies, events, counter ], [ Publishing::Version.count, Audit::Event.count, PublicSite::Version.current ]
+    assert_equal [ { record_type: "Post", record_id: post.id, locale: "en", path: "/blog/hello" } ],
+      PublicSite::Paths.foresee(post.reload).select { |row| row[:locale] == "en" }, "what the overview can say beforehand: its own address"
+
+    # A change WITH A TIME is asked nothing when it is scheduled: nobody
+    # tries the future. At its time the post yields and the clash is reported.
+    assert Publishing::PublishChanges.call(post.reload, at: 2.days.from_now).ok?
+    assert_not_nil Publishing.pending(post)
     assert_equal addresses, PublicPath.order(:id).pluck(:id, :path, :current)
+    reports = clash_reports { travel_to(3.days.from_now) { 2.times { PublicSite::Paths.refresh } } }
+    assert_nil path_of(post.reload)
+    assert_equal [ lost(post, "/topic/hello") ], reports
   end
 
-  # N1 of the re-review: the same rule for a PAGE's publish. The page's new
-  # list would take a live post from its address onto one a child page
-  # holds; the post would be left with none.
+  # A PAGE's publish that takes ANOTHER record's address is not refused. The
+  # page's new list would take a live post from its address onto one a child
+  # page holds; the post yields.
   def topic_about_to_take_hello
     listing_page("Blog")
     Tag.create!(name: "topic")
@@ -490,30 +524,69 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert signals.any?, "a publish that goes through is signalled, so an empty list after a refusal means something"
   end
 
-  test "publishing a page's changes that would take a live post's address away is refused, and nothing is written, announced or signalled" do
+  test "publishing a page's changes that take a live post to an address a subpage holds is not refused: the post yields and the clash is reported" do
     topic, post = topic_about_to_take_hello
 
-    assert_nothing_happened do
-      result = Publishing::PublishChanges.call(topic.reload)
+    reports = clash_reports { publish_changes(topic) }
 
-      assert_not result.ok?
-      assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
-    end
+    assert_nil path_of(post.reload)
     get "/blog/hello"
-    assert_response :success
-    assert_equal "/blog/hello", path_of(post.reload)
+    assert_response :not_found
+    assert_equal [ lost(post, "/topic/hello") ], reports
+    assert_addresses_as_rebuilt
   end
 
-  test "a page's scheduled change that would take a live post's address away is refused when it is scheduled, and nothing is written" do
-    topic, = topic_about_to_take_hello
+  # C1 of the second re-review, as ruled: the post's next list is on ANOTHER
+  # page. Nobody is refused; the overview could have said so (`foresee`),
+  # the yield is logged when the address is lost and reported once.
+  test "removing a page's list block and publishing drops a live post to no address: named beforehand, not refused, logged and reported once, and the addresses are a rebuild's" do
+    blog = listing_page("Blog")
+    topic = listing_page("Topic")
+    create_page(title: "Hello", parent: topic)
+    post = create_post(title: "Hello")
+    assert_equal "/blog/hello", path_of(post)
+    assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
+    assert_equal "/blog/hello", path_of(post.reload), "a live page's rows move nothing"
 
-    assert_nothing_happened do
-      assert_not Publishing::PublishChanges.call(topic.reload, at: 2.days.from_now).ok?
+    foreseen = nil
+    assert_nothing_happened { foreseen = PublicSite::Paths.foresee(blog.reload) }
+    assert_equal %w[de en es].map { |locale| { record_type: "Post", record_id: post.id, locale: locale, path: "/blog/hello" } }, foreseen.sort_by { |row| row[:locale] }
+    assert_empty PublicSite::Paths.foresee(topic.reload), "a publish that takes nothing away names nothing"
+
+    log = StringIO.new
+    sink = ActiveSupport::Logger.new(log)
+    Rails.logger.broadcast_to(sink)
+    reports = clash_reports do
+      publish_changes(blog)
+      assert Pages::Save.call(topic.reload, translations: { "en" => { subtitle: "Typed" } }).ok?
+      publish_changes(topic) # the post is met again, and is nobody's news
     end
-    assert_nil Publishing.pending(topic)
+
+    assert_nil path_of(post.reload)
+    get "/blog/hello"
+    assert_response :not_found
+    assert_equal %w[de en es], log.string.scan(/Post##{post.id} gets no (\w+) URL: \/topic\/hello is already another record's current path/).flatten.sort
+    assert_equal [ lost(post, "/topic/hello") ], reports
+    assert_addresses_as_rebuilt
+  ensure
+    Rails.logger.stop_broadcasting_to(sink) if sink
   end
 
-  test "a scheduled change that is free is asked as of its time, the answer rolled back, and taken once: one copy, one event, no address moved yet" do
+  test "a page's scheduled change that will take a live post's address away is taken and moves nothing yet; at its time the post yields and the clash is reported once" do
+    topic, post = topic_about_to_take_hello
+    assert_equal [ { record_type: "Post", record_id: post.id, locale: "en", path: "/blog/hello" } ],
+      PublicSite::Paths.foresee(topic.reload, now: 2.days.from_now).select { |row| row[:locale] == "en" }, "the overview can say it for the time asked"
+
+    publish_changes(topic, at: 2.days.from_now)
+    assert_not_nil Publishing.pending(topic)
+    assert_equal "/blog/hello", path_of(post.reload)
+
+    reports = clash_reports { travel_to(3.days.from_now) { 2.times { PublicSite::Paths.refresh } } }
+    assert_nil path_of(post.reload)
+    assert_equal [ lost(post, "/topic/hello") ], reports
+  end
+
+  test "a scheduled change is taken once and moves no address yet: one copy, one event, its number" do
     listing_page("Blog")
     Tag.create!(name: "topic")
     topic = create_page(title: "Topic")
@@ -535,28 +608,8 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal "/blog/hello", path_of(post.reload)
   end
 
-  test "publishing a draft page whose list would take a live post's address away is refused, and the page stays a draft" do
-    listing_page("Blog")
-    Tag.create!(name: "topic")
-    topic = create_page(title: "Topic", published: false)
-    create_page(title: "Hello", parent: topic, published: false)
-    post = create_post(title: "Hello", tags: %w[topic])
-    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
-    assert_equal "/blog/hello", path_of(post), "a draft list loses to a live one"
-
-    result = nil
-    assert_nothing_happened { result = Pages::Save.call(topic.reload, attributes: { published: true }) }
-
-    assert_not result.ok?
-    assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
-    assert_nil topic.reload.published_at
-    assert_equal "/blog/hello", path_of(post.reload)
-  end
-
-  # I1 of the review: the two other doors of `Pages::Save`. A page that is
-  # SCHEDULED takes nobody's address yet; it would when its time comes, and
-  # then nobody could be refused. So the copy is asked as of the moment it
-  # will show (`Publishing::Version.take!`).
+  # The other doors of `Pages::Save`: a DRAFT page published, scheduled, and
+  # scheduled and then published now. None is refused for the post's address.
   def draft_topic_about_to_take_hello
     listing_page("Blog")
     Tag.create!(name: "topic")
@@ -568,37 +621,44 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     [ topic, post ]
   end
 
-  test "scheduling a draft page whose list would take a live post's address away when its time comes is refused, and nothing is written" do
+  test "publishing a draft page whose list takes a live post to an address a subpage holds is not refused: the page is live, the post yields and the clash is reported once" do
     topic, post = draft_topic_about_to_take_hello
 
-    result = nil
-    assert_nothing_happened do
-      result = Pages::Save.call(topic.reload, attributes: { published_at: 1.hour.from_now }, translations: { "en" => { subtitle: "Sent with it" } })
-    end
+    reports = clash_reports { assert Pages::Save.call(topic.reload, attributes: { published: true }).ok? }
 
-    assert_not result.ok?
-    assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
-    assert_nil topic.reload.published_at
-    travel_to(2.hours.from_now) { PublicSite::Paths.refresh }
-    assert_equal "/blog/hello", path_of(post.reload)
+    assert topic.reload.live?
+    assert_nil path_of(post.reload)
+    assert_equal [ lost(post, "/topic/hello") ], reports
+    assert_addresses_as_rebuilt
   end
 
-  test "a page that cannot be scheduled for that reason cannot be published through the schedule either: the header's Publish on it is refused the same way" do
+  test "scheduling a draft page whose list will take a live post's address away is not refused: nothing moves until its time, then the post yields and the clash is reported once" do
     topic, post = draft_topic_about_to_take_hello
 
-    assert_not Pages::Save.call(topic.reload, attributes: { published_at: 1.day.from_now }).ok?, "the review's sequence ends here: it is never scheduled"
-    result = Pages::Save.call(topic.reload, attributes: { published: true })
+    result = Pages::Save.call(topic.reload, attributes: { published_at: 1.hour.from_now }, translations: { "en" => { subtitle: "Sent with it" } })
 
-    assert_not result.ok?
+    assert result.ok?, result.errors.to_sentence
     assert_equal "/blog/hello", path_of(post.reload)
+    reports = clash_reports { travel_to(2.hours.from_now) { 2.times { PublicSite::Paths.refresh } } }
+    assert_nil path_of(post.reload)
+    assert_equal [ lost(post, "/topic/hello") ], reports
+  end
+
+  test "a page scheduled that way and then published now: the header's Publish goes through, the post yields in that save and the clash is reported once" do
+    topic, post = draft_topic_about_to_take_hello
+    assert Pages::Save.call(topic.reload, attributes: { published_at: 1.day.from_now }).ok?
+
+    reports = clash_reports { assert Pages::Save.call(topic.reload, attributes: { published: true }).ok? }
+
+    assert_nil path_of(post.reload)
     get "/blog/hello"
-    assert_response :success
+    assert_response :not_found
+    assert_equal [ lost(post, "/topic/hello") ], reports
   end
 
-  # What is left to the clock, and said: a clash that arises AFTER a page was
-  # scheduled. Its copy is asked when it is taken; "Publish" on a scheduled
-  # page takes no copy (it changes the time only), so it is the clock's case
-  # a little earlier: the post yields and the clash is reported.
+  # A clash that arises AFTER a page was scheduled: "Publish" on a scheduled
+  # page takes no copy (it changes the time only), that save's refresh
+  # settles the page's copy, the post yields and the clash is reported.
   test "a clash that arose after a page was scheduled is not refused when the page is then published now: the post yields and the clash is reported, as the clock would" do
     listing_page("Blog")
     Tag.create!(name: "topic")
@@ -619,30 +679,66 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     Rails.error.unsubscribe(subscriber) if subscriber
   end
 
-  test "a page with a live post that already stands without an address under it cannot publish changes until the clash is resolved" do
+  # N2 of the second re-review, for a POST: "Publish" on a post that is
+  # already scheduled takes no copy either, and what the person sees depends
+  # on nothing new: a publication time is a URL input, so the slug's
+  # validation looks at the address the post wants and marks the slug field.
+  test "Publish on a scheduled post that another record's publish left without an address is refused by the slug's validation, which the person sees on the slug field" do
     listing_page("Blog")
     Tag.create!(name: "topic")
-    topic = listing_page("Topic", tag: "topic")
-    late = create_post(title: "Hello")
-    assert Posts::Save.call(late, attributes: { tag_names: %w[topic] }).ok?
-    publish_changes(late, at: 1.hour.from_now)
+    topic = create_page(title: "Topic")
+    create_page(title: "Hello", parent: topic)
+    scheduled = Posts::Save.call(attributes: { content_type: "blog", published_at: 1.day.from_now, tag_names: %w[topic] }, translations: { "en" => { title: "Hello" } })
+    assert scheduled.ok?, scheduled.errors.to_sentence
+    post = scheduled.record
+    assert_equal "/blog/hello", path_of(post)
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
+    reports = clash_reports { publish_changes(topic) }
+    assert_nil path_of(post.reload), "the scheduled post yields to the page at /topic/hello"
+    assert_empty reports, "a record that is not on the site yet is logged, not reported"
+
+    result = Posts::Save.call(post.reload, attributes: { published: true })
+
+    assert_not result.ok?
+    assert_includes result.errors, "Slug en gives the address /topic/hello, which is already taken in EN"
+    assert_operator post.reload.published_at, :>, Time.current, "still scheduled"
+  end
+
+  # I1 of the second re-review, as ruled: a standing yielder blocks nobody.
+  test "a live post that stands without an address blocks nobody: the page above it, the homepage, a schedule, an unpublish and publish again, and the post's own text all go through" do
+    blog = listing_page("Blog")
+    topic = listing_page("Topic")
     holder = create_page(title: "Hello", parent: topic)
+    post = create_post(title: "Hello")
+    assert_equal "/blog/hello", path_of(post)
+    reports = clash_reports { assert Trash::Move.call(blog.reload).ok? }
+    assert_nil path_of(post.reload), "it wants /topic/hello, which the page holds"
+    assert_equal [ lost(post, "/topic/hello") ], reports, "a trash that takes a live post's address is reported as any other write"
+    home = root_page
+    other = create_page(title: "Other")
 
-    travel_to 2.hours.from_now do
-      PublicSite::Paths.refresh
-      assert_nil path_of(late.reload), "the clock's clash"
-      assert Pages::Save.call(topic.reload, translations: { "en" => { subtitle: "Typed" } }).ok?
-
-      result = Publishing::PublishChanges.call(topic.reload)
-      assert_not result.ok?
-      assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
-
-      renamed = Pages::Save.call(holder.reload, translations: Locales.enabled.index_with { { slug: "hello-page" } })
-      assert renamed.ok?, renamed.errors.to_sentence
-      assert_equal "/topic/hello", path_of(late.reload), "the holder moved away and the post has its address"
-      published = Publishing::PublishChanges.call(topic.reload)
-      assert published.ok?, published.errors.to_sentence
+    again = clash_reports do
+      [ home, other, topic ].each do |page|
+        assert Pages::Save.call(page.reload, translations: { "en" => { subtitle: "Typed" } }).ok?
+        publish_changes(page)
+      end
+      assert Pages::Save.call(topic.reload, translations: { "en" => { subtitle: "Typed again" } }).ok?
+      publish_changes(topic, at: 1.day.from_now)
+      assert Pages::Save.call(home.reload, attributes: { published: false }).ok?
+      republished = Pages::Save.call(home.reload, attributes: { published: true })
+      assert republished.ok?, republished.errors.to_sentence
+      assert home.reload.live?
+      assert Posts::Save.call(post.reload, translations: { "en" => { excerpt: "Its own text" } }).ok?
+      publish_changes(post)
+      assert_equal "Its own text", Publishing.published(post.reload).excerpt
     end
+
+    assert_empty again, "a record met again that stood without an address is reported once, when it lost it"
+    assert_nil path_of(post.reload)
+    assert_addresses_as_rebuilt
+    renamed = Pages::Save.call(holder.reload, translations: Locales.enabled.index_with { { slug: "hello-page" } })
+    assert renamed.ok?, renamed.errors.to_sentence
+    assert_equal "/topic/hello", path_of(post.reload), "the holder moved away and the post has its address"
   end
 
   test "a publish answers for itself only: another record's scheduled change that came into force onto a taken address does not refuse it" do
@@ -719,6 +815,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     assert_not result.ok?
     assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
+    assert_equal [ nil, false ], [ result.record.published_at, result.record.changed? ], "the object in memory is what is stored again"
     assert_nil post.reload.published_at
   end
 

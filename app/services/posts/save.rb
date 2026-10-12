@@ -119,6 +119,7 @@ module Posts
 
       success(@post)
     rescue Publishing::AddressTaken => e
+      discard_refused_changes
       address_taken(@post, e)
     rescue ActiveRecord::InvalidForeignKey => e
       vanished_media_failure(e, @post, nil, nil)
@@ -128,12 +129,12 @@ module Posts
 
     # A save that publishes or schedules takes the copy the public site will
     # show (drafts spec §4.3), after the tags are written (related posts are
-    # not part of a copy); the copy refuses itself when the post would be
-    # left without an address (`Publishing::AddressTaken`).
+    # not part of a copy), and the copy's refresh refuses when the post
+    # itself would be left without an address (`Publishing.keep_address!`).
     #
-    # A DRAFT has no copy to ask, and the same error is raised here for the
-    # one clash its validation cannot see: a tag this very save made had no
-    # id when the validation ran, so a list that filters by it did not count
+    # A DRAFT has no copy, and the same check is asked here for the one
+    # clash its validation cannot see: a tag this very save made had no id
+    # when the validation ran, so a list that filters by it did not count
     # yet. Asked only when the tag set really changed. Not for tags that were
     # merely sent again: the editor resends every chip with every autosave,
     # and a draft that another record's write left without an address must
@@ -141,10 +142,8 @@ module Posts
     # changes are published.
     def keep_address(was_unpublished, related_before)
       return Publishing::Version.take!(@post, by: actor_user) if was_unpublished && @post.published_at.present?
-      return unless @post.published_at.nil? && related_before.key?("tag_names") && related_before["tag_names"] != tag_names
 
-      yields = PublicSite::Paths.refresh(posts: [ @post ])
-      raise Publishing::AddressTaken, yields if yields.any?
+      Publishing.keep_address!(@post) if @post.published_at.nil? && related_before.key?("tag_names") && related_before["tag_names"] != tag_names
     end
 
     # Tags and related posts are join rows: changing only those saves no
@@ -199,8 +198,9 @@ module Posts
       "posts.publish" if @post.published_at_changed? && !authorize!("posts.publish", @post)
     end
 
-    # After a pass-2 refusal the transaction has rolled back, but the
-    # in-memory post still holds the refused values -- the attacker's
+    # After a pass-2 refusal, or a refusal for the post's own address, the
+    # transaction has rolled back, but the in-memory post still holds the
+    # refused values -- the attacker's
     # title would become the `access.denied` row's `subject_label`, and the
     # refused tags would linger in `@post.tags`. A persisted post is
     # reloaded to what's stored; a new one only has its join associations

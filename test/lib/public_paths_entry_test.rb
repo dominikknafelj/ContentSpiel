@@ -22,6 +22,10 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
     "canonical_pages" => "the same for several posts",
     "post_path" => "a post's path under a given page, for the preview's link"
   }.freeze
+  # Read by nothing under app/ yet: the overview of what a publish will
+  # change (Task 6 of the drafts plan) is its caller. When that exists, this
+  # moves into READS.
+  AWAITED = { "foresee" => "the addresses a publish would take away, tried in a savepoint and rolled back" }.freeze
 
   PATHS = "app/models/public_site/paths.rb".freeze
 
@@ -37,10 +41,11 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
       source.scan(/\bPaths\.([a-z_]+[!?]?)/).flatten.map { |name| [ name, path ] }
     end
 
-    reaching_in = called.reject { |name, _| WRITES.key?(name) || READS.key?(name) }
+    reaching_in = called.reject { |name, _| WRITES.key?(name) || READS.key?(name) || AWAITED.key?(name) }
     assert_empty reaching_in, "these call into PublicSite::Paths past its entry point: say what was touched with `refresh(pages:, posts:)` instead"
     assert_includes called, [ "rebuild!", "db/seeds.rb" ], "the seed file is read by this guard"
     (WRITES.keys + READS.keys - called.map(&:first)).each { |name| flunk "nothing outside #{PATHS} calls Paths.#{name} any more: remove it from this test's lists" }
+    (AWAITED.keys & called.map(&:first)).each { |name| flunk "Paths.#{name} has a caller now: move it from AWAITED to READS" }
   end
 
   test "the guard sees a bare Paths inside module PublicSite and the functions it is there to refuse" do

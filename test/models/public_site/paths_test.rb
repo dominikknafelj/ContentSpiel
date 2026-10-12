@@ -872,6 +872,47 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
         PublicSite::Paths.refresh
         assert_nil current(late), "it yields to the page that holds /desk/late"
         assert_parity "the sweep of a post's scheduled change onto a taken address"
+
+        # C1 of the second re-review: a list block removed from a live page
+        # and published, and the post's next list is on ANOTHER page, where a
+        # subpage holds the address. Nothing is refused; the post yields.
+        Tag.create!(name: "c1")
+        front = service_page("Front", published: false)
+        front_block = service_listing(front, content_type: "blog", tag: "c1")
+        ok! Pages::Save.call(front, attributes: { published: true })
+        back = service_page("Back", published: false)
+        service_listing(back, content_type: "blog", tag: "c1")
+        ok! Pages::Save.call(back, attributes: { published: true })
+        story_page = service_page("Story", parent: back)
+        story = service_post("Story", tags: %w[c1])
+        assert_equal "/front/story", current(story)
+        ok! ContentBlocks::Destroy.call(front_block.reload)
+        assert_parity "removing a live page's listing block from its rows"
+        publish_changes(front)
+        assert_nil current(story), "it wants /back/story, which the page holds"
+        assert_parity "publishing a listing block away so that a live post lands on a taken address"
+
+        # I1: the post stands without an address, and every publish above it
+        # goes through and leaves the table a rebuild's.
+        ok! Pages::Save.call(@root.reload, translations: { "en" => { subtitle: "Typed" } })
+        publish_changes(@root)
+        assert_parity "publishing the homepage's changes above a post that stands without an address"
+        ok! Pages::Save.call(back.reload, translations: { "en" => { subtitle: "Typed" } })
+        publish_changes(back)
+        assert_parity "publishing the changes of the page it wants its address under"
+        ok! Pages::Save.call(back.reload, attributes: { published: false })
+        assert_equal "/journal/story", current(story), "a draft list loses to a live one"
+        assert_parity "unpublishing that page"
+        ok! Pages::Save.call(back.reload, attributes: { published: true })
+        assert_nil current(story)
+        assert_parity "publishing it again, which takes the post's address away once more"
+        ok! Posts::Save.call(story.reload, translations: { "en" => { excerpt: "Its own text" } })
+        publish_changes(story)
+        assert_nil current(story)
+        assert_parity "publishing the text of the post that stands without an address"
+        ok! Pages::Save.call(story_page.reload, translations: Locales.enabled.index_with { { slug: "story-page" } })
+        assert_equal "/back/story", current(story), "the holder moved away"
+        assert_parity "the holder of the address moving away"
       end
     end
   end
@@ -1343,8 +1384,9 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
         assert_nil current(post), "the copy in force lists another type"
         assert_parity "a page #{verb} while its scheduled change was in force and not settled"
-        # A draft shows no copy: its change stays due until the page is live again.
-        assert_equal verb == "unpublished", Publishing::Version.of(page).where(settled_at: nil).any?
+        # Settled, or, for a page that is no longer published, marked as it
+        # is met: a draft shows no copy, and publishing it again takes a new one.
+        assert_empty Publishing::Version.of(page).where(settled_at: nil)
       end
     end
   end
@@ -1377,6 +1419,29 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       sql = capture_sql { PublicSite::Paths.refresh }.grep_v(/SAVEPOINT/)
       assert_equal 1, sql.size, sql.join("\n")
       assert_match(/"published_versions"/, sql.sole)
+    end
+  end
+
+  # N1 of the second re-review: a copy of a record that is not published is
+  # in force and never due. Left waiting, it cost every refresh of anything
+  # two more statements, forever.
+  test "a schedule that was removed and a change pending on an unpublished page leave no copy waiting, and a refresh of nothing is one statement again" do
+    removed = create_page(title: "Later", published: false)
+    assert Pages::Save.call(removed, attributes: { published_at: 1.day.from_now }).ok?
+    assert_equal [ nil ], Publishing::Version.of(removed).pluck(:settled_at), "a scheduled record's copy waits for its record"
+    assert Pages::Save.call(removed.reload, attributes: { published: false }).ok?
+    page, = page_with_scheduled_change
+    assert Pages::Save.call(page.reload, attributes: { published: false }).ok?
+
+    travel_to 2.hours.from_now do
+      PublicSite::Paths.refresh
+
+      assert_empty Publishing::Version.where(settled_at: nil)
+      sql = capture_sql { PublicSite::Paths.refresh }.grep_v(/SAVEPOINT/)
+      assert_equal 1, sql.size, sql.join("\n")
+      assert_parity "marking the copies of records that are not published"
+      assert Pages::Save.call(page.reload, attributes: { published: true }).ok?
+      assert_parity "publishing again a page whose pending change was marked while it was a draft"
     end
   end
 

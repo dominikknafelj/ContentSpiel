@@ -133,12 +133,13 @@ module HasPublicPaths
   # its paths are the ones it already holds, so it cannot newly clash, and a
   # title-only save computes no path and asks `public_paths` nothing.
   #
-  # What this cannot see is an address that follows from a PUBLISH: a tag
-  # made by the very save that carries it has no id yet, and a published
-  # post is judged by its copy's tags, not by the ones about to be
-  # published. Those are refused when the copy is taken, which rolls the
-  # publish back (`Publishing::AddressTaken`); this stays the check that
-  # marks the slug field before anything is written.
+  # What this cannot see is an address that follows from the record's own
+  # tags: a tag made by the very save that carries it has no id yet, and a
+  # published post is judged by its copy's tags, not by the ones about to be
+  # published. Those are refused by the one check after the record's own
+  # refresh, which rolls the save or the publish back
+  # (`Publishing.keep_address!`); this stays the check that marks the slug
+  # field before anything is written.
   def public_paths_are_available
     return unless url_inputs_changed?
 

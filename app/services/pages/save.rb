@@ -105,9 +105,8 @@ module Pages
         # unpublish: the copy the public site will show (drafts spec §4.3).
         # A save of a record that already has a time takes none: its changes
         # wait for `Publishing::PublishChanges`.
-        # The page's list blocks are public from here on, or from its time.
-        # A live post they would leave without an address refuses the copy
-        # (`Publishing::AddressTaken`), and the whole save with it.
+        # The page's list blocks are public from here on, or from its time:
+        # a post they take to an address another record holds yields.
         Publishing::Version.take!(@page, by: actor_user) if was_unpublished && @page.published_at.present?
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
@@ -118,6 +117,9 @@ module Pages
 
       success(@page)
     rescue Publishing::AddressTaken => e
+      # The page's own address, where the validation did not see the clash.
+      # Nothing was written: the object goes back to what is stored.
+      @page.reload if @page.persisted?
       address_taken(@page, e)
     rescue ActiveRecord::InvalidForeignKey => e
       # The hero was deleted between `#media_choice_result`'s check and the

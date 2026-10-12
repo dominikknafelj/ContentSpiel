@@ -8,16 +8,24 @@
 # settled), marks them and re-derives their records, once, however late.
 #
 # The partial index is what "the copies that are due" reads: the pending
-# changes and the scheduled records' copies, and nothing else.
+# changes and the scheduled records' copies, and nothing else for long (a
+# copy of a record that is not published is marked by the first refresh
+# that meets it, `Publishing::Version.settle!`).
 #
-# Every copy that shows when this runs is marked as it stands, in SQL and
-# with no application class: its addresses were derived by the write that
-# took it, or by the old sweep. A copy of a record that is still scheduled
-# is left due.
+# Every copy that shows when this runs is marked as it stands
+# (`mark_shown`), in SQL and with no application class: its addresses were
+# derived by the write that took it, or by the old sweep. A copy of a record
+# that is still scheduled is left due, a pending change is left pending, and
+# a copy of a record that is not published is left for that first refresh
+# (`test/migrations/add_settled_at_to_published_versions_test.rb`).
 class AddSettledAtToPublishedVersions < ActiveRecord::Migration[8.1]
   def up
     add_column :published_versions, :settled_at, :datetime
     add_index :published_versions, :live_at, where: "settled_at IS NULL", name: "index_published_versions_on_live_at_unsettled"
+    mark_shown
+  end
+
+  def mark_shown
     execute(<<~SQL.squish)
       UPDATE published_versions SET settled_at = live_at
       WHERE live_at <= NOW() AND (
