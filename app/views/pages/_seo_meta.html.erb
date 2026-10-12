@@ -1,17 +1,17 @@
-<%# The head tags describing this response: the document title, the meta
-    description and the Open Graph card (page-tree design spec section 7).
+<%# The head tags describing this response: the meta description and the
+    Open Graph card (page-tree design spec section 7).
 
     Rendered by the layout (layouts/application.html.erb), first thing in
     <head>, and not by pages/show: a theme replaces the page template and
     must not be able to lose these (theming spec §2). It prints nothing where
-    it is rendered; the layout picks both halves up through
-    `content_for(:title)` and its `yield :head`. The `Page` -- and, at a post
-    permalink, the `Post` -- it describes are handed in from the controller's
-    `@page` and `@post`. %>
+    it is rendered; the layout picks the tags up through its `yield :head`.
+    The title is not among them: the layout asks
+    `PagesHelper#document_title` itself, since a slot filled with
+    `content_for` is appended to by whoever writes to it next. The `Page` --
+    and, at a post permalink, the `Post` -- it describes are handed in from
+    the controller's `@page` and `@post`. %>
 <% title = seo_title(page, post: post) %>
 <% description = seo_description(page, post: post) %>
-
-<% content_for :title, document_title(page, post: post) %>
 
 <% content_for :head do %>
   <%= tag.meta(name: "description", content: description) if description %>

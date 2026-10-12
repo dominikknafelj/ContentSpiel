@@ -5,12 +5,26 @@ require "test_helper"
 # block and 404 where the theme holds none; and the CMS's head whatever the
 # theme does.
 class ThemePagesTest < ActionDispatch::IntegrationTest
-  # What the CMS writes into <head> and a theme cannot remove (spec §2).
-  CMS_HEAD = [
-    "title", "meta[name=viewport]", "meta[property='og:title']", "meta[property='og:type']", "meta[property='og:url']",
-    "meta[property='og:locale']", "link[rel=canonical]", "link[rel=alternate][hreflang=en]",
-    "link[rel=alternate][hreflang=x-default]", "link[rel=stylesheet]", "script[type=importmap]"
+  # What the CMS writes into <head> and a theme cannot remove (spec §2), in
+  # two groups by where the layout prints them: ahead of the theme's own
+  # tags (`layouts/public/_icons`, `_head`) and after them. Each is there
+  # EXACTLY ONCE as the CMS's own. The CSP tag is `meta[name=csp-nonce]`,
+  # which is what `csp_meta_tag` prints.
+  CMS_HEAD_BEFORE_THEME = [
+    "title", "meta[name=viewport]", "meta[name=csp-nonce]", "script:not([type])",
+    "meta[property='og:title']", "meta[property='og:type']", "meta[property='og:url']", "meta[property='og:locale']",
+    "link[rel=canonical]", "link[rel=alternate][hreflang=en]", "link[rel=alternate][hreflang=x-default]"
   ].freeze
+  CMS_HEAD_AFTER_THEME = [ "link[rel=stylesheet]", "script[type=importmap]" ].freeze
+
+  # A `_head` that prints tags that are the CMS's to print, behind a marker
+  # that says where the theme's part of the head starts.
+  GREEDY_HEAD = <<~ERB.freeze
+    <meta name="theme-head-starts">
+    <link rel="canonical" href="https://elsewhere.example/not-this-page">
+    <%= csp_meta_tag %>
+    <meta name="csrf-token" content="a-theme-wrote-this">
+  ERB
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -46,20 +60,98 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select ".plain-frame, .plain-text, .plain-page", count: 0
   end
 
-  test "every tag the CMS writes into the head is there under both themes" do
-    get "/about"
-    default_head = head
-    with_plain_theme { get "/about" }
-    themed_head = head
+  # The elements of <head> in the order they are printed, cut where the
+  # theme's part starts: at the first tag `_icons` prints (the default
+  # theme's and the second theme's start with a `link[rel=icon]`) or at the
+  # greedy theme's marker.
+  def head_parts(cut)
+    elements = head.element_children.to_a
+    at = elements.index { |element| element.matches?(cut) } or flunk "the head has no #{cut}"
+    [ fragment(elements[0...at]), fragment(elements[at..]) ]
+  end
 
-    CMS_HEAD.each do |selector|
-      assert default_head.at_css(selector), "the default theme's head has no #{selector}"
-      assert themed_head.at_css(selector), "the second theme's head has no #{selector}"
+  def fragment(elements) = Nokogiri::HTML5.fragment(elements.map(&:to_html).join)
+
+  def assert_cms_head(before, whole, theme)
+    CMS_HEAD_BEFORE_THEME.each do |selector|
+      assert_equal 1, before.css(selector).size, "#{theme}: #{selector} is not there exactly once ahead of the theme's own tags"
     end
-    assert_includes themed_head.to_html, 'localStorage.getItem("cs-theme")'
-    assert_equal default_head.css("meta[property^='og:'], link[rel=canonical], link[rel=alternate]").map(&:to_html),
-      themed_head.css("meta[property^='og:'], link[rel=canonical], link[rel=alternate]").map(&:to_html)
-    assert_nil themed_head.at_css("meta[name=csrf-token]")
+    CMS_HEAD_AFTER_THEME.each do |selector|
+      assert_equal 1, whole.css(selector).size, "#{theme}: #{selector} is not there exactly once"
+    end
+    assert_includes before.at_css("script:not([type])").text, 'localStorage.getItem("cs-theme")'
+    assert_nil before.at_css("meta[name=csrf-token]"), "#{theme}: the CMS wrote a CSRF token on a public page"
+  end
+
+  test "every tag the CMS writes into the head is there exactly once under both themes, ahead of the theme's own" do
+    get "/about"
+    default_before, default_after = head_parts("link[rel=icon]")
+    assert_cms_head default_before, head, "the default theme"
+
+    with_plain_theme { get "/about" }
+    themed_before, themed_after = head_parts("link[rel=icon]")
+    assert_cms_head themed_before, head, "the second theme"
+
+    described = "meta[property^='og:'], link[rel=canonical], link[rel=alternate]"
+    assert_equal default_before.css(described).map(&:to_html), themed_before.css(described).map(&:to_html)
+    [ default_after, themed_after ].each do |theme_part|
+      assert_empty theme_part.css("title, meta[name=viewport], meta[name=csp-nonce], link[rel=canonical], link[rel=alternate], meta[property^='og:'], meta[name=csrf-token]").map(&:to_html)
+    end
+  end
+
+  # The rule (spec §2): a theme cannot REMOVE or REPLACE a tag of the CMS's,
+  # because each is a line of the layout and none of a replaceable template.
+  # Nothing in the rendering stops a theme's `_head` from printing more
+  # markup, a tag of the same name included: what holds is that the CMS's
+  # own is there once, unchanged, and FIRST, ahead of everything the theme
+  # prints. Refusing a `_head` that names such a tag is the contract check's
+  # (Task 4), not the renderer's.
+  test "a theme whose head prints a canonical link, a CSP tag and a CSRF tag of its own takes none of the CMS's away: each is there once, unchanged and first" do
+    get "/about"
+    default_before, = head_parts("link[rel=icon]")
+
+    with_theme_copy do |dir|
+      dir.join("views/layouts/public/_icons.html.erb").write("")
+      dir.join("views/layouts/public/_head.html.erb").write(GREEDY_HEAD)
+      Theme.with(Theme.new(path: dir)) { get "/about" }
+    end
+    before, after = head_parts("meta[name=theme-head-starts]")
+
+    assert_cms_head before, head, "the greedy theme"
+    assert_equal "http://www.example.com/about", before.at_css("link[rel=canonical]")["href"]
+    assert_equal default_before.css("meta, link").map(&:to_html), before.css("meta, link").map(&:to_html)
+    # What the theme printed is on the page, after the CMS's: it is extra
+    # markup, which only the contract check can refuse.
+    assert_equal [ "https://elsewhere.example/not-this-page" ], after.css("link[rel=canonical]").map { |link| link["href"] }
+    assert_equal 1, after.css("meta[name=csp-nonce]").size
+    assert_equal 1, after.css("meta[name=csrf-token]").size
+    assert_equal 2, head.css("link[rel=canonical]").size
+  end
+
+  # `content_for` appends: a second write to the title's slot would be put
+  # behind the first, and <title> would read "HijackAbout – Site".
+  test "a theme's template that writes to the title's slot changes no title: on a page, on a 404 and with a meta title" do
+    with_theme_copy do |dir|
+      dir.join("views/pages/show.html.erb").write(%(<% content_for :title, "Hijack" %><article class="plain-page"></article>\n))
+      dir.join("views/pages/not_found.html.erb").write(%(<% content_for :title, "Hijack" %><p>Nothing here</p>\n))
+      dir.join("views/layouts/public/_frame.html.erb").write(%(<% content_for :title, "Hijack" %><main><%= yield %></main>\n))
+
+      Theme.with(Theme.new(path: dir)) do
+        get "/about"
+        assert_select "article.plain-page"
+        assert_includes response.body, "<title>Dana&#39;s Notes | About</title>"
+
+        get "/no-such-page"
+        assert_response :not_found
+        assert_select "p", text: "Nothing here"
+        assert_includes response.body, "<title>Dana&#39;s Notes</title>"
+
+        assert Pages::Save.call(@about, translations: { "en" => { meta_title: "About us" } }).ok?
+        publish_changes(@about)
+        get "/about"
+        assert_includes response.body, "<title>About us</title>"
+      end
+    end
   end
 
   test "the title is the theme's pattern on one line, escaped once" do
@@ -236,17 +328,86 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select "head link[rel=canonical], head link[rel=alternate]", count: 0
   end
 
-  test "nothing of a theme reaches CS Studio, sign-in or setup" do
-    with_plain_theme do
+  # NOTHING OF A THEME REACHES CS STUDIO, SIGN-IN OR SETUP. A theme's views
+  # are on the view path of the two public controllers only
+  # (`PublicPageRendering#look_in_the_theme_first`). These tests can fail:
+  # the theme they use holds a file at the very name of each private layout
+  # and of one view of each private screen, every one of them the marker and
+  # nothing else, so a controller that gained the theme's path would draw
+  # the marker in place of its own page. (Seen failing, all three, with the
+  # `before_action` moved to `ApplicationController`.) The files are written
+  # into a copy and not kept in `test/fixtures/themes/plain`: a folder that
+  # holds `views/layouts/admin.html.erb` is not a theme, and the folder
+  # check refuses it (`lib/theme_folder.rb`); the copy is handed to
+  # `Theme.new`, which checks nothing, because what is tested here is the
+  # second fence, behind the check.
+  LEAK = "THEME-LEAK".freeze
+  PRIVATE_VIEWS = %w[
+    layouts/admin layouts/product layouts/setup layouts/mailer
+    admin/dashboard/show admin/sessions/new setup/token setup/system_check
+  ].freeze
+
+  def with_leaking_theme
+    with_theme_copy do |dir|
+      PRIVATE_VIEWS.each do |name|
+        assert Rails.root.join("app/views/#{name}.html.erb").file?, "#{name} is no view of the CMS any more: name one that is"
+        file = dir.join("views/#{name}.html.erb")
+        file.dirname.mkpath
+        file.write("#{LEAK}\n")
+      end
+      # The control: the same folder IS where a public page's template comes from.
+      dir.join("views/pages/not_found.html.erb").write("<p>THEME-FOUND</p>\n")
+      @leaking_views = dir.join("views").to_s
+      Theme.with(Theme.new(path: dir)) { yield }
+    end
+  end
+
+  def assert_theme_reached_the_public_page
+    get "/no-such-page"
+    assert_includes response.body, "THEME-FOUND", "the control failed: the theme's folder is on no path at all"
+    assert_equal @leaking_views, controller.lookup_context.view_paths.first.to_s
+  end
+
+  def assert_no_theme_here
+    assert_response :success
+    assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, response.body)
+    assert_not_includes controller.lookup_context.view_paths.map(&:to_s), @leaking_views
+  end
+
+  test "nothing of a theme reaches sign-in: a theme's file named as the product layout or the sign-in view is never drawn" do
+    with_leaking_theme do
+      assert_theme_reached_the_public_page
+
       get admin_sign_in_path
-      assert_response :success
-      assert_no_match(/plain-frame|plain-mark|plain-page/, response.body)
+      assert_no_theme_here
+      assert_select "form input[type=password]"
+    end
+  end
+
+  test "nothing of a theme reaches CS Studio: a theme's file named as the admin layout or the dashboard is never drawn" do
+    with_leaking_theme do
+      assert_theme_reached_the_public_page
 
       sign_in_as users(:one)
       get "/cs-studio"
-      assert_response :success
-      assert_no_match(/plain-frame|plain-mark|plain-page/, response.body)
+      assert_no_theme_here
       assert_select "head meta[name='theme-color'][content='#123456']", count: 0
+    end
+  end
+
+  test "nothing of a theme reaches setup: a theme's file named as the setup layout or a step is never drawn" do
+    start_fresh_install
+
+    with_leaking_theme do
+      get setup_path
+      follow_redirect! while response.redirect?
+      assert_no_theme_here
+      assert_equal "SetupController", controller.class.name
+
+      verify_setup_token
+      get setup_step_path("system_check")
+      assert_no_theme_here
+      assert_includes response.body, "File storage"
     end
   end
 

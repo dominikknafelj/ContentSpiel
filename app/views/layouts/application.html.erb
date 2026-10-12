@@ -14,12 +14,14 @@
     first paint, the description and Open Graph tags (pages/_seo_meta), the
     canonical and language links, the stylesheet link and the import map.
     `test/integration/theme_pages_test.rb` ("every tag the CMS writes into
-    the head is there under both themes") holds the list. %>
+    the head is there exactly once under both themes, ahead of the theme's
+    own") holds the list. A theme's `_head` can print more markup, a tag of
+    the same name included: the CMS's own are printed once and first, and
+    refusing such a `_head` is the folder check's. %>
 <html lang="<%= I18n.locale %>"<%= " class=\"scroll-pt-9\"".html_safe if @preview_record %>>
   <head>
     <%# The head tags that describe what is shown are collected first: the
-        partial prints nothing here, it fills `content_for(:title)` and
-        `content_for(:head)`. It is rendered by the layout, not by
+        partial prints nothing here, it fills `content_for(:head)`. It is rendered by the layout, not by
         pages/show, so a theme that replaces the page template cannot lose
         them.
 
@@ -32,8 +34,16 @@
         pages/show was the guard
         (`test/integration/theme_pages_test.rb`: "a 404 that had a record in
         hand describes none"). %>
-    <% render "pages/seo_meta", page: @page, post: @post if @page && !response.not_found? %>
-    <title><%= content_for(:title) || themed_title(page_title: nil, site_title: Locales.read(Current.site, :title)) %></title>
+    <% described = @page && !response.not_found? %>
+    <% render "pages/seo_meta", page: @page, post: @post if described %>
+    <%# The title's text is asked for here and not read from a
+        `content_for(:title)` slot: `content_for` appends, so a theme's
+        template that wrote to the slot would have its text put in front of
+        the page's ("HijackAbout – Site"). The pattern is the theme's
+        (layouts/public/_title); the element and what goes into it are not
+        (`test/integration/theme_pages_test.rb`: "a theme's template that
+        writes to the title's slot changes no title"). %>
+    <title><%= described ? document_title(@page, post: @post) : themed_title(page_title: nil, site_title: Locales.read(Current.site, :title)) %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%# No csrf_meta_tags (spec §6.4): PublicController serves the same
         cookie-less response to every visitor, and Rails only reads/writes

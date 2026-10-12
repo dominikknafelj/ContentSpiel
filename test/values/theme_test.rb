@@ -124,6 +124,20 @@ class ThemeTest < ActiveSupport::TestCase
     assert_not Theme.new.configured?
   end
 
+  # `PublicPageRendering` asks for this on every public request.
+  test "whether the theme has a views folder is asked of the filesystem once per Theme, not once per request" do
+    with_theme_copy do |dir|
+      theme = Theme.new(path: dir)
+      assert_equal dir.join("views").to_s, theme.views_directory
+
+      FileUtils.rm_r(dir.join("views"))
+
+      assert_equal dir.join("views").to_s, theme.views_directory, "the same Theme asked the filesystem again"
+      assert_nil Theme.new(path: dir).views_directory, "a theme with no views folder has none to look in"
+    end
+    assert_nil Theme.new.views_directory
+  end
+
   test "load builds a theme from a folder: its path, its fingerprint and how many templates it brings" do
     folder = ThemeFolder.new(ThemeTestHelper::PLAIN)
     theme = Theme.load(folder)

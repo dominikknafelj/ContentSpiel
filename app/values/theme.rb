@@ -83,6 +83,18 @@ class Theme
   # app/views by the two public controllers (`PublicPageRendering`).
   def views_path = path&.join("views")
 
+  # That folder as the view path it is prepended as, or nil when the theme
+  # has no `views` folder (or there is no theme). Asked on every public
+  # request, so the filesystem is asked once per Theme and the answer kept:
+  # a Theme is built when the application is prepared and built again by a
+  # reload, which a changed file of the folder causes in development
+  # (`config/initializers/theme.rb`).
+  def views_directory
+    return @views_directory if defined?(@views_directory)
+
+    @views_directory = views_path&.directory? ? views_path.to_s : nil
+  end
+
   # The component that draws `definition` in `role` (`:component` for a
   # block, `:list_component` and `:detail_component` for a content type):
   # the theme's class when the folder holds that component's template, the

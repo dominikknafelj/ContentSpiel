@@ -129,8 +129,8 @@ module PublicPageRendering
   end
 
   def look_in_the_theme_first
-    views = Theme.current.views_path
-    prepend_view_path(views.to_s) if views&.directory?
+    views = Theme.current.views_directory
+    prepend_view_path(views) if views
   end
 
   def render_in_requested_locale(&block)
