@@ -479,6 +479,77 @@ class Theme::CheckTest < ActiveSupport::TestCase
     ERB
   end
 
+  # The commonest ERB mistake beside the block never closed is its mirror: a
+  # closing tag too many. Ruby finds it at the END of what was compiled (the
+  # surplus `end` closes the method the template is wrapped in, and the
+  # wrapper's own `end` is then the one left over), so "past the last line"
+  # alone would say the opposite fault and send the reader looking for a
+  # block to close.
+  test "an end too many is said as that, with the line of the end that closes nothing" do
+    source = "<% if true %>\n<p>a</p>\n<% end %>\n<p>b</p>\n<% end %>\n<p>c</p>\n"
+    problems = problems_with({ "views/theme/_broken.html.erb" => source }, deep: true)
+
+    assert_equal 1, problems.size, problems.inspect
+    assert_equal "views/theme/_broken.html.erb does not compile: line 5, an `end` (or a `}`) that closes nothing: the template " \
+      "closes more than it opens. Delete the <% end %> that is too many.", problems.first
+
+    brace = problems_with({ "views/theme/_broken.html.erb" => "<%= [ 1 ].map { |n| %>x<% } %>\n<p>b</p>\n<% } %>\n" }, deep: true)
+    assert_equal 1, brace.size, brace.inspect
+    assert_includes brace.first, "does not compile: line 3,"
+  end
+
+  # A file saved in another encoding (Latin-1 from an old editor) made every
+  # pattern raise "invalid byte sequence in UTF-8": an ArgumentError's trace
+  # from `theme:check` and from the boot. One problem, with the file.
+  test "a template that is not UTF-8 text is one problem with its file, at the boot's depth and the deep one, and stops the load with it" do
+    with_theme_copy do |dir|
+      dir.join("views/theme/_latin.html.erb").binwrite("<p>caf\xE9 <%= params[:q] %></p>\n".b)
+      folder = ThemeFolder.new(dir)
+
+      [ false, true ].each do |deep|
+        problems = Theme::Check.problems(folder, deep: deep)
+        assert_equal [ "views/theme/_latin.html.erb is not UTF-8 text, so it cannot be read or drawn. Save the file as UTF-8." ], problems
+      end
+      error = assert_raises(ThemeFolder::Invalid) { Theme.load(folder) }
+      assert_includes error.message, "views/theme/_latin.html.erb is not UTF-8 text"
+    end
+  end
+
+  # The deep check gates a site's build, so a refusal that is wrong blocks a
+  # deploy. A theme's own variable may be named like a fenced word (a
+  # conference site lists its sessions), and Ruby reads `x /2` and `x ?"a"`
+  # by whether `x` is a local, which one tag alone does not know.
+  test "a block parameter, a lambda's parameter and a local named like a fenced word are the theme's own, in every tag after" do
+    assert_empty problems_with({ "views/theme/_x.html.erb" => <<~'ERB' }, deep: true)
+      <% sessions = [] %>
+      <% sessions.each do |session| %>
+        <%= session.title %> <%= link_to session.room, "/rooms" %>
+      <% end %>
+      <% request = "a quote" %><%= request %>
+      <% show = ->(flash) { flash.to_s } %><%= show.("x") %>
+      <%= [ 1 ].map { |params, cookies| params.to_s + cookies.to_s }.join %>
+    ERB
+  end
+
+  test "a local before a slash or a question mark does not turn the string after it into code" do
+    assert_empty problems_with({ "views/theme/_x.html.erb" => <<~'ERB' }, deep: true)
+      <% width = 4 %><% ok = true %>
+      <%= link_to width /2, "/cookies" %>
+      <%= ok ?"cookies" : "session" %>
+    ERB
+  end
+
+  test "a fenced word that no tag of the template binds is still read, beside one that is bound" do
+    problems = problems_with({ "views/theme/_x.html.erb" => <<~'ERB' }, deep: true)
+      <% [].each do |session| %><%= session %><%= cookies[:x] %><% end %>
+      <% item = 1 %><%= params[:q] %>
+    ERB
+
+    assert_equal 2, problems.size, problems.inspect
+    assert_includes problems.first, "reads params:"
+    assert_includes problems.last, "reads cookies:"
+  end
+
   # R1 of the re-review. The reading took comments away BEFORE strings, and a
   # comment was "a space, a hash, to the line's end": a hex colour in a
   # string lost its closing quote, which then paired with the opening quote

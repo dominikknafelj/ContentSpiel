@@ -57,7 +57,12 @@ class Theme
     # template has for it (`helpers.request` in a component's template,
     # `controller.params`, `self.cookies`). Not seen: the name reached by
     # `send`, through a local (`r = controller; r.request`) or a helper of
-    # another name. A fence, as the comment above says.
+    # another name; asked with `&.` (`helpers&.request`); handed on by a
+    # keyword's shorthand (`render "theme/x", params:`); in a template that
+    # binds the same name itself (`bound_in`); and after a spelling Ruby
+    # reads by whether a name is a local (`reads?`). A fence, as the comment
+    # above says, and one that lets through where it is unsure: it gates a
+    # site's build.
     FORBIDDEN = %w[params request cookies session flash].freeze
 
     # Who a template can ask for one of them.
@@ -230,7 +235,12 @@ class Theme
       found = out_of_place.map { |file| misplaced(file) }
       found += folder.hidden_templates.map { |file| hidden(file) }
       found += shadowing(placed, cms_asset_roots(Pathname(root), paths: paths, folder: folder, started: started))
+      # A template in another encoding (Latin-1 from an old editor) cannot be
+      # asked anything: every pattern raises on its bytes, and Rails would
+      # raise drawing it. It is one problem, and nothing else is said of it.
       templates = folder.templates & placed
+      foreign, templates = templates.partition { |file| !folder.read(file).force_encoding(Encoding::UTF_8).valid_encoding? }
+      found += foreign.map { |file| "#{file} is not UTF-8 text, so it cannot be read or drawn. Save the file as UTF-8." }
       found += templates.flat_map { |file| written(file, folder.read(file)) }
       found += templates.flat_map { |file| unsound(file, folder.read(file)) } if deep
       found
@@ -336,7 +346,7 @@ class Theme
         found << "#{file} asks for the CSRF token: a public page is one answer for every visitor and carries none, because asking " \
                  "for the token starts a session and sets a cookie on a page a cache may keep. Delete it from the template."
       end
-      if tags.any? { |tag| code_of(tag).match?(FORM) && !code_of(tag, strings: true).match?(GET) }
+      if tags.any? { |tag| reads?(tag, FORM) && !code_of(tag, strings: true).match?(GET) }
         found << "#{file} has a form that is sent with a CSRF token (form_with, form_tag, form_for or button_to without " \
                  "`method: :get`): a public page is one answer for every visitor and is given no token, so the form would be " \
                  "sent without one. Write a search form with `method: :get`, and a form that posts to another service as a " \
@@ -346,7 +356,7 @@ class Theme
         found << "#{file} writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, " \
                  "so the tag would never be printed. Put the tag into #{HEAD}, which is the theme's part of the head."
       end
-      if tags.any? { |tag| code_of(tag).match?(ASSIGNMENT) }
+      if tags.any? { |tag| reads?(tag, ASSIGNMENT) }
         found << "#{file} assigns an instance variable: a template is rendered before the layout, which reads the page, the post " \
                  "and the preview from instance variables to write the title and the head's tags. Use a local variable " \
                  "(`name = …`), or pass the value to a partial as a local."
@@ -378,12 +388,65 @@ class Theme
     # The lexer hands back every character of what it was given, also for a
     # fragment and for Ruby that is wrong; should it ever not, the tag is
     # read as it was written, which errs towards refusing.
-    def code_of(tag, strings: false)
+    #
+    # `locals:` is the second reading (`reads?`): the same tag, lexed after a
+    # line that assigns every name in it, so that each is a local variable
+    # to the lexer. That line is not part of the answer.
+    def code_of(tag, strings: false, locals: false)
       away = strings ? COMMENTS : COMMENTS + WORDS
-      tokens = Ripper.lex(tag)
+      before = locals ? "#{names_in(tag).map { |name| "#{name}=0;" }.join}\n" : ""
+      tokens = Ripper.lex(before + tag)
+      return tag unless tokens.sum { |_, _, text, _| text.size } == before.size + tag.size
+
+      read = 0
+      tokens = tokens.drop_while { |_, _, text, _| (read += text.size) <= before.size }
       return tag unless tokens.sum { |_, _, text, _| text.size } == tag.size
 
       tokens.map { |_, kind, text, _| away.include?(kind) ? (text.end_with?("\n") ? " \n" : " ") : text }.join
+    end
+
+    # Every plain name a tag holds (a method's or a variable's: the lexer
+    # cannot tell, which is the point).
+    def names_in(tag)
+      Ripper.lex(tag).filter_map { |_, kind, text, _| text if kind == :on_ident && text.match?(/\A[a-z_]\w*\z/) }.uniq
+    end
+
+    # Whether a tag's code holds `pattern` HOWEVER RUBY WOULD READ THE TAG.
+    # A tag is lexed without the tags before it, and Ruby reads three
+    # spellings by whether the name in front is a local variable, which only
+    # those tags say: `width /2, "/cookies"` (a division, or the start of a
+    # regular expression that swallows the string's opening quote),
+    # `ok ?"cookies" : "session"` (a ternary, or the character `?"`) and
+    # `list <<name` (a shovel, or a heredoc). Read the wrong way, the words
+    # of the string after it are code, and a build is refused for a word in
+    # a link. So the tag is read both ways, with no name a local and with
+    # every name a local, and a fence speaks only when both readings hold
+    # what it looks for. The deep check gates a site's build: where the two
+    # disagree it lets the template through, and a read written after such
+    # a spelling (`width /2 + params[:w].to_i`) is missed.
+    def reads?(tag, pattern)
+      code_of(tag).match?(pattern) && code_of(tag, locals: true).match?(pattern)
+    end
+
+    # The fenced names a template binds itself, in any of its tags: a
+    # block's parameter (`sessions.each do |session|`, `{ |request| … }`),
+    # a lambda's (`->(flash) { … }`) and a local that is assigned
+    # (`request = …`). From there on the name is the theme's own variable
+    # and not the view's method, in that tag and in the tags after it, and a
+    # template that lists a conference's sessions is not told to "take
+    # session out". Asked of the whole template's code, since a block opened
+    # in one tag is used in the next.
+    #
+    # The price, a miss: once a name is bound anywhere in a template, no
+    # read of the view's method of that name is seen in it, before the
+    # binding or after (`request = request.path` hides both), and a default
+    # value in a parameter list binds what it names (`|a, b = params|`).
+    PARAMETERS = /(?:\bdo|\{)\s*\|([^|]*)\||->\s*\(([^)]*)\)/
+
+    def bound_in(code)
+      parameters = code.scan(PARAMETERS).flatten.compact.flat_map { |list| list.scan(/[a-z_]\w*/) }
+      assigned = FORBIDDEN.select { |name| code.match?(/(?<![.\w@$:])#{name}\s*(?:\|\||&&|[-+*\/%|&^])?=(?![=~>])/) }
+      (parameters + assigned) & FORBIDDEN
     end
 
     # What is wrong with a template Ruby will not compile, as one sentence.
@@ -400,6 +463,18 @@ class Theme
       found = Prism.parse(compiled).errors.reject { |problem| problem.message.include?("to close the `def` statement") }
       first = found.min_by { |problem| [ problem.location.start_line, problem.location.start_column ] }
       return "#{error.message.lines.first.to_s.strip}. Correct the template." unless first
+
+      # One closing tag too many. Past the template's last line it is the
+      # WRAPPER's `end` that Ruby finds left over, because the template's
+      # surplus one closed the wrapper's method: that `end` is where the
+      # method ends, and that is the line to say. (Without this it read as
+      # the opposite fault, "something is never closed".)
+      if first.message.match?(/\Aunexpected (?:'end'|'\}'), ignoring it/)
+        line = first.location.start_line
+        line = Prism.parse(compiled).value.statements.body.first.end_keyword_loc&.start_line || line if line > source.lines.size
+        return "line #{line}, an `end` (or a `}`) that closes nothing: the template closes more than it opens. " \
+               "Delete the <% end %> that is too many."
+      end
 
       if first.location.start_line > source.lines.size || first.message.include?("end-of-input")
         "it ends before something it opened is closed (an `if`, a `do … end` block, a bracket). " \
@@ -425,14 +500,16 @@ class Theme
       # (`link_to "Cookies", "/cookies"`, `image_tag "flash.svg"`), and this
       # check is a gate of a site's build, where a wrong refusal blocks a
       # deploy.
-      code = source.gsub(/<%#.*?%>/m, "").scan(TAG).flatten.map { |tag| code_of(tag) }.join("\n;\n")
+      tags = source.gsub(/<%#.*?%>/m, "").scan(TAG).flatten
+      bound = bound_in(tags.map { |tag| code_of(tag) }.join("\n;\n"))
       asked = REQUEST_RECEIVERS.map { |receiver| "(?<=\\b#{receiver}\\.)" }.join("|")
-      FORBIDDEN.each do |name|
+      (FORBIDDEN - bound).each do |name|
         # Not a method of something else (`text.request_id`, `post.session`),
         # not a symbol or an instance variable, and not a Hash key
         # (`data: { session: "1" }`: the colon touches the name; in a ternary,
         # `ok ? params : nil`, it does not).
-        next unless code.match?(/(?:(?<![.\w@:])|#{asked})#{name}\b(?!:(?!:))/)
+        # Each tag by itself, and however Ruby would read it (`reads?`).
+        next unless tags.any? { |tag| reads?(tag, /(?:(?<![.\w@:])|#{asked})#{name}\b(?!:(?!:))/) }
 
         found << "#{file} reads #{name}: a public page is one answer for every visitor, and its ETag does not know what a template " \
                  "reads there. Take #{name} out of the template. (This reading finds mistakes and is no sandbox: a theme is code " \
