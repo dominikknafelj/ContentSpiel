@@ -1,6 +1,6 @@
 # The Code block
 
-Date: 2026-10-12. Status: design, for the owner's review; the plan follows. Built after theming is merged, as its own pull request, and relies on the theming contract (`docs/superpowers/specs/2026-10-12-theming-design.md` on the `theming` branch).
+Date: 2026-10-12. Status: approved by the owner on 2026-10-12 ("Sounds everything good"); the plan is `docs/superpowers/plans/2026-10-12-code-block.md`. Built after theming is merged, as its own pull request, and relies on the theming contract (`docs/superpowers/specs/2026-10-12-theming-design.md` on the `theming` branch).
 
 ## Why
 
@@ -17,17 +17,25 @@ The documentation site is the first real integration, and a guide for integrator
 
 Decided by the owner (roadmap, "The documentation site", "Decided since", 2026-10-11) and not reopened: plain-text source, a language, an optional file name, a copy button; the same code in every language, the caption translated; coloured on the server; seven syntax roles as theme tokens, light and dark; a block type of the CMS, not of a theme.
 
-Decided here, each with what was rejected:
+Decided here, each with what was rejected. The owner approved all nine on 2026-10-12; the three that were put to the owner as open questions (2, 5 and 8) are marked "confirmed", each as recommended. The smaller points the controller ruled on afterwards are under "Decided by the controller" below, and where one changes a sentence of this document the sentence has been changed.
 
 1. **Rouge colours the code.** It is pure Ruby, has no dependency of its own, and is already in `Gemfile.lock` at 5.1.0 through Lookbook, so the bundle gains nothing; it gets its own line in the `Gemfile` because Lookbook is a development gem. Rejected: a hand-written highlighter. ERB, YAML, shell and Ruby are what the guide shows most, and each is wrong in corners (heredocs, `%w[]`, a `%>` inside a string) that a visitor reads as a mistake in the documentation. A wrong highlighter is worse than a dependency.
-2. **A fixed list of 20 languages plus "Plain text"**, a constant of the CMS. Rejected: all 234 of Rouge's lexers in a select (nobody finds YAML between Xojo and YANG), and a free-text language (a typo is silently plain).
+2. **A fixed list of 20 languages plus "Plain text"**, a constant of the CMS (confirmed 2026-10-12: the twenty as listed in §2). Rejected: all 234 of Rouge's lexers in a select (nobody finds YAML between Xojo and YANG), and a free-text language (a typo is silently plain).
 3. **Source, language and file name are fields of the block's `settings`; the caption is the existing translated `caption` column.** No migration. Rejected: a `code` column on `content_blocks`, which is a column for one block type and a new entry in the published copy's lists for nothing the jsonb does not already do.
 4. **A new schema field type, `:code`**, because a `:text` setting is stripped at both ends when stored and the first line of a sample would lose its indentation. Rejected: an option on `:text`, which every reader of a text field would then have to know.
-5. **The Tab key leaves the field**, as in every textarea. Rejected: Tab inserts spaces, which traps a keyboard user unless they know an escape key, for the sake of code that is nearly always pasted.
+5. **The Tab key leaves the field**, as in every textarea (confirmed 2026-10-12). Rejected: Tab inserts spaces, which traps a keyboard user unless they know an escape key, for the sake of code that is nearly always pasted.
 6. **A limit of 20,000 characters, refused by the server and not cut by the browser.** A `maxlength` cuts a paste silently; a refused save says so and keeps the text.
 7. **What is cached is the coloured tokens, not HTML**, so a theme's template is never inside the cache.
-8. **On a strong section band the code is not coloured.** The band turns the page's colours round; a second set of seven values for it would be fourteen more to keep passing contrast.
-9. **The Copy button is a Stimulus controller of the CMS**, `copy`. Rejected: leaving it to each theme (the spike's `docs--copy`), which makes every theme write the same twenty lines and get the announcement wrong.
+8. **On a strong section band the code is one colour** (confirmed 2026-10-12): not coloured by role. The band turns the page's colours round; a second set of seven values for it would be fourteen more to keep passing contrast.
+9. **The Copy button is a Stimulus controller of the CMS**, `code-copy`. Rejected: leaving it to each theme (the spike's `docs--copy`), which makes every theme write the same twenty lines and get the announcement wrong.
+
+Decided by the controller (2026-10-12, after the approval; not the owner's decisions):
+
+- **The copy script's identifier is `code-copy`**, not `copy`: it names what it copies. The file is `app/javascript/controllers/code_copy_controller.js`, at the top level of `controllers/`, a public controller of the site like `theme` and `password_field`.
+- **The four public strings live in a new `config/locales/public.en.yml`.** That file starts ahead of the roadmap's item on translating the public site (item 7 of "Next"), and the roadmap entry says so.
+- **The block card's caption handling changes only for a type that uses an image**, as §3 proposes. The Image block's existing tests stay green, and one test pins that an Image block's card is unchanged.
+- **The counter of the plain columns is reused for the code field only if it fits without a special case**; otherwise the field gets a small controller of its own in the editor's topic folder (`app/javascript/controllers/admin/editor/`). The plan decides by reading the script.
+- **Language and file name are stacked above the code in the card**, each on its own line, in the order the type declares them. No special row.
 
 ## 1. The type and its storage
 
@@ -77,15 +85,15 @@ The generic block card draws the type; it gains no branch for it.
 `Blocks::CodeComponent` (`app/components/blocks/`), built like `Blocks::ImageComponent`: `initialize(block:, page:)`, reading the block it is handed (a published view on the site, the rows in a preview). Its template:
 
 ```html
-<figure class="content-block content-block--code" data-controller="copy">
+<figure class="content-block content-block--code" data-controller="code-copy">
   <div class="code-head">
     <span class="code-file" id="code-12-file">config/deploy.yml</span>
     <span class="code-language">YAML</span>
-    <button type="button" hidden data-copy-target="button" data-action="copy#copy"
+    <button type="button" hidden data-code-copy-target="button" data-action="code-copy#copy"
             aria-label="Copy code" aria-describedby="code-12-file">Copy</button>
-    <span class="sr-only" role="status" data-copy-target="status"></span>
+    <span class="sr-only" role="status" data-code-copy-target="status"></span>
   </div>
-  <pre tabindex="0" data-copy-target="source"><code>…<span class="syn-keyword">def</span>…</code></pre>
+  <pre tabindex="0" data-code-copy-target="source"><code>…<span class="syn-keyword">def</span>…</code></pre>
   <figcaption>…</figcaption>
 </figure>
 ```
@@ -93,8 +101,8 @@ The generic block card draws the type; it gains no branch for it.
 - The head is always drawn, since it holds the button; file name and language are each left out when blank, and `aria-describedby` with the file name. The caption is the translated one, with fallback, and left out when blank.
 - **Escaping.** The template prints each token's text through ERB's own escaping and wraps it with `tag.span`; nothing in the component or in `CodeHighlight` calls `html_safe` or `raw`, and Rouge's HTML formatters are not used. The code can therefore add no element and no attribute. The file name and caption are escaped text too.
 - **Long lines scroll** inside the `<pre>` (`overflow-x: auto`, `white-space: pre`), which is focusable so a keyboard can scroll it. The page never scrolls sideways, in a column of a section as at full width: the figure has `min-width: 0`.
-- **Copy** (`app/javascript/controllers/copy_controller.js`, identifier `copy`, registered with the public site's controllers). The button is `hidden` in the markup and shown on `connect` when `navigator.clipboard` exists, so nobody sees a button that does nothing. A press writes the `source` target's `textContent` (the code exactly as stored, no markup), sets the button's text and the status region to "Copied" for two seconds, or to "Not copied" when the browser refuses. Its words come from the server as values (`data-copy-copied-value`, `data-copy-failed-value`).
-- **Public strings** ("Copy", "Copy code", "Copied", "Not copied") are keys under `public.blocks.code` in a new `config/locales/public.en.yml`, read in the visitor's language with English as the fallback. The public site's other strings are still literals; these four start the file roadmap item 7 will fill.
+- **Copy** (`app/javascript/controllers/code_copy_controller.js`, identifier `code-copy`, registered with the public site's controllers). The button is `hidden` in the markup and shown on `connect` when `navigator.clipboard` exists, so nobody sees a button that does nothing. A press writes the `source` target's `textContent` (the code exactly as stored, no markup), sets the button's text and the status region to "Copied" for two seconds, or to "Not copied" when the browser refuses. Its words come from the server as values (`data-code-copy-copied-value`, `data-code-copy-failed-value`).
+- **Public strings** ("Copy", "Copy code", "Copied", "Not copied") are keys under `public.blocks.code` in a new `config/locales/public.en.yml`, read in the visitor's language with English as the fallback. The public site's other strings are still literals; these four start the file ahead of roadmap item 7, which will fill it, and the roadmap entry says so.
 - **Styles** are `app/assets/tailwind/themes/default/code.css`, imported by `theme.css`: plain rules on tokens, because the span classes are built from role names and no utility scan would find them. Background `--th-sunken`, text `--th-ink`, border `--th-line`, face `--th-mono`.
 
 ## 5. The seven roles and their tokens
@@ -111,9 +119,9 @@ The generic block card draws the type; it gains no branch for it.
 
 The values are the documentation design's, with the chroma of two light ones lowered into sRGB. Computed against `--th-sunken` (and `--th-surface`, which a tinted band puts behind the code) the lowest is the comment: 5.7 to 1 light, 5.5 to 1 dark; a test computes all 28 pairs and fails under 4.5. On a strong band `sections.css` sets the seven to `--th-on-band-strong`, the comment to its dim (decision 8).
 
-**The contract's two entries.** Among the replaceable components: `Blocks::CodeComponent`, template `components/blocks/code_component.html.erb`, receiving `block`, `page`, `lines`, `code`, `language` (the tag), `language_label`, `filename`, `caption`, each safe for an empty block. Among the tokens: the seven names above. With the component's entry the reference describes the `copy` controller's markup (the identifier, the targets `button`, `source` and `status`, the action, the two values), since a replaced template has to write it.
+**The contract's two entries.** Among the replaceable components: `Blocks::CodeComponent`, template `components/blocks/code_component.html.erb`, receiving `block`, `page`, `lines`, `code`, `language` (the tag), `language_label`, `filename`, `caption`, each safe for an empty block. Among the tokens: the seven names above. With the component's entry the reference describes the `code-copy` controller's markup (the identifier, the targets `button`, `source` and `status`, the action, the two values), since a replaced template has to write it.
 
-**The documentation theme** keeps its values and its classes. `--th-syn-attr` becomes `--th-syn-attribute`; the other six names are the same and stop being the theme's own invention. Its template reads `lines` instead of `helpers.highlighted_lines`, its `docs--copy` controller is deleted for the CMS's `copy`, and `--th-note-line` stays the theme's until a Note block exists.
+**The documentation theme** keeps its values and its classes. `--th-syn-attr` becomes `--th-syn-attribute`; the other six names are the same and stop being the theme's own invention. Its template reads `lines` instead of `helpers.highlighted_lines`, its `docs--copy` controller is deleted for the CMS's `code-copy`, and `--th-note-line` stays the theme's until a Note block exists.
 
 ## 6. MCP and Markdown
 
@@ -139,10 +147,10 @@ Built and tested the way the Image and Rich text blocks are.
 - `ContentModel::FieldSet`: `:code` keeps indentation, normalises line endings, drops blank outer lines, refuses 20,001 characters, refuses `translated: true`.
 - `test/components/blocks/code_component_test.rb`: the markup above; nothing drawn for an empty block; a head without file name or language; a source of `</code><script>` and `<%= %>` is text in the output and the document holds one `pre`; the caption in the visitor's language with fallback. A Lookbook preview beside the other blocks'.
 - Card and fields (`test/components/admin/`): the textarea's attributes, the shared fields on a translation tab, the caption without the override, the tile's summary; `held_fields_test.rb` gains the code field.
-- Integration (`test/integration/blocks_test.rb`, `public_blocks_test.rb`): add, save, refuse over the limit with nothing written, duplicate, delete; in a column of a section; the stale 409 and the claim as for any block. `public_canary_test.rb` gains a Code block: code overwritten on the rows reaches no visitor until published. `public_javascript_test.rb`: the `copy` controller is on a public page and no admin script is.
+- Integration (`test/integration/blocks_test.rb`, `public_blocks_test.rb`): add, save, refuse over the limit with nothing written, duplicate, delete; in a column of a section; the stale 409 and the claim as for any block. `public_canary_test.rb` gains a Code block: code overwritten on the rows reaches no visitor until published. `public_javascript_test.rb`: the `code-copy` controller is on a public page and no admin script is.
 - System: type into the card, autosave, reload, the indentation is there; a second session sees it read-only. Public: the button is hidden without a clipboard and shown with one, a press puts the stored code on the clipboard and the status says "Copied"; a 300-character line scrolls in the block and the page has no horizontal scroll.
 - Contract: the seven tokens are in `tokens.css` for light and dark and in `Theme::Contract`; the contrast test; the fixture theme `plain` replaces the Code template in one test and leaves it in the others.
 
 ## Documentation
 
-Guide, in `contentspiel-docs` (no guide text here). **New, integrators: "How to add a block type"** (the owner, 2026-10-12: "a great topic to document"): a walk-through that follows this block as it was really built, step by step (the declaration, its fields and where they are stored, the component and its template, the editor card, what is translated, the published copy, the tokens, the tests), written from the finished pull request so it cannot describe steps nobody took. Editors: `pages/build-a-page-with-blocks` (a fifth block type, its fields, the limit, what is translated), `pages/arrange-blocks-in-sections` (one sentence: it works in a column), `pages/the-rich-text-editor` (when to use which code), `translating` (the code is shared, the caption is not). Integrators: `theming/the-token-contract` (seven tokens), `theming/rendering-blocks-and-pages` and the block and template reference (the component's entry, the `copy` markup). In this repository: `docs/reference/content-blocks-and-types.md` (the type, the `:code` field), `docs/reference/theming.md` (the two entries), `docs/reference/i18n.md` (the public file), `CLAUDE.md` (the block-type list in "What This Repo Is" stays general; nothing to add unless a rule appears while building).
+Guide, in `contentspiel-docs` (no guide text here). **New, integrators: "How to add a block type"** (the owner, 2026-10-12: "a great topic to document"): a walk-through that follows this block as it was really built, step by step (the declaration, its fields and where they are stored, the component and its template, the editor card, what is translated, the published copy, the tokens, the tests), written from the finished pull request so it cannot describe steps nobody took. Editors: `pages/build-a-page-with-blocks` (a fifth block type, its fields, the limit, what is translated), `pages/arrange-blocks-in-sections` (one sentence: it works in a column), `pages/the-rich-text-editor` (when to use which code), `translating` (the code is shared, the caption is not). Integrators: `theming/the-token-contract` (seven tokens), `theming/rendering-blocks-and-pages` and the block and template reference (the component's entry, the `code-copy` markup). In this repository: `docs/reference/content-blocks-and-types.md` (the type, the `:code` field), `docs/reference/theming.md` (the two entries), `docs/reference/i18n.md` (the public file), `CLAUDE.md` (the block-type list in "What This Repo Is" stays general; nothing to add unless a rule appears while building).
