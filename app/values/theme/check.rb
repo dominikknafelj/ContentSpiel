@@ -121,34 +121,49 @@ class Theme
     end
     LANGUAGE = /\bhreflang\b/i
     ALTERNATE = said.("rel", "alternate")
-    # A `<link>` written out, up to its own `>`: the `>` that closes an ERB
-    # tag inside it (`href="<%= url %>"`) is not its end.
-    LINK_TAG = /<link\b(?:[^>]|(?<=%)>)*>/im
-    # A `<link>` built by a helper, inside one ERB tag.
-    LINK_HELPER = /<%(?:(?!%>).)*?(?:\btag\s*\.\s*link\b|\b(?:tag|content_tag)\s*\(?\s*[:"']link\b)(?:(?!%>).)*%>/m
 
+    # WHERE A TAG CAN BE, AND NOWHERE ELSE. The words of a head tag
+    # (`rel="canonical"`, `og:url`, `csrf-token`) are also what a template
+    # SAYS: in a sentence, in a code sample, in a link's text, in a comment.
+    # The first site with a theme documents this CMS, and a check that
+    # stops its boot for a sentence about `og:url`, with "prints the og:url
+    # tag: delete it", is wrong about what is there. So a tag's attributes
+    # are asked only of a tag (`markup_of`):
+    # - a `<link>`, `<meta>` or `<script>` written out in the template's
+    #   text, up to its own `>`, outside an HTML comment. An ERB tag inside
+    #   it (`href="<%= url %>"`) is a blank there, so its `>` is not the
+    #   tag's end;
+    # - one built by a helper, inside one ERB tag: `tag.link`, `tag.meta`,
+    #   `tag.script`, `tag(:link, …)`, `content_tag("meta", …)`,
+    #   `javascript_tag`. Known by the tag's CODE (`code_of`), read WITH its
+    #   strings, since the value is one (`rel: "canonical"`).
+    # A helper's name (`csp_meta_tag`, `csrf_meta_tags`) is asked of each ERB
+    # tag's code, as `FORM` is: not of a comment, not of a string's words.
+    LITERAL_TAG = /<(?:link|meta|script)\b[^>]*>/im
+    TAG_HELPER = /\btag\s*\.\s*(?:link|meta|script)\b|\b(?:tag|content_tag)\s*\(?\s*(?::(?:link|meta|script)\b|["'])|\bjavascript_tag\b/
+    TAG_HELPER_NAMED = /\btag\s*\.\s*(?:link|meta|script)\b|\b(?:tag|content_tag)\s*\(?\s*[:"'](?:link|meta|script)\b|\bjavascript_tag\b/
+
+    # The tags the layout writes into <head> for every public page (spec §2:
+    # "a theme cannot remove or replace one of them"), each with how a
+    # template would write one: the helper's name, asked of a tag's code,
+    # and the attribute that makes the tag what it is, asked of each tag
+    # written out or built by a helper (the comment above). A second one
+    # from a theme contradicts the CMS's (two canonical links, two
+    # policies), so no template of a theme prints one, wherever it is: a
+    # partial is rendered from anywhere.
+    #
     # A language link is a `<link>` with `rel="alternate"` AND `hreflang`.
     # Not the pair on an `<a>`: `link_to name, path, hreflang: code, rel:
     # "alternate"` is how a language switcher in the page is written, and it
     # is the theme's. Not a feed's `<link rel="alternate">` either.
-    language_link = lambda do |code|
-      (code.scan(LINK_TAG) + code.scan(LINK_HELPER)).any? { |link| link.match?(ALTERNATE) && link.match?(LANGUAGE) }
-    end
-
-    # The tags the layout writes into <head> for every public page (spec §2:
-    # "a theme cannot remove or replace one of them"), each with how a
-    # template would write one: the helper's name and the literal tag. A
-    # second one from a theme contradicts the CMS's (two canonical links,
-    # two policies), so no template of a theme prints one, wherever it is:
-    # a partial is rendered from anywhere. Each value answers `===` for a
-    # template's source.
     CMS_HEAD = {
-      "a canonical link" => said.("rel", "canonical"),
-      "a language link (rel=\"alternate\" with hreflang)" => language_link,
-      "the og:url tag" => /\bog:url\b/i,
-      "the content security policy's tag" => /\bcsp_meta_tag\b|\bcsp-nonce\b|Content-Security-Policy/i,
-      "the import map" => /\bjavascript_importmap_tags\b|\bjavascript_inline_importmap_tag\b|#{said.("type", "importmap")}/i,
-      "a stylesheet link" => /\bstylesheet_link_tag\b|#{said.("rel", "stylesheet")}/i
+      "a canonical link" => [ nil, said.("rel", "canonical") ],
+      "a language link (rel=\"alternate\" with hreflang)" => [ nil, ->(tag) { tag.match?(ALTERNATE) && tag.match?(LANGUAGE) } ],
+      "the og:url tag" => [ nil, said.("(?:property|name)", "og:url") ],
+      "the content security policy's tag" =>
+        [ /\bcsp_meta_tag\b/, Regexp.union(said.("name", "csp-nonce"), said.("http[-_]equiv", "Content-Security-Policy")) ],
+      "the import map" => [ /\bjavascript_importmap_tags\b|\bjavascript_inline_importmap_tag\b/, said.("type", "importmap") ],
+      "a stylesheet link" => [ /\bstylesheet_link_tag\b/, said.("rel", "stylesheet") ]
     }.freeze
 
     # No CSRF token on a public page is the CMS's decision "and not a tag"
@@ -156,10 +171,13 @@ class Theme
     # Rails reads the session to mint it and so sets a cookie on a response
     # that is publicly cacheable. `PublicController` is the wall (it mints
     # none, commits no session and lets no cookie leave, whatever a template
-    # calls); this is the sentence that tells an author why their tag prints nothing. (In the
-    # test environment forgery protection is off, so no rendering test
-    # would notice without switching it on.)
-    CSRF = /\bcsrf_meta_tags?\b|\bcsrf-(?:token|param)\b|\bform_authenticity_token\b/
+    # calls); this is the sentence that tells an author why their tag prints
+    # nothing. (In the test environment forgery protection is off, so no
+    # rendering test would notice without switching it on.) The helpers by
+    # name in a tag's code, the tag itself by its `name` (the comment above
+    # `LITERAL_TAG`).
+    CSRF = /\bcsrf_meta_tags?\b|\bform_authenticity_token\b/
+    CSRF_TAG = said.("name", "csrf-(?:token|param)")
 
     # A form that is sent with a token: `form_with`, `form_tag`, `form_for`
     # and `button_to`, unless the same ERB tag says `method: :get` (a search
@@ -255,8 +273,12 @@ class Theme
     RAILS_CACHE = /\bRails\s*\.\s*cache\b/
 
     # A write to the slot the CMS's head once read. The layout reads none
-    # now, so the tag would be lost without a word.
+    # now, so the tag would be lost without a word. The slot's name is a
+    # symbol or a string, so a tag is asked twice: its code for the call
+    # (`link_to "content_for :head", …` is none), and the same tag with its
+    # strings for the name (`says?`).
     HEAD_SLOT = /\b(?:content_for|provide)\s*\(?\s*[:"']head\b/
+    SLOT_CALL = /\b(?:content_for|provide)\s*\(?\s*(?::head\b|["'])/
 
     module_function
 
@@ -364,20 +386,22 @@ class Theme
     end
 
     # What a template's source says that no page can be drawn with, or that
-    # is the CMS's to write. Comments are not read: a template may say in
-    # one what it does not do.
+    # is the CMS's to write. Code and markup are read, and nothing else: not
+    # a comment (ERB's, Ruby's or HTML's), not the words of a string, not
+    # the template's text. A template may say what it does not do.
     def written(file, source)
       code = source.gsub(/<%#.*?%>/m, "")
       # The Ruby of the template, tag by tag (`TAG`), each read by itself:
       # `<%= @page %>` followed by `<%= x %>` is not `@page = x`.
       tags = code.scan(TAG).flatten
-      found = CMS_HEAD.filter_map do |tag, pattern|
-        next unless pattern === code
+      markup = markup_of(code, tags)
+      found = CMS_HEAD.filter_map do |tag, (helper, attribute)|
+        next unless (helper && tags.any? { |ruby| reads?(ruby, helper) }) || markup.any? { |piece| attribute === piece }
 
         "#{file} prints #{tag}: that tag is the CMS's own, it is in the head of every public page already, and a second one " \
           "contradicts it. Delete it from the template."
       end
-      if code.match?(CSRF)
+      if tags.any? { |tag| reads?(tag, CSRF) } || markup.any? { |piece| piece.match?(CSRF_TAG) }
         found << "#{file} asks for the CSRF token: a public page is one answer for every visitor and carries none, because asking " \
                  "for the token starts a session and sets a cookie on a page a cache may keep. Delete it from the template."
       end
@@ -397,7 +421,7 @@ class Theme
                  "draw the same template and would share the entry, so a visitor could be served what only an editor may see. " \
                  "Take the cache out and put nothing in its place: a public page is already answered whole by its ETag."
       end
-      if code.match?(HEAD_SLOT)
+      if tags.any? { |tag| says?(tag, SLOT_CALL, HEAD_SLOT) }
         found << "#{file} writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, " \
                  "so the tag would never be printed. Put the tag into #{HEAD}, which is the theme's part of the head."
       end
@@ -415,6 +439,23 @@ class Theme
                  "`page_title` and `site_title`, or delete the file to get the default pattern."
       end
       found
+    end
+
+    # Every tag of a template that can be one of the head's, as text
+    # (`LITERAL_TAG`'s comment): those written out, and each ERB tag that
+    # builds one with a helper, with its strings and without its comments.
+    def markup_of(code, tags)
+      text = code.gsub(/<%(?!%).*?%>/m, " ").gsub(/<!--.*?-->/m, "")
+      text.scan(LITERAL_TAG) + tags.filter_map { |tag| code_of(tag, strings: true) if says?(tag, TAG_HELPER, TAG_HELPER_NAMED) }
+    end
+
+    # Whether a tag's CODE holds `call` and the same tag, read with its
+    # strings, holds `named`: for a call whose argument is a string or a
+    # symbol (`content_for "head"`, `tag("link", …)`). The first keeps a
+    # word in a string from being taken for the call, the second reads the
+    # name the call was given.
+    def says?(tag, call, named)
+      reads?(tag, call) && code_of(tag, strings: true).match?(named)
     end
 
     # `COOKIE_HOLDERS`' comment says what a write is.

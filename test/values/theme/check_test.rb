@@ -407,6 +407,47 @@ class Theme::CheckTest < ActiveSupport::TestCase
     )
   end
 
+  # The check gates a site's boot and its image build, and the first site
+  # with a theme is a documentation site ABOUT this CMS: its templates hold
+  # these words in a sample, a sentence or a comment. Each row was refused
+  # ("prints the og:url tag", "asks for the CSRF token") while the three
+  # patterns were asked of the whole source.
+  test "a head tag's, the token's and the head slot's words are no tag: in a sentence, in a string, in a Ruby or an HTML comment, in an escaped sample" do
+    [ "<p>We set og:url for you.</p>",
+      "<% # no stylesheet_link_tag here %>",
+      '<%= link_to "About csrf-token", "/x" %>',
+      '<p>Use rel="canonical" on your pages</p>',
+      "<pre>&lt;%= csrf_meta_tags %&gt;</pre>",
+      "<!-- <link rel=\"canonical\" href=\"/\"> and <meta name=\"csrf-token\"> are the CMS's -->",
+      "<% # csp_meta_tag, javascript_importmap_tags, csrf_meta_tags, form_authenticity_token, content_for :head %>",
+      '<%= link_to "csp_meta_tag and javascript_importmap_tags", "/stylesheet_link_tag" %>',
+      '<%= tag.p "content_for :head, rel: canonical, og:url and type=\"importmap\"" %>',
+      "<p>The Content-Security-Policy, the csp-nonce and type=\"importmap\" are set for you; hreflang and rel=\"alternate\" too.</p>",
+      '<code>content_for :head</code> <code>provide :head</code> <code>rel="stylesheet"</code>',
+      '<a rel="canonical" href="/x">not a link tag</a><%= tag.a "x", rel: "stylesheet", href: "/x" %>',
+      '<% render "theme/x", title: "csrf_meta_tags" %>' ].each do |markup|
+      assert_empty problems_with("views/theme/_x.html.erb" => "#{markup}\n"), markup
+    end
+  end
+
+  test "a real tag beside its word in a comment is still refused, once, and a tag built by a helper is read with its strings" do
+    {
+      "<%# no canonical link here %>\n<link rel=\"canonical\" href=\"/\">" => "prints a canonical link",
+      "<% # the og:url tag %>\n<%= tag.meta property: \"og:url\", content: \"/\" %>" => "prints the og:url tag",
+      "<%= tag(:meta, name: \"csrf-token\", content: \"x\") %>" => "asks for the CSRF token",
+      "<%= content_tag(\"link\", nil, rel: \"stylesheet\", href: \"/x.css\") %>" => "prints a stylesheet link",
+      "<p>rel=\"canonical\"</p>\n<%= csrf_meta_tags # as every layout has %>" => "asks for the CSRF token",
+      "<link\n  rel=\"canonical\"\n  href=\"<%= url %>\">" => "prints a canonical link",
+      "<%= javascript_inline_importmap_tag %>" => "prints the import map",
+      "<% provide(\"head\", \"x\") %>" => "writes to the head's slot"
+    }.each do |markup, said|
+      problems = problems_with("views/theme/_x.html.erb" => "#{markup}\n")
+
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_x.html.erb #{said}"
+    end
+  end
+
   # The layout is rendered after the page template, in the same view, and
   # reads @page, @post and @preview_record for the title and the head.
   test "a template that assigns an instance variable is refused, however it is written" do
