@@ -24,6 +24,7 @@ Bundler.require(*Rails.groups)
 
 # lib/ is not autoloaded; the site's address is read at boot.
 require_relative "../lib/site_address"
+require_relative "../lib/host_settings"
 
 module ContentSpiel
   class Application < Rails::Application
@@ -88,6 +89,31 @@ module ContentSpiel
     # payload (written around the model) is an error, never read as
     # plaintext.
     config.active_record.encryption.support_unencrypted_data = false
+
+    # Production says at boot which address it serves, and stops without
+    # SECRET_KEY_BASE with a message of its own (lib/host_settings.rb).
+    #
+    # Where it runs matters. Rails raises its own error, the one that points
+    # at `bin/rails credentials:edit`, the first time `secret_key_base` is
+    # read; in this app that is Active Record's `generated_token_verifier` in
+    # an `after_initialize` block, but any initializer, gem or eagerly loaded
+    # class that asks for a key generator or a message verifier earlier would
+    # move it. So the check is placed among Rails' bootstrap initializers:
+    # after the logger exists (the environment file, which sets the logger
+    # and parses PUBLIC_HOST, is loaded before that) and before every
+    # railtie's and every `config/initializers` file's turn. `after:` alone
+    # would not do it: an application's own initializers run after all the
+    # engines' unless a `before:` pulls them forward.
+    #
+    # `SECRET_KEY_BASE_DUMMY` is the Dockerfile's asset precompilation, which
+    # has no secret and needs none; Rails asks only whether it is set, and so
+    # does this.
+    initializer "content_spiel.host_announcement", after: :initialize_logger, before: :initialize_cache do
+      if Rails.env.production?
+        HostSettings.require_secret!(ENV) unless ENV["SECRET_KEY_BASE_DUMMY"]
+        Rails.logger.info HostSettings.announcement(SiteAddress.current)
+      end
+    end
 
     # Configuration for the application, engines, and railties goes here.
     #
