@@ -23,46 +23,23 @@ module Publishing
       return denied(key, @record) unless authorize!(key, @record)
 
       version = nil
-      lost = []
       @record.class.transaction(requires_new: true) do
         # The page's row first, as every write that reads its blocks does.
         lock_owner(@record)
         next if @record.class.where(id: @record.id).pick(:published_at).nil?
 
         now = Time.current
-        live_at = @at || Publishing.pending(@record, now: now)&.live_at || now
-        # A change with a time moves no address until that time, when nobody
-        # can be refused any more. So it is asked now, of the site as it is
-        # now: taken as if it were published at once, looked at, and rolled
-        # back whatever the answer.
-        lost = lost_if_published(now) if live_at > now
-        next if lost.any?
-
-        version = Version.take!(@record, live_at: live_at, by: actor_user, now: now)
-        # Publishing never leaves a live record without an address
-        # (`KeepsAddresses`): the copy is taken, the addresses have followed
-        # it, and if one had to yield everything here is rolled back.
-        lost = lost_addresses(@record, version.yields)
-        raise ActiveRecord::Rollback if lost.any?
-
+        version = Version.take!(@record, live_at: @at || Publishing.pending(@record, now: now)&.live_at || now, by: actor_user, now: now)
         record_event("#{prefix}.changes_published", subject: @record, coalesce: false,
           metadata: { "number" => version.number, "live_at" => version.live_at.iso8601, "scheduled" => version.live_at > now })
       end
-      return failure(@record, lost) if lost.any?
 
       version ? success(@record) : failure(@record, [ NOT_PUBLISHED ])
+    rescue AddressTaken => e
+      address_taken(@record, e)
     end
 
     private
-
-    def lost_if_published(now)
-      lost = []
-      @record.class.transaction(requires_new: true) do
-        lost = lost_addresses(@record, Version.take!(@record, by: actor_user, now: now).yields)
-        raise ActiveRecord::Rollback
-      end
-      lost
-    end
 
     def prefix = @record.is_a?(Page) ? "page" : "post"
   end

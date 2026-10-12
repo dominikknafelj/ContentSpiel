@@ -453,17 +453,22 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
   # What a refused publish relies on: everything it did is inside the
   # savepoint that is rolled back, and what it would have told the world is
   # deferred to a commit that does not come.
+  def everything_a_publish_writes
+    [ Publishing::Version.order(:id).pluck(:id, :settled_at), Audit::Event.count, PublicSite::Version.current,
+      PublicPath.order(:id).pluck(:id, :record_type, :record_id, :locale, :path, :current, :listed_on_id),
+      Page.order(:id).pluck(:id, :updated_at, :published_at, :subtitle), Post.order(:id).pluck(:id, :updated_at, :published_at),
+      Media::Usage.order(:id).pluck(:id), Translations::State.order(:id).pluck(:id, :updated_at) ]
+  end
+
   def assert_nothing_happened
-    before = [ Publishing::Version.order(:id).pluck(:id, :settled_at), Audit::Event.count, PublicSite::Version.current,
-               PublicPath.order(:id).pluck(:id, :record_type, :record_id, :locale, :path, :current, :listed_on_id) ]
+    before = everything_a_publish_writes
     announced = []
     subscription = ActiveSupport::Notifications.subscribe("public_paths.changed") { |*, payload| announced << payload }
     signals = []
     with_singleton_override(Live::Signals, :later, ->(*arguments, **options) { signals << [ arguments, options ] }) { yield }
 
-    assert_equal before, [ Publishing::Version.order(:id).pluck(:id, :settled_at), Audit::Event.count, PublicSite::Version.current,
-                           PublicPath.order(:id).pluck(:id, :record_type, :record_id, :locale, :path, :current, :listed_on_id) ],
-      "copies, audit events, the content version and public_paths, in that order"
+    assert_equal before, everything_a_publish_writes,
+      "copies, audit events, the content version, public_paths, the pages' and posts' own rows, media usages and translation states, in that order"
     assert_empty announced, "an address change was announced"
     assert_empty signals, "a live signal was sent"
   ensure
@@ -508,7 +513,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_nil Publishing.pending(topic)
   end
 
-  test "a scheduled change that is free is asked as if now, rolled back, and taken with its time: one copy, one event, no address moved yet" do
+  test "a scheduled change that is free is asked as of its time, the answer rolled back, and taken once: one copy, one event, no address moved yet" do
     listing_page("Blog")
     Tag.create!(name: "topic")
     topic = create_page(title: "Topic")
@@ -525,7 +530,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal copies + 1, Publishing::Version.of(topic).count
     assert_equal events + 1, Audit::Event.where(action: "page.changes_published").count
     pending = Publishing.pending(topic)
-    assert_equal [ numbers + 1, nil ], [ pending.number, pending.settled_at ], "the number the trial took was given back with it"
+    assert_equal [ numbers + 1, nil ], [ pending.number, pending.settled_at ], "taken once, with its number"
     assert_equal addresses, PublicPath.order(:id).pluck(:id, :path, :current)
     assert_equal "/blog/hello", path_of(post.reload)
   end
@@ -546,6 +551,98 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
     assert_nil topic.reload.published_at
     assert_equal "/blog/hello", path_of(post.reload)
+  end
+
+  # I1 of the review: the two other doors of `Pages::Save`. A page that is
+  # SCHEDULED takes nobody's address yet; it would when its time comes, and
+  # then nobody could be refused. So the copy is asked as of the moment it
+  # will show (`Publishing::Version.take!`).
+  def draft_topic_about_to_take_hello
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = create_page(title: "Topic", published: false)
+    create_page(title: "Hello", parent: topic, published: false)
+    post = create_post(title: "Hello", tags: %w[topic])
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
+    assert_equal "/blog/hello", path_of(post), "a draft list loses to a live one"
+    [ topic, post ]
+  end
+
+  test "scheduling a draft page whose list would take a live post's address away when its time comes is refused, and nothing is written" do
+    topic, post = draft_topic_about_to_take_hello
+
+    result = nil
+    assert_nothing_happened do
+      result = Pages::Save.call(topic.reload, attributes: { published_at: 1.hour.from_now }, translations: { "en" => { subtitle: "Sent with it" } })
+    end
+
+    assert_not result.ok?
+    assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
+    assert_nil topic.reload.published_at
+    travel_to(2.hours.from_now) { PublicSite::Paths.refresh }
+    assert_equal "/blog/hello", path_of(post.reload)
+  end
+
+  test "a page that cannot be scheduled for that reason cannot be published through the schedule either: the header's Publish on it is refused the same way" do
+    topic, post = draft_topic_about_to_take_hello
+
+    assert_not Pages::Save.call(topic.reload, attributes: { published_at: 1.day.from_now }).ok?, "the review's sequence ends here: it is never scheduled"
+    result = Pages::Save.call(topic.reload, attributes: { published: true })
+
+    assert_not result.ok?
+    assert_equal "/blog/hello", path_of(post.reload)
+    get "/blog/hello"
+    assert_response :success
+  end
+
+  # What is left to the clock, and said: a clash that arises AFTER a page was
+  # scheduled. Its copy is asked when it is taken; "Publish" on a scheduled
+  # page takes no copy (it changes the time only), so it is the clock's case
+  # a little earlier: the post yields and the clash is reported.
+  test "a clash that arose after a page was scheduled is not refused when the page is then published now: the post yields and the clash is reported, as the clock would" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = create_page(title: "Topic", published: false)
+    post = create_post(title: "Hello", tags: %w[topic])
+    ContentBlocks::Save.call(ContentBlock.new(owner: topic), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "topic" } })
+    assert Pages::Save.call(topic.reload, attributes: { published_at: 1.day.from_now }).ok?, "free when it is scheduled"
+    create_page(title: "Hello", parent: topic)
+    reports = []
+    subscriber = Rails.error.subscribe(Class.new { define_method(:report) { |error, context:, **| reports << [ error.class, context ] } }.new)
+
+    assert Pages::Save.call(topic.reload, attributes: { published: true }).ok?
+
+    assert_nil path_of(post.reload)
+    assert_equal [ Publishing::AddressTaken ], reports.map(&:first)
+    assert_includes reports.sole.last[:yielded], { record_type: "Post", record_id: post.id, locale: "en", wanted: "/topic/hello" }
+  ensure
+    Rails.error.unsubscribe(subscriber) if subscriber
+  end
+
+  test "a page with a live post that already stands without an address under it cannot publish changes until the clash is resolved" do
+    listing_page("Blog")
+    Tag.create!(name: "topic")
+    topic = listing_page("Topic", tag: "topic")
+    late = create_post(title: "Hello")
+    assert Posts::Save.call(late, attributes: { tag_names: %w[topic] }).ok?
+    publish_changes(late, at: 1.hour.from_now)
+    holder = create_page(title: "Hello", parent: topic)
+
+    travel_to 2.hours.from_now do
+      PublicSite::Paths.refresh
+      assert_nil path_of(late.reload), "the clock's clash"
+      assert Pages::Save.call(topic.reload, translations: { "en" => { subtitle: "Typed" } }).ok?
+
+      result = Publishing::PublishChanges.call(topic.reload)
+      assert_not result.ok?
+      assert_equal [ "The post “Hello” would get the address /topic/hello, which is already taken in EN, DE, and ES" ], result.errors
+
+      renamed = Pages::Save.call(holder.reload, translations: Locales.enabled.index_with { { slug: "hello-page" } })
+      assert renamed.ok?, renamed.errors.to_sentence
+      assert_equal "/topic/hello", path_of(late.reload), "the holder moved away and the post has its address"
+      published = Publishing::PublishChanges.call(topic.reload)
+      assert published.ok?, published.errors.to_sentence
+    end
   end
 
   test "a publish answers for itself only: another record's scheduled change that came into force onto a taken address does not refuse it" do
@@ -875,7 +972,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     assert_equal 1, reports.size, reports.inspect
     error, handled, context = reports.sole
-    assert_equal [ PublicSite::Paths::AddressTaken, true ], [ error, handled ]
+    assert_equal [ Publishing::AddressTaken, true ], [ error, handled ]
     assert_equal [ Publishing::Version.of(post).order(:number).last.id ], context[:copies]
     assert_includes context[:yielded], { record_type: "Post", record_id: post.id, locale: "en", wanted: "/topic/hello" }
     assert_not_includes context.to_s, "Hello", "an address and ids, never content"

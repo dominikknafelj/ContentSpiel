@@ -136,9 +136,9 @@ module HasPublicPaths
   # What this cannot see is an address that follows from a PUBLISH: a tag
   # made by the very save that carries it has no id yet, and a published
   # post is judged by its copy's tags, not by the ones about to be
-  # published. Those are refused after the fact, by rolling the publish back
-  # (`Publishing::KeepsAddresses`); this stays the check that marks the slug
-  # field before anything is written.
+  # published. Those are refused when the copy is taken, which rolls the
+  # publish back (`Publishing::AddressTaken`); this stays the check that
+  # marks the slug field before anything is written.
   def public_paths_are_available
     return unless url_inputs_changed?
 

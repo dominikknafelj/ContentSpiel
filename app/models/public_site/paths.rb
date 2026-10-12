@@ -1,7 +1,11 @@
-# Derives and stores every public URL (spec §5.4). Called from model
-# callbacks (HasPublicPaths) rather than from services on purpose: CS
-# Studio, seeds and fixtures-built data all save through ActiveRecord, and
-# every one of those writes has to leave the URL table correct.
+# Derives and stores every public URL (spec §5.4). Whoever writes something
+# an address depends on calls `refresh` in its own transaction: the models'
+# callbacks for what a save of theirs changes (`HasPublicPaths`,
+# `ContentBlock`, `PostTag`), so that CS Studio, seeds and fixtures-built
+# data, which all save through ActiveRecord, leave the URL table correct;
+# and the few writers that go around the callbacks or decide more than one
+# record (taking a published copy, the three tag services, `Posts::Save` for
+# a draft's new tag, `Locales::Enable`).
 #
 # ONE ENTRY POINT: `refresh`. Whoever writes something an address depends
 # on says what it touched; `rebuild!` is the same function handed
@@ -12,12 +16,10 @@
 module PublicSite
   module Paths
     # One address that differs from what is stored: the record's current row
-    # in `locale` (`row_id` and its path `from`, both nil when it has none)
-    # and the path it should have (`to`, nil for none).
-    Change = Struct.new(:record, :locale, :row_id, :from, :to)
-
-    # Reported, never raised: see `report_clash`.
-    AddressTaken = Class.new(StandardError)
+    # in `locale` (`row_id` and its path `from`, both nil when it has none),
+    # the path it should have (`to`, nil for none) and, for a post, the id of
+    # the page that path runs through (`listed_on`).
+    Change = Struct.new(:record, :locale, :row_id, :from, :to, :listed_on)
 
     module_function
 
@@ -83,9 +85,9 @@ module PublicSite
     # branch `Trash::Move` has just flagged (its members with `update_all`,
     # the root saved last) deletes every member's rows.
     #
-    # The top page is the object the caller holds -- inside its own
-    # `after_save` that is the record as just written -- and everything below
-    # is read from the database.
+    # The top page is read again by `refresh` (by id: inside the page's own
+    # `after_save` that is the row as just written, and a caller's object can
+    # be older than its row), and everything below is read here.
     def sync_subtree(page)
       below = Page.where(<<~SQL.squish, page.id).order(:id).group_by(&:parent_id)
         pages.id IN (
@@ -166,10 +168,12 @@ module PublicSite
     # keeps the winner it had. A touched post is its own address under its
     # canonical page, and nothing else.
     #
-    # Not healed here, a known interim: a post that yielded to another POST
-    # which then moves away (a post's touch looks at that post only), a post
-    # that yielded in one language while it has an address in another, and
-    # the pages below a page that yielded.
+    # Not healed here, a known interim, the cases in which `public_paths` can
+    # differ from a rebuild: a post that yielded to another POST which then
+    # moves away (a post's touch looks at that post only; the next touch of
+    # any page heals it), a post that yielded in one language while it has
+    # an address in another, a PAGE that yielded, and the pages below it.
+    # `refresh(everything: true)` heals each.
     #
     # Locks: none on a page, post or block row. The callers hold what the
     # code base's order asks for (a save its own row, a block service the
@@ -232,7 +236,7 @@ module PublicSite
 
     # A copy came into force BY THE CLOCK and a record had to yield for it.
     # Nobody asked for that write, so nobody can be refused (a publish that
-    # would do it is: `Publishing::KeepsAddresses`); the yielder has no
+    # would do it is, when its copy is taken); the yielder has no
     # address until someone resolves the clash, and the person running the
     # site is told: once, because a copy is settled once, after the commit,
     # with the copies, the records and the addresses they wanted and nothing
@@ -242,7 +246,7 @@ module PublicSite
       context = { copies: due.map(&:first),
                   yielded: yields.map { |change| { record_type: change.record.class.polymorphic_name, record_id: change.record.id, locale: change.locale, wanted: change.to } } }
       ActiveRecord.after_all_transactions_commit do
-        Rails.error.report(AddressTaken.new("a scheduled change came into force and a record had to yield its address"), handled: true, context: context)
+        Rails.error.report(Publishing::AddressTaken.new(yields), handled: true, context: context)
       end
     end
 
@@ -598,7 +602,7 @@ module PublicSite
       return [] if records.empty?
 
       stored ||= current_rows(records.first.class.polymorphic_name, records.filter_map(&:id))
-      changes = changes_between(desired, stored)
+      changes = changes_between(desired, stored, hosts)
       return [] if changes.empty?
 
       type = records.first.class.polymorphic_name
@@ -633,7 +637,7 @@ module PublicSite
           now = Time.current
           PublicPath.insert_all!(moved.map do |change|
             { record_type: type, record_id: change.record.id, locale: change.locale, path: change.to, current: true,
-              listed_on_id: hosts[change.record]&.id, created_at: now, updated_at: now }
+              listed_on_id: change.listed_on, created_at: now, updated_at: now }
           end)
         end
 
@@ -645,12 +649,12 @@ module PublicSite
     # What differs: one `Change` per record and locale whose path in
     # `desired` is not the one its current row in `stored` holds, in the
     # order of `desired`.
-    def changes_between(desired, stored)
+    def changes_between(desired, stored, hosts = {})
       desired.flat_map do |record, paths|
         type = record.class.polymorphic_name
         paths.filter_map do |locale, path|
           row_id, from = stored[[ type, record.id, locale.to_s ]]
-          Change.new(record, locale.to_s, row_id, from, path) unless from == path
+          Change.new(record, locale.to_s, row_id, from, path, hosts[record]&.id) unless from == path
         end
       end
     end
@@ -665,8 +669,8 @@ module PublicSite
     # validation error first (spec §5.2). A hit here means the refresh was
     # caused by something the validation cannot see:
     # - a PUBLISH, of this record or of a page that lists it. That one is
-    #   refused: the service reads what yielded and rolls back
-    #   (`Publishing::KeepsAddresses`);
+    #   refused: the copy reads what yielded and raises, and the service's
+    #   transaction is rolled back (`take!` of `Publishing::Version`);
     # - a *different* record's write: a post_list block saved or destroyed
     #   on a draft page, a page saved, moved or reordered (including a
     #   cascade into its descendants), a tag added or removed, a language

@@ -783,31 +783,32 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_equal "/writing/blog/hello", current(hello)
       assert_parity "deleting a tag"
 
-      # A name only a page's COPY still filters by. The copy recorded no id
-      # (no such tag when it was taken), so it lists nothing, whatever tag
-      # comes to carry that name afterwards, while the page's rows have moved
-      # on to another name: a rename away from that name, and one onto it,
-      # move nothing.
+      # A tag only a page's COPY still filters by: the copy recorded the
+      # tag's id when it was taken (the tag exists by then, or the copy
+      # would list nothing: see Archive at the top), while the page's rows
+      # have moved on to another name. A rename away from that name, and one
+      # back onto it, change no id and so move nothing.
+      Tag.create!(name: "press")
       press = service_page("Press", published: false)
       press_block = service_listing(press, content_type: "blog", tag: "press")
       ok! Pages::Save.call(press, attributes: { published: true })
       wire = service_post("Wire", tags: %w[press])
-      assert_equal "/writing/blog/wire", current(wire)
+      assert_equal "/press/wire", current(wire)
       ok! ContentBlocks::Save.call(press_block.reload, attributes: { settings: { content_type: "blog", tag: "other" } })
       assert_parity "pointing a live page's listing block at another tag, in its rows"
       ok! Tags::Rename.call(Tag.find_by!(name: "press"), name: "media")
-      assert_equal "/writing/blog/wire", current(wire), "the copy's filter names a tag nobody has any more"
+      assert_equal "/press/wire", current(wire), "the copy holds the tag's id, whatever the tag is called"
       assert_parity "renaming a tag away from a name only a page's copy filters by"
       ok! Tags::Rename.call(Tag.find_by!(name: "media"), name: "press")
-      assert_equal "/writing/blog/wire", current(wire)
+      assert_equal "/press/wire", current(wire)
       assert_parity "renaming a tag onto a name only a page's copy filters by"
 
       # A merge is immediate in the copies too: the id they hold is replaced.
       ok! Tags::Merge.call(Tag.find_by!(name: "press"), into: Tag.create!(name: "newsroom"))
-      assert_equal "/writing/blog/wire", current(wire), "the list and the address are what they were"
+      assert_equal "/press/wire", current(wire), "the list and the address are what they were"
       assert_parity "merging a tag the copies hold"
       publish_changes(wire)
-      assert_equal "/writing/blog/wire", current(wire)
+      assert_equal "/press/wire", current(wire)
       assert_parity "publishing a post after a merge"
       publish_changes(press)
       assert_equal "/writing/blog/wire", current(wire), "the page's rows filter by another tag"
@@ -837,9 +838,9 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       ok! Trash::Purge.call(hello.reload)
       assert_parity "deleting a post for good"
 
-      # A scheduled change in force by the clock and not swept (nothing
-      # sweeps here), then the next publish of the same page: it reads back
-      # past the scheduled copy to the one the addresses still reflect.
+      # A scheduled change in force by the clock and not settled (nothing
+      # sweeps here), then the next publish of the same page: its refresh
+      # settles the due copy first, and the posts the page hosted follow.
       # Last in this test: the clock is moved, and a copy taken under it
       # would be a pending one once it is put back.
       ok! ContentBlocks::Save.call(press_block.reload, attributes: { settings: { content_type: "blog", tag: "newsroom" } })
@@ -1267,7 +1268,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     end
   end
 
-  test "two scheduled changes in a row, neither swept, on a page that had no copy before them: the next publish reads back past both, to what the rows listed" do
+  test "two scheduled changes in a row, neither settled, on a page that had no copy before them: the next publish gives up what the rows listed" do
     page = listing(@root, "Blog", "blog", published_at: 3.days.ago)
     post = Post.create!(content_type: :blog, title: "Hello", published_at: 3.days.ago)
     job = Post.create!(content_type: :resume_entry, title: "Job", published_at: 3.days.ago)

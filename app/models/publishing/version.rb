@@ -58,9 +58,24 @@ module Publishing
     # `live_at` in the past means now. A pending copy is replaced; its number
     # is not given out again.
     #
-    # Answers the copy, which says through `yields` what the addresses did
-    # with it: the changes that had to yield (`PublicSite::Paths.refresh`),
-    # empty for a copy with a time, whose addresses follow when it is due.
+    # THE ONE REFUSAL OF A PUBLISH FOR AN ADDRESS is here, because every
+    # publish and every schedule that shows something new takes a copy.
+    # Publishing never leaves a live record without an address: a post whose
+    # published tags put it under a list where another record holds its
+    # address, and a page whose list blocks take a live post out of the list
+    # it was in and want it at an address a subpage holds. Nobody works that
+    # out beforehand. The copy is taken, the addresses follow it
+    # (`PublicSite::Paths.refresh`, which answers what had to yield), and
+    # when the answer refuses (`lost_to`) this raises
+    # `Publishing::AddressTaken` and the caller's transaction is gone with
+    # the copy in it.
+    #
+    # A copy that DOES NOT SHOW YET moves no address now: one with a time of
+    # its own, and one of a record that is only scheduled. When its moment
+    # comes nobody can be refused any more (the clock's clash is only
+    # reported), so it is asked now AS OF THAT MOMENT: the refresh is run
+    # with that time as its `now`, inside a savepoint that is rolled back
+    # whatever it answers.
     def self.take!(record, live_at: nil, by: nil, now: Time.current)
       transaction do
         row = record.class.lock.find(record.id)
@@ -90,13 +105,47 @@ module Publishing
         # record is only scheduled. A copy with a time changes no address
         # yet. Either is settled by the first refresh after its moment
         # (`settle!`).
-        version.yields = live_at <= now ? PublicSite::Paths.refresh(**{ (row.is_a?(Page) ? :pages : :posts) => [ row ] }, now: now) : []
+        touched = { (row.is_a?(Page) ? :pages : :posts) => [ row ] }
+        shows_at = [ live_at, row.published_at ].compact.max
+        yields = live_at <= now ? PublicSite::Paths.refresh(**touched, now: now) : []
+        yields += foreseen(touched, shows_at) if shows_at > now
+        lost = lost_to(row, yields, shows_at)
+        raise AddressTaken, lost if lost.any?
+
         version
       end
     end
 
-    # What `take!` learned from the addresses; not stored.
-    attr_accessor :yields
+    # What a refresh of these records would answer at `time`, with nothing
+    # of it kept: not the addresses, not the marks of the copies that will
+    # be due by then, not the report of a clash among them.
+    def self.foreseen(touched, time)
+      yields = []
+      transaction(requires_new: true) do
+        yields = PublicSite::Paths.refresh(**touched, now: time)
+        raise ActiveRecord::Rollback
+      end
+      yields
+    end
+
+    # The yields that refuse a copy of `row`: of a post, its own (it would
+    # be public with no address); of a page, those of every record that is
+    # live at `time` and wants its address UNDER that page or a page below
+    # it (`Change#listed_on`), whether it had one before or not. A record
+    # that wants an address elsewhere is not this copy's doing, however the
+    # refresh came to look at it. The consequence, on purpose: while a live
+    # post stands without an address under a page, that page's changes
+    # cannot be published; the sentence names the post and the address.
+    def self.lost_to(row, yields, time)
+      return yields.select { |change| change.record == row } if row.is_a?(Post)
+
+      wanting = yields.select { |change| change.listed_on && change.record.published_at&.<=(time) }
+      return [] if wanting.empty?
+
+      below = Page.hierarchy_class.where(ancestor_id: row.id).pluck(:descendant_id) << row.id
+      wanting.select { |change| below.include?(change.listed_on) }
+    end
+    private_class_method :foreseen, :lost_to
 
     # THE COPIES THAT ARE DUE: showing by the clock and not acted on yet.
     # A copy shows from the later of two moments, its own time (`live_at`)

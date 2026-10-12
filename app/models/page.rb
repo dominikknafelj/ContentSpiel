@@ -253,11 +253,6 @@ class Page < ApplicationRecord
     super
   end
 
-  # What the addresses answered to this page's last save: the changes that
-  # had to yield (`PublicSite::Paths.refresh`). For `Pages::Save`, which
-  # refuses a publish that takes a live record's address away.
-  def address_yields = @address_yields || []
-
   private
 
   def forget_preloaded_branch
@@ -279,7 +274,7 @@ class Page < ApplicationRecord
   # same for every kind of save that gets here: a slug, the publish state, a
   # move, a reorder or the trash.
   def sync_public_paths
-    @address_yields = url_inputs_changed_by_save? ? PublicSite::Paths.refresh(pages: [ self ]) : []
+    PublicSite::Paths.refresh(pages: [ self ]) if url_inputs_changed_by_save?
   end
 
   # Checked per enabled locale, the same granularity
