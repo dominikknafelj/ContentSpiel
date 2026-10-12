@@ -363,6 +363,35 @@ class Theme::CheckTest < ActiveSupport::TestCase
     ERB
   end
 
+  # The reason is shown end to end in `test/integration/theme_pages_test.rb`
+  # ("a fragment a theme's template caches is shared by the preview and the
+  # public page…").
+  test "a template that caches a fragment or asks the application's cache is refused when the application starts, and the message says why and what to do" do
+    [ '<% cache "sidebar" do %>x<% end %>', "<% cache @page do %>x<% end %>", "<% cache([ @page, :tree ]) do %>x<% end %>",
+      "<% cache_if true, @page do %>x<% end %>", '<% cache_unless false, "x" do %>x<% end %>', '<% helpers.cache "x" do %>x<% end %>',
+      '<%= Rails.cache.fetch("tree") { "x" } %>', '<% Rails.cache.write("x", 1) %>', '<%= ::Rails .cache.read("x") %>' ].each do |markup|
+      problems = problems_with("views/theme/_side.html.erb" => "<p>x</p>\n#{markup}\n")
+
+      assert_equal 1, problems.size, "#{markup}: #{problems.inspect}"
+      assert_includes problems.first, "views/theme/_side.html.erb caches what it draws"
+      assert_includes problems.first, "the preview"
+      assert_includes problems.first, "Take the cache out"
+      assert_equal problems, problems_with({ "views/theme/_side.html.erb" => "<p>x</p>\n#{markup}\n" }, deep: true)
+    end
+  end
+
+  test "the word cache is no cache: in text, in a string, in a comment, as a key, as a method of something else, or a variable of the theme's own" do
+    assert_empty problems_with("views/theme/_side.html.erb" => <<~'ERB')
+      <p>We cache nothing here: Rails.cache is not asked.</p>
+      <%= link_to "Clear the cache", "/cache" %>
+      <% # cache "sidebar" do, and Rails.cache.fetch %>
+      <%= tag.div data: { cache: "1" }, class: @page.cache_key %>
+      <%= @page.cache_version %><%= :cache %>
+      <% cache = {} %><%= cache[:x] %>
+      <% [ 1 ].each do |cache_if| %><%= cache_if %><% end %>
+    ERB
+  end
+
   test "the reading is not fooled: a comment, a word in text, a language link in the page, a feed link, another slot" do
     assert_empty problems_with(
       HEAD => "<%# no canonical link, no csrf_meta_tags and no content_for :head here %>\n" \

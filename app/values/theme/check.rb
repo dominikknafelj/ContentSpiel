@@ -236,6 +236,24 @@ class Theme
     ASSIGNED = /\s*(?:\|\||&&|[-+*\/%|&^])?=(?![=~>])/
     COOKIE_CALLS = /\b(?:set|delete)_cookie\b|(?<![.\w@:])reset_session\b/
 
+    # A CACHE OF THE THEME'S OWN: the view's `cache`, `cache_if` and
+    # `cache_unless` around a part of a template, and `Rails.cache` asked
+    # directly. The public page and the preview draw the SAME template of a
+    # theme (`PublicPageRendering#look_in_the_theme_first`), and Rails keys
+    # a fragment by the template's path, its digest and the name it was
+    # given: nothing in the key says which of the two is drawing, and the
+    # preview draws rows nobody has published. A sidebar wrapped in
+    # `cache "sidebar"` is filled by whichever comes first; filled by an
+    # editor's preview, it is served to every visitor until it expires, and
+    # no publish changes it. It is the obvious optimisation and not an
+    # evasion, so it is refused when the application starts, and not only
+    # at the deep depth (`test/integration/theme_pages_test.rb` shows the
+    # leak with a real store: "a fragment a theme's template caches is
+    # shared by the preview and the public page…"). Nothing is lost: a
+    # public page is answered whole by its ETag.
+    CACHES = %w[cache cache_if cache_unless].freeze
+    RAILS_CACHE = /\bRails\s*\.\s*cache\b/
+
     # A write to the slot the CMS's head once read. The layout reads none
     # now, so the tag would be lost without a word.
     HEAD_SLOT = /\b(?:content_for|provide)\s*\(?\s*[:"']head\b/
@@ -374,6 +392,11 @@ class Theme
                  "answer for every visitor and a cache may keep it, so no cookie leaves with it and the write is lost. Take it " \
                  "out of the template; what differs from one visitor to the next is kept in the browser, by a script."
       end
+      if caches?(tags)
+        found << "#{file} caches what it draws (cache, cache_if, cache_unless or Rails.cache): the public page and the preview " \
+                 "draw the same template and would share the entry, so a visitor could be served what only an editor may see. " \
+                 "Take the cache out and put nothing in its place: a public page is already answered whole by its ETag."
+      end
       if code.match?(HEAD_SLOT)
         found << "#{file} writes to the head's slot (content_for :head): the head of a public page is the CMS's and reads no slot, " \
                  "so the tag would never be printed. Put the tag into #{HEAD}, which is the theme's part of the head."
@@ -404,6 +427,15 @@ class Theme
           through = "#{asked_of(name)}(?:\\s*\\.\\s*\\w+)*"
           reads?(tag, /#{through}\s*\[[^\]]*\]#{ASSIGNED}/) || (name == "cookies" && reads?(tag, /#{through}\s*\.\s*delete\b/))
         end
+      end
+    end
+
+    # `CACHES`' comment says why. Not a key (`data: { cache: "1" }`), and
+    # not a name the template bound itself.
+    def caches?(tags)
+      bound = bound_through(tags, CACHES)
+      tags.each_with_index.any? do |tag, index|
+        reads?(tag, RAILS_CACHE) || (CACHES - bound[index]).any? { |name| reads?(tag, /#{asked_of(name)}(?!:(?!:))/) }
       end
     end
 

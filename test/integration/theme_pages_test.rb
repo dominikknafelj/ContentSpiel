@@ -746,6 +746,60 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select "p.plain-crumb a[href='/preview/guide']", text: "Guide"
   end
 
+  # WHY `Theme::Check` REFUSES `cache` IN A THEME'S TEMPLATE. The public page
+  # and the preview draw the SAME template of the theme, and Rails keys a
+  # fragment by the template's path and digest and the name it was given:
+  # nothing in the key says which of the two is drawing. Whichever comes
+  # first fills the entry. Here an editor's preview fills it with a title
+  # that is not published, and the next visitor of the public page is
+  # served it. Caching is off in the test environment, so it is switched on
+  # here with a store of this test's own, as production has it (Solid
+  # Cache); the folder goes through `Theme.new`, which checks nothing.
+  #
+  # This test shows the leak ON PURPOSE and passes while it is there. Should
+  # it fail one day (Rails keying a fragment by the controller, say), the
+  # refusal can be thought about again; until then it is the reason.
+  test "a fragment a theme's template caches is shared by the preview and the public page: an unpublished title reaches a visitor, which is why the check refuses it" do
+    assert Pages::Save.call(@about, translations: { "en" => { title: "About UNPUBLISHED" } }).ok?
+
+    with_theme_copy do |dir|
+      dir.join("views/layouts/public/_frame.html.erb").write(<<~ERB)
+        <main><%= yield %></main>
+        <% cache "footer" do %><p class="cached"><%= translated(@page, :title) if @page %></p><% end %>
+      ERB
+
+      with_caching do
+        Theme.with(Theme.new(path: dir)) do
+          get "/about"
+          assert_select "p.cached", text: "About"
+        end
+      end
+
+      with_caching do
+        Theme.with(Theme.new(path: dir)) do
+          sign_in_as users(:one)
+          get "/preview/about"
+          assert_select "p.cached", text: "About UNPUBLISHED"
+
+          delete admin_sign_out_path
+          get "/about"
+          assert_response :success
+          assert_equal "max-age=0, public, must-revalidate", response.headers["Cache-Control"]
+          assert_select "p.cached", { text: "About UNPUBLISHED" }, "the leak is gone: read the comment above this test"
+        end
+      end
+    end
+  end
+
+  def with_caching
+    before = [ ActionController::Base.perform_caching, ActionController::Base.cache_store ]
+    ActionController::Base.perform_caching = true
+    ActionController::Base.cache_store = ActiveSupport::Cache::MemoryStore.new
+    yield
+  ensure
+    ActionController::Base.perform_caching, ActionController::Base.cache_store = before
+  end
+
   # The tree on a page is other pages' titles: the page's ETag must move when
   # one of them is published, or a visitor's cached page keeps the old tree.
   test "a page a visitor has is asked for again when another page of its tree is published under a new title" do
