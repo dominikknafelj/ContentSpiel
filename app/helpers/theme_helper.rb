@@ -25,8 +25,16 @@ module ThemeHelper
     @theme_root_page = Page.find_by(parent_id: nil)
   end
 
+  # Other records a page shows by their title, as a visitor sees them: each
+  # as published (`Publishing.published_all`, one statement per record type).
+  # The preview shows the rows. The CALLER narrows first, on the rows
+  # (`kept.published`): whether a record is shown at all is not in a copy.
+  def published_views(records)
+    public_urls.preview? ? records.to_a : Publishing.published_all(records)
+  end
+
   def navigation_pages
-    theme_root_page ? theme_root_page.children.kept.published.to_a : []
+    theme_root_page ? published_views(theme_root_page.children.kept.published) : []
   end
 
   def home_url_path

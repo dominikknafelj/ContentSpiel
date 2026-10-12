@@ -32,6 +32,11 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal %(COALESCE(LOWER("pages"."content_type"), '')), sql(SqlNodes.coalesce(@pages[:content_type].lower, ""))
   end
 
+  test "array_contains is the @> operator on an integer array" do
+    assert_equal %("published_versions"."tag_ids" @> CAST('{7}' AS integer[])), sql(SqlNodes.array_contains(Arel::Table.new(:published_versions)[:tag_ids], [ 7 ]))
+    assert_raises(ArgumentError) { SqlNodes.array_contains(@pages[:id], [ "7}'; --" ]) }
+  end
+
   test "cast names the type" do
     assert_equal %(CAST("pages"."title" AS text)), sql(SqlNodes.cast(@pages[:title], "text"))
     assert_equal "CAST('{}' AS jsonb)", sql(SqlNodes.cast("{}", "jsonb"))

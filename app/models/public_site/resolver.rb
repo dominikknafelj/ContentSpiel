@@ -67,11 +67,23 @@ module PublicSite
       page_row = PublicPath.current.find_by(record_type: "Page", locale: locale.to_s, path: parent_path.presence || "/")
       return nil if page_row.nil? || slug.blank?
 
-      post = Post.kept.i18n.where(slug: slug, locale: locale.to_s).find { |candidate| page_row.record.content_blocks.listing.any? { |b| b.lists?(candidate) } }
+      post = Post.kept.i18n.where(slug: slug, locale: locale.to_s).find { |candidate| listed_on?(page_row.record, candidate) }
       return nil if post.nil? || !visible?(post)
 
       target = @urls.path_for(post, locale)
       target && Result.redirect(target, record: post)
+    end
+
+    # Whether `page` lists `post`: for a visitor by the page's copy and the
+    # post's (a scope on a rebuilt page's blocks would query the rows), for
+    # the preview by the rows.
+    def listed_on?(page, post)
+      return page.content_blocks.listing.any? { |block| block.lists?(post) } if @scope == :preview
+
+      @listing_blocks ||= {}
+      blocks = @listing_blocks[page.id] ||= Publishing.published(page).content_blocks.to_a
+      view = Publishing.published(post)
+      blocks.any? { |block| Publishing::Listing.lists?(block, view) }
     end
 
     # `:preview` (signed-in editors) never gates on publication state --

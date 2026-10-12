@@ -73,6 +73,28 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # because the header's navigation names the kept page on every page anyway.
   # A trashed page keeps its `published_at`, so "published" alone doesn't
   # hide it -- and it has no URL any more, so its link would point nowhere.
+  test "a trashed page's and a trashed post's published copy is served nowhere: not at its address, in the menu, in a list of subpages or in a post list" do
+    listing = create_page(title: "Copy listing", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert Pages::Save.call(listing, attributes: { published: true }).ok?
+    child = create_page(title: "Copied child", parent: listing)
+    post = create_post(title: "Copied post")
+    page_path = PublicSite::Urls.new.path_for(child, "en")
+    post_path = PublicSite::Urls.new.path_for(post, "en")
+    assert Publishing.copied?(child) && Publishing.copied?(post)
+
+    assert Trash::Move.call(child).ok?
+    assert Trash::Move.call(post).ok?
+
+    get page_path
+    assert_response :not_found
+    get post_path
+    assert_response :not_found
+    get PublicSite::Urls.new.path_for(listing, "en")
+    assert_not_includes response.body, "Copied child"
+    assert_not_includes response.body, "Copied post"
+  end
+
   test "a page's list of subpages leaves out a trashed subpage, publicly and in preview" do
     kept_child = create_page(title: "Kept child", parent: @kept_page)
     gone_child = create_page(title: "Gone child", parent: @kept_page)
@@ -111,6 +133,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     # has to skip a trashed post itself.
     other = create_page(title: "Other")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: other), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(other)
 
     get "/other/kept-post"
     assert_response :moved_permanently

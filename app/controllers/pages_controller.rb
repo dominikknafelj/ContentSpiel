@@ -87,6 +87,9 @@ class PagesController < PublicController
 
   def as_published(record) = Publishing.published(record)
 
+  # By the page's copy and the post's (`Publishing::Listing`).
+  def lists_post?(block, post) = Publishing::Listing.lists?(block, post)
+
   # What of a record the ETag depends on: its copy, or, for a record served
   # from its rows, the row. The rows' `updated_at` moves with every autosave,
   # which the public does not see.

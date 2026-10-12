@@ -31,6 +31,12 @@ module SqlNodes
   # `COALESCE(a, b)`: the first that is not NULL.
   def coalesce(*values) = function("COALESCE", *values)
 
+  # `column @> CAST('{1,2}' AS integer[])`: an integer array column holds
+  # every one of `values` (each forced through Integer, never text).
+  def array_contains(column, values)
+    Arel::Nodes::InfixOperation.new("@>", column, cast("{#{values.map { |value| Integer(value) }.join(",")}}", "integer[]"))
+  end
+
   # `CAST(value AS type)`; `type` is a constant type name, never user text.
   def cast(value, type) = Arel::Nodes::NamedFunction.new("CAST", [ quoted(value).as(type) ])
 

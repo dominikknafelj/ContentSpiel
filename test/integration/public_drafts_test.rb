@@ -151,10 +151,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     get path_of(page, "de")
 
     assert_select "h1", text: "Only English"
-    # The page's own content. The menu in the header still reads the rows'
-    # titles until the lists and menus read copies (Task 3), which then
-    # widens this to the whole body.
-    assert_not_includes main_html, "Nur im Entwurf"
+    assert_not_includes response.body, "Nur im Entwurf"
   end
 
   test "the preview of an address shows the rows and the public page the copy" do
@@ -231,8 +228,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert Posts::Save.call(post, attributes: { tag_names: %w[rails] }).ok?
     get path_of(post.reload)
 
-    # The article's place, not the whole of `main`: the lists beside it read the
-    # rows until Task 3.
+    assert_equal before, main_html, "an unpublished tag change moved something of the page, the lists beside the article included"
     assert_operator main_html.index("Slotted body"), :<, main_html.index("Between the lists"), "an unpublished tag change moved the article"
     assert_select "article li", text: "ruby"
 
@@ -240,5 +236,112 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     get path_of(post)
 
     assert_operator main_html.index("Slotted body"), :>, main_html.index("Between the lists"), "the article moved to the unfiltered slot"
+  end
+
+  def listing_page(title = "Blog", **settings)
+    page = create_page(title: title, published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" }.merge(settings.stringify_keys) })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    page
+  end
+
+  test "the menu and a page's list of subpages name a live page as published, and follow a publish" do
+    section = create_page(title: "Services")
+    child = create_page(title: "Consulting", parent: section)
+    assert Pages::Save.call(section, translations: { "en" => { title: "Typed section" } }).ok?
+    assert Pages::Save.call(child, translations: { "en" => { title: "Typed child" } }).ok?
+
+    get path_of(section)
+
+    assert_select "nav[aria-label=Main] a", text: "Services"
+    assert_select "nav.page-children a", text: "Consulting"
+    assert_not_includes response.body, "Typed"
+
+    publish_changes(section)
+    publish_changes(child)
+    get path_of(section)
+
+    assert_select "nav[aria-label=Main] a", text: "Typed section"
+    assert_select "nav.page-children a", text: "Typed child"
+  end
+
+  test "a post list shows a live post's title, excerpt and tag as published, and follows a publish" do
+    page = listing_page
+    post = Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: %w[ruby] },
+      translations: { "en" => { title: "Hello", excerpt: "Short" } }).record
+    assert Posts::Save.call(post, attributes: { tag_names: %w[rails] }, translations: { "en" => { title: "Typed", excerpt: "Typed too" } }).ok?
+
+    get path_of(page)
+
+    assert_select ".content-block--post-list a", text: "Hello"
+    assert_includes response.body, "Short"
+    assert_includes response.body, "ruby"
+    assert_not_includes response.body, "Typed"
+
+    publish_changes(post)
+    get path_of(page)
+
+    assert_select ".content-block--post-list a", text: "Typed"
+    assert_includes response.body, "rails"
+  end
+
+  test "a post whose tag was taken off in the rows stays in the public list until the post is published, and leaves it then" do
+    page = listing_page("Ruby posts", tag: "ruby")
+    post = create_post(title: "About Ruby", tags: %w[ruby])
+    publish_changes(page)
+    assert Posts::Save.call(post, attributes: { tag_names: [] }).ok?
+
+    get path_of(page)
+    assert_select ".content-block--post-list a", text: "About Ruby"
+
+    publish_changes(post)
+    get path_of(page)
+    assert_select ".content-block--post-list a", text: "About Ruby", count: 0
+  end
+
+  test "a list block's changed filter is not public until its page is published" do
+    page = listing_page
+    create_post(title: "A blog post")
+    block = page.content_blocks.sole
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "content_type" => "resume_entry" } }).ok?
+
+    get path_of(page)
+
+    assert_includes response.body, "A blog post"
+  end
+
+  test "a permalink no block of the page's copy lists is not found" do
+    page = create_page(title: "No list yet")
+    post = create_post(title: "Orphan")
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    address = PublicSite::Paths.current_path(post.reload, "en")
+
+    get(address) if address
+
+    assert_response :not_found if address
+    assert_nil address unless address # after Task 4 the unpublished list block gives the post no address at all
+  end
+
+  test "the preview's menu, subpages and lists show the rows" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    page = listing_page
+    post = create_post(title: "Hello")
+    assert Posts::Save.call(post, translations: { "en" => { title: "Typed post" } }).ok?
+    assert Pages::Save.call(page, translations: { "en" => { title: "Typed page" } }).ok?
+    sign_in_as users(:one)
+
+    get "/preview#{path_of(page)}"
+
+    assert_select "nav[aria-label=Main] a", text: "Typed page"
+    assert_select ".content-block--post-list a", text: "Typed post"
+  end
+
+  test "the menu reads its pages' copies in one statement, for 2 pages as for 6" do
+    2.times { |index| create_page(title: "Nav #{index}") }
+    copies = ->(statements) { statements.count { |sql| sql.include?("published_versions") } }
+    few = copies.call(capture_sql { get "/" })
+    4.times { |index| create_page(title: "More #{index}") }
+
+    assert_equal few, copies.call(capture_sql { get "/" })
   end
 end

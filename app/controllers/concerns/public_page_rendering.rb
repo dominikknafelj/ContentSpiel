@@ -74,7 +74,10 @@ module PublicPageRendering
       @post = as_published(record)
       outline = BlockOutline.new(@page.content_blocks)
       @block_outlines = { @page => outline }
-      @post_list_block = outline.reading_order.find { |block| block.lists?(@post) }
+      @post_list_block = outline.reading_order.find { |block| lists_post?(block, @post) }
+      # An address is a stored row and a list is read now: when no block of
+      # this page lists the post (any more), there is no page to draw it on.
+      return false if @post_list_block.nil?
     else
       @page = as_published(record)
     end
