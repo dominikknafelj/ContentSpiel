@@ -160,7 +160,11 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, %(<meta name="description")
   end
 
-  test "a page renders Open Graph tags for the URL it was requested at" do
+  # `og:url` is the page's own address, built by `public_urls` and not read
+  # off the request: with no PUBLIC_HOST (as here) its origin is the
+  # request's. Under a configured address, a foreign Host and a query string:
+  # `test/integration/public_head_address_test.rb`.
+  test "a page renders Open Graph tags for its own address" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
       meta_description: "Who I am.", published_at: Time.current)

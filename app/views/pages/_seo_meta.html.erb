@@ -17,9 +17,14 @@
   <%# A post permalink is one piece of writing; every other response is a page
       of the site. %>
   <%= tag.meta property: "og:type", content: post ? "article" : "website" %>
-  <%# The URL this response was actually served at, which for a page in a
-      non-default locale is its localized path -- the canonical address of what
-      is being shared. %>
-  <%= tag.meta property: "og:url", content: request.original_url %>
+  <%# The address of what is being shared: the record's own, in the language
+      shown (for a page in a non-default locale its localized path), on the
+      site's configured address and without the query string -- so the same
+      address as the layout's `canonical` link. Never the request's URL: its
+      host is whatever the client sent (`PublicController#public_urls`). In a
+      preview `public_urls` builds the /preview address on the request's own
+      origin. The fallback is for a record that has no address: a post in
+      the preview that only a page's working rows list yet. %>
+  <%= tag.meta property: "og:url", content: public_urls.url_for(post || page) || request.original_url %>
   <%= tag.meta property: "og:locale", content: I18n.locale %>
 <% end %>
