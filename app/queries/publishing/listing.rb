@@ -12,26 +12,26 @@ module Publishing
   class Listing
     class << self
       # The posts a visitor sees in `block`'s list, newest first, each as
-      # published. A fixed number of statements however many posts: the
-      # candidates (with their row tags, for a post that has no copy), their
-      # copies in one statement, and nothing per post. Without a tag filter
-      # the limit is applied in SQL; with one, the candidates are judged by
-      # their published tags first, so the whole type is read once.
+      # published. Which posts is decided in the database, limit included:
+      # the type's posts live at `now` and not trashed, filtered by tag as
+      # follows. A post with a CURRENT copy is judged by the copy's `tag_ids`
+      # (`SqlNodes.array_contains`, a subquery over current copies of posts).
+      # A live post with NO current copy (written around the services; the
+      # public serves it from its rows) is judged by its rows' own tags
+      # (`post_tags`), so it is listed exactly when its rows carry the tag.
+      # Only the posts that survive the limit are then rebuilt from their
+      # copies: a fixed number of statements, rows bounded by the limit.
       def posts(block, limit: nil, now: Time.current)
         settings = block.settings_object
         scope = Post.published.kept.where(content_type: ContentTypes.names).includes(:tags)
         scope = scope.where(content_type: settings.content_type) if settings.content_type.present?
-        scope = scope.order(published_at: :desc, id: :desc)
-
         if settings.tag.to_s.strip.present?
           tag_id = block.listed_tag_id or return []
-          views = Publishing.published_all(scope.to_a, now: now)
-          views = views.select { |view| tag_ids(view).include?(tag_id) }
-          limit.present? ? views.first(limit) : views
-        else
-          scope = scope.limit(limit) if limit.present?
-          Publishing.published_all(scope.to_a, now: now)
+          scope = scope.merge(carrying(tag_id, now))
         end
+        scope = scope.order(published_at: :desc, id: :desc)
+        scope = scope.limit(limit) if limit.present?
+        Publishing.published_all(scope.to_a, now: now)
       end
 
       # Whether `block` lists `post`: a post as published, or a row.
@@ -48,6 +48,15 @@ module Publishing
       # A post's tags as the public sees them: its copy's, or its rows' when
       # it was not rebuilt from one.
       def tag_ids(post) = post.published_version ? post.published_version.tag_ids : post.tags.map(&:id)
+
+      private
+
+      def carrying(tag_id, now)
+        current = Version.current(now).where(record_type: "Post")
+        copied = current.where(SqlNodes.array_contains(Version.arel_table[:tag_ids], [ tag_id ])).select(:record_id)
+        bare = PostTag.where(tag_id: tag_id).where.not(post_id: current.select(:record_id)).select(:post_id)
+        Post.where(id: copied).or(Post.where(id: bare))
+      end
     end
   end
 end

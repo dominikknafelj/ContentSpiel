@@ -87,4 +87,27 @@ class Publishing::ListingTest < ActiveSupport::TestCase
 
     assert_equal few, capture_sql { Publishing::Listing.posts(block) }.size
   end
+
+  test "a tagged live post with no copy is listed in a filtered list by its rows' tags, and one whose rows lack the tag is not" do
+    tagged = create_post(title: "Bare tagged", tags: %w[ruby])
+    untagged = create_post(title: "Bare untagged", tags: %w[rails])
+    block = published_block(content_type: "blog", tag: "ruby")
+    [ tagged, untagged ].each { |post| Publishing::Version.where(record_type: "Post", record_id: post.id).delete_all }
+
+    assert_equal [ "Bare tagged" ], titles(Publishing::Listing.posts(block))
+  end
+
+  test "a filtered list is decided in the database: the same statements for 3 posts as for 30, and the posts read are bounded by the limit" do
+    3.times { |index| create_post(title: "Few #{index}", tags: %w[ruby]) }
+    block = published_block(content_type: "blog", tag: "ruby")
+    few = capture_sql { Publishing::Listing.posts(block, limit: 3) }
+    27.times { |index| create_post(title: "More #{index}", tags: %w[ruby]) }
+    many = capture_sql { Publishing::Listing.posts(block, limit: 3) }
+
+    assert_equal few.size, many.size
+    post_selects = many.select { |sql| sql.start_with?('SELECT "posts".* FROM "posts"') }
+    assert post_selects.any?, many.inspect
+    assert post_selects.all? { |sql| sql.include?("LIMIT") }, "a statement selected posts without a LIMIT: #{post_selects.inspect}"
+    assert_equal 3, titles(Publishing::Listing.posts(block, limit: 3)).size
+  end
 end
