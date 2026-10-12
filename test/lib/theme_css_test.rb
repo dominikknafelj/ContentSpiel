@@ -349,6 +349,62 @@ class ThemeCssTest < ActiveSupport::TestCase
     end
   end
 
+  # R2 of the re-review. `theme_css:watch` is one of the three processes of
+  # bin/dev, and Foreman stops them all when one ends. Its first build
+  # raised when the stylesheet did not build (a half-written `@import`), so
+  # a person whose theme had a CSS error could not start the server at all.
+  # And Tailwind's own watcher is no help there: started on an entry that
+  # does not build, it prints the error and EXITS (seen with 4.3.3; one
+  # that is running when the stylesheet breaks stays). So the watch says
+  # that the build failed and waits for a file to change.
+  #
+  # The stand-in for the executable fails while the theme's stylesheet holds
+  # the word "broken", and as the watcher (`-w`) notes that it was started
+  # and ends well at once.
+  test "the watch goes on when the stylesheet does not build: it says so, and builds, stamps and watches once the file is mended" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        stylesheet = dir.join("assets/stylesheets/theme.css")
+        stylesheet.write("broken\n")
+        script = File.join(root, "tailwind")
+        File.write(script, <<~SH)
+          #!/bin/sh
+          if grep -q broken "#{stylesheet}"; then exit 1; fi
+          for last; do :; done
+          if [ "$last" = "-w" ]; then echo watching >> "#{root}/calls"; else echo built >> "#{root}/calls"; fi
+        SH
+        File.chmod(0o755, script)
+        folder = ThemeFolder.new(dir)
+        said = []
+        calls = -> { File.exist?("#{root}/calls") ? File.readlines("#{root}/calls", chomp: true) : [] }
+
+        before = Thread.list.select(&:alive?)
+        watch = Thread.new { ThemeCss.watch(folder, root: root, executable: script, every: 0.01, log: ->(line) { said << line }) }
+        begin
+          await { said.any? }
+          assert_equal [ "theme_css:watch: the public stylesheet did not build; what Tailwind said of it is above. The watch goes on, " \
+                         "and builds again when a file of the theme or of the default theme's styles changes." ], said
+          assert watch.alive?, "the watch did not end with the failed build"
+          assert_nil ThemeFolder.stamp(root), "a build that failed vouches for nothing"
+          assert_empty calls.call
+
+          stylesheet.write(".mended { color: red; }\n")
+          await { !watch.alive? }
+
+          assert_includes calls.call, "built"
+          assert_includes calls.call, "watching", "the watcher is started once the stylesheet builds"
+          await { (Thread.list.select(&:alive?) - before).empty? }
+          assert_empty Thread.list.select(&:alive?) - before, "the stamp's keeper ends with the watch"
+          assert_equal folder.fingerprint, ThemeFolder.stamp(root)
+          assert_equal 1, said.size, "said once for one failure"
+        ensure
+          watch.kill
+          watch.join
+        end
+      end
+    end
+  end
+
   private
     def keeping(folder, root:, build:, **options)
       keeper = ThemeCss.keep_stamped(folder, root: root, build: build, every: 0.01, **options)

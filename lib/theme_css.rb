@@ -199,6 +199,66 @@ module ThemeCss
     end
   end
 
+  # `theme_css:watch` (lib/tasks/theme_css.rake), one of the three processes
+  # of bin/dev: one whole build, stamped when it succeeded (`build`), then
+  # Tailwind's watcher on the same entry, with the stamp kept true beside it
+  # (`keep_stamped`).
+  #
+  # IT DOES NOT END BECAUSE THE STYLESHEET DOES NOT BUILD. Foreman stops
+  # every process of bin/dev when one of them ends, so a watch that raised
+  # at its first build took the web server with it, and a person with a
+  # half-written `@import` in their theme could not start the application
+  # they were writing it in. Tailwind's own watcher does not stay either:
+  # started on an entry that does not build it prints the error and exits
+  # (seen with 4.3.3; a watcher that is already running when the stylesheet
+  # breaks reports and stays). So the failure is said, once per failure,
+  # under Tailwind's own words for it, which the executable has printed to
+  # the same terminal; and the watch waits until a file of the theme or of
+  # the default theme's styles has changed, and then tries again from the
+  # whole build.
+  #
+  # The watcher ending well (its input closed, bin/dev stopped) ends the
+  # watch; the watcher ending badly is taken as a build that failed, since
+  # that is the one way it does by itself.
+  def watch(folder, root:, executable:, every: 1, log: ->(line) { warn line })
+    command = command(root: root, executable: executable)
+    keeper = keep_stamped(folder, root: root, every: every, log: log, build: -> { system(*command, out: File::NULL, err: File::NULL) })
+
+    loop do
+      seen = sources_glance(folder, root: root)
+      break if build_for_watch(folder, root: root, executable: executable) && system(*command, "-w")
+
+      log.call("theme_css:watch: the public stylesheet did not build; what Tailwind said of it is above. The watch goes on, " \
+               "and builds again when a file of the theme or of the default theme's styles changes.")
+      sleep every while sources_glance(folder, root: root) == seen
+    end
+  ensure
+    keeper&.kill
+  end
+
+  # `build`, answering whether it succeeded: a failed executable is the
+  # watch's to say and to wait out, not an exception's.
+  def build_for_watch(folder, root:, executable:)
+    build(folder, root: root, executable: executable)
+    true
+  rescue RuntimeError, SystemCallError, ThemeFolder::Invalid
+    false
+  end
+
+  # What the build reads, without reading a file: the theme's folder
+  # (`ThemeFolder#glance`) and the default theme's stylesheets, by name,
+  # size and time. A folder that cannot be listed at this moment (a file
+  # half written, a link not yet made) is a look that differs from the last.
+  def sources_glance(folder, root:)
+    styles = Dir.glob(Pathname(root).join(DEFAULT).dirname.join("**/*").to_s).sort.filter_map do |file|
+      status = File.stat(file)
+      [ file, status.size, status.mtime.to_f ] if status.file?
+    end
+    [ folder.glance, styles ]
+  rescue SystemCallError, ThemeFolder::Invalid => error
+    [ error.class, Process.clock_gettime(Process::CLOCK_MONOTONIC) ]
+  end
+
   def current_entry?(folder, root:)
     path = Pathname(root).join(ENTRY)
     path.file? && path.read == entry(folder, root: root)
