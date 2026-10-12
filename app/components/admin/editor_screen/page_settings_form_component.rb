@@ -96,6 +96,26 @@ module Admin
       # path is "/" by design, so there's nothing here for an editor to type.
       def show_slug? = page.parent_id.present?
 
+      # A draft's slug is a field of this autosaving form; a published or
+      # scheduled page's is not (drafts spec D7): its address moves at once, so
+      # it is shown as text with a button that opens `SlugDialogComponent`,
+      # which the page's view draws outside this form. `Admin::PagesController
+      # #update` ignores `page[slug]` for such a page as well.
+      def slug_field? = show_slug? && page.published_at.nil?
+
+      def address_line? = show_slug? && page.published_at.present?
+
+      def address_path = PublicSite::Urls.new.path_for(page, locale)
+
+      def change_address_data = dialog_trigger(SlugDialogComponent.dialog_id_for(page))
+
+      # The slug preview stands on the title and the slug field together and
+      # throws without its output span, so only a form that has the field
+      # carries it.
+      def title_data = slug_field? ? { "admin--editor--slug-preview-target": "title" } : {}
+
+      def slug_preview_data = slug_field? ? { controller: "admin--editor--slug-preview", action: "input->admin--editor--slug-preview#update" } : {}
+
       # The parent's own current path, in this locale -- what the slug field
       # appends to (`Admin::Columns::SlugColumnComponent`'s own doc comment).
       # Only ever called when `show_slug?` is true, so `page.parent` is never

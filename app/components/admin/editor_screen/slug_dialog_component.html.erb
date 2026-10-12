@@ -1,0 +1,13 @@
+<%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".title"), width: :form_narrow) do |dialog| %>
+  <%= form_with url: url, method: :patch, id: form_id, data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } do %>
+    <label for="<%= input_id %>" class="<%= setup_label_class %>"><%= t(".label") %></label>
+    <%= tag.input type: "text", id: input_id, name: "slug", value: value, class: setup_input_class, autocomplete: "off", spellcheck: "false" %>
+    <p class="mt-2 text-[13px] text-dim"><%= t(".body") %></p>
+  <% end %>
+  <% dialog.with_footer do %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
+    <% end %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :primary, type: "submit", form: form_id) %>
+  <% end %>
+<% end %>

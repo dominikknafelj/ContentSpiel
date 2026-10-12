@@ -111,6 +111,13 @@
 </section>
 <% end %>
 
+<%# A published or scheduled page's address is changed in its own dialog, drawn
+    here: outside the live region (a refresh of the settings does not touch it
+    and an open dialog is never replaced) and outside the settings form (a form
+    in a form is invalid, and the write queue would read it as part of the
+    autosaving one). Nothing for a draft or the homepage. %>
+<%= render Admin::EditorScreen::SlugDialogComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+
 <%# The notes drawer (notes spec §4.1): once per screen, after everything
     else and outside every form. `?notes=open` (a link from the inbox, the
     posts list) opens it on load, at `?thread=` when there is one. %>

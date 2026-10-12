@@ -490,4 +490,28 @@ class Admin::DraftsSystemTest < ApplicationSystemTestCase
       assert_no_selector "[data-publishing-overview]"
     end
   end
+
+  test "Change address… moves a live page at once: the visitor finds it at the new address and is sent on from the old one" do
+    open_editor
+    assert_no_field "page[slug]", visible: :all
+    assert_selector "#page-settings [data-page-address]", text: @address
+
+    press "Change address…"
+    within "dialog#page-slug-#{@page.id}[open]" do
+      assert_text "The page moves to the new address at once"
+      fill_in "Last part of the address", with: "prices"
+      press "Change address"
+    end
+
+    assert_text "Address changed"
+    assert_selector "#page-settings [data-page-address]", text: "/prices"
+    assert_no_selector "#{HEADER} [data-unpublished-changes]"
+    using_session(:visitor) do
+      visit "/prices"
+      assert_text "As published"
+      visit @address
+      assert_current_path "/prices"
+      assert_text "As published"
+    end
+  end
 end

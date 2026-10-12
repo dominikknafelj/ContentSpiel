@@ -10,7 +10,8 @@ class Admin::FieldErrorBorderSystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
     create_page(title: "Taken")
-    @page = create_page(title: "About")
+    # A draft: a live page's slug is not a field of the autosaving form (drafts spec D7).
+    @page = create_page(title: "About", published: false)
   end
 
   # The computed colour of `--cs-danger`, read through a probe element so the

@@ -273,6 +273,19 @@ en:
           cancel_scheduled_gone: "No change is scheduled any more."
           cancel_scheduled_keep: "Keep it scheduled"
           cancel_scheduled_confirm: "Cancel scheduled change"
+        # A published or scheduled page's address, changed at once through its
+        # own form (drafts spec D7): the settings panel's line and button, and
+        # the dialog the button opens.
+        page_settings_form:
+          address: "Address"
+          change_address: "Change address…"
+        slug_dialog:
+          title: "Change this page’s address"
+          label: "Last part of the address"
+          body: "The page moves to the new address at once, and the old address redirects to it. This does not wait for “Publish changes…”."
+          cancel: "Cancel"
+          confirm: "Change address"
+          changed: "Address changed"
         # The rest of the header's strings are in `notes.en.yml` or not
         # converted yet.
         header:

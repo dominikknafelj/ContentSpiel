@@ -36,7 +36,7 @@ module Admin
     TRANSLATED_FIELDS = %w[title slug subtitle meta_title meta_description hero_alt].freeze
     ATTRIBUTE_FIELDS = %w[page_type hero_media_asset_id].freeze
 
-    before_action :set_page, only: %i[show update destroy publish unpublish schedule]
+    before_action :set_page, only: %i[show update destroy publish unpublish schedule slug]
 
     # The Pages module's own index (handoff §10 C34): Home's editor when the
     # viewer can open it (303, with the editing language kept), otherwise the
@@ -182,6 +182,9 @@ module Admin
 
       page_params = params.fetch(:page, ActionController::Parameters.new).permit(*TRANSLATED_FIELDS, *ATTRIBUTE_FIELDS)
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h
+      # A live page's slug is changed through `slug` only: typed into an
+      # autosaving field it would move the address with every keystroke.
+      translated = translated.except("slug") if @page.published_at.present?
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
 
       stored_hero_id = @page.hero_media_asset_id
@@ -290,6 +293,18 @@ module Admin
       return refuse_schedule(error, editor) if error
 
       redirect_after Pages::Save.call(@page, attributes: { published_at: at }), success: "Scheduled"
+    end
+
+    # A published or scheduled page's slug (drafts spec D7): not in the
+    # autosaving settings form, because a new slug moves the page's address
+    # at once and is in no published copy to wait in. Its own form, behind a
+    # confirmation. An instant action like Publish: no hold is taken, and it
+    # is refused while another tab holds the settings.
+    def slug
+      editor = admin_page_path(@page, **admin_url_options)
+      return if refuse_instant_redirect(@page, to: editor)
+
+      redirect_after Pages::Save.call(@page, translations: { admin_locale => { slug: params[:slug].to_s } }), success: t("admin.components.editor_screen.slug_dialog.changed")
     end
 
     private

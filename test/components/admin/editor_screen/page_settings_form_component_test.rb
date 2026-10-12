@@ -19,10 +19,36 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
       translations: translations).record
   end
 
+  # A published page's slug is not a field (drafts spec D7): the help text belongs to the draft's.
   test "the slug carries its help text" do
-    render_settings(create_page(title: "About"))
+    render_settings(create_page(title: "About", published: false))
 
     assert_text "The last part of the page’s address. Changing it leaves a redirect from the old address."
+  end
+
+  test "a live page's settings show its address and Change address…, and no slug field; a draft's show the slug field as before" do
+    live = create_page(title: "About")
+    render_settings(live)
+
+    assert_no_selector "input[name='page[slug]']", visible: :all
+    assert_no_selector "[data-controller='admin--editor--slug-preview']", visible: :all
+    assert_selector "[data-page-address]", text: "/about"
+    assert_selector "button[data-action*='dialog']", text: "Change address…"
+
+    draft = create_page(title: "Drafty", published: false)
+    render_settings(draft)
+
+    assert_selector "input[name='page[slug]'][value='drafty']"
+    assert_selector "[data-controller='admin--editor--slug-preview'] [data-admin--editor--slug-preview-target='slug']", visible: :all
+    assert_no_selector "[data-page-address]"
+    assert_no_selector "button", text: "Change address…", visible: :all
+  end
+
+  test "the homepage has neither a slug field nor an address to change" do
+    render_settings(root_page)
+
+    assert_no_selector "input[name='page[slug]']", visible: :all
+    assert_no_selector "button", text: "Change address…", visible: :all
   end
 
   test "SEO is a collapsed details with soft counters at 60 and 160 characters" do

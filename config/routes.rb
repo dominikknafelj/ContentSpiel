@@ -46,6 +46,9 @@ Rails.application.routes.draw do
         post :publish
         post :unpublish
         post :schedule
+        # A published or scheduled page's slug, behind its own confirmation
+        # (`Admin::PagesController#slug`): not part of the autosaving settings.
+        patch :slug
       end
 
       # A page's blocks (cs-studio spec §5.1/§6.1, Task 5): nested under the
