@@ -30,11 +30,11 @@ module Publishable
     # `after_commit` sees only the last.
     before_save :note_live_before_change
     # The mark that the rows have moved on from what is published
-    # (`unpublished_changes_at`, drafts spec §4.4). After `note_live_before_change`
-    # so it reads the same pending changes; a save marks, and a `touch` (which
+    # (`unpublished_changes_at`, drafts spec §4.4). After the save, so that
+    # `saved_changes` says what it wrote; a save marks, and a `touch` (which
     # runs no save callback: every block write touches its page, a post is
     # touched for its tags) marks around the callbacks.
-    before_save :note_unpublished_changes
+    after_save :note_unpublished_changes
     after_touch :note_unpublished_changes_on_touch
     before_destroy :note_live_before_change
     # A destroy has no `changed`, and it is always immediate.
@@ -51,15 +51,9 @@ module Publishable
   # a row. A public reader that needs to know which it holds asks this.
   attr_accessor :published_version
 
-  def status
-    if published_at.nil?
-      "draft"
-    elsif published_at > Time.current
-      "scheduled"
-    else
-      "live"
-    end
-  end
+  # "draft", "scheduled" or "live": `Publishing::State`'s, which is the one
+  # place the time is compared with the clock.
+  def status = Publishing::State.of(self).status
 
   def live?
     status == "live"
@@ -89,6 +83,15 @@ module Publishable
     @live_before_change == true || live?
   end
 
+  # A touch that moves `updated_at` (an open form goes stale) and is no
+  # change to what a copy holds.
+  def touch_without_mark
+    @touched_without_mark = true
+    touch
+  ensure
+    @touched_without_mark = nil
+  end
+
   def publish_now!
     update!(published_at: Time.current)
   end
@@ -111,26 +114,28 @@ module Publishable
     @immediate_change ||= new_record? || (changed - Publishing.content_columns(self) - BOOKKEEPING).any?
   end
 
-  # A column a copy holds is about to change on a record that has a time and
-  # keeps it. The save that publishes or schedules for the first time (or a
-  # new record) is not a change waiting to be published: its copy is taken
-  # from these very rows. The mark may be set when the net difference is
-  # nothing (typed and typed back): `Publishing::Changes` then finds none.
-  # It moves neither `updated_at` nor a page's settings base (both ignore it).
+  # A column a copy holds has changed on a record, or a touch says a write
+  # beside it did. The mark is set by `Publishing.note_change`, whose UPDATE
+  # asks THE ROW (`published_at IS NOT NULL`), never this object: an object
+  # loaded before a colleague published still marks, and one loaded after an
+  # unpublish does not. The save that publishes or schedules for the first
+  # time (or a new record) is not a change waiting to be published: its copy
+  # is taken from these very rows. The mark may be set when the net
+  # difference is nothing (typed and typed back): `Publishing::Changes` then
+  # finds none. It moves neither `updated_at` nor a page's settings base.
   def note_unpublished_changes
-    return if published_at.nil? || published_at_in_database.nil?
+    return if previously_new_record? || (saved_change_to_published_at? && published_at_before_last_save.nil?)
 
-    self.unpublished_changes_at = Time.current if (changed & Publishing.content_columns(self)).any?
+    Publishing.note_change(self) if (saved_changes.keys & Publishing.content_columns(self)).any?
   end
 
   # A touch is how a write beside the record says it changed: every block
   # write touches its page, and a post is touched for its tags. `touch` runs
-  # no `before_save`, so the mark is written here, around the callbacks, and
-  # moves neither `updated_at` nor a page's settings base.
+  # no save callback, so the mark is written here. A touch that is no
+  # change to a copy (`touch_without_mark`: a post's related posts, which no
+  # copy holds) says so.
   def note_unpublished_changes_on_touch
-    return if published_at.nil?
-
-    update_column(:unpublished_changes_at, Time.current) # version: none (a mark CS Studio reads; no page shows it)
+    Publishing.note_change(self) unless @touched_without_mark
   end
 
   def forget_live_before_change

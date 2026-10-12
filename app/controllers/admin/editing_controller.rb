@@ -59,6 +59,17 @@ module Admin
       render form, layout: false
     end
 
+    # The header's publishing chip (the mark, the "No address" chip and the
+    # sign that shows the Publish changes button), as the page draws it, for
+    # a tab that is told someone else's save or publish moved the mark. 204
+    # for a draft: it has none.
+    def publishing
+      state = ::Publishing::State.of(@record)
+      return head(:no_content) if state.draft?
+
+      render Admin::EditorScreen::PublishingStateComponent.new(record: @record, part: :chip, url_options: admin_url_options, state: state), layout: false
+    end
+
     # The tab claims a subject ahead of its first save (spec §4.2): sent through
     # the write queue when a clean form gets its first change. 204 when the tab
     # holds the subject now (or sent no tab id: nothing was claimed), 409 with

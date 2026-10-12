@@ -106,9 +106,13 @@ class Publishing::PublishChangesTest < ActiveSupport::TestCase
     assert_equal 1, Publishing::Version.of(bare).count
   end
 
-  test "it clears the mark when it takes the copy, and a copy for a time clears it too" do
+  test "it clears the mark when it takes the copy, now or for a time" do
     assert @page.reload.unpublished_changes?
+    assert Publishing::PublishChanges.call(@page).ok?
+    assert_not @page.reload.unpublished_changes?
 
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Three" } }).ok?
+    assert @page.reload.unpublished_changes?
     assert Publishing::PublishChanges.call(@page, at: 2.days.from_now).ok?
 
     assert_not @page.reload.unpublished_changes?

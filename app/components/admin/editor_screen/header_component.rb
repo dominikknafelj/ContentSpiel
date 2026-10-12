@@ -8,10 +8,11 @@ module Admin
     # carry `turbo_frame: "_top"` to refresh the sidebar's badge and the
     # lists).
     #
-    # "No drafts" variant (spec §2): an edit to a live record goes live at
-    # once, so a live record has no primary button at all -- only the hint
-    # that says so -- while a draft offers Publish and a scheduled record
-    # Publish now plus Edit schedule. Everything else (Activity, Schedule…,
+    # "Drafts of live content" (drafts spec §3): an edit to a live record
+    # reaches the site only with "Publish changes", so a live record has no
+    # primary button until its rows differ from what is published (the
+    # button is `Publishing::State`'s `publish_changes`) -- while a draft
+    # offers Publish and a scheduled record Publish now plus Edit schedule. Everything else (Activity, Schedule…,
     # Unpublish, Move to trash) sits in the ⋯ menu, the destructive item last
     # and after a divider.
     #
@@ -64,11 +65,20 @@ module Admin
 
       def title = ::Locales.read(record, :title, locale: locale)
 
-      def status = record.status
+      # What the header says about publishing is `Publishing::State`'s: its
+      # status for the chip, its actions for the buttons. One per header, read
+      # once (a live record asks for a pending copy with the first of them),
+      # and handed to the part that draws the mark and the Publish changes
+      # button.
+      def state = @state ||= ::Publishing::State.of(record)
 
-      def live? = record.live?
+      def status = state.status
 
-      def scheduled? = status == "scheduled"
+      def live? = state.live?
+
+      def scheduled? = state.scheduled?
+
+      def draft? = state.draft?
 
       def scheduled_at = record.published_at
 
@@ -123,15 +133,16 @@ module Admin
 
       def may_delete? = can?("#{type}s.delete", record)
 
-      def can_publish? = !live? && may_publish?
+      # Publish (a draft) and Publish now (a scheduled record): the state's `publish`.
+      def can_publish? = state.action?(:publish) && may_publish?
 
-      def can_unpublish? = status != "draft" && may_publish?
+      def can_unpublish? = state.action?(:unpublish) && may_publish?
 
       # Only a draft is scheduled from the menu; a scheduled record edits its
       # schedule from the header's own button, a live one is not scheduled.
-      def can_schedule? = status == "draft" && may_publish?
+      def can_schedule? = state.action?(:schedule) && draft? && may_publish?
 
-      def can_edit_schedule? = scheduled? && may_publish?
+      def can_edit_schedule? = state.action?(:schedule) && scheduled? && may_publish?
 
       def primary_label = scheduled? ? "Publish now" : "Publish"
 

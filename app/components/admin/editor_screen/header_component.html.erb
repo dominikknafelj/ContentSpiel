@@ -1,6 +1,6 @@
 <%# Structure and copy: handoff §4.1 / `Studio Pages.dc.html`, the default
     ("no drafts") variant. %>
-<%= tag.header class: "admin-editor-header sticky top-(--admin-top-offset) z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
+<%= tag.header class: "group/publishing admin-editor-header sticky top-(--admin-top-offset) z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
       data: { record_type: type, record_id: record.id } do %>
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
     <%# "Pages ▾" (the side-column handoff's decision 9): the page tree's drawer while
@@ -52,7 +52,7 @@
       <%# Whoever may publish this record may publish what is in it (D5): shown
           only while `Publishing::State` says there is something to publish,
           and always drawn (empty otherwise) so a save's answer can fill it. %>
-      <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :actions, url_options: url_options) if record.published_at.present? %>
+      <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :actions, url_options: url_options, state: state) unless draft? %>
 
       <% if can_edit_schedule? %>
         <%= render Admin::Ui::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
@@ -91,7 +91,7 @@
     <h1 class="min-w-0 truncate text-[26px] font-semibold leading-tight text-ink"><%= title %></h1>
     <%# Never hidden in an editor: here the state is the point. %>
     <%= render Admin::Ui::StatusChipComponent.new(status: status, at: scheduled_at) %>
-    <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :chip, url_options: url_options) if record.published_at.present? %>
+    <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :chip, url_options: url_options, state: state) unless draft? %>
     <% unless editable? %>
       <%= render "admin/shared/view_only_badge" %>
     <% end %>

@@ -42,17 +42,25 @@ module Publishing
 
     def none? = fields.empty? && blocks.empty?
 
-    # The live records that would be left without an address if these rows
-    # were published now, as data (`PublicSite::Paths.foresee`:
+    # The live records that would be left without an address if the rows of
+    # `record` were published at `now`, as data (`PublicSite::Paths.foresee`:
     # `{ record_type:, record_id:, locale:, path: }`, the record's own among
     # them). Information, never a refusal: the publish dialog words it
-    # (Task 7). Asked for, not computed with the rest: it tries a publish in
-    # a savepoint and reads every current address twice, which a page view
-    # or a list must never pay, and `PublishChanges` asks only whether
-    # anything differs. Empty when nothing differs, since publishing
-    # nothing takes nothing.
-    def lost_addresses
-      @lost_addresses ||= (none? || record.published_at.nil?) ? [] : PublicSite::Paths.foresee(record)
+    # (Task 7). Empty when nothing differs (publishing nothing takes nothing)
+    # and for a record with no time.
+    #
+    # NEVER FROM A GET, and not part of `Changes.of`, which is cheap and
+    # lock-free. This TRIES a publish: it takes the record's ROW LOCK (a
+    # colleague's block autosave on that page waits at `lock_owner` for the
+    # length of the call) and WRITES inside a savepoint it rolls back (a copy,
+    # `public_paths` rows, `media_usages`, the mark), reading every current
+    # address twice. It can be one side of a `(locale, path)` wait. So the
+    # request that asks is a POST, sent through the write queue when the
+    # dialog opens (Task 7), serialised with the tab's own saves.
+    def self.lost_addresses(record, now: Time.current)
+      return [] if record.published_at.nil? || of(record).none?
+
+      PublicSite::Paths.foresee(record, now: now)
     end
 
     private

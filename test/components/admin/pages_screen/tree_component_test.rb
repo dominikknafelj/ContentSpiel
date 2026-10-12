@@ -197,7 +197,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "li[data-page-id='#{leaf.id}'] > div a[title='#{leaf.title}']"
   end
 
-  test "a live page with unpublished changes carries the mark; a draft with a stale mark does not; the tree costs no statement more for it" do
+  test "a live page with unpublished changes carries the mark; a draft with a stale mark does not" do
     live = create_page(title: "Marked live")
     assert Pages::Save.call(live, translations: { "en" => { title: "Typed" } }).ok?
     draft = create_page(title: "Marked draft", published: false)

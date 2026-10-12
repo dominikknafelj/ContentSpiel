@@ -120,36 +120,32 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
     page
   end
 
-  test "nothing differs, nothing is taken away: lost_addresses is empty, and asking reads no address of a title edit" do
+  test "nothing differs, nothing is taken away: lost_addresses is empty, and Changes.of itself reads no address and has no such answer" do
     assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
-    result = Publishing::Changes.of(@page.reload)
-    statements = capture_sql { result.fields }
-    assert_empty statements.grep(/public_paths/), "Changes.of reads no address"
+    result = nil
+    statements = capture_sql { result = Publishing::Changes.of(@page.reload); result.fields }
+    assert_empty statements.grep(/public_paths|FOR UPDATE/), "Changes.of reads no address and takes no lock"
+    assert_not_respond_to result, :lost_addresses
 
-    assert_empty result.lost_addresses, "a title takes nothing away"
-    assert_empty Publishing::Changes.of(create_page(title: "Same")).lost_addresses
+    assert_empty Publishing::Changes.lost_addresses(@page), "a title takes nothing away"
+    assert_empty Publishing::Changes.lost_addresses(create_page(title: "Same"))
+    assert_empty Publishing::Changes.lost_addresses(create_page(title: "Draft", published: false))
   end
 
   # `test/integration/public_drafts_test.rb`: "removing a page's list block and
-  # publishing drops a live post to no address". The overview names it
-  # beforehand, as data, and Changes.of itself computes nothing of the kind.
-  test "removing a page's list block names the live posts a publish would leave without an address, and only when asked" do
+  # publishing drops a live post to no address". Named beforehand, as data, by
+  # a call of its own that nothing makes on a GET.
+  test "removing a page's list block names the live posts a publish would leave without an address" do
     blog = listing_page("Blog")
     topic = listing_page("Topic")
     create_page(title: "Hello", parent: topic)
     post = create_post(title: "Hello")
     assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
-    result = nil
-
-    statements = capture_sql { result = Publishing::Changes.of(blog.reload) }
-    assert_equal 1, result.blocks.size
-    assert_equal :removed, result.blocks.first.kind
-    assert_empty statements.grep(/public_paths/), "computed only when asked"
 
     expected = %w[de en es].map { |locale| { record_type: "Post", record_id: post.id, locale: locale, path: "/blog/hello" } }
-    assert_equal expected, result.lost_addresses.sort_by { |row| row[:locale] }
-    assert_same result.lost_addresses, result.lost_addresses, "asked once"
+    assert_equal expected, Publishing::Changes.lost_addresses(blog.reload).sort_by { |row| row[:locale] }
     assert_equal "/blog/hello", PublicSite::Urls.new.path_for(post, "en"), "asking moved nothing"
-    assert_empty Publishing::Changes.of(topic.reload).lost_addresses
+    assert_equal 1, Publishing::Version.of(blog).count, "and kept no copy"
+    assert_empty Publishing::Changes.lost_addresses(topic.reload)
   end
 end

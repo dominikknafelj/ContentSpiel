@@ -38,8 +38,9 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     render_header(page)
     # Scoped to the header: the Unpublish confirm dialog is a sibling AFTER it
     # and its confirm button is (rightly) primary; rack_test treats a closed
-    # <dialog>'s content as visible.
-    assert_no_selector "header button.bg-accent"
+    # <dialog>'s content as visible. The Publish changes form is in the header
+    # for whoever may publish and shown by a mark (CSS), so no mark is no primary button.
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all
     assert_selector "[role=status]", text: "This page is live. Changes are published with “Publish changes”."
     assert_selector "[role=menu] button", text: "Unpublish", visible: :all
     assert_selector "a[href='/about']", text: "View on site"
@@ -97,22 +98,23 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "header #publishing-chip", visible: :all
     assert_selector "header #publishing-actions", visible: :all
     assert_no_selector "header #publishing-chip [data-unpublished-changes]"
-    assert_no_selector "header button", text: "Publish changes"
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all # the form is drawn once for whoever may publish, and shown by this mark
 
     render_header(edit_title(live))
     assert_selector "header #publishing-chip [data-unpublished-changes]", text: "Unpublished changes"
     assert_selector "header #publishing-actions form[action='/cs-studio/publishing/page/#{live.id}/publish'] button", text: "Publish changes"
+    assert_selector "header #publishing-chip [data-publish-changes-offered]", visible: :all
   end
 
   test "a scheduled record with unpublished changes offers them too, and a draft shows neither the chip nor the button, whatever mark it kept" do
     post = create_post(title: "Later", published: false)
     as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
     render_header(post.reload)
-    assert_no_selector "header button", text: "Publish changes"
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all
 
     render_header(edit_title(post.reload))
     assert_selector "header [data-unpublished-changes]"
-    assert_selector "header button", text: "Publish changes"
+    assert_selector "header [data-publish-changes-offered]", visible: :all
 
     draft = create_page(title: "Draft", published: false)
     draft.update_columns(unpublished_changes_at: Time.current) # version: none (a test gives a draft a stale mark) # changes: none (a test gives a draft a stale mark)
@@ -120,6 +122,19 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_no_selector "header [data-unpublished-changes]"
     assert_no_selector "header #publishing-chip", visible: :all
     assert_no_selector "header button", text: "Publish changes"
+  end
+
+  test "a live record with a change scheduled offers Publish changes with or without edits since, because its time can be changed" do
+    live = create_page(title: "About")
+    assert as_owner { Pages::Save.call(live, translations: { "en" => { title: "Edited" } }) }.ok?
+    assert as_owner { Publishing::PublishChanges.call(live.reload, at: 2.days.from_now) }.ok?
+    assert_not live.reload.unpublished_changes?
+
+    render_header(live)
+
+    assert_selector "header #publishing-actions form[action='/cs-studio/publishing/page/#{live.id}/publish'] button", text: "Publish changes"
+    assert_selector "header #publishing-chip [data-publish-changes-offered]", visible: :all
+    assert_no_selector "header [data-unpublished-changes]"
   end
 
   test "someone who may not publish sees the chip and no button" do

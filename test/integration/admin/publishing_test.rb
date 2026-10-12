@@ -96,19 +96,21 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
 
   # -- the header follows the mark (Task 6) --------------------------------------
 
-  def chip_and_button_in_stream
-    fragment = Nokogiri::HTML5.fragment(response.body)
-    [ fragment.at_css("turbo-stream[target='publishing-chip']"), fragment.at_css("turbo-stream[target='publishing-actions']") ]
-  end
+  # Only the chip is streamed: the Publish changes form is drawn once and
+  # never replaced (it may be the form the write queue holds while this very
+  # save is out). The chip carries the mark that shows it.
+  def chip_in_stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='publishing-chip']")
 
   def assert_publishing_parts(present:)
-    chip, actions = chip_and_button_in_stream
-    assert chip && actions, "both parts are in the answer:\n#{response.body}"
+    chip = chip_in_stream
+    assert chip, "the chip is in the answer:\n#{response.body}"
     assert_equal present, chip.at_css("[data-unpublished-changes]").present?, "the chip"
-    assert_equal present, actions.at_css("form[action*='/publishing/'] button").present?, "the Publish changes button"
+    assert_equal present, chip.at_css("[data-publish-changes-offered]").present?, "the sign that shows the Publish changes button"
+    assert_nil Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='publishing-actions']"), "the form is never replaced"
+    assert_no_match(/<form/, chip.to_s)
   end
 
-  test "a live page's settings autosave, its block's autosave and a live post's autosave each answer with the chip and the Publish changes button" do
+  test "a live page's settings autosave, its block's autosave and a live post's autosave each answer with the chip, and the sign that shows the Publish changes button" do
     live = create_page(title: "Live")
     publish_changes(live)
     patch "/cs-studio/pages/#{live.id}", params: { page: { title: "Typed" }, base_updated_at: live.reload.settings_changed_at.iso8601(6) }, as: :turbo_stream
@@ -156,10 +158,10 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     draft = create_page(title: "Draft", published: false)
     patch "/cs-studio/pages/#{draft.id}", params: { page: { title: "Typed" } }, as: :turbo_stream
     assert_response :success
-    assert_equal [ nil, nil ], chip_and_button_in_stream
+    assert_nil chip_in_stream
 
     post "/cs-studio/pages/#{draft.id}/content_blocks", params: { block: { block_type: "rich_text" } }, as: :turbo_stream
-    assert_equal [ nil, nil ], chip_and_button_in_stream
+    assert_nil chip_in_stream
   end
 
   test "a draft's editor draws no publishing parts, a live one draws both, empty until something changes" do
@@ -172,8 +174,8 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     get admin_page_path(live)
     assert_select "#publishing-chip", count: 1
     assert_select "#publishing-chip *", count: 0
-    assert_select "#publishing-actions", count: 1
-    assert_select "#publishing-actions *", count: 0
+    assert_select "#publishing-actions form[action$='/publishing/page/#{live.id}/publish']", count: 1, text: /Publish changes/
+    assert_select "[data-publish-changes-offered]", count: 0
   end
 
   test "someone who may edit but not publish gets the chip and no button" do
@@ -189,7 +191,8 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "#publishing-chip [data-unpublished-changes]", count: 1
-    assert_select "#publishing-actions button", count: 0
+    assert_select "#publishing-chip [data-publish-changes-offered]", count: 0
+    assert_select "#publishing-actions form", count: 0
   end
 
   test "publishing with nothing changed says so and takes no copy" do

@@ -1,9 +1,11 @@
 <%= tag.span id: id, class: "contents" do %>
   <% if chip? %>
     <%= render Admin::Ui::UnpublishedChipComponent.new if changes? %>
-    <%= render Admin::Ui::NoAddressChipComponent.new if no_address? %>
-  <% elsif publish_changes? %>
+    <%= render Admin::EditorScreen::NoAddressChipComponent.new if no_address? %>
+    <%= tag.span "", hidden: true, data: { publish_changes_offered: "" } if publish_changes? %>
+  <% elsif may_publish? %>
+    <%# Drawn once and never replaced (see the class comment); shown while the chip part says so (CSS, not the `hidden` attribute: Tailwind's preflight makes that `!important`). %>
     <%= button_to t(".publish_changes"), publish_url, method: :post, class: setup_primary_button_class,
-          form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
+          form: { class: "hidden group-has-[[data-publish-changes-offered]]/publishing:contents", data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
   <% end %>
 <% end %>

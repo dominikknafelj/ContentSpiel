@@ -18,8 +18,8 @@ class Publishing::StateTest < ActiveSupport::TestCase
     [ :future, true, true ] => [ :scheduled, true, %i[publish schedule publish_changes discard_changes unpublish] ],
     [ :past, false, false ] => [ :live, false, %i[unpublish] ],
     [ :past, false, true ] => [ :live_with_changes, true, %i[publish_changes discard_changes unpublish] ],
-    [ :past, true, false ] => [ :live_change_scheduled, false, %i[unpublish] ],
-    [ :past, true, true ] => [ :live_change_scheduled, true, %i[publish_changes discard_changes unpublish] ]
+    [ :past, true, false ] => [ :live_change_scheduled, false, %i[publish_changes cancel_scheduled_change discard_changes unpublish] ],
+    [ :past, true, true ] => [ :live_change_scheduled, true, %i[publish_changes cancel_scheduled_change discard_changes unpublish] ]
   }.freeze
 
   def record_with(time, pending, mark, kind: :page)
@@ -75,6 +75,27 @@ class Publishing::StateTest < ActiveSupport::TestCase
       assert_equal changes, Page.with_unpublished_changes.exists?(page.id), "#{time} #{pending} #{mark}: the scope"
       post = record_with(time, pending, mark, kind: :post)
       assert_equal changes, Post.with_unpublished_changes.exists?(post.id), "#{time} #{pending} #{mark}: the scope, for a post"
+    end
+  end
+
+  test "Publishable#status and the state's status are one answer, for every combination, and the booleans follow" do
+    TABLE.each_key do |time, pending, mark|
+      record = record_with(time, pending, mark)
+      state = Publishing::State.of(record)
+
+      assert_equal state.status, record.status, "#{time} #{pending} #{mark}"
+      assert_equal state.live?, record.live?
+      assert_equal({ none: "draft", future: "scheduled", past: "live" }.fetch(time), state.status)
+    end
+  end
+
+  test "a copy pending on a live record offers every way out of it, with or without edits since" do
+    [ false, true ].each do |mark|
+      actions = Publishing::State.of(record_with(:past, true, mark)).actions
+
+      assert_includes actions, :publish_changes
+      assert_includes actions, :cancel_scheduled_change
+      assert_includes actions, :discard_changes
     end
   end
 end

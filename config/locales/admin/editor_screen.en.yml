@@ -227,6 +227,12 @@ en:
           # The status beside "Copy my text" when the read of the card to show after
           # "Discard" failed: the notice stays.
           discard_failed: "Couldn't load the block. Try again."
+        # A live page or post the site has no address for: another record
+        # holds it, so a visitor is told "not found" (drafts plan, task 6).
+        no_address_chip:
+          label: "No address"
+          title: "Another page or post holds this address, so this one shows “not found” on the site."
+
         # The header's two publishing parts (`PublishingStateComponent`): the
         # button that makes a published or scheduled record's rows what the
         # public sees (drafts spec §4.3).

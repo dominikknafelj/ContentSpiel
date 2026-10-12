@@ -28,26 +28,34 @@ module Publishing
   # - `:live`: a time that has passed, no copy pending, no mark.
   # - `:live_with_changes`: live, the mark, no copy pending.
   # - `:live_change_scheduled`: live, a copy pending (whatever the mark: more
-  #   edits since are `changes?`).
+  #   edits since are `changes?`). Its changes can be published again (now or
+  #   at another time), withdrawn (`cancel_scheduled_change`: the pending
+  #   copy goes, the rows stay as they are, as unpublished changes) or
+  #   discarded, with or without edits since.
   #
   # A combination that should not exist (a mark on a draft) is answered as
   # the nearest true state and never raises: this runs on a page view.
+  #
+  # THE ONE PLACE. The header's Publish, Schedule, Edit schedule, Unpublish
+  # and Publish changes, every status chip and `Publishable#status` ask this
+  # object (`status` is its one comparison of `published_at` with the clock);
+  # nobody compares the time again.
   #
   # `actions` is what makes sense in the state, BEFORE rights are applied
   # (`can?("pages.publish")` and the rest are the caller's):
   #
   # | state                  | actions                                              |
   # | :draft                 | publish, schedule                                    |
-  # | :scheduled             | publish, schedule, unpublish (+ publish_changes, discard_changes when changes?) |
+  # | :scheduled             | publish, schedule (+ publish_changes, discard_changes when changes?), unpublish |
   # | :live                  | unpublish                                            |
   # | :live_with_changes     | publish_changes, discard_changes, unpublish          |
-  # | :live_change_scheduled | unpublish (+ publish_changes, discard_changes when changes?) |
+  # | :live_change_scheduled | publish_changes, cancel_scheduled_change, discard_changes, unpublish |
   #
   # (`schedule` on a scheduled record is "Edit schedule"; `publish` on one is
   # "Publish now".)
   class State
     STATES = %i[draft scheduled live live_with_changes live_change_scheduled].freeze
-    ACTIONS = %i[publish schedule publish_changes discard_changes unpublish].freeze
+    ACTIONS = %i[publish schedule publish_changes cancel_scheduled_change discard_changes unpublish].freeze
 
     def self.of(record, now: Time.current) = new(record, now: now)
 
@@ -56,11 +64,27 @@ module Publishing
       @now = now
     end
 
+    # "draft", "scheduled" or "live": the cheap answer lists and chips use,
+    # from the time alone. The one place `published_at` meets the clock.
+    def status
+      if record.published_at.nil? then "draft"
+      elsif record.published_at > now then "scheduled"
+      else "live"
+      end
+    end
+
+    def draft? = status == "draft"
+
+    def scheduled? = status == "scheduled"
+
+    # Live in any of its three states. No query.
+    def live? = status == "live"
+
     # Exactly one of STATES.
     def state
       @state ||=
-        if record.published_at.nil? then :draft
-        elsif record.published_at > now then :scheduled
+        if draft? then :draft
+        elsif scheduled? then :scheduled
         elsif pending_at then :live_change_scheduled
         elsif changes? then :live_with_changes
         else :live
@@ -84,7 +108,8 @@ module Publishing
       when :draft then %i[publish schedule]
       when :scheduled then %i[publish schedule] + changes_actions + %i[unpublish]
       when :live then %i[unpublish]
-      when :live_with_changes, :live_change_scheduled then changes_actions + %i[unpublish]
+      when :live_with_changes then changes_actions + %i[unpublish]
+      when :live_change_scheduled then %i[publish_changes cancel_scheduled_change discard_changes unpublish]
       end
     end
 

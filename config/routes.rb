@@ -319,6 +319,8 @@ Rails.application.routes.draw do
       get "blocks", to: "editing#blocks", as: :editing_blocks
       get "blocks/:block_id", to: "editing#block", as: :editing_block, constraints: { block_id: /\d+/ }
       get "record", to: "editing#record", as: :editing_record
+      # The header's publishing chip, for another tab's change to the mark.
+      get "publishing", to: "editing#publishing", as: :editing_publishing
       # A save is a claim (live-editing spec §4.2): the tab takes a subject ahead
       # of its first save, and lets it go. `block_id` is optional (absent: the
       # record itself); a block that is not this record's is a 404.

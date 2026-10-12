@@ -162,7 +162,8 @@ module Posts
       return if @post.saved_change_to_updated_at?
       return if related_state == related_before
 
-      @post.touch
+      # Tags are marked by the caller; related posts are in no copy.
+      @post.touch_without_mark
     end
 
     # Publishing, unpublishing and scheduling need `posts.publish` (design

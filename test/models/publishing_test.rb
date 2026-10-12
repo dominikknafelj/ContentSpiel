@@ -207,4 +207,41 @@ class PublishingTest < ActiveSupport::TestCase
     assert_includes Publishing::ROWS.fetch("Page"), "unpublished_changes_at"
     assert_includes Publishing::ROWS.fetch("Post"), "unpublished_changes_at"
   end
+
+  test "a change of a live post's related posts alone sets no mark: they are in no copy; it still moves updated_at, so an open form goes stale" do
+    post = create_post(title: "Has relations")
+    other = create_post(title: "Related")
+    before = post.reload.updated_at
+
+    assert Posts::Save.call(post, attributes: { related_post_ids: [ other.id ] }).ok?
+
+    assert_not marked?(post), "related posts are public at once and in no copy"
+    assert_operator post.reload.updated_at, :>, before
+    assert Publishing::Changes.of(post).none?
+
+    assert Posts::Save.call(post, attributes: { related_post_ids: [], tag_names: %w[fresh] }).ok?
+    assert marked?(post), "tags in the same save are a change"
+  end
+
+  # The mark is decided by the ROW (`published_at IS NOT NULL` in the UPDATE),
+  # not by the object a request loaded before a colleague published.
+  test "a write whose object was loaded before a colleague's publish still marks, and one loaded before an unpublish does not" do
+    page = create_page(title: "Race", published: false)
+    stale = Page.find(page.id)
+    assert Pages::Save.call(Page.find(page.id), attributes: { published: true }).ok?
+    assert_not marked?(page)
+
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: stale), attributes: { block_type: "rich_text" }).ok?
+    assert marked?(page), "a block added through a page object that still believed it a draft"
+
+    Publishing.clear_changes(page)
+    assert Pages::Save.call(Page.find(page.id).tap { |row| row.published_at = nil; row.clear_attribute_changes([ :published_at ]) }, translations: { "en" => { subtitle: "Typed" } }).ok?
+    assert marked?(page), "settings saved through such an object"
+
+    live = Page.find(page.id)
+    assert Pages::Save.call(Page.find(page.id), attributes: { published: false }).ok?
+    Publishing.clear_changes(page)
+    Pages::Save.call(live, translations: { "en" => { subtitle: "Again" } }) # saved or refused, the row says draft
+    assert_not marked?(page), "a draft by its row has no mark whatever the object believed"
+  end
 end
