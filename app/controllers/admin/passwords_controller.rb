@@ -13,7 +13,13 @@ module Admin
 
     def create
       if user = User.find_by(email_address: params[:email_address])
-        PasswordsMailer.reset(user).deliver_later
+        # The link in the mail is the site's configured address when there
+        # is one, and then the request's origin is not handed over at all
+        # (it is whatever Host this request named). Without one, this
+        # request's origin is the only address anybody knows: a String,
+        # because a job delivers the mail, which `PasswordsMailer` parses
+        # before it uses any of it.
+        PasswordsMailer.reset(user, **reset_mail_origin).deliver_later
       end
 
       # The "sent" state is a param on the request page, not a flash and not
@@ -45,6 +51,10 @@ module Admin
     end
 
     private
+      def reset_mail_origin
+        SiteAddress.current.configured? ? {} : { origin: request.base_url }
+      end
+
       def set_user_by_token
         @user = User.find_by_password_reset_token!(params[:token])
       rescue ActiveSupport::MessageVerifier::InvalidSignature

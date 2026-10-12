@@ -33,13 +33,42 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1.text-\\[28px\\].font-semibold"
   end
 
+  # With no address configured the mail's link can only point where the
+  # request came from, so the request's origin goes along (as a String: the
+  # mail is delivered by a job).
   test "create" do
-    post admin_password_path, params: { email_address: @user.email_address }
-    assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user ]
-    assert_redirected_to new_admin_password_path(sent: 1)
+    with_site_address(nil) do
+      post admin_password_path, params: { email_address: @user.email_address }
+      assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user, { origin: "http://www.example.com" } ]
+      assert_redirected_to new_admin_password_path(sent: 1)
 
-    follow_redirect!
-    assert_notice "If that address belongs to an account"
+      follow_redirect!
+      assert_notice "If that address belongs to an account"
+    end
+  end
+
+  # With an address configured the request's origin is not handed over at
+  # all: the mailer would ignore it, and a Host a client made up never
+  # reaches the job's arguments.
+  test "create with a site address configured hands the mailer no origin, whatever Host the request named" do
+    with_site_address("https://docs.example.org") do
+      post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
+
+      assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user ]
+      assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
+    end
+  end
+
+  test "the mail that create enqueues links to the configured address, and without one to the request's origin" do
+    with_site_address("https://docs.example.org") do
+      perform_enqueued_jobs { post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" } }
+      assert_match %r{^https://docs\.example\.org/cs-studio/password/}, ActionMailer::Base.deliveries.last.text_part.body.to_s
+    end
+
+    with_site_address(nil) do
+      perform_enqueued_jobs { post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "here.example:3010" } }
+      assert_match %r{^http://here\.example:3010/cs-studio/password/}, ActionMailer::Base.deliveries.last.text_part.body.to_s
+    end
   end
 
   test "create for an unknown user redirects but sends no mail" do
