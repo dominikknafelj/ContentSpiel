@@ -26,9 +26,41 @@ class PublicController < ActionController::Base
   # `:public` is untrusted: a nil actor on it is denied everything.
   before_action { Current.channel = :public }
 
+  # NO SESSION AND NO TOKEN, AS A WALL (theming spec §2: "no CSRF token on a
+  # public page, which is the same cookie-less answer for every visitor").
+  # The first line of this file was a convention while every public
+  # template was the CMS's own. A theme's templates are not: a `form_with`
+  # or a `button_to` in a theme's footer, `csrf_meta_tags` in its head or a
+  # `form_authenticity_token` anywhere asks Rails for the token, Rails reads
+  # the session to mint it, and the response, which says
+  # `Cache-Control: public`, leaves with a `Set-Cookie`. So:
+  #
+  # - the session of a public request is never committed (`:skip`, which
+  #   the session middleware asks before it writes the cookie), whatever a
+  #   template read or wrote in it;
+  # - `protect_against_forgery?` answers false, which is what
+  #   `csrf_meta_tags` and every form helper ask before they print a token;
+  # - `form_authenticity_token`, which mints one without asking, answers nil.
+  #
+  # Nothing public needs either: every public route is a GET
+  # (`config/routes.rb`: `pages#show` only) and no action reads the session.
+  # A theme's GET form (a search box) works as before, and a form that posts
+  # to another service posts without a token of this application, which that
+  # service could not have checked anyway. `PreviewController` is not a
+  # `PublicController` and keeps both: it is signed in, private and never
+  # cached. `Theme::Check` refuses the same words in a theme's template with
+  # a message that says why; this is what holds for a spelling it does not
+  # see (`test/integration/theme_pages_test.rb`: "a public page drawn under
+  # a theme sets no cookie and carries no token").
+  before_action { request.session_options[:skip] = true }
+
   helper_method :public_urls
 
   private
+
+  def protect_against_forgery? = false
+
+  def form_authenticity_token(**) = nil
 
   # One `PublicSite::Urls` per request: every nav link, permalink and
   # hreflang alternate the response renders reads its host and preview state
