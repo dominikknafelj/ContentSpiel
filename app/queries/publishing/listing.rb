@@ -26,7 +26,7 @@ module Publishing
       # copies: a fixed number of statements, rows bounded by the limit.
       def posts(block, limit: nil, now: Time.current)
         settings = block.settings_object
-        scope = Post.where(published_at: ..now).kept.where(content_type: ContentTypes.names)
+        scope = Post.where(published_at: ..now).kept.where(content_type: ContentTypes.names) # public: rows (which posts are live, kept and of a type is the rows'; their content is rebuilt from copies below)
         scope = scope.where(content_type: settings.content_type) if settings.content_type.present?
         if settings.tag.to_s.strip.present?
           tag_id = block.listed_tag_id or return []
@@ -67,7 +67,7 @@ module Publishing
         filtered = blocks.select { |block| filter_name(block).present? }
         names = filtered.reject(&:tag_recorded?).map { |block| filter_name(block).downcase }.uniq
         # The lowest id of a name, as `ContentBlock#listed_tag_id` picks it.
-        by_name = names.empty? ? {} : Tag.named_any(names).order(:id).pluck(:name, :id)
+        by_name = names.empty? ? {} : Tag.named_any(names).order(:id).pluck(:name, :id) # public: rows (a tag's id by name, for a block that is a row)
           .each_with_object({}) { |(name, id), found| found[name.downcase] ||= id }
         filtered.each_with_object({}.compare_by_identity) do |block, found|
           found[block] = block.tag_recorded? ? block.listed_tag_id : by_name[filter_name(block).downcase]
@@ -91,12 +91,12 @@ module Publishing
       # chosen among the pages that ever had a copy listing posts, so a site's
       # other copies are neither grouped nor read.
       def blocks(now: Time.current)
-        pages = Page.kept
+        pages = Page.kept # public: rows (the pages that have no copy are judged by their rows, as written above)
         copying = pages.where.not(published_at: nil).where(id: Version.in_force(now).where(record_type: "Page").select(:record_id))
 
-        rows = ContentBlock.listing.where(owner_type: "Page", owner_id: pages.where.not(id: copying.select(:id)).select(:id)).includes(:owner).to_a
+        rows = ContentBlock.listing.where(owner_type: "Page", owner_id: pages.where.not(id: copying.select(:id)).select(:id)).includes(:owner).to_a # public: rows (list blocks of pages with no copy are rows by design)
         copies = current_copies_listing(now).where(record_id: copying.select(:id)).to_a
-        owners = Page.where(id: copies.map(&:record_id)).index_by(&:id)
+        owners = Page.where(id: copies.map(&:record_id)).index_by(&:id) # public: rows (the owners' ids and publication state; content is the copy's)
         copied = copies.flat_map do |version|
           Snapshot.blocks_from(version, owners.fetch(version.record_id)).select { |block| block.definition&.capability?(:lists_posts) }
         end
@@ -127,8 +127,8 @@ module Publishing
         newest = Version.unscoped.in_force(now).where(record_type: "Post").group(:record_id).select(Version.arel_table[:id].maximum)
         current = Version.unscoped.where(id: newest)
         copied = current.where(SqlNodes.array_contains(Version.arel_table[:tag_ids], [ tag_id ])).select(:record_id)
-        bare = PostTag.where(tag_id: tag_id).where.not(post_id: current.select(:record_id)).select(:post_id)
-        Post.where(id: copied).or(Post.where(id: bare))
+        bare = PostTag.where(tag_id: tag_id).where.not(post_id: current.select(:record_id)).select(:post_id) # public: rows (a post with no copy is judged by its rows' tags, as written above)
+        Post.where(id: copied).or(Post.where(id: bare)) # public: rows (ids only, from copies and from rows of posts with no copy)
       end
     end
   end

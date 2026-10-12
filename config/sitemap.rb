@@ -49,7 +49,7 @@ SitemapGenerator::Sitemap.create(include_root: false) do
   # in batches instead of being loaded into memory at once. `includes(:record)`
   # avoids an N+1 for the polymorphic `record` lookup below.
   PublicPath.current.includes(:record).find_each do |public_path|
-    record = public_path.record
+    record = public_path.record # public: rows (an address and whether it is visible are the rows'; the date comes from the copy)
     next unless visible.call(record)
 
     path = urls.path_for(record, public_path.locale)

@@ -40,7 +40,7 @@ module Blocks
     # lists the rows, as it always did. Either way the list components get
     # something they can walk and take the first of.
     def posts(settings)
-      return Publishing::Listing.posts(block, limit: settings.limit) unless helpers.public_urls.preview?
+      return Publishing::Listing.posts(block, limit: settings.limit) unless helpers.public_urls.preview? # public: rows (the list is chosen by Publishing::Listing; the line only names that call)
 
       rows = block.listed_posts.order(published_at: :desc).includes(:tags) # public: rows (the preview shows the working version)
       settings.limit.present? ? rows.limit(settings.limit) : rows

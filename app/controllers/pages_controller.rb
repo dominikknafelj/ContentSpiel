@@ -48,8 +48,8 @@ class PagesController < PublicController
       # `etag_key_of`) and the copy is read and rebuilt, blocks included, only
       # for a response that is rendered, so a 304 costs that statement and
       # not the page's weight.
-      light = result.record.is_a?(Page)
-      return render(:not_found, status: :not_found) unless light || assign_record(result.record)
+      light = result.record.is_a?(Page) # public: rows (the resolver's record is only asked its class here)
+      return render(:not_found, status: :not_found) unless light || assign_record(result.record) # public: rows (assign_record reads the copy through as_published)
 
       # `stale?` answers a matching `If-None-Match` with a bare 304 itself --
       # `render :show` below only ever runs for a genuinely stale request.
@@ -80,9 +80,9 @@ class PagesController < PublicController
       # and their variants are loaded only past `stale?`, for a response that
       # is actually rendered.
       expires_in 0, public: true, must_revalidate: true
-      keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) }
+      keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) } # public: rows (the ETag names the copy's id, not content)
       if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year ], public: true)
-        assign_record(result.record) if light
+        assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
         preload_page_images(@page)
         render :show
       end

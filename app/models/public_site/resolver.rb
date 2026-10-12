@@ -55,11 +55,11 @@ module PublicSite
     private
 
     def from_row(row, locale)
-      return Result.not_found unless visible?(row.record)
-      return Result.found(row.record) if row.current
+      return Result.not_found unless visible?(row.record) # public: rows (visibility is the tree and publish state, which no copy holds)
+      return Result.found(row.record) if row.current # public: rows (the resolver hands the record on; the controller reads its copy)
 
-      target = @urls.path_for(row.record, locale)
-      target ? Result.redirect(target, record: row.record) : Result.not_found
+      target = @urls.path_for(row.record, locale) # public: rows (an address is the rows')
+      target ? Result.redirect(target, record: row.record) : Result.not_found # public: rows (the resolver hands the record on; the controller reads its copy)
     end
 
     # "A listing page's path + a post slug" where the post lives canonically
@@ -80,7 +80,7 @@ module PublicSite
       # no published copy does yet (a list block added to a live page and not
       # published). The preview shows the rows, so it shows the post here,
       # on the page that lists it; a visitor gets the 404 below.
-      Result.found(post, listing_page: page_row.record) if @scope == :preview
+      Result.found(post, listing_page: page_row.record) if @scope == :preview # public: rows (the preview shows the working version)
     end
 
     # Whether `page` lists `post`: for a visitor by the page's copy and the

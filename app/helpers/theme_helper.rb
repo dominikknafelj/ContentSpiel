@@ -34,7 +34,7 @@ module ThemeHelper
   end
 
   def navigation_pages
-    theme_root_page ? published_views(theme_root_page.children.kept.published) : []
+    theme_root_page ? published_views(theme_root_page.children.kept.published) : [] # public: rows (the menu's membership and order are the rows' (the tree); titles come from published_views)
   end
 
   def home_url_path
