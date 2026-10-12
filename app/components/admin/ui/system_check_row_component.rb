@@ -14,7 +14,8 @@ module Admin
     #
     # The command is rendered as text (ERB-escaped) and copied from the
     # `text` value; it is a static string (`Setup::SystemCheck::
-    # MAIL_FALLBACK_COMMAND`), never built from anything of the viewer's.
+    # MAIL_FALLBACK_COMMAND`, `SITE_ADDRESS_COMMAND`), never built from
+    # anything of the viewer's.
     class SystemCheckRowComponent < AdminComponent
       def initialize(result:, copyable: true)
         @result = result

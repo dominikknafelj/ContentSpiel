@@ -39,6 +39,12 @@ module Setup
       "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).".freeze
     MAIL_FALLBACK_COMMAND = %(bin/rails runner 'p Users::UpdatePassword.call(User.find_by!(email_address: "you@example.com"), password: "a new password", password_confirmation: "a new password").ok?').freeze
 
+    # What the "Site address" warning offers to copy: the variable with a
+    # placeholder address, a fixed string like the command above. The check's
+    # OK message does name the configured origin, which is the address the
+    # site is published at and no secret.
+    SITE_ADDRESS_COMMAND = "PUBLIC_HOST=https://www.example.org".freeze
+
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
     # uploading -- if the upload fails (the case this probe exists to catch),
@@ -64,11 +70,17 @@ module Setup
 
     def self.run(**options) = new(**options).run
 
+    # `address` is the site's configured address (`SiteAddress`). `request_ssl`
+    # is whether the request that asked for the checks came over an encrypted
+    # connection (`request.ssl?`, which both screens hand over): nil when
+    # nobody said, as from the console, and then there is nothing to say
+    # about HTTPS. `production` is handed in so a test can say it.
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       mail_delivery_method: ActionMailer::Base.delivery_method,
       mail_smtp_address: ActionMailer::Base.smtp_settings[:address],
-      mail_host: ActionMailer::Base.default_url_options[:host])
+      mail_host: ActionMailer::Base.default_url_options[:host],
+      address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -76,13 +88,47 @@ module Setup
       @mail_delivery_method = mail_delivery_method.to_s
       @mail_smtp_address = mail_smtp_address.to_s
       @mail_host = mail_host.to_s
+      @address = address
+      @request_ssl = request_ssl
+      @production = production
     end
 
     def run
-      [ storage, image_processing, background_jobs, mail ]
+      [ site_address, https, storage, image_processing, background_jobs, mail ].compact
     end
 
     private
+      # Without an address the app accepts any Host header and builds the
+      # addresses in its pages from it, and in production sends no reset
+      # mail at all (`PasswordsMailer`: a link taken from the request could
+      # be made to point anywhere).
+      def site_address
+        if @address.configured?
+          ok("Site address", "This site answers at #{@address.origin}.")
+        else
+          warning("Site address", "No site address is set. Any host name is accepted, addresses in pages follow the request, " \
+            "and password reset mails are not sent until it is set.", command: SITE_ADDRESS_COMMAND)
+        end
+      end
+
+      # Production only, and only for a request: nil (no row) otherwise. A
+      # development server is plain HTTP on purpose. With an https address
+      # set, plain HTTP is redirected before it reaches the app
+      # (`HostSettings.apply`), so the warning is seen only where the address
+      # is an http one or missing, and its last sentence is right for both.
+      # The same fact raises `Admin::Ui::InsecureNoticeComponent`.
+      def https
+        return nil unless @production
+        return nil if @request_ssl.nil?
+
+        if @request_ssl
+          ok("HTTPS", "This page was reached over an encrypted connection.")
+        else
+          warning("HTTPS", "This page was reached over plain HTTP. Passwords and sessions can be read on the way. " \
+            "Set PUBLIC_HOST to an https address.")
+        end
+      end
+
       def storage
         if probe(@storage_probe)
           ok("File storage", "Uploads can be stored and read back.")

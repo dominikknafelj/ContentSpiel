@@ -10,7 +10,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     get setup_step_path("system_check")
 
     assert_response :success
-    %w[File\ storage Image\ processing Background\ jobs Outgoing\ mail].each do |label|
+    %w[Site\ address File\ storage Image\ processing Background\ jobs Outgoing\ mail].each do |label|
       assert_includes response.body, label
     end
     assert_select "a[href=?]", setup_step_path("admin"), text: "Continue"
@@ -24,6 +24,31 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_select "code", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND
     assert_select "button", text: "Copy", count: 0
     assert_select "[data-controller='admin--ui--clipboard']", count: 0
+  end
+
+  # The wizard is where a new site is first seen, often before its address
+  # and its certificate are in place: it says both, from this request.
+  test "the system check says how this request came, in production only, and what the site's address is" do
+    get setup_step_path("system_check")
+    assert_select "li.admin-system-check", text: /HTTPS/, count: 0
+
+    was = Rails.env
+    begin
+      Rails.env = "production"
+      get setup_step_path("system_check")
+    ensure
+      Rails.env = was
+    end
+    assert_select "li.admin-system-check[data-status=warning]", text: /HTTPS\s+This page was reached over plain HTTP\./
+
+    with_site_address(nil) do
+      get setup_step_path("system_check")
+
+      assert_select "li.admin-system-check[data-status=warning]", text: /Site address\s+No site address is set\./ do
+        assert_select "code", text: "PUBLIC_HOST=https://www.example.org"
+      end
+      assert_select "button", text: "Copy", count: 0
+    end
   end
 
   test "the step list marks the current step, done steps and optional ones" do

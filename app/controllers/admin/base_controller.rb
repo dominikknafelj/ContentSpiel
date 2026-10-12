@@ -68,6 +68,14 @@ module Admin
       { label: "Audit log", icon: :audit, path: :admin_audit_events_path, permission: "audit.view", group: :system }
     ].freeze
 
+    # The rights that make someone a person who runs the site, for the
+    # plain-HTTP notice in the shell (`insecure_notice_viewer?`): the one
+    # that changes the site's settings and the one that opens System
+    # status, where the same fact is the "HTTPS" check. An editor can do
+    # nothing about the connection and is not shown a warning on every
+    # screen.
+    INSECURE_NOTICE_PERMISSIONS = %w[settings.manage system_status.view].freeze
+
     FORBIDDEN_MESSAGE = "You don't have permission to open this."
 
     layout "admin"
@@ -84,7 +92,8 @@ module Admin
     # always UTC until now.
     around_action :use_site_time_zone
 
-    helper_method :admin_locale, :admin_url_options, :root_page, :pages_landing_path, :admin_modules, :trash_badge_count, :notes_badge_count
+    helper_method :admin_locale, :admin_url_options, :root_page, :pages_landing_path, :admin_modules, :trash_badge_count, :notes_badge_count,
+      :insecure_notice_viewer?
 
     # A record outside the viewer's scope and a record that doesn't exist
     # answer identically (access-control design spec §3.3) -- now inside the
@@ -153,6 +162,12 @@ module Admin
     end
 
     def holds_any?(keys) = Array(keys).any? { |key| can?(key) }
+
+    # Who the shell tells that CS Studio was reached over plain HTTP
+    # (`Admin::Ui::InsecureNoticeComponent`, in the layout): whoever runs
+    # the site. Navigation, not a gate: it decides what is drawn, and
+    # nothing is refused by it.
+    def insecure_notice_viewer? = holds_any?(INSECURE_NOTICE_PERMISSIONS)
 
     def first_admin_module_path
       entry = admin_modules.first

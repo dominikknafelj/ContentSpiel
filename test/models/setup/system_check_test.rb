@@ -6,7 +6,64 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+    assert_equal [ "Site address", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+  end
+
+  test "in production with the request's facts, HTTPS comes second" do
+    labels = run_check(production: true, request_ssl: true).map(&:label)
+
+    assert_equal [ "Site address", "HTTPS", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+  end
+
+  test "a configured site address is named by its origin" do
+    check = result("Site address", run_check(address: SiteAddress.parse("https://www.example.org/")))
+
+    assert check.ok?
+    assert_equal "This site answers at https://www.example.org.", check.message
+    assert_nil check.command
+  end
+
+  test "no site address is a warning that says what follows from it, with the variable to set" do
+    check = result("Site address", run_check(address: SiteAddress.parse(nil)))
+
+    assert_equal :warning, check.status
+    assert_equal "No site address is set. Any host name is accepted, addresses in pages follow the request, " \
+      "and password reset mails are not sent until it is set.", check.message
+    assert_equal "PUBLIC_HOST=https://www.example.org", check.command
+  end
+
+  test "the address defaults to the site's own" do
+    with_site_address("https://docs.example.org") do
+      assert_equal "This site answers at https://docs.example.org.", result("Site address", Setup::SystemCheck.run).message
+    end
+    with_site_address(nil) do
+      assert_equal :warning, result("Site address", Setup::SystemCheck.run).status
+    end
+  end
+
+  test "HTTPS in production: an encrypted request is ok" do
+    check = result("HTTPS", run_check(production: true, request_ssl: true))
+
+    assert check.ok?
+    assert_equal "This page was reached over an encrypted connection.", check.message
+  end
+
+  test "HTTPS in production: a plain request is a warning that says what to set" do
+    check = result("HTTPS", run_check(production: true, request_ssl: false))
+
+    assert_equal :warning, check.status
+    assert_equal "This page was reached over plain HTTP. Passwords and sessions can be read on the way. " \
+      "Set PUBLIC_HOST to an https address.", check.message
+    assert_nil check.command
+  end
+
+  test "HTTPS is left out when nobody said how the page was reached, and outside production" do
+    assert_nil result("HTTPS", run_check(production: true, request_ssl: nil))
+    assert_nil result("HTTPS", run_check(production: true))
+    assert_nil result("HTTPS", run_check(production: false, request_ssl: false))
+    assert_nil result("HTTPS", run_check(production: false, request_ssl: true))
+    # The default is the environment's, and the tests do not run in production.
+    assert_nil result("HTTPS", Setup::SystemCheck.run(request_ssl: false))
   end
 
   test "the real storage probe works against the test disk service" do
@@ -110,11 +167,17 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_nil check.docs
   end
 
-  test "only the mail warning carries a command" do
-    commands = run_check(storage_probe: -> { false }, image_probe: -> { false }, mail_host: "example.com").map(&:command)
+  # A command is shown to anyone who may view the status page and, in the
+  # wizard, before anyone is signed in: each is a fixed string.
+  test "only the site address and the mail warnings carry a command, each a fixed string" do
+    results = run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
+      storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
+      mail_host: "example.com")
 
-    assert_equal [ nil, nil, nil ], commands.first(3)
-    assert_predicate commands.last, :present?
+    assert results.none?(&:ok?)
+    assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Outgoing mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
+      results.select(&:command).to_h { |check| [ check.label, check.command ] })
+    assert Setup::SystemCheck::SITE_ADDRESS_COMMAND.frozen?
   end
 
   test "configured SMTP with a real host is ok" do
@@ -129,7 +192,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       defaults = {
         storage_probe: -> { true }, image_probe: -> { true }, worker_alive_probe: -> { true },
         queue_adapter: "async", mail_delivery_method: :smtp, mail_smtp_address: "smtp.example.org",
-        mail_host: "cms.example.org"
+        mail_host: "cms.example.org", address: SiteAddress.parse("https://cms.example.org")
       }
       Setup::SystemCheck.run(**defaults.merge(overrides))
     end

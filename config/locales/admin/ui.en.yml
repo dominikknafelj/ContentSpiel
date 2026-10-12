@@ -20,6 +20,12 @@ en:
         confirm_dialog:
           cancel: "Cancel"
 
+        # Shown on sign-in, on the password pages and in the shell when CS
+        # Studio is reached over plain HTTP in production. `PUBLIC_HOST` is the
+        # environment variable's name and is not translated.
+        insecure_notice:
+          body: "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address."
+
         toast:
           dismiss: "Dismiss"
           # What the layout's `<template id="toast-error-template">` is cloned
