@@ -84,7 +84,18 @@ class Admin::TokensRelatedPostsAndStarterPagesSystemTest < ApplicationSystemTest
       press "Create starter pages"
     end
 
-    assert_text "Starter pages created"
+    # The answer to this press is the slowest in CS Studio: the POST writes
+    # three pages, their posts and blocks and every derived row (568
+    # statements, 0.4 s on an idle laptop), and its redirect then renders the
+    # whole editor again. On a two-core runner or a loaded machine that is
+    # more than Capybara's default 2 s, and nothing was wrong: the failure's
+    # screenshot showed the old page with Turbo's progress bar still running
+    # (the same failure comes from delaying `StarterContents::Add` by 1.6 s).
+    # An answer that lands just as the 2 s run out can read as an Error
+    # instead, "Unable to find visible xpath /html": the last poll has found
+    # <html>, the visit resets Chrome's node ids before it is read
+    # (`StaleNodeAtOnce`), and Capybara reports a stale node as not found.
+    assert_text "Starter pages created", wait: 10
     within("#tree") { assert_text "Blog" }
   end
 end
