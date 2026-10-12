@@ -22,6 +22,9 @@ require "rails/test_unit/railtie"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# lib/ is not autoloaded; the site's address is read at boot.
+require_relative "../lib/site_address"
+
 module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.

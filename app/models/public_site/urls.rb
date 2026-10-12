@@ -10,7 +10,7 @@ module PublicSite
     # the request's own origin then, rather than to the placeholder below,
     # which would hand an editor a link to a domain that isn't theirs.
     def self.configured_host
-      ENV["PUBLIC_HOST"].presence || ENV["SITEMAP_HOST"].presence
+      SiteAddress.current.origin
     end
 
     def self.default_host
