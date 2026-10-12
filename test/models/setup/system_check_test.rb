@@ -174,6 +174,48 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_no_match(/keeps it built/, check.message + default.message)
   end
 
+  # R3 of the re-review. A build takes the stamp away before it starts and
+  # writes it after it succeeded (`ThemeCss.build`), and a fresh checkout
+  # has none: with no stamp nothing "was built for another theme". The probe
+  # answers nil for that, and the row says what is so, with the same command.
+  test "with no stamp at all the row says the stylesheet was not built or its build failed, for either theme, with the command" do
+    default = result("Theme", run_check(theme: Theme.new, production: false, stylesheet_probe: -> { nil }))
+
+    assert_equal :warning, default.status
+    assert_equal "The default theme is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+      "is drawn with an earlier build's styles or with none. Build it without THEME_PATH: run this command, or start bin/dev " \
+      "again. If the build fails, it says why where it runs.", default.message
+    assert_equal "bin/rails tailwindcss:build", default.command
+    assert_no_match(/another theme/, default.message)
+
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    themed = result("Theme", run_check(theme: theme, production: false, stylesheet_probe: -> { nil }))
+
+    assert_equal "The theme “plain” is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+      "is drawn with an earlier build's styles or with none. Build it with THEME_PATH set as the server has it: run this " \
+      "command, or start bin/dev again. If the build fails, it says why where it runs.", themed.message
+    assert_equal "bin/rails tailwindcss:build", themed.command
+
+    production = result("Theme", run_check(theme: theme, production: true, request_ssl: true, stylesheet_probe: -> { nil }))
+    assert_equal "The theme “plain” is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+      "is drawn with an earlier build's styles or with none. Build the site's image again: assets:precompile with THEME_PATH set.",
+      production.message
+    assert_nil production.command
+  end
+
+  test "the row's own probe tells no stamp from another theme's" do
+    Dir.mktmpdir("root") do |root|
+      probe = Setup::SystemCheck.stylesheet_probe(Theme.new, root: root)
+      assert_nil probe.call, "no stamp"
+
+      ThemeCss.stamp!(ThemeFolder.new(nil), root: root)
+      assert_equal true, probe.call
+
+      ThemeCss.stamp!(ThemeFolder.new(ThemeTestHelper::PLAIN), root: root)
+      assert_equal false, probe.call, "another theme's"
+    end
+  end
+
   test "a probe that raises is a stylesheet that was not built for the theme, and never a path" do
     check = result("Theme", run_check(theme: Theme.new, stylesheet_probe: -> { raise Errno::EACCES, "/rails/app/assets/builds/theme.stamp" }))
 

@@ -117,7 +117,18 @@ module Setup
       @production = production
       @reset_link_from_request = reset_link_from_request
       @theme = theme
-      @stylesheet_probe = stylesheet_probe || -> { ThemeFolder.stamp(Rails.root) == theme.fingerprint }
+      @stylesheet_probe = stylesheet_probe || self.class.stylesheet_probe(theme)
+    end
+
+    # Whether the public stylesheet was built for `theme`, in three answers:
+    # true (the build's stamp is the theme's fingerprint), false (it is
+    # another theme's, or an earlier state's of this one) and nil (there is
+    # no stamp: nothing was built in this checkout, or the last build
+    # failed, since a build takes the stamp away before it starts and writes
+    # it after it succeeded, `ThemeCss.build`). The row has a sentence for
+    # each of the two that are not true.
+    def self.stylesheet_probe(theme, root: Rails.root)
+      -> { ThemeFolder.stamp(root)&.then { |stamp| stamp == theme.fingerprint } }
     end
 
     def run
@@ -190,8 +201,11 @@ module Setup
       # And whether the stylesheet is that theme's: the build stamps its
       # output with the fingerprint of the theme it was built for
       # (`ThemeCss.stamp!`), and a stamp that is another's, or none, means
-      # the right templates are drawn with the wrong styles. Two wordings,
-      # because what a person does about it differs:
+      # the right templates are drawn with the wrong styles. No stamp has a
+      # sentence of its own ("has not been built, or its last build
+      # failed"): a fresh checkout and a failed build were built for no
+      # other theme. For a stamp that is another's, two wordings, because
+      # what a person does about it differs:
       # - in production the boot already refuses such a stylesheet
       #   (config/application.rb), so the warning is seen only where that
       #   check was passed over (a process started with
@@ -210,11 +224,22 @@ module Setup
         described = @theme.configured? ? "The theme “#{@theme.name}”" : "The default theme"
         with = @theme.configured? ? "with THEME_PATH set" : "without THEME_PATH"
 
-        if probe(@stylesheet_probe)
+        built = probe(@stylesheet_probe)
+        if built
           if @theme.configured?
             ok("Theme", "#{described} draws the site (#{@theme.template_count} templates, fingerprint #{@theme.fingerprint[0, 8]}).")
           else
             ok("Theme", "#{described} draws the site (THEME_PATH is not set).")
+          end
+        elsif built.nil?
+          # No stamp at all: nothing here "was built for another theme".
+          missing = "#{described} is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+            "is drawn with an earlier build's styles or with none."
+          if @production
+            warning("Theme", "#{missing} Build the site's image again: assets:precompile #{with}.")
+          else
+            warning("Theme", "#{missing} Build it #{with}#{" as the server has it" if @theme.configured?}: run this command, " \
+              "or start bin/dev again. If the build fails, it says why where it runs.", command: STYLESHEET_COMMAND)
           end
         elsif @production
           warning("Theme", "#{described} is set, but the stylesheet was built for another theme, so the site is drawn " \
