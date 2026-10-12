@@ -31,7 +31,14 @@ module Editing
       "post.updated" => SAVED, "post.published" => SAVED, "post.unpublished" => SAVED, "post.scheduled" => SAVED,
       "post.translation_confirmed" => SAVED, "post.trashed" => GONE, "post.purged" => GONE,
       "block.created" => STRUCTURE, "block.deleted" => STRUCTURE, "block.reordered" => STRUCTURE,
-      "block.updated" => SAVED, "block.translation_confirmed" => SAVED
+      "block.updated" => SAVED, "block.translation_confirmed" => SAVED,
+      # A discard runs the save and block services, which signal their own
+      # saves and structure; this one makes an open editor read the record's
+      # form and the header's chip once more at the end. A cancelled change
+      # writes no row an editor shows, but the chip and the buttons of every
+      # open header follow it.
+      "page.changes_discarded" => SAVED, "post.changes_discarded" => SAVED,
+      "page.scheduled_change_cancelled" => SAVED, "post.scheduled_change_cancelled" => SAVED
     }.freeze
 
     SILENT = {

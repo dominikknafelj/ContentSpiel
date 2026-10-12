@@ -63,6 +63,58 @@ module Publishing
       PublicSite::Paths.foresee(record, now: now)
     end
 
+    # A per-language value without the languages that hold nothing: a blank,
+    # and a rich-text document with no content. A body is emptied by writing
+    # an empty document (`HasRichTextBody#assign_body` never deletes a
+    # language), so a language typed into and emptied again, or one a discard
+    # emptied, is the same as a language that was never written: a visitor
+    # is shown the same nothing. Also for `Publishing::DiscardChanges`, which
+    # must judge "differs" exactly as this does.
+    def self.languages_with_text(value)
+      return {} unless value.is_a?(Hash)
+
+      value.compact_blank.reject { |_locale, text| text.is_a?(Hash) && text["type"] == "doc" && RichText::Document.new(text).blank? }
+    end
+
+    # A BLOCK THAT CAME BACK UNDER A NEW ID is the block it was. "Discard
+    # changes" creates a block the rows had lost again, as a new row
+    # (`Publishing::DiscardChanges`), and nothing a visitor or an editor can
+    # see tells it from the one in the copy: read by id alone it would be one
+    # block removed and one added until the next publish, and the next
+    # discard would delete it (with its notes) to create it once more. So a
+    # block only the rows have STANDS FOR a block only the copy has when the
+    # two are the same in every content column and in their place (the same
+    # column of the same container, a section itself being judged this way
+    # first), each once, in reading order.
+    #
+    # `{ the row's id => the copy's id }` for such pairs, from the two sides
+    # in the form a copy stores blocks in. For `changed_blocks` and for the
+    # discard, which must agree on which block is which.
+    def self.stand_ins(was, now)
+      known = now.map { |block| block["id"] }.to_set
+      lost = was.reject { |block| known.include?(block["id"]) }
+      return {} if lost.empty?
+
+      copied = was.map { |block| block["id"] }.to_set
+      stands_for = {}
+      # Top-level blocks (the sections among them) before the blocks inside.
+      now.reject { |block| copied.include?(block["id"]) }.partition { |block| block["section_id"].nil? }.flatten.each do |block|
+        place = [ stands_for.fetch(block["section_id"], block["section_id"]), block["section_column"] ]
+        twin = lost.find { |old| old.values_at("section_id", "section_column") == place && same_content?(old, block) } or next
+        lost.delete(twin)
+        stands_for[block["id"]] = twin["id"]
+      end
+      stands_for
+    end
+
+    def self.same_content?(one, other)
+      BLOCK_CONTENT.all? do |name|
+        next one[name] == other[name] unless BLOCK_TRANSLATED.include?(name)
+
+        languages_with_text(one[name]) == languages_with_text(other[name])
+      end
+    end
+
     private
 
     def changed_fields(was, now)
@@ -80,15 +132,18 @@ module Publishing
     def differs?(before, after, translated:)
       return before != after unless translated
 
-      before = before.is_a?(Hash) ? before.compact_blank : {}
-      after = after.is_a?(Hash) ? after.compact_blank : {}
+      before = self.class.languages_with_text(before)
+      after = self.class.languages_with_text(after)
       (before.keys | after.keys).select { |locale| before[locale] != after[locale] }.each { |locale| @changed_locales << locale }.any?
     end
 
     def changed_blocks(was, now)
+      rows = ContentBlock.where(id: now.map { |block| block["id"] }).index_by(&:id)
+      stands_for = self.class.stand_ins(was, now)
+      rows = rows.transform_keys { |id| stands_for.fetch(id, id) }
+      now = now.map { |block| block.merge("id" => stands_for.fetch(block["id"], block["id"]), "section_id" => stands_for.fetch(block["section_id"], block["section_id"])) }
       before = was.index_by { |block| block["id"] }
       after = now.index_by { |block| block["id"] }
-      rows = ContentBlock.where(id: after.keys).index_by(&:id)
       # A block that changed container is moved whatever the order says, so
       # it takes no part in finding the ones that stayed in place.
       stayed = ->(id) { before[id] && after[id] && before[id].values_at("section_id", "section_column") == after[id].values_at("section_id", "section_column") }

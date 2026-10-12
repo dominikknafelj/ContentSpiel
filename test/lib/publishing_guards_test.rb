@@ -36,12 +36,20 @@ class PublishingGuardsTest < ActiveSupport::TestCase
   end
 
   # The model's own file is exempt above, so its writers are named here:
-  # `take!`, which writes a copy and removes a pending one; `repoint_tag!`,
+  # `take!`, which writes a copy and removes a pending one;
+  # `withdraw_pending!`, which removes a pending one and nothing else; `repoint_tag!`,
   # which replaces a merged tag's id (a reference that is about to name
   # nothing; drafts fix round, Task 4); and `settle!`, which marks a copy
   # whose coming into force is being acted on (Task 4b). Neither of the last
   # two touches what a copy shows.
-  WRITERS_IN_THE_MODEL = %w[take! repoint_tag! settle!].freeze
+  WRITERS_IN_THE_MODEL = %w[take! repoint_tag! settle! withdraw_pending!].freeze
+  # `withdraw_pending!` deletes the one copy that was never public (its time
+  # has not come): "Cancel scheduled change", and a discard, which goes back
+  # to what is in force (Task 7).
+  WITHDRAWERS = {
+    "app/services/publishing/cancel_scheduled_change.rb" => "Cancel scheduled change withdraws the pending copy",
+    "app/services/publishing/discard_changes.rb" => "a discard goes back to the copy in force, so a scheduled change goes with it"
+  }.freeze
   REPOINTERS = { "app/services/tags/merge.rb" => "a merge replaces the merged tag's id in the copies" }.freeze
   SETTLERS = { "app/models/public_site/paths.rb" => "refresh settles the due copies and re-derives their records in one transaction" }.freeze
 
@@ -49,7 +57,7 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     sources("app", "lib").select { |path, source| path != "app/models/publishing/version.rb" && source.lines.any? { |line| !line.strip.start_with?("#") && line.include?(name) } }.keys
   end
 
-  test "inside Publishing::Version only take!, repoint_tag! and settle! write a row; only Tags::Merge repoints and only PublicSite::Paths settles" do
+  test "inside Publishing::Version only take!, repoint_tag!, settle! and withdraw_pending! write a row; only Tags::Merge repoints, only PublicSite::Paths settles and only the cancel and the discard withdraw" do
     writing = []
     method = nil
     Rails.root.join("app/models/publishing/version.rb").read.each_line do |line|
@@ -62,6 +70,7 @@ class PublishingGuardsTest < ActiveSupport::TestCase
 
     assert_equal REPOINTERS.keys, callers_of("repoint_tag!")
     assert_equal SETTLERS.keys, callers_of("settle!")
+    assert_equal WITHDRAWERS.keys.sort, callers_of("withdraw_pending!").sort
   end
 
   # "A live record has a copy" is not enforced by the database or by a

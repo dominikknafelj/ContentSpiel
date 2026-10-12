@@ -828,6 +828,31 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       ok! Locales::Configure.call([ { "code" => "es" }, { "code" => "de" }, { "code" => "en", "fallbacks" => [ "de" ] } ])
       assert_parity "reordering languages and changing a fallback"
 
+      # -- discarding, and cancelling a scheduled change (Task 7) -----------------
+      # A live page's list block changed and removed in its rows, a post's
+      # tags and text changed in its rows: nothing moved, and a discard
+      # writes the copies back through the same services, so nothing moves
+      # then either.
+      before = [ current(wire), current(hello), current(old) ]
+      ok! ContentBlocks::Save.call(press_block.reload, attributes: { settings: { content_type: "now_update", tag: "" } })
+      ok! ContentBlocks::Destroy.call(archive_block.reload)
+      ok! Posts::Save.call(wire.reload, attributes: { tag_names: %w[somewhere else] }, translations: { "en" => { title: "Wired" } })
+      assert_parity "changing live rows that a discard will put back"
+      ok! Publishing::DiscardChanges.call(press.reload)
+      ok! Publishing::DiscardChanges.call(archive.reload)
+      ok! Publishing::DiscardChanges.call(wire.reload)
+      assert_equal before, [ current(wire), current(hello), current(old) ]
+      assert_parity "discarding the changes of two listing pages and a post"
+
+      ok! ContentBlocks::Destroy.call(ContentBlock.where(owner: archive).listing.first)
+      publish_changes(archive, at: 2.days.from_now)
+      assert_parity "scheduling the removal of a listing block"
+      ok! Publishing::CancelScheduledChange.call(archive.reload)
+      assert_equal before, [ current(wire), current(hello), current(old) ]
+      assert_parity "cancelling that scheduled change"
+      ok! Publishing::DiscardChanges.call(archive.reload)
+      assert_parity "discarding what the cancelled change left in the rows"
+
       # -- for good ------------------------------------------------------------
       ok! Trash::Move.call(blog.reload)
       ok! Trash::Purge.call(blog.reload)

@@ -392,6 +392,19 @@ module ServiceCalls
       { call: -> { Publishing::PublishChanges.call(page) }, permission: "pages.publish", on: page }
     },
 
+    "Publishing::DiscardChanges" => lambda {
+      page = create_page(title: "Live")
+      Pages::Save.call(page, translations: { "en" => { title: "Edited" } })
+      { call: -> { Publishing::DiscardChanges.call(page) }, permission: "pages.edit", on: page }
+    },
+
+    "Publishing::CancelScheduledChange" => lambda {
+      page = create_page(title: "Live")
+      Pages::Save.call(page, translations: { "en" => { title: "Edited" } })
+      Publishing::PublishChanges.call(page, at: 2.days.from_now)
+      { call: -> { Publishing::CancelScheduledChange.call(page) }, permission: "pages.publish", on: page }
+    },
+
     "Posts::Save" => lambda {
       post = create_post(title: "Edit me", published: false, tags: [ "kept" ])
       { call: -> { Posts::Save.call(post, attributes: { published: true, tag_names: [ "other" ] }, translations: { "en" => { title: "Edited" } }) },

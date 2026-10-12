@@ -490,4 +490,28 @@ class Media::UsageIndexTest < ViewComponent::TestCase
     assert_not off_asset.usages.exists?(role: "published")
     assert trashed_asset.usages.exists?(role: "published")
   end
+
+  test "media:reindex leaves exactly the rows a discard and a cancelled scheduled change leave" do
+    published, typed, scheduled, in_block = Array.new(4) { create_media_asset }
+    discarded = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: published.id }, translations: { "en" => { title: "Discarded" } }).record
+    assert Pages::Save.call(discarded, attributes: { hero_media_asset_id: typed.id }).ok?
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: discarded), attributes: { block_type: "image", media_asset_id: in_block.id }).ok?
+    cancelled = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: published.id }, translations: { "en" => { title: "Cancelled" } }).record
+    assert Pages::Save.call(cancelled, attributes: { hero_media_asset_id: scheduled.id }).ok?
+    publish_changes(cancelled, at: 2.days.from_now)
+    assert Pages::Save.call(cancelled, attributes: { hero_media_asset_id: typed.id }).ok?
+
+    assert Publishing::DiscardChanges.call(discarded.reload).ok?
+    assert Publishing::CancelScheduledChange.call(cancelled.reload).ok?
+
+    assert_equal [ [ "Page", discarded.id, "hero" ], [ "Page", discarded.id, "published" ], [ "Page", cancelled.id, "published" ] ].sort,
+      published.usages.pluck(:owner_type, :owner_id, :role).sort
+    assert_equal [ [ "Page", cancelled.id, "hero" ] ], typed.usages.pluck(:owner_type, :owner_id, :role)
+    assert_empty scheduled.usages
+    assert_empty in_block.usages
+    expected = usage_tuples.sort
+    Media::Usage.delete_all
+    assert_equal 0, Media::UsageIndex.rebuild_all
+    assert_equal expected, usage_tuples.sort
+  end
 end

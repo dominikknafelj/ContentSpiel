@@ -190,6 +190,35 @@ class TranslationStateParityTest < ActiveSupport::TestCase
     end
   end
 
+  test "discarding the changes of a live page and of a live post keeps the index in step, block for block" do
+    as_owner do
+      page = create_page(title: "About", published: false)
+      kept = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "rich_text" },
+        translations: { "en" => { body: rich_doc("Text") }, "de" => { body: rich_doc("Text DE") } }).record
+      gone = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("Second") } }).record
+      assert Pages::Save.call(page, attributes: { published: true }, translations: { "de" => { title: "Über" } }).ok?
+      post = Posts::Save.call(attributes: { content_type: "blog", published: true }, translations: { "en" => { title: "Hello", body: rich_doc("Body") }, "de" => { title: "Hallo" } }).record
+      assert_parity page, post
+
+      assert Pages::Save.call(page, translations: { "en" => { title: "About us" }, "es" => { title: "Sobre" } }).ok?
+      assert ContentBlocks::Save.call(kept, translations: { "en" => { body: rich_doc("Text changed") }, "es" => { body: rich_doc("Texto") } }).ok?
+      assert ContentBlocks::Destroy.call(gone).ok?
+      assert ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "rich_text" }, translations: { "de" => { body: rich_doc("Neu") } }).ok?
+      assert Posts::Save.call(post, translations: { "en" => { title: "Hello again", body: rich_doc("Changed") }, "es" => { title: "Hola" } }).ok?
+      assert_parity page, post
+
+      assert Publishing::DiscardChanges.call(page.reload).ok?
+      assert Publishing::DiscardChanges.call(post.reload).ok?
+      assert_parity page, post
+      assert_empty Translations::State.where(record_type: "ContentBlock").where.not(record_id: ContentBlock.select(:id)), "no row is left for a block the discard deleted"
+
+      assert Pages::Save.call(page, translations: { "en" => { title: "About us" } }).ok?
+      publish_changes(page, at: 2.days.from_now)
+      assert Publishing::CancelScheduledChange.call(page.reload).ok?
+      assert_parity page
+    end
+  end
+
   test "purging a post removes its rows" do
     as_owner do
       post = create_post(title: "Hello")

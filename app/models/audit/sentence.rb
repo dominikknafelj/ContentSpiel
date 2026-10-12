@@ -51,12 +51,14 @@ module Audit
       "purged" => [ "permanently deleted ", "" ], "uploaded" => [ "uploaded ", "" ],
       "translation_confirmed" => [ "marked a translation of ", " as up to date" ],
       "taken_over" => [ "took over editing ", "" ],
-      "changes_published" => [ "published changes to ", "" ]
+      "changes_published" => [ "published changes to ", "" ],
+      "changes_discarded" => [ "discarded the unpublished changes to ", "" ],
+      "scheduled_change_cancelled" => [ "cancelled the scheduled changes to ", "" ]
     }.freeze
 
     CONTENT_ACTIONS = {
-      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published],
-      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published],
+      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
+      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
       "media" => %w[uploaded updated trashed restored purged translation_confirmed],
       "settings" => %w[translation_confirmed]
     }.freeze

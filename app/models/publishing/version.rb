@@ -1,9 +1,10 @@
 module Publishing
   # One published copy of a page or post. Its content is written once, by
   # `take!`, and never changed (`readonly?`); the only row ever removed is one
-  # whose `live_at` is still in the future, replaced by the next `take!`. Two
-  # things about a copy that are not its content are written afterwards, each
-  # by one method here: `settled_at` (`settle!`) and a merged tag's id
+  # whose `live_at` is still in the future: replaced by the next `take!`, or
+  # withdrawn (`withdraw_pending!`: "Cancel scheduled change", and a discard).
+  # Two things about a copy that are not its content are written afterwards,
+  # each by one method here: `settled_at` (`settle!`) and a merged tag's id
   # (`repoint_tag!`).
   #
   # THE ORDER OF COPIES. `live_at` is never earlier than the moment a copy is
@@ -107,6 +108,21 @@ module Publishing
 
         version
       end
+    end
+
+    # WITHDRAWS THE COPY THAT WAITS FOR ITS TIME, if there is one: a pending
+    # copy was never public, so it may be deleted (drafts spec §7). Answers the
+    # numbers of what was removed (none or one); a number is not given out
+    # again. For `Publishing::CancelScheduledChange` and
+    # `Publishing::DiscardChanges` alone (`test/lib/publishing_guards_test.rb`),
+    # each of which holds the record's row lock, as `take!` does, and
+    # refreshes the images in use afterwards. Nothing public moves: a pending
+    # copy has given no address and is no part of the content version.
+    def self.withdraw_pending!(record, now: Time.current)
+      waiting = of(record).pending(now)
+      numbers = waiting.pluck(:number)
+      waiting.delete_all if numbers.any? # version: none (a pending copy was never public)
+      numbers
     end
 
     # THE COPIES THAT ARE DUE: showing by the clock and not acted on yet.

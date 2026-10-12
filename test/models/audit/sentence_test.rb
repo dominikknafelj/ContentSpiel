@@ -47,6 +47,10 @@ class Audit::SentenceTest < ActiveSupport::TestCase
       media.translation_confirmed settings.translation_confirmed],
     # "#{prefix}.changes_published": a page or a post
     "app/services/publishing/publish_changes.rb" => %w[page.changes_published post.changes_published],
+    # "#{page or post}.changes_discarded"
+    "app/services/publishing/discard_changes.rb" => %w[page.changes_discarded post.changes_discarded],
+    # "#{prefix}.scheduled_change_cancelled": a page or a post
+    "app/services/publishing/cancel_scheduled_change.rb" => %w[page.scheduled_change_cancelled post.scheduled_change_cancelled],
     # "#{PREFIX.fetch(subject class)}.taken_over": a block, a page's settings or a post
     "app/services/editing/take_over.rb" => %w[page.taken_over post.taken_over block.taken_over]
   }.freeze
@@ -417,6 +421,16 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     metadata = { "number" => 2, "live_at" => Time.utc(2026, 10, 14, 9).iso8601, "scheduled" => true }
 
     assert_equal "You scheduled changes to “Pricing” for 14 Oct", read(sentence_for(event("page.changes_published", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: metadata)))
+  end
+
+  test "a discard reads 'discarded the unpublished changes to Pricing', a cancelled change 'cancelled the scheduled changes to Pricing'" do
+    page = create_page(title: "Pricing")
+    post = as(@me) { create_post(title: "Hello", published: false) }
+
+    assert_equal "You discarded the unpublished changes to “Pricing”", read(sentence_for(event("page.changes_discarded", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: { "number" => 1 })))
+    assert_equal "You discarded the unpublished changes to “Hello”", read(sentence_for(event("post.changes_discarded", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
+    assert_equal "You cancelled the scheduled changes to “Pricing”", read(sentence_for(event("page.scheduled_change_cancelled", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: { "number" => 2 })))
+    assert_equal "You cancelled the scheduled changes to “Hello”", read(sentence_for(event("post.scheduled_change_cancelled", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
   end
 
   test "a take-over reads as having taken over editing, of a block on its page, of a page, of a post" do
