@@ -252,6 +252,8 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     assert_equal [ [ "armed", NOTICE_MS, "shown" ], [ "due", NOTICE_MS, "shown" ], [ "ran", NOTICE_MS, "gone" ] ], mark_life
   end
 
+  def reads_but_the_chip = page.evaluate_script("window.__seen").grep_v(%r{/publishing\z})
+
   test "my own save draws no mark and fetches nothing" do
     open_page
     count_requests
@@ -267,7 +269,9 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     dana_saves(@block, "Theirs")
     await_js("window.__seen.length > 0", wait: LIVE)
     assert_selector "#{card(@block)} .ProseMirror", text: "Theirs", wait: LIVE
-    assert_equal 1, page.evaluate_script("window.__seen").size, "this tab also fetched its own save: #{page.evaluate_script("window.__seen").inspect}"
+    # The colleague's save is two reads: the block, and the header's publishing chip (the mark moved).
+    assert_equal 1, reads_but_the_chip.size, "this tab also fetched its own save: #{page.evaluate_script("window.__seen").inspect}"
+    assert_equal 1, page.evaluate_script("window.__seen").size - reads_but_the_chip.size, "the chip is read once for it"
   end
 
   # Every write of an editor carries the tab header, or the server cannot say
@@ -298,7 +302,7 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
     # As above: a colleague's save, which is heard, is the only read ever made.
     dana_saves(second, "Theirs")
     await_js("window.__merged.length > 0", wait: LIVE)
-    assert_equal 1, page.evaluate_script("window.__seen").size, "this tab also fetched what it had written itself: #{page.evaluate_script("window.__seen").inspect}"
+    assert_equal 1, reads_but_the_chip.size, "this tab also fetched what it had written itself: #{page.evaluate_script("window.__seen").inspect}"
     assert_equal [ "block:#{second.id}" ], page.evaluate_script("window.__merged")
   end
 
