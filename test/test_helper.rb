@@ -38,6 +38,7 @@ require_relative "support/component_test_helper"
 require_relative "support/test_types"
 require_relative "support/site_address_helper"
 require_relative "support/log_capture"
+require_relative "support/theme_test_helper"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
@@ -91,6 +92,10 @@ module ActiveSupport
     # `SiteAddress`'s memo dropped on both sides -- see
     # test/support/site_address_helper.rb.
     include SiteAddressHelper
+
+    # `with_plain_theme { ... }`: the second theme for a block -- see
+    # test/support/theme_test_helper.rb.
+    include ThemeTestHelper
 
     # Setup.required? memoizes "setup is done" per process (spec §6.1), reset
     # by SiteSetting after every commit -- but a test that clears the table
