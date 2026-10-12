@@ -8,18 +8,42 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
+  # The page has a Copy button for every check that offers a command, and in
+  # the test environment that is two: "Site address" (no PUBLIC_HOST here) and
+  # "Outgoing mail". So a test presses the button of the row it means, and
+  # reads that row: `check_row` below finds it by the button's own name.
   test "Copy writes the command, says Copied, and announces it politely" do
     visit admin_system_status_path
     await_admin_controllers
-    page.execute_script("window.__copied = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (text) => { window.__copied = text; return Promise.resolve() } }, configurable: true })")
+    stub_clipboard
 
-    press "Copy"
+    within check_row("Outgoing mail") do
+      press "Copy"
 
-    assert_selector "button", text: "Copied"
-    assert_selector "[data-admin--ui--clipboard-target=status][aria-live=polite]", text: "Copied", visible: :all
-    assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.__copied")
-    # The label comes back.
-    assert_selector "button", text: "Copy", exact_text: true
+      assert_selector "button", text: "Copied"
+      assert_selector "[data-admin--ui--clipboard-target=status][aria-live=polite]", text: "Copied", visible: :all
+      assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.__copied")
+      # The label comes back.
+      assert_selector "button", text: "Copy", exact_text: true
+    end
+  end
+
+  test "each row's Copy copies its own command: the site address's, and the other row is left alone" do
+    visit admin_system_status_path
+    await_admin_controllers
+    stub_clipboard
+
+    within check_row("Site address") do
+      press "Copy"
+
+      assert_selector "button", text: "Copied"
+      assert_equal Setup::SystemCheck::SITE_ADDRESS_COMMAND, page.evaluate_script("window.__copied")
+    end
+
+    within check_row("Outgoing mail") do
+      assert_selector "button", text: "Copy", exact_text: true
+      assert_no_selector "[data-admin--ui--clipboard-target=status]", text: "Copied", visible: :all
+    end
   end
 
   test "without a Clipboard API the command is selected instead and nothing raises" do
@@ -27,9 +51,11 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script("Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })")
 
-    press "Copy"
+    within check_row("Outgoing mail") do
+      press "Copy"
 
-    assert_selector "[data-admin--ui--clipboard-target=status]", text: "the text is selected", visible: :all
+      assert_selector "[data-admin--ui--clipboard-target=status]", text: "the text is selected", visible: :all
+    end
     assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.getSelection().toString()").strip
   end
 
@@ -71,4 +97,17 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     # otherwise run at phone width.
     page.driver.resize(1400, 1400)
   end
+
+  private
+    # The row of one check, found by what its Copy button is called for a
+    # screen reader ("Copy command for Outgoing mail"): the check's name,
+    # whole, and nothing another row's message could also say.
+    def check_row(label)
+      find("li.admin-system-check:has(button[aria-label='Copy command for #{label}'])")
+    end
+
+    # A Clipboard API that keeps what was written where the test can read it.
+    def stub_clipboard
+      page.execute_script("window.__copied = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (text) => { window.__copied = text; return Promise.resolve() } }, configurable: true })")
+    end
 end
