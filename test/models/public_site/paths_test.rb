@@ -868,7 +868,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
         assert_equal "/journal/wire", current(wire)
         assert_parity "publishing a page whose scheduled change was in force and unswept"
 
-        PublicSite::Paths.sync_went_live(since: 1.day.ago)
+        PublicSite::Paths.refresh
         assert_nil current(late), "it yields to the page that holds /desk/late"
         assert_parity "the sweep of a post's scheduled change onto a taken address"
       end
@@ -947,12 +947,20 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_equal few.size, many.size, "the statements grew with the posts:\n#{many.map { |sql| sql.first(160) }.join("\n")}"
   end
 
-  # -- going live by the clock ---------------------------------------------------
+  # -- going live by the clock -------------------------------------------------
   #
-  # A scheduled page becomes live when its time passes, and nothing is
-  # written at that moment: `sync_went_live` is what moves the posts.
-  def scheduled_listing_ahead_of_blog
-    fresh = listing(@root, "Fresh", "blog", published_at: 1.hour.from_now)
+  # A scheduled page becomes live when `published_at` passes, and no row is
+  # written at that moment. A page scheduled through the services has a copy,
+  # and that copy is DUE from the page's time until some refresh settles it
+  # (`Publishing::Version.settle!`): the same event as a copy that comes into
+  # force by its own time, with no window to remember.
+
+  # A listing page "Fresh" scheduled an hour from now through the services,
+  # ahead of the live "Blog" in the tree, and a post at /blog/hello.
+  def scheduled_listing_ahead_of_blog(parent: @root)
+    fresh = create_page(title: "Fresh", parent: parent, published: false)
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: fresh), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    assert Pages::Save.call(fresh, attributes: { published_at: 1.hour.from_now }).ok?
     listing(@root, "Blog", "blog")
     post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
     assert_equal "/blog/hello", current(post), "a scheduled page is not live yet"
@@ -961,53 +969,91 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
   def writes_to_public_paths(sql) = sql.grep(/\A\s*(INSERT INTO|UPDATE|DELETE FROM) "public_paths"/i)
 
-  test "posts move to a listing page that went live by the clock only when the sweep runs" do
-    _, post = scheduled_listing_ahead_of_blog
+  test "posts move to a listing page that went live by the clock when the next refresh settles its copy, once" do
+    fresh, post = scheduled_listing_ahead_of_blog
+    assert_nil Publishing::Version.of(fresh).sole.settled_at, "a scheduled page's copy is due when the page goes live"
+    PublicSite::Paths.refresh
+    assert_nil Publishing::Version.of(fresh).sole.settled_at, "and not before"
 
     travel 2.hours
     assert_equal "/blog/hello", current(post), "time passing writes nothing"
 
-    PublicSite::Paths.sync_went_live(since: 24.hours.ago)
+    PublicSite::Paths.refresh
 
     assert_equal "/fresh/hello", current(post)
     old = PublicPath.find_by(locale: "en", path: "/blog/hello")
     assert_equal [ false, post ], [ old.current, old.record ], "the old address is a redirect"
+    assert_parity "a scheduled page going live"
 
-    sql = capture_sql { PublicSite::Paths.sync_went_live(since: 24.hours.ago) }
-    assert_empty writes_to_public_paths(sql), "a second run wrote:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
+    sql = capture_sql { PublicSite::Paths.refresh }.grep_v(/SAVEPOINT/)
+    assert_equal 1, sql.size, "a second run did more than look for due copies:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
   end
 
-  test "a page that went live before the window is not swept" do
+  test "a page that went live long before any refresh is settled all the same" do
     _, post = scheduled_listing_ahead_of_blog
 
-    travel 3.days
-    PublicSite::Paths.sync_went_live(since: 24.hours.ago)
+    travel 30.days
+    PublicSite::Paths.refresh
 
-    assert_equal "/blog/hello", current(post)
+    assert_equal "/fresh/hello", current(post)
   end
 
-  test "a trashed page that went live is ignored by the sweep" do
+  test "a scheduled page moved to another time is due at the time it has, and published now it is settled by that save" do
+    fresh, post = scheduled_listing_ahead_of_blog
+    assert Pages::Save.call(fresh.reload, attributes: { published_at: 3.hours.from_now }).ok?
+
+    travel 2.hours
+    PublicSite::Paths.refresh
+    assert_equal "/blog/hello", current(post), "its first time has passed, its time has not"
+
+    assert Pages::Save.call(fresh.reload, attributes: { published: true }).ok?
+    assert_equal "/fresh/hello", current(post)
+    assert Publishing::Version.of(fresh).sole.settled_at
+    assert_parity "publishing a scheduled page now"
+  end
+
+  test "a trashed page that went live is settled and moves nothing" do
     fresh, post = scheduled_listing_ahead_of_blog
     fresh.update_columns(trashed_at: Time.current)
 
     travel 2.hours
-    sql = capture_sql { PublicSite::Paths.sync_went_live(since: 24.hours.ago) }
+    PublicSite::Paths.refresh
 
-    assert_empty sql.grep(/"posts"|"public_paths"/), "nothing went live, so nothing is synced"
     assert_equal "/blog/hello", current(post)
+    assert_nil current(fresh), "trashed around its callbacks, it loses its own address in the same pass"
+    assert Publishing::Version.of(fresh).sole.settled_at
+    assert_parity "settling the copy of a trashed page that went live"
   end
 
   test "a page below one that went live is covered: its listing's posts move too" do
-    section = Page.create!(parent: @root, title: "Section", published_at: 1.hour.from_now)
+    section = create_page(title: "Section", parent: @root, published: false)
     listing(section, "Fresh", "blog")
+    assert Pages::Save.call(section, attributes: { published_at: 1.hour.from_now }).ok?
     listing(@root, "Blog", "blog")
     post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
     assert_equal "/blog/hello", current(post), "a listing under a scheduled parent has no live chain"
 
     travel 2.hours
-    PublicSite::Paths.sync_went_live(since: 24.hours.ago)
+    PublicSite::Paths.refresh
 
     assert_equal "/section/fresh/hello", current(post)
+  end
+
+  # The limit, on purpose: nothing looks through a window any more. A record
+  # that is scheduled around the services has no copy to be due; the
+  # application has no such writer (`test/lib/publishing_guards_test.rb`:
+  # "published_at is assigned only in the two save services").
+  test "a page scheduled around the services has no copy, so its going live is acted on by the next refresh that reaches its posts, not by the clock's" do
+    listing(@root, "Fresh", "blog", published_at: 1.hour.from_now)
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    travel 2.hours
+    PublicSite::Paths.refresh
+    assert_equal "/blog/hello", current(post)
+
+    PublicSite::Paths.refresh(pages: [ blog ])
+    assert_equal "/fresh/hello", current(post)
   end
 
   # -- addresses follow the published copy (drafts spec §5, Task 4) -------------
@@ -1095,14 +1141,11 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert ContentBlocks::Destroy.call(block).ok?
     publish_changes(page, at: 2.days.from_now)
 
-    PublicSite::Paths.sync_went_live(since: 1.day.ago)
+    PublicSite::Paths.refresh
     assert PublicSite::Paths.current_path(post, "en"), "moved before its time"
 
     travel_to 3.days.from_now do
-      # Two days back, not one: the copy's time was read a moment before
-      # this block's clock, so a window of exactly one day would begin a
-      # few milliseconds after it.
-      PublicSite::Paths.sync_went_live(since: 2.days.ago)
+      PublicSite::Paths.refresh
       assert_nil PublicSite::Paths.current_path(post, "en")
       assert_parity "the sweep of a page's copy that came into force"
     end
@@ -1121,7 +1164,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_equal [ nil, "/blog/job" ], [ current(post), current(job) ], "until the copy's time the rows decide"
 
     travel_to 2.hours.from_now do
-      PublicSite::Paths.sync_went_live(since: 1.day.ago)
+      PublicSite::Paths.refresh
 
       assert_equal [ "/blog/hello", nil ], [ current(post), current(job) ]
       assert_parity "the sweep of the first copy of a page that had none"
@@ -1144,11 +1187,11 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_equal "/ruby/hello", current(post), "a copy with a time changes nothing yet"
 
     travel_to 3.days.from_now do
-      PublicSite::Paths.sync_went_live(since: 2.days.ago)
+      PublicSite::Paths.refresh
       assert_nil current(post)
       assert_parity "the sweep of a post's copy that came into force"
 
-      sql = capture_sql { PublicSite::Paths.sync_went_live(since: 2.days.ago) }
+      sql = capture_sql { PublicSite::Paths.refresh }
       assert_empty writes_to_public_paths(sql), "a second run wrote:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
       assert_empty sql.grep(/"posts"/), "a second run looked at the post again"
     end
@@ -1165,7 +1208,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     publish_changes(page, at: 1.hour.from_now)
 
     travel_to 30.days.from_now do
-      PublicSite::Paths.sync_went_live(since: 1.day.ago)
+      PublicSite::Paths.refresh
       assert_nil current(post), "a month late is not too late"
       assert_parity "settling a copy whose time came a month ago"
     end
@@ -1179,7 +1222,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_nil current(post)
 
     travel_to 2.hours.from_now do
-      sql = capture_sql { PublicSite::Paths.sync_went_live(since: 1.day.ago) }
+      sql = capture_sql { PublicSite::Paths.refresh }
       assert_empty writes_to_public_paths(sql)
       assert Publishing::Version.of(page).where(settled_at: nil).none?
       assert_parity "settling the copy of a page in the trash"
@@ -1299,7 +1342,8 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
         assert_nil current(post), "the copy in force lists another type"
         assert_parity "a page #{verb} while its scheduled change was in force and not settled"
-        assert Publishing::Version.of(page).where(settled_at: nil).none?
+        # A draft shows no copy: its change stays due until the page is live again.
+        assert_equal verb == "unpublished", Publishing::Version.of(page).where(settled_at: nil).any?
       end
     end
   end

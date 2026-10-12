@@ -376,7 +376,7 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
 
     travel_to 2.hours.from_now do
       before = counter
-      statements = capture_sql { PublicSite::Paths.sync_went_live(since: 1.day.ago) }
+      statements = capture_sql { PublicSite::Paths.refresh }
 
       assert_equal "/journal/hello", post.full_path("en")
       assert_operator counter, :>, before

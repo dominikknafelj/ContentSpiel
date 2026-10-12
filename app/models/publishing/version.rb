@@ -72,7 +72,7 @@ module Publishing
         version = create!(record_type: row.class.polymorphic_name, record_id: row.id, number: number, live_at: live_at,
           snapshot: data.except("blocks"), blocks: data.fetch("blocks", []), lists_posts: Snapshot.lists_posts?(data),
           tag_ids: data.fetch("tags", []).map { |tag| tag["id"] }.sort, created_by_id: by&.id, created_at: now,
-          settled_at: (now if live_at <= now))
+          settled_at: (now if live_at <= now && row.published_at&.<=(now)))
         # A scheduled record shows nothing yet, so its copy changes nothing the
         # public can see (the moment it goes live is the content version's own
         # publication-time lookup, as for the record itself).
@@ -85,9 +85,11 @@ module Publishing
         # The addresses this copy can change, in this transaction (derived
         # rows are refreshed with the write, after the record's row was
         # locked above: the order every refresh from a save has). In force
-        # at once, it is settled as it is written and its record is what was
-        # touched. A copy with a time changes no address yet and is left
-        # due: the first refresh after its time settles it (`settle!`).
+        # at once, its record is what was touched; it is settled as it is
+        # written when the record is live, and left to become due when the
+        # record is only scheduled. A copy with a time changes no address
+        # yet. Either is settled by the first refresh after its moment
+        # (`settle!`).
         version.yields = live_at <= now ? PublicSite::Paths.refresh(**{ (row.is_a?(Page) ? :pages : :posts) => [ row ] }, now: now) : []
         version
       end
@@ -96,20 +98,39 @@ module Publishing
     # What `take!` learned from the addresses; not stored.
     attr_accessor :yields
 
-    # THE COPIES THAT ARE DUE: in force by the clock and not acted on yet.
+    # THE COPIES THAT ARE DUE: showing by the clock and not acted on yet.
+    # A copy shows from the later of two moments, its own time (`live_at`)
+    # and its record's (`published_at`): a change published with a time
+    # comes into force at the first, the copy of a scheduled page or post is
+    # in force at once and shown when the record goes live. Neither moment
+    # writes a row, and this is what stands for both: `settled_at` is set by
+    # `take!` for a copy that shows at once, and here for every other, once,
+    # however long ago its moment came. Nothing has to remember a window,
+    # and a scheduled record moved to another time needs nothing kept in
+    # step: its copy is due when the record is live, whenever that is.
+    #
     # Marks them and answers `[[id, record type, record id], ...]`, for
     # `PublicSite::Paths.refresh` alone, which re-derives the addresses of
-    # those records in the same transaction. A copy in force at once is never
-    # due (`take!` marks it as it is written), so this finds the copies that
-    # were taken with a time, once each, however long ago their time came:
-    # nothing has to remember a window.
+    # those records in the same transaction.
     #
-    # The rows are locked as they are read, so of two refreshes at once the
-    # second waits and then finds nothing left to mark. With nothing due
-    # (nearly always) this is one statement on a partial index that is empty.
+    # One statement when no copy is waiting (nearly always): the partial
+    # index it reads holds the scheduled records' copies and nothing else
+    # that is in force. When some are, their records' times are read (a
+    # statement per record type), and the rows that are due are locked as
+    # they are read again, so of two refreshes at once the second waits and
+    # then finds nothing left to mark.
     def self.settle!(now = Time.current)
-      due = unscoped.where(settled_at: nil, live_at: ..now).order(:id).lock.pluck(:id, :record_type, :record_id)
-      unscoped.where(id: due.map(&:first)).update_all(settled_at: now) if due.any? # version: none (a mark on a copy, not content: the refresh that follows bumps for an address that moves)
+      waiting = unscoped.where(settled_at: nil, live_at: ..now).pluck(:id, :record_type, :record_id)
+      return [] if waiting.empty?
+
+      shown = waiting.group_by { |_, type, _| type }.flat_map do |type, copies|
+        type.constantize.where(id: copies.map(&:last), published_at: ..now).ids.map { |id| [ type, id ] }
+      end
+      ids = waiting.filter_map { |id, type, record_id| id if shown.include?([ type, record_id ]) }
+      return [] if ids.empty?
+
+      due = unscoped.where(id: ids, settled_at: nil).order(:id).lock.pluck(:id, :record_type, :record_id)
+      unscoped.where(id: due.map(&:first)).update_all(settled_at: now) # version: none (a mark on a copy, not content: the refresh that follows bumps for an address that moves)
       due
     end
 

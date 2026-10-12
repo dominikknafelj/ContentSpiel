@@ -782,7 +782,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal [ kept ], Publishing.pending(tagged).blocks.filter_map { |block| block["listed_tag_id"] }
     assert_equal %w[ruby], Publishing.pending(tagged).blocks.filter_map { |block| block.dig("settings", "tag") }, "the name in the copy is as it was taken"
     travel_to 3.days.from_now do
-      PublicSite::Paths.sync_went_live(since: 2.days.ago)
+      PublicSite::Paths.refresh
       assert_listed_at_tagged
     end
   end
@@ -862,8 +862,8 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     travel_to 2.hours.from_now do
       assert_kind_of ActiveSupport::Cache::NullStore, Rails.cache, "nothing here remembers a report"
-      PublicSite::Paths.sync_went_live(since: 1.day.ago)
-      PublicSite::Paths.sync_went_live(since: 1.day.ago)
+      PublicSite::Paths.refresh
+      PublicSite::Paths.refresh
 
       assert_nil path_of(post.reload)
       get "/blog/hello"
@@ -894,7 +894,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     reports = []
     subscriber = Rails.error.subscribe(Class.new { define_method(:report) { |error, context:, **| reports << context } }.new)
 
-    travel_to(2.hours.from_now) { PublicSite::Paths.sync_went_live(since: 1.day.ago) }
+    travel_to(2.hours.from_now) { PublicSite::Paths.refresh }
 
     assert_nil path_of(post.reload)
     assert_includes reports.sole[:yielded], { record_type: "Post", record_id: post.id, locale: "en", wanted: "/topic/hello" }

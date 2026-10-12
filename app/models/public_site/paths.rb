@@ -4,8 +4,8 @@
 # every one of those writes has to leave the URL table correct.
 #
 # ONE ENTRY POINT: `refresh`. Whoever writes something an address depends
-# on says what it touched; `rebuild!` and the window sweep (`sync_went_live`)
-# are the same function handed everything, or the pages the clock made live.
+# on says what it touched; `rebuild!` is the same function handed
+# everything, and the clock's job hands it nothing and lets it settle.
 # Everything else here is read by others (`current_path`, `compute`,
 # `canonical_pages`) or is a step inside `refresh` that nothing outside this
 # file calls (`test/lib/public_paths_entry_test.rb`).
@@ -193,10 +193,11 @@ module PublicSite
     end
 
     # FIRST IN EVERY REFRESH, so that no derivation acts on a picture the
-    # clock has made stale: the copies that came into force with no write
-    # (`Publishing::Version.settle!` marks them, once) have their records
-    # refreshed like any touched record, which is the whole of "a copy came
-    # into force". A pass of its own, ahead of the caller's: what yields
+    # clock has made stale: the copies that began to show with no write
+    # (`Publishing::Version.settle!` marks them, once: a change whose time
+    # came, and the copy of a scheduled page or post whose time came) have
+    # their records refreshed like any touched record, which is the whole of
+    # "it went live by the clock". There is no window and no sweep. A pass of its own, ahead of the caller's: what yields
     # here is the clock's doing and is reported; what the caller is answered
     # is what ITS records made yield, which a publish refuses by.
     def settle_due(now)
@@ -205,7 +206,12 @@ module PublicSite
 
       of = ->(type) { due.filter_map { |_, record_type, id| id if record_type == type.polymorphic_name } }
       yields = refresh_touched(of.call(Page), of.call(Post), now)
-      report_clash(due, yields) if yields.any?
+      # What the clock did: an address that was lost in this pass, and a due
+      # record that did not get its own. A record met again that stood
+      # without an address before is not this copy's doing.
+      mine = due.map { |_, type, id| [ type, id ] }
+      clashes = yields.select { |change| change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]) }
+      report_clash(due, clashes) if clashes.any?
     end
 
     def refresh_all(now)
@@ -288,32 +294,6 @@ module PublicSite
     def write_posts(posts, candidates: nil, now: Time.current)
       hosts = canonical_pages(posts, candidates: candidates, now: now)
       write_all(post_paths(posts, hosts: hosts), hosts: hosts)
-    end
-
-    # THE ONE TIME WINDOW LEFT. A scheduled page becomes live
-    # (`Publishable#live?`) when `published_at` passes, and no row is written
-    # at that moment -- but a live chain is the first thing `canonical_page`
-    # ranks listing pages by, so the posts listed on that page, or on any
-    # page below it, may belong under it from then on. Nothing records that
-    # a page's time has passed, so this asks by window: every kept page that
-    # went live in `(since, now]` is touched.
-    #
-    # Idempotent and unmarked: the caller's window simply overlaps the
-    # previous run's (`PublicSite::SyncWentLiveJob` looks a day back every
-    # five minutes), and a run with nothing to move writes no row of
-    # `public_paths`. A page that went live before `since` with no run in
-    # between (the job only runs where Solid Queue is the adapter) is caught
-    # by the next refresh that reaches its posts, or by `rebuild!`.
-    #
-    # A published COPY that comes into force by the clock needs no window:
-    # it is due until some refresh settles it (`Publishing::Version.settle!`),
-    # and this one does, like every other. Until then the public list is
-    # already drawn from the copy, so a post a new list block lists has no
-    # address there yet and one a removed block listed keeps an address that
-    # answers 404: five minutes in production, and where nothing sweeps until
-    # the next write that refreshes anything.
-    def sync_went_live(since:, now: Time.current)
-      refresh(pages: Page.kept.where(Page.arel_table[:published_at].gt(since)).where(published_at: ..now), now: now)
     end
 
     # Bumps the public content version whatever it finds: this is the repair
@@ -412,15 +392,13 @@ module PublicSite
     #    still wins when it is the *only* kind there is, so a post listed only
     #    by a draft page keeps a URL there and `/preview` can show it.
     #
-    #    "Live" is `Publishable#live?`, so a *scheduled* page counts as
-    #    unpublished until its time comes -- and nothing writes a row at that
-    #    moment, so posts don't move onto a scheduled listing page the instant
-    #    it goes live: `sync_went_live` moves them, run every five minutes by
-    #    `PublicSite::SyncWentLiveJob` where Solid Queue is the adapter
-    #    (production), and elsewhere the next sync that reaches them does (a
-    #    save of that page or an ancestor that changes one of its URL inputs,
-    #    a write to a listing block, a save of the post that changes one of
-    #    its own, or `rebuild!`). Until then they stay at the published
+    #    "Live" is a publication time not after `now`, so a *scheduled* page
+    #    counts as unpublished until its time comes -- and nothing writes a
+    #    row at that moment, so posts don't move onto a scheduled listing page
+    #    the instant it goes live: the page's copy is due from then on, and
+    #    the first refresh after it settles it (`settle_due`), which
+    #    `PublicSite::SyncWentLiveJob` makes sure of every five minutes where
+    #    Solid Queue is the adapter (production). Until then they stay at the published
     #    listing they already had, which keeps serving them; the ETag already
     #    changes at go-live (`PublicSite.content_version`), so the page itself
     #    isn't served stale.
@@ -501,7 +479,7 @@ module PublicSite
           chain = chains.fetch(block.owner.id, [])
           settings = block.settings_object
           [
-            chain.all?(&:live?) ? 0 : 1,
+            chain.all? { |page| page.published_at&.<=(now) } ? 0 : 1,
             settings.content_type.present? ? 0 : 1,
             settings.tag.to_s.strip.present? ? 0 : 1,
             chain.map { |page| page.position.to_i }

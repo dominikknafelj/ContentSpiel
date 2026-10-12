@@ -47,8 +47,9 @@
 # - the enabled languages: `Locales::Enable` refreshes everything, `Locales::
 #   Disable` deletes the language's rows (the default language is no input:
 #   it decides how a link is written, not which rows exist);
-# - time: a scheduled page going live writes nothing (see `PublicSite::
-#   Paths.sync_went_live`, the one window left).
+# - time: a scheduled page or post going live writes nothing; its published
+#   copy is due from that moment and the first refresh after it settles it
+#   (`Publishing::Version.settle!`).
 # `test/models/public_site/paths_test.rb` ("every write path leaves
 # public_paths equal to a full rebuild") runs one step per entry of both
 # lists and compares the table with `PublicSite::Paths.rebuild!` after each;

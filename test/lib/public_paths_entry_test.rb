@@ -13,8 +13,7 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
   # What may be called from outside `app/models/public_site/paths.rb`.
   WRITES = {
     "refresh" => "the entry point",
-    "rebuild!" => "the repair: empties the table and refreshes everything",
-    "sync_went_live" => "the one time window: the pages whose `published_at` passed, handed to refresh"
+    "rebuild!" => "the repair: empties the table and refreshes everything"
   }.freeze
   READS = {
     "current_path" => "a stored address",
@@ -33,7 +32,7 @@ class PublicPathsEntryTest < ActiveSupport::TestCase
     end
   end
 
-  test "outside its own file PublicSite::Paths is asked to refresh, to rebuild, to sweep the window, or to read: nothing calls a function inside the entry point" do
+  test "outside its own file PublicSite::Paths is asked to refresh, to rebuild, or to read: nothing calls a function inside the entry point" do
     called = code("app", "lib", "db/seeds.rb").except(PATHS).flat_map do |path, source|
       source.scan(/\bPaths\.([a-z_]+[!?]?)/).flatten.map { |name| [ name, path ] }
     end
