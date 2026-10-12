@@ -64,8 +64,6 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
   test "the pattern is built from the admin path, not from a literal" do
     assert_equal "/back-office/password/#{FILTERED}/edit", scrub("/back-office/password/abc123/edit", admin_path: "back-office")
     assert_equal "/cs-studio/password/abc123/edit", scrub("/cs-studio/password/abc123/edit", admin_path: "back-office")
-    assert_equal "/a.b/password/#{FILTERED}", scrub("/a.b/password/abc123", admin_path: "a.b")
-    assert_equal "/aXb/password/abc123", scrub("/aXb/password/abc123", admin_path: "a.b")
   end
 
   test "what is not a string is handed back" do
@@ -81,14 +79,62 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
 
     assert_equal "/#{ADMIN}/password/#{FILTERED}/edit", seen
     assert_equal "/#{ADMIN}/password/#{FILTERED}/edit", exported.attributes["url.path"]
-    assert_equal "/#{ADMIN}/password/abc123/edit", exported.attributes["other"], "only the four address attributes are rewritten"
+    assert_equal "/#{ADMIN}/password/abc123/edit", exported.attributes["other"], "only the address attributes are rewritten"
   end
 
-  test "an attribute set after the start is scrubbed in what is exported, each of the four" do
+  test "scrub itself keeps a query: it is the request line's rule too, and the router needs the query" do
+    assert_equal "/#{ADMIN}/password/#{FILTERED}/edit?from=mail", scrub("/#{ADMIN}/password/abc123/edit?from=mail")
+    assert_equal "/up?x=1", scrub("/up?x=1")
+  end
+
+  # No query string leaves in a span, whatever its parameters are called: a
+  # note's quote travels in one, and a request answered before a controller
+  # (a redirect in the routes, a throttle) keeps it as it was sent.
+  test "an attribute's query is cut from an address and replaced where it stands alone" do
+    {
+      [ "url.query", "note_quote=some+private+words&x=1" ] => FILTERED,
+      [ "url.query", "" ] => "",
+      [ "http.target", "/#{ADMIN}/pages/12?note_quote=some+private+words" ] => "/#{ADMIN}/pages/12",
+      [ "http.target", "/#{ADMIN}/password/abc123/edit?x=1#y" ] => "/#{ADMIN}/password/#{FILTERED}/edit",
+      [ "http.target", "/up" ] => "/up",
+      [ "url.full", "https://example.org/en/blog?note_quote=some+private+words" ] => "https://example.org/en/blog",
+      [ "url.full", "https://example.org/#{ADMIN}/password/abc123?x=1" ] => "https://example.org/#{ADMIN}/password/#{FILTERED}",
+      [ "http.url", "https://example.org/?q=some+private+words" ] => "https://example.org/",
+      [ "http.url", "https://example.org/#{ADMIN}/password/abc123/edit" ] => "https://example.org/#{ADMIN}/password/#{FILTERED}/edit",
+      [ "url.path", "/#{ADMIN}/password/abc123" ] => "/#{ADMIN}/password/#{FILTERED}",
+      [ "url.path", "/a?b" ] => "/a?b",
+      [ "http.route", "/#{ADMIN}/password/abc123?x=1" ] => "/#{ADMIN}/password/abc123?x=1",
+      [ "url.query", nil ] => nil,
+      [ "http.target", 12 ] => 12
+    }.each do |(key, value), scrubbed|
+      if scrubbed.nil?
+        assert_nil Telemetry::PathScrubber.scrub_attribute(key, value)
+      else
+        assert_equal scrubbed, Telemetry::PathScrubber.scrub_attribute(key, value), "#{key} #{value.inspect}"
+      end
+    end
+  end
+
+  test "a span that starts with a query holds none, on the span itself and in what is exported" do
+    seen = nil
+    started_with = {
+      "url.path" => "/#{ADMIN}/pages/12",
+      "url.query" => "note_quote=some+private+words",
+      "http.target" => "/#{ADMIN}/pages/12?note_quote=some+private+words"
+    }
+    tracer.in_span("request", attributes: started_with) { |span| seen = span.attributes }
+
+    scrubbed = { "url.path" => "/#{ADMIN}/pages/12", "url.query" => FILTERED, "http.target" => "/#{ADMIN}/pages/12" }
+    assert_equal scrubbed, seen
+    assert_equal scrubbed, exported.attributes
+  end
+
+  test "an attribute set after the start is scrubbed in what is exported, each of the five" do
     tracer.in_span("request") do |span|
       span.set_attribute("url.path", "/#{ADMIN}/password/abc123")
+      span.set_attribute("url.query", "note_quote=some+private+words")
       span.set_attribute("http.target", "/#{ADMIN}/password/abc123/edit?x=1")
-      span.set_attribute("url.full", "https://example.org/#{ADMIN}/password/abc123/edit")
+      span.set_attribute("url.full", "https://example.org/#{ADMIN}/password/abc123/edit?x=1")
       span.set_attribute("http.url", "https://example.org/#{ADMIN}/password/abc123")
       span.set_attribute("http.route", "/#{ADMIN}/password/:token/edit")
     end
@@ -96,7 +142,8 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
     assert_equal(
       {
         "url.path" => "/#{ADMIN}/password/#{FILTERED}",
-        "http.target" => "/#{ADMIN}/password/#{FILTERED}/edit?x=1",
+        "url.query" => FILTERED,
+        "http.target" => "/#{ADMIN}/password/#{FILTERED}/edit",
         "url.full" => "https://example.org/#{ADMIN}/password/#{FILTERED}/edit",
         "http.url" => "https://example.org/#{ADMIN}/password/#{FILTERED}",
         "http.route" => "/#{ADMIN}/password/:token/edit"

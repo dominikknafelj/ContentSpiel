@@ -11,6 +11,8 @@
 #   2. OTEL_EXPORTER_OTLP_ENDPOINT set -> OTLP, batched -- point this at a
 #      real backend (e.g. Honeycomb) by setting that one env var, no code or
 #      gem change needed; the otlp exporter gem is already bundled.
+#      (OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, which the exporter reads ahead
+#      of it, counts the same.)
 #   3. OTEL_CONSOLE=1 -> console, printed immediately (SimpleSpanProcessor,
 #      not batched) so a span shows up in the terminal right after the
 #      request that created it. For a developer who wants to look, in any
@@ -55,7 +57,8 @@ unless kind == :none
   OpenTelemetry::SDK.configure do |c|
     c.service_name = ENV.fetch("OTEL_SERVICE_NAME", "contentspiel")
 
-    # No span leaves with a password-reset token in its address, twice over:
+    # No span leaves with a password-reset token in its address, or with a
+    # query string (a note's quote travels in one), twice over:
     # the scrubber's processor comes FIRST, so the attributes a span starts
     # with are clean before any other processor sees it, and the exporter is
     # wrapped, because an attribute set after the start can only be rewritten

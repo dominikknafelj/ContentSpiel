@@ -1,6 +1,7 @@
 module Telemetry
-  # Takes a password-reset token out of a request's address before a span
-  # that holds the address leaves the process.
+  # Takes a password-reset token out of a request's address, and the query
+  # string off it (`scrub_attribute` says why), before a span that holds the
+  # address leaves the process.
   #
   # The token was a segment of two routes, `GET <admin>/password/:token/edit`
   # and `PATCH <admin>/password/:token`, and the Rack instrumentation writes
@@ -25,10 +26,13 @@ module Telemetry
     # reset form. Neither is a token.
     NOT_A_TOKEN = %w[new edit].freeze
 
-    # The attributes that hold a request's path or its whole address, in the
-    # stable HTTP conventions (`url.*`) and in the older ones (`http.*`).
-    # `url.query` is not among them: the token was never in a query string.
-    ATTRIBUTES = %w[url.path http.target url.full http.url].freeze
+    # The attributes that hold a request's address or a part of it, in the
+    # stable HTTP conventions (`url.*`) and in the older ones (`http.*`):
+    # the path alone, the query alone, and the three that may hold both.
+    PATH = "url.path".freeze
+    QUERY = "url.query".freeze
+    ADDRESSES = %w[http.target url.full http.url].freeze
+    ATTRIBUTES = [ PATH, QUERY, *ADDRESSES ].freeze
 
     # What may follow a segment that is the last one: slashes, then the end
     # or a query or a fragment.
@@ -49,20 +53,56 @@ module Telemetry
       "#{match[:lead]}#{FILTERED}#{match[:rest]}"
     end
 
-    # The attributes with every address among them scrubbed: the very hash
-    # it was given when there is nothing to change, a frozen copy otherwise.
+    # One attribute of a span as it may leave the process. Two rules:
+    #
+    # The path is scrubbed as above, wherever it stands.
+    #
+    # NO QUERY STRING LEAVES IN A SPAN, whatever its parameters are called:
+    # `url.query` is replaced whole, and an address is cut at its first "?".
+    # The Action Pack instrumentation does put the app's `filter_parameters`
+    # over the query, but only once a controller has the request. One that
+    # is answered before any controller (a redirect in the routes, a
+    # throttle, a refusal in a middleware) keeps the query as it was sent,
+    # and with the older attribute names `http.target` is never rewritten
+    # at all. A note's quote travels in a query string (`note_quote`), and a
+    # note's text reaches no log line, so none of it is kept; `http.route`
+    # still says which address was asked for.
+    #
+    # An attribute that is none of ATTRIBUTES, a value that is no string and
+    # a value with nothing to take out are handed back as they are, the very
+    # object, which is how a caller sees that nothing changed.
+    def self.scrub_attribute(key, value)
+      return value unless value.is_a?(String)
+
+      case key
+      when PATH then scrub(value)
+      when QUERY then value.empty? ? value : FILTERED
+      when *ADDRESSES then scrub(without_query(value))
+      else value
+      end
+    end
+
+    # The attributes with each of ATTRIBUTES scrubbed: the very hash it was
+    # given when there is nothing to change, a frozen copy otherwise.
     def self.scrub_attributes(attributes)
       return attributes if attributes.nil?
 
       changed = nil
       ATTRIBUTES.each do |key|
         value = attributes[key]
-        scrubbed = scrub(value)
+        scrubbed = scrub_attribute(key, value)
         (changed ||= {})[key] = scrubbed unless scrubbed.equal?(value)
       end
 
       changed ? attributes.merge(changed).freeze : attributes
     end
+
+    # Everything from the first "?" goes, a fragment after it included.
+    def self.without_query(address)
+      at = address.index("?")
+      at ? address[0, at] : address
+    end
+    private_class_method :without_query
 
     # A path, or a whole address (`url.full`), whose first two segments are
     # the admin path and `password`. The router squeezes doubled slashes
@@ -76,9 +116,9 @@ module Telemetry
     private_class_method :pattern
 
     # First in the list of span processors: the address attributes a span is
-    # started with (all the Rack instrumentation writes) are scrubbed before
-    # any other processor, or anything that reads the running span, has
-    # seen them.
+    # started with (all the Rack instrumentation writes, the path and the
+    # query both) are scrubbed before any other processor, or anything that
+    # reads the running span, has seen them.
     #
     # It can do nothing for an attribute set later. The SDK freezes a span's
     # attributes before it calls `on_finish`, and its `on_finishing` hook,
@@ -92,7 +132,7 @@ module Telemetry
 
         ATTRIBUTES.each do |key|
           value = attributes[key]
-          scrubbed = PathScrubber.scrub(value)
+          scrubbed = PathScrubber.scrub_attribute(key, value)
           span.set_attribute(key, scrubbed) unless scrubbed.equal?(value)
         end
       end

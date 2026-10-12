@@ -8,13 +8,16 @@
 # the autoloader is set up, and are not among what a development reload
 # takes away and defines again.
 module Telemetry
-  ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT".freeze
+  # Either says where the spans go. The OTLP exporter reads both by itself,
+  # the traces' own ahead of the general one, so somebody who set only that
+  # one has configured an endpoint and must not get silence for it.
+  ENDPOINTS = %w[OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_ENDPOINT].freeze
   CONSOLE = "OTEL_CONSOLE".freeze
 
   # Where the spans of this process go, first match first:
   #
   #   :memory   the test environment, whatever is set
-  #   :otlp     an endpoint is configured
+  #   :otlp     an endpoint is configured (either of ENDPOINTS, not blank)
   #   :console  somebody asked for the spans in the terminal: OTEL_CONSOLE=1
   #   :none     everything else, production included. No telemetry at all.
   #
@@ -29,7 +32,7 @@ module Telemetry
   # `rails_env` is `Rails.env` or its name.
   def self.exporter_kind(env, rails_env)
     return :memory if rails_env.to_s == "test"
-    return :otlp unless env[ENDPOINT].to_s.strip.empty?
+    return :otlp if ENDPOINTS.any? { |name| !env[name].to_s.strip.empty? }
     return :console if env[CONSOLE] == "1"
 
     :none

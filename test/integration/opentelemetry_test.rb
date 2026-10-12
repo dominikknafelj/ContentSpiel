@@ -69,4 +69,26 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
       assert_not_includes written, word, "span #{span.name.inspect} carries the token"
     end
   end
+
+  # A note's quote travels in a query string (`note_quote`), and a note's
+  # text reaches no log line. The first address is answered by a redirect
+  # in the routes, before any controller: nothing has filtered its
+  # parameters, and the span would hold the query as it was sent. The second
+  # reaches a controller under a name nothing filters. Neither query leaves.
+  test "no span carries a query string, of a request answered before a controller or by one" do
+    quote = "some-private-words-of-a-note"
+
+    get "/#{ContentSpiel::ADMIN_PATH}/settings/languages?note_quote=#{quote}"
+    assert_response :moved_permanently
+    get "/up?remark=#{quote}"
+    assert_response :success
+
+    spans = @exporter.finished_spans
+    assert_equal [ "[FILTERED]", "[FILTERED]" ], spans.filter_map { |span| span.attributes&.[]("url.query") }
+
+    spans.each do |span|
+      written = [ span.name, span.attributes.to_a, Array(span.events).map { |event| [ event.name, event.attributes.to_a ] } ].flatten.join(" ")
+      assert_not_includes written, quote, "span #{span.name.inspect} carries the query"
+    end
+  end
 end
