@@ -12,47 +12,72 @@ require "uri"
 # error; a value that is there but is not an absolute http(s) address with a
 # host raises `Invalid` at once, so a typo stops the boot instead of quietly
 # producing wrong links.
+#
+# THE MESSAGE NEVER REPEATS THE VALUE. It goes to the boot log, and a value
+# someone typed as `https://user:password@…` would put the password there.
+# It names the variable the value came from instead, which is what the
+# person has to go and look at.
 class SiteAddress
   class Invalid < ArgumentError; end
 
   DEFAULT_PORTS = { "http" => 80, "https" => 443 }.freeze
+  PORTS = (1..65_535)
+
+  # Read in this order; a blank one counts as not there.
+  VARIABLES = %w[PUBLIC_HOST SITEMAP_HOST].freeze
 
   attr_reader :host, :port
 
-  def self.parse(value)
+  # `source` is the name of the variable the value came from, for the
+  # message only.
+  #
+  # What is refused, beside a value with no scheme or no host: user info (an
+  # origin has none, and dropping it silently would leave a password sitting
+  # in the environment unnoticed), a port outside 1..65535, any whitespace or
+  # control character inside the value (a newline would also break the log
+  # line), and a host that is not ASCII (write it in its xn-- form; nothing
+  # is converted here). What is normalised: the scheme and the host are
+  # lower-cased, a trailing dot of the host is dropped (no request's Host
+  # would match it), the scheme's default port is dropped, and an IPv6
+  # literal keeps its brackets, as `config.hosts` and `url_for` want it.
+  def self.parse(value, source: VARIABLES.first)
     text = value.to_s.strip
     return new(nil, nil, nil) if text.empty?
+    raise invalid(source) if text.match?(/[[:space:][:cntrl:]]/) || !text.ascii_only?
 
     uri = begin
       URI.parse(text)
     rescue URI::InvalidURIError
-      raise invalid(text)
+      raise invalid(source)
     end
-    raise invalid(text) unless %w[http https].include?(uri.scheme) && !uri.host.to_s.empty?
+    scheme = uri.scheme.to_s.downcase
+    host = uri.host.to_s.downcase.chomp(".")
+    # An "@" in the authority is user info even when it is empty
+    # (`https://@host`), which URI reports as none.
+    user_info = uri.userinfo || text[%r{\A[^:/?#]+://([^/?#]*)}, 1].to_s.include?("@")
+    raise invalid(source) unless DEFAULT_PORTS.key?(scheme) && !host.empty? && !user_info && PORTS.cover?(uri.port)
 
-    port = uri.port == DEFAULT_PORTS[uri.scheme] ? nil : uri.port
-    new(uri.scheme, uri.host.downcase, port)
+    new(scheme, host, uri.port == DEFAULT_PORTS[scheme] ? nil : uri.port)
   end
 
   # Memoised: the environment does not change while the app runs. Tests that
-  # set `ENV` call `reset!` before and after.
+  # set `ENV` go through `with_site_address` (test/support/site_address_helper.rb),
+  # which calls `reset!` before and after.
   def self.current
-    @current ||= parse(presence(ENV["PUBLIC_HOST"]) || presence(ENV["SITEMAP_HOST"]))
+    @current ||= begin
+      source = VARIABLES.find { |name| !ENV[name].to_s.strip.empty? }
+      parse(source && ENV[source], source: source || VARIABLES.first)
+    end
   end
 
   def self.reset!
     @current = nil
   end
 
-  def self.invalid(text)
-    Invalid.new(%(PUBLIC_HOST must be the site's address with its scheme, for example https://www.example.org (got: "#{text}")))
+  def self.invalid(source)
+    Invalid.new("#{source} must be the site's address with its scheme, for example https://www.example.org")
   end
   private_class_method :invalid
-
-  def self.presence(value)
-    value.to_s.strip.empty? ? nil : value
-  end
-  private_class_method :presence
 
   def initialize(scheme, host, port)
     @scheme = scheme
