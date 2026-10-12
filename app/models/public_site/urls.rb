@@ -17,6 +17,9 @@ module PublicSite
       configured_host || "https://www.example.com"
     end
 
+    # The origin every absolute address of this instance starts with.
+    attr_reader :host
+
     def initialize(preview: false, host: self.class.default_host)
       @preview = preview
       @host = host

@@ -55,4 +55,17 @@ class PublicController < ActionController::Base
   def public_urls
     @public_urls ||= PublicSite::Urls.new(host: PublicSite::Urls.configured_host || request.base_url)
   end
+
+  # What a public ETag adds for the addresses the head prints (`og:url`, the
+  # canonical link, the hreflang alternates), splatted into the ETag's keys:
+  # nothing when a site address is configured, since they are then the same
+  # under every host and a configured site's ETags stay what they were; the
+  # origin `public_urls` fell back to when none is. Without it a client or a
+  # shared cache that revalidates, under a second name the same checkout
+  # answers to, with an ETag it was given under the first would be told 304
+  # and keep a body whose head names the first.
+  # `test/integration/public_head_address_test.rb`.
+  def origin_etag_key
+    PublicSite::Urls.configured_host ? [] : [ public_urls.host ]
+  end
 end

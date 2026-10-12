@@ -1,4 +1,6 @@
 require "test_helper"
+require "sitemap_generator"
+require "tmpdir"
 
 # Every absolute address a public page prints in its head -- `og:url`, the
 # `hreflang` alternates and the `canonical` link -- is the site's own
@@ -84,6 +86,129 @@ class PublicHeadAddressTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # THE HOMEPAGE'S ADDRESS ENDS IN A SLASH, IN EVERY LANGUAGE, pinned here on
+  # purpose (Task 3's review, Minor 3). `Urls#path_for` is the language's
+  # prefix plus the page's path, and the homepage's path is "/": so "/" in
+  # the default language and "/de/" in German, not the "/de" a visitor may
+  # type. Both spellings answer with the page (the router drops a trailing
+  # slash before it matches), and the canonical link is what says which of
+  # the two is the address: the one the hreflang alternates, `og:url` and
+  # the sitemap print too.
+  test "the homepage's canonical link, og:url and hreflang are its address with the slash, which answers 200 with the same page" do
+    with_site_address(SITE) do
+      get "/"
+
+      assert_response :success
+      assert_equal "#{SITE}/", canonical
+      assert_equal canonical, og_url
+      assert_equal canonical, alternates["en"]
+      assert_equal canonical, alternates["x-default"]
+      assert_equal({ "en" => "#{SITE}/", "de" => "#{SITE}/de/", "es" => "#{SITE}/es/", "x-default" => "#{SITE}/" }, alternates)
+      body = response.body
+
+      get canonical
+      assert_response :success
+      assert_equal "#{SITE}/", canonical
+      assert_equal body, response.body
+    end
+  end
+
+  test "the homepage in another language: the three agree on /de/, and that address answers 200 with the same page, as /de does" do
+    Mobility.with_locale(:de) { @root.update!(title: "Startseite") }
+
+    with_site_address(SITE) do
+      get "/de"
+
+      assert_response :success
+      assert_equal "#{SITE}/de/", canonical
+      assert_equal canonical, og_url
+      assert_equal canonical, alternates["de"]
+      assert_equal "#{SITE}/", alternates["x-default"]
+      assert_equal "de", css_select("html").sole["lang"]
+      body = response.body
+      assert_includes body, "Startseite"
+
+      # The canonical address is not a redirect (to "/de", which would name
+      # "/de/" as canonical again): it is the page.
+      get canonical
+      assert_response :success
+      assert_equal "#{SITE}/de/", canonical
+      assert_equal body, response.body
+    end
+  end
+
+  # One `Urls` builds both, so they agree by construction; this is the test
+  # that says so. The one difference is the sitemap's own: for the default
+  # language's homepage sitemap_generator joins "/" onto the host and prints
+  # the bare origin as `<loc>`, which is the same address as the canonical
+  # link's (an empty path and "/" are one http address). Every alternate in
+  # the entry, that page's own included, has the slash.
+  test "the sitemap lists the homepage in each language at the address its canonical link names" do
+    with_site_address(SITE) do
+      entries = sitemap_entries
+
+      { "/" => "en", "/de" => "de", "/es" => "es" }.each do |path, locale|
+        get path
+        assert_response :success
+
+        entry = entries.find { |candidate| with_root_path(candidate[:loc]) == canonical }
+        assert entry, "the sitemap has no entry for #{canonical}: #{entries.pluck(:loc).inspect}"
+        assert_equal canonical, entry[:alternates][locale]
+        assert_equal alternates.except("x-default"), entry[:alternates]
+      end
+
+      assert_equal [ SITE, "#{SITE}/de/", "#{SITE}/es/" ], entries.pluck(:loc).reject { |loc| loc.match?(/about|uber/) }.sort
+    end
+  end
+
+  # WITH NO ADDRESS CONFIGURED THE HEAD FOLLOWS THE REQUEST'S HOST, so the
+  # ETag does too (Task 3's review, Minor 2): a validator obtained under one
+  # host must not confirm, under another, a body whose `og:url`, canonical
+  # link and hreflang name the first. With an address configured the head is
+  # the same under every host, and so is the ETag.
+  test "with no address configured an ETag obtained under one Host is not confirmed under another, and is under the same one" do
+    with_site_address(nil) do
+      get "/about", headers: { "Host" => "one.example" }
+      assert_response :success
+      assert_equal "http://one.example/about", canonical
+      etag = response.headers["ETag"]
+
+      get "/about", headers: { "Host" => "two.example", "If-None-Match" => etag }
+      assert_response :success
+      assert_equal "http://two.example/about", canonical
+      assert_not_equal etag, response.headers["ETag"]
+
+      get "/about", headers: { "Host" => "one.example", "If-None-Match" => etag }
+      assert_response :not_modified
+    end
+  end
+
+  test "with no address configured the scheme and the port are part of it too" do
+    with_site_address(nil) do
+      get "/about", headers: { "Host" => "one.example" }
+      etag = response.headers["ETag"]
+
+      get "/about", headers: { "Host" => "one.example:8080", "If-None-Match" => etag }
+      assert_response :success
+      get "/about", headers: { "Host" => "one.example", "X-Forwarded-Proto" => "https", "If-None-Match" => etag }
+      assert_response :success
+    end
+  end
+
+  test "with an address configured the ETag is the same under every Host, and a 304 is given under any" do
+    with_site_address(SITE) do
+      get "/about", headers: { "Host" => "one.example" }
+      assert_response :success
+      etag = response.headers["ETag"]
+
+      get "/about", headers: { "Host" => "two.example" }
+      assert_equal etag, response.headers["ETag"]
+
+      get "/about", headers: { "Host" => "two.example", "If-None-Match" => etag }
+      assert_response :not_modified
+    end
+  end
+
   test "a preview keeps the request's origin and its /preview addresses, and has no canonical link" do
     sign_in_as(users(:one))
 
@@ -105,4 +230,23 @@ class PublicHeadAddressTest < ActionDispatch::IntegrationTest
   def canonical = css_select("head link[rel=canonical]").sole["href"]
 
   def alternates = css_select("head link[rel=alternate]").to_h { |link| [ link["hreflang"], link["href"] ] }
+
+  # What `config/sitemap.rb` prints, generated the way the deploy does it
+  # (`test/lib/sitemap_test.rb`): each entry's `<loc>` and its alternates.
+  def sitemap_entries
+    Dir.mktmpdir do |dir|
+      SitemapGenerator::Interpreter.run(config_file: Rails.root.join("config/sitemap.rb"), public_path: dir, compress: false, verbose: false)
+
+      Nokogiri::XML(File.read(File.join(dir, "sitemap.xml"))).tap(&:remove_namespaces!).css("url").map do |url|
+        { loc: url.at_css("loc").text, alternates: url.css("link[rel=alternate]").to_h { |link| [ link["hreflang"], link["href"] ] } }
+      end
+    end
+  end
+
+  # An address with no path at all is the address of "/".
+  def with_root_path(address)
+    uri = URI.parse(address)
+    uri.path = "/" if uri.path.empty?
+    uri.to_s
+  end
 end
