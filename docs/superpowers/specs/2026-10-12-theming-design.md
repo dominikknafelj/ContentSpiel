@@ -16,7 +16,7 @@ A site that is not the demo has no way to look like itself. The public templates
 
 ## Decisions
 
-Decisions 1 to 6 are the owner's (D7 to D12, and the environment variable, 2026-10-12). **Decisions 7 to 16 were made in this design and are to confirm.**
+Decisions 1 to 6 are the owner's (D7 to D12, and the environment variable, 2026-10-12), and so is decision 7 (confirmed 2026-10-12). **Decisions 8 to 16 were made in this design and are to confirm.**
 
 1. **Three layers inside the CMS, no design-system repository** (D7): tokens and base styles, which know nothing of blocks; block styles and templates on those tokens; a site's own values. Each knows only the one before it.
 2. **The token set is a contract** (D8): named, documented, stable; every default block is styled only through it.
@@ -24,7 +24,7 @@ Decisions 1 to 6 are the owner's (D7 to D12, and the environment variable, 2026-
 4. **A theme is a folder in the site's repository, layered onto the CMS by deployment** (D10). The theme first, the default theme behind it. Not a gem, an engine, a fork or templates in the database.
 5. **A theme may replace tokens, styles and any template of the contract, and brings no block types or settings** (D12).
 6. **One environment variable, `THEME_PATH`**, validated when the application starts, announced in the boot log and shown in System status, as `PUBLIC_HOST` is.
-7. **To confirm: the read-only data the documentation theme needs is part of this work** (§7): one section's page tree at any depth with the shown page marked, previous and next, a page's ancestors, an article's headings with an id on each. Not part of it: search, a summary field, a group heading that is not a page, the frame option on images, the product's version, a header link that leaves the site, and the Code, Note and Table blocks.
+7. **The read-only data the documentation theme needs is part of this work** (§7): one section's page tree at any depth with the shown page marked, previous and next, a page's ancestors, an article's headings with an id on each. Not part of it: search, a summary field, a group heading that is not a page, the frame option on images, the product's version, a header link that leaves the site, and the Code, Note and Table blocks.
 8. **To confirm: a theme holds no Ruby.** It cannot bring a helper, a component class or an initializer; what a template needs to compute is a CMS helper. Rejected: autoloading a `lib/` of the theme, which would make every internal class of the CMS something a theme can depend on.
 9. **To confirm: a block's template is replaced through `Theme#component_for`, not through the view path** (§3). Rejected: the spike's override of `ApplicationComponent.sidecar_files`, which works but compiles the theme into the CMS's own classes, so a process can hold one theme and no test can draw two.
 10. **To confirm: the CMS keeps `<html>` and `<head>`; a theme replaces the frame inside `<body>`** (§2). Rejected: replacing `layouts/application.html.erb` whole, as the spike had to, which made the theme copy the CSP tag, the light/dark script, hreflang and the import map, and lose every tag the CMS adds later.
@@ -112,7 +112,7 @@ The public ETag and the rich-text render cache are keyed on `RichText.code_revis
 
 What the ETag cannot see is what a template reads beyond the contract. A public page is one cookie-less answer for every visitor, so a theme's template reads the page, the tree, the site and the language, and never `params`, `request`, `cookies`, `session` or the clock; `theme:check` refuses a template that names one of the first four.
 
-## 7. What a template may call (decision 7, to confirm)
+## 7. What a template may call (decision 7)
 
 `ThemeHelper` is the contract's helper surface. Already there: `theme_site`, `translated`, `rich_text`, `render_block`, `block_outline`, `published_views`, `navigation_pages` (now memoised: the documentation theme draws the menu three times), `language_links`, `safe_social_links`, `home_url_path`, `page_url_path`, `post_url_path`, `post_date`, and `public_urls.preview?`.
 
