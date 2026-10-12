@@ -32,8 +32,16 @@ module Admin
     # Nothing is kept: no row, no event, no signal. For anyone who may read
     # the record (it shows nothing the editor does not); the trial is made
     # only for someone who may publish, whose dialog it is.
+    #
+    # EVERY ANSWER SAYS WHAT IS SCHEDULED NOW (the pending copy's id and the
+    # sentences that name its time): nothing a dialog says about a schedule
+    # is from the page view. `part=schedule` answers that alone, with no
+    # overview and no trial: what the discard and the cancel dialogs ask
+    # when they open, one request per opening like the publish dialog's.
     def changes
       response.set_header("Cache-Control", "no-store")
+      return render(Admin::EditorScreen::ChangesOverviewComponent.schedule_only(record: @record), layout: false) if params[:part] == "schedule"
+
       lost = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.lost_addresses(@record) : []
       render Admin::EditorScreen::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: lost,
         holds: ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab), locale: admin_locale, url_options: admin_url_options), layout: false
@@ -48,7 +56,7 @@ module Admin
       return refuse_publish(error) if error
 
       before = ::Publishing.baseline(@record)&.number
-      result = ::Publishing::PublishChanges.call(@record, at: at)
+      result = ::Publishing::PublishChanges.call(@record, at: at, shown_pending: shown_pending)
       return forbidden_or(result) { refuse_publish(result.errors.to_sentence) } unless result.ok?
 
       redirect_to editor_path, status: :see_other, notice: published_notice(before)
@@ -57,8 +65,8 @@ module Admin
     def discard
       return if refuse_discard_under_hold(@record, to: editor_path)
 
-      result = ::Publishing::DiscardChanges.call(@record)
-      return redirect_to editor_path, status: :see_other, notice: t("#{SCOPE}.discarded") if result.ok?
+      result = ::Publishing::DiscardChanges.call(@record, shown_pending: shown_pending)
+      return redirect_to editor_path, status: :see_other, notice: [ t("#{SCOPE}.discarded"), result.notice ].compact.join(". ") if result.ok?
 
       forbidden_or(result) { redirect_to editor_path, status: :see_other, alert: result.errors.to_sentence }
     end
@@ -66,7 +74,7 @@ module Admin
     # Withdraws the change that waits for its time. It writes no row an
     # editor holds, so it asks no hold either.
     def cancel_scheduled_change
-      result = ::Publishing::CancelScheduledChange.call(@record)
+      result = ::Publishing::CancelScheduledChange.call(@record, shown_pending: shown_pending)
       return redirect_to editor_path, status: :see_other, notice: t("#{SCOPE}.cancelled") if result.ok?
 
       forbidden_or(result) { redirect_to editor_path, status: :see_other, alert: result.errors.to_sentence }
@@ -79,6 +87,15 @@ module Admin
     end
 
     def kind = @record.is_a?(Page) ? "page" : "post"
+
+    # The pending copy the dialog showed when the press was made (its id, nil
+    # for none): each dialog's form carries it in `pending`, filled from the
+    # answer it got when it opened, and the service refuses when it is no
+    # longer so (`Publishing::ShownSchedule`). A request without the field (a
+    # script) showed nothing and is not checked.
+    def shown_pending
+      params.key?(:pending) ? params[:pending].presence&.to_i : ::Publishing::ShownSchedule::NOT_ASKED
+    end
 
     def editor_path
       @record.is_a?(Page) ? admin_page_path(@record, **admin_url_options) : admin_post_path(@record, **admin_url_options)

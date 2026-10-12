@@ -9,12 +9,14 @@ module Publishing
   class PublishChanges < ApplicationService
     include ContentBlocks::Structure
     include KeepsAddresses
+    include ShownSchedule
 
     NOT_PUBLISHED = "There is nothing on the site to change: publish it first".freeze
 
-    def initialize(record, at: nil, actor: Current.actor)
+    def initialize(record, at: nil, shown_pending: NOT_ASKED, actor: Current.actor)
       @record = record
       @at = at
+      @shown_pending = shown_pending
       @actor = actor
     end
 
@@ -24,10 +26,13 @@ module Publishing
 
       version = nil
       @nothing = false
+      @moved = false
       @record.class.transaction(requires_new: true) do
         # The page's row first, as every write that reads its blocks does.
         lock_owner(@record)
         next if @record.class.where(id: @record.id).pick(:published_at).nil?
+        # What the dialog said about a schedule is no longer so (`ShownSchedule`).
+        next @moved = true if schedule_moved?(@record, Time.current)
 
         # The mark may be set when nothing differs (typed and typed back):
         # then there is nothing to publish, and it is cleared. A new time for
@@ -48,6 +53,8 @@ module Publishing
 
       # The result does not say which of the two happened; the controller
       # tells by the baseline's number before and after.
+      return failure(@record, [ MOVED ]) if @moved
+
       (version || @nothing) ? success(@record) : failure(@record, [ NOT_PUBLISHED ])
     rescue AddressTaken => e
       address_taken(@record, e)

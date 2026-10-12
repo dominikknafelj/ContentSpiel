@@ -14,10 +14,15 @@ module Admin
     # no id in it: it is drawn beside the editor's own cards.
     class ChangesOverviewComponent < Admin::AdminComponent
       KINDS = %i[changed added removed moved].freeze
+      DIALOG = "admin.components.editor_screen.publish_changes_dialog".freeze
       SUMMARY_LENGTH = 80
       Lost = Data.define(:record, :path, :locales)
 
-      def initialize(record:, changes:, holds:, locale:, lost: [], url_options: {})
+      # The answer to `part=schedule`: what is scheduled now and nothing else.
+      def self.schedule_only(record:) = new(record: record, changes: nil, holds: nil, locale: ::Locales.default, schedule_only: true)
+
+      def initialize(record:, changes:, holds:, locale:, lost: [], url_options: {}, schedule_only: false)
+        @schedule_only = schedule_only
         @record = record
         @changes = changes
         @holds = holds
@@ -27,6 +32,22 @@ module Admin
       end
 
       def type = record.is_a?(::Page) ? "page" : "post"
+
+      def schedule_only? = @schedule_only
+
+      # WHAT IS SCHEDULED NOW, for the dialogs' scripts (`admin--editor--publish-dialog`):
+      # the pending copy's id (what each form sends back as `pending`, so
+      # the server can refuse a press made on older news) and the three
+      # sentences that name its time, each whole, as the dialogs show them.
+      # Empty attributes when nothing is scheduled.
+      def schedule_facts
+        pending = ::Publishing.pending(record)
+        return { publishing_schedule: "", pending_id: "", cancel_line: t("#{DIALOG}.cancel_scheduled_gone") } unless pending
+
+        time = I18n.l(pending.live_at.in_time_zone(Current.site.effective_time_zone), format: :"admin.datetime")
+        { publishing_schedule: "", pending_id: pending.id, kept_label: t("#{DIALOG}.kept", time: time),
+          discard_line: t("#{DIALOG}.discard_scheduled", time: time), cancel_line: t("#{DIALOG}.cancel_scheduled_body", time: time) }
+      end
 
       def none? = changes.none?
 

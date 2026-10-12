@@ -1,3 +1,6 @@
+<%# What is scheduled now, in every answer (see `schedule_facts`). %>
+<%= tag.span "", hidden: true, data: schedule_facts %>
+<% unless schedule_only? %>
 <%= tag.div data: { publishing_overview: "", nothing: (none? ? "" : nil) } do %>
   <% if none? %>
     <p class="text-sm text-dim"><%= scheduled_baseline? ? t(".none_scheduled", time: baseline_time) : t(".none") %></p>
@@ -55,4 +58,5 @@
   <% holders.each do |user| %>
     <%= tag.p t(".held.#{type}", name: ::PersonName.of(user)), class: "mt-4 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink", data: { publishing_held: "" } %>
   <% end %>
+<% end %>
 <% end %>

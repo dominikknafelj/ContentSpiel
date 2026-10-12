@@ -261,11 +261,16 @@ en:
           discard_body:
             page: "This page goes back to what is published. Blocks added since are deleted with their notes; blocks deleted since come back without theirs."
             post: "This post goes back to what is published."
+            # A scheduled record is not on the site yet: it goes back to what was scheduled.
+            scheduled_page: "This page goes back to what was scheduled. Blocks added since are deleted with their notes; blocks deleted since come back without theirs."
+            scheduled_post: "This post goes back to what was scheduled."
           # One more line when a change waits for its time: it goes too.
           discard_scheduled: "The changes scheduled for %{time} are discarded as well."
           discard_confirm: "Discard changes"
           cancel_scheduled_title: "Cancel the scheduled change?"
           cancel_scheduled_body: "The changes scheduled for %{time} will not be published then. They stay in the editor as unpublished changes."
+          # The cancel dialog, opened after someone else cancelled or published the change.
+          cancel_scheduled_gone: "No change is scheduled any more."
           cancel_scheduled_keep: "Keep it scheduled"
           cancel_scheduled_confirm: "Cancel scheduled change"
         # The rest of the header's strings are in `notes.en.yml` or not

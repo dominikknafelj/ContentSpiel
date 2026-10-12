@@ -335,6 +335,116 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_equal "Two", Mobility.with_locale(:en) { @page.reload.title }
   end
 
+  # -- the server checks what the dialog showed (fix round 1, I1) -------------------
+
+  MOVED = "The scheduled change was set, moved or cancelled since this was opened. Nothing was done: look again.".freeze
+
+  test "the schedule alone is asked by the same POST with part=schedule: the facts, no overview, no trial, kept by no cache" do
+    publish_changes(@page, at: 2.days.from_now)
+
+    statements = capture_sql { post admin_publishing_changes_path(kind: "page", id: @page.id, part: "schedule") }
+
+    assert_response :success
+    assert_select "[data-publishing-schedule][data-pending-id='#{Publishing.pending(@page).id}'][data-discard-line]", count: 1
+    assert_select "[data-publishing-overview]", count: 0
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_empty statements.grep(/FOR UPDATE|SAVEPOINT/)
+  end
+
+  test "scheduled since: Now, pressed in a dialog that showed no schedule, publishes nothing, and the dialog reopens saying so with the scheduled time on offer" do
+    publish_changes(@page, at: 2.days.from_now)
+    pending = Publishing.pending(@page)
+
+    post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "now", pending: "" }
+
+    assert_equal MOVED, flash[:publish_error]
+    assert_equal pending.id, Publishing.pending(@page).id, "the colleague's scheduled change is untouched"
+    assert_equal 1, Publishing.current(@page).number
+    follow_redirect!
+    assert_select "dialog#publish-changes-page-#{@page.id}[data-admin--ui--dialog-open-on-load]" do
+      assert_select "[role=alert]", text: MOVED
+      assert_select "label:not([hidden]) input[type=radio][value=kept]"
+      assert_select "input[type=hidden][name=pending][value='#{pending.id}']"
+    end
+  end
+
+  test "moved since: At the scheduled time, pressed for a time a colleague has moved, publishes nothing" do
+    publish_changes(@page, at: 2.days.from_now)
+    shown = Publishing.pending(@page).id
+    publish_changes(@page, at: 5.days.from_now)
+    moved = Publishing.pending(@page)
+
+    post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "kept", pending: shown }
+
+    assert_equal MOVED, flash[:publish_error]
+    assert_equal [ moved.id, moved.live_at ], Publishing.pending(@page).then { |copy| [ copy.id, copy.live_at ] }
+  end
+
+  test "cancelled since: At the scheduled time and Now, pressed for a change a colleague cancelled, publish nothing" do
+    publish_changes(@page, at: 2.days.from_now)
+    shown = Publishing.pending(@page).id
+    assert Publishing::CancelScheduledChange.call(@page.reload).ok?
+
+    post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "kept", pending: shown }
+    assert flash[:publish_error].present?
+    post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "now", pending: shown }
+    assert_equal MOVED, flash[:publish_error]
+
+    assert_equal 1, Publishing::Version.of(@page).count
+    assert_equal "Two", Mobility.with_locale(:en) { @page.reload.title }
+  end
+
+  test "shown what is so, each press goes through" do
+    post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "at", published_at: 2.days.from_now.strftime("%Y-%m-%dT%H:%M"), pending: "" }
+    assert_nil flash[:publish_error]
+    shown = Publishing.pending(@page).id
+
+    post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "kept", pending: shown }
+    assert_nil flash[:publish_error]
+    post admin_publishing_cancel_scheduled_change_path(kind: "page", id: @page.id), params: { pending: Publishing.pending(@page).id }
+    assert_equal "Scheduled change cancelled", flash[:notice]
+    post admin_publishing_discard_path(kind: "page", id: @page.id), params: { pending: "" }
+    assert_equal "Changes discarded", flash[:notice]
+  end
+
+  test "scheduled since: a discard pressed in a dialog that did not mention a scheduled change withdraws nothing and says so" do
+    publish_changes(@page, at: 2.days.from_now)
+    events = Audit::Event.count
+
+    post admin_publishing_discard_path(kind: "page", id: @page.id), params: { pending: "" }
+
+    assert_redirected_to admin_page_path(@page)
+    assert_equal MOVED, flash[:alert]
+    assert Publishing.pending(@page)
+    assert_equal "Two", Mobility.with_locale(:en) { @page.reload.title }
+    assert_equal events, Audit::Event.count
+  end
+
+  test "moved since: a cancel pressed for another change than the one that waits now withdraws nothing" do
+    publish_changes(@page, at: 2.days.from_now)
+    shown = Publishing.pending(@page).id
+    publish_changes(@page, at: 5.days.from_now)
+
+    post admin_publishing_cancel_scheduled_change_path(kind: "page", id: @page.id), params: { pending: shown }
+
+    assert_equal MOVED, flash[:alert]
+    assert Publishing.pending(@page)
+  end
+
+  test "a discard that could not put a renamed tag's name back says so after Changes discarded, and the mark stays" do
+    record = Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: %w[ruby] }, translations: { "en" => { title: "Tagged" } }).record
+    assert Posts::Save.call(record, translations: { "en" => { title: "Typed" } }).ok?
+    assert Tags::Rename.call(Tag.find_by!(name: "ruby"), name: "rubies").ok?
+
+    post admin_publishing_discard_path(kind: "post", id: record.id)
+
+    assert_equal "Changes discarded. A tag was renamed, merged or deleted since this was published: that difference stays, as unpublished changes", flash[:notice]
+    assert_equal "Tagged", Mobility.with_locale(:en) { record.reload.title }
+    assert record.unpublished_changes?
+    follow_redirect!
+    assert_select "#publishing-chip [data-unpublished-changes]", count: 1
+  end
+
   test "after a refusal the publish dialog reopens with the sentence, the choice and the time that was typed" do
     post admin_publishing_publish_path(kind: "page", id: @page.id), params: { when: "at", published_at: "2001-01-01T09:00" }
     follow_redirect!

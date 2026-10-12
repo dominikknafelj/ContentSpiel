@@ -163,8 +163,33 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
     overview
 
     assert_selector "body > [data-publishing-overview]", count: 1
-    assert_no_selector "[id]"
+    assert_selector "body > *", count: 2, visible: :all # the overview and the schedule's facts
+    assert_no_selector "[id]", visible: :all
     assert_no_selector "turbo-frame"
+  end
+
+  test "every answer says what is scheduled now: nothing, or the pending copy's id and the three sentences with its time" do
+    edit
+    overview
+    assert_selector "span[hidden][data-publishing-schedule][data-pending-id='']", visible: :all
+    assert_selector "[data-publishing-schedule][data-cancel-line='No change is scheduled any more.']", visible: :all
+    assert_no_selector "[data-kept-label], [data-discard-line]", visible: :all
+
+    publish_changes(@pricing, at: Time.zone.local(2031, 10, 12, 9))
+    overview
+    facts = page.find("[data-publishing-schedule]", visible: :all)
+    assert_equal Publishing.pending(@pricing).id.to_s, facts["data-pending-id"]
+    assert_equal "At the scheduled time (12 Oct 2031, 09:00)", facts["data-kept-label"]
+    assert_equal "The changes scheduled for 12 Oct 2031, 09:00 are discarded as well.", facts["data-discard-line"]
+    assert_equal "The changes scheduled for 12 Oct 2031, 09:00 will not be published then. They stay in the editor as unpublished changes.", facts["data-cancel-line"]
+  end
+
+  test "the schedule alone is the facts and no overview" do
+    publish_changes(@pricing, at: 2.days.from_now) if edit
+    as(@me) { render_inline Admin::EditorScreen::ChangesOverviewComponent.schedule_only(record: @pricing.reload) }
+
+    assert_selector "[data-publishing-schedule][data-pending-id='#{Publishing.pending(@pricing).id}']", visible: :all
+    assert_no_selector "[data-publishing-overview]", visible: :all
   end
 
   test "a name is text, whatever was typed as one" do

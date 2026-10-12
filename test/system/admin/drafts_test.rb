@@ -406,4 +406,88 @@ class Admin::DraftsSystemTest < ApplicationSystemTestCase
     visit admin_posts_path
     assert_selector "[data-unpublished-changes]", text: "Unpublished changes"
   end
+
+  # -- what a dialog says about a schedule is asked when it opens, and checked when it is pressed (fix round 1, I1) --
+
+  test "two people: a change Dana scheduled since my page loaded is offered when I open the publish dialog and named when I open the discard dialog" do
+    as_me { assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok? }
+    open_editor
+    assert_no_selector "#{HEADER} [data-change-scheduled]"
+
+    using_session(:dana) do
+      sign_in_via_form(@dana)
+      visit editor
+      await_notes_live
+      press "Publish changes…"
+      within publish_dialog do
+        assert_selector "[data-changed-fields]", text: "Title"
+        choose "At a time"
+        press "Publish changes"
+      end
+      assert_text "Changes scheduled for"
+    end
+    pending = Publishing.pending(@page)
+    assert pending
+
+    # My header follows by the live signal; my dialogs were drawn before.
+    assert_selector "#{HEADER} #publishing-chip [data-change-scheduled]", wait: LIVE
+    assert_equal "", find("#publish-changes-page-#{@page.id} input[name=pending]", visible: :all).value, "drawn when nothing was scheduled"
+
+    press "Publish changes…"
+    within publish_dialog do
+      assert_text "Nothing new to publish. This is the same as the changes scheduled for"
+      assert_selector "input[name=when][value=kept]:checked"
+      assert_text "At the scheduled time ("
+      assert_equal pending.id.to_s, find("input[name=pending]", visible: :all).value
+      press "Cancel"
+    end
+
+    as_me { assert Pages::Save.call(@page.reload, translations: { "en" => { subtitle: "One more word" } }).ok? }
+    assert_selector "#{HEADER} #publishing-chip [data-discard-changes-offered]", visible: :all, wait: LIVE
+    press "Discard changes…"
+    within "dialog[open]" do
+      assert_selector "[data-discard-withdraws]", text: "are discarded as well."
+      assert_equal pending.id.to_s, find("input[name=pending]", visible: :all).value
+      press "Cancel"
+    end
+    assert_equal pending.id, Publishing.pending(@page).id
+  end
+
+  test "Now pressed for a schedule that changed after the dialog was filled publishes nothing, and the dialog comes back with the fresh state" do
+    as_me { assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok? }
+    open_editor
+    press "Publish changes…"
+    within publish_dialog do
+      assert_selector "[data-changed-fields]", text: "Title"
+      assert_checked_field "Now"
+    end
+    # A colleague schedules these changes while my dialog is open.
+    as_me { publish_changes(@page, at: 2.days.from_now) }
+    pending = Publishing.pending(@page)
+
+    within(publish_dialog) { press "Publish changes" }
+
+    within publish_dialog do
+      assert_selector "[role=alert]", text: "The scheduled change was set, moved or cancelled since this was opened. Nothing was done: look again."
+      assert_text "At the scheduled time ("
+      assert_equal pending.id.to_s, find("input[name=pending]", visible: :all).value
+    end
+    assert_equal pending.id, Publishing.pending(@page).id
+    assert_equal 1, Publishing.current(@page).number
+    visitor_sees "Pricing", absent: "Typed"
+  end
+
+  test "when the overview cannot be read the dialog says so" do
+    as_me { assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok? }
+    open_editor
+    as_me { assert Trash::Move.call(@page.reload).ok? } # the page goes away elsewhere: the overview's POST answers 404
+
+    press "Publish changes…"
+
+    within publish_dialog do
+      assert_text "Couldn’t read what will change. Close this and open it again."
+      assert_no_text "Reading what will change…"
+      assert_no_selector "[data-publishing-overview]"
+    end
+  end
 end

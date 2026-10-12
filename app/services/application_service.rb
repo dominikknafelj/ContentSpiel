@@ -10,10 +10,14 @@ class ApplicationService
   # controller answer 403 for one and 422 for the other (access-control
   # design spec §3.4) without matching on the message text, which a
   # `message:` override (the owner-only user rules) changes anyway.
-  Result = Data.define(:record, :errors, :denied) do
-    def initialize(record:, errors:, denied: false) = super
+  #
+  # `notice` is one sentence a SUCCESS has to say beyond "done" (a discard
+  # that could not put everything back): nil for every other result. It is
+  # not an error: `ok?` does not read it.
+  Result = Data.define(:record, :errors, :denied, :notice) do
+    def initialize(record:, errors:, denied: false, notice: nil) = super
 
-    def self.success(record) = new(record:, errors: [])
+    def self.success(record, notice: nil) = new(record:, errors: [], notice: notice)
 
     # `errors` defaults to `record.errors.full_messages` (see
     # `ApplicationService#failure` below), which is only non-empty when the
@@ -125,6 +129,6 @@ class ApplicationService
     Current.set(actor: actor, &block)
   end
 
-  def success(record) = Result.success(record)
+  def success(record, notice: nil) = Result.success(record, notice: notice)
   def failure(record, errors = record.errors.full_messages) = Result.failure(record, errors)
 end

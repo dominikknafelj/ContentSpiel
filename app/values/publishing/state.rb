@@ -31,7 +31,10 @@ module Publishing
   #   edits since are `changes?`). Its changes can be published again (now or
   #   at another time), withdrawn (`cancel_scheduled_change`: the pending
   #   copy goes, the rows stay as they are, as unpublished changes) or
-  #   discarded, with or without edits since.
+  #   discarded, with or without edits since. Discarded only while a copy is
+  #   IN FORCE: a record whose only copy is the pending one (written around
+  #   the services, then given a scheduled change) is shown from its rows,
+  #   and there is nothing to return to.
   #
   # A combination that should not exist (a mark on a draft) is answered as
   # the nearest true state and never raises: this runs on a page view.
@@ -49,7 +52,7 @@ module Publishing
   # | :scheduled             | publish, schedule (+ publish_changes, discard_changes when changes?), unpublish |
   # | :live                  | unpublish                                            |
   # | :live_with_changes     | publish_changes, discard_changes, unpublish          |
-  # | :live_change_scheduled | publish_changes, cancel_scheduled_change, discard_changes, unpublish |
+  # | :live_change_scheduled | publish_changes, cancel_scheduled_change, (discard_changes when a copy is in force), unpublish |
   #
   # (`schedule` on a scheduled record is "Edit schedule"; `publish` on one is
   # "Publish now".)
@@ -109,7 +112,7 @@ module Publishing
       when :scheduled then %i[publish schedule] + changes_actions + %i[unpublish]
       when :live then %i[unpublish]
       when :live_with_changes then changes_actions + %i[unpublish]
-      when :live_change_scheduled then %i[publish_changes cancel_scheduled_change discard_changes unpublish]
+      when :live_change_scheduled then %i[publish_changes cancel_scheduled_change] + (in_force? ? %i[discard_changes] : []) + %i[unpublish]
       end
     end
 
@@ -120,5 +123,11 @@ module Publishing
     attr_reader :record, :now
 
     def changes_actions = changes? ? %i[publish_changes discard_changes] : []
+
+    # Whether a copy is in force: what a discard returns to. Asked only for
+    # a live record with a change scheduled (one statement, the first time):
+    # one whose ONLY copy is the pending one is shown from its rows, so there
+    # is nothing to go back to, and withdrawing the change is its action.
+    def in_force? = defined?(@in_force) ? @in_force : (@in_force = Publishing.in_force?(record, now: now))
   end
 end

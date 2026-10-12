@@ -189,7 +189,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     end
     assert_select "dialog#merge-tag-dialog footer button[type=submit][form='merge-tag-form'][disabled]", text: "Merge tags"
     assert_select "dialog#merge-tag-dialog [data-merge-published-lists]",
-      text: "A merge changes published lists at once, without “Publish changes…”: posts with the merged tag join the lists that show the chosen tag, and a post with either tag can move to another address."
+      text: "A merge changes published lists at once, without “Publish changes…”: lists that show either tag then show the posts of both, and a post with either tag can move to another address."
     # The picker's controls never sit inside a row's autosave form.
     assert_select "form[data-controller='admin--saving--autosave'] [data-controller='admin--ui--chip-input']", count: 0
     assert_select "dialog#delete-tag-dialog button.bg-danger", text: "Delete tag"

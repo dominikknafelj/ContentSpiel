@@ -98,4 +98,17 @@ class Publishing::StateTest < ActiveSupport::TestCase
       assert_includes actions, :discard_changes
     end
   end
+
+  test "a live record whose only copy is the pending one is not offered a discard: nothing is in force to return to, and cancelling is its action" do
+    [ false, true ].each do |mark|
+      record = record_with(:past, true, mark)
+      Publishing::Version.of(record).in_force.delete_all # version: none (a test makes a record that was written around the services)
+
+      state = Publishing::State.of(record)
+
+      assert_equal :live_change_scheduled, state.state
+      assert_equal %i[publish_changes cancel_scheduled_change unpublish], state.actions
+      assert_not Publishing::DiscardChanges.call(record).ok?, "and the service has nothing to discard there"
+    end
+  end
 end

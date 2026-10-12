@@ -15,14 +15,19 @@ module Admin
     # out and sends it afterwards, and a form replaced meanwhile would be a
     # press that is lost (docs/reference/save-rule-and-write-queue.md).
     #
-    # WHAT IS IN THE PUBLISH DIALOG IS ASKED WHEN IT OPENS: the overview is
-    # an empty element the script fills (`admin--editor--publish-dialog`),
-    # because what a publish would change is known only then. What is drawn
-    # here is what this page view knew: whether a change is scheduled (the
-    # "At the scheduled time" choice, "Cancel scheduled change"). In this
-    # tab that changes only through a publish, a discard or a cancel, each
-    # of which is a full visit; another tab's cancel is answered by the
-    # controller ("These changes are no longer scheduled…").
+    # WHAT A DIALOG SAYS IS ASKED WHEN IT OPENS (`admin--editor--publish-dialog`):
+    # the overview, and everything about a SCHEDULE: whether "At the
+    # scheduled time (…)" is offered, the discard dialog's line that a
+    # scheduled change goes too, the cancel dialog's sentence with its time.
+    # What is drawn here is only the first state of those, from this page
+    # view; the script replaces it with the server's answer at each opening
+    # (a colleague may have scheduled, moved or cancelled a change since).
+    # AND THE SERVER CHECKS WHAT WAS SHOWN: each form sends the pending copy
+    # it showed (`pending`), and a press made on older news is refused with
+    # one sentence, writing nothing (`Publishing::ShownSchedule`). Only
+    # WHETHER the cancel dialog and its menu item exist is from the page
+    # view: a change scheduled elsewhere since has no menu item until the
+    # next visit, which says nothing untrue.
     #
     # A refusal of the publish (a time in the past, the record's own address
     # taken) comes back as `error:` and the dialog reopens with it, the
@@ -75,6 +80,22 @@ module Admin
 
       def zone = Current.site.effective_time_zone
       def pending_at = state.pending_at
+
+      # The pending copy's id as this page view knew it: the first value of
+      # each form's `pending` field, which the script replaces with what the
+      # server answers at each opening.
+      def pending_id = pending_at && ::Publishing.pending(record)&.id
+
+      # A scheduled record is not on the site yet: it goes back to what was scheduled.
+      def discard_body_key = state.scheduled? ? "scheduled_#{type}" : type
+
+      # The discard and the cancel dialog read what is scheduled when they
+      # open, through the same script and the same queued POST as the
+      # publish dialog, without the overview.
+      def schedule_reader
+        { controller: "admin--editor--publish-dialog", admin__editor__publish_dialog_url_value: "#{changes_url}#{changes_url.include?("?") ? "&" : "?"}part=schedule",
+          action: "admin--ui--dialog:opening@window->admin--editor--publish-dialog#opening" }
+      end
       def pending_time = I18n.l(pending_at.in_time_zone(zone), format: :"admin.datetime")
 
       # Which "when" is on: what was chosen before a refusal, else the

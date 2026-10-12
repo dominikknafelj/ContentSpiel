@@ -11,12 +11,16 @@
       <div id="publishing-changes" aria-live="polite" data-admin--editor--publish-dialog-target="overview"></div>
 
       <%= form_with url: publish_url, method: :post, id: form_id, class: "mt-4 border-t border-line pt-4", data: queue_hold, html: { novalidate: true } do %>
+        <%# The scheduled change this dialog shows (its id, or none): set by the script from each answer, checked by the server. %>
+        <%= hidden_field_tag :pending, pending_id.to_s, id: nil %>
         <fieldset>
           <legend class="<%= setup_label_class %>"><%= t(".when") %></legend>
-          <% if pending_at %>
-            <label class="mt-2 flex items-center gap-2 text-sm"><%= radio_button_tag :when, "kept", chosen == "kept", id: "#{dialog_id}-kept" %> <%= t(".kept", time: pending_time) %></label>
+          <%# Always in the form, shown while a change is scheduled: the script sets it from what the server answers at each opening. %>
+          <%= tag.label class: "mt-2 flex items-center gap-2 text-sm", hidden: pending_at.nil?, data: { admin__editor__publish_dialog_target: "keptRow" } do %>
+            <%= radio_button_tag :when, "kept", chosen == "kept", id: "#{dialog_id}-kept", data: { admin__editor__publish_dialog_target: "kept" } %>
+            <span data-admin--editor--publish-dialog-target="keptLabel"><%= t(".kept", time: pending_time) if pending_at %></span>
           <% end %>
-          <label class="mt-2 flex items-center gap-2 text-sm"><%= radio_button_tag :when, "now", chosen == "now", id: "#{dialog_id}-now" %> <%= t(".now") %></label>
+          <label class="mt-2 flex items-center gap-2 text-sm"><%= radio_button_tag :when, "now", chosen == "now", id: "#{dialog_id}-now", data: { admin__editor__publish_dialog_target: "now" } %> <%= t(".now") %></label>
           <label class="mt-2 flex items-center gap-2 text-sm"><%= radio_button_tag :when, "at", chosen == "at", id: "#{dialog_id}-at", data: { admin__editor__publish_dialog_target: "at" } %> <%= t(".at") %></label>
           <%= tag.input type: "datetime-local", id: input_id, name: "published_at", value: input_value, min: min_value, class: "#{setup_input_class} mt-2",
                 aria: { label: t(".time"), describedby: [ (error_id if error), zone_id ].compact.join(" ") },
@@ -35,12 +39,16 @@
 <% end %>
 
 <% if may_discard? %>
-  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: discard_dialog_id, title: t(".discard_title"), body: t(".discard_body.#{type}")) do |dialog| %>
-    <% if pending_at %>
-      <% dialog.with_details do %><p data-discard-withdraws><%= t(".discard_scheduled", time: pending_time) %></p><% end %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: discard_dialog_id, title: t(".discard_title"), body: t(".discard_body.#{discard_body_key}")) do |dialog| %>
+    <%# Whether a scheduled change goes with the discard is asked when the dialog opens (`part=schedule`). %>
+    <% dialog.with_details do %>
+      <%= tag.div data: schedule_reader do %>
+        <%= tag.p (t(".discard_scheduled", time: pending_time) if pending_at), hidden: pending_at.nil?, data: { discard_withdraws: "", admin__editor__publish_dialog_target: "discardLine" } %>
+      <% end %>
     <% end %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: discard_url, method: :post, data: queue_hold do %>
+        <%= hidden_field_tag :pending, pending_id.to_s, id: nil %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".discard_confirm"), variant: :danger, type: "submit") %>
       <% end %>
     <% end %>
@@ -48,9 +56,16 @@
 <% end %>
 
 <% if may_cancel? %>
-  <%= render Admin::Ui::ConfirmDialogComponent.new(id: cancel_dialog_id, title: t(".cancel_scheduled_title"), body: t(".cancel_scheduled_body", time: pending_time), cancel_label: t(".cancel_scheduled_keep")) do |dialog| %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(id: cancel_dialog_id, title: t(".cancel_scheduled_title"), cancel_label: t(".cancel_scheduled_keep")) do |dialog| %>
+    <%# Its sentence names the time of the change that waits NOW: read again when the dialog opens. %>
+    <% dialog.with_details do %>
+      <%= tag.div data: schedule_reader do %>
+        <p data-admin--editor--publish-dialog-target="cancelLine"><%= t(".cancel_scheduled_body", time: pending_time) %></p>
+      <% end %>
+    <% end %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: cancel_url, method: :post, data: queue_hold do %>
+        <%= hidden_field_tag :pending, pending_id.to_s, id: nil %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel_scheduled_confirm"), variant: :primary, type: "submit") %>
       <% end %>
     <% end %>

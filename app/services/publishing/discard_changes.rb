@@ -11,6 +11,16 @@ module Publishing
   # shows now. A record whose only copy is pending is shown from its rows and
   # has nothing to return to.
   #
+  # TAGS ARE REFERENCES, FOLLOWED BY ID, AND NONE IS EVER MADE. A post's tags
+  # go back to the ids its copy holds, each under the name that tag has NOW;
+  # a list block's filter goes back to the tag the copy recorded, under its
+  # present name. A tag deleted since stays deleted and a merged tag stays
+  # merged: the standing rule of this work. Where that leaves the rows
+  # different from the copy (the copy still shows the old name, or a tag
+  # that is gone), the discard succeeds, says so (`REMAINS`, the result's
+  # `notice`), and the mark STAYS: the difference is visible in the
+  # overview and is published, or left, by a person.
+  #
   # WHAT COMES BACK is content: the columns `Publishing.content_columns`
   # names (less the bookkeeping), a page's blocks with their order and
   # sections, a post's tags. The slug, the place in the tree and the publish
@@ -54,14 +64,20 @@ module Publishing
   # write: a call with no tab (the console) is not refused.
   class DiscardChanges < ApplicationService
     include ContentBlocks::Structure
+    include ShownSchedule
 
     NOTHING = "There is nothing to discard".freeze
+    # What a discard cannot put back: a tag is a reference, not content of
+    # the record, and one that was renamed, merged or deleted since the copy
+    # was taken stays as it is now (see TAGS in the class comment).
+    REMAINS = "A tag was renamed, merged or deleted since this was published: that difference stays, as unpublished changes".freeze
     PAGE_TRANSLATED = %w[title subtitle meta_title meta_description hero_alt].freeze
     POST_TRANSLATED = %w[title excerpt].freeze
     BLOCK_TRANSLATED = %w[caption alt].freeze
 
-    def initialize(record, actor: Current.actor)
+    def initialize(record, shown_pending: NOT_ASKED, actor: Current.actor)
       @record = record
+      @shown_pending = shown_pending
       @actor = actor
     end
 
@@ -69,12 +85,15 @@ module Publishing
       refused = AccessControl::OwnerRule.refusal(@record) { |key| authorize!(key, @record) }
       return denied(refused, @record) if refused
 
+      @wrote = @moved = @remains = false
       done = @record.class.transaction(requires_new: true) do
         lock_owner(@record)
         @record.reload
         now = Time.current
         version = @record.published_at.nil? ? nil : Publishing.current(@record, now: now)
         next false if version.nil?
+        # A scheduled change the dialog did not mention would go with it (`ShownSchedule`).
+        next @moved = true if schedule_moved?(@record, now)
 
         # Nothing differs and nothing is scheduled: a mark left by typing
         # and typing back is cleared, and no event says a discard happened.
@@ -86,12 +105,24 @@ module Publishing
         @record.is_a?(Page) ? restore_page(version) : restore_post(version)
         withdrawn = Version.withdraw_pending!(@record, now: now).last
         Media::UsageIndex.refresh_published(@record, now: now) if withdrawn
-        Publishing.clear_changes(@record)
+        # THE MARK FOLLOWS WHAT IS TRUE NOW, read again under the lock: gone
+        # when the rows are the copy, kept when something could not be put
+        # back (`REMAINS`), so that difference can still be seen, published
+        # or left, and never goes public unseen with a later publish.
+        @remains = !Changes.new(@record, version).none?
+        @remains ? Publishing.note_change(@record, now: now) : Publishing.clear_changes(@record)
+        # Nothing was written and nothing withdrawn: what differs is only
+        # what cannot be put back. No event says a discard happened.
+        next false unless @wrote || withdrawn
+
         record_event("#{@record.is_a?(Page) ? "page" : "post"}.changes_discarded", subject: @record, coalesce: false,
           metadata: { "number" => version.number, "withdrawn_number" => withdrawn }.compact)
         true
       end
-      done ? success(@record) : failure(@record, @errors.presence || [ NOTHING ])
+      return failure(@record, [ MOVED ]) if @moved
+      return success(@record, notice: (REMAINS if @remains)) if done
+
+      failure(@record, @errors.presence || [ @remains ? REMAINS : NOTHING ])
     end
 
     private
@@ -100,6 +131,7 @@ module Publishing
     # succeeded; otherwise its errors are this service's and everything
     # written so far is rolled back.
     def step(result)
+      @wrote = true
       return result.record if result.ok?
 
       @errors = result.errors
@@ -125,16 +157,31 @@ module Publishing
       end
       attributes = {}
       attributes[:fields] = every_key(fields["metadata"], @record.metadata) unless fields["metadata"].to_h == @record.metadata.to_h
-      names = tag_names(version)
-      attributes[:tag_names] = names unless names.sort == @record.tags.reload.map(&:name).sort
+      tags = tags_back(version)
+      attributes[:tag_names] = tags.map(&:name) unless tags.map(&:id).sort == @record.tags.reload.map(&:id).sort
       step Posts::Save.call(@record, attributes: attributes, translations: translations, actor: actor) if attributes.any? || translations.any?
     end
 
-    # The copy's tags by their present names; one that is gone since, by the
-    # name the copy knew, which creates it again.
-    def tag_names(version)
-      present = Tag.where(id: version.tag_ids).pluck(:id, :name).to_h
-      version.snapshot.fetch("tags", []).map { |tag| present[tag["id"]] || tag["name"] }
+    # The tags a post's copy holds BY ID (`tag_ids`, which a merge has
+    # repointed to the tag that was kept), as the rows they are now: each is
+    # attached under whatever name it has today (`Posts::Save` finds it by
+    # that name), and an id with no row (the tag was deleted since) is left
+    # out. No tag is ever made by a discard.
+    def tags_back(version) = Tag.where(id: version.tag_ids).order(:id).to_a
+
+    # A block's settings as the copy has them, with ONE reference followed:
+    # a list block's tag filter is a tag's NAME in the settings, and the copy
+    # recorded which tag that was (`listed_tag_id`, repointed by a merge).
+    # While that tag exists the filter is written under its present name, so
+    # the row filters by the tag the published list filters by. When it does
+    # not (deleted since), the copy's own name is written: a name no tag has,
+    # which lists nothing, as everywhere else. No tag is made.
+    def settings_back(attributes)
+      settings = attributes["settings"].to_h
+      id = attributes["listed_tag_id"] or return settings
+      name = Tag.where(id: id).pick(:name) or return settings
+
+      settings.merge("tag" => name)
     end
 
     def restore_blocks(copied)
@@ -165,7 +212,8 @@ module Publishing
       changed = {}
       changed[:block_type] = attributes["block_type"] unless attributes["block_type"] == row.block_type
       changed[:media_asset_id] = attributes["media_asset_id"] unless attributes["media_asset_id"] == row.media_asset_id
-      changed[:settings] = every_key(attributes["settings"], row.settings) unless attributes["settings"].to_h == row.settings.to_h
+      settings = settings_back(attributes)
+      changed[:settings] = every_key(settings, row.settings) unless settings == row.settings.to_h
       translations = block_translations(attributes, row)
       return row if changed.empty? && translations.empty?
 
@@ -175,7 +223,7 @@ module Publishing
     def recreate(attributes, ids)
       placement = { section_id: ids[attributes["section_id"]], section_column: attributes["section_column"] }.compact
       step ContentBlocks::Save.call(ContentBlock.new(owner: @record),
-        attributes: { block_type: attributes["block_type"], media_asset_id: attributes["media_asset_id"], settings: attributes["settings"].to_h, **placement },
+        attributes: { block_type: attributes["block_type"], media_asset_id: attributes["media_asset_id"], settings: settings_back(attributes), **placement },
         translations: block_translations(attributes, nil), actor: actor)
     end
 

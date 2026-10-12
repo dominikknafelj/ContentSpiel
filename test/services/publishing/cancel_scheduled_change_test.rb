@@ -35,6 +35,8 @@ class Publishing::CancelScheduledChangeTest < ActiveSupport::TestCase
     event = Audit::Event.where(action: "page.scheduled_change_cancelled").sole
     assert_equal @page, event.subject
     assert_equal({ "number" => 2 }, event.metadata)
+    assert_includes Dashboard::Feed::NOT_A_CHANGE, "page.scheduled_change_cancelled", "no content moved: nobody becomes 'Changed by' for it"
+    assert_includes Dashboard::Feed::NOT_A_CHANGE, "post.scheduled_change_cancelled"
   end
 
   test "a post's event is post.scheduled_change_cancelled" do
@@ -105,5 +107,19 @@ class Publishing::CancelScheduledChangeTest < ActiveSupport::TestCase
     lock = statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
     first_copy = statements.index { |sql| sql.include?(%("published_versions")) }
     assert_operator lock, :<, first_copy
+  end
+
+  test "a cancel that named another change than the one that waits now is refused, and withdraws nothing" do
+    shown = Publishing.pending(@page).id
+    publish_changes(@page, at: 5.days.from_now)
+    events = Audit::Event.count
+
+    result = Publishing::CancelScheduledChange.call(@page.reload, shown_pending: shown)
+
+    assert_not result.ok?
+    assert_equal [ Publishing::ShownSchedule::MOVED ], result.errors
+    assert Publishing.pending(@page)
+    assert_equal events, Audit::Event.count
+    assert Publishing::CancelScheduledChange.call(@page.reload, shown_pending: Publishing.pending(@page).id).ok?
   end
 end

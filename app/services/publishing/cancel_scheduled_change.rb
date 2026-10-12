@@ -12,11 +12,13 @@ module Publishing
   # hold is asked. The record's row lock first, as taking a copy takes it.
   class CancelScheduledChange < ApplicationService
     include ContentBlocks::Structure
+    include ShownSchedule
 
     NOTHING = "No change is scheduled".freeze
 
-    def initialize(record, actor: Current.actor)
+    def initialize(record, shown_pending: NOT_ASKED, actor: Current.actor)
       @record = record
+      @shown_pending = shown_pending
       @actor = actor
     end
 
@@ -24,11 +26,15 @@ module Publishing
       key = "#{prefix}s.publish"
       return denied(key, @record) unless authorize!(key, @record)
 
+      @moved = false
       cancelled = @record.class.transaction(requires_new: true) do
         lock_owner(@record)
         next false if @record.class.where(id: @record.id).pick(:published_at).nil?
 
         now = Time.current
+        # The change the dialog named is not the one that waits now (`ShownSchedule`).
+        next @moved = true if schedule_moved?(@record, now)
+
         number = Version.withdraw_pending!(@record, now: now).last
         next false if number.nil?
 
@@ -45,6 +51,8 @@ module Publishing
         record_event("#{prefix}.scheduled_change_cancelled", subject: @record, metadata: { "number" => number }, coalesce: false)
         true
       end
+
+      return failure(@record, [ MOVED ]) if @moved
 
       cancelled ? success(@record) : failure(@record, [ NOTHING ])
     end

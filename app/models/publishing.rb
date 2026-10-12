@@ -21,10 +21,12 @@ module Publishing
   # whether the public sees it from the copy or from the rows.
   #
   # IN THE COPY. Includes `translation_sources` and
-  # `translation_original_changed_at` of all three models: nothing public
-  # draws them (a copy is never public as such), but "Discard changes" must
-  # put back a translated field together with the marks that say whether the
-  # translation is current, or the marks would be wrong afterwards.
+  # `translation_original_changed_at` of all three models, although nothing
+  # reads them back: nothing public draws them, the overview does not
+  # compare them (`Publishable::BOOKKEEPING`), and "Discard changes" does NOT
+  # copy them back (`Publishing::DiscardChanges`: translation bookkeeping is
+  # what the save services leave when the text is written back). They are
+  # kept as a record of what the marks were when the copy was taken.
   CONTENT = {
     "Page" => %w[title subtitle meta_title meta_description hero_alt hero_media_asset_id page_type
                  translation_sources translation_original_changed_at],

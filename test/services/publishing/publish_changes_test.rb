@@ -117,4 +117,51 @@ class Publishing::PublishChangesTest < ActiveSupport::TestCase
 
     assert_not @page.reload.unpublished_changes?
   end
+
+  # -- what the dialog showed (Task 7 fix round 1, I1) ----------------------------
+
+  def refused_as_moved(**options)
+    copies = Publishing::Version.of(@page).order(:id).pluck(:id, :live_at)
+    events = Audit::Event.count
+
+    result = Publishing::PublishChanges.call(@page.reload, **options)
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ Publishing::ShownSchedule::MOVED ], result.errors
+    assert_equal copies, Publishing::Version.of(@page).order(:id).pluck(:id, :live_at), "no copy taken, none removed"
+    assert_equal events, Audit::Event.count
+  end
+
+  test "scheduled since: 'Now' from a dialog that showed no schedule does not publish over a colleague's scheduled change" do
+    publish_changes(@page, at: 2.days.from_now)
+
+    refused_as_moved(at: Time.current, shown_pending: nil)
+    assert_equal 1, Publishing.current(@page).number, "the site is as it was"
+  end
+
+  test "moved since: 'At the scheduled time' does not keep a time a colleague has moved" do
+    publish_changes(@page, at: 2.days.from_now)
+    shown = Publishing.pending(@page).id
+    publish_changes(@page, at: 5.days.from_now)
+    assert_not_equal shown, Publishing.pending(@page).id, "a moved change is another copy"
+
+    refused_as_moved(shown_pending: shown)
+  end
+
+  test "cancelled since: 'At the scheduled time' does not publish now what a colleague withdrew" do
+    publish_changes(@page, at: 2.days.from_now)
+    shown = Publishing.pending(@page).id
+    assert Publishing::CancelScheduledChange.call(@page.reload).ok?
+
+    refused_as_moved(shown_pending: shown)
+    assert_equal 1, Publishing.current(@page).number
+  end
+
+  test "shown what is so, the publish goes through; a caller that showed nothing is not asked" do
+    assert Publishing::PublishChanges.call(@page.reload, at: 2.days.from_now, shown_pending: nil).ok?
+    assert Publishing::PublishChanges.call(@page.reload, shown_pending: Publishing.pending(@page).id).ok?
+    assert Publishing::PublishChanges.call(@page.reload, at: Time.current).ok?
+    assert_nil Publishing.pending(@page)
+  end
 end

@@ -29,7 +29,10 @@ class Admin::EditorScreen::PublishChangesDialogComponentTest < ViewComponent::Te
     assert_no_selector "turbo-frame", visible: :all
     assert_selector "#{body} form[action='/cs-studio/publishing/page/#{@live.id}/publish'][novalidate]", visible: :all
     assert_selector "#{publish_dialog} legend", text: "When", visible: :all
-    assert_equal [ "Now", "At a time" ], texts("#{publish_dialog} fieldset label")
+    assert_equal [ "Now", "At a time" ], texts("#{publish_dialog} fieldset label:not([hidden])")
+    # "At the scheduled time" is in the form from the start, hidden and unworded: the script shows it when the server says a change is scheduled.
+    assert_selector "#{publish_dialog} fieldset label[hidden][data-admin--editor--publish-dialog-target=keptRow] input[type=radio][value=kept]:not([checked])", visible: :all
+    assert_selector "#{publish_dialog} form input[type=hidden][name=pending][value='']", visible: :all
     assert_selector "#{publish_dialog} input[type=radio][name=when][value=now][checked]", visible: :all
     assert_selector "#{publish_dialog} input[type=datetime-local][name=published_at][aria-label='Date and time']", visible: :all
     assert_selector "#{publish_dialog} fieldset p", text: "the site’s time zone.", visible: :all
@@ -49,7 +52,8 @@ class Admin::EditorScreen::PublishChangesDialogComponentTest < ViewComponent::Te
     publish_changes(@live, at: Time.zone.local(2031, 10, 12, 9))
     dialogs
 
-    assert_equal [ "At the scheduled time (12 Oct 2031, 09:00)", "Now", "At a time" ], texts("#{publish_dialog} fieldset label")
+    assert_equal [ "At the scheduled time (12 Oct 2031, 09:00)", "Now", "At a time" ], texts("#{publish_dialog} fieldset label:not([hidden])")
+    assert_selector "#{publish_dialog} form input[type=hidden][name=pending][value='#{Publishing.pending(@live).id}']", visible: :all
     assert_selector "#{publish_dialog} input[type=radio][name=when][value=kept][checked]", visible: :all
     assert_selector "#{publish_dialog} input[type=radio][name=when][checked]", count: 1, visible: :all
     assert_selector "#{publish_dialog} input[name=published_at][value='2031-10-12T09:00']", visible: :all
@@ -63,7 +67,19 @@ class Admin::EditorScreen::PublishChangesDialogComponentTest < ViewComponent::Te
     assert_selector discard, text: "This page goes back to what is published. Blocks added since are deleted with their notes; blocks deleted since come back without theirs.", visible: :all
     assert_selector "#{discard} form[action='/cs-studio/publishing/page/#{@live.id}/discard'][method=post] button[type=submit]", text: "Discard changes", visible: :all
     assert_selector "#{discard} footer button[autofocus]", text: "Cancel", visible: :all
-    assert_no_selector "#{discard} [data-discard-withdraws]", visible: :all
+    assert_selector "#{discard} [data-discard-withdraws][hidden]:empty", visible: :all
+    assert_selector "#{discard} form input[type=hidden][name=pending][value='']", visible: :all
+    assert_selector "#{discard} [data-controller='admin--editor--publish-dialog'][data-admin--editor--publish-dialog-url-value='/cs-studio/publishing/page/#{@live.id}/changes?part=schedule'] [data-admin--editor--publish-dialog-target=discardLine]", visible: :all
+  end
+
+  test "a scheduled record's discard dialog says it goes back to what was scheduled" do
+    scheduled = create_page(title: "Later", published: false)
+    assert Pages::Save.call(scheduled, attributes: { published_at: 3.days.from_now }).ok?
+    assert Pages::Save.call(scheduled, translations: { "en" => { title: "Typed" } }).ok?
+    dialogs(scheduled)
+
+    assert_selector "dialog#discard-changes-page-#{scheduled.id}", text: "This page goes back to what was scheduled. Blocks added since are deleted with their notes; blocks deleted since come back without theirs.", visible: :all
+    assert_no_text "goes back to what is published"
   end
 
   test "a post's discard dialog says what a post goes back to, and with a change scheduled it says that goes too" do
@@ -73,7 +89,8 @@ class Admin::EditorScreen::PublishChangesDialogComponentTest < ViewComponent::Te
     dialogs(post)
 
     assert_selector "dialog#discard-changes-post-#{post.id}", text: "This post goes back to what is published.", visible: :all
-    assert_selector "dialog#discard-changes-post-#{post.id} [data-discard-withdraws]", text: "The changes scheduled for 12 Oct 2031, 09:00 are discarded as well.", visible: :all
+    assert_selector "dialog#discard-changes-post-#{post.id} [data-discard-withdraws]:not([hidden])", text: "The changes scheduled for 12 Oct 2031, 09:00 are discarded as well.", visible: :all
+    assert_selector "dialog#discard-changes-post-#{post.id} form input[type=hidden][name=pending][value='#{Publishing.pending(post).id}']", visible: :all
   end
 
   test "the cancel dialog is there only while a change is scheduled, names its time, and its form posts to cancel" do
@@ -86,7 +103,8 @@ class Admin::EditorScreen::PublishChangesDialogComponentTest < ViewComponent::Te
     assert_selector "#{cancel} h2", text: "Cancel the scheduled change?", visible: :all
     assert_selector cancel, text: "The changes scheduled for 12 Oct 2031, 09:00 will not be published then. They stay in the editor as unpublished changes.", visible: :all
     assert_equal [ "Keep it scheduled", "Cancel scheduled change" ], texts("#{cancel} footer button")
-    assert_selector "#{cancel} form[action='/cs-studio/publishing/page/#{@live.id}/cancel_scheduled_change'][method=post]", visible: :all
+    assert_selector "#{cancel} form[action='/cs-studio/publishing/page/#{@live.id}/cancel_scheduled_change'][method=post] input[type=hidden][name=pending][value='#{Publishing.pending(@live).id}']", visible: :all
+    assert_selector "#{cancel} [data-controller='admin--editor--publish-dialog'] [data-admin--editor--publish-dialog-target=cancelLine]", visible: :all
   end
 
   test "all the forms go through the write queue's hold and replace the page" do
@@ -109,7 +127,7 @@ class Admin::EditorScreen::PublishChangesDialogComponentTest < ViewComponent::Te
 
     dialogs(error: "These changes are no longer scheduled. Nothing was published.", when_chosen: "kept", value: "")
     assert_selector "#{publish_dialog} input[type=radio][value=now][checked]", visible: :all
-    assert_no_selector "#{publish_dialog} input[type=radio][value=kept]", visible: :all
+    assert_selector "#{publish_dialog} label[hidden] input[type=radio][value=kept]:not([checked])", visible: :all
   end
 
   test "someone who may not publish or change the record gets no dialog" do

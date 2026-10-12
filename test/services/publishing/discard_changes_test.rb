@@ -32,7 +32,8 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     data = Publishing::Snapshot.of(@page.reload)
     sections = data["blocks"].select { |block| block["block_type"] == "section" }.map { |block| block["id"] }
     [ data["fields"].except(*Publishable::BOOKKEEPING), data["blocks"].map do |block|
-      [ block["block_type"], sections.index(block["section_id"]), block["section_column"], block["settings"], with_text(block["body"]), block["caption"] ]
+      [ block["block_type"], sections.index(block["section_id"]), block["section_column"], block["settings"], block["translated_settings"],
+        with_text(block["body"]), block["caption"], block["alt"], block["media_asset_id"], block["listed_tag_id"] ]
     end ]
   end
 
@@ -133,21 +134,194 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal @published, shape
   end
 
-  test "a post gets its text, its fields and its tags back, a renamed tag under its present name" do
-    post = Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: %w[ruby rails] },
+  # -- tags are references, followed by id; none is ever made (fix round 1, C1 and I2) --
+
+  def live_post(tags)
+    Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: tags },
       translations: { "en" => { title: "Hello", excerpt: "Short", body: rich_doc("Body") } }).record
+  end
+
+  test "a post gets its text and its fields back, and its tags by id: a renamed tag under its present name, and the mark stays for the name the copy still shows" do
+    post = live_post(%w[ruby rails])
     assert Posts::Save.call(post, attributes: { tag_names: %w[other] }, translations: { "en" => { title: "Typed", body: rich_doc("Typed") }, "de" => { title: "Getippt" } }).ok?
-    Tag.find_by!(name: "ruby").update!(name: "rubies")
+    ruby = Tag.find_by!(name: "ruby")
+    assert Tags::Rename.call(ruby, name: "rubies").ok?
+    tags = Tag.count
 
-    assert Publishing::DiscardChanges.call(post.reload).ok?
+    result = Publishing::DiscardChanges.call(post.reload)
 
+    assert result.ok?, result.errors.to_sentence
     post.reload
     assert_equal({ "en" => "Hello" }, post.read_attribute(:title).compact_blank)
     assert_equal "Body", post.body_document(locale: "en").to_markdown.strip
     assert_equal %w[rails rubies], post.tags.pluck(:name).sort
-    assert_not post.unpublished_changes?
+    assert_equal Publishing.current(post).tag_ids, post.tags.pluck(:id).sort, "the same tags, by id"
+    assert_equal tags, Tag.count, "no tag was made"
     # What is left is the rename itself: the copy says "ruby" until the post is published again.
     assert_equal %w[tags], Publishing::Changes.of(post).fields
+    assert post.unpublished_changes?, "so the mark stays"
+    assert_equal Publishing::DiscardChanges::REMAINS, result.notice
+  end
+
+  test "with nothing renamed, merged or deleted the tags go back, the mark is gone and the result says nothing more" do
+    post = live_post(%w[ruby rails])
+    assert Posts::Save.call(post, attributes: { tag_names: %w[other] }).ok?
+
+    result = Publishing::DiscardChanges.call(post.reload)
+
+    assert result.ok?
+    assert_nil result.notice
+    assert_equal %w[rails ruby], post.reload.tags.pluck(:name).sort
+    assert_not post.unpublished_changes?
+    assert Publishing::Changes.of(post).none?
+  end
+
+  # The review's sequence: published with alpha and gamma, alpha merged into
+  # beta, any edit, discard.
+  test "after a merge a discard leaves the post on the KEPT tag: the merged tag is not made again, and publishing afterwards changes no list and no address" do
+    Tag.create!(name: "beta")
+    listing = create_page(title: "Topic", published: false)
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => "beta" } }).ok?
+    assert Pages::Save.call(listing, attributes: { published: true }).ok?
+    post = live_post(%w[alpha gamma])
+    assert Tags::Merge.call(Tag.find_by!(name: "alpha"), into: Tag.find_by!(name: "beta")).ok?
+    beta = Tag.find_by!(name: "beta")
+    assert_equal "/topic/hello", post.reload.full_path("en")
+    assert Posts::Save.call(post, translations: { "en" => { title: "Typed" } }).ok?
+    tags = Tag.count
+
+    result = Publishing::DiscardChanges.call(post.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    post.reload
+    assert_equal %w[beta gamma], post.tags.pluck(:name).sort
+    assert_includes post.tags.pluck(:id), beta.id
+    assert_equal Publishing.current(post).tag_ids, post.tags.pluck(:id).sort
+    assert_nil Tag.find_by(name: "alpha"), "the merged tag did not come back"
+    assert_equal tags, Tag.count
+    assert_equal "Hello", Mobility.with_locale(:en) { post.title }
+    assert post.unpublished_changes?, "the copy still shows the name alpha: that is left to publish"
+    assert_equal Publishing::DiscardChanges::REMAINS, result.notice
+
+    paths = PublicPath.current.order(:id).pluck(:record_type, :record_id, :locale, :path)
+    listed = Publishing::Listing.blocks.flat_map { |block| Publishing::Listing.posts(block).map(&:id) }.sort
+    publish_changes(post)
+    assert_equal paths, PublicPath.current.order(:id).pluck(:record_type, :record_id, :locale, :path), "publishing afterwards moves no address"
+    assert_equal listed, Publishing::Listing.blocks.flat_map { |block| Publishing::Listing.posts(block).map(&:id) }.sort, "and changes no list"
+    assert_not post.reload.unpublished_changes?
+    assert Publishing::Changes.of(post).none?
+  end
+
+  test "after a merge a discard leaves a list block filtering by the KEPT tag, under its present name, and publishing afterwards keeps the list and the addresses" do
+    Tag.create!(name: "beta")
+    list = add(nil, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "alpha" })
+    post = live_post(%w[alpha])
+    publish_changes(@page)
+    assert_equal "/pricing/hello", post.reload.full_path("en")
+    assert Tags::Merge.call(Tag.find_by!(name: "alpha"), into: Tag.find_by!(name: "beta")).ok?
+    beta = Tag.find_by!(name: "beta")
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
+    tags = Tag.count
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "beta", list.reload.settings["tag"]
+    assert_equal beta.id, list.listed_tag_id
+    assert_equal beta.id, Publishing.current(@page).blocks.find { |block| block["id"] == list.id }["listed_tag_id"], "the id the copy recorded, repointed by the merge"
+    assert_equal tags, Tag.count
+    assert_nil Tag.find_by(name: "alpha")
+    assert_equal "Pricing", Mobility.with_locale(:en) { @page.reload.title }
+    assert @page.unpublished_changes?, "the copy's block still says alpha by name"
+    assert_equal Publishing::DiscardChanges::REMAINS, result.notice
+
+    publish_changes(@page)
+    assert_equal "/pricing/hello", post.reload.full_path("en"), "the list still lists the post"
+    assert Publishing::Changes.of(@page.reload).none?
+  end
+
+  test "after a rename a list block whose filter was corrected to the new name keeps filtering by that tag" do
+    list = add(nil, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "alpha" })
+    post = live_post(%w[alpha])
+    publish_changes(@page)
+    alpha = Tag.find_by!(name: "alpha")
+    assert Tags::Rename.call(alpha, name: "omega").ok?
+    assert ContentBlocks::Save.call(list.reload, attributes: { settings: { "content_type" => "blog", "tag" => "omega" } }).ok?
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "omega", list.reload.settings["tag"]
+    assert_equal alpha.id, list.listed_tag_id
+    assert_equal 1, Tag.where(name: %w[alpha omega]).count
+    assert @page.reload.unpublished_changes?
+
+    publish_changes(@page)
+    assert_equal "/pricing/hello", post.reload.full_path("en")
+  end
+
+  test "a tag deleted since stays deleted: the post goes back without it, the list block's filter names no tag, the mark stays and the result says why" do
+    list = add(nil, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "alpha" })
+    post = live_post(%w[alpha gamma])
+    publish_changes(@page)
+    assert Tags::Destroy.call(Tag.find_by!(name: "alpha")).ok?
+    assert Posts::Save.call(post, translations: { "en" => { title: "Typed" } }).ok?
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
+    tags = Tag.count
+
+    of_post = Publishing::DiscardChanges.call(post.reload)
+    of_page = Publishing::DiscardChanges.call(@page.reload)
+
+    assert of_post.ok? && of_page.ok?
+    assert_equal tags, Tag.count
+    assert_nil Tag.find_by(name: "alpha"), "a deleted tag never comes back"
+    assert_equal %w[gamma], post.reload.tags.pluck(:name)
+    assert_equal "Hello", Mobility.with_locale(:en) { post.title }
+    assert_equal %w[tags], Publishing::Changes.of(post).fields
+    assert post.unpublished_changes?
+    assert_equal Publishing::DiscardChanges::REMAINS, of_post.notice
+    assert_equal "alpha", list.reload.settings["tag"], "written as the copy has it: a name no tag has"
+    assert_nil list.listed_tag_id
+    assert_equal "Pricing", Mobility.with_locale(:en) { @page.reload.title }
+    assert @page.unpublished_changes?
+    assert_equal Publishing::DiscardChanges::REMAINS, of_page.notice
+  end
+
+  test "when all that differs is what cannot be put back, a discard writes nothing, records nothing, keeps the mark and says why" do
+    post = live_post(%w[ruby])
+    assert Tags::Rename.call(Tag.find_by!(name: "ruby"), name: "rubies").ok?
+    assert post.reload.unpublished_changes?
+    events = Audit::Event.count
+    updated_at = post.updated_at
+
+    result = Publishing::DiscardChanges.call(post)
+
+    assert_not result.ok?
+    assert_equal [ Publishing::DiscardChanges::REMAINS ], result.errors
+    assert_equal events, Audit::Event.count
+    assert_equal updated_at, post.reload.updated_at
+    assert post.unpublished_changes?
+  end
+
+  # -- what the dialog showed (fix round 1, I1) ----------------------------------
+
+  test "a discard that was shown no scheduled change is refused when one was scheduled since, and writes nothing" do
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
+    publish_changes(@page, at: 2.days.from_now)
+    events = Audit::Event.count
+
+    result = Publishing::DiscardChanges.call(@page.reload, shown_pending: nil)
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ Publishing::ShownSchedule::MOVED ], result.errors
+    assert Publishing.pending(@page), "the colleague's scheduled change is still there"
+    assert_equal "Typed", Mobility.with_locale(:en) { @page.reload.title }
+    assert_equal events, Audit::Event.count
+
+    assert Publishing::DiscardChanges.call(@page.reload, shown_pending: Publishing.pending(@page).id).ok?, "shown the change, it goes with the rest"
+    assert_nil Publishing.pending(@page)
   end
 
   # The dispatch of Task 7 reverses the brief here ("it returns to changes
