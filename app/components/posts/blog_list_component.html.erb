@@ -3,7 +3,7 @@
     <li class="grid grid-cols-[7rem_1fr_auto] gap-4 border-b border-line py-4">
       <span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= post_date(post) %></span>
       <div>
-        <%= link_to translated(post, :title), post_url_path(post), class: "font-semibold text-ink hover:text-accent" %>
+        <%= link_to translated(post, :title), post_url_path(post, listed_on: page), class: "font-semibold text-ink hover:text-accent" %>
         <% excerpt = translated(post, :excerpt) %>
         <% if excerpt.present? %><p class="mt-1 text-sm text-dim"><%= excerpt %></p><% end %>
       </div>

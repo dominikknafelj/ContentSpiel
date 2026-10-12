@@ -67,7 +67,8 @@ module ServiceCalls
   # contract also runs the call as a token on the :mcp channel, once with each
   # half of the intersection (group and user) lacking the right.
   MCP_REACHABLE = {
-    "Posts::Save" => "the create_post and update_post tools"
+    "Posts::Save" => "the create_post and update_post tools",
+    "Publishing::PublishChanges" => "the update_post tool's publish_changes argument"
   }.freeze
 
   # `ApplicationService` subclasses that are not services of their own (a
@@ -384,6 +385,25 @@ module ServiceCalls
       page = create_page(title: "Edit me", published: false)
       { call: -> { Pages::Save.call(page, attributes: { published: true }, translations: { "en" => { title: "Edited" } }) },
         permission: "pages.edit", on: page }
+    },
+
+    "Publishing::PublishChanges" => lambda {
+      page = create_page(title: "Live")
+      Pages::Save.call(page, translations: { "en" => { title: "Edited" } })
+      { call: -> { Publishing::PublishChanges.call(page) }, permission: "pages.publish", on: page }
+    },
+
+    "Publishing::DiscardChanges" => lambda {
+      page = create_page(title: "Live")
+      Pages::Save.call(page, translations: { "en" => { title: "Edited" } })
+      { call: -> { Publishing::DiscardChanges.call(page) }, permission: "pages.edit", on: page }
+    },
+
+    "Publishing::CancelScheduledChange" => lambda {
+      page = create_page(title: "Live")
+      Pages::Save.call(page, translations: { "en" => { title: "Edited" } })
+      Publishing::PublishChanges.call(page, at: 2.days.from_now)
+      { call: -> { Publishing::CancelScheduledChange.call(page) }, permission: "pages.publish", on: page }
     },
 
     "Posts::Save" => lambda {

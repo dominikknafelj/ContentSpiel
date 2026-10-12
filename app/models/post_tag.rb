@@ -12,6 +12,10 @@ class PostTag < ApplicationRecord
   # `post.tags = [...]` -- is a plain `DELETE` that runs no callback here;
   # `Post` counts it as a changed URL input of its next save instead.)
   #
+  # A post that is published or scheduled and has a copy is listed by its
+  # COPY's tags, so for it this sync finds nothing to move: its address
+  # follows when its changes are published (the copy's own refresh).
+  #
   # `after_commit`, not `after_save`/`after_destroy`: a join row is written
   # inside whatever transaction its caller opened (a CS Studio save, a
   # console `<<`), and syncing before that transaction either commits or
@@ -34,11 +38,13 @@ class PostTag < ApplicationRecord
   # this fires, after the whole transaction commits, the post row is gone, so
   # the lazily-loaded association finds nothing left to sync.
   def sync_post_paths
-    PublicSite::Paths.sync(post) if post
+    PublicSite::Paths.refresh(posts: [ post ]) if post
   end
 
   # No post (it was destroyed with this row): its own `after_commit` decides.
   def bump_public_version_when_post_live
-    PublicSite.bump_version! if post&.live?
+    # A post that has a copy shows the copy's tags: its tags change what the
+    # public sees when the changes are published (taking the next copy bumps).
+    PublicSite.bump_version! if post&.live? && !Publishing.in_force?(post)
   end
 end

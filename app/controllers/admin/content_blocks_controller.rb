@@ -9,6 +9,7 @@ module Admin
   # from PATCHing a block that belongs to a page they don't have open.
   class ContentBlocksController < BaseController
     include AutosaveResponses
+    include PublishingState
     include EditingClaims
     include MediaFields
 
@@ -84,10 +85,10 @@ module Admin
         streams.concat(section_structure_streams(section)) if section && !result.denied?
         render turbo_stream: streams, status: failure_status(result)
       elsif section
-        render turbo_stream: [ *tile_streams(result.record, open: true), *section_count_streams(section) ], status: :created
+        render turbo_stream: [ *tile_streams(result.record, open: true), *section_count_streams(section), *publishing_state_streams(@page) ], status: :created
       else
         reposition_after(result.record, params[:after_id])
-        render turbo_stream: [ *insertion_stream(result.record, params[:after_id]) ], status: :created
+        render turbo_stream: [ *insertion_stream(result.record, params[:after_id]), *publishing_state_streams(@page) ], status: :created
       end
     end
 
@@ -141,6 +142,7 @@ module Admin
       streams << refused if refused
       streams << tile_summary_stream(result) if block.section_id
       streams.concat(section_save_streams(result.record, layout_before: layout_before, columns_before: columns_before)) if block.container? && result.ok?
+      streams.concat(publishing_state_streams(@page)) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
     end
@@ -184,7 +186,8 @@ module Admin
       # header's number, the markers and the next delete dialog's warning are
       # told with the same answer, through the page's one copy of the counts.
       render turbo_stream: [ *removal_streams(block, kept_ids, section),
-        turbo_stream.replace("notes-counts", Admin::NotesScreen::CountsComponent.new(counts: Notes::Counts.for_container(@page, user: Current.user), id: "notes-counts")) ]
+        turbo_stream.replace("notes-counts", Admin::NotesScreen::CountsComponent.new(counts: Notes::Counts.for_container(@page, user: Current.user), id: "notes-counts")),
+        *publishing_state_streams(@page) ]
     end
 
     # Drag reorder or Move up/down (spec §6.1): the client already knows
@@ -261,6 +264,7 @@ module Admin
       streams = [ turbo_stream.replace(status_id, state) ]
       if result.ok?
         streams.concat(structural ? move_streams(origins) : reorder_undo_streams(before))
+        streams.concat(publishing_state_streams(@page))
       else
         streams << picker_error_stream(result.errors)
         streams << blocks_list_stream if structural && !result.denied?
@@ -288,7 +292,7 @@ module Admin
 
       copy = result.record
       streams = copy.section_id ? copy_tile_streams(copy, source) : insertion_stream(copy, source.id)
-      render turbo_stream: streams, status: :created
+      render turbo_stream: [ *streams, *publishing_state_streams(@page) ], status: :created
     end
 
     private

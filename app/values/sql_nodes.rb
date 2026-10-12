@@ -28,8 +28,18 @@ module SqlNodes
       .then { |array| Arel::Nodes::InfixOperation.new("@>", array, cast([ value ].to_json, "jsonb")) }
   end
 
+  # `column @> '<value as json>'::jsonb`: whether a jsonb column contains
+  # `value` (an array column holding an object with these pairs, for one).
+  def json_contains(column, value) = Arel::Nodes::InfixOperation.new("@>", column, cast(value.to_json, "jsonb"))
+
   # `COALESCE(a, b)`: the first that is not NULL.
   def coalesce(*values) = function("COALESCE", *values)
+
+  # `column @> CAST('{1,2}' AS integer[])`: an integer array column holds
+  # every one of `values` (each forced through Integer, never text).
+  def array_contains(column, values)
+    Arel::Nodes::InfixOperation.new("@>", column, cast("{#{values.map { |value| Integer(value) }.join(",")}}", "integer[]"))
+  end
 
   # `CAST(value AS type)`; `type` is a constant type name, never user text.
   def cast(value, type) = Arel::Nodes::NamedFunction.new("CAST", [ quoted(value).as(type) ])

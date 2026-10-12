@@ -60,7 +60,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     find("#{card_for(first)} button[aria-label='Block actions']").click
     within(card_for(first)) { press "Delete block…" }
     assert_text "Delete this block?"
-    assert_text "Blocks don’t go to the trash. This can’t be undone."
+    assert_text "Blocks don’t go to the trash."
     within("dialog[open]") { press "Delete block" }
 
     assert_no_selector card_for(first)
@@ -350,11 +350,11 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     block = @page.content_blocks.sole
 
     within("##{ActionView::RecordIdentifier.dom_id(block)}") { find("input[name='block[settings][limit]']").fill_in(with: "4") }
-    assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal 4, block.reload.settings["limit"].to_i
 
     fill_in "Title", with: "About the Studio"
-    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_no_text "CHANGED ELSEWHERE"
     assert_no_selector "#changed-elsewhere"
     assert_equal "About the Studio", @page.reload.title(locale: :en)
@@ -397,11 +397,11 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     page.execute_script("window.__releaseFirstPatch()")
     await_js "window.__patchesStarted === 2"
-    assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_eventually { block.reload.settings["limit"].to_i == 5 }
 
     fill_in "Title", with: "About the Studio"
-    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_no_text "CHANGED ELSEWHERE"
     assert_no_selector "#changed-elsewhere"
   end

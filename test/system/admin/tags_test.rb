@@ -28,7 +28,7 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     field = find("#tag-#{@gear.id}-name")
     field.set("kit")
 
-    assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 8
+    assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}/, wait: 8
     assert_eventually { @gear.reload.name == "kit" }
   end
 
@@ -112,7 +112,7 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
   # rendered; the dialogs name the tag as it is called now.
   test "after an inline rename the dialogs name the tag by its new name, and the picker excludes it" do
     find("#tag-#{@gear.id}-name").set("kit")
-    assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 8
+    assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}/, wait: 8
 
     open_row_menu(@gear, "Delete tag…")
     within("dialog#delete-tag-dialog[open]") do

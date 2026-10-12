@@ -85,7 +85,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{root}")).t("components.ui.save_status.saving")))["value"], "the root's own data-messages does not hide <body>'s"
 
     find(field).set("renamed")
-    assert_selector "#tag-#{Tag.first.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 8
+    assert_selector "#tag-#{Tag.first.id}-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}/, wait: 8
   end
 
   test "a missing key, a plural without a count and a placeholder without a value all throw" do

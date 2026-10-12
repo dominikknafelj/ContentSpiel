@@ -41,7 +41,7 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     # The publish form targets `_top`: a full visit, so everything re-renders.
     assert_selector "#{header} .admin-status-chip[data-status=live]", wait: 10
     assert_no_selector "#{header} button.bg-accent"
-    assert_selector "#{header} [role=status]", text: "This page is live. Changes appear on the site as soon as they’re saved."
+    assert_selector "#{header} [role=status]", text: "This page is live. Changes are published with “Publish changes…”."
     assert_no_selector "li[data-page-id='#{@draft.id}'] .admin-status-chip[data-status=draft]"
     assert @draft.reload.live?
 

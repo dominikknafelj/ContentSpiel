@@ -651,7 +651,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     copy = (@page.content_blocks.reload.to_a - [ first, second ]).sole
     assert_equal [ first, copy, second ], @page.content_blocks.to_a
     assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
-    assert_not_includes response.body, %(<turbo-stream action="replace")
+    # Task 6: the answer carries the header's two publishing parts, and no card.
+    assert_select "turbo-stream[action='replace']:not([target='publishing-chip']):not([target='publishing-actions'])", count: 0
   end
 
   # A copy stands directly after its source in the source's own container
@@ -1089,11 +1090,17 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='#{slot}']"), "choosing an image is acting on the field: its slot is rewritten"
   end
 
-  test "a block on a live page saves 'to site', like the page does; on a draft page it just saves" do
+  test "a block on a live or scheduled page saves 'not published', like the page does; on a draft page it just saves" do
     block = @page.content_blocks.create!(block_type: :image, position: 0)
     assert @page.live?
     patch "#{blocks_path}/#{block.id}", params: { block: { caption: "Live" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
-    assert_select_in_stream "block-#{block.id}-save-status", /● SAVED TO SITE \d\d:\d\d/
+    assert_select_in_stream "block-#{block.id}-save-status", /\ASAVED · NOT PUBLISHED \d\d:\d\d$/
+
+    scheduled = create_page(title: "Scheduled page", published: false)
+    scheduled_block = scheduled.content_blocks.create!(block_type: :image, position: 0)
+    assert Pages::Save.call(scheduled, attributes: { published_at: 3.days.from_now }).ok?
+    patch "/cs-studio/pages/#{scheduled.id}/content_blocks/#{scheduled_block.id}", params: { block: { caption: "Later" }, base_updated_at: scheduled_block.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_select_in_stream "block-#{scheduled_block.id}-save-status", /\ASAVED · NOT PUBLISHED \d\d:\d\d$/
 
     draft = create_page(title: "Draft page", published: false)
     draft_block = draft.content_blocks.create!(block_type: :image, position: 0)

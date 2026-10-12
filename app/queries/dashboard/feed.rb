@@ -22,7 +22,7 @@ module Dashboard
   # "Going live next" is site-wide, but joins the same subquery so it can
   # say "by you" without a query per row (`#mine?`).
   class Feed
-    LIMITS = { drafts: 5, going_live_next: 5 }.freeze
+    LIMITS = { drafts: 5, going_live_next: 5, unpublished_changes: 5 }.freeze
 
     # Events that never count as "the newest change" (final fix wave, I1):
     # `ApplicationService#denied` records `access.denied` with the refused
@@ -33,7 +33,8 @@ module Dashboard
     # events have the page, post or block as their subject too, and are no
     # change to it either (notes spec §3.5): "Mine" and "Changed by"
     # (`Audit::ChangeSince` reads this list) ignore them.
-    NOT_A_CHANGE = (%w[access.denied page.taken_over post.taken_over block.taken_over] + Audit::Sentence::NOTE_VERBS.keys).freeze
+    NOT_A_CHANGE = (%w[access.denied page.taken_over post.taken_over block.taken_over
+                       page.scheduled_change_cancelled post.scheduled_change_cancelled] + Audit::Sentence::NOTE_VERBS.keys).freeze
 
     # The LATERAL subquery `#with_newest_event` joins, as a table to read its
     # columns from: `newest.newest_user_id`, `newest.newest_at`.
@@ -64,6 +65,19 @@ module Dashboard
           with_newest_event(outer).select(outer.arel_table[Arel.star], NEWEST[:newest_user_id].as("dashboard_newest_user_id")).to_a
         end
         .then { |records| soonest_first(records, :published_at, LIMITS[:going_live_next]) }
+    end
+
+    # Published and scheduled pages and posts whose rows have moved on from
+    # what the site shows (`Publishing::State#changes?`: a time and the mark,
+    # `Publishable.with_unpublished_changes` in SQL), the most recently
+    # changed first. Site-wide like "Going live next" and read-scoped the same
+    # way (`AccessControl.scope` hides the trash and what the actor may not
+    # read); one limited query per model. The mark may be set when the net
+    # difference is nothing (typed and typed back): the row is listed until
+    # someone opens "Publish changes", which finds out.
+    def unpublished_changes
+      @unpublished_changes ||= page_and_post_relations { |r| r.with_unpublished_changes.reorder(unpublished_changes_at: :desc, id: :desc).limit(LIMITS[:unpublished_changes]) }
+        .flat_map(&:to_a).then { |records| newest_first(records, :unpublished_changes_at, LIMITS[:unpublished_changes]) }
     end
 
     # Whether a record `#going_live_next` returned is mine (a post I wrote,

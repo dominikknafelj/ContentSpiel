@@ -71,7 +71,8 @@
     list it by name with a link to nowhere. Hiding trashed records is
     explicit at every such query (`Trashable` has no default scope); this
     one is pinned in `test/integration/trash_visibility_test.rb`. %>
-<% children = @page.children.kept.published.to_a %>
+<%# Their titles are the published ones. %>
+<% children = published_views(@page.children.kept.published) # public: rows (the subpages' membership and order are the tree's; titles come from published_views) %>
 <% if children.any? %>
   <nav class="page-children mt-12 border-t border-line pt-6">
     <ul class="space-y-2">

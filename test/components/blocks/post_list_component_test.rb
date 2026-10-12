@@ -6,6 +6,7 @@ class Blocks::PostListComponentTest < ActiveSupport::TestCase
   test "a blog list renders titles linked to their canonical URLs" do
     page = root_page
     block = page.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    publish_changes(page)
     post = create_post(title: "Notes on Hotwire")
 
     render_inline(Blocks::PostListComponent.new(block: block, page: page))
@@ -16,6 +17,7 @@ class Blocks::PostListComponentTest < ActiveSupport::TestCase
   test "limit trims the list" do
     page = root_page
     block = page.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog", "limit" => 1 })
+    publish_changes(page)
     create_post(title: "First", published: true)
     create_post(title: "Second", published: true)
 
@@ -27,6 +29,7 @@ class Blocks::PostListComponentTest < ActiveSupport::TestCase
   test "an unfiltered post list renders every type with the default rows" do
     page = root_page
     block = page.content_blocks.create!(block_type: :post_list, position: 0, settings: {})
+    publish_changes(page)
     create_post(title: "A blog post", content_type: "blog")
     create_post(title: "A resume entry", content_type: "resume_entry")
 

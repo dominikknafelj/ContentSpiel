@@ -201,6 +201,7 @@ class Trash::RestoreTest < ActiveSupport::TestCase
   test "a post restores with its URL, and posts a restored listing page lists get theirs back" do
     blog = create_page(title: "Blog")
     ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    publish_changes(blog)
     post = create_post(title: "Hello")
     listed = create_post(title: "Listed")
     Trash::Move.call(post)

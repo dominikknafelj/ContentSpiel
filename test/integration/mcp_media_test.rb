@@ -121,6 +121,23 @@ class McpMediaTest < ActionDispatch::IntegrationTest
     assert_equal %(::image{asset="#{asset.id}"}), entry["directive"]
   end
 
+  # A record counts once: a hero, an image block and the published copy of one
+  # page are one place, and the two tools answer the same number.
+  test "list_media and get_media agree on usage_count: a page is one place however many ways it shows the image" do
+    raw = token_for(users(:one), access_control_groups(:admin))
+    asset = create_media_asset
+    asset.update!(title: "Shown three ways")
+    page = Pages::Save.call(attributes: { parent: root_page, published: false, hero_media_asset_id: asset.id }, translations: { "en" => { title: "Three ways" } }).record
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: asset.id })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+
+    listed = call_tool(raw, "list_media_tool", query: "Shown three ways")["structuredContent"].sole
+    got = call_tool(raw, "get_media_tool", id: asset.id)["structuredContent"]
+
+    assert_equal 1, listed["usage_count"]
+    assert_equal listed["usage_count"], got["usage_count"]
+  end
+
   # Trash spec §5.1 / Task 4 controller ruling: `usage_count` is the "still
   # used" signal an agent decides against, so a trashed owner's reference
   # must not count toward it.

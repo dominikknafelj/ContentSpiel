@@ -46,7 +46,10 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_selector "#page-hero_alt[placeholder='A wide view']"
     assert_eventually { @landing.reload.hero_media_asset_id == @asset.id }
 
-    # The public page renders it responsively.
+    # The public page renders it responsively. The site shows the page's
+    # published copy, so the hero chosen in the editor is published first
+    # (setup fix, Task 5).
+    publish_changes(@landing)
     visit "/landing"
     assert_selector "header img[src='#{@asset.src}'][srcset*='480w']"
 

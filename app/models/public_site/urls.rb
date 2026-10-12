@@ -36,12 +36,22 @@ module PublicSite
       @preview ? "/preview#{code_prefix}" : code_prefix
     end
 
-    def path_for(record, locale = I18n.locale)
+    # `listed_on:` is the page whose list a post is being drawn in, and it
+    # matters in the PREVIEW only: the preview draws the rows, an address
+    # follows the published copies (`PublicSite::Paths.canonical_pages`), so
+    # a post in a list block that exists only in a live page's rows has no
+    # address yet. Its link then is that page's preview address plus the
+    # post's slug, which the preview's resolver answers with the post drawn
+    # on that page (`Resolver#listing_fallback`) -- never the bare prefix,
+    # which is the preview's homepage. Publicly a record without an address
+    # has no path, as before.
+    def path_for(record, locale = I18n.locale, listed_on: nil)
       return nil if record.nil?
 
       path = @paths.fetch([ record.class.name, record.id, locale.to_s ]) do |key|
         @paths[key] = PublicSite::Paths.current_path(record, locale)
       end
+      path ||= PublicSite::Paths.post_path(record, locale, PublicSite::Paths.current_path(listed_on, locale)) if @preview && listed_on
       path && "#{prefix(locale)}#{path}"
     end
 

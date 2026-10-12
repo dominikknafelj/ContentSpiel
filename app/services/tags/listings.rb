@@ -31,14 +31,29 @@ module Tags
       tag.present? && names.include?(tag.downcase)
     end
 
-    # The content types a `PublicSite::Paths.sync_posts` has to re-derive after
-    # a change to `names`: those of the blocks that filter by any of them (see
-    # `Tags::Rename#resync` for why both the vacated and the arrived-at name
-    # matter). `content_type.presence` folds a blank filter to `nil`, which
-    # `sync_posts` reads as "every content type"; `map` + `uniq`, never
-    # `filter_map`, because that `nil` is a meaningful answer here.
-    def affected_content_types(*names)
-      listing_blocks_naming(*names).map { |block| block.settings_object.content_type.presence }.uniq
+    # The live and scheduled pages in `page_ids` have list blocks whose rows no
+    # longer say what their copy recorded (a block's tag name resolves to
+    # another id, or to none): marked, in the transaction of the write that
+    # did it. The copy keeps listing what it listed until the page is
+    # published (`Publishing::Version.repoint_tag!` keeps the ids it refers to
+    # real).
+    def note_pages_changed(page_ids)
+      Publishing.note_change(Page.where(id: page_ids))
+    end
+
+    # WHAT A TAG SERVICE TOUCHED, for `PublicSite::Paths.refresh`: the pages
+    # whose list blocks refer to a tag. Only a tag service can know them, so
+    # this finder is theirs; which posts follow from those pages is the
+    # refresh's to know.
+    #
+    # A ROW refers to a tag by name (a draft's blocks, and those of a page
+    # written around the services): the owners of the row blocks that filter
+    # by one of `names`. A published COPY refers to it by the id it
+    # recorded, and never by name: the pages one of whose copies recorded one
+    # of `ids`. A rename changes no id, so it passes names only.
+    def pages_listing(names: [], ids: [])
+      rows = listing_blocks_naming(*names).select { |block| block.owner_type == Page.polymorphic_name }.map(&:owner_id)
+      (rows + Publishing::Version.listing_tag(ids).pluck(:record_id)).uniq
     end
 
     # An open post form resends every tag chip on every autosave, so a post
@@ -51,8 +66,25 @@ module Tags
     # editor's tag-only change. `touch_all` skips callbacks and validations on
     # purpose: only the stale-save base moves. Must run before the tag's join
     # rows are removed, which is what it reads.
-    def touch_carrying_posts(tag)
-      Post.where(id: tag.post_tags.select(:post_id)).touch_all
+    #
+    # The carriers are also MARKED as having unpublished changes
+    # (`Publishing.note_change`) by a rename and a delete: a post's copy
+    # holds its tags by id and name, and the carrying post's rows have now
+    # moved on from it (a renamed tag has another name, a deleted one is
+    # gone), while the site shows the copy until the post is published again
+    # (drafts plan, disagreement 5). Only the live and scheduled ones; a
+    # draft has no copy to differ from.
+    #
+    # NOT BY A MERGE (`mark: false`): `Publishing::Version.repoint_tag!`
+    # rewrites every copy as the merge rewrites the rows, the merged tag's
+    # entry becoming the kept tag's, so the merge puts no difference between
+    # a carrier's rows and its copies and there is nothing to publish. A
+    # carrier that was marked before (something else was typed, or a tag of
+    # its was renamed) keeps its mark: nothing here clears one.
+    def touch_carrying_posts(tag, mark: true)
+      carriers = Post.where(id: tag.post_tags.select(:post_id))
+      Publishing.note_change(carriers) if mark
+      carriers.touch_all
       # `touch_all` runs no `after_commit` on the posts, and what follows it
       # (a rename, a delete, a merge) changes what they print and which
       # listings show them: the public content version moves, whether or not

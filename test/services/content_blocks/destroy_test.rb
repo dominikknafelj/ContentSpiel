@@ -53,8 +53,18 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
 
   test "a live page's version moves when a section is deleted either way" do
     @page.update!(published_at: 1.day.ago)
+    follow_rows! # setup fix: the page was made live through the service and has a copy; this one is served from its rows
 
     assert_changes -> { PublicSite.content_version } do
+      ContentBlocks::Destroy.call(@section, keep_blocks: true, actor: nil)
+    end
+  end
+
+  test "a live page that has a copy keeps its version when a section is deleted either way" do
+    assert @page.reload.live?
+    assert copied?(@page)
+
+    assert_no_changes -> { PublicSite.content_version } do
       ContentBlocks::Destroy.call(@section, keep_blocks: true, actor: nil)
     end
   end

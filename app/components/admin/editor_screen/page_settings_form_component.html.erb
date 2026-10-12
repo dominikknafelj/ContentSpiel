@@ -21,21 +21,32 @@
         in from Task 2's review): a bubbling `input` listener here is enough
         to keep the slug preview live without either field's own component
         knowing that controller exists. %>
-    <div data-controller="admin--editor--slug-preview" data-action="input->admin--editor--slug-preview#update">
+    <%= tag.div data: slug_preview_data do %>
       <%= render Admin::Columns::PlainColumnComponent.new(
             name: "title", id: field_id("title"), html_name: field_html_name("title"),
             value: value(:title), original: original(:title), locale: locale, **translation(:title),
-            data: { "admin--editor--slug-preview-target": "title" }
+            data: title_data
           ) %>
 
-      <% if show_slug? %>
+      <% if slug_field? %>
         <%= render Admin::Columns::SlugColumnComponent.new(
               name: "slug", id: field_id("slug"), html_name: field_html_name("slug"),
               value: value(:slug), base_url: slug_base_url, original: original(:slug), locale: locale,
               data: { "admin--editor--slug-preview-target": "slug" }, help: "The last part of the page’s address. Changing it leaves a redirect from the old address."
             ) %>
+      <% elsif address_line? %>
+        <%# Not a field: the page is live, so a new address is not typed here but
+            confirmed in `SlugDialogComponent` (drawn by the view, outside this
+            form). The button is a plain button: a held form disables it. %>
+        <div class="admin-column mb-4" data-field-name="slug">
+          <span class="<%= setup_label_class %>"><%= t(".address") %></span>
+          <div class="mt-1 flex items-center gap-3">
+            <span class="truncate font-cs-mono text-[12px] text-dim" data-page-address><%= address_path %></span>
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".change_address"), variant: :secondary, size: :small, type: "button", data: change_address_data) %>
+          </div>
+        </div>
       <% end %>
-    </div>
+    <% end %>
 
     <% if translation_tab? %>
       <%# The page type is the same in every language: a read-only line here, not a `<select>`,

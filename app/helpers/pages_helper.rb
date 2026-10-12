@@ -32,8 +32,12 @@ module PagesHelper
   # node per `Post`, so its URL is its canonical listing page's own path plus
   # its slug -- `public_paths` already stores that joined path, so this is
   # just `PublicSite::Urls` reading it back, same as `page_url_path` above.
-  def post_url_path(post, locale = I18n.locale)
-    public_urls.path_for(post, locale)
+  #
+  # `listed_on:` is the page a list draws the post on: in the preview, and
+  # only there, a post with no address yet links to itself on that page
+  # (`PublicSite::Urls#path_for`).
+  def post_url_path(post, locale = I18n.locale, listed_on: nil)
+    public_urls.path_for(post, locale, listed_on: listed_on)
   end
 
   # "<page or post> – <site>" in the browser tab; the homepage is the site

@@ -117,6 +117,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_a, tag: "a")
     only_a = create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_operator for_b.position, :<, for_a.position
     assert_equal "/a-posts/only-a", only_a.full_path("en")
     assert_equal :found, resolve("/a-posts/only-a").status
@@ -142,6 +143,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_b, tag: "b")
     create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/b-posts/only-b", only_b.full_path("en")
 
     assert Tags::Merge.call(tag("a"), into: tag("b")).ok?
@@ -158,6 +160,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_a, tag: "a")
     create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_nil only_b.full_path("en")
     assert_equal :not_found, resolve("/a-posts/only-b").status
 
@@ -215,6 +218,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(for_b, tag: "b")
     only_a = create_post(title: "Only A", tags: [ "a" ])
     only_b = create_post(title: "Only B", tags: [ "b" ])
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/a-posts/only-a", only_a.full_path("en")
     assert_equal "/b-posts/only-b", only_b.full_path("en")
 
@@ -231,6 +235,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
     listing_block(listing, tag: "b")
     only_a = create_post(title: "Only A", tags: [ "a" ])
     Tag.create!(name: "b")
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_nil only_a.full_path("en")
 
     assert Tags::Merge.call(tag("a"), into: tag("b")).ok?
@@ -447,5 +452,90 @@ class Tags::MergeTest < ActiveSupport::TestCase
     assert_equal before, post.reload.updated_at
     assert_equal "a", block.reload.settings["tag"]
     assert_equal 0, PostTag.where(tag_id: into.id).count
+  end
+
+  def marked?(record) = record.class.where(id: record.id).pick(:unpublished_changes_at).present?
+
+  # A live page whose list filters by the tag, a live post and a draft that
+  # carry it, and the page's list as the site shows it.
+  def live_list_and_carriers(tag_name = "rails")
+    Tag.find_or_create_by!(name: tag_name) # the page's copy records the tag's id: it must exist when the page is published
+    page = create_page(title: "Rails posts #{tag_name}", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog", "tag" => tag_name } })
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+    live = create_post(title: "Live carrier #{tag_name}", tags: [ tag_name ])
+    draft = create_post(title: "Draft carrier #{tag_name}", tags: [ tag_name ], published: false)
+    [ page, live, draft ]
+  end
+
+  def listed(page) = Publishing::Listing.posts(Publishing.published(page).content_blocks.to_a.sole).map(&:id)
+
+  # A merge used to mark every live carrier: its copy kept the merged tag's
+  # name. `repoint_tag!` rewrites the name now, so rows and copy agree.
+  test "merging a tag marks no post, carrier or not: repoint_tag! makes every copy say what the rows say, and the lists hold what they held" do
+    page, live, draft = live_list_and_carriers
+    kept_page, kept_post, = live_list_and_carriers("kept")
+    shown = listed(page)
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: Tag.find_by!(name: "kept")).ok?
+
+    assert_not marked?(live), "its copy names the kept tag as its rows do"
+    assert Publishing::Changes.of(live).none?
+    assert_not marked?(draft)
+    assert_not marked?(kept_post), "it carried only the kept tag: its rows and its copy say the same"
+    assert_not marked?(kept_page), "its list already filtered by the kept tag"
+    assert_equal [ Tag.find_by!(name: "kept").id ], Publishing.current(live).tag_ids, "the copy's reference stays real"
+    assert_equal (shown + [ kept_post.id ]).sort, listed(page).sort, "the list still holds what it held; the two tags are one from now on, so the kept tag's posts are in it too"
+  end
+
+  # The ruling after the hand test: a merge marks NOTHING by itself. The
+  # copy's list block is repointed as the row's is, name and id.
+  test "a live page whose list block named the merged tag is not marked: its copy names the kept tag as its rows do, lists the same posts and has nothing to publish" do
+    page, live, = live_list_and_carriers
+    kept = Tag.create!(name: "kept")
+    assert_equal [ live.id ], listed(page)
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: kept).ok?
+
+    assert_not marked?(page)
+    assert_equal [ live.id ], listed(page), "the copy still lists the post"
+    assert_equal "kept", page.content_blocks.sole.settings["tag"], "the rows name the kept tag"
+    assert_equal [ [ kept.id, "kept" ] ], Publishing.current(page).blocks.map { |block| [ block["listed_tag_id"], block.dig("settings", "tag") ] }, "and so does the copy"
+    assert Publishing::Changes.of(page.reload).none?, "the publish dialog would show nothing to publish"
+    assert_equal "live", Publishing::State.of(page).status.to_s
+  end
+
+  test "a page and a post that had unpublished changes before a merge keep their marks, and the merge is no part of what they have to publish" do
+    page, live, = live_list_and_carriers
+    kept = Tag.create!(name: "kept")
+    assert Pages::Save.call(page, translations: { "en" => { subtitle: "Typed" } }).ok?
+    assert Posts::Save.call(live, translations: { "en" => { excerpt: "Typed" } }).ok?
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: kept).ok?
+
+    assert marked?(page) && marked?(live)
+    assert_equal [ %w[subtitle], [] ], Publishing::Changes.of(page.reload).then { |changes| [ changes.fields, changes.blocks ] }
+    assert_equal %w[excerpt], Publishing::Changes.of(live.reload).fields
+  end
+
+  test "a merge repoints a page's pending copy and its copy in force alike, and the page is not marked" do
+    page, live, = live_list_and_carriers
+    kept = Tag.create!(name: "kept")
+    assert Pages::Save.call(page, translations: { "en" => { subtitle: "Scheduled" } }).ok?
+    publish_changes(page, at: 2.days.from_now)
+    copies = [ Publishing.current(page), Publishing.pending(page) ]
+    assert_equal 2, copies.compact.map(&:id).uniq.size
+
+    assert Tags::Merge.call(Tag.find_by!(name: "rails"), into: kept).ok?
+
+    copies.each do |copy|
+      assert_equal [ [ kept.id, "kept" ] ], copy.reload.blocks.map { |block| [ block["listed_tag_id"], block.dig("settings", "tag") ] }, "copy #{copy.number}"
+    end
+    assert_not marked?(page)
+    assert Publishing::Changes.of(page.reload).none?, "compared with what is scheduled, nothing differs"
+    travel_to(3.days.from_now) do
+      PublicSite::Paths.refresh
+      assert_equal [ live.id ], listed(page), "and when its time comes the list holds the post"
+    end
   end
 end

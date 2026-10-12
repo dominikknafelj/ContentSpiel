@@ -85,7 +85,7 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
 
   # The point of a version that moves only on published changes: an editor
   # autosaving a draft no longer throws away every visitor's cached page.
-  test "a draft's edits leave the etag alone, a live record's change it" do
+  test "a draft's edits and a live record's edits leave the etag alone, and publishing the live record's changes it" do
     live = create_post(title: "Live")
     draft = create_post(title: "Draft", published: false)
     draft_page = create_page(title: "Draft page", published: false)
@@ -100,7 +100,71 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
 
     assert Posts::Save.call(live, translations: { "en" => { title: "Live, edited" } }).ok?
     get "/", headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+
+    publish_changes(live)
+    get "/", headers: { "If-None-Match" => etag }
     assert_response :success
+    assert_not_equal etag, response.headers["ETag"]
+  end
+
+  # A change scheduled for later changes the page when its time comes, with no
+  # write and no job: the version has a part that reads the copies by the
+  # clock, so a request just past the time is not answered 304.
+  test "a change scheduled for later is not answered 304 once its time has come" do
+    page = Pages::Save.call(attributes: { parent: @root, published: true }, translations: { "en" => { title: "Scheduled change" } }).record
+    assert Pages::Save.call(page, translations: { "en" => { title: "Changed title" } }).ok?
+    at = 1.hour.from_now.change(usec: 0)
+    publish_changes(page, at: at)
+    path = PublicSite::Urls.new.path_for(page.reload, :en)
+
+    get path
+    etag = response.headers["ETag"]
+    assert_includes response.body, "Scheduled change"
+
+    travel_to(at - 1.second) do
+      get path, headers: { "If-None-Match" => etag }
+      assert_response :not_modified
+    end
+    travel_to(at + 1.second) do
+      get path, headers: { "If-None-Match" => etag }
+      assert_response :success
+      assert_includes response.body, "Changed title"
+    end
+  end
+
+  # The headline, on a page's own URL: rows change, a conditional GET still
+  # answers 304; publishing the changes answers 200 with them.
+  test "a page's autosave leaves its conditional GET a 304, and publishing the changes answers 200 with them" do
+    page = Pages::Save.call(attributes: { parent: @root, published: true }, translations: { "en" => { title: "Headline before" } }).record
+    path = PublicSite::Urls.new.path_for(page.reload, :en)
+    get path
+    etag = response.headers["ETag"]
+    assert_includes response.body, "Headline before"
+
+    assert Pages::Save.call(page, translations: { "en" => { title: "Headline after" } }).ok?
+    get path, headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+
+    publish_changes(page)
+    get path, headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_includes response.body, "Headline after"
+  end
+
+  test "a 304 for a page reads its copy's id and not its blocks" do
+    page = Pages::Save.call(attributes: { parent: @root, published: true }, translations: { "en" => { title: "Light" } }).record
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("Heavy") } }).ok?
+    publish_changes(page)
+    path = PublicSite::Urls.new.path_for(page.reload, :en)
+    get path
+    etag = response.headers["ETag"]
+
+    statements = capture_sql { get path, headers: { "If-None-Match" => etag } }
+
+    assert_response :not_modified
+    assert_empty statements.grep(/"published_versions"."blocks"|"published_versions"\.\*/), statements.join("\n")
+    assert_empty statements.grep(/FROM "content_blocks"/)
   end
 
   test "etag changes when a block of the page is reordered" do

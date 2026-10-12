@@ -69,6 +69,11 @@ en:
         delete_block_dialog:
           title: "Delete this block?"
           body: "Blocks don’t go to the trash. This can’t be undone."
+          # The body on a published or scheduled page, INSTEAD of the one
+          # above (drafts spec §9): there the delete is an unpublished change
+          # like any other, so "can't be undone" would be untrue of the block
+          # and is true only of its notes.
+          published_body: "Blocks don’t go to the trash. The block is removed from the site only when the changes are published; until then “Discard changes…” brings it back. Its notes are deleted now and do not come back."
           confirm: "Delete block"
         # The heading of a block's form under a section's lanes.
         panel_title:
@@ -227,3 +232,155 @@ en:
           # The status beside "Copy my text" when the read of the card to show after
           # "Discard" failed: the notice stays.
           discard_failed: "Couldn't load the block. Try again."
+        # A live page or post the site has no address for: another record
+        # holds it, so a visitor is told "not found" (drafts plan, task 6).
+        no_address_chip:
+          label: "No address"
+          title: "Another page or post holds this address, so this one shows “not found” on the site."
+
+        # The header's two publishing parts (`PublishingStateComponent`): the
+        # button that makes a published or scheduled record's rows what the
+        # public sees (drafts spec §4.3).
+        publishing_state:
+          # Both open a dialog, hence the ellipsis.
+          publish_changes: "Publish changes…"
+          discard_changes: "Discard changes…"
+          # Beside the chips, while a change waits for its time.
+          scheduled: "Changes scheduled for %{time}"
+        # The dialogs those buttons, and the menu's "Cancel scheduled
+        # change", open (`PublishChangesDialogComponent`).
+        publish_changes_dialog:
+          title: "Publish changes"
+          loading: "Reading what will change…"
+          failed: "Couldn’t read what will change. Close this and open it again."
+          when: "When"
+          kept: "At the scheduled time (%{time})"
+          now: "Now"
+          at: "At a time"
+          time: "Date and time"
+          cancel: "Cancel"
+          confirm: "Publish changes"
+          discard_title: "Discard the unpublished changes?"
+          discard_body:
+            page: "This page goes back to what is published. Blocks added since are deleted with their notes; blocks deleted since come back without theirs."
+            post: "This post goes back to what is published."
+            # A scheduled record is not on the site yet: it goes back to what was scheduled.
+            scheduled_page: "This page goes back to what was scheduled. Blocks added since are deleted with their notes; blocks deleted since come back without theirs."
+            scheduled_post: "This post goes back to what was scheduled."
+          # One more line when a change waits for its time: it goes too.
+          discard_scheduled: "The changes scheduled for %{time} are discarded as well."
+          discard_confirm: "Discard changes"
+          cancel_scheduled_title: "Cancel the scheduled change?"
+          cancel_scheduled_body: "The changes scheduled for %{time} will not be published then. They stay in the editor as unpublished changes."
+          # The cancel dialog, opened after someone else cancelled or published the change.
+          cancel_scheduled_gone: "No change is scheduled any more."
+          cancel_scheduled_keep: "Keep it scheduled"
+          cancel_scheduled_confirm: "Cancel scheduled change"
+        # A published or scheduled page's address, changed at once through its
+        # own form (drafts spec D7): the settings panel's line and button, and
+        # the dialog the button opens.
+        page_settings_form:
+          address: "Address"
+          change_address: "Change address…"
+        slug_dialog:
+          title: "Change this page’s address"
+          label: "Last part of the address"
+          body: "The page moves to the new address at once, and the old address redirects to it. This does not wait for “Publish changes…”."
+          cancel: "Cancel"
+          confirm: "Change address"
+          changed: "Address changed"
+        # The rest of the header's strings are in `notes.en.yml` or not
+        # converted yet.
+        header:
+          # Under the title of a post that has no address although a page's
+          # unpublished rows hold a list block for it.
+          waiting_lister: "Not listed on the site yet: the page “%{title}” lists this post, and its changes are not published."
+          waiting_lister_unnamed: "Not listed on the site yet: a page lists this post, and its changes are not published."
+          # The ⋯ menu's item, while a change waits for its time.
+          cancel_scheduled_change: "Cancel scheduled change"
+          # Under the address of a live record, and of a scheduled one: the
+          # plan's wording, with the button's name as it reads.
+          live_hint: "This %{type} is live. Changes are published with “Publish changes…”."
+          scheduled_hint: "This %{type} is scheduled. What was scheduled goes live at its time; later changes are published with “Publish changes…”."
+        # What the redirect says once the copy is taken.
+        publishing:
+          published: "Changes published"
+          # "Publish now" on a scheduled record that has been edited since: it goes live as it was scheduled.
+          published_as_scheduled: "Published as it was scheduled. The changes made since are not published yet: “Publish changes…” publishes them."
+          # A copy that waits for its time.
+          scheduled: "Changes scheduled for %{time}"
+          # The press found the rows and the newest copy the same.
+          nothing: "Nothing to publish"
+          discarded: "Changes discarded"
+          cancelled: "Scheduled change cancelled"
+          # "At the scheduled time" was chosen, and nothing is scheduled any
+          # more (cancelled in another tab, or its time has come).
+          not_scheduled: "These changes are no longer scheduled. Nothing was published."
+        # The overview in the publish dialog (`ChangesOverviewComponent`).
+        changes_overview:
+          none: "Nothing to publish. This is the same as what is published."
+          # Nothing was changed since a change was scheduled: its time can still be changed below.
+          none_scheduled: "Nothing new to publish. This is the same as the changes scheduled for %{time}."
+          compared_with_scheduled: "Compared with the changes scheduled for %{time}."
+          blocks: "Blocks"
+          fields:
+            page: "Page"
+            post: "Post"
+          languages: "Languages"
+          kinds:
+            changed: "Changed"
+            added: "Added"
+            removed: "Removed"
+            moved: "Moved"
+          # The record's own fields, by the names their forms give them.
+          field_names:
+            title: "Title"
+            subtitle: "Subtitle"
+            meta_title: "Meta title"
+            meta_description: "Meta description"
+            hero_alt: "Hero image alt text"
+            hero_media_asset_id: "Hero image"
+            page_type: "Page type"
+            excerpt: "Excerpt"
+            body: "Body"
+            metadata: "Fields"
+            translated_metadata: "Fields"
+            tags: "Tags"
+          untitled: "(untitled)"
+          held:
+            page: "%{name} is editing this page. Only what has been saved is published."
+            post: "%{name} is editing this post. Only what has been saved is published."
+          # Other live records that a publish leaves without an address:
+          # information, nothing is refused for it.
+          lost_addresses:
+            heading: "Addresses"
+            body:
+              page: "When this page is published, these lose their address and show “not found” on the site:"
+              post: "When this post is published, these lose their address and show “not found” on the site:"
+            hidden:
+              one: "1 more that you can’t open"
+              other: "%{count} more that you can’t open"
+          # Live records that a publish MOVES to another address (a post
+          # whose list on this page goes and which another page lists too):
+          # the second group under "Addresses". The old address stays as a
+          # redirect of the record (`PublicSite::Paths.foresee` reads it from
+          # the trial), except where another record takes it in the same
+          # publish, which the line then says (`no_redirect`).
+          moved_addresses:
+            body:
+              page: "When this page is published, these move to another address. Each old address then redirects to the new one:"
+              post: "When this post is published, these move to another address. Each old address then redirects to the new one:"
+            # The old address and the new one.
+            change: "%{from} → %{to}"
+            # The record whose dialog this is, among those that move.
+            own:
+              page: "This page"
+              post: "This post"
+            no_redirect: "(no redirect: another page or post takes the old address)"
+            hidden:
+              one: "1 more that you can’t open"
+              other: "%{count} more that you can’t open"
+          # The record's own address: the one thing a publish is refused for.
+          own_address:
+            page: "This page would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
+            post: "This post would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."

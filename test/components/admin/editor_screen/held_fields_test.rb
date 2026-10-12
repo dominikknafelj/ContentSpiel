@@ -145,11 +145,20 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
   end
 
   test "Admin::Columns::PlainColumnComponent and SlugColumnComponent (the page settings), rewritten" do
-    page = create_page(title: "Plain and slug")
+    page = create_page(title: "Plain and slug", published: false)
     as_owner { render_inline Admin::EditorScreen::PageSettingsFormComponent.new(page: page, locale: "en") }
 
     assert_selector "input[name='page[slug]']"
     assert_survives(rendered_content)
+  end
+
+  test "the Change address button of a held settings form is disabled" do
+    page = create_page(title: "Held address")
+    reserve(page, page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_inline Admin::EditorScreen::PageSettingsFormComponent.new(page: page, locale: "en") }
+
+    assert_selector "fieldset.admin-held button[disabled]", text: "Change address…"
+    assert_no_selector "button[data-action*='dialog']:not([disabled])", text: "Change address…"
   end
 
   test "Admin::Columns::RichTextColumnComponent (a rich-text block), rewritten, with a body that holds an ampersand and a less-than" do

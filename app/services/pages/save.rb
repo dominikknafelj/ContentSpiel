@@ -9,8 +9,9 @@ module Pages
   #
   # 1. Before assigning, against the stored page: `pages.edit`, plus
   #    `pages.publish` when it's already published (live or scheduled) --
-  #    the spec §8 interim rule that editing live content needs the right
-  #    to publish it, until pending revisions (Phase 3). A publish-state-
+  #    the rule that editing a published record needs the right to publish
+  #    it (drafts spec D5: the person who may change it is the person who
+  #    may publish it; a save is not a publication). A publish-state-
   #    only call needs `pages.publish` alone (`#publish_only?`).
   # 2. After assigning, inside the transaction: a new page needs
   #    `pages.create` on its *parent's* branch (the checker reads the
@@ -18,6 +19,10 @@ module Pages
   #    `pages.publish`. A refusal rolls back and is recorded afterwards.
   #
   # Pages have no author (design spec §8), so there's no `own` rule here.
+  #
+  # A page published or scheduled for the first time, or again after an
+  # unpublish, also takes its published copy (`Publishing::Version.take!`)
+  # in the same transaction; a save of a page that has a time takes none.
   #
   # The hero is a library image (media library design spec §5.1):
   # `hero_media_asset_id` in `attributes` sets, changes or (nil) clears
@@ -43,6 +48,7 @@ module Pages
   # would land in whatever locale happens to be ambient.
   class Save < ApplicationService
     include Media::Choosing
+    include Publishing::KeepsAddresses
 
     TRANSLATED = %i[title slug subtitle meta_title meta_description hero_alt].freeze
     # Everything `attributes:` may carry. `parent` (a `Page`, never
@@ -81,6 +87,7 @@ module Pages
       # savepoint, so the FK refusal rescued below can't leave a caller's
       # transaction aborted.
       saved = Page.transaction(requires_new: true) do
+        was_unpublished = @page.published_at_in_database.nil?
         assign
         refused = refusal_after_assign
         raise ActiveRecord::Rollback if refused
@@ -95,6 +102,13 @@ module Pages
         # Where the page stands in each language (`translation_states`), like
         # the usage rows above: derived inside the same transaction.
         Translations::StateIndex.refresh(@page)
+        # Published or scheduled for the first time, or again after an
+        # unpublish: the copy the public site will show (drafts spec §4.3).
+        # A save of a record that already has a time takes none: its changes
+        # wait for `Publishing::PublishChanges`.
+        # The page's list blocks are public from here on, or from its time:
+        # a post they take to an address another record holds yields.
+        Publishing::Version.take!(@page, by: actor_user) if was_unpublished && @page.published_at.present?
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end
@@ -103,6 +117,11 @@ module Pages
       return failure(@page) unless saved
 
       success(@page)
+    rescue Publishing::AddressTaken => e
+      # The page's own address, where the validation did not see the clash.
+      # Nothing was written: the object goes back to what is stored.
+      @page.reload if @page.persisted?
+      address_taken(@page, e)
     rescue ActiveRecord::InvalidForeignKey => e
       # The hero was deleted between `#media_choice_result`'s check and the
       # save (final fix wave, M1; `Media::Choosing`).

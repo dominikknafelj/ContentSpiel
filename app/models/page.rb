@@ -201,7 +201,7 @@ class Page < ApplicationRecord
 
   # Declared *after* `has_closure_tree`, so it runs after closure_tree's own
   # `after_save` -- which is what creates and rebuilds the hierarchy rows
-  # `PublicSite::Paths.sync_subtree` reads back to assemble the path.
+  # `PublicSite::Paths.refresh` reads back to find what is below the page.
   #
   # Only for a save that changed one of the page's URL inputs
   # (`url_inputs_are` above; a new page always). That is asked in a
@@ -212,6 +212,11 @@ class Page < ApplicationRecord
   # fields -- can't have changed a URL, and syncing for it re-derived every
   # descendant and every listed post inside each autosave's transaction.
   after_save :sync_public_paths
+  # A kept page destroyed directly (a console, a test; the application
+  # destroys only trashed pages, which give no address): the posts it gave
+  # an address to are found by the host their rows record, although the page
+  # is gone, and go to the next list or lose theirs.
+  after_destroy { PublicSite::Paths.refresh(pages: [ id ]) unless trashed? }
 
   # `AccessControl.preload_branches` leaves a snapshot of this page's
   # self-and-ancestor ids on the object (so rendering the tree checks
@@ -240,7 +245,7 @@ class Page < ApplicationRecord
   # move descendants with `update_all`, so a descendant's base does not move on
   # trash and restore while the branch root's does: harmless, no settings value
   # changes.
-  SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at parent_id position].freeze
+  SETTINGS_BASE_IGNORES = %w[updated_at settings_changed_at unpublished_changes_at parent_id position].freeze
   before_save { self.settings_changed_at = Time.current if new_record? || (changed - SETTINGS_BASE_IGNORES).any? }
 
   def reload(...)
@@ -260,30 +265,16 @@ class Page < ApplicationRecord
     parent_id.present?
   end
 
+  # The page says that it was touched, and nothing more. What depends on it
+  # is `PublicSite::Paths.refresh`'s to know: its own path and its subtree's,
+  # and the posts this subtree hosts or can list, since a save can hand a
+  # list block a new place in the tree or a newly (un)published chain without
+  # the block changing at all, and chain publication and tree order are what
+  # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3). The
+  # same for every kind of save that gets here: a slug, the publish state, a
+  # move, a reorder or the trash.
   def sync_public_paths
-    return unless url_inputs_changed_by_save?
-
-    PublicSite::Paths.sync_subtree(self)
-    resync_listed_posts
-  end
-
-  # A page's own save can hand a post_list block a new position in the tree,
-  # or a newly (un)published page chain, without the block itself changing at
-  # all -- `sync_subtree` above already rewrote this page's (and its
-  # descendants') paths for that, but every post any of *their* post_list
-  # blocks list also needs its canonical page re-derived, since chain
-  # publication and tree order -- not just this page's own path -- are what
-  # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3).
-  #
-  # Scoped to this subtree's own post_list blocks
-  # (`PublicSite::Paths.sync_posts_listed_under`, which says why that is
-  # enough), for every kind of save that gets here -- a slug, publish state,
-  # a move, a reorder or the trash alike. The posts they list are re-derived
-  # from scratch against every candidate in the tree, which covers both
-  # "moved ahead of another listing, now canonical" and "moved behind it,
-  # gave the posts back".
-  def resync_listed_posts
-    PublicSite::Paths.sync_posts_listed_under([ self ])
+    PublicSite::Paths.refresh(pages: [ self ]) if url_inputs_changed_by_save?
   end
 
   # Checked per enabled locale, the same granularity

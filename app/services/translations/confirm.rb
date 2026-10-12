@@ -60,7 +60,7 @@ module Translations
         # (`base_updated_at`), so bumping it here would make the very next
         # keystroke's save report "Changed elsewhere" against nothing but
         # this click.
-        @record.update_columns(translation_sources: @record.translation_sources) # version: none (bookkeeping no page renders)
+        @record.update_columns(translation_sources: @record.translation_sources) # version: none (bookkeeping no page renders) # changes: none (translation bookkeeping; no change to what a copy shows)
         # The confirmed field no longer counts as outdated in the stored
         # state (`translation_states`); `refresh` writes no `updated_at` on
         # the record either.

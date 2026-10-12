@@ -22,6 +22,8 @@ module Admin
     # and its buttons live in the dialog's footer, outside the form, so they
     # reach it through `form=`.
     class ScheduleDialogComponent < Admin::AdminComponent
+      include SiteZoneLine
+
       def initialize(record:, url_options: {}, error: nil, value: nil)
         raise ArgumentError, "the schedule dialog is for a Page or a Post, not #{record.class}" unless record.is_a?(::Page) || record.is_a?(::Post)
 
@@ -76,20 +78,9 @@ module Admin
 
       def min_value = zone.now.strftime(FORMAT)
 
-      # "Berlin time (GMT+1), the site’s time zone." -- one string (admin copy
-      # is one sentence per string). The offset is the one in force at the
-      # time shown in the field, so a summer schedule reads GMT+2.
-      def zone_line
-        offset = gmt_offset(default_time.utc_offset)
-        name = zone.name
-        if name.include?("(")
-          "#{name}, #{offset}, the site’s time zone."   # no nested parentheses
-        elsif name.match?(/time|\AUTC\z/i)
-          "#{name} (#{offset}), the site’s time zone."
-        else
-          "#{name} time (#{offset}), the site’s time zone."
-        end
-      end
+      # "Berlin time (GMT+1), the site’s time zone.", for the time shown in
+      # the field (`SiteZoneLine`).
+      def zone_line = site_zone_line(default_time)
 
       attr_reader :error
 
@@ -99,12 +90,6 @@ module Admin
       SUBMITTED_FORMAT = /\A\d{4}-\d\d-\d\dT\d\d:\d\d\z/
 
       attr_reader :record, :url_options
-
-      def gmt_offset(seconds)
-        sign = seconds.negative? ? "-" : "+"
-        hours, minutes = (seconds.abs / 60).divmod(60)
-        "GMT#{sign}#{hours}#{":%02d" % minutes if minutes.positive?}"
-      end
     end
   end
 end

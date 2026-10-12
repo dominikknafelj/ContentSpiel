@@ -60,12 +60,21 @@
 module PublicSite
   module_function
 
-  # Three queries: the counter and the two publication times.
+  # Four queries: the counter, the two publication times and the newest copy
+  # in force. The last follows copies by the clock: a copy with a time of its
+  # own (a change scheduled for later) bumps nothing when it is taken, and
+  # comes into force when that time passes, with no write, so the version
+  # must change then and not before. It is read from the copies, not from a
+  # job having run (`settled_at`), so a request a second after the time gets
+  # the new version. A scheduled RECORD's copy is in force at once and shown
+  # from the record's `published_at`, which the second and third parts already
+  # follow. Served by `index_published_versions_on_live_at`.
   def content_version
     [
       PublicSite::Version.current,
       Page.kept.published.maximum(:published_at),
-      Post.kept.published.maximum(:published_at)
+      Post.kept.published.maximum(:published_at),
+      Publishing::Version.in_force.maximum(:live_at)
     ].map { |value| value.is_a?(Integer) ? value : value&.to_f }.join("-")
   end
 

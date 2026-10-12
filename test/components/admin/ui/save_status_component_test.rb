@@ -66,12 +66,18 @@ class Admin::Ui::SaveStatusComponentTest < ViewComponent::TestCase
     assert_text "Not saved — you don't have permission to change this"
   end
 
-  test "a live record reads SAVED TO SITE in the ok colour, and SAVING TO SITE while saving" do
+  test "a published record reads SAVED · NOT PUBLISHED in the neutral colour, and SAVING while saving" do
     render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :saved, at: Time.zone.parse("2026-09-27 10:42"), live: true)
-    assert_selector "p#s[data-live].text-ok-ink", text: "● SAVED TO SITE 10:42"
+    assert_selector "p#s[data-live].text-meta", text: "SAVED · NOT PUBLISHED 10:42"
+    assert_no_selector "p.text-ok-ink"
+    assert_no_text "●"
+
+    render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :saved, live: true)
+    assert_selector "p#s[data-live]", exact_text: "SAVED · NOT PUBLISHED"
 
     render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :saving, live: true)
-    assert_text "SAVING TO SITE…"
+    assert_text "SAVING…"
+    assert_no_text "TO SITE"
 
     render_inline Admin::Ui::SaveStatusComponent.new(id: "s", state: :saved, at: Time.zone.parse("2026-09-27 10:42"))
     assert_no_selector "p[data-live]"

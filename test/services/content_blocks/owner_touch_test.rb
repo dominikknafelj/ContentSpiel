@@ -6,10 +6,12 @@ require "test_helper"
 # page's own path/hierarchy rebuild (`Page#sync_public_paths`, closure_tree's
 # `after_save`) never runs for a block edit.
 #
-# The page is live: the touch is also what moves the public content version
-# for a block edit (`Publishable#bump_public_version_when_live`), and that
-# version moves only for published output. A draft's block edit touches its
-# page all the same and moves no version (the last test).
+# The page is live and has a copy: the site shows the copy, so a block edit
+# touches the page all the same and moves no version (it moves when the
+# changes are published). A page with no copy is served from its rows, and
+# there the touch is what moves the public content version
+# (`Publishable#bump_public_version_when_live`). A draft's block edit touches
+# its page and moves no version either (the last test).
 class ContentBlocks::OwnerTouchTest < ActiveSupport::TestCase
   setup do
     @page = create_page(title: "Owner")
@@ -25,7 +27,7 @@ class ContentBlocks::OwnerTouchTest < ActiveSupport::TestCase
     end
 
     assert_operator @page.reload.updated_at, :>, before
-    assert_not_equal version, PublicSite.content_version
+    assert_equal version, PublicSite.content_version, "a copied page's block edit is not on the site yet"
     assert_empty sql.grep(/public_paths|page_hierarchies/i), "a block edit rebuilt the page's paths:\n#{sql.join("\n")}"
   end
 

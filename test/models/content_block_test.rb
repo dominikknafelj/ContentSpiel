@@ -240,7 +240,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   # says such a post "has no public URL", which only holds if an unfiltered
   # ("every content type") listing skips it too; otherwise it shows up
   # linked to a path that was never computed for it (see
-  # `PublicSite::Paths.sync`, which likewise skips a post whose `definition`
+  # `PublicSite::Paths.compute_path`, which likewise skips a post whose `definition`
   # is nil).
   test "an unfiltered post list omits a post whose content_type isn't registered" do
     @page.update!(published_at: Time.current)

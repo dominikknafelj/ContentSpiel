@@ -33,6 +33,7 @@ module Admin
           "admin--editing--live-blocks-url-value": (helpers.admin_editing_blocks_path(**route) if @record.is_a?(::Page)),
           "admin--editing--live-block-url-value": block_url,
           "admin--editing--live-record-url-value": helpers.admin_editing_record_path(**route),
+          "admin--editing--live-publishing-url-value": helpers.admin_editing_publishing_path(**route),
           "admin--editing--live-notice-value": ::Editing::NOTICE.in_milliseconds,
           "admin--editing--hold-claim-url-value": helpers.admin_editing_claim_path(**route),
           "admin--editing--hold-release-url-value": helpers.admin_editing_release_path(**route),

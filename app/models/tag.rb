@@ -24,6 +24,11 @@ class Tag < ApplicationRecord
 
   # The tag(s) of exactly this name, whatever the case.
   scope :named, ->(name) { where(lowered_name.eq(name.to_s.downcase)) }
+  # The tags of any of these names, whatever the case; no name is no tag.
+  scope :named_any, ->(names) {
+    names = Array(names).map { |name| name.to_s.downcase }
+    names.empty? ? none : where(lowered_name.in(names))
+  }
   # Every tag but the ones of these names, whatever the case. With no name at
   # all it is no tag at all, not every tag -- what `NOT (... IN (NULL))`, the
   # condition this used to be, answered; the one caller never passes an empty

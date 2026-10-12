@@ -6,9 +6,9 @@ module Translations
   # never do more than typing into the editor could:
   #
   # * a page or post: `<prefix>.edit`, plus `<prefix>.publish` once it's
-  #   published (live or scheduled) -- the interim autosave rule
-  #   `Pages::Save`/`Posts::Save` enforce, since a write lands on live
-  #   content;
+  #   published (live or scheduled) -- the rule
+  #   `Pages::Save`/`Posts::Save` enforce: whoever may change a published
+  #   record may publish it (drafts spec D5);
   # * a block: its owner's, the same rule (`ContentBlocks::OwnerPermissions`);
   # * an image: `media.manage`, or being its uploader with `media.upload`
   #   (`Media::Ownership`, what `Media::Save` asks);

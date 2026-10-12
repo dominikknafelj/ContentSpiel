@@ -87,7 +87,7 @@ class Post < ApplicationRecord
   # Keeps `public_paths` in step with this post's canonical listing page and
   # slug (spec §5.4) -- the same duty `Page#sync_public_paths` performs for
   # pages, just without a subtree to cascade into: a post has no descendants
-  # of its own, so `PublicSite::Paths.sync` (not `sync_subtree`) is enough.
+  # of its own, so the post says it was touched and nothing else depends on it.
   # Only for a save that changed one of the post's URL inputs (a new post
   # always; see `HasPublicPaths`):
   # - `slug`, in every language: its own segment;
@@ -110,6 +110,11 @@ class Post < ApplicationRecord
   # `after_commit`, with or without a save of the post; a tag removed
   # through the association with no save of the post afterwards is synced
   # by nothing until the next sync that reaches the post.
+  #
+  # For a published or scheduled post that has a copy, the tags that count
+  # are the COPY's (`PublicSite::Paths.canonical_pages`): each of these
+  # refreshes still runs and finds nothing to move, and the address follows
+  # when the post's changes are published (the copy's own refresh).
   url_inputs_are :slug, :content_type, :published_at, :trashed_at
   after_save :sync_public_paths
 
@@ -177,7 +182,7 @@ class Post < ApplicationRecord
   def sync_public_paths
     return unless url_inputs_changed_by_save?
 
-    PublicSite::Paths.sync(self)
+    PublicSite::Paths.refresh(posts: [ self ])
     @tags_changed = false
   end
 

@@ -12,7 +12,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", "About"
     assert_select "[data-status='live']"
-    assert_includes response.body, "This page is live. Changes appear on the site as soon as they’re saved."
+    assert_includes response.body, "This page is live. Changes are published with “Publish changes…”."
     assert_select "form[data-controller~='admin--saving--autosave'] input[name='page[title]'][value='About']"
   end
 
@@ -35,11 +35,69 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "head meta[name='turbo-prefetch']", count: 0
   end
 
+  test "the settings autosave of a live page does not take a slug, and a draft's does" do
+    live = create_page(title: "Live")
+    draft = create_page(title: "Draft", published: false)
+    before = live.reload.read_attribute(:slug)
+
+    [ live, draft ].each do |page|
+      patch admin_page_path(page), as: :turbo_stream, params: { base_updated_at: page.reload.settings_changed_at.iso8601(6), page: { title: page.title, slug: "typed-while-thinking" } }
+      assert_response :success
+    end
+
+    assert_equal before, live.reload.read_attribute(:slug)
+    assert_equal "typed-while-thinking", Mobility.with_locale(:en) { draft.reload.slug }
+  end
+
+  test "a live page's address changes through its own form, at once, leaving a redirect, with no unpublished change" do
+    page = create_page(title: "Pricing")
+    old = PublicSite::Urls.new.path_for(page, "en")
+
+    patch slug_admin_page_path(page), params: { slug: "prices" }
+
+    assert_redirected_to admin_page_path(page)
+    assert_equal "/prices", PublicSite::Urls.new.path_for(page.reload, "en")
+    assert_not page.unpublished_changes?
+    get old
+    assert_redirected_to "/prices"
+  end
+
+  test "an address that is taken or reserved goes back with the reason and changes nothing" do
+    create_page(title: "Taken")
+    page = create_page(title: "Pricing")
+
+    patch slug_admin_page_path(page), params: { slug: "taken" }
+
+    assert_redirected_to admin_page_path(page)
+    assert flash[:alert].present?
+    assert_equal "pricing", Mobility.with_locale(:en) { page.reload.slug }
+  end
+
+  test "the address form is refused while another tab holds the page's settings, and by someone who may not publish" do
+    page = create_page(title: "Pricing")
+    reserve(page, page, users(:two), "tab-bbbbbbbb")
+
+    patch slug_admin_page_path(page), params: { slug: "prices" }, headers: { "X-Notes-Tab" => "tab-aaaaaaaa" }
+
+    assert_redirected_to admin_page_path(page)
+    assert_equal "pricing", Mobility.with_locale(:en) { page.reload.slug }
+
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    sign_in_as(users(:editor_branch))
+    other = create_page(title: "Other")
+
+    patch slug_admin_page_path(other), params: { slug: "elsewhere" }
+
+    assert_response :forbidden
+    assert_equal "other", Mobility.with_locale(:en) { other.reload.slug }
+  end
+
   test "autosaving settings answers with a saved status stream" do
     patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "About us" }, base_updated_at: @page.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
     assert_equal "About us", @page.reload.title(locale: :en)
-    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
+    assert_match(/SAVED( · NOT PUBLISHED)? \d\d:\d\d/, response.body)
   end
 
   # Fix (final-fixes round, finding 1): the tree lives outside this form

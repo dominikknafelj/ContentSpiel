@@ -114,13 +114,13 @@ module AccessControl
       # and leave values set since alone; the owner step can't be, since
       # "not an owner" is exactly what it changes.
       def backfill!
-        User.where(owner: false).update_all(owner: true)
+        User.where(owner: false).update_all(owner: true) # changes: none (a user, not a page or post)
 
         admin = Group.find_by!(name: ADMIN_NAME)
-        ApiToken.where(group_id: nil).update_all(group_id: admin.id)
+        ApiToken.where(group_id: nil).update_all(group_id: admin.id) # changes: none (a token, not a page or post)
 
         first_owner = User.where(owner: true).order(:id).first
-        Post.where(author_id: nil).update_all(author_id: first_owner.id) if first_owner # version: none (the public site shows no author)
+        Post.where(author_id: nil).update_all(author_id: first_owner.id) if first_owner # version: none (the public site shows no author) # changes: none (an author is not in a copy)
       end
 
       private

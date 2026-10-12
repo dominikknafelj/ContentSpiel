@@ -13,6 +13,7 @@ class Admin::SlugBaseUrlTest < ViewComponent::TestCase
 
   test "a child of the root page: the page form's prefix has no doubled slash, in either language" do
     child = PreviewFixtures.page(title: "Child")
+    child.update_columns(published_at: nil) # a draft: only its settings form has the slug field and its prefix (drafts spec D7)
     %w[en de].each do |locale|
       component = Admin::EditorScreen::PageSettingsFormComponent.new(page: child, locale: locale)
       # The source, not just the defensive `SlugColumnComponent#prefix` on top of it.
@@ -25,7 +26,7 @@ class Admin::SlugBaseUrlTest < ViewComponent::TestCase
 
   test "a page below another page keeps exactly one slash between segments" do
     parent = PreviewFixtures.page(title: "Parent")
-    child = parent.children.create!(page_type: :standard, title: "Grandchild #{SecureRandom.hex(4)}", published_at: Time.current)
+    child = parent.children.create!(page_type: :standard, title: "Grandchild #{SecureRandom.hex(4)}", published_at: nil)
     as_owner { render_inline Admin::EditorScreen::PageSettingsFormComponent.new(page: child, locale: "de") }
     assert_no_text "//"
     assert_selector ".admin-prefix-input span.bg-sunken", text: %r{\A/de/.+/\z}

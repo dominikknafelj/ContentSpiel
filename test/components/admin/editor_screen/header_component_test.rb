@@ -38,9 +38,10 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     render_header(page)
     # Scoped to the header: the Unpublish confirm dialog is a sibling AFTER it
     # and its confirm button is (rightly) primary; rack_test treats a closed
-    # <dialog>'s content as visible.
-    assert_no_selector "header button.bg-accent"
-    assert_selector "[role=status]", text: "This page is live. Changes appear on the site as soon as they’re saved."
+    # <dialog>'s content as visible. The Publish changes form is in the header
+    # for whoever may publish and shown by a mark (CSS), so no mark is no primary button.
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all
+    assert_selector "[role=status]", text: "This page is live. Changes are published with “Publish changes…”."
     assert_selector "[role=menu] button", text: "Unpublish", visible: :all
     assert_selector "a[href='/about']", text: "View on site"
   end
@@ -85,6 +86,175 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu] [role=separator]", visible: :all
   end
 
+  def edit_title(record, title = "Edited")
+    assert as_owner { Pages::Save.call(record, translations: { "en" => { title: title } }) }.ok? if record.is_a?(Page)
+    assert as_owner { Posts::Save.call(record, translations: { "en" => { title: title } }) }.ok? if record.is_a?(Post)
+    record.reload
+  end
+
+  test "a live record with unpublished changes shows the chip and Publish changes; without changes neither, and both elements are there, empty" do
+    live = create_page(title: "About", published: true)
+    render_header(live)
+    assert_selector "header #publishing-chip", visible: :all
+    assert_selector "header #publishing-actions", visible: :all
+    assert_no_selector "header #publishing-chip [data-unpublished-changes]"
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all # the form is drawn once for whoever may publish, and shown by this mark
+
+    render_header(edit_title(live))
+    assert_selector "header #publishing-chip [data-unpublished-changes]", text: "Unpublished changes"
+    assert_selector "header #publishing-actions button[data-admin--ui--dialog-id-param='publish-changes-page-#{live.id}']", text: "Publish changes…"
+    assert_selector "header #publishing-chip [data-publish-changes-offered]", visible: :all
+    assert_selector "header #publishing-chip [data-discard-changes-offered]", visible: :all
+  end
+
+  test "a scheduled record with unpublished changes offers them too, and a draft shows neither the chip nor the button, whatever mark it kept" do
+    post = create_post(title: "Later", published: false)
+    as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
+    render_header(post.reload)
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all
+
+    render_header(edit_title(post.reload))
+    assert_selector "header [data-unpublished-changes]"
+    assert_selector "header [data-publish-changes-offered]", visible: :all
+
+    draft = create_page(title: "Draft", published: false)
+    draft.update_columns(unpublished_changes_at: Time.current) # version: none (a test gives a draft a stale mark) # changes: none (a test gives a draft a stale mark)
+    render_header(draft)
+    assert_no_selector "header [data-unpublished-changes]"
+    assert_no_selector "header #publishing-chip", visible: :all
+    assert_no_selector "header button", text: "Publish changes", visible: :all
+  end
+
+  test "a live record with a change scheduled offers Publish changes with or without edits since, because its time can be changed" do
+    live = create_page(title: "About")
+    assert as_owner { Pages::Save.call(live, translations: { "en" => { title: "Edited" } }) }.ok?
+    assert as_owner { Publishing::PublishChanges.call(live.reload, at: 2.days.from_now) }.ok?
+    assert_not live.reload.unpublished_changes?
+
+    render_header(live)
+
+    assert_selector "header #publishing-actions button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='publish-changes-page-#{live.id}']", text: "Publish changes…"
+    assert_selector "header #publishing-chip [data-publish-changes-offered]", visible: :all
+    assert_selector "header #publishing-chip [data-discard-changes-offered]", visible: :all
+    assert_no_selector "header [data-unpublished-changes]"
+  end
+
+  # -- Task 7: the dialogs ---------------------------------------------------------
+
+  test "the Publish changes control opens the dialog and is not a form" do
+    live = edit_title(create_page(title: "About"))
+    render_header(live)
+
+    assert_selector "header #publishing-actions button[type=button][data-admin--ui--dialog-id-param='publish-changes-page-#{live.id}']", text: "Publish changes…"
+    assert_selector "dialog#publish-changes-page-#{live.id} form[action='/cs-studio/publishing/page/#{live.id}/publish']", visible: :all
+  end
+
+  test "no form in the header publishes without the dialog" do
+    render_header(edit_title(create_page(title: "About")))
+
+    assert_no_selector "#publishing-actions form", visible: :all
+    assert_no_selector "header form[action*='/publishing/']", visible: :all
+  end
+
+  test "Discard changes… is offered with it to someone who may change the record, opens its own dialog, and stands before Publish changes…" do
+    live = edit_title(create_page(title: "About"))
+    render_header(live)
+
+    assert_selector "header #publishing-actions button[type=button][data-admin--ui--dialog-id-param='discard-changes-page-#{live.id}']", text: "Discard changes…"
+    assert_equal [ "Discard changes…", "Publish changes…" ], page.all("header #publishing-actions button", visible: :all).map { |button| button.text(:all).strip }
+    assert_selector "dialog#discard-changes-page-#{live.id}[data-destructive] form[action='/cs-studio/publishing/page/#{live.id}/discard']", visible: :all
+  end
+
+  test "the buttons and the dialogs are drawn for a live record with nothing to publish too, without their marks: the first save's answer shows them" do
+    live = create_page(title: "About")
+    render_header(live)
+
+    assert_selector "header #publishing-actions button", text: "Publish changes…", visible: :all
+    assert_selector "header #publishing-actions button", text: "Discard changes…", visible: :all
+    wrappers = page.all("header #publishing-actions > span", visible: :all).map { |span| span[:class] }
+    assert_equal [ "hidden group-has-[[data-discard-changes-offered]]/publishing:contents", "hidden group-has-[[data-publish-changes-offered]]/publishing:contents" ], wrappers
+    assert_no_selector "header [data-publish-changes-offered]", visible: :all
+    assert_no_selector "header [data-discard-changes-offered]", visible: :all
+    assert_selector "dialog#publish-changes-page-#{live.id}", visible: :all
+    assert_selector "dialog#discard-changes-page-#{live.id}", visible: :all
+    assert_includes page.find("header.admin-editor-header")[:class].split, "group/publishing"
+  end
+
+  test "a draft has neither the dialogs nor the buttons" do
+    draft = create_page(title: "Draft", published: false)
+    render_header(draft)
+
+    assert_no_selector "dialog[id^=publish-changes-]", visible: :all
+    assert_no_selector "dialog[id^=discard-changes-]", visible: :all
+    assert_no_selector "dialog[id^=cancel-scheduled-change-]", visible: :all
+  end
+
+  test "changes that are scheduled are named with their time, and Cancel scheduled change is in the menu with its confirmation" do
+    live = create_page(title: "About")
+    assert as_owner { Pages::Save.call(live, translations: { "en" => { title: "Edited" } }) }.ok?
+    assert as_owner { Publishing::PublishChanges.call(live.reload, at: Time.zone.local(2031, 10, 12, 9)) }.ok?
+
+    render_header(live.reload)
+
+    assert_selector "header #publishing-chip [data-change-scheduled]", text: "Changes scheduled for 12 Oct 2031, 09:00"
+    assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='cancel-scheduled-change-page-#{live.id}']", text: "Cancel scheduled change", visible: :all
+    assert_selector "dialog#cancel-scheduled-change-page-#{live.id} form[action='/cs-studio/publishing/page/#{live.id}/cancel_scheduled_change']", visible: :all
+    items = page.all("[role=menu] a, [role=menu] button", visible: :all).map { |item| item.text(:all).strip }
+    assert_equal [ "Cancel scheduled change", "Unpublish" ], items[items.index("Cancel scheduled change"), 2]
+  end
+
+  test "with no change scheduled there is no such item, no such dialog and no such line" do
+    live = edit_title(create_page(title: "About"))
+    render_header(live)
+
+    assert_no_selector "[role=menu] button", text: "Cancel scheduled change", visible: :all
+    assert_no_selector "dialog[id^=cancel-scheduled-change-]", visible: :all
+    assert_no_selector "[data-change-scheduled]"
+  end
+
+  test "someone who may read but not change the record gets no button, no dialog and no menu item of these" do
+    live = create_page(title: "About")
+    assert as_owner { Pages::Save.call(live, translations: { "en" => { title: "Edited" } }) }.ok?
+    assert as_owner { Publishing::PublishChanges.call(live.reload, at: 2.days.from_now) }.ok?
+    assert as_owner { Pages::Save.call(live.reload, translations: { "en" => { title: "Edited again" } }) }.ok?
+
+    render_header(live.reload, actor: users(:reader))
+
+    assert_selector "header [data-unpublished-changes]"
+    assert_selector "header [data-change-scheduled]"
+    assert_no_selector "button", text: /Publish changes|Discard changes|Cancel scheduled change/, visible: :all
+    assert_no_selector "dialog[id^=publish-changes-], dialog[id^=discard-changes-], dialog[id^=cancel-scheduled-change-]", visible: :all
+    assert_no_selector "[data-publish-changes-offered], [data-discard-changes-offered]", visible: :all
+  end
+
+  test "someone who may not publish sees the chip and no button" do
+    post = edit_title(create_post(title: "Read me"))
+
+    render_header(post, actor: users(:reader))
+
+    assert_selector "header [data-unpublished-changes]"
+    assert_no_selector "header button", text: "Publish changes", visible: :all
+    assert_no_selector "header button", text: "Discard changes", visible: :all
+  end
+
+  test "a live page that has no address says so, and one that has an address, a draft and an unlisted post do not" do
+    page = create_page(title: "About")
+    render_header(page)
+    assert_no_selector "header [data-no-address]"
+
+    PublicPath.where(record: page).delete_all # version: none (a test takes a live page's address away) # changes: none (a test removes derived rows)
+    render_header(page.reload)
+    assert_selector "header #publishing-chip [data-no-address]", text: "No address"
+
+    draft = create_page(title: "Draft", published: false)
+    PublicPath.where(record: draft).delete_all # version: none (a test takes a draft's address away) # changes: none (a test removes derived rows)
+    render_header(draft)
+    assert_no_selector "header [data-no-address]"
+
+    render_header(create_post(title: "Nobody lists me"))
+    assert_no_selector "header [data-no-address]", text: "No address"
+  end
+
   test "a viewer who can only read sees View only and nothing that writes" do
     post = create_post(title: "Read me")
     render_header(post, actor: users(:reader))
@@ -92,16 +262,16 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: /Publish|Unpublish|Schedule|Move to trash/, visible: :all
   end
 
-  # Task 19's f2: the "changes appear as soon as they're saved" hint is about
+  # Task 19's f2: the "changes are published with Publish changes" hint is about
   # the viewer's own edits.
   test "a view-only viewer of a live record is not told their changes go live" do
     post = create_post(title: "Read me", published: true)
     render_header(post, actor: users(:reader))
-    assert_no_text "Changes appear on the site"
+    assert_no_text "Changes are published with"
     assert_selector "[data-view-only-hint]"
 
     render_header(post)
-    assert_text "Changes appear on the site as soon as they’re saved."
+    assert_text "Changes are published with “Publish changes…”."
   end
 
   test "a post shows its type and, unlisted, says so" do
@@ -109,6 +279,73 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     render_header(post)
     assert_selector ".admin-type-dot"
     assert_text "Not listed on any page yet — add a post list block for this type"
+  end
+
+  test "a scheduled page's hint says what was scheduled goes live at its time" do
+    page = create_page(title: "Later", published: false)
+    assert as_owner { Pages::Save.call(page, attributes: { published_at: 3.days.from_now }) }.ok?
+    render_header(page.reload)
+
+    assert_selector "[role=status]", text: "This page is scheduled. What was scheduled goes live at its time; later changes are published with “Publish changes…”."
+    assert_selector "p#page-save-status[data-live]", visible: :all
+
+    post = create_post(title: "Later post", published: false)
+    assert as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }.ok?
+    render_header(post.reload)
+    assert_selector "[role=status]", text: "This post is scheduled. What was scheduled goes live at its time"
+  end
+
+  test "a draft has no such hint, and its save line is the plain one" do
+    render_header(create_page(title: "Draft", published: false))
+
+    assert_no_text "Changes are published with"
+    assert_no_text "later changes are published"
+    assert_no_selector "p#page-save-status[data-live]", visible: :all
+  end
+
+  test "a post without an address whose list block waits in a live page's unpublished rows says so, naming the page to someone who may read it" do
+    blog = create_page(title: "Journal page")
+    post = create_post(title: "Loose")
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }) }.ok?
+    assert_nil post.reload.full_path("en"), "the list block is not published, so the post has no address"
+
+    render_header(post)
+    assert_selector "[data-waiting-lister]", text: "Not listed on the site yet: the page “Journal page” lists this post, and its changes are not published."
+    assert_no_text "add a post list block for this type"
+
+    group = AccessControl::Group.create!(name: "Posts only")
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
+    reader = User.create!(email_address: "posts-only@example.com", password: "password12345")
+    AccessControl::Membership.create!(user: reader, group: group)
+    render_header(post, actor: reader)
+    assert_selector "[data-waiting-lister]", text: "Not listed on the site yet: a page lists this post, and its changes are not published."
+    assert_no_text "Journal page"
+
+    as_owner { publish_changes(blog) }
+    render_header(post.reload)
+    assert_no_selector "[data-waiting-lister]"
+    assert_no_text "Not listed"
+  end
+
+  test "a list block in a draft page's rows, in a trashed page's, or for another type is no such line" do
+    post = create_post(title: "Loose")
+    draft = create_page(title: "Draft list", published: false)
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: draft), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }) }.ok?
+    other = create_page(title: "Other type")
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: other), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } }) }.ok?
+    trashed = create_page(title: "Trashed list")
+    assert as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: trashed), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }) }.ok?
+    assert as_owner { Trash::Move.call(trashed.reload) }.ok?
+
+    render_header(post.reload)
+
+    if post.full_path("en").nil?
+      assert_no_selector "[data-waiting-lister]"
+      assert_text "Not listed on any page yet — add a post list block for this type"
+    else
+      assert_equal "/draft-list/loose", post.full_path("en"), "a draft page lists what its rows list, so the post has a would-be address there"
+      assert_no_selector "[data-waiting-lister]"
+    end
   end
 
   test "the dialog ids the later tasks and the tests rely on" do

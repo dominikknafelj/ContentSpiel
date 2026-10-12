@@ -17,6 +17,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     site_settings(:default).update!(setup_completed_at: Time.current)
     @blog = create_page(title: "Blog")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: @blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(@blog) # the list block was added after the page went live: the public page draws the copy
     @kept_post = create_post(title: "Kept post")
     @gone_post = create_post(title: "Gone post")
     @kept_page = create_page(title: "Kept page")
@@ -72,6 +73,58 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # because the header's navigation names the kept page on every page anyway.
   # A trashed page keeps its `published_at`, so "published" alone doesn't
   # hide it -- and it has no URL any more, so its link would point nowhere.
+  test "a trashed page's and a trashed post's published copy is served nowhere: not at its address, in the menu, in a list of subpages or in a post list" do
+    listing = create_page(title: "Copy listing", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert Pages::Save.call(listing, attributes: { published: true }).ok?
+    child = create_page(title: "Copied child", parent: listing)
+    menu = create_page(title: "Copied menu")
+    post = create_post(title: "Copied post")
+    page_path = PublicSite::Urls.new.path_for(child, "en")
+    post_path = PublicSite::Urls.new.path_for(post, "en")
+    assert copied?(child) && copied?(post)
+
+    assert Trash::Move.call(child).ok?
+    assert Trash::Move.call(menu).ok?
+    assert Trash::Move.call(post).ok?
+
+    get page_path
+    assert_response :not_found
+    get post_path
+    assert_response :not_found
+    get PublicSite::Urls.new.path_for(listing, "en")
+    assert_not_includes response.body, "Copied child"
+    assert_not_includes response.body, "Copied menu"
+    assert_not_includes response.body, "Copied post"
+  end
+
+  # The addresses read list blocks as published (`Publishing::Listing.blocks`):
+  # a trashed page's copy still lists posts, and must give none an address.
+  test "a trashed page's published copy lists nothing for an address: its list blocks are no candidates, and its posts go to the next listing" do
+    first = create_page(title: "First listing", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: first), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } })
+    assert Pages::Save.call(first, attributes: { published: true }).ok?
+    second = create_page(title: "Second listing", published: false)
+    ContentBlocks::Save.call(ContentBlock.new(owner: second), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } })
+    assert Pages::Save.call(second, attributes: { published: true }).ok?
+    post = create_post(title: "Update", content_type: "now_update")
+    assert_equal "/first-listing/update", PublicSite::Paths.current_path(post, "en")
+    assert Publishing.current(first).lists_posts
+
+    assert Trash::Move.call(first).ok?
+
+    assert_not_includes Publishing::Listing.blocks.map { |block| block.owner.id }, first.id
+    assert_equal second, PublicSite::Paths.canonical_page(post.reload)
+    assert_equal "/second-listing/update", PublicSite::Paths.current_path(post, "en")
+    get "/first-listing/update"
+    assert_redirected_to "/second-listing/update"
+
+    # Restored (to the end of its siblings, so the other listing stays the
+    # post's), its copy's list block is a candidate again.
+    assert Trash::Restore.call(first.reload).ok?
+    assert_includes Publishing::Listing.blocks.map { |block| block.owner.id }, first.id
+  end
+
   test "a page's list of subpages leaves out a trashed subpage, publicly and in preview" do
     kept_child = create_page(title: "Kept child", parent: @kept_page)
     gone_child = create_page(title: "Gone child", parent: @kept_page)
@@ -110,6 +163,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     # has to skip a trashed post itself.
     other = create_page(title: "Other")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: other), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(other)
 
     get "/other/kept-post"
     assert_response :moved_permanently
@@ -136,6 +190,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
     block = @kept_page.content_blocks.create!(block_type: :rich_text, position: 0)
     block.update_columns(body: { "en" => body })
+    publish_changes(@kept_page) # the block was written around the services, after the page went live
 
     get "/kept-page"
     assert_response :ok
@@ -259,6 +314,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     # Drafts are "mine" by their newest audit event, so create them as the viewer.
     kept_draft, gone_draft = as(users(:one)) { [ create_post(title: "Kept draft", published: false), create_post(title: "Gone draft", published: false) ] }
     [ @kept_post, @gone_post ].each { |post| post.update_columns(published_at: 3.days.from_now) }
+    # Both have unpublished changes (a scheduled post is a record with a copy to differ from).
+    [ @kept_post, @gone_post ].each { |post| post.update_columns(unpublished_changes_at: Time.current) } # version: none (a test marks two posts) # changes: none (a test marks two posts)
     gone_draft.update!(trashed_at: Time.current)
     # The trashed post is the NEWEST outdated item, so a leak would show it.
     Translations::State.where(record_type: "Post", record_id: [ @kept_post.id, @gone_post.id ], locale: "de")
@@ -274,6 +331,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-drafts] a", text: "Gone draft", count: 0
     assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Kept post"
     assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Gone post", count: 0
+    assert_select "section[aria-labelledby=dashboard-unpublished-changes] a[href=?]", "/cs-studio/posts/#{@kept_post.id}"
+    assert_select "section[aria-labelledby=dashboard-unpublished-changes] a", text: "Gone post", count: 0
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@kept_post.id}?locale=de"
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@gone_post.id}?locale=de", count: 0
     assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"
@@ -778,6 +837,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     section = page.content_blocks.create!(block_type: "section", position: 0)
     inside = page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, media_asset: asset)
     Media::UsageIndex.refresh(inside)
+    publish_changes(page) # the blocks were written around the services, after the page went live
 
     result = Trash::Move.call(asset, actor: nil)
 
@@ -869,6 +929,17 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # each list hands them the ids it is about to draw, which went through the
   # read scope. The viewer is mentioned in every note, so a count that leaked
   # would leak in accent too.
+  test "a trashed page is not named as the page that will list a post once its changes are published" do
+    blog = create_page(title: "Waiting list")
+    post = create_post(title: "Loose")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    assert_equal [ blog ], Publishing::WaitingListers.for(post.reload)
+
+    assert Trash::Move.call(blog.reload).ok?
+
+    assert_empty Publishing::WaitingListers.for(post.reload)
+  end
+
   test "note counts in the posts list, the page tree and the media grid are for kept records only, and so are the media panel's notes" do
     [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: nil) }
     as(users(:two)) do

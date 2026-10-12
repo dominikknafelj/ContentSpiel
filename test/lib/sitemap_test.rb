@@ -115,7 +115,37 @@ class SitemapTest < ActiveSupport::TestCase
     assert_equal "https://www.example.com/es/about", alternates["es"]
   end
 
+  # The date of a record with a copy is the copy's, not the row's: an autosave
+  # of live content is not a change a crawler can see.
+  test "a live page's date is when its copy came into force, and an autosave does not move it" do
+    page = create_page(title: "Dated")
+    first = lastmod_of("/dated")
+
+    travel 1.day do
+      assert Pages::Save.call(page, translations: { "en" => { title: "Dated, edited" } }).ok?
+      @sitemap_document = nil
+      assert_equal first, lastmod_of("/dated")
+
+      publish_changes(page)
+      @sitemap_document = nil
+      assert_operator lastmod_of("/dated"), :>, first
+    end
+  end
+
+  test "a live page with no copy is dated by its row, as before" do
+    page = create_page(title: "Bare")
+    follow_rows!
+    page.update_columns(updated_at: Time.utc(2026, 1, 2, 3, 4, 5)) # version: none (a test dates a row)
+
+    assert_equal Time.utc(2026, 1, 2, 3, 4, 5), Time.iso8601(lastmod_of("/bare"))
+  end
+
   private
+
+  def lastmod_of(path)
+    entry = sitemap_document.css("url").find { |url| URI.parse(url.at_css("loc").text).path == path }
+    entry.at_css("lastmod").text
+  end
 
   def sitemap_paths
     sitemap_locs.map { |loc| URI.parse(loc).path }

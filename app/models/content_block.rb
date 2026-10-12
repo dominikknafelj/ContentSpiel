@@ -101,13 +101,18 @@ class ContentBlock < ApplicationRecord
 
   # A post_list block's own criteria decide which posts have a canonical URL
   # under it (spec §5.3): adding, editing or removing one can hand a post its
-  # first URL, move it to a different listing, or take it away entirely. Every
-  # one of those has to re-run `PublicSite::Paths.canonical_page` for the
-  # affected posts, not just the ones this block already lists -- edited to a
-  # narrower `content_type`/`tag` still has to release the posts it no longer
-  # matches. `sync_posts` re-derives each post's canonical page from scratch,
-  # so it's called for both the block's current content type (after_save) and,
-  # when a save or destroy changes which type that was, the previous one too.
+  # first URL, move it to a different listing, or take it away entirely. The
+  # block says that its PAGE was touched (`sync_listed_post_paths`) and
+  # `PublicSite::Paths.refresh` looks at the posts that page gave an address
+  # to until now and the ones its list blocks can list from now on; what the
+  # block's settings were before the save is not asked.
+  #
+  # On a published or scheduled page that has a copy this finds nothing to
+  # move: the page lists what its COPY lists (`PublicSite::Paths
+  # .canonical_pages`), so the block's change gives and takes addresses when
+  # the page's changes are published (the copy's own refresh). It still
+  # runs, for a draft page and one written around the services, whose rows
+  # are what is listed.
   after_save :sync_listed_post_paths
   after_destroy :sync_listed_post_paths
 
@@ -204,6 +209,28 @@ class ContentBlock < ApplicationRecord
     definition&.capability?(:lists_posts) ? BlockTypes::PostList.lists?(settings_object, post) : false
   end
 
+  # The tag a list block's filter names, as an id; nil with no filter, and
+  # nil when no tag has that name. A block rebuilt from a published copy
+  # answers the id the copy recorded (`Publishing::Snapshot`), so a public
+  # list keeps its posts when the tag is renamed. A row asks by name, now,
+  # and never remembers the answer: its settings can change under it.
+  attr_writer :listed_tag_id
+
+  def listed_tag_id
+    return @listed_tag_id if instance_variable_defined?(:@listed_tag_id)
+
+    name = settings_object&.tag.to_s.strip
+    name.present? ? Tag.named(name).order(:id).pick(:id) : nil
+  end
+
+  # Whether a published copy speaks for this block's filter: true for a
+  # block rebuilt from a copy, which then answers `listed_tag_id` without a
+  # query, also when the answer is "no tag had that name". Such a block
+  # lists nothing until its page is published again; the name is never
+  # looked up on a copy's behalf, so a tag renamed or deleted since cannot
+  # come back through a published list.
+  def tag_recorded? = instance_variable_defined?(:@listed_tag_id)
+
   private
 
   # "Live" is the owner's own publication (`Publishable#live?`), as it stands
@@ -213,7 +240,11 @@ class ContentBlock < ApplicationRecord
   # `after_commit` has the say for a page or post), counts as live: the doubt
   # is a bump.
   def bump_public_version_when_owner_live
-    PublicSite.bump_version! unless owner.respond_to?(:live?) && !owner.live?
+    return if owner.respond_to?(:live?) && !owner.live?
+    # A block of a record that has a copy is not what the site shows.
+    return if owner.respond_to?(:published_versions) && Publishing.in_force?(owner)
+
+    PublicSite.bump_version!
   end
 
   # `object.assign(settings)` (not just building `settings_object` and
@@ -289,35 +320,16 @@ class ContentBlock < ApplicationRecord
     object.errors.each { |error| errors.add("settings.#{error.attribute}", error.type, message: error.message) }
   end
 
-  # Every content type a post_list save or destroy could have handed a
-  # canonical page to, or taken one away from: the block's content type as it
-  # is now (skipped if this isn't -- or, on a save that changed `block_type`
-  # away from a listing type, no longer is -- one), and, only on a save, the
-  # content type it matched *before* this save (skipped when that doesn't
-  # apply either). `_before_last_save` accessors read back the value from
-  # before the save that just ran regardless of whether that particular
-  # attribute changed in it, which is exactly "before this edit" whether the
-  # edit touched `settings`, `block_type`, both, or neither -- and after a
-  # destroy they read back the value from the *previous* save instead, which
-  # for an otherwise-untouched record is simply its current value, so
-  # `definition&.capability?(:lists_posts)` alone (still readable on a
-  # destroyed record; only mutation is frozen) already covers that case
-  # without a second lookup.
-  #
-  # `nil` here means "every content type", the same reading `listed_posts`
-  # and `settings_are_valid` give a blank `content_type` field -- `presence`
-  # is what keeps that blank from reaching `sync_posts` as `""`.
+  # For a block that lists posts, or did until this save changed its type
+  # (`block_type_before_last_save`; after a destroy that is its type as last
+  # saved). Only a page's block is a candidate at all. Not for a block
+  # destroyed WITH its page: the page's row is still there at that moment,
+  # so a refresh would write the page's addresses back after they were
+  # deleted; the page's own `after_destroy` says what was touched.
   def sync_listed_post_paths
-    old_definition = BlockTypes.find(block_type_before_last_save)
-    return unless definition&.capability?(:lists_posts) || old_definition&.capability?(:lists_posts)
+    return if owner_type != Page.polymorphic_name || destroyed_by_association
+    return unless definition&.capability?(:lists_posts) || BlockTypes.find(block_type_before_last_save)&.capability?(:lists_posts)
 
-    content_types_to_resync(old_definition).each { |content_type| PublicSite::Paths.sync_posts(content_type) }
-  end
-
-  def content_types_to_resync(old_definition)
-    types = []
-    types << settings_object&.content_type if definition&.capability?(:lists_posts)
-    types << settings_before_last_save["content_type"].presence if old_definition&.capability?(:lists_posts)
-    types.uniq
+    PublicSite::Paths.refresh(pages: [ owner_id ])
   end
 end

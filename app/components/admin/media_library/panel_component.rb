@@ -36,7 +36,7 @@ module Admin
     # inputs, no Move to trash; handoff B19) and the sentence naming who may
     # edit -- the whole module only ever needs `media.upload` to be read.
     class PanelComponent < Admin::AdminComponent
-      ROLE_LABELS = { "hero" => "Hero image", "block_image" => "Image block", "rich_text" => "Rich text" }.freeze
+      ROLE_LABELS = { "hero" => "Hero image", "block_image" => "Image block", "rich_text" => "Rich text", "published" => "Published version" }.freeze
 
       def initialize(asset:, locale:, url_options: {}, link_params: {})
         @asset = asset
@@ -324,6 +324,10 @@ module Admin
       # (nothing there assumes the two only ever come from different block
       # types), so `entry[:roles]` isn't guaranteed to be a single-element
       # Array the way it usually is in practice.
+      #
+      # `published` is already left out of a group that has another role and
+      # out of the list when the same place has another group
+      # (`Media::Asset#usages_summary`), so it is only ever named alone.
       def role_label(roles) = roles.map { |role| ROLE_LABELS.fetch(role, role) }.join(", ")
     end
   end

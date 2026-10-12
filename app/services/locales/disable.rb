@@ -49,7 +49,7 @@ module Locales
         site.locales = entries.map { |entry| without_fallback(entry) }
         next false unless site.save
 
-        PublicPath.where(locale: @code).delete_all
+        PublicPath.where(locale: @code).delete_all # changes: none (addresses are derived rows, not content)
         # Every address in that language is gone, deleted around the
         # callbacks: the public content version moves (deferred to the
         # commit; the settings row's own `after_commit` bumps as well).

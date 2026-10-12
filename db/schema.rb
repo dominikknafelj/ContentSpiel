@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_12_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -287,6 +287,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
     t.datetime "settings_changed_at", null: false
+    t.datetime "unpublished_changes_at"
     t.index "((parent_id IS NULL))", name: "index_pages_on_single_root", unique: true, where: "(parent_id IS NULL)"
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"
@@ -333,6 +334,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
     t.bigint "trashed_by_id"
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.datetime "unpublished_changes_at"
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["content_type"], name: "index_posts_on_content_type"
     t.index ["published_at"], name: "index_posts_on_published_at"
@@ -364,6 +366,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
     t.bigint "record_id", null: false
     t.string "record_type", null: false
     t.datetime "updated_at", null: false
+    t.bigint "listed_on_id"
+    t.index ["listed_on_id"], name: "index_public_paths_on_listed_on", where: "(current AND (listed_on_id IS NOT NULL))"
     t.index ["locale", "path"], name: "index_public_paths_on_locale_and_path", unique: true
     t.index ["record_type", "record_id", "locale"], name: "index_public_paths_one_current_per_record_locale", unique: true, where: "current"
     t.index ["record_type", "record_id"], name: "index_public_paths_on_record_type_and_record_id"
@@ -373,6 +377,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
     t.bigint "counter", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "published_versions", force: :cascade do |t|
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.integer "number", null: false
+    t.jsonb "snapshot", default: {}, null: false
+    t.jsonb "blocks", default: [], null: false
+    t.boolean "lists_posts", default: false, null: false
+    t.integer "tag_ids", default: [], null: false, array: true
+    t.datetime "live_at", null: false
+    t.bigint "created_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "settled_at"
+    t.index ["live_at"], name: "index_published_versions_on_live_at"
+    t.index ["live_at"], name: "index_published_versions_on_live_at_unsettled", where: "(settled_at IS NULL)"
+    t.index ["record_type", "record_id", "live_at"], name: "index_published_versions_on_record_and_live_at"
+    t.index ["record_type", "record_id", "number"], name: "index_published_versions_on_record_and_number", unique: true
+    t.index ["tag_ids"], name: "index_published_versions_on_tag_ids", using: :gin
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -471,5 +494,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_110000) do
   add_foreign_key "posts", "users", column: "author_id", on_delete: :nullify
   add_foreign_key "posts", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "presence_marks", "users", on_delete: :cascade
+  add_foreign_key "published_versions", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "sessions", "users"
 end

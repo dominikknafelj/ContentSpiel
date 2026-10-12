@@ -38,7 +38,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # DOM subtree) rather than the whole page, since the exact wording
     # (global constraints) is this element's *entire* text content, not
     # just some text on the page.
-    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
 
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
@@ -296,7 +296,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
 
     fill_in "Subtitle", with: "Typed after coming back"
     page.execute_script("document.activeElement.blur()")
-    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
+    assert_selector "#page-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 8
     assert_equal "Typed after coming back", @page.reload.subtitle
     assert_no_text "CHANGED ELSEWHERE"
   end

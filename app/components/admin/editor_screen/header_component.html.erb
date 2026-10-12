@@ -1,6 +1,6 @@
 <%# Structure and copy: handoff §4.1 / `Studio Pages.dc.html`, the default
     ("no drafts") variant. %>
-<%= tag.header class: "admin-editor-header sticky top-(--admin-top-offset) z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
+<%= tag.header class: "group/publishing admin-editor-header sticky top-(--admin-top-offset) z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
       data: { record_type: type, record_id: record.id } do %>
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
     <%# "Pages ▾" (the side-column handoff's decision 9): the page tree's drawer while
@@ -33,7 +33,7 @@
           before the status that says what has happened. %>
       <%= render Admin::Ui::SlotComponent.new(name: "editor.header.people", record: record, viewer: viewer, **slot_context) %>
 
-      <%= render Admin::Ui::SaveStatusComponent.new(id: save_status_id, state: :idle, live: live?) %>
+      <%= render Admin::Ui::SaveStatusComponent.new(id: save_status_id, state: :idle, live: !draft?) %>
 
       <%# What features register at `editor.header.actions` (a feature's
           button for a side panel, today): where the secondary actions stand, before Preview. %>
@@ -49,6 +49,11 @@
         <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
       <% end %>
 
+      <%# "Discard changes…" and "Publish changes…": drawn once for whoever has
+          the right, each shown only while `Publishing::State` offers it (a
+          mark in the chip part, which a save's answer replaces). %>
+      <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :actions, url_options: url_options, state: state) unless draft? %>
+
       <% if can_edit_schedule? %>
         <%= render Admin::Ui::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
       <% end %>
@@ -61,6 +66,9 @@
           <% end %>
           <% if can_schedule? %>
             <% menu.with_item do %><%= tag.button "Schedule…", type: "button", data: dialog_trigger(schedule_dialog_id) %><% end %>
+          <% end %>
+          <% if can_cancel_scheduled_change? %>
+            <% menu.with_item do %><%= tag.button t(".cancel_scheduled_change"), type: "button", data: dialog_trigger(cancel_scheduled_change_dialog_id) %><% end %>
           <% end %>
           <% if can_unpublish? %>
             <% menu.with_item do %><%= tag.button "Unpublish", type: "button", data: dialog_trigger(unpublish_dialog_id) %><% end %>
@@ -86,6 +94,7 @@
     <h1 class="min-w-0 truncate text-[26px] font-semibold leading-tight text-ink"><%= title %></h1>
     <%# Never hidden in an editor: here the state is the point. %>
     <%= render Admin::Ui::StatusChipComponent.new(status: status, at: scheduled_at) %>
+    <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :chip, url_options: url_options, state: state) unless draft? %>
     <% unless editable? %>
       <%= render "admin/shared/view_only_badge" %>
     <% end %>
@@ -107,14 +116,18 @@
         <%= link_to "View on site ↗", public_path, target: "_blank", rel: "noopener", class: "shrink-0 underline hover:text-ink" %>
       <% end %>
     </div>
+  <% elsif !page? && waiting_lister %>
+    <%# A list block for this post exists and waits to be published with its page (drafts plan, task 7). %>
+    <p class="mt-1 text-[13px] text-dim" data-waiting-lister><%= waiting_lister_line %></p>
   <% elsif !page? %>
     <p class="mt-1 text-[13px] text-dim">Not listed on any page yet — add a post list block for this type</p>
   <% end %>
 
-  <%# Not for a viewer who can't change anything: "changes appear as soon as
-      they're saved" is about their edits, and the view-only hint below is
-      the sentence that is true for them. %>
-  <% if live? && editable? %>
+  <%# Not for a viewer who can't change anything: "changes are published
+      with…" is about their edits, and the view-only hint below is the
+      sentence that is true for them. For a scheduled record too: a save of
+      one is not a publication either. %>
+  <% if !draft? && editable? %>
     <p role="status" class="mt-2 text-[13px] text-dim"><%= live_hint %></p>
   <% end %>
 
@@ -150,6 +163,13 @@
 <%# Dialogs: siblings of the header (see the class comment). %>
 <% if can_schedule? || can_edit_schedule? %>
   <%= render Admin::EditorScreen::ScheduleDialogComponent.new(record: record, url_options: url_options, error: schedule_error, value: schedule_value) %>
+<% end %>
+
+<%# The publish, discard and cancel dialogs of a record that is not a draft:
+    drawn once, whatever there is to publish now (see the component). %>
+<% unless draft? %>
+  <%= render Admin::EditorScreen::PublishChangesDialogComponent.new(record: record, state: state, url_options: url_options,
+        error: publish_error, when_chosen: publish_when, value: publish_value) %>
 <% end %>
 
 <% if can_unpublish? %>

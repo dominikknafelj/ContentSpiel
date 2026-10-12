@@ -46,6 +46,9 @@ Rails.application.routes.draw do
         post :publish
         post :unpublish
         post :schedule
+        # A published or scheduled page's slug, behind its own confirmation
+        # (`Admin::PagesController#slug`): not part of the autosaving settings.
+        patch :slug
       end
 
       # A page's blocks (cs-studio spec §5.1/§6.1, Task 5): nested under the
@@ -319,6 +322,8 @@ Rails.application.routes.draw do
       get "blocks", to: "editing#blocks", as: :editing_blocks
       get "blocks/:block_id", to: "editing#block", as: :editing_block, constraints: { block_id: /\d+/ }
       get "record", to: "editing#record", as: :editing_record
+      # The header's publishing chip, for another tab's change to the mark.
+      get "publishing", to: "editing#publishing", as: :editing_publishing
       # A save is a claim (live-editing spec §4.2): the tab takes a subject ahead
       # of its first save, and lets it go. `block_id` is optional (absent: the
       # record itself); a block that is not this record's is a 404.
@@ -329,6 +334,16 @@ Rails.application.routes.draw do
       post "hand_over", to: "editing#hand_over", as: :editing_hand_over
       # The asking tab leaves, or stops asking: its own request goes.
       post "withdraw", to: "editing#withdraw", as: :editing_withdraw
+    end
+    # Publishing a record's changes (drafts spec §4.3).
+    scope "publishing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
+      post "publish", to: "publishing#publish", as: :publishing_publish
+      # What a publish would change, for the dialog: a POST, sent through the
+      # tab's write queue, because part of the answer is found by trying
+      # (`Publishing::Changes.addresses` takes the record's row lock).
+      post "changes", to: "publishing#changes", as: :publishing_changes
+      post "discard", to: "publishing#discard", as: :publishing_discard
+      post "cancel_scheduled_change", to: "publishing#cancel_scheduled_change", as: :publishing_cancel_scheduled_change
     end
     # Notes on content (notes spec §3.4, §4). Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,

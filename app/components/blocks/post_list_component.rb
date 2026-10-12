@@ -27,15 +27,23 @@ module Blocks
     # good a choice as any single one.
     def list_component
       settings = block.settings_object
-      posts = block.listed_posts.order(published_at: :desc).includes(:tags)
-      posts = posts.limit(settings.limit) if settings.limit.present?
-
       list_definition = ContentTypes.find(settings.content_type) || ContentTypes.default
-      Theme.current.component_for(list_definition, :list_component).new(posts: posts, page: page)
+      Theme.current.component_for(list_definition, :list_component).new(posts: posts(settings), page: page)
     end
 
     private
 
     attr_reader :block, :page
+
+    # A visitor's list is what is published (`Publishing::Listing`): posts
+    # rebuilt from their copies, chosen by their published tags. The preview
+    # lists the rows, as it always did. Either way the list components get
+    # something they can walk and take the first of.
+    def posts(settings)
+      return Publishing::Listing.posts(block, limit: settings.limit) unless helpers.public_urls.preview? # public: rows (the list is chosen by Publishing::Listing; the line only names that call)
+
+      rows = block.listed_posts.order(published_at: :desc).includes(:tags) # public: rows (the preview shows the working version)
+      settings.limit.present? ? rows.limit(settings.limit) : rows
+    end
   end
 end

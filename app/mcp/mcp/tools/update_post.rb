@@ -28,7 +28,9 @@ module Mcp
         "publishing it immediately rather than leaving it scheduled. published: false unpublishes " \
         "back to a draft. The response's `status` field (\"draft\"/\"scheduled\"/\"live\") reflects " \
         "the result; `published` is kept as a boolean for compatibility. `fields` holds the post's " \
-        "own content type's typed fields (open-types spec §6); it can't change content_type itself."
+        "own content type's typed fields (open-types spec §6); it can't change content_type itself. " \
+        "Editing a live or scheduled post does not change the site: the response's `unpublished_changes` " \
+        "is then true, until the changes are published (`publish_changes: true`, or in CS Studio)."
       input_schema(
         properties: {
           id: { type: "integer" },
@@ -38,14 +40,17 @@ module Mcp
           fields: { type: "object", description: "The content type's own typed fields, keyed by field name " \
             "(e.g. {\"company\": \"Acme\"} for resume_entry). See each type's field schema." },
           locale: { type: "string", enum: Locales::SUPPORTED.keys },
-          published: { type: "boolean", description: "Omit to leave the current publish state alone." }
+          published: { type: "boolean", description: "Omit to leave the current publish state alone." },
+          publish_changes: { type: "boolean", description: "A live or scheduled post's edits are a draft: the site keeps " \
+            "showing what was last published. true publishes them in this call (needs the right to publish). " \
+            "Default false. Ignored for a draft." }
         },
         required: [ "id" ]
       )
       annotations(read_only_hint: false, destructive_hint: false, idempotent_hint: true, open_world_hint: false,
         title: "Update post")
 
-      def self.call(id:, title: nil, body: nil, excerpt: nil, fields: nil, locale: nil, published: nil, server_context:)
+      def self.call(id:, title: nil, body: nil, excerpt: nil, fields: nil, locale: nil, published: nil, publish_changes: false, server_context:)
         # Read scope first (spec §3.3): a post the token can't even read is
         # "not found", never a permission error that would confirm it
         # exists. One it can read but not edit reaches `Posts::Save`, whose
@@ -83,7 +88,21 @@ module Mcp
         result = Posts::Save.call(post, attributes: attributes, translations: translations)
         return error_response(result.errors.to_sentence) unless result.ok?
 
-        data = Mobility.with_locale(locale) { PostSerializer.call(result.record, locale) }
+        # The edits of a published or scheduled post are a draft until they
+        # are published (drafts spec §6): `publish_changes: true` does that
+        # in the same call, through the service CS Studio's dialog uses and
+        # with its rights (the token's group and its user's: no other way
+        # in). A draft has nothing to publish this way (`published: true`
+        # publishes it). When the publication is refused (the post's own
+        # address is taken) the edit above stays saved, and the answer says
+        # both. Published NOW, as the description says: without a time the
+        # service would keep the time of a change already scheduled.
+        if publish_changes && result.record.published_at.present?
+          published_changes = Publishing::PublishChanges.call(result.record, at: Time.current)
+          return error_response("The post was saved, but its changes were not published: #{published_changes.errors.to_sentence}") unless published_changes.ok?
+        end
+
+        data = Mobility.with_locale(locale) { PostSerializer.call(result.record.reload, locale) }
         post_response(data, warnings)
       end
     end

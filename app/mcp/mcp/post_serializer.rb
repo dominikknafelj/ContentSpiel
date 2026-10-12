@@ -38,6 +38,10 @@ module Mcp
         # reading it.
         status: post.status,
         published_at: post.published_at&.iso8601,
+        # Whether a published or scheduled post's rows have moved on from
+        # what the site shows (drafts spec §4.4): `Publishing::State`'s
+        # answer, the one place that says so.
+        unpublished_changes: Publishing::State.of(post).changes?,
         # The content type's own typed fields (open-types spec §6): the
         # untranslated ones plus whatever this `locale` has translated, both
         # already cast and keyed by field name -- literal, not

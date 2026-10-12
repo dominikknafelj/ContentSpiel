@@ -4,7 +4,8 @@ require "test_helper"
 # Every test here follows the same shape -- build (or change) an owner's
 # real state, call `.refresh` on it, and check the resulting rows -- since
 # that's the entire contract: `.refresh` recomputes, it never accumulates.
-class Media::UsageIndexTest < ActiveSupport::TestCase
+class Media::UsageIndexTest < ViewComponent::TestCase
+  include ContentHelper
   def usage_tuples(scope = Media::Usage.all)
     scope.pluck(:media_asset_id, :owner_type, :owner_id, :role, :locale)
   end
@@ -349,5 +350,168 @@ class Media::UsageIndexTest < ActiveSupport::TestCase
 
     assert_nothing_raised { Media::UsageIndex.refresh(setting) }
     assert_empty Media::Usage.where(owner_type: "SiteSetting", owner_id: setting.id)
+  end
+
+  # --- Drafts of live content: the published copy's images are used ----------
+
+  test "an image only the published copy shows cannot be moved to the trash or deleted, and can once the changes are published" do
+    hero = create_media_asset
+    picture = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: false, hero_media_asset_id: hero.id }, translations: { "en" => { title: "Gallery" } }).record
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: picture.id }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+
+    assert ContentBlocks::Destroy.call(block).ok?
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: nil }).ok?
+
+    [ hero, picture ].each do |asset|
+      assert_equal [ [ "Page", page.id, "published" ] ], asset.usages.pluck(:owner_type, :owner_id, :role)
+      assert asset.reload.used_by_kept_owner?
+      assert_not Trash::Move.call(asset).ok?, "an image on the site went to the trash"
+    end
+
+    publish_changes(page)
+
+    [ hero, picture ].each do |asset|
+      assert_not asset.reload.used?
+      assert Trash::Move.call(asset).ok?
+    end
+  end
+
+  test "an image in a published post's body is used by the copy when the rows drop it" do
+    asset = create_media_asset
+    post = Posts::Save.call(attributes: { content_type: "blog", published: true }, translations: { "en" => { title: "Pictured", body: rich_doc(%(::image{asset="#{asset.id}"})) } }).record
+
+    assert Posts::Save.call(post, translations: { "en" => { body: rich_doc("No picture") } }).ok?
+
+    assert_equal [ "published" ], asset.usages.where(owner: post).pluck(:role)
+  end
+
+  test "a refresh of a page's own usages leaves the copy's alone, and a destroyed page takes both" do
+    asset = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: asset.id }, translations: { "en" => { title: "Hero" } }).record
+    assert_equal %w[hero published], asset.usages.pluck(:role).sort
+
+    Media::UsageIndex.refresh(page)
+    assert_equal %w[hero published], asset.usages.pluck(:role).sort
+
+    delete_for_good(page)
+    assert_empty asset.usages.reload
+  end
+
+  test "an image a pending copy shows is used as well as the current copy's" do
+    now_shown = create_media_asset
+    later = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: now_shown.id }, translations: { "en" => { title: "Hero" } }).record
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: later.id }).ok?
+    publish_changes(page, at: 2.days.from_now)
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: nil }).ok?
+
+    assert now_shown.usages.exists?(role: "published")
+    assert later.usages.exists?(role: "published")
+  end
+
+  # --- A record counts once; the copy's rows follow the record's state -------
+
+  test "an image in a published image block is listed once, and once as the published version when the rows drop it" do
+    picture = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: false }, translations: { "en" => { title: "Shown" } }).record
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: picture.id }).record
+    assert Pages::Save.call(page, attributes: { published: true }).ok?
+
+    assert_equal [ %w[block_image] ], picture.usages_summary.map { |entry| entry[:roles] }
+    render_inline Admin::MediaLibrary::PanelComponent.new(asset: picture.reload, locale: "en")
+    assert_selector "a", text: "Image block — page “Shown”", count: 1
+    assert_no_text "Published version"
+
+    assert ContentBlocks::Destroy.call(block).ok?
+
+    assert_equal [ %w[published] ], picture.reload.usages_summary.map { |entry| entry[:roles] }
+    render_inline Admin::MediaLibrary::PanelComponent.new(asset: picture, locale: "en")
+    assert_selector "a", text: "Published version — page “Shown”", count: 1
+  end
+
+  test "a hero and the published copy are one group, labelled by the hero" do
+    asset = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: asset.id }, translations: { "en" => { title: "Hero" } }).record
+
+    assert_equal [ %w[hero] ], asset.usages_summary.map { |entry| entry[:roles] }
+    assert_equal [ page ], Media::Asset.usage_places_for([ asset.id ]).fetch(asset.id)
+  end
+
+  test "an unpublish releases the copy's rows, and publishing again writes them again" do
+    asset = create_media_asset
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: asset.id }, translations: { "en" => { title: "Gallery" } }).record
+    assert Pages::Save.call(page, attributes: { published: false }).ok?
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: nil }).ok?
+
+    assert_empty asset.usages.reload
+    render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en")
+    assert_no_text "Published version"
+    assert Trash::Move.call(asset.reload).ok?
+    assert Trash::Restore.call(asset.reload).ok?
+
+    other = create_media_asset
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: other.id, published: true }).ok?
+    assert_equal %w[hero published], other.usages.pluck(:role).sort
+  end
+
+  test "a post's unpublish releases the copy's rows too" do
+    asset = create_media_asset
+    post = Posts::Save.call(attributes: { content_type: "blog", published: true }, translations: { "en" => { title: "Pic", body: rich_doc(%(::image{asset="#{asset.id}"})) } }).record
+    assert asset.usages.exists?(role: "published")
+
+    assert Posts::Save.call(post, attributes: { published: false }, translations: { "en" => { body: rich_doc("None") } }).ok?
+
+    assert_not asset.usages.exists?(role: "published")
+  end
+
+  test "media:reindex leaves exactly the rows the incremental path leaves, in every state" do
+    live_asset, scheduled_asset, pending_old, pending_new, off_asset, trashed_asset = Array.new(6) { create_media_asset }
+    make = lambda do |title, asset, **attributes|
+      Pages::Save.call(attributes: { parent: root_page, hero_media_asset_id: asset.id }.merge(attributes), translations: { "en" => { title: title } }).record
+    end
+    make.call("Live", live_asset, published: true)
+    make.call("Scheduled", scheduled_asset, published_at: 3.days.from_now)
+    pending = make.call("Pending", pending_old, published: true)
+    assert Pages::Save.call(pending, attributes: { hero_media_asset_id: pending_new.id }).ok?
+    publish_changes(pending, at: 2.days.from_now)
+    off = make.call("Off", off_asset, published: true)
+    assert Pages::Save.call(off, attributes: { published: false }).ok?
+    trashed = make.call("Trashed", trashed_asset, published: true)
+    assert Trash::Move.call(trashed).ok?
+    expected = usage_tuples.sort
+    assert_equal 5, usage_tuples(Media::Usage.where(role: "published")).size
+
+    Media::Usage.delete_all
+    assert_equal 0, Media::UsageIndex.rebuild_all
+
+    assert_equal expected, usage_tuples.sort
+    assert_not off_asset.usages.exists?(role: "published")
+    assert trashed_asset.usages.exists?(role: "published")
+  end
+
+  test "media:reindex leaves exactly the rows a discard and a cancelled scheduled change leave" do
+    published, typed, scheduled, in_block = Array.new(4) { create_media_asset }
+    discarded = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: published.id }, translations: { "en" => { title: "Discarded" } }).record
+    assert Pages::Save.call(discarded, attributes: { hero_media_asset_id: typed.id }).ok?
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: discarded), attributes: { block_type: "image", media_asset_id: in_block.id }).ok?
+    cancelled = Pages::Save.call(attributes: { parent: root_page, published: true, hero_media_asset_id: published.id }, translations: { "en" => { title: "Cancelled" } }).record
+    assert Pages::Save.call(cancelled, attributes: { hero_media_asset_id: scheduled.id }).ok?
+    publish_changes(cancelled, at: 2.days.from_now)
+    assert Pages::Save.call(cancelled, attributes: { hero_media_asset_id: typed.id }).ok?
+
+    assert Publishing::DiscardChanges.call(discarded.reload).ok?
+    assert Publishing::CancelScheduledChange.call(cancelled.reload).ok?
+
+    assert_equal [ [ "Page", discarded.id, "hero" ], [ "Page", discarded.id, "published" ], [ "Page", cancelled.id, "published" ] ].sort,
+      published.usages.pluck(:owner_type, :owner_id, :role).sort
+    assert_equal [ [ "Page", cancelled.id, "hero" ] ], typed.usages.pluck(:owner_type, :owner_id, :role)
+    assert_empty scheduled.usages
+    assert_empty in_block.usages
+    expected = usage_tuples.sort
+    Media::Usage.delete_all
+    assert_equal 0, Media::UsageIndex.rebuild_all
+    assert_equal expected, usage_tuples.sort
   end
 end

@@ -41,7 +41,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "nav[aria-label='Languages'] [aria-current='true']", text: /deutsch/i
 
     fill_in "Alt", with: "Ein Sonnenuntergang"
-    assert_selector "#media-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#media-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
 
     assert_alt_eventually(asset, :de, "Ein Sonnenuntergang")
     assert_predicate asset.reload.alt(locale: :en), :blank?
@@ -300,7 +300,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     fill_in "Title", with: "First image, renamed"
-    assert_selector "#media-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#media-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "First image, renamed", first.reload.title
   end
 

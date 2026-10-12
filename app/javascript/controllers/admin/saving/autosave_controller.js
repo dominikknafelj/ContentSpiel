@@ -101,8 +101,9 @@ export default class extends Controller {
   // actually rendered by a server response either -- see the component's
   // own comment for why it's still a named state there) and `retry`.
   //
-  // `saving_live` is the same line for a live record, whose edits go
-  // straight to the site: the status element says so with `data-live`
+  // `saving_live` is the line for a published or scheduled record, whose
+  // saves are not publications (today the same word as `saving`; the saved
+  // line is what differs): the status element says so with `data-live`
   // (`Admin::Ui::SaveStatusComponent`'s `live:`). `offline` ends in a Retry
   // button (`setStatus` builds it), which is why its text stops at "· ".
   text(key) { return messages(this.element).t(key) }

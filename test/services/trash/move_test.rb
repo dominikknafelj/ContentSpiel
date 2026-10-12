@@ -45,6 +45,7 @@ class Trash::MoveTest < ActiveSupport::TestCase
   test "a post moves and loses its URL; tags stay" do
     blog = create_page(title: "Blog")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(blog)
     post = create_post(title: "Hello", tags: [ "ruby" ])
     assert PublicPath.where(record: post).exists?
     assert Trash::Move.call(post).ok?
@@ -93,6 +94,7 @@ class Trash::MoveTest < ActiveSupport::TestCase
   test "posts a trashed listing page gave a URL lose it" do
     blog = create_page(title: "Blog")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(blog)
     post = create_post(title: "Hello")
     assert_not_nil PublicSite::Paths.current_path(post.reload, Locales.default)
 

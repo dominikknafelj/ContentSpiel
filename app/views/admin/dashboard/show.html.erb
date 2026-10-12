@@ -45,6 +45,15 @@
     <% end %>
   <% end %>
 
+  <%# Published and scheduled records whose rows moved on from what the site
+      shows (`Dashboard::Feed#unpublished_changes`); the card's rows are the
+      drafts' (title, type, "edited 2h ago"). %>
+  <%= render Admin::DashboardScreen::CardComponent.new(title: t(".unpublished_changes.title"), id: "dashboard-unpublished-changes", empty: t(".unpublished_changes.empty")) do |card| %>
+    <% @feed.unpublished_changes.each do |record| %>
+      <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :draft) } %>
+    <% end %>
+  <% end %>
+
   <%= render Admin::DashboardScreen::TranslationCardComponent.new(entries: @translation_needs.entries) %>
 </div>
 

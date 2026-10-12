@@ -60,6 +60,10 @@ import { anchored, holds, mergeList, mergeUnits } from "editing/merge"
 // times and growing; after that it waits for the next signal, connect or
 // `visibilitychange`.
 //
+// The header's publishing chip (`publishing`) is read with any content signal
+// and is replaced when it differs (`drawPublishing`): the mark moves with a
+// colleague's save and with their publish.
+//
 // The "Updated by" mark comes with a block's own read (`mark=1`). A block ask
 // folded into a list ask is fetched with the mark after the list is drawn.
 //
@@ -88,7 +92,7 @@ const MENU = "[data-admin--ui--menu-target~='panel']:not([hidden])"
 export default class extends Controller {
   static targets = [ "missing" ]
   static values = {
-    kind: String, id: String, blocksUrl: String, blockUrl: String, recordUrl: String,
+    kind: String, id: String, blocksUrl: String, blockUrl: String, recordUrl: String, publishingUrl: String,
     notice: { type: Number, default: 6000 }, timeout: { type: Number, default: 10000 }, retry: { type: Number, default: 1000 }
   }
 
@@ -148,6 +152,9 @@ export default class extends Controller {
       return this.want(signal.content_block_id ? `block:${signal.content_block_id}` : "record")
     }
     if (signal.kind !== "content") return
+    // The header's chip follows the mark, which any content change may move
+    // (a colleague's save sets it, their publish clears it).
+    this.want("publishing")
     if (signal.reason === "gone") return this.want("record")
     if (signal.reason === "structure") return this.want(this.hasBlocksUrlValue ? "blocks" : "record")
     this.want(signal.content_block_id ? `block:${signal.content_block_id}` : "record", { mark: true })
@@ -183,7 +190,7 @@ export default class extends Controller {
 
   // The list and the record's form, drawing only what differs.
   catchUp() {
-    return Promise.all([ this.hasBlocksUrlValue ? this.want("blocks", { onlyChanged: true }) : null, this.want("record", { onlyChanged: true }) ])
+    return Promise.all([ this.hasBlocksUrlValue ? this.want("blocks", { onlyChanged: true }) : null, this.want("record", { onlyChanged: true }), this.want("publishing") ])
   }
 
   // Asks for a part. Answers a promise that is kept when the ask has been
@@ -191,7 +198,7 @@ export default class extends Controller {
   want(part, options = {}) {
     if (part === "blocks" && !this.hasBlocksUrlValue) part = "record"
     if (document.hidden) {
-      this.owe("blocks", { onlyChanged: true }); this.owe("record", { onlyChanged: true })
+      this.owe("blocks", { onlyChanged: true }); this.owe("record", { onlyChanged: true }); this.owe("publishing")
       if (part.startsWith("notice:")) this.owe(part, options)
       return Promise.resolve()
     }
@@ -330,6 +337,7 @@ export default class extends Controller {
   urlFor(part, { mark = false } = {}) {
     if (part === "blocks") return this.blocksUrlValue
     if (part === "record") return this.recordUrlValue
+    if (part === "publishing") return this.publishingUrlValue
     const url = new URL(this.blockUrlValue.replace(":block_id", part.slice(part.indexOf(":") + 1)), window.location.origin)
     if (mark) url.searchParams.set("mark", "1")
     return url.toString()
@@ -338,6 +346,7 @@ export default class extends Controller {
   draw(part, answer, { onlyChanged = false } = {}) {
     // A deleted block's notice is the answer's body, drawn by the hold script.
     if (part.startsWith("notice:")) return this.dispatch("notice", { detail: { blockId: part.slice("notice:".length), status: answer.status, text: answer.text } })
+    if (part === "publishing") return this.drawPublishing(answer)
     if (answer.status === 404) return part.startsWith("block:") ? this.want("blocks") : this.gone()
     this.busy = this.busySubjects()
     this.kept = new Set()
@@ -349,6 +358,17 @@ export default class extends Controller {
       this.busy = null
       this.kept = null
     }
+  }
+
+  // The header's publishing chip (`#publishing-chip`), replaced when it
+  // differs. It holds no form and no text of anyone's: the Publish changes
+  // button's form is in `#publishing-actions`, which is never replaced (the
+  // write queue may hold it), and the chip carries the mark that shows it.
+  drawPublishing(answer) {
+    if (!answer.fragment) return
+    const fresh = answer.fragment.querySelector("#publishing-chip")
+    const current = document.getElementById("publishing-chip")
+    if (fresh && current && current.outerHTML !== fresh.outerHTML) current.replaceWith(fresh)
   }
 
   drawFragment(part, answer, onlyChanged) {

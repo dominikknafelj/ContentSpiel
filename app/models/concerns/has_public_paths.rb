@@ -4,15 +4,28 @@
 #
 # Both only when a URL can have changed. The including model names the
 # columns its URLs are built from (`url_inputs_are`), and its `after_save`
-# sync asks `url_inputs_changed_by_save?` first: a save that changed none of
+# asks `url_inputs_changed_by_save?` first: a save that changed none of
 # them -- a title, a body, a hero image, most autosaves -- reads and writes
 # nothing in `public_paths`. A bare `touch` runs no save callbacks at all, so
 # a block write touching its page, or a tag service touching its posts,
 # never gets here.
 #
-# What a record's URLs depend on that is NOT one of its own columns is
-# synced by whoever writes it, never by this condition, and each of them
-# calls `PublicSite::Paths` itself:
+# The record SAYS THAT IT WAS TOUCHED and nothing more: `PublicSite::Paths
+# .refresh(pages: [self])` or `(posts: [self])`. What depends on a touched
+# record is the function's to know (a page's subtree, the posts it gave an
+# address to until now, the posts its list blocks can list from now on), so
+# no caller works out which posts its change could have moved.
+#
+# What a record's URLs depend on that is NOT one of its own columns is said
+# by whoever writes it, in the same way, never by this condition:
+# FOR A PUBLISHED OR SCHEDULED RECORD THAT HAS A COPY, the list blocks of a
+# page and the tags of a post are read from that copy, not from the rows
+# (`PublicSite::Paths.canonical_pages`, drafts spec §5): the block's and the
+# join row's refreshes named below then find nothing to move, and the address
+# moves when the copy is taken (`Publishing::Version`'s `take!` refreshes its
+# record) or, for a copy taken with a time, at the first refresh after that
+# time (`Publishing::Version.settle!`). The entries below are as written for
+# every other record: a draft, and one written around the services.
 # - a tag's *name*, which is what a listing block's `tag` setting matches,
 #   and join rows written around the association: `Tags::Rename`,
 #   `Tags::Merge` and `Tags::Destroy` (a post's own tags coming and going
@@ -20,27 +33,29 @@
 #   also `PostTag`'s own `after_commit`);
 # - the listing blocks that give posts their page (`block_type`, `settings`'
 #   `content_type` and `tag`, the owning page): `ContentBlock#
-#   sync_listed_post_paths`, on every save and destroy of a listing block;
+#   sync_listed_post_paths`, on every save and destroy of a listing block,
+#   which names the block's page;
 # - an ancestor's slug, parent or trash state, and for posts the position
 #   and publication of every page on a listing page's chain: that page's own
-#   save, which syncs its whole subtree and the posts its blocks list
-#   (`Page#sync_public_paths`);
+#   save (`Page#sync_public_paths`);
 # - descendants flagged around the callbacks (`Trash::Move` and
 #   `Trash::Restore` write a branch's members with `update_all`): the
 #   branch root's own save, last, whose `trashed_at` is an input;
 # - siblings renumbered by `Page::TreeRanking#place_among_siblings`
 #   (`update_columns`): the moved page's save, whose requested `position` is
-#   an input, resyncs the posts its subtree lists; the relative order of
-#   every other page is unchanged;
-# - the enabled languages: `Locales::Enable` syncs everything, `Locales::
+#   an input; the relative order of every other page is unchanged;
+# - the enabled languages: `Locales::Enable` refreshes everything, `Locales::
 #   Disable` deletes the language's rows (the default language is no input:
 #   it decides how a link is written, not which rows exist);
-# - time: a scheduled page going live writes nothing (see `PublicSite::
-#   Paths.canonical_page`).
+# - time: a scheduled page or post going live writes nothing; its published
+#   copy is due from that moment and the first refresh after it settles it
+#   (`Publishing::Version.settle!`).
 # `test/models/public_site/paths_test.rb` ("every write path leaves
 # public_paths equal to a full rebuild") runs one step per entry of both
 # lists and compares the table with `PublicSite::Paths.rebuild!` after each;
-# a new input, or a new write path around the callbacks, belongs in it.
+# a new input, or a new write path around the callbacks, belongs in it. And
+# `test/lib/public_paths_entry_test.rb` holds that every one of them goes
+# through `refresh`.
 module HasPublicPaths
   extend ActiveSupport::Concern
 
@@ -117,6 +132,14 @@ module HasPublicPaths
   # Skipped for a stored record none of whose URL inputs is about to change:
   # its paths are the ones it already holds, so it cannot newly clash, and a
   # title-only save computes no path and asks `public_paths` nothing.
+  #
+  # What this cannot see is an address that follows from the record's own
+  # tags: a tag made by the very save that carries it has no id yet, and a
+  # published post is judged by its copy's tags, not by the ones about to be
+  # published. Those are refused by the one check after the record's own
+  # refresh, which rolls the save or the publish back
+  # (`Publishing.keep_address!`); this stays the check that marks the slug
+  # field before anything is written.
   def public_paths_are_available
     return unless url_inputs_changed?
 
@@ -125,9 +148,7 @@ module HasPublicPaths
 
     taken = PublicPath.current.where(path: paths.values.uniq)
       .where.not(record_type: self.class.polymorphic_name, record_id: id).pluck(:locale, :path).to_set
-    paths.each do |locale, path|
-      next unless taken.include?([ locale.to_s, path ])
-
+    paths.select { |locale, path| taken.include?([ locale.to_s, path ]) }.each do |locale, path|
       errors.add(Mobility.normalize_locale_accessor(:slug, locale), :taken,
         message: "gives the address #{path}, which is already taken in #{locale.upcase}")
     end

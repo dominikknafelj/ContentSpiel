@@ -48,6 +48,31 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
       "1 block: #{one_block_queries} queries, 5 blocks: #{five_block_queries} queries"
   end
 
+  # The same for a page served from its COPY: its blocks are rebuilt objects
+  # set as a loaded association, and `preload_page_images` preloads their
+  # images in one batch all the same.
+  test "a page served from its copy with more image blocks doesn't use more statements" do
+    page = create_page(title: "Gallery")
+    add_image = lambda do
+      result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: create_media_asset.id })
+      assert result.ok?, result.errors.to_sentence
+    end
+    path = PublicSite::Urls.new.path_for(page, :en)
+    add_image.call
+    publish_changes(page)
+    get path # warms what the first request of a process loads once
+    one_block = capture_sql { get path }
+    assert copied?(page)
+
+    4.times { add_image.call }
+    publish_changes(page)
+    five_blocks = capture_sql { get path }
+
+    assert_equal 5, controller.instance_variable_get(:@page).content_blocks.size
+    assert_equal one_block.size, five_blocks.size, "1 block: #{one_block.size} statements, 5 blocks: #{five_blocks.size}"
+    assert_equal one_block.count { |sql| sql.include?("media_assets") }, five_blocks.count { |sql| sql.include?("media_assets") }
+  end
+
   test "blog rows show date, excerpt and first tag" do
     post = Post.create!(content_type: :blog, title: "Notes on Hotwire", excerpt: "What stayed simple",
       published_at: Time.zone.local(2026, 9, 12))
@@ -187,7 +212,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 2, position: 0, settings: { "content_type" => "blog" })
     post = create_post(title: "In a column")
     other = create_post(title: "Another post")
-    PublicSite::Paths.sync_posts("blog")
+    PublicSite::Paths.refresh(posts: Post.where(content_type: "blog"))
 
     get "/blog/#{post.slug}"
 
@@ -218,7 +243,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_operator top_level.position, :<, in_column.position
     post = create_post(title: "Listed twice")
     other = create_post(title: "Another post")
-    PublicSite::Paths.sync_posts("blog")
+    PublicSite::Paths.refresh(posts: Post.where(content_type: "blog"))
 
     3.times do
       get "/blog/#{post.slug}"
@@ -242,7 +267,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 0, settings: { "content_type" => "blog" })
     post = create_post(title: "Counted")
-    PublicSite::Paths.sync_posts("blog")
+    PublicSite::Paths.refresh(posts: Post.where(content_type: "blog"))
     built = 0
     original = BlockOutline.method(:new)
 

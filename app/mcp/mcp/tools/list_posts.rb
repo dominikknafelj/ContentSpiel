@@ -15,7 +15,8 @@ module Mcp
       tool_name "list_posts_tool"
 
       description "List posts, optionally filtered by content type. Titles/slugs/excerpts are read in the given locale " \
-        "(default: the site's current default locale)."
+        "(default: the site's current default locale). Each post says `unpublished_changes`: true when a live " \
+        "or scheduled post has edits the site does not show yet."
       annotations(read_only_hint: true, idempotent_hint: true, destructive_hint: false, open_world_hint: false,
         title: "List posts")
 

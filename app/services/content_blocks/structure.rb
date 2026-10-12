@@ -34,7 +34,7 @@ module ContentBlocks
     # Positions 0..n-1 over one container, in its current order.
     def renumber(relation)
       relation.reorder(:position, :id).each_with_index do |block, index|
-        block.update_columns(position: index) unless block.position == index # version: none (every caller touches the owner, whose after_commit bumps for a live page)
+        block.update_columns(position: index) unless block.position == index # version: none (the owner is touched below: its after_commit bumps where its rows are what the site shows, and a page with a copy shows the copy) # changes: none (every caller touches the owner, which marks it)
       end
     end
   end

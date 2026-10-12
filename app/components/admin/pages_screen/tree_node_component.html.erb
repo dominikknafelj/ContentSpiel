@@ -29,6 +29,11 @@
       <%# The chip carries `data-status` itself and renders nothing for Live. %>
       <%= render Admin::Ui::StatusChipComponent.new(status: status, at: page.published_at, hide_live: true) %>
 
+      <%# The rows moved on from what the site shows (`Publishing::State#changes?`,
+          a column already loaded: no statement per row): the warn dot alone, the
+          column is narrow. %>
+      <%= render Admin::Ui::UnpublishedChipComponent.new(compact: true) if page.unpublished_changes? %>
+
       <%# Outdated and missing translated fields (handoff §10 B24), summed over
           the target languages: plain text in a warn / meta ink, nothing at
           zero. `role="img"` + `aria-label` so a screen reader hears what the

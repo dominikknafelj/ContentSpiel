@@ -7,12 +7,13 @@ module Posts
   #
   # 1. Before anything is assigned, against the post as stored: `posts.edit`
   #    to touch an existing post at all, plus `posts.publish` when it's
-  #    already published (live or scheduled). The second is the spec §8
-  #    interim rule: autosave writes live content straight to the public
-  #    site (there are no pending revisions until Phase 3), so editing a
-  #    published post *is* publishing, and needs the same right. A
-  #    scheduled post counts too -- it will go live with whatever it says
-  #    by then, without anyone with `publish` having seen it. A call that
+  #    already published (live or scheduled). The second is the rule
+  #    that the person who may change a published post is the person who
+  #    may publish it (drafts spec D5): a save writes the rows, which the
+  #    site shows only once "Publish changes" has taken a copy, but nobody
+  #    without `publish` is to prepare what someone else then publishes
+  #    blind. A scheduled post counts too -- it goes live with the copy
+  #    taken when it was scheduled, and later changes wait for a publish. A call that
   #    asks for nothing but a publish-state change needs `posts.publish`
   #    alone instead (`#publish_only?`).
   # 2. After assigning, inside the transaction, against the post as it
@@ -39,6 +40,10 @@ module Posts
   # existence check and that write fails the save as "has an image that
   # doesn't exist" (`Media::Choosing#vanished_media_failure`), not a 500.
   #
+  # A post published or scheduled for the first time, or again after an
+  # unpublish, also takes its published copy (`Publishing::Version.take!`)
+  # in the same transaction; a save of a post that has a time takes none.
+  #
   # `attributes:` is an allow-list (`ATTRIBUTES`), and any other key is an
   # `ArgumentError` -- a programming error, raised before anything is
   # checked or written (see `Pages::Save`, which has the same rule for the
@@ -50,6 +55,7 @@ module Posts
   # dropping the key is what makes such a caller find out. A translated
   # attribute belongs in `translations:`.
   class Save < ApplicationService
+    include Publishing::KeepsAddresses
     include Media::Choosing
 
     TRANSLATED = %i[title slug excerpt body].freeze
@@ -87,6 +93,7 @@ module Posts
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = Post.transaction(requires_new: true) do
+        was_unpublished = @post.published_at_in_database.nil?
         related_before = related_state
         assign
         refused = refusal_after_assign
@@ -94,12 +101,16 @@ module Posts
 
         (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
         touch_for_join_rows(related_before)
+        # A post is touched for its tags only when nothing else of it changed;
+        # the mark (a post's tags are in its copy) must not depend on that.
+        Publishing.note_change(@post) if related_before.key?("tag_names") && related_before["tag_names"] != tag_names
         # The body's `image` nodes, every locale (media library design spec
         # §5.1) -- recomputed from the saved post, so an image removed from
         # one locale's body loses exactly that locale's row.
         Media::UsageIndex.refresh(@post)
         # The post's stored translation state (`translation_states`).
         Translations::StateIndex.refresh(@post)
+        keep_address(was_unpublished, related_before)
         record_events(related_before)
         true
       end
@@ -111,11 +122,33 @@ module Posts
       return failure(@post) unless saved
 
       success(@post)
+    rescue Publishing::AddressTaken => e
+      discard_refused_changes
+      address_taken(@post, e)
     rescue ActiveRecord::InvalidForeignKey => e
       vanished_media_failure(e, @post, nil, nil)
     end
 
     private
+
+    # A save that publishes or schedules takes the copy the public site will
+    # show (drafts spec §4.3), after the tags are written (related posts are
+    # not part of a copy), and the copy's refresh refuses when the post
+    # itself would be left without an address (`Publishing.keep_address!`).
+    #
+    # A DRAFT has no copy, and the same check is asked here for the one
+    # clash its validation cannot see: a tag this very save made had no id
+    # when the validation ran, so a list that filters by it did not count
+    # yet. Asked only when the tag set really changed. Not for tags that were
+    # merely sent again: the editor resends every chip with every autosave,
+    # and a draft that another record's write left without an address must
+    # go on saving its text. A live post's tags move nothing until its
+    # changes are published.
+    def keep_address(was_unpublished, related_before)
+      return Publishing::Version.take!(@post, by: actor_user) if was_unpublished && @post.published_at.present?
+
+      Publishing.keep_address!(@post) if @post.published_at.nil? && related_before.key?("tag_names") && related_before["tag_names"] != tag_names
+    end
 
     # Tags and related posts are join rows: changing only those saves no
     # column of the post, so its `updated_at` would not move -- and
@@ -130,7 +163,8 @@ module Posts
       return if @post.saved_change_to_updated_at?
       return if related_state == related_before
 
-      @post.touch
+      # Tags are marked by the caller; related posts are in no copy.
+      @post.touch_without_mark
     end
 
     # Publishing, unpublishing and scheduling need `posts.publish` (design
@@ -169,8 +203,9 @@ module Posts
       "posts.publish" if @post.published_at_changed? && !authorize!("posts.publish", @post)
     end
 
-    # After a pass-2 refusal the transaction has rolled back, but the
-    # in-memory post still holds the refused values -- the attacker's
+    # After a pass-2 refusal, or a refusal for the post's own address, the
+    # transaction has rolled back, but the in-memory post still holds the
+    # refused values -- the attacker's
     # title would become the `access.denied` row's `subject_label`, and the
     # refused tags would linger in `@post.tags`. A persisted post is
     # reloaded to what's stored; a new one only has its join associations

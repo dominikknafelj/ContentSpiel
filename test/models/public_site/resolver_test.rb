@@ -41,6 +41,18 @@ class PublicSite::ResolverTest < ActiveSupport::TestCase
     assert_equal [ :redirect, "/blog/hello", 301 ], [ result.status, result.location, result.http_status ]
   end
 
+  test "the listing fallback asks the page's copy: a list block that is only in the rows redirects nobody" do
+    blog = Page.create!(parent: @root, title: "Blog", published_at: 1.day.ago)
+    blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    archive = Page.create!(parent: @root, title: "Archive", published_at: 1.day.ago)
+    Publishing::Version.take!(archive)
+    archive.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal :not_found, @published.call(locale: "en", path: "/archive/hello").status
+    assert_equal :redirect, @preview.call(locale: "en", path: "/archive/hello").status
+  end
+
   test "drafts are not found publicly and their old paths don't reveal new ones" do
     draft = Page.create!(parent: @root, title: "Secret", published_at: nil)
     Mobility.with_locale(:en) { draft.update!(slug: "renamed") }

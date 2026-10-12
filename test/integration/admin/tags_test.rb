@@ -115,11 +115,12 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "rails" } })
     post = create_post(title: "Hi", tags: [ "rails" ])
     tag = Tag.find_by!(name: "rails")
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/rails-posts/hi", post.full_path("en")
 
     patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "ruby" }, base_updated_at: tag.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
+    assert_match(/SAVED( · NOT PUBLISHED)? \d\d:\d\d/, response.body)
     assert_equal "ruby", tag.reload.name
     assert_nil post.reload.full_path("en")
   end
@@ -187,6 +188,8 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
       assert_select "[data-controller='admin--ui--chip-input'][data-admin--ui--chip-input-single-value='true'][data-admin--ui--chip-input-create-value='false']"
     end
     assert_select "dialog#merge-tag-dialog footer button[type=submit][form='merge-tag-form'][disabled]", text: "Merge tags"
+    assert_select "dialog#merge-tag-dialog [data-merge-published-lists]",
+      text: "A merge changes published lists at once, without “Publish changes…”: lists that show either tag then show the posts of both, and a post with either tag can move to another address."
     # The picker's controls never sit inside a row's autosave form.
     assert_select "form[data-controller='admin--saving--autosave'] [data-controller='admin--ui--chip-input']", count: 0
     assert_select "dialog#delete-tag-dialog button.bg-danger", text: "Delete tag"
@@ -220,6 +223,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "rails" } })
     post = create_post(title: "Hi", tags: [ "rails" ])
     tag = Tag.find_by!(name: "rails")
+    follow_rows! # the service's own sync, which acts on the rows: with copies nothing moves until they are published
     assert_equal "/rails-posts/hi", post.full_path("en")
 
     delete "/cs-studio/tags/#{tag.id}", as: :turbo_stream

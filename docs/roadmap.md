@@ -6,6 +6,16 @@ How to read it: **Next** is the agreed order of sub-projects. **Before the first
 
 Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), code-structure review (`docs/architecture/2026-09-26-code-structure-review.md`, findings `#N`, sections `§N`), staff review (`docs/architecture/2026-10-04-staff-review.md`, findings `S`, `M`, `L`, `D`, `C`, `O` plus a number), and the specs under `docs/superpowers/specs/`.
 
+## Version 1: a solid foundation
+
+Decided by the owner on 2026-10-11: the first stable version is the focus, and everything else on this roadmap is sorted after it. Version 1 is five things; the order is the order of meaning, not a schedule.
+
+1. **Editing is safe.** Live editing (shipped, PR #66) and drafts of live content (shipped 2026-10-12, under "Shipped"): two people can work on one page, and nothing typed into a live page reaches visitors by itself.
+2. **Theming as a real mechanism.** A site is its own repository with a theme folder layered onto the CMS image ("Next", item 2, D9 and D10). `THEME_PATH` exists only on a throwaway branch (the spike), not in the CMS.
+3. **It can be hosted properly.** The items under "Before the first deploy" move ahead of features, beginning with the gaps the dry run found ("Hosting and the dry run" there).
+4. **The documentation site runs in public.** `contentspiel-docs` ("Next", item 9) is the first real integration, and is used as the prototype that finds the gaps in 2 and 3.
+5. **Pages as nodes in the mind graph** (the owner's decision): the graph shows posts and tags today; pages join it.
+
 ## Decisions already made
 
 | Decision | Detail |
@@ -16,7 +26,6 @@ Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), c
 | Independent CSS | Product UI and public theme are separate Tailwind builds with separate tokens (`--cs-*` and `--th-*`); the demo look is only the default public theme. |
 | One PR per body of work | Bugfixes and features of a round ship together; no production exists yet. |
 | Two repositories | `ContentSpiel` is the CMS and holds no guide text. `contentspiel-docs` is the documentation site: its content, its theme and its hosting, and the first real integration of the CMS ("Next", item 9). There is no third repository. |
-| Live edits go live | CS Studio autosaves straight to the record; drafts of live records wait for versioning (see "Versioning"). |
 
 ## Shipped
 
@@ -41,6 +50,7 @@ Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), c
 | Presence (step 2 of "Collaboration on content"): who else has a page, a post or a library image open, as initials in the editors' header and the media panel and a marker in the page tree and the posts list, live over the cable; with the three seams it stood on, extracted from notes — a registry of record kinds, a live core on the server (`Live::Signals`, `Live::RecordChannel`) and in the browser (`live/connection`, `live/state`), and screen slots — and the notes script split into four files first | `2026-10-10-presence-design.md` (§9 "As built" lists where the build left the spec; the look is `2026-10-10-presence-handoff.md`; `docs/reference/presence.md`) |
 | Source layout cleanup: every CS Studio screen has one shape (components in `Admin::Ui` or a screen folder, scripts in `controllers/admin/<topic>/` with their modules in `app/javascript/<topic>/`, one locale file per component folder); no behaviour changed, guarded by `test/lib/source_layout_test.rb` | `2026-10-10-source-layout-cleanup-design.md` |
 | Live refresh and edit reservations (step 3 of "Collaboration on content"): what someone saves appears in every other open editor of that page or post without a reload, fetched part by part and merged around every form that holds unsaved text, with "Updated by …" on the card for a few seconds; and a block, a page's settings or a post that someone is changing is theirs for two minutes after their last saved change, read-only for everyone else with a strip that names them, who can take it over without anybody's text being lost (the holder's tab sends what it has and lets go; a tab that does not answer in five seconds is passed over and keeps its text for copying). The page settings form got a base of its own, so a colleague's block save no longer refuses it; the holder's avatar on a section's tile and the notes marker moved onto a slot on the block | `2026-10-11-live-editing-design.md` (§10 "As built" lists where the build left the spec, with the wording nobody designed; the look is `2026-10-11-live-editing-handoff.md`; `docs/reference/live-editing.md`) |
+| Drafts of live content: nothing typed into a published or scheduled page or post reaches the public site by itself. Autosave writes the rows; the site draws a published copy taken by "Publish changes…" (now or at a time, with an overview of what changes) and "Discard changes…" returns the rows to it; a scheduled change can be cancelled. A live page's slug is its own confirmed form. Addresses, the content version, the sitemap's dates and the images in use follow the copy, and two guards hold that nothing public reads a live record's rows. Every publish keeps its copy | `2026-10-11-drafts-of-live-content-design.md` ("As built" says where the code departed from it; `docs/reference/publishing.md` carries the lifecycle table) |
 
 ## Next, in order
 
@@ -70,6 +80,10 @@ Agreed 2026-10-04; reordered 2026-10-08, when the block and type catalogue becam
 8. **More tools in the MCP server** (Should; added 2026-10-10 by the owner). The server has six tools today, all for posts and the media library (`list_posts`, `get_post`, `create_post`, `update_post`, `list_media`, `get_media`), so an AI client can neither read nor build a page, see or write a note, upload an image or restore anything. This step starts with a look at what an assistant should be able to do in CS Studio and in which order, then builds it as one sub-project. The candidates, each already listed where its area is: page and block tools (under "Sections", in the gaps: they carry a block's section and column on create and move and report them on read); notes tools ("Collaboration": list a record's open threads, read a thread, start one, reply; the twelve `Notes::` services take any actor already); uploads ("Media"); trash tools (list, restore, purge); and `list_posts` paginated, without rendering bodies. To decide in its brainstorm: whether a note or an edit made through a token is marked as written by an assistant (the screens cannot show that today), and whether an assistant may mention people, which notifies them. Not part of it: the MCP tool registry for plugins (that stays with "Plugin API v1") and AI tools over MCP (deliberately not planned, see "AI").
 9. **The documentation site, as the first real integration** (Should; decided 2026-10-11, D2 and D11). The guide for editors, administrators and integrators is not kept in this repository: shipping it with the CMS would be a weight every change carries. It is one repository of its own, `contentspiel-docs`, the documentation site: its content, its theme and its hosting. (It was first planned as two, one for the text and one for the theme and the deployment; that was simplified, and there are two repositories in all now, this one and that one.) The site itself is a real ContentSpiel installation with its own theme folder, which makes it the first user of theming (item 2) and the place where "its own look without forking" is proved. It waits for theming and for the catalogue, and brings the documentation blocks. State on 2026-10-11: 34 of 50 pages written (23 for editors, 11 for administrators); 4 administrator pages wait for the owner (install, go-live, backups, upgrading), 11 integrator pages are unwritten (6 of them wait for theming), and one editor page is reserved for live editing. Its rule in this repository is in `CLAUDE.md`: a change that alters what a person sees or does names the guide pages it affects in its pull request under "Documentation", or says "none"; live editing's pull request is the first to follow it. In the docs repository, to build: each page's front matter names its sources in this repository and the commit it was last checked against, and a script lists the pages whose sources changed since and checks that every quoted on-screen word still exists. What the writers found untrue in `docs/reference` was corrected with live editing; what they found wrong or awkward in the product is "Found while writing the guides" in the backlog. Still to confirm with the owner or on a real deployment before the administrator pages can be finished: where outgoing mail is configured; how an administrator opens a console on the production server (the System status screen's password command needs it); whether `sitemap:create` runs after a deploy or on a schedule (nothing runs it today, by the writers' reading); how to back up and restore; when a group change takes effect for someone signed in.
    - **Decided since (recorded 2026-10-11, with live editing's final review).** The documentation blocks it brings are two. A **"Code" block**: plain-text source, a language, an optional file name and a copy button; the same code in every language of the site, only the caption translated; coloured on the server; the syntax colours are theme tokens. A **"Note" block** (tip, warning). And the **integrator documentation gets a block and template reference** generated from the block types' own declarations and shown from the component previews, so that it cannot drift from the code as a hand-written page would.
+   - **Its fourth section, "How ContentSpiel is built"** (about ten overview pages, each naming a `docs/reference/` document as its background): the architecture in prose for integrators and contributors, including the lifecycle of a page or post (the states, what a visitor sees in each, what each action does; its source is the table in `docs/reference/publishing.md`) and how the admin's components are organised (see "Structure" under "Technical health").
+   - **Tables** belong with the two documentation blocks above: in rich text or as a Table block (open).
+   - **What the documentation theme asks of the CMS** (from its design, 2026-10-11; requirements for the theme contract and the catalogue): the page tree of one section at any depth with the current page marked; a group heading in that tree that is not a page; previous and next page in tree order; a page's ancestors; an article's headings as a list, with an id on each heading; a page's summary as its own field and a page's children with their summaries; search over titles and text by a plain GET form with a results page; a layout wider than one column, chosen by the theme; a header link that leaves the site; the product's version printable by a template and, per page, the version it was checked against; a frame option on an image for screenshots; a place for a theme's own small script (a copy button). The code colours are seven syntax roles as theme tokens (light and dark) and `--th-note-line`.
+   - **Links (D13).** A button or card links to a page or post of the site, picked from a list and stored as a reference (it survives renames and moves, follows the visitor's language and disappears when its target is trashed or unpublished), or to a typed external address; external opens in the same tab unless the link says otherwise, always `rel="noopener"`.
 
 ## Before the first deploy
 
@@ -105,6 +119,23 @@ Then, Should: caching as a per-instance setting under Settings (the shared lifet
 | Guards against the performance problems returning: N+1 detection raising in tests, and query-count assertions on a public page render and a page save | Should | O5 |
 | Structured logs tied to traces; a jobs dashboard and failed-job counts on System status; browser errors reported to the server; a cache hit rate; `/up` that checks the database | Should | O3, O4, O6, O7, O8 |
 
+### Hosting and the dry run (2026-10-11)
+
+A dry run of hosting the documentation site (`contentspiel-docs`: `GAPS.md` and `hosting/research.md` hold the detail) found what a stranger would meet. The CMS's Kamal files are Rails' boilerplate and go when the real deploy files exist in `contentspiel-docs`: the CMS stays agnostic of deploy details, and what it asks of its host becomes a page of the administrators' guide, with the value and a comment in code as that page's source. The blockers, in the order they were ranked (all Must, like the rest of this section):
+
+| Item |
+|---|
+| Themes from outside exist only on a throwaway branch (`THEME_PATH`); the CMS cannot load a site's theme folder ("Next", item 2) |
+| The `Host` header is trusted: `og:url` and `hreflang` follow whatever host the request names; the site's address should be a setting |
+| No HTTPS settings: the session cookie is not `Secure`, there is no HSTS (`assume_ssl`, `force_ssl` and the proxy's `ssl` are commented out) |
+| Telemetry prints every span to the log in production when no exporter is set, and the request's full address reaches it: a note's quote travels in a URL, and a password-reset token appeared in the log |
+| Mail is unconfigured, and the reset screen says a link was sent when delivery failed ("Next", item 4) |
+| The sitemap is built by hand, is lost when the container is recreated, and `/sitemap.xml` answers 404 |
+| The four databases (primary, cache, queue, cable) need four addresses, which nothing documents |
+| No published image and no version number: an installation cannot say which ContentSpiel it runs, and a guide page cannot say which version it was checked against |
+| No supported way to load content into a running site (the demo site is loaded by a script of the docs repository) |
+| The setup wizard never asks for the site's address, tests no mail and no live connection, and ends without saying what is left; it is meant to help a stranger with exactly this |
+
 ## Product backlog (Phase 3)
 
 What comes after the admin; code comments and `CLAUDE.md` call it "Phase 3". Grouped by topic. Nothing here is ordered or scheduled.
@@ -113,10 +144,46 @@ What comes after the admin; code comments and `CLAUDE.md` call it "Phase 3". Gro
 
 | Item | Priority | Notes |
 |---|---|---|
-| Versioning: revisions and restore, with pending revisions (drafts of live records) | Must | §7.3. Audit snapshots are the version basis; they keep a translation source's digest but not its text, so a restore can't reproduce a word diff's "before". Closes the largest group of known gaps (see "Closed by versioning") |
+| Versioning: revisions and restore. **Pending revisions (drafts of live records) shipped 2026-10-12** ("Shipped"; every publish keeps its copy). Still to do: a history screen, restoring an earlier version, comparing two versions. Remove the rows fallback for a live record with no copy (the application cannot create one; the helper `follow_rows!` props about fifteen tests on it), as its own piece of work. Publish now on a scheduled record publishes what was scheduled; whether it should instead offer to publish the later changes with it is the owner's to decide | Must | §7.3. Audit snapshots are the version basis; they keep a translation source's digest but not its text, so a restore can't reproduce a word diff's "before". Closes the largest group of known gaps (see "Closed by versioning") |
 | Publishing workflow: review and approval, draft comments, edit lock, scheduled unpublish | Should | Needs pending revisions. Comments and edit reservations come first, with collaboration ("Next", item 1) |
-| Release management: bundle changes to several pages and posts, preview the whole site with the release applied, shareable preview links, publish atomically | Should | A release is a set of pending revisions |
+| Release management: bundle changes to several pages and posts, preview the whole site with the release applied, shareable preview links, publish atomically | Should | A release is a set of pending revisions. Since 2026-10-12 that is a set of published copies that come into force together: one `live_at` for several records is already possible; what is missing is a name for the group and a preview of the whole site with the copies applied (below) |
 | Approval chains for releases: steps that specific groups must approve, defined in the admin by authorised groups, recorded in the audit log | Should | Needs releases |
+
+#### Release management: what drafts of live content settled for it, and what it left to it (2026-10-11)
+
+The first learning, in the owner's words (2026-10-11): "we need to remember what good ux is and releasing when people draft or 'doodle' is not good UX". Autosave wrote the live record from 2026-09-27 on; it was written down as interim in the design, on the roadmap and in the editor's own header, and it still stood for two weeks, because it was weighed as a technical trade-off and not from the seat of the person typing. For everything below, and for release management as a whole: what a person does while working (typing, trying, rearranging) and what the public sees are separate, and the step between them is theirs to take, on purpose, with a view of what will change. An interim behaviour that breaks that is not acceptable as interim.
+
+What a release is made of, now that the pieces exist:
+- A release is a set of published copies, one per page or post (`published_versions`), that become current together. A copy already carries the time it goes live (`live_at`) and is picked at read time by the clock, so "publish atomically" is several copies sharing one `live_at`; no job has to fire. Today there is at most one future copy per record, and nothing names a group of them: a release is that name, with a way to cancel or move the whole group.
+- The overview in the "Publish changes…" dialog (`Publishing::Changes`: blocks changed, added, removed, moved; the record's own fields; languages) is one record's part of a release's contents. A release's screen is that overview across its records.
+- Every publish keeps its copy, so "what did the site look like before this release" and rolling a release back are reads of copies that exist. A history screen and restore are not built.
+
+Decisions deferred to release management, each with the reason it was deferred:
+- **Who prepares and who approves.** Rights were left as they are (whoever may change a live record may publish its changes; editing a live record still needs the right to publish). The split belongs here: an author prepares, someone with the publish right reviews the overview and approves. The staff review of 2026-10-04 suggests one `AccessControl.edit_keys(record)` to drop the publish-to-edit rule. The guide's writers found the cost of today's rule: the seeded Author can read every post and cannot touch one once it is live.
+- **Slug, place in the tree, and whether a record is published at all** stayed immediate actions. In a release they are pending changes like any other: a page moved, renamed or first published together with the pages that link to it. That needs addresses (`public_paths`) derived from copies, redirects for the old address, and the menu and sitemap following the release.
+- **Per language.** A record is published in every language at once and missing optional fields fall back silently ("missing" counts required fields only). A release could carry one language of a record, or refuse to go out while a language it names is incomplete.
+- **Several records that depend on each other.** A post list's settings are part of the PAGE's copy and a post's tags are part of the POST's copy, so the two can be published at different times and disagree for a while (a list filtered by a tag the post does not publicly have yet). A release publishes both together; so does a tag rename or merge, which today acts at once and can empty a list.
+- **Preview of the whole site with the release applied, and a shareable link to it.** Preview shows one record's working rows today; its lists show published posts only.
+
+What step 3 (live editing) adds to it:
+- Publishing changes while a colleague holds unsaved text publishes what was saved and says so; discarding is refused while someone holds part of the record. A release should show, per record, who is still editing it, and decide whether it waits for them.
+- Bulk publish in the posts list is a small release without a name: it already skips posts someone is editing and reports them.
+
+For the interface to other programs:
+- The MCP server's `update_post` leaves a live post with unpublished changes unless called with `publish_changes`; a release needs tools of its own (list what is pending, publish a set).
+
+Costs seen while building drafts that a release will meet again:
+- Discarding brings a deleted block back as a new block, without the notes that were on it. Rolling back a release has the same limit unless deletion becomes pending too.
+- About 200 tests name publish, live or scheduled; the ones that pinned "an edit of a live record is public at once" were rewritten. A release will touch the same set.
+- No test may assert a duration (four did in step 3 and failed on CI); scheduled copies are tested by moving the clock.
+
+What the dry run of drafts of live content adds (2026-10-12):
+- **Releasing the whole site as one release is the target shape**: all copies and all addresses switched together, and a scheduled change is a release with a time. `PublicSite::Paths.refresh` then becomes "apply a release".
+- **A workflow for a release, not for a record.** The `state_machines` gem is an option to weigh for a RELEASE's workflow (prepared, in review, approved, released). It is not for a record's publishing state: `Publishing::State` derives that from three facts and stores nothing, on purpose.
+- **A tag rename marks every carrying post as changed**, and a discard cannot clear that mark until the name is published (a rename of a tag with forty posts is forty marks and no action to publish them together): a release of tag changes is what this wants.
+- **A publish that takes another record's address away is announced, not refused** (the publish dialog names the records; the record's own address is the only one that refuses). The owner may want it refused: the rule is one place (`Publishing.keep_address!`).
+- **A discard brings a deleted block back without its notes** (already named above); a release's rollback has the same limit.
+
 
 ### SEO, navigation and the public site
 
@@ -255,6 +322,30 @@ Reported on 2026-10-11 by the writers of the editors' and administrators' guides
 | AI assistant | Anyone signed in can create a token for themselves (checked: a person without `tokens.manage` sees and creates their own) |
 | Settings | The time zone's help reads "Used for scheduled publishing." (checked), but the zone is every time CS Studio shows, while the public site shows dates in UTC ("Public-site dates in the site time zone" above); the AI provider is shown as its raw key ("anthropic") |
 | Audit log | Its snapshots are full copies of a page's or a post's text, kept for ever ("Audit log export and retention" above) |
+| Toasts | A warning toast never hides itself |
+| Labels | Field labels are capitalised by CSS, so searching the code for what the screen shows fails |
+| Presence | Nothing links "someone is here" to "Changed elsewhere": a colleague's presence says nothing about a save that will be refused |
+| System status | The command that resets a password needs server access that no document describes |
+| Audit log | An event's time cannot be set through the services, so demo activity is all "just now" |
+| Reference documents | `setup-wizard` spec §4 step 8 still says the wizard redirects to Avo (it is `admin_root_path`, "Setup complete.") and step 5 says languages are read-only (en/de/es) where the step offers all 38; `docs/reference/users-groups-tokens.md` does not say that an admin changing someone's password ends all that person's sessions; `docs/reference/access-control-and-audit.md` does not say `session.failed` stores the typed email in its metadata; `docs/reference/settings-languages-ai.md` does not list the Publishing card's one field ("Keep trashed items for N days") |
+
+### Found building the demo site (2026-10-11)
+
+By the demo site "Studio Nordlicht" (`contentspiel-docs`, `bin/demo`), with real content in CS Studio. All Could unless a row says otherwise.
+
+| Screen | Item |
+|---|---|
+| Page tree | A title beside a state chip is cut to almost nothing ("Workshops" with the Scheduled chip reads "W.") |
+| Page tree | The tree scrolls away with the editor: an empty strip stands beside a long page while the header stays |
+| Mind graph | It opened at 139% and Fit kept 139% (to verify in a foreground tab); labels are cut at the edges and under the zoom buttons |
+| Mind graph | Several tag nodes and a post node are drawn with no label; the legend lists Resume entry and Now update although such nodes cannot appear without a tag or a link |
+| Translation pair | At 1440px wide the original is stacked above the field; side by side only wider, and then the original is on the right where the guide says left |
+| Dashboard | It has five cards; the guide says four |
+| Media panel | The title is flush against the top border; ALT is a one-line field that cuts a sentence |
+| Media | On first load the tiles are grey for seconds while thumbnails are generated |
+| Post list block | LIMIT is very narrow and hard against the card's edge |
+| Languages | Switching a language on marks every image and post missing (38 for Deutsch on a 13-page site), which drowns the real work on the dashboard's card |
+
 
 ## Technical health
 
@@ -301,6 +392,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 |---|---|---|
 | One shared `fetchStream` helper, and one `AccessControl.edit_keys(record)` for the "published needs publish" rule (written out five times) | Should | M6 |
 | One segmented-control component (drawn by hand on four screens) | Could | Round 3 |
+| `notes_screen` (20 components, 13 of them entered from outside the folder) and `editor_screen` (30) have no single root: notes is a feature shown in many places, not a screen. Whether to split them into subfolders is a question for after version 1; the documentation site's architecture section will carry a table of entry points per folder, generated from the code | Could | Source layout |
 | Split `admin/translation/translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; `admin/editor/blocks_controller.js` (over 1,100 lines: the remembered orders, the menu moves with their dialog and focus rule are separable units) and the stream helpers of `Admin::ContentBlocksController` (a streams object); unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7, sections |
 | Notes, written more than once: the frame-params expression (six places), `add_note_item` (card and tile), the inbox sentence's three cases and the read of `X-Notes-Tab` (component or concern, and `NoteInboxController`), `NotesForYou::KINDS` and `Admin::NotePathsHelper::TYPES`, the avatar's classes and initials (`AvatarComponent`, the composer's picker, `card_notes.js`), the disabled state of a message's reaction chips (the component, and `takeReactions` in the browser: the most fragile copy, no test compares the two), `"cs-notes-open"` (the script and the layout's head script), `FOCUSABLE` (two different lists under one name), the burst's 10 seconds, "this tab" (`TAB` in both body controllers), "a message being worked in" (three selectors), "is there a draft" (the composer and `note_unsaved`), the shape `…/threads/<id>` (two scripts), and the 1024px breakpoint (the stylesheet, Tailwind's `lg:` and one `matchMedia`; a resize across it with the drawer open is not handled). `signal.thread_id` is carried through three functions to an event detail nobody reads; `Deliveries.write` is public; `"list"` in `Notes::Thread::ORIGIN_VIEWS` is reserved and unused | Could | Notes, final review |
 | Rename `data-notes-live` and `await_notes_live` (they say "notes" and now cover presence's and live editing's subscriptions too) and the header `X-Notes-Tab` (every write of an editor carries it now, and `Current.editing_tab` is read from it), and move the icon buttons from `title` to the shared tooltip (`Admin::Ui::TooltipComponent`), one sweep; the tooltip then also needs a vertical collision check (it checks the window's and a clipping box's edges sideways only) | Could | Presence |
@@ -320,6 +412,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | Mouse drag in the page tree and block list (SortableJS's fallback) was never hand-tested in Firefox | Could | Round 1 |
 | A full system run prints Cuprite's "Modal window with text `` has been opened" once, among the media picker tests (`test/system/admin/media_picker_test.rb`) and never from the sections tests alone: find which test opens a dialog nobody answers | Could | Sections |
 | The coverage report (`COVERAGE=1 bin/rails test`) lists about 66 files at 0% that are loaded while the app boots, so its total (85.65% on the sections branch) understates: 98.7% of the lines it did measure are covered. Find why those files are not measured (`test/test_helper.rb`: where `SimpleCov.start` runs, and whether the parent process's result is merged with the workers') before a minimum is set | Could | Sections |
+| Measured again on `main` (2026-10-11): the report's headline (86.7% of lines) counts 80 files loaded before the test workers fork (`page.rb`, `post.rb`, `access_control.rb`; 1,775 lines) as never run; of what it does measure, 99.0% of lines and 91.2% of branches are covered. Fix the measuring first, then consider a minimum | Should | Coverage |
 
 | Live editing, tests that were not written: a claim whose page was replaced before its answer came (`isCurrent()` in `admin--editing--hold#claim`; it needs a restoration visit); a release followed by a claim, coalesced into one read, not being announced as a take-over; the media picker as the open dialog that keeps a card from being replaced (the rich-text dialogs and the menus are tested); the page tree's move carrying the tab header in a browser (its source is held by `test/lib/editing_tab_header_test.rb`); the real clipboard ("Copy my text" is tested against a stubbed `navigator.clipboard`). Nothing was run in Safari, and a hidden holder tab whose timers the browser throttles (its renewals and its hand-over) has no test. From the final review: no test exercises a clean unit that is reconciled in place because a strip slot inside it shows an alert (after a failed Discard; traced as harmless); `await_live_part` gives up after 8 s where the live script's own read gives up after 10 s per GET, so under heavy load an editor test can fail before the part would have answered by itself; `test/lib/editing_tab_header_test.rb` is a source grep that passes for a file with the header once and a second write without it; and `test/system_test_seconds.yml` lists none of the six live-editing files, which the shards therefore weigh by their number of tests (measure again from the next CI log) | Could | Live editing |
 
@@ -364,10 +457,38 @@ Knowingly shipped incomplete, and fine while tracked here. Grouped by what close
 
 ### Closed by versioning
 
+The first two of these shipped on 2026-10-12 with drafts of live content: a save no longer goes live, and editing a published record needs `publish` because the person who may change it is the person who may publish it (`docs/reference/publishing.md`).
+
 - CS Studio autosave writes straight to the record: edits to a published page or post go live as the editor types (the editor header says so).
 - Editing an already-published page, post or block therefore needs `publish`, not only `edit`.
 - A save the server processed but whose answer was lost is retried on the old base and gets a final "Changed elsewhere" refusal, locking the editor out until Reload. Per-record version columns would close it too.
 - An edit typed between a header action's submit and its redirect is refused unseen; an edit typed during an in-flight save followed at once by Back or Forward is dropped.
+
+### Drafts of live content
+
+Left by drafts of live content (spec "As built"; `docs/reference/publishing.md`). None loses saved data.
+
+- **A published record with no copy is served from its rows.** Chosen so that a record made around the services (a console, and 1,098 direct creations in the tests) keeps working. It follows typing until someone presses "Publish changes…" once. A guard holds only that `published_at` is assigned in the two save services.
+- **Addresses.** A yielder is healed when its holder is a page, not when a post yielded to a post, nor a yield in one language only, nor a page that yielded (`bin/rails public_paths:rebuild` heals each). A scheduled change of a post's own tags onto a taken address yields at its time instead of being refused. The dashboard does not list live records without an address. A slug or a move does not move a copied record's sitemap date.
+- **The tree's dot does not follow a block write** until the list is read again, and an empty block save marks its page.
+- **A post's 304 still rebuilds its copy** (a page's reads the copy's id only).
+- **`media:reindex` drops a superseded copy's usage row** that the incremental path keeps until the next copy; the images of a copy that a scheduled change replaced by the clock stay "in use" until the next publish of that record.
+- **MCP's `publish_changes` is not atomic with the edit**: when the publication is refused the edit stays saved and the answer says both.
+- **A possible deadlock of a post's discard against a concurrent tag write**, two pairs: with `Posts::Save` (the discard takes the post's row, then `Posts::Save` writes `post_tags` before `posts`, as it does against another `Posts::Save`) and with `Tags::Merge` (a merge locks both tags, then inserts a `post_tags` row that needs the post's row; the discard holds the post and needs a tag). One side gets `Deadlocked`, nothing is lost; not reproduced. Locking the post `FOR NO KEY UPDATE` removes the second pair only; the first is `Posts::Save`'s own order.
+- **A post's slug stays in its autosaving form**: on a live post a typed slug moves the address at once, the surprise the page's form no longer has. And "SAVED · NOT PUBLISHED" also stands for a post's slug save, which is public at once.
+- **An open editor's dialogs are read when they open**: a colleague's publish or discard refreshes the header's chip, but the overview is read when a dialog opens, not when a colleague saves; whether the cancel dialog and its menu item exist is from the page view; a draft published in another tab shows its slug field until a reload.
+- **The lost addresses are foreseen for now**, also when "At a time" is chosen; a clash that exists only at the later time is not shown.
+- **A discard recreates a deleted block with a new id**: its notes are gone, and a colleague's open editor draws it as a new block. A block whose type left the registry cannot be recreated, and the discard then fails with that message. Someone without `media.upload` cannot discard a changed image, and the refusal is not audited.
+- **"Moved" in the overview is a rule of thumb**: now and then two blocks that swapped are named as one moved, never a change missed.
+- **After a tag merge or rename the mark stays after every discard of a carrying record** (with the sentence) until someone publishes; there is no "publish all of these".
+- **The publish dialog's date field is always visible** and used only with "At a time" (a time typed there selects it).
+- **Two primary buttons** stand side by side on a scheduled record ("Publish now" and "Publish changes…"). "Publish now" there publishes what was scheduled, not what is on screen: later edits stay unpublished changes, and the answer says so ("Published as it was scheduled. The changes made since are not published yet: “Publish changes…” publishes them."). The same holds for bulk publish (which does not say so) and MCP's `update_post(published: true)`.
+- **The mark outlives typing and typing back.** The overview says "Nothing to publish" but writes nothing, so the "Unpublished changes" chip stays until someone presses Publish changes or Discard changes, which find nothing and clear it.
+- **The first copies of an existing database protect no image until `bin/rails media:reindex` is run**: the migration writes no `media_usages` rows of role `published` and prints a line saying to run it. Until then an image only a first copy shows can be trashed or deleted, and a later "Discard changes…" of that page can fail on it.
+- **Smaller findings of the whole-branch review, left**: `page.changes_published` and `post.changes_published` are named as the cause of a refused stale save (they are not in `Dashboard::Feed::NOT_A_CHANGE`, which `Audit::ChangeSince` reads; a second list is the cleaner fix); publishing again after an unpublish derives a post's addresses once from the old copy, which leaves a redirect row and one second version bump; the overview can answer 500 when a colleague deletes a block between its two reads (and computes the changes twice); the refusal sentences of the publishing services are English literals, not locale keys; someone without `media.upload` cannot discard a changed image and nothing says so before the press; a merge rewrites `tag_ids` and not `snapshot["tags"]`.
+- **Translation bookkeeping is not copied back by a discard**: where the original's text goes back a translation can read "outdated" although the pair is what it was when published.
+- **The readers guard is a list and a pattern**; the canary is the real guard (`docs/reference/publishing.md`). The mark's guard is per file.
+- **Wording that nobody designed** is in use (the pull request lists each string and place): to put to the design project in one go.
 
 ### The write queue and Turbo
 
@@ -531,6 +652,7 @@ Left by the live-editing sub-project (spec §10; `docs/reference/live-editing.md
 - **For a page, a refused settings save can say "Changed elsewhere." where it could name someone**: `Audit::ChangeSince` counts only the page's own events, which is right for the cause and loses the name when the event that moved the base is not one of them.
 - **The three rules without a behaviour test have static guards with stated limits** (final review): an id on every ancestor of a unit is held for the markup the server draws, not for what a script does to it afterwards; "every version through `Editing.version`" and "a reservation's statements in autocommit" are source greps (`test/lib/editing_guards_test.rb`), and the second cannot see a transaction opened further up the call stack than the caller's own file. A test that runs a claim on a second connection inside a caller's request would be the real guard.
 - **Small things the final review named and left**: `Editing::Reservation::FREE` is a SQL fragment in a plain constant, which the `# sql:` guard neither sees nor lets be marked; `admin--saving--autosave#announce` serialises the whole form on every input event (fine for today's forms, worth knowing for a long rich-text body); `Editing::TakeOver#take` retries a lost race up to three times where the row lock makes a second loss all but impossible; and `holdTurboRequest`'s `before` and `baseIds` options (`saving/queue_core.js`) have no caller since the tree's base forwarding went.
+- **What the guide's writer found hard to explain because it is hard to use** (2026-10-12): the first change claims a block but nothing shows the claim to its owner; a claim lapses after two minutes with no sign to either side; whether a take-over saves the other person's text depends on their tab, and the requester cannot tell; "You're editing this in another tab" can stand for two minutes after a reload with one tab open; there are three different rules for what a hold refuses (a save, an instant action, a discard); and one conflict appears in three wordings.
 - **The tests that were not written** are in the Tests table under "Technical health" ("Live editing, tests that were not written").
 
 ### Accepted as they are

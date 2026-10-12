@@ -1,13 +1,32 @@
-# Derives and stores every public URL (spec §5.4). Called from model
-# callbacks (HasPublicPaths) rather than from services on purpose: CS
-# Studio, seeds and fixtures-built data all save through ActiveRecord, and
-# every one of those writes has to leave the URL table correct.
+# Derives and stores every public URL (spec §5.4). Whoever writes something
+# an address depends on calls `refresh` in its own transaction: the models'
+# callbacks for what a save of theirs changes (`HasPublicPaths`,
+# `ContentBlock`, `PostTag`), so that CS Studio, seeds and fixtures-built
+# data, which all save through ActiveRecord, leave the URL table correct;
+# and the few writers that go around the callbacks or decide more than one
+# record (taking a published copy, the three tag services, `Posts::Save` for
+# a draft's new tag, `Locales::Enable`).
+#
+# ONE ENTRY POINT: `refresh`. Whoever writes something an address depends
+# on says what it touched; `rebuild!` is the same function handed
+# everything, and the clock's job hands it nothing and lets it settle.
+# Everything else here is read by others (`current_path`, `compute`,
+# `canonical_pages`, and `foresee`, which tries a publish and keeps nothing)
+# or is a step inside `refresh` that nothing outside this file calls
+# (`test/lib/public_paths_entry_test.rb`).
 module PublicSite
   module Paths
     # One address that differs from what is stored: the record's current row
-    # in `locale` (`row_id` and its path `from`, both nil when it has none)
-    # and the path it should have (`to`, nil for none).
-    Change = Struct.new(:record, :locale, :row_id, :from, :to)
+    # in `locale` (`row_id` and its path `from`, both nil when it has none),
+    # the path it should have (`to`, nil for none) and, for a post, the id of
+    # the page that path runs through (`listed_on`).
+    Change = Struct.new(:record, :locale, :row_id, :from, :to, :listed_on)
+    # What `foresee` answers: the addresses a publish would take away and
+    # those it would move (rows of plain data, see there). `nothing` is the
+    # answer for a caller that knows without trying.
+    Foreseen = Data.define(:lost, :moved) do
+      def self.nothing = new(lost: [], moved: [])
+    end
 
     module_function
 
@@ -33,10 +52,6 @@ module PublicSite
       when Post then post_paths([ record ]).fetch(record)
       else Locales.enabled.index_with { nil }
       end
-    end
-
-    def sync(record)
-      write_all({ record => compute(record) })
     end
 
     # A page and everything below it, in a number of statements that doesn't
@@ -77,9 +92,9 @@ module PublicSite
     # branch `Trash::Move` has just flagged (its members with `update_all`,
     # the root saved last) deletes every member's rows.
     #
-    # The top page is the object the caller holds -- inside its own
-    # `after_save` that is the record as just written -- and everything below
-    # is read from the database.
+    # The top page is read again by `refresh` (by id: inside the page's own
+    # `after_save` that is the row as just written, and a caller's object can
+    # be older than its row), and everything below is read here.
     def sync_subtree(page)
       below = Page.where(<<~SQL.squish, page.id).order(:id).group_by(&:parent_id)
         pages.id IN (
@@ -126,70 +141,224 @@ module PublicSite
       end
     end
 
-    # Every post, or every post of one content type, re-derives its canonical
-    # page and current path from scratch (spec §5.4): a `post_list` block's
-    # own save/destroy, and a page save that changes one of its URL inputs
-    # (a move, reorder, publish or trash included -- `Page#resync_listed_posts`,
-    # for the types its subtree's blocks list), both call this rather than
-    # `sync`ing one post at a time, because either can hand a post its first
-    # canonical page, take it away, or move it to a *different* page than the
-    # one that just changed -- something a single record's own callback has
-    # no way to know about.
+    # THE ONE ENTRY POINT. Makes the addresses of everything that depends on
+    # these records what a full rebuild would write, in the caller's
+    # transaction, and answers the changes that had to yield (`Change`s, see
+    # `yield_to_holder`): empty when every record got the address it wants.
+    # Nothing else derives: a caller says WHAT IT TOUCHED (pages and posts, as
+    # records or ids; `posts` may be a relation) and never which posts that
+    # could have moved. `everything` is every page and every post: a language
+    # switched on, the rebuild.
     #
-    # `content_type` is `nil` for "every post" (a content-type-less
-    # post_list block matches every type itself) -- `Post.all`, not a
-    # `where(content_type: nil)` that would compile to a no-op the way
-    # `ContentBlock#listed_posts` warns against.
+    # What depends on a touched page, with S the touched pages and everything
+    # below them:
+    # - its own address and its subtree's (`sync_subtree`);
+    # - HOSTED: the posts whose current row says a page of S gives them their
+    #   address (`listed_on_id`). This is "before", whatever the page listed
+    #   and however it came to list it: a block's earlier settings, an older
+    #   copy, a copy that came into force by the clock, a tag under another
+    #   name. No caller reconstructs it;
+    # - LISTABLE: the posts of every content type the list blocks of S name
+    #   as published now (`Publishing::Listing.blocks`; a block that names no
+    #   type lists every type). This is "after";
+    # - UNHOUSED: the kept posts that have no address at all, of the types
+    #   some list block of the site names now. A post that yielded under a
+    #   page of S has no row to say so and must be looked at when that page
+    #   stops listing it, and this is also what gives a yielder its address
+    #   once the record that held it has moved away. Narrowed to the listed
+    #   types because a post no block of the site can list gets no address
+    #   whatever happens, so a site's unlisted posts are not read on every
+    #   page save.
+    # A page's rank among the candidates (its live chain, its place in the
+    # tree, the trash) matters only for posts it hosts or can list, so the
+    # three sets are complete for a touched page: a post outside all of them
+    # keeps the winner it had. A touched post is its own address under its
+    # canonical page, and nothing else.
     #
+    # Not healed here, a known interim, the cases in which `public_paths` can
+    # differ from a rebuild: a post that yielded to another POST which then
+    # moves away (a post's touch looks at that post only; the next touch of
+    # any page heals it), a post that yielded in one language while it has
+    # an address in another, a PAGE that yielded, and the pages below it.
+    # `refresh(everything: true)` heals each.
+    #
+    # Locks: none on a page, post or block row. The callers hold what the
+    # code base's order asks for (a save its own row, a block service the
+    # page's first, `take!` the record's); here only `public_paths` rows are
+    # written, pages top-down and then posts by id. Two refreshes that want
+    # the same address can wait on the `(locale, path)` index in opposite
+    # order, and Postgres ends one, as before.
+    #
+    # A fixed number of statements however many pages, posts or blocks there
+    # are: the due copies, the subtree's ids, the list blocks as published,
+    # and per touched page `sync_subtree`'s, per batch of posts
+    # `write_posts`'.
+    def refresh(pages: [], posts: [], everything: false, now: Time.current)
+      PublicPath.transaction do
+        # FIRST, so that no derivation acts on a picture the clock has made
+        # stale: the copies that began to show with no write
+        # (`Publishing::Version.settle!` marks them, once: a change whose
+        # time came, and the copy of a scheduled page or post whose time
+        # came) have their records refreshed like any touched record, which
+        # is the whole of "it went live by the clock". There is no window
+        # and no sweep. A pass of its own, ahead of the caller's: the caller
+        # is answered what ITS records made yield.
+        due = Publishing::Version.settle!(now)
+        of = ->(type) { due.filter_map { |_, record_type, id| id if record_type == type.polymorphic_name } }
+        settled = due.empty? ? [] : refresh_touched(of.call(Page), of.call(Post), now)
+
+        post_ids = posts.is_a?(ActiveRecord::Relation) ? posts.select(:id) : ids_of(posts)
+        yields = everything ? refresh_all(now) : refresh_touched(ids_of(pages), post_ids, now)
+        report_clash(due, settled + yields, now)
+        yields
+      end
+    end
+
+    def refresh_all(now)
+      root = Page.find_by(parent_id: nil)
+      (root ? sync_subtree(root) : []) + write_posts_in_batches(Post.all, nil, now)
+    end
+
+    def refresh_touched(page_ids, post_ids, now)
+      return [] if page_ids.empty? && post_ids == []
+
+      touched = Post.where(id: post_ids)
+      return write_posts_in_batches(touched, nil, now) if page_ids.empty?
+
+      yields = Page.where(id: page_ids).order(:id).flat_map { |page| sync_subtree(page) }
+      candidates = Publishing::Listing.blocks(now: now)
+      yields + write_posts_in_batches(dependent_posts(page_ids, touched, candidates), candidates, now)
+    end
+
+    # A LIVE RECORD IS LEFT WITHOUT AN ADDRESS by this refresh: it lost the
+    # one it had (to another record's write: a list block published away, a
+    # page published, scheduled, moved or trashed, a tag; or to the clock),
+    # or its own copy came into force by the clock and could not be given
+    # one. Nobody is refused for it (only a record's OWN address refuses its
+    # own save or publish, `Publishing.keep_address!`), so the person running
+    # the site is told: once, because a row is lost once and a copy is
+    # settled once, after the commit, with the due copies, the records and
+    # the addresses they wanted and nothing of anyone's content. A record
+    # met again that stood without an address before is not reported again,
+    # and a refresh that is rolled back (a refused publish, `foresee`)
+    # reports nothing.
+    def report_clash(due, yields, now)
+      mine = due.map { |_, type, id| [ type, id ] }
+      clashes = yields.select do |change|
+        change.record.published_at&.<=(now) && (change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]))
+      end
+      return if clashes.empty?
+
+      context = { copies: due.map(&:first),
+                  yielded: clashes.map { |change| { record_type: change.record.class.polymorphic_name, record_id: change.record.id, locale: change.locale, wanted: change.to } } }
+      ActiveRecord.after_all_transactions_commit do
+        Rails.error.report(Publishing::AddressTaken.new(clashes), handled: true, context: context)
+      end
+    end
+
+    # INFORMATION, for the overview of what a publish will change: what
+    # would happen to the addresses of LIVE records if the working rows of
+    # `record` (a published or scheduled page or post) were published at
+    # `now`, the record's own among them (`Foreseen`):
+    #
+    # - `lost`: those left with NO address in a language, as
+    #   `[{ record_type:, record_id:, locale:, path: }, ...]`;
+    # - `moved`: those that would stand at ANOTHER address, as
+    #   `[{ record_type:, record_id:, locale:, path:, to:, redirects: }, ...]`
+    #   (a post whose list on this page goes and which another page lists
+    #   too; a post whose own published tags take it to another list).
+    #   `redirects` is whether the old address is then a redirect of that
+    #   record: it is, unless another record took that very address in the
+    #   same refresh (`write_all` gives a wanted path to its new holder and
+    #   deletes the redirect that stood there). Read from the trial's own
+    #   rows, so the dialog's sentence is what the publish will do.
+    #
+    # A hand test found the dialog silent about the second: only `lost` was
+    # answered, and a post that moved from `/blog/x` to `/x` was nobody's
+    # news until a visitor's bookmark was redirected.
+    #
+    # Data, never wording, and no service decides anything by it.
+    #
+    # It tries: inside a savepoint the copy is taken and the addresses
+    # follow, the current rows are compared with what they were, and the
+    # savepoint is rolled back whatever happened, so nothing is kept: no
+    # copy, no settled mark, no address, no content version, no
+    # announcement, no report (each is a row of that savepoint or deferred
+    # to a commit that does not come). It reads every current row twice
+    # (and, when something moves, the redirects of the moved records), which
+    # is why it is asked for one dialog and never on a save path, and it
+    # holds the record's row lock until it is done.
+    def foresee(record, now: Time.current)
+      lost = moved = []
+      PublicPath.transaction(requires_new: true) do
+        before = PublicPath.current.pluck(:record_type, :record_id, :locale, :path)
+        begin
+          Publishing::Version.take!(record, live_at: now, now: now, shown: true)
+        rescue Publishing::AddressTaken
+          # The record's own address: the rows say so already.
+        end
+        after = PublicPath.current.pluck(:record_type, :record_id, :locale, :path).to_h { |type, id, locale, path| [ [ type, id, locale ], path ] }
+        lost, moved = before.reject { |*key, path| after[key] == path }.partition { |*key, _| !after.key?(key) }
+        sent_on = moved.empty? ? [] : PublicPath.redirects.where(record_id: moved.map(&:second).uniq).pluck(:record_type, :record_id, :locale, :path)
+        moved = moved.map { |*key, path| [ *key, path, after[key], sent_on.include?([ *key, path ]) ] }
+        raise ActiveRecord::Rollback
+      end
+      live = (lost + moved).group_by(&:first).flat_map { |type, rows| type.constantize.where(id: rows.map(&:second), published_at: ..now).ids.map { |id| [ type, id ] } }
+      Foreseen.new(
+        lost: lost.filter_map { |type, id, locale, path| { record_type: type, record_id: id, locale: locale, path: path } if live.include?([ type, id ]) },
+        moved: moved.filter_map do |type, id, locale, path, to, redirects|
+          { record_type: type, record_id: id, locale: locale, path: path, to: to, redirects: redirects } if live.include?([ type, id ])
+        end)
+    end
+
+    def ids_of(records)
+      records.respond_to?(:ids) ? records.ids : records.map { |record| record.respond_to?(:id) ? record.id : record }.uniq
+    end
+
+    # The posts a refresh has to look at (see `refresh`), as one relation:
+    # the touched ones, and for touched pages the hosted, the listable and
+    # the unhoused. Its subqueries are read with each batch, so a post
+    # written by an earlier batch is simply no longer unhoused.
+    def dependent_posts(page_ids, touched, candidates)
+      # The pages themselves too: one written around closure_tree has no
+      # closure row of its own.
+      below = (page_ids + Page.hierarchy_class.where(ancestor_id: page_ids).pluck(:descendant_id)).uniq
+      addressed = PublicPath.current.where(record_type: Post.polymorphic_name)
+      hosted = Post.where(id: addressed.where(listed_on_id: below).select(:record_id))
+      listable = posts_listed_by(candidates.select { |block| below.include?(block.owner.id) })
+      unhoused = posts_listed_by(candidates).kept.where(content_type: ContentTypes.names).where.not(id: addressed.select(:record_id))
+      [ touched, hosted, listable, unhoused ].reduce(:or)
+    end
+
+    # Every post of the content types these list blocks name; a block that
+    # names none lists every type, so every post (`Post.all`, never a
+    # `where(content_type: nil)`, which would match nothing).
+    def posts_listed_by(blocks)
+      types = blocks.map { |block| block.settings_object.content_type.presence }.uniq
+      types.include?(nil) ? Post.all : Post.where(content_type: types)
+    end
+
     # A batch at a time, each in a fixed number of statements: the posts and
-    # their tags (`includes(:tags)`, which `ContentBlock#lists?`'s tag check
-    # reads for every listing block), `canonical_pages` for the whole batch
-    # at once, those pages' current paths, the posts' stored rows, and then
-    # the writes for whatever differs.
-    def sync_posts(content_type)
-      scope = content_type ? Post.where(content_type: content_type) : Post.all
-      scope.includes(:tags).find_in_batches { |posts| write_all(post_paths(posts)) }
+    # their tags (`includes(:tags)`, which `Publishing::Listing.lists?` reads
+    # for a post that is judged by its rows; one with a published copy is
+    # judged by the copy's, read for the whole batch in one statement),
+    # `canonical_pages` for the whole batch at once, those pages' current
+    # paths, the posts' stored rows, and then the writes for whatever
+    # differs. Answers what had to yield.
+    def write_posts_in_batches(scope, candidates, now)
+      yields = []
+      scope.includes(:tags).find_in_batches { |posts| yields.concat(write_posts(posts, candidates: candidates, now: now)) }
+      yields
     end
 
-    # `sync_posts` for every content type the listing blocks on `pages` and on
-    # everything below them list: what has to be re-derived when something
-    # about those pages changed that `canonical_page` ranks listing pages by
-    # (their place in the tree, a live chain, the trash) -- the posts those
-    # blocks list may have a new canonical page, here or elsewhere. Only
-    # those: the order and publication of every page *outside* these
-    # subtrees is as it was, so a post none of their blocks list keeps the
-    # winner it had. A block with no content type lists every type, so one
-    # such block means every post.
-    def sync_posts_listed_under(pages)
-      return if pages.empty?
-
-      subtree_ids = Page.hierarchy_class.where(ancestor_id: pages.map(&:id)).select(:descendant_id)
-      types = ContentBlock.listing.where(owner_type: Page.polymorphic_name, owner_id: subtree_ids).map { |block| block.settings_object.content_type }
-      types.include?(nil) ? sync_posts(nil) : types.uniq.each { |type| sync_posts(type) }
-    end
-
-    # The sweep for the one input no write announces: time. A scheduled page
-    # becomes live (`Publishable#live?`) when `published_at` passes, and no
-    # row is written at that moment -- but a live chain is the first thing
-    # `canonical_page` ranks listing pages by, so the posts listed on that
-    # page, or on any page below it, may belong under it from then on. This
-    # re-derives them for every kept page that went live in `(since, now]`.
-    #
-    # Only the posts: a page's own path is its ancestors' slugs and its own
-    # (`page_path`), whatever its publication, so there is no `sync_subtree`
-    # to run here. A page that became live through a save (Publish) had its
-    # posts synced by that save; sweeping it again finds nothing to change.
-    #
-    # Idempotent and unmarked: nothing records that a page was swept, the
-    # caller's window simply overlaps the previous run's
-    # (`PublicSite::SyncWentLiveJob` looks a day back every five minutes),
-    # and a run with nothing to move reads and writes no row of
-    # `public_paths` beyond the comparison. A page that went live before
-    # `since` with no run in between (the job only runs where Solid Queue is
-    # the adapter) is caught by the next sync that reaches its posts, or by
-    # `rebuild!`.
-    def sync_went_live(since:, now: Time.current)
-      sync_posts_listed_under(Page.kept.where(Page.arel_table[:published_at].gt(since)).where(published_at: ..now).to_a)
+    # The addresses of these posts, each written with THE PAGE THAT GIVES IT
+    # (`listed_on_id` of its current rows): the one fact about a post's
+    # address that cannot be read back from the records afterwards, because
+    # which page listed a post "until a moment ago" is gone once the block,
+    # the copy or the tag that said so has changed.
+    def write_posts(posts, candidates: nil, now: Time.current)
+      hosts = canonical_pages(posts, candidates: candidates, now: now)
+      write_all(post_paths(posts, hosts: hosts), hosts: hosts)
     end
 
     # Bumps the public content version whatever it finds: this is the repair
@@ -199,9 +368,7 @@ module PublicSite
       PublicPath.transaction do
         PublicPath.delete_all
         PublicSite.bump_version!
-        root = Page.find_by(parent_id: nil)
-        sync_subtree(root) if root
-        sync_posts(nil)
+        refresh(everything: true)
       end
     end
 
@@ -218,8 +385,8 @@ module PublicSite
     #
     # A trashed page or post has no URL either (trash spec §5.2). Returning
     # nil here, rather than deleting rows from the trash services, is what
-    # keeps every other writer -- `rebuild!`, `sync_posts`, an ancestor's
-    # `sync_subtree` -- from ever giving it one back; a record whose path
+    # keeps every refresh -- of the record, of an ancestor, of everything --
+    # from ever giving it one back; a record whose path
     # comes out nil loses its current row *and* its redirects for that
     # locale (`write_all`). A trashed page's descendants follow without a
     # check of their own: `page_path` is handed no path for their parent and
@@ -250,8 +417,8 @@ module PublicSite
     # `{ post => { locale => path } }` for several posts in one pass: their
     # canonical pages together (`canonical_pages`), then those pages' current
     # paths in one query.
-    def post_paths(posts)
-      pages = canonical_pages(posts)
+    def post_paths(posts, hosts: canonical_pages(posts))
+      pages = hosts
       listing_paths = current_paths("Page", pages.values.compact.map(&:id).uniq)
 
       posts.index_with do |post|
@@ -290,15 +457,13 @@ module PublicSite
     #    still wins when it is the *only* kind there is, so a post listed only
     #    by a draft page keeps a URL there and `/preview` can show it.
     #
-    #    "Live" is `Publishable#live?`, so a *scheduled* page counts as
-    #    unpublished until its time comes -- and nothing writes a row at that
-    #    moment, so posts don't move onto a scheduled listing page the instant
-    #    it goes live: `sync_went_live` moves them, run every five minutes by
-    #    `PublicSite::SyncWentLiveJob` where Solid Queue is the adapter
-    #    (production), and elsewhere the next sync that reaches them does (a
-    #    save of that page or an ancestor that changes one of its URL inputs,
-    #    a write to a listing block, a save of the post that changes one of
-    #    its own, or `rebuild!`). Until then they stay at the published
+    #    "Live" is a publication time not after `now`, so a *scheduled* page
+    #    counts as unpublished until its time comes -- and nothing writes a
+    #    row at that moment, so posts don't move onto a scheduled listing page
+    #    the instant it goes live: the page's copy is due from then on, and
+    #    the first refresh after it settles it (`refresh`), which
+    #    `PublicSite::SyncWentLiveJob` makes sure of every five minutes where
+    #    Solid Queue is the adapter (production). Until then they stay at the published
     #    listing they already had, which keeps serving them; the ETag already
     #    changes at go-live (`PublicSite.content_version`), so the page itself
     #    isn't served stale.
@@ -309,7 +474,9 @@ module PublicSite
     #    teaser (unfiltered, and on the root, which always comes first in tree
     #    order) from taking every post's URL away from /blog. (A block that
     #    names a *different* type or a tag the post lacks isn't a candidate at
-    #    all -- `lists?` already said no.)
+    #    all -- `lists?` already said no.) Which blocks there are and which
+    #    tags the post carries are both read AS PUBLISHED: see
+    #    `canonical_pages`.
     #
     # 3. tree order -- depth-first by sibling position, as the tiebreak. That
     #    is the page whose own position, then its parent's, and so on up to
@@ -328,31 +495,56 @@ module PublicSite
     #
     # Every post_list block is checked, not just the ones on already-synced
     # pages: this is also what a block's own save/destroy calls (via
-    # `sync_posts`), where nothing about the page tree changed at all.
+    # `refresh` with the block's page), where nothing about the page tree
+    # changed at all. (On a
+    # published page that has a copy that call now finds nothing to move:
+    # the block is no candidate until the page's changes are published.)
     def canonical_page(post) = canonical_pages([ post ]).fetch(post)
 
     # `canonical_page` for several posts in ONE pass: `{ post => page or nil }`.
-    # The listing blocks, their owners and every candidate's ancestry are loaded
-    # once (a constant number of queries however many posts, blocks or pages
-    # there are), then each post is ranked among the blocks that list it. The
+    # The listing blocks, their owners, every candidate's ancestry, the tags
+    # the blocks filter by and the posts' published copies are loaded once (a
+    # constant number of queries however many posts, blocks or pages there
+    # are), then each post is ranked among the blocks that list it. The
     # New post dialog asks for every creatable type's listing page at once.
-    def canonical_pages(posts)
-      # `ContentBlock.listing` is every block whose type has the
-      # `lists_posts` capability -- only a `Page` owner is a candidate at
-      # all (open-types spec §4.1 lets other records own blocks too, but
-      # none render a listing of their own posts today).
-      # A block on a trashed page isn't a candidate either (trash spec §5.2):
-      # its posts move to the next-best listing, or lose their URL, and
-      # come back here when the page is restored.
-      candidates = ContentBlock.listing.includes(:owner).select { |block| block.owner.is_a?(Page) && !block.owner.trashed? }
+    def canonical_pages(posts, candidates: nil, now: Time.current)
+      # The list blocks AS PUBLISHED (`Publishing::Listing.blocks`, drafts
+      # spec §5): a published or scheduled page that has a copy lists what
+      # its current copy lists, so a list block changed, added or deleted in
+      # its rows moves no address until the page is published -- the public
+      # list is drawn from that same copy, and a post in it must open. Every
+      # other page (a draft, a page written around the services) lists what
+      # its rows do, as before.
+      #
+      # Every block whose type has the `lists_posts` capability -- only a
+      # `Page` owner is a candidate at all (open-types spec §4.1 lets other
+      # records own blocks too, but none render a listing of their own posts
+      # today). A block on a trashed page isn't a candidate either (trash spec
+      # §5.2): its posts move to the next-best listing, or lose their URL,
+      # and come back here when the page is restored.
+      #
+      # Each block's `owner` is the page's ROW, read now, whichever of the
+      # two its blocks came from: publication, the tree and the trash are
+      # immediate (they are not in a copy), and they are what the ranking
+      # below reads -- and the row is what this method answers.
+      candidates ||= Publishing::Listing.blocks(now: now)
       chains = ancestry_chains(candidates.map(&:owner).uniq)
+      # The tag each filtered block names, by id, found once for all of them.
+      tags = Publishing::Listing.filter_tags(candidates)
+      # Each post is judged by its tags as published, for the same reason: a
+      # published post that has a copy by the copy's tags, any other (a
+      # draft, an unsaved one, one written around the services) by its rows'.
+      # Only the tags: the post's type, slug, publication and trash state are
+      # read from `post` itself by everything else here.
+      views = posts.zip(Publishing.published_all(posts, now: now)).each_with_object({}.compare_by_identity) { |(post, view), all| all[post] = view }
 
       posts.index_with do |post|
-        best = candidates.select { |block| block.lists?(post) }.min_by do |block|
+        view = views.fetch(post)
+        best = candidates.select { |block| Publishing::Listing.lists?(block, view, tags: tags) }.min_by do |block|
           chain = chains.fetch(block.owner.id, [])
           settings = block.settings_object
           [
-            chain.all?(&:live?) ? 0 : 1,
+            chain.all? { |page| page.published_at&.<=(now) } ? 0 : 1,
             settings.content_type.present? ? 0 : 1,
             settings.tag.to_s.strip.present? ? 0 : 1,
             chain.map { |page| page.position.to_i }
@@ -411,18 +603,13 @@ module PublicSite
       above == "/" ? "/#{segment}" : "#{above}/#{segment}"
     end
 
-    # Moves one record's current row to `path` in `locale`; see `write_all`,
-    # which this is for a single address.
-    def write(record, locale, path)
-      write_all({ record => { locale => path } })
-    end
-
     # Brings the current rows of `desired` (`{ record => { locale => path or
     # nil } }`, the records all of one class) to those paths, writing only
     # what differs from `stored` (their rows as `current_rows` reads them)
     # and yielding to `held` (see `held_by_others`) -- both read here when
     # the caller hasn't already -- in a number of statements that doesn't
-    # depend on how many records or rows there are.
+    # depend on how many records or rows there are. Answers the changes that
+    # had to yield.
     #
     # For each record and locale whose path changed:
     # - the old current row stays behind as a redirect;
@@ -441,6 +628,13 @@ module PublicSite
     # a redirect by the time redirects on the new paths are dropped -- so a
     # record may take the address another record of this same call (one
     # batch) has just left (one address per locale, redirects included).
+    #
+    # `hosts` (`{ post => page }`, `canonical_pages`' answer) is written with
+    # a post's row as `listed_on_id`. A row is only written when its path
+    # changes, and that is enough: a post's path begins with its host's, and
+    # a current path belongs to one page, so the host cannot change under a
+    # path that stays (`assert_parity` in the paths test compares the column
+    # with a rebuild's after every write path).
     #
     # `update_all`, `delete_all` and `insert_all!`, never a model save: this
     # runs from inside another record's `after_save`, and re-entering
@@ -464,32 +658,38 @@ module PublicSite
     # live in the same save is bumped by its own `after_commit`, and one that
     # goes live by the clock by `PublicSite.content_version`'s publication
     # times.
-    def write_all(desired, stored: nil, held: nil)
+    def write_all(desired, stored: nil, held: nil, hosts: {})
       records = desired.keys
-      return if records.empty?
+      return [] if records.empty?
 
       stored ||= current_rows(records.first.class.polymorphic_name, records.filter_map(&:id))
-      changes = changes_between(desired, stored)
-      return if changes.empty?
+      changes = changes_between(desired, stored, hosts)
+      return [] if changes.empty?
 
       type = records.first.class.polymorphic_name
       PublicPath.transaction do
-        # Inside the transaction, so the bump waits for *this* commit even
-        # when the caller has none open (a tag service's sync after its own
-        # commit, `PostTag`'s `after_commit`, `SyncWentLiveJob`). Called
-        # ahead of it, the counter would move at once and the rows commit
-        # afterwards: a request in between would render the old addresses
-        # under the new version, and nothing would bump again.
-        PublicSite.bump_version! if changes.any? { |change| !change.record.respond_to?(:live?) || change.record.live? }
         held ||= held_by_others(changes)
         given = Set.new
         moved, rest = changes.partition { |change| change.to && !held.key?([ change.locale, change.to ]) && given.add?([ change.locale, change.to ]) }
         gone, yielding = rest.partition { |change| change.to.nil? }
+        # The bump is decided from the rows this call writes, never from what
+        # a record merely wants: a record that stands without an address
+        # wants it again in every refresh that looks at it, yields again and
+        # writes nothing, and that is nobody's change. Inside the
+        # transaction, so the bump waits for *this* commit even when the
+        # caller has none open (a tag service's refresh after its own commit,
+        # `PostTag`'s `after_commit`, the job). Called ahead of it, the
+        # counter would move at once and the rows commit afterwards: a
+        # request in between would render the old addresses under the new
+        # version, and nothing would bump again.
+        written = moved + gone + yielding.select(&:row_id)
+        PublicSite.bump_version! if written.any? { |change| !change.record.respond_to?(:live?) || change.record.live? }
         yielding.each { |change| yield_to_holder(change) }
 
         delete_rows(gone)
         PublicPath.where(id: yielding.filter_map(&:row_id)).delete_all if yielding.any?(&:row_id)
-        PublicPath.where(id: moved.filter_map(&:row_id)).update_all(current: false, updated_at: Time.current) if moved.any?(&:row_id)
+        # A redirect carries no host: the column is about current rows.
+        PublicPath.where(id: moved.filter_map(&:row_id)).update_all(current: false, listed_on_id: nil, updated_at: Time.current) if moved.any?(&:row_id)
         if moved.any?
           addresses(PublicPath.redirects, moved.map { |change| [ change.locale, change.to ] }).delete_all
           # Timestamps from the application clock, as a model save writes
@@ -497,23 +697,25 @@ module PublicSite
           # transaction start time).
           now = Time.current
           PublicPath.insert_all!(moved.map do |change|
-            { record_type: type, record_id: change.record.id, locale: change.locale, path: change.to, current: true, created_at: now, updated_at: now }
+            { record_type: type, record_id: change.record.id, locale: change.locale, path: change.to, current: true,
+              listed_on_id: change.listed_on, created_at: now, updated_at: now }
           end)
         end
 
         (gone + moved).each { |change| announce(change.record, change.locale, change.from, change.to) }
+        yielding
       end
     end
 
     # What differs: one `Change` per record and locale whose path in
     # `desired` is not the one its current row in `stored` holds, in the
     # order of `desired`.
-    def changes_between(desired, stored)
+    def changes_between(desired, stored, hosts = {})
       desired.flat_map do |record, paths|
         type = record.class.polymorphic_name
         paths.filter_map do |locale, path|
           row_id, from = stored[[ type, record.id, locale.to_s ]]
-          Change.new(record, locale.to_s, row_id, from, path) unless from == path
+          Change.new(record, locale.to_s, row_id, from, path, hosts[record]&.id) unless from == path
         end
       end
     end
@@ -523,16 +725,23 @@ module PublicSite
     # this call -- a current row that one of these changes is itself moving
     # away, or deleting, holds nothing any more. One query.
     #
-    # The record's own save never gets this far with such a path --
-    # `HasPublicPaths#public_paths_are_available` turns it into a validation
-    # error first (spec §5.2) -- so a hit here means the sync was triggered
-    # by a *different* record's write: a post_list block saved or destroyed
-    # (`ContentBlock#sync_listed_post_paths`), a page saved, moved or
-    # reordered (`Page#sync_public_paths`, including a cascade into its
-    # descendants), a tag added or removed (`PostTag#sync_post_paths`), or a
-    # language enabled. E.g. page /blog/team plus post "team" living at /team
-    # via a homepage listing: removing that homepage block moves the post
-    # onto /blog/team, which the page holds.
+    # The record's own save never gets this far with such a path of its own
+    # slug: `HasPublicPaths#public_paths_are_available` turns it into a
+    # validation error first (spec §5.2). A hit here means the refresh was
+    # caused by something the validation cannot see:
+    # - the record's OWN tags, made by its save or made public by its
+    #   publish. That one is refused: `Publishing.keep_address!` reads what
+    #   yielded and raises, and the service's transaction is rolled back;
+    # - a *different* record's write: a post_list block saved or destroyed
+    #   on a draft page, a page's changes published (its list blocks as they
+    #   are from then on), a page saved, published, scheduled, moved,
+    #   trashed or reordered (including a cascade into its descendants), a
+    #   tag added or removed, a language enabled. E.g. page /blog/team plus
+    #   post "team" living at /team via a homepage listing: removing that
+    #   homepage block and publishing moves the post onto /blog/team, which
+    #   the page holds. The post yields, and a live one is reported
+    #   (`report_clash`);
+    # - the clock: a copy that came into force at its time. The same.
     def held_by_others(changes)
       wanted = changes.filter_map(&:to).uniq
       return {} if wanted.empty?
@@ -556,21 +765,24 @@ module PublicSite
     # current row (`Resolver#from_row` finds no target) and start 301ing
     # again once a later sync gives it one.
     #
-    # An interim state, known and accepted: once the clash is gone, nothing
-    # looks again on the yielder's behalf. It gets its address back at the
-    # next sync that reaches it -- a save of it that changes one of its URL
-    # inputs, any of the triggers above -- or from `bin/rails
-    # public_paths:rebuild`, which is the fix when a record is found without
-    # an address; a save that changes no input (most autosaves) does not
-    # look. The other side of the same condition: the yielder's editor is not
-    # told of the clash on every autosave either, since the availability
-    # validation is skipped for a save that changes no input. Logged, since
-    # nothing on screen says why the record vanished from that address.
+    # Once the clash is gone the yielder gets its address back from the
+    # next refresh that looks at it: any touch of a PAGE looks at every post
+    # without an address that some list block can list (`refresh`, the
+    # unhoused), so a holder that is a page hands the address over in the
+    # very save that moves it away. What is still not looked at is named
+    # there; `bin/rails public_paths:rebuild` is the fix when a record is
+    # found without an address. Logged when the address is LOST, since
+    # nothing on screen says why the record vanished from it; a record that
+    # had none and is met again (every page's refresh looks at it) is not
+    # logged again, and neither is one that wanted its first address and
+    # could not be given it: the two cannot be told apart here.
     def yield_to_holder(change)
+      return unless change.row_id
+
       record = change.record
       Rails.logger.warn("[public_paths] #{record.class.polymorphic_name}##{record.id} gets no #{change.locale} URL: " \
         "#{change.to} is already another record's current path")
-      announce(record, change.locale, change.from, nil) if change.row_id
+      announce(record, change.locale, change.from, nil)
     end
 
     # Every row -- current and redirects alike -- of the records and locales

@@ -42,7 +42,14 @@ class PagesController < PublicController
 
     case result.status
     when :found
-      return render(:not_found, status: :not_found) unless assign_record(result.record)
+      # A POST is read and rebuilt first: whether it is shown at all depends on
+      # its listing page's blocks (`assign_record` returns false for none).
+      # A PAGE is not: its ETag names its copy by id (one light statement,
+      # `etag_key_of`) and the copy is read and rebuilt, blocks included, only
+      # for a response that is rendered, so a 304 costs that statement and
+      # not the page's weight.
+      light = result.record.is_a?(Page) # public: rows (the resolver's record is only asked its class here)
+      return render(:not_found, status: :not_found) unless light || assign_record(result.record) # public: rows (assign_record reads the copy through as_published)
 
       # `stale?` answers a matching `If-None-Match` with a bare 304 itself --
       # `render :show` below only ever runs for a genuinely stale request.
@@ -66,12 +73,16 @@ class PagesController < PublicController
       # - the year, which the footer prints: a 304 on 1 January would
       #   otherwise confirm last year's copyright line.
       #
-      # The blocks, their images and the images' variants are loaded only
-      # past it, for a response that is actually rendered: a conditional GET
-      # that still matches costs the resolver's lookup, the version and the
-      # settings row, nothing else.
+      # What the ETag says of the record is its copy's id (`etag_key_of`): the
+      # copy never changes once taken, so the id names its content, and a
+      # change that comes into force by the clock is a different id AND a
+      # different content version (the newest `live_at` in force). The images
+      # and their variants are loaded only past `stale?`, for a response that
+      # is actually rendered.
       expires_in 0, public: true, must_revalidate: true
-      if stale?(etag: [ result.record, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year ], public: true)
+      keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) } # public: rows (the ETag names the copy's id, not content)
+      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year ], public: true)
+        assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
         preload_page_images(@page)
         render :show
       end
@@ -83,6 +94,24 @@ class PagesController < PublicController
   end
 
   private
+
+  def as_published(record) = Publishing.published(record)
+
+  # By the page's copy and the post's (`Publishing::Listing`).
+  def lists_post?(block, post) = Publishing::Listing.lists?(block, post)
+
+  # What of a record the ETag depends on: its copy's id, or, for a record
+  # served from its rows (a draft or one with no copy), the row. The rows'
+  # `updated_at` moves with every autosave, which the public does not see.
+  # A record already rebuilt from its copy names it; a row is asked once,
+  # without the copy's content (the id and the time only).
+  def etag_key_of(record)
+    version = record.published_version
+    if version.nil? && record.published_at.present?
+      version = Publishing::Version.current_for([ record ], columns: %w[id record_type record_id live_at])[[ record.class.polymorphic_name, record.id ]]
+    end
+    version ? [ record.class.name, record.id, version.id ] : record
+  end
 
   def read_content_version_first
     PublicSite.current_content_version

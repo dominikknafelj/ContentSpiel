@@ -54,7 +54,7 @@ module Tags
       return failure(@source, [ self.class.same_tag ]) if @into.id == @source.id
 
       problem = nil
-      content_types = []
+      pages = posts = []
       merged = Tag.transaction do
         # Both rows locked, in id order, so two merges running the other way round
         # (A into B, B into A) queue up instead of deadlocking, and a tag deleted
@@ -73,21 +73,37 @@ module Tags
         # also the "posts that had the tag" number the event records.
         carrier_ids = source.post_tags.pluck(:post_id)
 
-        # Read before anything changes: which listings are affected is decided by
-        # the blocks as they stand now (a block naming either tag, whichever
-        # content types they list).
-        content_types = affected_content_types(source.name, into.name)
+        # Read before anything changes: what the merge touches is decided by
+        # the blocks and the join rows as they stand now. The two tags become
+        # one, so the pages whose lists refer to EITHER and the posts that
+        # carry either are touched: a list that filtered by the merged tag
+        # holds the kept tag's posts from now on, and the other way round.
+        pages = pages_listing(names: [ source.name, into.name ], ids: [ source.id, into.id ])
+        posts = PostTag.where(tag_id: [ source.id, into.id ]).distinct.pluck(:post_id)
         blocks = listing_blocks_naming(source.name)
 
         give_target_to_carriers(into, carrier_ids)
-        touch_carrying_posts(source)
+        # Touched, not marked: the copies are rewritten below exactly as the
+        # rows are here, so the merge leaves no carrier with anything to
+        # publish.
+        touch_carrying_posts(source, mark: false)
         repoint_blocks(blocks, source, into)
-        PostTag.where(tag_id: source.id).delete_all
+        # The published copies too, after the page locks above: a merge is
+        # immediate everywhere, as a slug is. The copies reference the tag by
+        # id and `source`'s is about to stop existing, so its id is replaced
+        # by the kept tag's and the lists that held its posts still hold them;
+        # and what a post's copy SHOWS of the tag becomes the kept tag, id
+        # and name, so no visitor reads the name of a tag that is gone
+        # (`Publishing::Version.repoint_tag!`). `into` is the locked row.
+        Publishing::Version.repoint_tag!(from: source, to: into)
+        PostTag.where(tag_id: source.id).delete_all # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
         source.destroy!
-        # Join rows and block settings were written around the callbacks
-        # (`insert_all`, `delete_all`, `update_columns`, `touch_all`), so no
-        # post's or page's `after_commit` speaks for them: the merge moves
-        # the public content version itself, deferred to the commit.
+        # Join rows, block settings and the copies were written around the
+        # callbacks (`insert_all`, `delete_all`, `update_columns`,
+        # `touch_all`, `update_all`), so no post's or page's `after_commit`
+        # speaks for them: the merge moves the public content version
+        # itself, deferred to the commit, and with it every cached page that
+        # printed the merged tag's name.
         PublicSite.bump_version!
 
         record_event("tag.merged", subject: into, metadata: { "merged" => source.name, "posts" => carrier_ids.size })
@@ -97,11 +113,9 @@ module Tags
       return failure(@source, [ problem ]) if problem
 
       # Join rows were written without callbacks (`insert_all`/`delete_all`), so
-      # `PostTag#sync_post_paths` didn't run per post -- and needn't: a post's
-      # canonical page depends on its tags only through listing blocks that
-      # filter by tag, and every block that names either tag is in
-      # `content_types`, which this re-derives from scratch.
-      content_types.each { |content_type| PublicSite::Paths.sync_posts(content_type) }
+      # `PostTag#sync_post_paths` didn't run per post: the merge says what it
+      # touched, after its commit.
+      PublicSite::Paths.refresh(pages: pages, posts: posts)
       success(merged)
     end
 
@@ -113,7 +127,7 @@ module Tags
     def give_target_to_carriers(into, carrier_ids)
       return if carrier_ids.empty?
 
-      PostTag.insert_all(carrier_ids.map { |post_id| { post_id: post_id, tag_id: into.id } },
+      PostTag.insert_all(carrier_ids.map { |post_id| { post_id: post_id, tag_id: into.id } }, # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
         unique_by: :index_post_tags_on_post_id_and_tag_id)
     end
 
@@ -165,8 +179,15 @@ module Tags
       now = Time.current
       Page.where(id: blocks.select { |block| block.owner_type == "Page" }.map(&:owner_id)).order(:id).lock.pluck(:id) # i18n-ok: a class name compared with owner_type
       fresh = ContentBlock.where(id: blocks.map(&:id)).order(:id).lock.select { |block| block_names_tag?(block, source.name) }
-      fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
-      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all # i18n-ok: a class name compared with owner_type
+      fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) } # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
+      pages = Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)) # i18n-ok: a class name compared with owner_type
+      # Touched, NOT marked as having unpublished changes: the copies of
+      # these pages are repointed as their rows are here, id and name
+      # (`Publishing::Version.repoint_tag!`), so the merge puts nothing
+      # between a page's rows and its copy and its publish dialog has
+      # nothing to show for it. A merge marks nothing by itself; a page that
+      # was marked before keeps its mark.
+      pages.touch_all # changes: none (the copies are repointed with the rows by repoint_tag!, so nothing is left to publish)
     end
   end
 end

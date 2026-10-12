@@ -8,10 +8,11 @@ module Admin
     # carry `turbo_frame: "_top"` to refresh the sidebar's badge and the
     # lists).
     #
-    # "No drafts" variant (spec §2): an edit to a live record goes live at
-    # once, so a live record has no primary button at all -- only the hint
-    # that says so -- while a draft offers Publish and a scheduled record
-    # Publish now plus Edit schedule. Everything else (Activity, Schedule…,
+    # "Drafts of live content" (drafts spec §3): an edit to a live record
+    # reaches the site only with "Publish changes", so a live record has no
+    # primary button until its rows differ from what is published (the
+    # button is `Publishing::State`'s `publish_changes`) -- while a draft
+    # offers Publish and a scheduled record Publish now plus Edit schedule. Everything else (Activity, Schedule…,
     # Unpublish, Move to trash) sits in the ⋯ menu, the destructive item last
     # and after a divider.
     #
@@ -64,11 +65,20 @@ module Admin
 
       def title = ::Locales.read(record, :title, locale: locale)
 
-      def status = record.status
+      # What the header says about publishing is `Publishing::State`'s: its
+      # status for the chip, its actions for the buttons. One per header, read
+      # once (a live record asks for a pending copy with the first of them),
+      # and handed to the part that draws the mark and the Publish changes
+      # button.
+      def state = @state ||= ::Publishing::State.of(record)
 
-      def live? = record.live?
+      def status = state.status
 
-      def scheduled? = status == "scheduled"
+      def live? = state.live?
+
+      def scheduled? = state.scheduled?
+
+      def draft? = state.draft?
 
       def scheduled_at = record.published_at
 
@@ -101,6 +111,22 @@ module Admin
 
       def preview_path = preview_urls.path_for(record, locale)
 
+      # For a post without an address: a published or scheduled page whose
+      # unpublished rows hold a list block that lists it
+      # (`Publishing::WaitingListers`). Asked only when there is no address.
+      def waiting_lister
+        return @waiting_lister if defined?(@waiting_lister)
+
+        @waiting_lister = page? || public_path.present? ? nil : ::Publishing::WaitingListers.for(record).first
+      end
+
+      # The page is named only to someone who may read it.
+      def waiting_lister_line
+        return t(".waiting_lister_unnamed") unless can?("pages.read", waiting_lister)
+
+        t(".waiting_lister", title: ::Locales.read(waiting_lister, :title, locale: locale))
+      end
+
       # Access control (design spec §5 "Everywhere"): publishing, unpublishing
       # and scheduling need `<pages|posts>.publish` on the record, moving it to
       # the trash `.delete` -- absent, not disabled, without them. A readable
@@ -110,8 +136,8 @@ module Admin
       # Why a record that is readable cannot be changed -- one whole string per
       # case. The editing right is there but the record is published (or
       # scheduled) and the viewer cannot publish: `can_edit?`'s own rule
-      # ("editing a published record needs publish too", the interim rule
-      # until revisions exist).
+      # ("editing a published record needs publish too": the person who may
+      # change it is the person who may publish it, drafts spec D5).
       def view_only_hint
         hint = "You can view this #{type} but not change it."
         return hint unless can?("#{type}s.edit", record) && record.published_at.present?
@@ -123,17 +149,33 @@ module Admin
 
       def may_delete? = can?("#{type}s.delete", record)
 
-      def can_publish? = !live? && may_publish?
+      # Publish (a draft) and Publish now (a scheduled record): the state's `publish`.
+      def can_publish? = state.action?(:publish) && may_publish?
 
-      def can_unpublish? = status != "draft" && may_publish?
+      def can_unpublish? = state.action?(:unpublish) && may_publish?
 
       # Only a draft is scheduled from the menu; a scheduled record edits its
       # schedule from the header's own button, a live one is not scheduled.
-      def can_schedule? = status == "draft" && may_publish?
+      def can_schedule? = state.action?(:schedule) && draft? && may_publish?
 
-      def can_edit_schedule? = scheduled? && may_publish?
+      def can_edit_schedule? = state.action?(:schedule) && scheduled? && may_publish?
 
       def primary_label = scheduled? ? "Publish now" : "Publish"
+
+      # "Cancel scheduled change" (the state's own action), in the menu; its
+      # confirmation and its form are the publish dialogs' (`PublishChangesDialogComponent`).
+      def can_cancel_scheduled_change? = state.action?(:cancel_scheduled_change) && may_publish?
+
+      def cancel_scheduled_change_dialog_id = PublishChangesDialogComponent.cancel_dialog_id_for(record)
+
+      # What the last refused publish left in the flash (`Admin::PublishingController#refuse_publish`),
+      # read once, here, so the publish dialog reopens with it. Never
+      # `flash[:alert]`: that is the toast region's.
+      def publish_error = helpers.flash[:publish_error]
+
+      def publish_when = helpers.flash[:publish_when]
+
+      def publish_value = helpers.flash[:publish_value]
 
       # Trash spec §4.1: a page with subpages moves its whole branch, so only
       # the homepage is refused (`Page#only_one_root_page`, `Trash::Move`).
@@ -163,12 +205,13 @@ module Admin
         body
       end
 
-      def live_hint = "This #{type} is live. Changes appear on the site as soon as they’re saved."
+      # A save of a live or scheduled record is not a publication (drafts spec §3).
+      def live_hint = t(scheduled? ? ".scheduled_hint" : ".live_hint", type: type)
 
       # Whether the ⋯ menu has anything to hold (a viewer who can only read
       # gets no empty menu).
       def menu_items?
-        can?("audit.view") || can_schedule? || can_unpublish? || may_delete?
+        can?("audit.view") || can_schedule? || can_cancel_scheduled_change? || can_unpublish? || may_delete?
       end
 
       # [label, url-or-nil] per crumb; a crumb the viewer may not open is plain

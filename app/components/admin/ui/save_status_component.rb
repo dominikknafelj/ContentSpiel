@@ -34,8 +34,12 @@ module Admin
 
       #
       # Wording (design pass round 2, handoff §4.1): the saved/saving/offline
-      # lines are mono capitals ("SAVED 10:42"; a live record's edits go
-      # straight to the site, so "● SAVED TO SITE 10:42" in the ok colour). The
+      # lines are mono capitals ("SAVED 10:42"). A save of a published or
+      # scheduled record is NOT a publication (drafts spec §3): its line reads
+      # "SAVED · NOT PUBLISHED 10:42", in the neutral colour and without the
+      # dot the "SAVED TO SITE" line had, which said "this is on the site" in
+      # the ok colour and is no longer true. `live:` is that question, and
+      # keeps its name: a page or post with a `published_at`. The
       # capitals are literal text, not a CSS `uppercase`, so what a test or a
       # screen reader reads is exactly what is shown. `live:` also rides on the
       # element (`data-live`) so `autosave_controller.js`, which writes the
@@ -87,13 +91,10 @@ module Admin
       # themselves or need the fields fixed first).
       def retry_button? = state == :offline
 
-      # `text-ok-ink` marks a live record's saved line only; a failure or
-      # anything else keeps the neutral colour.
+      # A saved line is neutral, whatever the record: nothing went to the
+      # site (see the class comment). The refusals keep the warn colour.
       def css_class
-        colour = if state == :saved && live then "text-ok-ink"
-        elsif state == :stale || state == :held || state == :saved_over then "text-warn-ink"
-        else "text-meta"
-        end
+        colour = %i[stale held saved_over].include?(state) ? "text-warn-ink" : "text-meta"
         "min-h-[1lh] font-cs-mono text-[11px] tracking-mono #{colour}"
       end
 
@@ -111,7 +112,8 @@ module Admin
       end
 
       # "SAVED 14:05", or just "SAVED" for a save with no time (a stream that
-      # carries none); a live record's own wording says it went to the site.
+      # carries none); a published or scheduled record's own wording says it
+      # is not published by that.
       def saved_text
         return t(live ? ".saved_live" : ".saved") unless at
 

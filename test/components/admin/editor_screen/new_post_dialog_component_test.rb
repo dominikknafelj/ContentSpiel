@@ -68,6 +68,7 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
 
     journal = create_page(title: "Journal")
     ContentBlock.create!(owner: journal, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    publish_changes(journal)
     render_form
     assert_selector "input[value=blog][data-path='/journal']", visible: :all
   end
