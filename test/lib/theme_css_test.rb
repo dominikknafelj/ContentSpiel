@@ -211,7 +211,7 @@ class ThemeCssTest < ActiveSupport::TestCase
           let_it_ask(keeper)
           assert_equal 0, builds, "nothing changed, nothing is built"
 
-          dir.join("assets/stylesheets/theme.css").write(".changed { color: red; }\n")
+          change(dir, ".changed { color: red; }\n")
           assert_not_equal before, folder.fingerprint
           await { folder.built?(root) }
 
@@ -221,7 +221,7 @@ class ThemeCssTest < ActiveSupport::TestCase
           # A stamp another build wrote since is that build's, and stays.
           ThemeCss.stamp!(ThemeFolder.new(nil), root: root)
           let_it_ask(keeper)
-          dir.join("assets/stylesheets/theme.css").write(".changed { color: blue; }\n")
+          change(dir, ".changed { color: blue; }\n")
           let_it_ask(keeper)
           assert_equal "default", ThemeFolder.stamp(root)
           assert_equal 1, builds
@@ -231,13 +231,88 @@ class ThemeCssTest < ActiveSupport::TestCase
           # folder's, the keeper takes it for its own and goes on keeping.
           ThemeCss.stamp!(folder, root: root)
           let_it_ask(keeper)
-          dir.join("assets/stylesheets/theme.css").write(".changed { color: green; }\n")
+          change(dir, ".changed { color: green; }\n")
           await { folder.built?(root) }
           assert_equal folder.fingerprint, ThemeFolder.stamp(root)
           assert_equal 2, builds
           assert keeper.alive?
         end
       end
+    end
+  end
+
+  # THE STAMP A TURN REMEMBERS IS THE ONE IT JUDGED. A turn reads the stamp
+  # at its top and decides by that reading whose it is. It then remembered
+  # a SECOND reading as "seen", so a stamp another build wrote while the
+  # turn hashed the folder was remembered without ever having been judged:
+  # no later turn looked at it again, the keeper never took it for its own,
+  # and from then on no change of the theme was built or stamped (the first
+  # CI run of the branch: the stamp stayed the one the test had written,
+  # and the wait for the keeper's ran out). Here the other build stamps
+  # from inside the keeper's own reading of the fingerprint, which is the
+  # middle of a turn every time.
+  test "a stamp another build writes in the middle of a keeper's turn is judged at the next turn, and the theme is kept from there" do
+    Dir.mktmpdir("root") do |root|
+      with_theme_copy do |dir|
+        folder = ThemeFolder.new(dir)
+        ThemeCss.stamp!(folder, root: root)
+        before = folder.fingerprint
+        test = Thread.current
+        builds = 0
+        stamped_meanwhile = false
+        real_fingerprint = folder.method(:fingerprint)
+        folder.define_singleton_method(:fingerprint) do
+          real_fingerprint.call.tap do |value|
+            # The keeper's reading of the CHANGED folder, once: a build for
+            # the theme (bin/rails tailwindcss:build with THEME_PATH set)
+            # ends at this moment and stamps.
+            if Thread.current != test && value != before && !stamped_meanwhile
+              ThemeCss.stamp!(self, root: root, fingerprint: value)
+              stamped_meanwhile = true
+            end
+          end
+        end
+
+        keeping(folder, root: root, build: -> { builds += 1 }) do |keeper|
+          # Somebody else's stamp first, so the turn's own reading is not
+          # the keeper's and it builds nothing in that turn.
+          ThemeCss.stamp!(ThemeFolder.new(nil), root: root)
+          change(dir, ".changed { color: blue; }\n")
+          await { stamped_meanwhile }
+          await { ThemeFolder.stamp(root) == folder.fingerprint }
+          let_it_ask(keeper)
+          assert_equal 0, builds, "the stylesheet is the other build's, and it is the folder's: nothing to build"
+
+          change(dir, ".changed { color: green; }\n")
+          await { builds.positive? && folder.built?(root) }
+
+          assert_equal folder.fingerprint, ThemeFolder.stamp(root), "the keeper took the other build's stamp for its own and keeps it"
+          assert_equal 1, builds
+        end
+      end
+    end
+  end
+
+  # No reader meets half a stamp: it is written beside and renamed into
+  # place. A plain write empties the file first, and whoever read it then
+  # (the keeper, System status, a boot) read an empty stamp, which is
+  # neither "no build" nor anybody's fingerprint.
+  test "a stamp is put in place whole: a reader never meets an empty one, and nothing is left beside it" do
+    Dir.mktmpdir("root") do |root|
+      folder = ThemeFolder.new(PLAIN)
+      ThemeCss.stamp!(folder, root: root)
+      read = []
+      reader = Thread.new { loop { read << ThemeFolder.stamp(root) } }
+      begin
+        200.times { |turn| ThemeCss.stamp!(folder, root: root, fingerprint: turn.even? ? "default" : folder.fingerprint) }
+        await { read.size > 200 }
+      ensure
+        reader.kill
+        reader.join
+      end
+
+      assert_equal [ "default", folder.fingerprint ].sort, read.uniq.sort
+      assert_equal [ File.basename(ThemeFolder::STAMP) ], Dir.children(File.join(root, File.dirname(ThemeFolder::STAMP)))
     end
   end
 
@@ -334,12 +409,12 @@ class ThemeCssTest < ActiveSupport::TestCase
         folder.define_singleton_method(:fingerprint) { answers.fetch(asked).tap { asked += 1 } }
 
         keeping(folder, root: root, build: -> { true }) do
-          dir.join("assets/stylesheets/theme.css").write(".one { color: red; }\n")
+          change(dir, ".one { color: red; }\n")
           await { asked >= 1 && !ThemeFolder.stamp(root).match?(/\A\h{64}\z/) }
           assert_equal "first", ThemeFolder.stamp(root), "the value read, not a second reading"
           assert_equal 1, asked
 
-          dir.join("assets/stylesheets/theme.css").write(".two { color: blue; } /* longer */\n")
+          change(dir, ".two { color: blue; } /* longer */\n")
           await { ThemeFolder.stamp(root) == "second" }
           assert_equal "second", ThemeFolder.stamp(root), "the keeper still takes the stamp for its own"
         end
@@ -484,6 +559,17 @@ class ThemeCssTest < ActiveSupport::TestCase
     ensure
       keeper&.kill
       keeper&.join
+    end
+
+    # The theme's stylesheet with other content, in ONE step (written
+    # beside, then renamed): a plain write empties the file first, and a
+    # keeper that looks between the two sees two changes and builds twice,
+    # rightly. A test that counts builds makes one change.
+    def change(dir, css)
+      Dir.mktmpdir("change") do |beside|
+        File.write(File.join(beside, "theme.css"), css)
+        File.rename(File.join(beside, "theme.css"), dir.join("assets/stylesheets/theme.css"))
+      end
     end
 
     def await

@@ -102,10 +102,21 @@ module ThemeCss
   # `fingerprint` is handed in by a caller that has read it already and
   # must have THAT value written (`build`, `keep_stamped`): the folder can
   # change between two readings.
+  #
+  # PUT IN PLACE WHOLE: written beside, then renamed. A plain write empties
+  # the file before it fills it, and a reader in between (the keeper below
+  # asks every second, System status on every view) read an EMPTY stamp,
+  # which is neither "no build" nor anybody's fingerprint. Ruby hands the
+  # interpreter's lock to a waiting thread at exactly that `open`, so
+  # within one process it was no rare moment. The file beside is a dot
+  # file too (app/assets/builds is on the asset load path, where anything
+  # else is an asset), named for the process and the thread that write it.
   def stamp!(folder, root:, fingerprint: folder.fingerprint)
     path = Pathname(root).join(ThemeFolder::STAMP)
     FileUtils.mkdir_p(path.dirname)
-    path.write("#{fingerprint}\n")
+    beside = Pathname("#{path}.#{Process.pid}-#{Thread.current.object_id}")
+    beside.write("#{fingerprint}\n")
+    File.rename(beside, path)
   end
 
   def unstamp!(root:)
@@ -155,6 +166,15 @@ module ThemeCss
   # remembered the first took its own stamp for somebody else's after the
   # next change, and never wrote again.
   #
+  # The STAMP is read once a turn too, and what the turn remembers as seen
+  # is that reading, or what it wrote itself: never a second reading. A
+  # stamp another build wrote while the turn hashed the folder was otherwise
+  # remembered as seen without having been judged, no later turn looked at
+  # it again, the keeper never took it for its own, and from then on it
+  # built and stamped nothing (the first CI run of the branch). Remembered
+  # as it was judged, the newer stamp differs at the next turn and is
+  # judged there.
+  #
   # The entry file is written again before a build when it is no longer the
   # folder's (a theme that gained its stylesheet or its components folder
   # since the watch started); Tailwind's watcher watches tmp/theme and
@@ -192,8 +212,9 @@ module ThemeCss
               unstamp!(root: root)
               mine = nil
             end
+            stamp = mine
           end
-          seen = [ look, ThemeFolder.stamp(root) ]
+          seen = [ look, stamp ]
         rescue StandardError => error
           log.call("theme_css:watch: the stylesheet's stamp could not be kept (#{error.class}); it will be tried again") unless said
           said = true
