@@ -16,7 +16,9 @@ module Admin
   #
   # `data`, `search`, `unlisted` and `listed` are the screen's JSON reads
   # (mind graph canvas spec §3.1; pages spec §3) with the screen's own
-  # permission and scope: `data` answers the global graph, or the
+  # permission and scope: `data` answers the global graph (or, for a site of
+  # more than `PostGraph::OPEN_AROUND_HOME_ABOVE` lines, where to open
+  # instead, unless `everything=1` asks for all of it), or the
   # neighbourhood of `page=` / `post=` / `tag=` (a page wins over a post, a
   # post over a tag); `search` answers the search field's rows (readable
   # pages, posts and tags, `PostGraph::Search`), each with the URL of its
@@ -57,10 +59,10 @@ module Admin
         if focus
           PostGraph::Local.call(actor: Current.actor, focus: focus, depth: params[:depth], locale: admin_locale, url_for: editor_url)
         else
-          # `everything: true` until the script knows the `open` answer and a
-          # page's local view is drawn (pages plan, Task 8): until then the
-          # whole graph is what this screen can show.
-          PostGraph::Global.call(actor: Current.actor, locale: admin_locale, url_for: editor_url, everything: true)
+          # A site with too many lines to read as one picture is answered
+          # with where to open instead (`open`, pages spec decision 6), and
+          # "Show everything" asks again with `everything=1`.
+          PostGraph::Global.call(actor: Current.actor, locale: admin_locale, url_for: editor_url, everything: everything?)
         end
       render json: with_dates(graph)
     end
@@ -92,6 +94,12 @@ module Admin
     private
 
     def focus = PostGraph::Focus.find(actor: Current.actor, page: params[:page], post: params[:post], tag: params[:tag], locale: admin_locale)
+
+    # "Show everything" (pages spec, decision 6): exactly `everything=1`, and
+    # a parameter of the DATA alone. The page itself takes no such parameter,
+    # so no address a person can keep or reload asks for everything: the
+    # choice is not remembered (the third design answers).
+    def everything? = params[:everything] == "1"
 
     def list_rows = PostGraph::Rows.new(actor: Current.actor, locale: admin_locale, url_for: editor_url)
 

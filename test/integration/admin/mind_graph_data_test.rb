@@ -54,15 +54,40 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
   # asks for everything: a site over the threshold would otherwise be
   # answered with an address this script cannot follow. The threshold is
   # put at nothing here, so any graph is over it.
-  test "the data is the whole graph however many lines it holds" do
+  # Pages spec, decision 6: above the threshold the data says where to open
+  # instead, and `everything=1` -- exactly that -- answers the whole graph.
+  # The threshold is handed in: nobody builds three thousand lines for this.
+  test "a site above the threshold is answered with where to open, and with everything=1 with the whole graph" do
+    sign_in_as(users(:one))
+    home = root_page
+    3.times { |index| create_page(title: "Page #{index}") }
+    whole = PostGraph::Global.method(:call)
+
+    with_singleton_override(PostGraph::Global, :call, ->(**options) { whole.call(**options, open_above: 2) }) do
+      get "/cs-studio/mind_graph/data"
+      assert_equal({ "open" => "page-#{home.id}", "edges" => 3 }, data)
+
+      get "/cs-studio/mind_graph/data", params: { everything: "1" }
+      assert_equal 4, data["pages"].size
+      assert_nil data["open"]
+
+      [ "yes", "true", "01", "1 ", [ "1" ] ].each do |other|
+        get "/cs-studio/mind_graph/data", params: { everything: other }
+        assert_response :success
+        assert_equal "page-#{home.id}", data["open"], "everything=#{other.inspect} is not everything=1"
+      end
+
+      get "/cs-studio/mind_graph/data", params: { page: home.id, everything: "1" }
+      assert_equal "page", data.dig("focus", "kind"), "a local view is never redirected, and is the local view whatever else is asked"
+      assert_equal({ "pages" => 4, "posts" => 0, "tags" => 0 }, data["site"], "what the notice of the opened view says of the site")
+    end
+  end
+
+  test "a site below the threshold is answered whole, with no word of where to open" do
     sign_in_as(users(:one))
     create_page(title: "Blog")
-    whole = PostGraph::Global.method(:call)
-    assert whole.call(actor: users(:one), url_for: ->(_record) { "" }, open_above: 0).key?(:open), "without the option such a site is told where to open"
 
-    with_singleton_override(PostGraph::Global, :call, ->(**options) { whole.call(**options, open_above: 0) }) do
-      get "/cs-studio/mind_graph/data"
-    end
+    get "/cs-studio/mind_graph/data"
 
     assert_response :success
     assert_nil data["open"]

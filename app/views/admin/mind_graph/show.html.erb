@@ -65,7 +65,25 @@
       and the script draws its checkbox only when it has the address.
       `data-listed-url` is the rows behind one of a page's "+N more" pills,
       a template with `__ID__` (the page's id) and `__TARGET__` (the pill's
-      target, URL-encoded). %>
+      target, URL-encoded).
+
+      A PAGE'S CARD (pages spec §7) has two templates of its own beside a
+      post's: `data-page-focus-url` (its local view) and `data-page-notes-url`
+      (its open notes as JSON, and where the card posts a new one; built for
+      id 0 like the post's).
+
+      THE GRAPH THAT OPENS AROUND HOME (pages spec, decision 6). A site with
+      too many lines for one picture is answered by `data-url` with where to
+      open instead, and the script then reads `data-open-url` (the data of a
+      page's local view, `__ID__` the page's id) and shows the bar below
+      (`data-mind-graph-opened`), which stands where a focused view has its
+      bar. "Show everything" there is a BUTTON, not a link: it changes what
+      this page shows and leads nowhere. It reads `data-everything-url`, the
+      whole graph's data. So the choice is in no address, and a reload opens
+      around Home again (the third design answers: not remembered). How many
+      lines the site has is the script's to write (`data-opened-lines` on
+      the element, the bar's sentence, the button's name), and the
+      controller's `reset` takes all of it back. %>
   <div data-controller="admin--mind-graph--graph"
        data-url="<%= data_admin_mind_graph_path(**admin_url_options, page: params[:page].presence, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
@@ -76,6 +94,11 @@
                                      "mind_graph.script.card.related", "mind_graph.script.card.tags", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
                                      "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag", "mind_graph.script.card.pin", "mind_graph.script.card.unpin",
                                      "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
+                                     "mind_graph.script.card.status.unpublished_changes", "mind_graph.script.card.status.change_scheduled",
+                                     "mind_graph.script.card.status.live_with_changes", "mind_graph.script.card.status.live_change_scheduled",
+                                     "mind_graph.script.card.open_page", "mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts", "mind_graph.script.card.post_type",
+                                     "mind_graph.script.opened.line", "mind_graph.script.opened.everything_name",
+                                     "mind_graph.script.list.more_heading", "mind_graph.script.list.more_row", "mind_graph.script.list.back",
                                      "mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.sending", "mind_graph.script.card.notes.replies",
                                      "mind_graph.script.card.notes.more", "mind_graph.script.card.notes.deleted_user", "mind_graph.script.card.notes.unread", "mind_graph.script.card.notes.failed",
                                      "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed",
@@ -98,6 +121,10 @@
        data-post-notes-url="<%= admin_record_note_threads_data_path("post", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
        <% if @pages %>data-unlisted-url="<%= unlisted_admin_mind_graph_path(**admin_url_options) %>"<% end %>
        data-listed-url="<%= listed_admin_mind_graph_path(**admin_url_options, page: "__ID__", target: "__TARGET__") %>"
+       data-page-focus-url="<%= admin_mind_graph_path(**admin_url_options, page: "__ID__") %>"
+       data-page-notes-url="<%= admin_record_note_threads_data_path("page", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
+       data-open-url="<%= data_admin_mind_graph_path(**admin_url_options, page: "__ID__") %>"
+       data-everything-url="<%= data_admin_mind_graph_path(**admin_url_options, everything: 1) %>"
        data-type-labels="<%= @type_labels.to_json %>"
        data-button-classes="<%= { primary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
        data-dot-classes="<%= (Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS).to_json %>"
@@ -140,6 +167,19 @@
             <% end %>
           </span>
           <%= link_to t(".focus.whole"), admin_mind_graph_path(**admin_url_options), class: "text-accent underline" %>
+        </p>
+      <% else %>
+        <%# The bar of the view the 3,000-line rule opened (pages spec,
+            decision 6): hidden, and empty of any figure, until the script
+            has been told where to open. Then it says why the whole graph is
+            not what is drawn (its sentence, written with `textContent`) and
+            offers "Show everything", whose name the script completes with
+            how many lines that is. %>
+        <p data-mind-graph-opened hidden class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3.5 py-2 text-sm text-dim">
+          <span data-mind-graph-opened-line id="mind-graph-opened-line"></span>
+          <%= tag.button t(".opened.everything"), type: "button", aria: { describedby: "mind-graph-opened-line" },
+                class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                data: { mind_graph_everything: true, action: "admin--mind-graph--graph#showEverything" } %>
         </p>
       <% end %>
       <%# The legend, which is the filter (pages spec §6). Its counts and each

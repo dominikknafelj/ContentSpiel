@@ -50,6 +50,29 @@
 # language groups it ("1,214"), handed over by the script; `count` only
 # chooses the form.
 #
+# `script.card.status`: `draft`, `scheduled` and `live` are the chip's first
+# part, with its dot. A live record that has more to say gets a second part
+# after a "·" (design answer G4, verbatim): `unpublished_changes`, with no
+# dot, or `change_scheduled` behind a warn dot, where `%{date}` is the node's
+# `change_on`, a day the SERVER has already written in CS Studio's short date
+# format, so the script formats no date. Those two rows are for the eye;
+# `live_with_changes` and `live_change_scheduled` are the whole chip as a
+# screen reader is given it, the Status key's own words with the day added
+# (H6: one set of words). `card.child_pages` and `card.lists_posts` are the
+# two halves of a page's line of counts ("4 child pages · lists 112 posts");
+# a post type's card says its posts with `card.tag_posts`.
+#
+# `script.opened.*` is the view the 3,000-line rule opened: `line` the bar's
+# sentence and `everything_name` the whole accessible name of "Show
+# everything" (`show.opened.everything` is what is written on it), which
+# says how many lines pressing it draws; `%{figure}` is the grouped count.
+#
+# `script.list.more_row` is the whole name of a "+N more" pill's row in the
+# list (its visible words are the pill's own, `script.more`): `%{target}` is
+# the post type or tag the pill hangs off, `%{figure}` the grouped count.
+# `more_heading` heads the rows a pill opened, and `back` is the button
+# beside it (and beside "Try again" when a pill's read failed).
+#
 # `script.all_posts` names the one node a list block with no filter points
 # at. `script.more` is a "+N more" pill's words: `%{count}` is the figure as
 # the script has already grouped it ("+1,980 more"), not a plural's number,
@@ -77,6 +100,8 @@ en:
           depth: "Depth"
           depth_n: "Depth %{depth}"
           whole: "Whole graph"
+        opened:
+          everything: "Show everything"
         search:
           label: "Find a page, post or tag"
           placeholder: "Find a page, post or tag…"
@@ -137,6 +162,13 @@ en:
             lists: "Lists lines hidden."
             related: "Related lines hidden."
             tag: "Shares-a-tag lines hidden."
+        opened:
+          line:
+            one: "This site has %{figure} connection, so the graph opens around Home."
+            other: "This site has %{figure} connections, so the graph opens around Home."
+          everything_name:
+            one: "Show everything: %{figure} connection"
+            other: "Show everything: all %{figure} connections"
         legend:
           toggle: "%{name}, %{count}"
         all_posts: "All posts"
@@ -153,6 +185,14 @@ en:
             one: "%{count} post"
             other: "%{count} posts"
           open_post: "Open post"
+          open_page: "Open page"
+          post_type: "Post type"
+          child_pages:
+            one: "%{count} child page"
+            other: "%{count} child pages"
+          lists_posts:
+            one: "lists %{count} post"
+            other: "lists %{count} posts"
           focus: "Focus"
           pin: "Pin"
           unpin: "Unpin"
@@ -163,6 +203,10 @@ en:
             draft: "Draft"
             scheduled: "Scheduled"
             live: "Live"
+            unpublished_changes: "Unpublished changes"
+            change_scheduled: "Change scheduled %{date}"
+            live_with_changes: "Live, unpublished changes"
+            live_change_scheduled: "Live, change scheduled %{date}"
         list:
           pages: "Pages · %{count}"
           posts: "Posts · %{count}"
@@ -174,6 +218,11 @@ en:
           open_in_posts: "Open in Posts →"
           failed: "The list couldn't be loaded."
           try_again: "Try again"
+          back: "Back to the list"
+          more_heading: "More from %{target} · %{count}"
+          more_row:
+            one: "%{figure} more post %{target} lists, not in view. Activate to show it."
+            other: "%{figure} more posts %{target} lists, not in view. Activate to show them."
           select_page:
             one: "%{title}: page, %{count} connection. Shows it in the graph."
             other: "%{title}: page, %{count} connections. Shows it in the graph."

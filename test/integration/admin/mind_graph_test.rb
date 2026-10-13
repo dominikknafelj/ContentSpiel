@@ -57,6 +57,58 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-tooltip][hidden]:empty"
   end
 
+  # A page's card (pages spec §7) and the graph that opens around Home
+  # (decision 6): four more addresses, built here by the route helpers.
+  test "the page's templates ride on the element, built by the route helpers" do
+    sign_in_as(users(:one))
+    create_page(title: "About")
+
+    get "/cs-studio/mind_graph", params: { locale: "de" }
+    element = css_select("[data-controller='admin--mind-graph--graph']").first
+
+    assert_equal "/cs-studio/mind_graph?locale=de&page=__ID__", element["data-page-focus-url"]
+    assert_equal "/cs-studio/notes/page/__ID__/threads?locale=de", element["data-page-notes-url"]
+    assert_equal "/cs-studio/mind_graph/data?locale=de&page=__ID__", element["data-open-url"]
+    assert_equal "/cs-studio/mind_graph/data?everything=1&locale=de", element["data-everything-url"]
+    assert_nil element["data-opened-lines"], "the script's to write, once the data has said where to open"
+  end
+
+  # "Show everything" is not remembered (the third design answers): it is no
+  # parameter of the page, so no address asks for it and a reload opens a
+  # large site around Home again. Only the data read takes it.
+  test "everything is no parameter of the page: the data url is the same with it" do
+    sign_in_as(users(:one))
+    create_page(title: "About")
+
+    get "/cs-studio/mind_graph", params: { everything: "1", lines: "3412" }
+
+    element = css_select("[data-controller='admin--mind-graph--graph']").first
+    assert_equal "/cs-studio/mind_graph/data", element["data-url"]
+    assert_nil element["data-opened-lines"]
+    assert_not_includes response.body, "3412"
+  end
+
+  # The bar of the view the 3,000-line rule opened: in the page from the
+  # start, hidden and empty of any figure, where a focused view has its bar.
+  # The script shows it; "Show everything" is a button, since it changes
+  # what this page shows and leads nowhere.
+  test "the whole graph's page holds the hidden bar with Show everything as a button, and a focused view has none" do
+    sign_in_as(users(:one))
+    page = create_page(title: "About")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-controller='admin--mind-graph--graph'] p[data-mind-graph-opened][hidden]" do
+      assert_select "span[data-mind-graph-opened-line]:empty", count: 1
+      assert_select "button[type=button][data-mind-graph-everything][data-action='admin--mind-graph--graph#showEverything']", text: "Show everything", count: 1
+      assert_select "a", count: 0
+    end
+
+    get "/cs-studio/mind_graph", params: { page: page.id }
+    assert_select "[data-mind-graph-opened]", count: 0
+    assert_select "[data-mind-graph-focus] a", text: "Whole graph"
+  end
+
   # A type that is no longer registered has no label to send: the card shows
   # the stored name.
   test "a retired type has no entry among the type labels" do
@@ -107,11 +159,19 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     # added there and forgotten in the view would throw in the script.
     held = I18n.t("admin.mind_graph.script.summary").flat_map { |key, value| value.is_a?(Hash) && !value.key?(:other) ? value.keys.map { |inner| "#{key}.#{inner}" } : [ key.to_s ] }
     assert_empty held.map { |key| "mind_graph.script.summary.#{key}" } - messages.keys
-    assert_equal %w[all_posts capped capped_local card.close card.focus card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more card.notes.replies card.notes.sending
-                    card.notes.title card.notes.unread card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
+    # The design answer's words, verbatim: a page's card (part one §5), the
+    # chip's second part (G4) and the whole chip for a screen reader (H6).
+    assert_equal [ "Open page", "Unpublished changes", "Change scheduled %{date}", "Live, unpublished changes", "Live, change scheduled %{date}" ],
+                 messages.values_at(*%w[open_page status.unpublished_changes status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
+    assert_equal [ { "one" => "%{count} child page", "other" => "%{count} child pages" }, { "one" => "lists %{count} post", "other" => "lists %{count} posts" } ],
+                 messages.values_at("mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts")
+    assert_equal %w[all_posts capped capped_local card.child_pages card.close card.focus card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more
+                    card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
+                    card.status.change_scheduled card.status.draft card.status.live card.status.live_change_scheduled card.status.live_with_changes card.status.scheduled card.status.unpublished_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
-                    list.add_post list.add_retired_post list.empty list.failed list.not_in_view list.open_in_posts list.pages list.posts list.select_page list.select_post list.select_tag list.select_type
-                    list.tags list.try_again list.types list.unlisted load_failed loading more no_connections
+                    list.add_post list.add_retired_post list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
+                    list.select_page list.select_post list.select_tag list.select_type
+                    list.tags list.try_again list.types list.unlisted load_failed loading more no_connections opened.everything_name opened.line
                     release_pinned retired_type retry search.count search.failed search.groups.page search.groups.post search.groups.tag search.none
                     summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type
                     summary.hidden_lines.lists summary.hidden_lines.related summary.hidden_lines.tag summary.hidden_lines.tree summary.local summary.more summary.none_yet summary.nothing
@@ -392,7 +452,10 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     order = css_select("[data-controller='admin--mind-graph--graph'] input[type=search], [data-controller='admin--mind-graph--graph'] input[type=checkbox], [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas[tabindex]")
       .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name == "input" ? (node["type"] == "search" ? "search" : node["data-name"]) : node.name }
-    assert_equal [ "search", "Posts", "Tags", "Related", "Shares a tag", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    # "Show everything" stands in a bar that is hidden until a large site has
+    # opened around Home, where a focused view has its bar's links.
+    assert_equal [ "search", "Show everything", "Posts", "Tags", "Related", "Shares a tag", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_select "[data-mind-graph-opened][hidden] button", text: "Show everything"
     assert_equal "search", css_select("[data-controller='admin--mind-graph--graph'] input, [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas").first["type"]
     assert_select "[data-controller='admin--mind-graph--graph'] canvas[data-swatch][tabindex]", count: 0
     # Nothing is taken out of the Tab order or moved within it; only the card
