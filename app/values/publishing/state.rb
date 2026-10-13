@@ -77,6 +77,15 @@ module Publishing
     # node, and asks once for all of them. Given (a time, or nil for "none"),
     # `pending_at` and `state` ask the database nothing. Not given, they read
     # it the first time, as before. A draft's is ignored either way.
+    #
+    # WHAT THE CALLER WHO HANDS IT OWES: the time is trusted, not checked.
+    # It is the `live_at` of the record's copy read with
+    # `Publishing::Version.pending(now)`, `Publishing.pending`'s own scope,
+    # and with the SAME `now` this state is given; nil when that read found
+    # none. A time that is not later than `now` (a copy already in force)
+    # would be answered as a change still scheduled. And only `pending_at`
+    # and `state` are free: `actions` still asks one statement for a record
+    # with a copy pending (`in_force?`), so a list never calls it per row.
     NOT_READ = Object.new.freeze
     private_constant :NOT_READ
 

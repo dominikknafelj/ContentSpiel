@@ -51,6 +51,38 @@ class PostGraph::SiteTest < ActiveSupport::TestCase
     assert_empty site.post_rows.map(&:first) & Post.trashed.pluck(:id)
   end
 
+  # The posts half of the rule, by a viewer narrowed by POST rights (the
+  # test above narrows by page and by the trash only): a post outside the
+  # scope is in no row, no link, no count and no list, and a tag only it
+  # carries has no count.
+  test "a post outside the viewer's posts scope is in no row, no tag link, no count and no list of what a page lists" do
+    %i[author_posts_read author_posts_create author_posts_edit].each { |grant| access_control_grants(grant).update!(scope: { "content_types" => [ "blog" ] }) }
+    mine = create_post(title: "Mine", tags: [ "shared" ])
+    theirs = create_post(title: "Theirs", content_type: "resume_entry", tags: [ "shared", "secret" ])
+    page = create_page(title: "Lists")
+    ContentBlock.create!(owner: page, block_type: :post_list, position: 0, settings: {})
+    ContentBlock.create!(owner: page, block_type: :post_list, position: 1, settings: { "content_type" => "resume_entry" })
+    shared, secret = %w[shared secret].map { |name| Tag.find_by!(name: name).id }
+
+    site = as(users(:author)) { PostGraph::Site.load(actor: users(:author)) }
+    whole = PostGraph::Site.load(actor: nil)
+
+    assert_equal [ mine.id, theirs.id ], whole.post_rows.map(&:first).sort, "trusted code reads both: what follows is the scope's doing"
+    assert_equal [ mine.id ], site.post_rows.map(&:first)
+    assert_equal [ mine.id ], site.readable_posts.pluck(:id)
+    assert_equal [ [ shared, mine.id ] ], site.tag_links
+    assert_equal({ shared => 1 }, site.tag_counts)
+    assert_not site.tag_counts.key?(secret)
+    assert_equal [ mine.id ], site.stamps.keys
+    assert_equal [ mine.id ], site.listings.posts_of(page.id)
+    assert_equal [ 1, 0, 1, 1 ], [ site.listings.listed_count(page.id), site.listings.type_count("resume_entry"), site.listings.type_count("blog"), site.listings.post_count ]
+    assert_not site.listings.listed?(theirs.id)
+    assert_empty site.listings.unlisted
+    assert_equal({ "all-posts" => 1 }, site.listings.left_out(page.id, shown: 0))
+    assert_empty site.listings.left_out_of(page.id, "type-resume_entry", shown: 0)
+    assert_nil site.listings.target_of(page.id, theirs.id)
+  end
+
   test "it costs five statements, with 3 pages and posts and with 30" do
     viewer = users(:one)
     build = ->(count) do

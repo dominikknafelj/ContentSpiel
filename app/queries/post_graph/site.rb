@@ -8,6 +8,11 @@
 # decision 3): CS Studio is the editors' view, and a line a live page's
 # unpublished block adds is drawn, with the page's own mark saying so.
 #
+# A PAGE'S PARENT IS ASKED OF `tree`, NEVER OF THE RECORD: `pages` are
+# records that carry `parent_id` (the tree is built from it), and for a page
+# whose parent the viewer cannot read that is an id they must not be told.
+# `Tree#parent` answers nil there.
+#
 # Five statements whatever the size: the readable posts (four columns, never
 # a body), their tag links, the readable pages (`PAGE_COLUMNS`), and
 # `Listings`' two.
@@ -33,6 +38,6 @@ module PostGraph
 
     def page(id) = @by_id[id]
     def home = @by_id[@tree.home_id]
-    def stamps = @stamps ||= @post_rows.to_h { |id, _type, _published_at, updated_at| [ id, updated_at ] }
+    def stamps = @stamps ||= @post_rows.to_h { |id, _type, _time, updated_at| [ id, updated_at ] }
   end
 end

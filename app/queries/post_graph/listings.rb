@@ -18,7 +18,8 @@
 # the parity). Blocks with the same settings share one pass over the posts.
 #
 # WHICH TARGET BRINGS A POST IN (`target_of`): the first list block of the
-# page (by id, as `blocks` orders them) that has a target and lists the post. A page's
+# page, AS A PERSON READS THE PAGE (`blocks`, by `BlockOutline`: never by
+# id or by `position` alone), that has a target and lists the post. A page's
 # local view draws a faint line from that hub to the post (pages spec §1,
 # the third design answers), so a post has one such line however many
 # blocks of the page list it.
@@ -27,14 +28,29 @@
 # may read, narrowed by the caller, so "listed" means "a page YOU can read
 # lists it" (spec §2, Risks).
 #
-# Two statements: the blocks, and the tags their settings name. (With no
+# Two statements: the blocks (with the sections that place them), and the
+# tags their settings name. (With no
 # name to look up the second is not made: `Tag.named_any` answers `none`.)
 module PostGraph
   class Listings
+    # The list blocks of these pages, page by page, each page's IN THE ORDER
+    # A PERSON READS THEM: `BlockOutline#reading_order`, the one rule for
+    # that (top-level blocks by position, a section's blocks where the
+    # section stands, column by column). "A page's first list block" is the
+    # first of these, so a block dragged above an older one is the first.
+    # The sections are loaded with them, for their place alone: ONE
+    # statement, and the order is worked out here. A block the outline does
+    # not reach (its section's type holds no blocks any more, so the section
+    # is not among the rows) comes last, by id: no line is lost to an order.
     def self.blocks(page_ids)
-      types = BlockTypes.with_capability(:lists_posts).map { |definition| definition.name.to_s }
-      ContentBlock.where(owner_type: "Page", owner_id: page_ids, block_type: types)
-                  .select(:id, :owner_id, :owner_type, :block_type, :settings, :translated_settings).order(:owner_id, :id)
+      places = BlockTypes.with_capability(:container).map { |definition| definition.name.to_s }
+      rows = ContentBlock.where(owner_type: "Page", owner_id: page_ids).merge(ContentBlock.listing.or(ContentBlock.where(block_type: places)))
+                         .select(:id, :owner_id, :owner_type, :block_type, :settings, :translated_settings, :position, :section_id, :section_column)
+                         .order(:owner_id, :id).to_a
+      rows.group_by(&:owner_id).flat_map do |_page_id, blocks|
+        read = BlockOutline.new(blocks).reading_order
+        (read + (blocks - read)).select { |block| block.definition&.capability?(:lists_posts) }
+      end
     end
 
     def self.key(settings) = [ settings.content_type.presence&.to_s, settings.tag.to_s.strip.downcase.presence ]

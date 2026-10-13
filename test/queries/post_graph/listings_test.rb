@@ -157,6 +157,70 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     assert_equal "all-posts", listings.target_of(@page.id, @plain.id), "only the block with no filter lists it now"
   end
 
+  # "First" is first AS A PERSON READS THE PAGE (`BlockOutline`), not first
+  # made: a newer block dragged above an older one is the page's first.
+  test "a newer list block moved above an older one is the first: the line to a post and the filter are the upper block's" do
+    older = list_block(@page, content_type: "blog")
+    newer = list_block(@page, tag: "ruby")
+    assert_operator newer.id, :>, older.id
+    assert_equal "type-blog", listings.target_of(@page.id, @ruby.id), "as made: the type's block is above the tag's"
+
+    older.update_columns(position: 1) # version: none (a test places a block) # changes: none (a test places a block)
+    newer.update_columns(position: 0) # version: none (a test places a block) # changes: none (a test places a block)
+    result = listings
+
+    assert_equal tag("ruby"), result.target_of(@page.id, @ruby.id)
+    assert_equal({ type: nil, tag: "ruby" }, result.filter_of(@page.id))
+    assert_equal [ tag("ruby"), "type-blog" ], result.targets(@page.id), "a page's targets in the order of its blocks"
+    assert_equal [ [ @page.id, tag("ruby") ], [ @page.id, "type-blog" ] ], result.edges
+    assert_equal [ newer.id, older.id ], PostGraph::Listings.blocks([ @page.id ]).map(&:id)
+    assert_equal({ tag("ruby") => 2, "type-blog" => 2 }, result.left_out(@page.id, shown: 0), "each post is counted with the upper block that lists it")
+    assert_equal [ @entry.id, @ruby.id ].sort, result.left_out_of(@page.id, tag("ruby"), shown: 0).sort
+    assert_equal [ @plain.id, @draft.id ].sort, result.left_out_of(@page.id, "type-blog", shown: 0).sort
+  end
+
+  test "of two blocks with one target, the filter is the upper one's, wherever it was made" do
+    older = list_block(@page, tag: "ruby", content_type: "blog")
+    newer = list_block(@page, tag: "ruby")
+    assert_equal({ type: "blog", tag: "ruby" }, listings.filter_of(@page.id, tag("ruby")))
+
+    older.update_columns(position: 1) # version: none (a test places a block) # changes: none (a test places a block)
+    newer.update_columns(position: 0) # version: none (a test places a block) # changes: none (a test places a block)
+
+    assert_equal({ type: nil, tag: "ruby" }, listings.filter_of(@page.id, tag("ruby")))
+    assert_equal({ type: nil, tag: "ruby" }, listings.filter_of(@page.id))
+  end
+
+  # A section whose type holds no blocks any more is not loaded, so the
+  # outline does not reach what is inside it: the block is kept all the same.
+  test "a list block the outline does not reach is kept, after the page's others" do
+    section = ContentBlock.create!(owner: @page, block_type: :section, position: 0, settings: { "layout" => "two" })
+    inside = ContentBlock.create!(owner: @page, block_type: :post_list, position: 0, section_id: section.id, section_column: 1, settings: { "tag" => "ruby" })
+    below = list_block(@page, content_type: "blog")
+    section.update_column(:block_type, "gone_container")
+
+    assert_equal [ below.id, inside.id ], PostGraph::Listings.blocks([ @page.id ]).map(&:id)
+    assert_equal [ "type-blog", tag("ruby") ], listings.targets(@page.id)
+  end
+
+  # A section's blocks are read where the section stands, column by column:
+  # a list block in a section at the top of the page comes before a
+  # top-level one under it, whatever their own positions and ids say.
+  test "a list block inside a section stands where its section stands, its columns left to right" do
+    below = list_block(@page, content_type: "blog")
+    section = ContentBlock.create!(owner: @page, block_type: :section, position: 0, settings: { "layout" => "two" })
+    right = ContentBlock.create!(owner: @page, block_type: :post_list, position: 0, section_id: section.id, section_column: 2, settings: {})
+    left = ContentBlock.create!(owner: @page, block_type: :post_list, position: 5, section_id: section.id, section_column: 1, settings: { "tag" => "ruby" })
+    below.update_columns(position: 1) # version: none (a test places a block) # changes: none (a test places a block)
+
+    result = listings
+
+    assert_equal [ left.id, right.id, below.id ], PostGraph::Listings.blocks([ @page.id ]).map(&:id)
+    assert_equal tag("ruby"), result.target_of(@page.id, @ruby.id)
+    assert_equal "all-posts", result.target_of(@page.id, @plain.id), "the section's second column comes before the block under the section"
+    assert_equal({ type: nil, tag: "ruby" }, result.filter_of(@page.id))
+  end
+
   # Design answer H1: one pill per target, each counting only what that
   # target brings in beyond the posts the view draws.
   test "what is left out is counted per target, by the target that brings each post in, and each target has its own block's filter" do
@@ -222,7 +286,15 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     end
 
     few_pages, few_posts, few = ask.call
-    27.times { |index| list_block(create_page(title: "More #{index}"), tag: index.even? ? "ruby" : "tag #{index}", content_type: "blog") }
+    # At the larger size every page has a section too, with a list block in
+    # each of its columns: a statement per section or per block inside one
+    # (`block.section` on a block whose section was not loaded) would show.
+    27.times do |index|
+      page = create_page(title: "More #{index}")
+      list_block(page, tag: index.even? ? "ruby" : "tag #{index}", content_type: "blog")
+      section = ContentBlock.create!(owner: page, block_type: :section, position: 1, settings: { "layout" => "two" })
+      [ 1, 2 ].each { |column| ContentBlock.create!(owner: page, block_type: :post_list, position: 0, section_id: section.id, section_column: column, settings: { "tag" => "tag #{index + column}" }) }
+    end
     55.times { |index| create_post(title: "Post #{index}", tags: [ "ruby", "tag #{index}" ]) }
     many_pages, many_posts, many = ask.call
 
