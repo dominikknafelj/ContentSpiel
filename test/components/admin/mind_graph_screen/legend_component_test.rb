@@ -77,13 +77,33 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     assert_no_text "Draft or scheduled"
   end
 
-  test "a viewer who reads no page has no toggle for pages, post types, the tree or lists; one who reads no post none for posts, tags, related or shared tags" do
+  # A kind that can be drawn has its toggle and its key, and one that cannot
+  # has none (`PostGraph::Kinds`, the one rule). A TAG is drawn for a reader
+  # of pages too: one a page's list block names.
+  test "a viewer gets the toggles of the kinds they may be shown: of posts alone, of pages alone with the tags pages list, and none who reads neither" do
+    toggles = -> { [ "nodes", "lines" ].map { |group| page.all("fieldset[data-legend-group=#{group}] label[data-legend-toggle]").map { |label| label["data-legend-toggle"] } } }
+
     legend(pages: false)
-    assert_equal %w[post tag related tag], page.all("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+    assert_equal [ %w[post tag], %w[related tag] ], toggles.call
     assert_no_selector "canvas[data-swatch=page], canvas[data-swatch=type], canvas[data-swatch=line-tree], canvas[data-swatch=line-lists]"
 
     legend(content_types: [], pages: true)
-    assert_equal %w[page type tree lists], page.all("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+    assert_equal [ %w[page tag type], %w[tree lists] ], toggles.call
+    assert_selector "label[data-legend-toggle=tag] canvas[data-swatch=tag]"
+    assert_no_selector "canvas[data-swatch=post], canvas[data-swatch=line-related], canvas[data-swatch=line-tag]"
+
+    legend
+    assert_equal [ %w[page post tag type], %w[tree lists related tag] ], toggles.call
+
+    legend(content_types: [], pages: false)
+    assert_no_selector "fieldset, input"
+  end
+
+  test "the toggles are the one rule's, kind for kind" do
+    [ true, false ].product([ true, false ]).each do |pages, posts|
+      component = Admin::MindGraphScreen::LegendComponent.new(content_types: posts ? %w[blog] : [], pages: pages)
+      assert_equal PostGraph::Kinds.shown(pages: pages, posts: posts), { nodes: component.node_toggles, lines: component.line_toggles }
+    end
   end
 
   test "the keys that are no controls are a list named Legend, after the toggles and the Status button" do

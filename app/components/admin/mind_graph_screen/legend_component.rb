@@ -12,11 +12,12 @@ module Admin
     # where it was dropped) and "Open notes" (the count badge of a post or a
     # page with open notes).
     #
-    # WHICH TOGGLES A VIEWER GETS (pages spec §2: no type the viewer cannot
-    # read): pages, post types, the tree and lists hang on pages, and are
-    # there for someone who can read a page; posts, tags, related and shared
-    # tags hang on posts. "Links in text" is not built and has no toggle,
-    # not even a disabled one (F6).
+    # WHICH TOGGLES A VIEWER GETS is `PostGraph::Kinds`' rule and nobody
+    # else's: a kind that can be drawn for them has its toggle and its key,
+    # and one that cannot has none (pages spec §2: no type the viewer cannot
+    # read). So a reader of pages alone gets "Tags" too: a tag their pages
+    # list is drawn. "Links in text" is not built and has no toggle, not
+    # even a disabled one (F6).
     #
     # THE COUNTS ARE THE SCRIPT'S: the page holds no graph data, so a count
     # is empty here and written once the data has come (`mind_graph/app.js`),
@@ -40,10 +41,8 @@ module Admin
     class LegendComponent < AdminComponent
       # In the legend's order, which `mind_graph/graph_data.js` repeats
       # (`NODE_TOGGLES`, `LINE_TOGGLES`; a test holds the two equal).
-      NODES = %i[page post tag type].freeze
-      LINES = %i[tree lists related tag].freeze
-      # What hangs on pages; everything else hangs on posts.
-      OF_PAGES = %i[page type tree lists].freeze
+      NODES = ::PostGraph::Kinds::NODES
+      LINES = ::PostGraph::Kinds::LINES
 
       # `content_types:` the type names of the viewer's posts, in any order, with
       # repeats allowed; `pages:` whether the viewer can read a page at all.
@@ -52,8 +51,8 @@ module Admin
         @pages = pages
       end
 
-      def node_toggles = NODES.select { |kind| shown?(kind) }
-      def line_toggles = LINES.select { |kind| shown?(kind) }
+      def node_toggles = kinds.fetch(:nodes)
+      def line_toggles = kinds.fetch(:lines)
 
       # A toggle's swatch by its group and kind: "tag" is a kind of node and
       # a kind of line.
@@ -73,7 +72,7 @@ module Admin
 
       private
 
-      def shown?(kind) = OF_PAGES.include?(kind) ? @pages : @content_types.any?
+      def kinds = @kinds ||= ::PostGraph::Kinds.shown(pages: @pages, posts: @content_types.any?)
     end
   end
 end

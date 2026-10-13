@@ -308,8 +308,22 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Links in text"
   end
 
-  # Pages spec §2: no type the viewer cannot read.
-  test "a viewer who reads pages and no post gets the toggles of pages only" do
+  # Pages spec §2 with the ruling on Task 6's review: a kind that can be
+  # drawn has its toggle and its key, and no kind the viewer cannot read has
+  # one. The matrix of rights: both, posts alone, pages alone, neither.
+  def toggles = css_select("label[data-legend-toggle]").map { |label| [ label.parent["data-legend-group"], label["data-legend-toggle"] ].join(":") }
+
+  test "a viewer who reads pages and posts gets all eight toggles" do
+    create_post(title: "Theirs")
+    create_page(title: "Theirs too")
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph"
+
+    assert_equal %w[nodes:page nodes:post nodes:tag nodes:type lines:tree lines:lists lines:related lines:tag], toggles
+  end
+
+  test "a viewer who reads pages and no post gets the toggles of pages, and of the tags pages list" do
     create_post(title: "Hidden from them")
     create_page(title: "Theirs to read")
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
@@ -318,7 +332,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_equal %w[page type tree lists], css_select("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+    assert_equal %w[nodes:page nodes:tag nodes:type lines:tree lines:lists], toggles
+    assert_select "label[data-legend-toggle=tag] canvas[data-swatch=tag]", count: 1
+    assert_not_includes response.body, "Hidden from them"
   end
 
   test "a viewer who reads posts and no page gets the toggles of posts only" do
@@ -329,26 +345,17 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_equal %w[post tag related tag], css_select("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+    assert_equal %w[nodes:post nodes:tag lines:related lines:tag], toggles
     assert_not_includes response.body, "Hidden from them"
   end
 
-  # To someone who reads no page every post is one no page (they read)
-  # lists, so "Not listed on any page" would say nothing: the script draws
-  # its checkbox only when the element carries the read's address.
-  test "the address of the unlisted read is there for a viewer who reads a page, and for no other" do
-    create_post(title: "Theirs to read")
-    root_page
-    sign_in_as(users(:author))
+  test "someone who holds neither read right is refused, and is shown no toggle" do
+    sign_in_as(users(:editor_branch))
 
     get "/cs-studio/mind_graph"
-    assert_select "[data-controller='admin--mind-graph--graph'][data-unlisted-url]"
 
-    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ 0 ] })
-    get "/cs-studio/mind_graph"
-    assert_select "[data-controller='admin--mind-graph--graph']"
-    assert_select "[data-controller='admin--mind-graph--graph'][data-unlisted-url]", count: 0
-    assert_not_includes response.body, "mind_graph/unlisted"
+    assert_response :forbidden
+    assert_select "[data-mind-graph-legend], label[data-legend-toggle]", count: 0
   end
 
   # Third design answers and H6: status is not a filter; its key is a dialog
