@@ -187,6 +187,114 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Code block spec §5: one token per role the highlighter names, each with
+  # its dark value.
+  SYNTAX_TOKENS = %w[comment keyword string constant tag attribute embed].map { |role| "--th-syn-#{role}" }.freeze
+
+  test "the seven syntax tokens are the highlighter's seven roles, and each has a light and a dark value" do
+    assert_equal CodeHighlight::ROLES.map { |role| "--th-syn-#{role}" }, SYNTAX_TOKENS
+    theme_tokens.each do |theme, tokens|
+      SYNTAX_TOKENS.each { |token| assert tokens.key?(token), "#{token} missing from the #{theme} theme" }
+    end
+  end
+
+  # WHERE A CODE BLOCK CAN STAND, and what is then behind its text
+  # (`code.css`: the `pre` and the head strip are both `--th-sunken`):
+  #   - on the page: the sunken ground;
+  #   - in a tinted band, which is itself the sunken ground and so puts the
+  #     surface behind code (`--th-sunken: var(--th-surface)`);
+  #   - in a strong band: the band's text colour at 12% over the band.
+  # Each answers `inside`, what the band declares for everything in it (read
+  # from `sections.css`, so a re-valued token is measured as re-valued), the
+  # colour behind the code, and the colour around the block, which is what
+  # the code's own focus ring is drawn on. `colour` is a token as it is THERE.
+  def code_grounds(tokens)
+    { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+      "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.transform_values do |inside, around|
+      outside = resolve_colour(tokens, around, inside: inside)
+      { inside: inside, outside: outside, ground: resolve_colour(tokens, "--th-sunken", inside: inside, under: outside),
+        colour: ->(name) { resolve_colour(tokens, name, inside: inside) } }
+    end
+  end
+
+  # WCAG 1.4.3 for code (design answer C8: "check all seven, comments are
+  # usually the one that fails"): every role on every ground a code block
+  # has, in both themes. 42 pairs; the lowest is the comment on the dark
+  # sunken ground, 5.5:1.
+  test "every syntax colour is readable on every ground a code block has: the page, a tinted band and a strong band, in both themes" do
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      code_grounds(tokens).each do |place, here|
+        SYNTAX_TOKENS.each do |token|
+          ratio = contrast(here[:ground], here[:colour].(token))
+          assert_operator ratio, :>=, 4.5, "#{token} on #{place} (#{theme}) is #{ratio.round(2)}:1"
+          pairs += 1
+        end
+      end
+    end
+    assert_equal 42, pairs
+  end
+
+  # The rest of what is written on that ground: plain code (`--th-ink`), the
+  # head strip's language (`--th-dim`) and Copy's word, at rest and under the
+  # pointer (the accent and its hover), each text at 4.5:1. And the two
+  # focus rings, which are not text and need 3:1 (WCAG 1.4.11; design answer
+  # C8): Copy's is drawn inside the strip, on the code's ground, and the
+  # code's own is drawn outside the block, on what is around it.
+  test "plain code, the head strip and Copy are readable on every ground a code block has, and both focus rings stand out, in both themes" do
+    theme_tokens.each do |theme, tokens|
+      code_grounds(tokens).each do |place, here|
+        %w[--th-ink --th-dim --th-accent --th-accent-hover].each do |token|
+          ratio = contrast(here[:ground], here[:colour].(token))
+          assert_operator ratio, :>=, 4.5, "#{token} on #{place} (#{theme}) is #{ratio.round(2)}:1"
+        end
+        ring = here[:colour].("--th-accent")
+        assert_operator contrast(here[:ground], ring), :>=, 3.0, "Copy's focus ring on #{place} (#{theme}) is #{contrast(here[:ground], ring).round(2)}:1"
+        assert_operator contrast(here[:outside], ring), :>=, 3.0, "the code's focus ring on #{place} (#{theme}) is #{contrast(here[:outside], ring).round(2)}:1"
+      end
+    end
+  end
+
+  # Spec decision 8 (confirmed by the owner): on a strong band the code is
+  # one colour. The band re-values the seven to its own text colour, the
+  # comment to its dim; the test above measures both on the band's sunken
+  # ground. A tinted band re-values none of them.
+  test "on a strong band the code is one colour: the seven are the band's text colour, the comment its dim; a tinted band leaves them alone" do
+    strong = band_values("strong")
+    (SYNTAX_TOKENS - %w[--th-syn-comment]).each { |token| assert_equal "var(--th-on-band-strong)", strong[token], token }
+    assert_equal "var(--th-on-band-strong-dim)", strong["--th-syn-comment"]
+    assert_equal "color-mix(in srgb, var(--th-on-band-strong) 12%, transparent)", strong["--th-sunken"], "the ground the two colours are measured on"
+    assert_empty band_values("tinted").keys & SYNTAX_TOKENS
+  end
+
+  # The measuring itself, on values of its own: a pair that is too close
+  # is seen as too close, a thinned colour is painted over what is under
+  # it, and a token is measured as it is valued where the code stands. A
+  # band's declaration names the band's own value of a token it declares
+  # and the page's value of every other; and a token the PAGE made from
+  # another (`--th-band-strong: var(--th-ink)`) was computed on the page, so
+  # the band's new ink does not reach back into it.
+  test "the measuring can fail: a colour too close to its ground is under 4.5, and a token is measured as the band values it" do
+    tokens = { "--th-paper" => "#ffffff", "--th-sunken" => "#ecebe6", "--th-surface" => "#ffffff", "--th-ink" => "#141417", "--th-band-tinted" => "var(--th-sunken)",
+               "--th-band-strong" => "var(--th-ink)", "--th-on-band-strong" => "#f5f4f0", "--th-on-band-strong-dim" => "#c9c8c2", "--th-syn-comment" => "#8a8a8a" }
+    grounds = code_grounds(tokens)
+    colour = ->(name) { resolve_colour(tokens, name) }
+
+    assert_operator contrast(grounds["the page"][:ground], grounds["the page"][:colour].("--th-syn-comment")), :<, 4.5
+    assert_in_delta 21.0, contrast(colour.("--th-paper"), [ 0.0, 0.0, 0.0 ]), 0.01
+    assert_equal colour.("--th-surface"), grounds["a tinted band"][:ground]
+    assert_equal colour.("--th-sunken"), grounds["a tinted band"][:outside], "the tinted band is the page's sunken ground, not the band's own"
+
+    strong = grounds["a strong band"]
+    assert_equal colour.("--th-ink"), strong[:outside], "the strong band is the PAGE's ink"
+    assert_equal colour.("--th-on-band-strong"), strong[:colour].("--th-ink"), "and ink inside it is the band's"
+    assert_equal colour.("--th-on-band-strong-dim"), strong[:colour].("--th-syn-comment"), "a comment in the band is the band's dim, not the page's comment"
+    assert_equal mix(colour.("--th-on-band-strong"), colour.("--th-ink"), 0.12), strong[:ground]
+    assert_operator contrast(strong[:ground], strong[:outside]), :<, 1.6, "the band's sunken ground is the band, a little lighter"
+    assert_operator contrast(strong[:ground], strong[:colour].("--th-ink")), :>, 10
+    assert_raises(Minitest::Assertion) { resolve_colour(tokens, "--th-sunken", inside: strong[:inside]) }
+  end
+
   private
     def helpers = ActionController::Base.helpers
 
@@ -197,16 +305,44 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
         .transform_values { |block| block.scan(/(--th-[\w-]+):\s*([^;]+);/).to_h }
     end
 
+    # The custom properties a band gives what is inside it
+    # (`sections.css`, `.content-section--<name> { … }`), as written.
+    def band_values(name)
+      css = Rails.root.join("app/assets/tailwind/themes/default/sections.css").read.gsub(%r{/\*.*?\*/}m, "")
+      rule = css[/^\.content-section--#{name}\s*\{(.*?)\}/m, 1] or flunk("sections.css has no rule for the #{name} band")
+      rule.scan(/(--th-[\w-]+):\s*([^;]+);/).to_h
+    end
+
     # A token's colour as linear-light sRGB, following `var()` to its value.
-    # Hex and `oklch()` are the two notations the opaque tokens use.
-    def resolve_colour(tokens, name)
-      case tokens.fetch(name)
-      when /\Avar\((--th-[\w-]+)\)\z/ then resolve_colour(tokens, $1)
+    # Hex and `oklch()` are the two notations the opaque tokens use; a
+    # colour thinned out with `color-mix(… <share>%, transparent)` is
+    # painted over `under`, which a caller that expects one hands in.
+    #
+    # `inside` is what a band declares for everything in it. A name it
+    # declares is the band's value, whose own `var()`s are read inside the
+    # band too; any other name is the page's, computed on the page with the
+    # page's values, as a custom property is inherited: computed.
+    def resolve_colour(tokens, name, under: nil, inside: {})
+      return resolve_colour(tokens, name, under: under) if inside.any? && !inside.key?(name)
+
+      case inside.fetch(name) { tokens.fetch(name) }
+      when /\Avar\((--th-[\w-]+)\)\z/ then resolve_colour(tokens, $1, under: under, inside: inside)
       when /\A#(\h{6})\z/
         $1.scan(/../).map { |pair| (channel = pair.hex / 255.0) <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055)**2.4 }
       when /\Aoklch\(([\d.]+) ([\d.]+) ([\d.]+)\)\z/ then oklch_to_linear_srgb($1.to_f, $2.to_f, $3.to_f)
-      else flunk("#{name} is neither a hex colour nor oklch(): #{tokens[name]}")
+      when /\Acolor-mix\(in srgb, var\((--th-[\w-]+)\) ([\d.]+)%, transparent\)\z/
+        under or flunk("#{name} is a thinned colour and nothing was named for it to be painted over")
+        mix(resolve_colour(tokens, $1, inside: inside), under, $2.to_f / 100)
+      else flunk("#{name} is neither a hex colour, oklch() nor a colour thinned with color-mix(): #{inside.fetch(name) { tokens[name] }}")
       end
+    end
+
+    # `color-mix(in srgb, top <share>, transparent)` painted over `under`:
+    # mixed in the encoded values, as a browser does, from and to linear light.
+    def mix(top, under, share)
+      encode = ->(value) { value <= 0.0031308 ? value * 12.92 : 1.055 * value**(1 / 2.4) - 0.055 }
+      decode = ->(value) { value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055)**2.4 }
+      top.zip(under).map { |one, other| decode.(encode.(one) * share + encode.(other) * (1 - share)) }
     end
 
     # Björn Ottosson's OKLab to linear sRGB matrices; out-of-gamut channels

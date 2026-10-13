@@ -30,12 +30,17 @@ class Theme
     # (`app/assets/tailwind/themes/default/tokens.css`, the first two
     # blocks), without the `--th-` prefix. A theme changes one by declaring
     # it again in its own stylesheet, under the same selectors.
+    #
+    # The last seven are the Code block's syntax colours, one per role of
+    # `CodeHighlight::ROLES` and in its order (the highlighter is not named
+    # here: `test/values/theme/contract_test.rb` holds the two together).
     THEMED_TOKENS = %w[
       paper surface sunken ink dim meta line line-strong
       accent accent-hover accent-tint on-accent
       ok ok-ink ok-tint warn warn-ink warn-tint danger danger-ink danger-tint
       shadow-menu
       band-tinted band-strong on-band-strong on-band-strong-dim on-band-strong-accent
+      syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed
     ].freeze
 
     # Tokens with one value (the last block): type, tracking, spacing, shape.
@@ -79,6 +84,16 @@ class Theme
     COMPONENTS = {
       "blocks/rich_text_component" => %w[block page],
       "blocks/image_component" => %w[block page asset alt caption sizes],
+      # `lines` is one array per line of [role, text] pairs, the role nil or
+      # one of the seven a `syn-` token exists for; `string(key)` is one of
+      # the copy button's four words (:copy, :copy_code, :copied, :failed) in
+      # the visitor's language; `file_id` is an id for the file name's
+      # element, one per block; `head_attributes` is what the element around
+      # the copy button is written with (`hidden` and the script's `strip`
+      # target when the block has no file name and no language, nothing
+      # otherwise). The markup the copy script asks of any template is in
+      # docs/reference/theming.md, "The Code block".
+      "blocks/code_component" => %w[block page lines code language language_label filename caption string file_id head_attributes],
       "blocks/post_list_component" => %w[block page list_component],
       "blocks/section_component" => %w[block page columns layout background width],
       "posts/blog_list_component" => %w[posts page],

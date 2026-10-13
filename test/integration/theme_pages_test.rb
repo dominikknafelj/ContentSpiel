@@ -334,7 +334,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
         Rails.application.reloader.prepare!
 
         assert_includes Theme.current.refusal.message, "views/pages/shwo.html.erb is not part of the theme contract"
-        assert_equal %w[image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
+        assert_equal %w[code image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
         assert_not_empty ContentTypes.all
         assert AccessControl::Permissions.all.any?
 
@@ -378,7 +378,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
 
         assert_includes Theme.current.refusal.message, "  - notes.txt is not part of a theme."
         assert_includes Theme.current.refusal.message, "  - javascript is not part of a theme."
-        assert_equal %w[image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
+        assert_equal %w[code image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
         assert_not_empty ContentTypes.all
         assert_includes assert_raises(ThemeFolder::Invalid) { get "/about" }.message, "notes.txt is not part of a theme"
         sign_in_as users(:one)
@@ -467,6 +467,57 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     with_plain_theme { get "/blog/first-post" }
 
     assert_select "div.plain-frame article.content-block--post-list-detail h1", text: "First post"
+  end
+
+  # The Code block's template is a theme's to replace (code block spec §5):
+  # the third theme's is written from the eleven names the contract gives it,
+  # each of which is drawn here, and the markup the copy script asks for.
+  # The second theme holds no Code template, so under it the block is the
+  # default's.
+  test "a theme replaces the Code block's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    docs = create_page(title: "Docs")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: docs), attributes: { block_type: "code", settings: { "language" => "ruby", "filename" => "<a>.rb", "code" => "a = 1\n  b = \"<b>\"" } },
+      translations: { "en" => { caption: "Two lines" } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(docs)
+
+    with_code_theme { get "/docs" }
+
+    assert_response :success
+    assert_select "div.plain-code[data-language='ruby'][data-characters='17'][data-block='#{result.record.id}'][data-page='#{docs.id}']", count: 1
+    assert_select "div.plain-code[data-controller='code-copy'][data-code-copy-label-value='Copy'][data-code-copy-copied-value='Copied'][data-code-copy-failed-value='Not copied']" do
+      assert_select "div.plain-code__bar:not([hidden]):not([data-code-copy-target]) p.plain-code__file#code-#{result.record.id}-file", text: "<a>.rb"
+      assert_select "button[aria-describedby='code-#{result.record.id}-file']", count: 1
+      assert_select "p.plain-code__language", text: "Ruby"
+      assert_select "button[type=button][hidden][aria-label='Copy code'][data-code-copy-target='button'][data-action='code-copy#copy']", text: "Copy"
+      assert_select "[role=status][data-code-copy-target='status']", count: 1
+      assert_select "pre[data-code-copy-target='source'] b.syn-constant[data-role='constant']", text: "1"
+      assert_select "pre[data-code-copy-target='source'] b[data-role='string']", text: "\"<b>\""
+      assert_select "p.plain-code__caption", text: "Two lines"
+    end
+    assert_equal "a = 1\n  b = \"<b>\"", Nokogiri::HTML5(response.body).at_css("div.plain-code pre").text, "what the script copies is the stored code, to the character"
+    assert_select "figure.content-block--code", count: 0
+    assert_select "div.plain-code b b, div.plain-code pre a", count: 0
+
+    with_plain_theme { get "/docs" }
+
+    assert_response :success
+    assert_select "div.plain-frame figure.content-block--code pre span.syn-constant", text: "1"
+    assert_select "div.plain-code", count: 0
+  end
+
+  test "the third theme is sound, checked deeply too: a Code template of the contract's names and a stylesheet of the seven tokens for both schemes" do
+    folder = ThemeFolder.new(ThemeTestHelper::CODE)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    assert_equal %w[assets/stylesheets/theme.css components/blocks/code_component.html.erb], folder.files
+    template = folder.read("components/blocks/code_component.html.erb")
+    Theme::Contract::COMPONENTS.fetch("blocks/code_component").each { |name| assert_match(/\b#{name}\b/, template, "the template calls #{name}") }
+    assert_no_match(/bare\?|settings|html_safe|raw\b|safe_join|<%==/, template, "nothing the contract does not name, and no string marked safe")
+    css = folder.read("assets/stylesheets/theme.css")
+    [ /:root, \[data-theme="light"\]\s*\{(.*?)\}/m, /^\[data-theme="dark"\]\s*\{(.*?)\}/m ].each do |block|
+      assert_equal CodeHighlight::ROLES.map { |role| "--th-syn-#{role}" }, css[block, 1].to_s.scan(/(--th-[\w-]+):/).flatten
+    end
   end
 
   test "the preview is drawn by the theme too, with the CMS's preview bar" do

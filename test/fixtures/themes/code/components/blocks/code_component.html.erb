@@ -1,0 +1,24 @@
+<%# A theme's own Code block, written from what `Theme::Contract` gives the template
+    (`block`, `page`, `lines`, `code`, `language`, `language_label`, `filename`, `caption`,
+    `string`, `file_id`, `head_attributes`) and from the markup the CMS's copy script asks of any template
+    (docs/reference/theming.md, "The Code block"): the identifier, the `button`, `source`
+    and `status` targets, the action and the three values. Each token's text is printed
+    through ERB's own escaping and nothing is marked safe. The `pre` is on one line: what
+    is between its tags is what is copied. %>
+<div class="plain-code" data-controller="code-copy" data-code-copy-label-value="<%= string(:copy) %>" data-code-copy-copied-value="<%= string(:copied) %>" data-code-copy-failed-value="<%= string(:failed) %>" data-language="<%= language %>" data-characters="<%= code.length %>" data-block="<%= block.id %>" data-page="<%= page.id %>">
+  <%= tag.div class: "plain-code__bar", **head_attributes do %>
+    <% if filename.present? %>
+      <p class="plain-code__file" id="<%= file_id %>"><%= filename %></p>
+    <% end %>
+    <% if language_label %>
+      <p class="plain-code__language"><%= language_label %></p>
+    <% end %>
+    <%= tag.button string(:copy), type: "button", hidden: true, aria: { label: string(:copy_code), describedby: (file_id if filename.present?) },
+          data: { code_copy_target: "button", action: "code-copy#copy" } %>
+    <span class="plain-code__status" role="status" data-code-copy-target="status"></span>
+  <% end %>
+  <pre data-code-copy-target="source"><% lines.each_with_index do |line, index| %><%= "\n" if index.positive? %><% line.each do |role, text| %><% if role %><b class="syn-<%= role %>" data-role="<%= role %>"><%= text %></b><% else %><%= text %><% end %><% end %><% end %></pre>
+  <% if caption.present? %>
+    <p class="plain-code__caption"><%= caption %></p>
+  <% end %>
+</div>

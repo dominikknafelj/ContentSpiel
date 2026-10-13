@@ -1,0 +1,33 @@
+/* The third theme's stylesheet: the Code block's seven syntax colours
+   declared again, for both schemes, which is all a theme does to re-colour
+   code (the build imports this after the default theme's styles). Then its
+   own template's rules: its spans carry the default's class names, and the
+   default's rules are for the default's figure, so the theme colours its own
+   by the same tokens. */
+:root, [data-theme="light"] {
+  --th-syn-comment: #5c5c5c;
+  --th-syn-keyword: #7a1fa2;
+  --th-syn-string: #1b5e20;
+  --th-syn-constant: #8a4b00;
+  --th-syn-tag: #005f73;
+  --th-syn-attribute: #3a3f9e;
+  --th-syn-embed: #a3002b;
+}
+[data-theme="dark"] {
+  --th-syn-comment: #a8a8a8;
+  --th-syn-keyword: #d7a8ee;
+  --th-syn-string: #9fd8a3;
+  --th-syn-constant: #f0c17a;
+  --th-syn-tag: #8fd3e0;
+  --th-syn-attribute: #b3b8f5;
+  --th-syn-embed: #f5a3b5;
+}
+.plain-code pre { overflow-x: auto; font-family: var(--th-mono); background: var(--th-sunken); color: var(--th-ink); }
+.plain-code .syn-comment { color: var(--th-syn-comment); }
+.plain-code .syn-keyword { color: var(--th-syn-keyword); }
+.plain-code .syn-string { color: var(--th-syn-string); }
+.plain-code .syn-constant { color: var(--th-syn-constant); }
+.plain-code .syn-tag { color: var(--th-syn-tag); }
+.plain-code .syn-attribute { color: var(--th-syn-attribute); }
+.plain-code .syn-embed { color: var(--th-syn-embed); }
+.plain-code__status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

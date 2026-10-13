@@ -60,6 +60,30 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_equal Theme::Contract::RICH_TEXT.sort, rows("Rich text selectors").keys.sort
   end
 
+  # The Code block's own section: what its template is handed, the four
+  # words and the markup the copy script reads, each table held to the code
+  # it describes. The script's side is read from its file (`static targets`
+  # and `static values`), so a target or a value it gains or loses fails
+  # here until the table says so: that markup is what a theme's own
+  # template is written from.
+  test "the Code block's tables name exactly the methods of its entry, the four words and what the copy script reads" do
+    section = section("The Code block")
+    cells = section.scan(/^\| `([^`]+)` \|/).flatten
+    script = Rails.root.join("app/javascript/controllers/code_copy_controller.js").read
+    targets = script[/static targets = \[(.*?)\]/m, 1].scan(/"(\w+)"/).flatten
+    values = script[/static values = \{(.*)\}\s*$/, 1].scan(/(\w+):\s*(?:String|\{)/).flatten
+    words = YAML.load_file(Rails.root.join("config/locales/public.en.yml")).dig("en", "public", "blocks", "code").keys
+
+    assert_equal %w[button source status strip], targets.sort, "the script's targets, as this test reads them"
+    assert_equal %w[copied failed label restore], values.sort, "the script's values, as this test reads them"
+    methods = Theme::Contract::COMPONENTS.fetch("blocks/code_component").map { |name| name == "string" ? "string(key)" : name }
+    markup = [ %(data-controller="code-copy"), %(data-action="code-copy#copy") ] +
+      targets.map { |name| %(data-code-copy-target="#{name}") } + values.map { |name| "data-code-copy-#{name}-value" }
+
+    assert_equal (methods + words.map { |key| "string(:#{key})" } + markup).sort, cells.sort
+    CodeHighlight::ROLES.each { |role| assert_includes section, "`#{role}`" }
+  end
+
   test "CLAUDE.md's reference index points here" do
     assert Rails.root.join("CLAUDE.md").read.include?("docs/reference/theming.md"), "CLAUDE.md's reference index has no line for docs/reference/theming.md"
   end

@@ -442,4 +442,106 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     ring = page.evaluate_script("(() => { const button = #{figure_js}.querySelector('button'); const style = getComputedStyle(button); const span = document.createElement('span'); span.style.color = 'var(--th-accent)'; button.after(span); const accent = getComputedStyle(span).color; span.remove(); return [button.matches(':focus-visible'), style.outlineStyle, style.outlineWidth, style.outlineColor === accent] })()")
     assert_equal [ true, "solid", "2px", true ], ring
   end
+
+  # THE THEMING CONTRACT, in a browser (code block spec §5,
+  # docs/reference/theming.md, "The Code block"). The third theme's template
+  # is written from the reference's tables alone: another element, other
+  # classes, the documented markup. That the button works under it is what
+  # makes the table a promise.
+  test "under a theme's own template the Copy button is shown, copies the stored code and says so, with nothing but the documented markup" do
+    code = "\tdef a\n\n    \"<b>\" # note\nend"
+    add_code(code, settings: { "language" => "ruby", "filename" => "a.rb", "code" => code })
+    add_code("plain words", settings: { "code" => "plain words" })
+    publish_changes(@page)
+    theme_figure = ->(index) { "document.querySelectorAll('div.plain-code')[#{index}]" }
+
+    with_code_theme do
+      visit PublicSite::Urls.new.path_for(@page, "en")
+      assert_no_selector FIGURE
+      assert_selector "div.plain-code", count: 2
+      connected = "Array.from(document.querySelectorAll('div.plain-code')).every((block) => window.Stimulus?.getControllerForElementAndIdentifier(block, 'code-copy'))"
+      await_js(connected)
+      clipboard(RECORDING)
+      page.execute_script("document.querySelectorAll('div.plain-code').forEach((block) => block.removeAttribute('data-controller'))")
+      await_js("Array.from(document.querySelectorAll('div.plain-code')).every((block) => !window.Stimulus.getControllerForElementAndIdentifier(block, 'code-copy'))")
+      assert_equal [ true, true ], page.evaluate_script("Array.from(document.querySelectorAll('div.plain-code button')).map((button) => button.hidden)"), "taken off, the script leaves the buttons as the template wrote them"
+      assert_equal [ false, true ], page.evaluate_script("Array.from(document.querySelectorAll('div.plain-code .plain-code__bar')).map((bar) => bar.hidden)"), "a bar with a file name is drawn; one with nothing to read is the script's to show"
+      page.execute_script("document.querySelectorAll('div.plain-code').forEach((block) => { block.setAttribute('data-controller', 'code-copy'); block.setAttribute('data-code-copy-restore-value', '60000') })")
+      await_js(connected)
+
+      assert_equal [ false, false ], page.evaluate_script("Array.from(document.querySelectorAll('div.plain-code .plain-code__bar')).map((bar) => bar.hidden)"), "the strip target is shown with its button"
+      find("div.plain-code:nth-of-type(1) button", exact_text: "Copy").click
+      assert_selector "div.plain-code button", exact_text: "Copied", count: 1
+      assert_equal "Copied", page.evaluate_script("#{theme_figure.(0)}.querySelector('[role=status]').textContent")
+      assert_equal code, page.evaluate_script("window.__copied"), "the stored code to the character: the tab, the blank line, the indentation, and markup as text"
+      find("div.plain-code button", exact_text: "Copy").click
+      assert_equal [ code, "plain words" ], page.evaluate_script("window.__copies")
+      assert_equal "Copy code", page.evaluate_script("#{theme_figure.(1)}.querySelector('button').getAttribute('aria-label')")
+    end
+  end
+
+  # A theme re-colours code by declaring the seven tokens again, and by
+  # nothing else. The suite's stylesheet is the default theme's, so the
+  # third theme's stylesheet is put into the page as text AFTER the built
+  # one, which is where the build puts a theme's (`ThemeCss.write_entry`:
+  # the default's import first, then the theme's). In a strong band the
+  # band's own values are nearer the code than a theme's on the root, and
+  # the code stays one colour (decision 8).
+  test "a theme's stylesheet that declares the seven tokens again re-colours the code in both schemes, and in a strong band the code stays the band's one colour" do
+    erb = "<%# note %>\n<p class=\"a\"><% if @x %><%= 1 %><% end %></p>"
+    ruby = "# note\ndef a = \"b\""
+    add_code(erb, settings: { "language" => "erb", "code" => erb })
+    add_code(ruby)
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "one", "background" => "strong" } }).record
+    add_code(ruby, section_id: section.id, section_column: 1)
+    open_page
+    assert page.evaluate_script("#{figure_js(2)}.closest('.content-section--strong') !== null")
+
+    css = ThemeTestHelper::CODE.join("assets/stylesheets/theme.css").read
+    theirs = { "light" => css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1], "dark" => css[/^\[data-theme="dark"\]\s*\{(.*?)\}/m, 1] }
+      .transform_values { |block| block.scan(/--th-syn-(\w+):\s*(#\h{6});/).to_h }
+    assert_equal [ CodeHighlight::ROLES, CodeHighlight::ROLES ], theirs.values.map(&:keys)
+    # { role => [the span's colour, the theme's value as the browser computes it] } for the blocks on the page,
+    # and for the one in the band [its colour, the band's ink, the band's dim].
+    seen = lambda do |theme|
+      page.evaluate_script(<<~JS, theirs.fetch(theme))
+        (() => {
+          const values = arguments[0]
+          const computed = (element, colour) => { const span = document.createElement("span"); span.style.color = colour; element.append(span); const answer = getComputedStyle(span).color; span.remove(); return answer }
+          const figures = Array.from(document.querySelectorAll("#{FIGURE}"))
+          const onPage = {}
+          figures.slice(0, 2).forEach((figure) => figure.querySelectorAll("pre span").forEach((span) => {
+            const role = span.className.replace("syn-", "")
+            onPage[role] = [getComputedStyle(span).color, computed(figure, values[role])]
+          }))
+          const band = figures[2]
+          const inBand = {}
+          band.querySelectorAll("pre span").forEach((span) => {
+            inBand[span.className.replace("syn-", "")] = [getComputedStyle(span).color, computed(band, "var(--th-on-band-strong)"), computed(band, "var(--th-on-band-strong-dim)")]
+          })
+          return { onPage, inBand }
+        })()
+      JS
+    end
+
+    before = seen.call("light")
+    assert_equal CodeHighlight::ROLES.sort, before["onPage"].keys.sort, "the two blocks show all seven roles between them"
+    before["onPage"].each { |role, (colour, value)| assert_not_equal value, colour, "#{role} is the default theme's before the theme's stylesheet is there" }
+
+    page.execute_script("const style = document.createElement('style'); style.id = 'third-theme'; style.textContent = arguments[0]; document.head.append(style)", css)
+    %w[light dark].each do |theme|
+      with_theme(theme) do
+        now = seen.call(theme)
+        assert_equal CodeHighlight::ROLES.sort, now["onPage"].keys.sort
+        now["onPage"].each { |role, (colour, value)| assert_equal value, colour, "#{role} (#{theme}) is the theme's" }
+        assert_equal %w[comment keyword string], now["inBand"].keys.sort
+        now["inBand"].each do |role, (colour, ink, dim)|
+          assert_equal (role == "comment" ? dim : ink), colour, "#{role} in a strong band (#{theme}) is the band's own, whatever the theme declared on the root"
+          assert_not_equal ink, dim
+        end
+      end
+    end
+  ensure
+    page.execute_script("document.getElementById('third-theme')?.remove()")
+  end
 end
