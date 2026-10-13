@@ -692,6 +692,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     stub_graph_data(CAPPED_GRAPH)
     page.execute_script(<<~JS)
       const real = window.fetch
+      window.realFetch ??= real
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/unlisted")) return real(url, options)
         window.fetch = real
@@ -740,6 +741,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const real = window.fetch
+      window.realFetch ??= real
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/data")) return real(url, options)
         window.fetch = real
