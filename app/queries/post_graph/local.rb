@@ -62,6 +62,12 @@
 # for (nine), and at depth 2 it is thirteen; a site where no list block
 # names a tag does not ask for the tags blocks name. The tag links and the
 # readable counts are the site's, narrowed here in Ruby.
+#
+# THE ANSWER ALSO SAYS WHAT THE SITE HOLDS (`site:`; design answer H5), for
+# the summary of the view the 3,000-line rule opens ("The site has 212 pages,
+# 2,040 posts and 64 tags."): the pages and the posts of the VIEWER'S scope
+# and the tags a readable post carries, counted from the site's rows with no
+# statement, so nothing outside the scope or in the trash is counted.
 module PostGraph
   class Local
     def self.call(...) = new(...).call
@@ -108,6 +114,7 @@ module PostGraph
       raise ActiveRecord::RecordNotFound if @focus.kind == "tag" && graph[:tags].none? { |tag| tag[:id] == @focus.node_id }
 
       graph.merge(total: post_ids.size, shown: kept.size,
+                  site: { pages: @site.pages.size, posts: @site.post_rows.size, tags: @site.tag_counts.size },
                   focus: { kind: @focus.kind, id: @focus.id, node_id: @focus.node_id, title: @focus.title, depth: @depth })
     end
 

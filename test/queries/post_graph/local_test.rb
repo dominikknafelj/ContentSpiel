@@ -153,6 +153,39 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert_equal 3, result[:edges].count { |edge| edge[:kind] == "tree" }
     assert_equal 2, result[:edges].count { |edge| edge[:kind] == "lists" }
     assert_nil result[:more]
+    assert_equal({ pages: Page.count, posts: Post.count, tags: PostTag.distinct.count(:tag_id) }, result[:site])
+  end
+
+  # Design answer H5: "The site has 212 pages, 2,040 posts and 64 tags." is
+  # said of what the VIEWER can read, from the site's rows.
+  test "the site's counts are the viewer's: the pages and posts of their scope, the tags those posts carry, nothing in the trash, and no statement more" do
+    tree
+    author = users(:author)
+    PostTag.create!(post: Post.create!(title: "Other", slug: "other", content_type: "blog", author: users(:one)), tag: Tag.find_or_create_by!(name: "not-the-authors"))
+    mine = Post.create!(title: "Mine", slug: "mine", content_type: "blog", author: author)
+    PostTag.create!(post: mine, tag: Tag.find_or_create_by!(name: "the-authors"))
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ @guide.id ] })
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    focus = as(author) { page_focus(@guide, actor: author) }
+    counts = lambda do
+      posts = AccessControl.scope(author, "posts.read", Post.all)
+      { pages: AccessControl.scope(author, "pages.read", Page.all).count, posts: posts.count, tags: PostTag.where(post_id: posts.select(:id)).distinct.count(:tag_id) }
+    end
+    site = -> { as(author) { local(focus, actor: author) }[:site] }
+
+    scoped = as(author) { counts.call }
+    assert_equal scoped, site.call
+    assert_operator scoped[:pages], :<, Page.count, "the scope must leave a page out, or this holds nothing"
+    assert_operator scoped[:posts], :<, Post.count
+    assert_operator scoped[:tags], :<, PostTag.distinct.count(:tag_id)
+    assert_operator scoped.values.min, :>, 0
+
+    statements = as(author) { capture_sql { local(focus, actor: author) } }.size
+    assert_operator statements, :<=, 9, "the ceiling of depth 1 around a page is as it was: the counts ask nothing"
+    @intro.update_column(:trashed_at, Time.current) # version: none (a test's own row)
+    mine.update_column(:trashed_at, Time.current) # version: none (a test's own row)
+    assert_equal({ pages: scoped[:pages] - 1, posts: scoped[:posts] - 1, tags: scoped[:tags] - 1 }, site.call, "nothing in the trash is counted, nor a tag only a trashed post carries")
   end
 
   test "depth 2 around a page adds the grandparent, the siblings and the grandchildren, each with its tree line" do

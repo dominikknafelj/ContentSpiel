@@ -1,6 +1,6 @@
 module Admin
   # The mind graph (mind graph canvas spec §3): the page is a FRAME -- heading,
-  # legend, filter, an empty canvas -- and holds no graph data. `admin--mind-graph--graph`
+  # the legend that is its filter, an empty canvas -- and holds no graph data. `admin--mind-graph--graph`
   # fetches the graph from `data` and draws it on the canvas, laid out by
   # d3-force in a worker. Read-only -- relations are edited in the post editor's
   # related-posts picker, not here. Each node's editor URL is built through the
@@ -35,7 +35,8 @@ module Admin
 
     # The frame only: the graph itself is fetched by the script from `data`.
     # What the page needs from the database is whether this viewer can read a
-    # post or a page at all ("No posts yet." when neither), which content types their posts have (the
+    # post or a page at all ("No pages or posts yet." when neither; `@pages`
+    # also decides which of the legend's toggles they get), which content types their posts have (the
     # legend names only those, so it discloses no type they can't see) and the
     # focus, which is not found when it is outside their scope. `@type_labels`
     # is the human name of each of those types that is still registered, for

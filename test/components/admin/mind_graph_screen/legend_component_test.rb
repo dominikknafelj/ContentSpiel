@@ -22,8 +22,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     render_inline(Admin::MindGraphScreen::LegendComponent.new(content_types: %w[gone/type resume_entry gone/other]))
 
     assert_selector "[data-legend=retired]", text: "Retired type", count: 1
-    assert_selector "[data-legend=retired] circle.mg-key-retired"
-    assert_selector "[data-legend=retired] line.mg-key-retired"
+    assert_selector "[data-legend=retired] canvas[data-swatch=retired]"
     assert_equal %w[resume_entry], page.all("[data-legend-type]").map { |li| li["data-legend-type"] }
     assert_no_text "gone/type"
   end
@@ -34,35 +33,83 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-legend=retired]"
   end
 
-  test "always names the tag node, draft, and both edge kinds, as text" do
-    render_inline(Admin::MindGraphScreen::LegendComponent.new(content_types: []))
+  def legend(content_types: %w[blog], pages: true) = render_inline(Admin::MindGraphScreen::LegendComponent.new(content_types: content_types, pages: pages))
 
-    assert_selector "ul[aria-label='Legend']"
-    assert_selector "[data-legend=tag]", text: "Tag"
-    assert_selector "[data-legend=hollow]", text: "Draft or scheduled"
-    assert_selector "[data-legend=related]", text: "Related post"
-    assert_selector "[data-legend=tag-edge]", text: "Shares a tag"
-    assert_selector "[data-legend=related] .mg-edge-related"
-    assert_selector "[data-legend=tag-edge] .mg-edge-tag"
+  # Pages spec §6 (design answers part one §4, F6): the legend is the filter.
+  test "the kinds of node and of line are checkboxes in two named groups, all on, each with its name and an empty count" do
+    legend
+
+    assert_selector "fieldset[data-legend-group=nodes] legend", text: "Show", visible: :all
+    assert_selector "fieldset[data-legend-group=lines] legend", text: "Lines", visible: :all
+    assert_equal %w[page post tag type], page.all("fieldset[data-legend-group=nodes] input[type=checkbox][name=mind_graph_nodes]").map { |input| input["value"] }
+    assert_equal %w[tree lists related tag], page.all("fieldset[data-legend-group=lines] input[type=checkbox][name=mind_graph_lines]").map { |input| input["value"] }
+    assert_equal 8, page.all("input[type=checkbox][checked]").size
+    assert_equal [ "Pages", "Posts", "Tags", "Post types", "Tree", "Lists", "Related", "Shares a tag" ], page.all("label[data-legend-toggle]").map { |label| label.text.squish }
+    assert_equal [ "Pages", "Shares a tag" ], [ page.first("input[name=mind_graph_nodes]")["data-name"], page.all("input[name=mind_graph_lines]").last["data-name"] ]
+    assert_selector "label[data-legend-toggle] [data-legend-count]", count: 8, text: "", visible: :all
+    assert_selector "input[data-action='change->admin--mind-graph--graph#filter']", count: 8
+    assert_equal 8, page.all("input[type=checkbox]").map { |input| input["id"] }.uniq.size, "each checkbox has an id of its own"
+    assert_no_selector "input[type=radio]"
+    assert_no_text "Links in text"
+  end
+
+  # The swatches are small canvases the graph's own renderer draws
+  # (`mind_graph/swatches.js`): no copy of a mark in SVG or CSS.
+  test "every toggle and every key has a swatch for the renderer to draw, at its size, and the legend holds no drawing of its own" do
+    legend(content_types: %w[blog gone/type])
+
+    names = page.all("[data-mind-graph-legend] canvas[data-swatch]").map { |canvas| canvas["data-swatch"] }
+    assert_equal %w[page post tag type line-tree line-lists line-related line-tag retired pinned notes], names
+    assert_selector "[data-mind-graph-legend][data-controller='admin--mind-graph--swatches']"
+    assert_selector "label[data-legend-toggle=tag] canvas[data-swatch=tag]"
+    assert_selector "fieldset[data-legend-group=lines] label[data-legend-toggle=tag] canvas[data-swatch=line-tag][data-width='22'][data-height='8'][width='22'][height='8'][aria-hidden=true]"
+    assert_no_selector "svg"
+  end
+
+  # Third design answers: status is not a filter. The five looks are a key
+  # behind a "Status" link (H6: a dialog), not in the legend's row.
+  test "the legend's Status button opens the key and is no filter" do
+    legend
+
+    assert_selector "button[type=button][data-legend-status][aria-haspopup=dialog][data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status"
+    assert_no_selector "[data-legend-state]", visible: :all
+    assert_no_selector "dialog", visible: :all
+    assert_no_text "Draft or scheduled"
+  end
+
+  test "a viewer who reads no page has no toggle for pages, post types, the tree or lists; one who reads no post none for posts, tags, related or shared tags" do
+    legend(pages: false)
+    assert_equal %w[post tag related tag], page.all("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+    assert_no_selector "canvas[data-swatch=page], canvas[data-swatch=type], canvas[data-swatch=line-tree], canvas[data-swatch=line-lists]"
+
+    legend(content_types: [], pages: true)
+    assert_equal %w[page type tree lists], page.all("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+  end
+
+  test "the keys that are no controls are a list named Legend, after the toggles and the Status button" do
+    legend
+
+    assert_selector "[data-mind-graph-legend] fieldset[data-legend-group=lines] ~ button[data-legend-status] ~ ul[aria-label='Legend']"
+    assert_no_selector "ul[aria-label='Legend'] input, ul[aria-label='Legend'] button"
   end
 
   # The mark of a node that stays where it was dropped (the round of
   # 2026-10-08): the canvas draws a small ink dot at the node's top-right, and
   # the legend names it.
   test "names the pin mark" do
-    render_inline(Admin::MindGraphScreen::LegendComponent.new(content_types: []))
+    legend(content_types: [])
 
-    assert_selector "li[data-legend=pinned]", text: "Pinned"
-    assert_selector "[data-legend=pinned] circle.mg-key-pin"
+    assert_selector "ul[aria-label='Legend'] li[data-legend=pinned]", text: "Pinned"
+    assert_selector "[data-legend=pinned] canvas[data-swatch=pinned]"
   end
 
   # A post with open notes (notes spec §4.4): the canvas draws its count in a
   # small badge at the node's top-left, opposite the pin, and the legend
   # names it after the pin.
   test "names the notes badge, last, after the pin" do
-    render_inline(Admin::MindGraphScreen::LegendComponent.new(content_types: []))
+    legend(content_types: [])
 
-    assert_selector "li[data-legend=pinned] + li:last-child[data-legend=notes]", text: "Open notes"
-    assert_selector "[data-legend=notes] rect.mg-key-notes"
+    assert_selector "ul[aria-label='Legend'] li[data-legend=pinned] + li:last-child[data-legend=notes]", text: "Open notes"
+    assert_selector "[data-legend=notes] canvas[data-swatch=notes]"
   end
 end

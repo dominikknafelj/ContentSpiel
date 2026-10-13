@@ -5,14 +5,41 @@
 en:
   admin:
     components:
-      # The Mind graph's legend. The content types' own names come from the
-      # registry (`Admin::Ui::ContentTypeDotComponent`); these are the shapes.
+      # The Mind graph's legend, which is its filter. `show` and `lines` name
+      # the two groups of toggles for a screen reader; `nodes` are the kinds of
+      # node a toggle switches and `edges` the kinds of line (once its count
+      # is known, a toggle's whole name is the script's `mind_graph.script.
+      # legend.toggle`); `status` is the link that opens the status key. The
+      # content types' own names come from the registry
+      # (`Admin::Ui::ContentTypeDotComponent`); `retired` and `pinned` are
+      # keys that switch nothing (the notes badge's is in `notes.en.yml`).
+      #
+      # `status_key` is the dialog that link opens: `title` its name and
+      # `states` its five rows, in the words of the card's status chip (one
+      # set of words; the day of a scheduled change stands only on the chip).
       mind_graph_screen:
         legend:
           label: "Legend"
-          tag: "Tag"
-          hollow: "Draft or scheduled"
+          show: "Show"
+          lines: "Lines"
+          nodes:
+            page: "Pages"
+            post: "Posts"
+            tag: "Tags"
+            type: "Post types"
+          edges:
+            tree: "Tree"
+            lists: "Lists"
+            related: "Related"
+            tag: "Shares a tag"
+          status: "Status"
           retired: "Retired type"
-          related: "Related post"
-          tag_edge: "Shares a tag"
           pinned: "Pinned"
+        status_key:
+          title: "Status key"
+          states:
+            live: "Live"
+            draft: "Draft"
+            scheduled: "Scheduled"
+            live_with_changes: "Live, unpublished changes"
+            live_change_scheduled: "Live, change scheduled"

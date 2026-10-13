@@ -81,10 +81,20 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "Showing the %{shown} nearest of %{total} posts around this one.", messages["mind_graph.script.capped_local"]
     assert_equal "Open notes · %{count}", messages["mind_graph.script.card.notes.title"]
     assert_equal [ "All posts", "+%{count} more", "%{name} (retired)" ], messages.values_at("mind_graph.script.all_posts", "mind_graph.script.more", "mind_graph.script.retired_type")
+    assert_equal "Mind graph: %{kinds}, %{connections}.", messages["mind_graph.script.summary.whole"]
+    assert_equal({ "one" => "%{figure} more is in the list.", "other" => "%{figure} more are in the list." }, messages["mind_graph.script.summary.more"])
+    assert_equal "%{name}, %{count}", messages["mind_graph.script.legend.toggle"]
+    # Every sentence of the summary the locale file holds is served: a key
+    # added there and forgotten in the view would throw in the script.
+    held = I18n.t("admin.mind_graph.script.summary").flat_map { |key, value| value.is_a?(Hash) && !value.key?(:other) ? value.keys.map { |inner| "#{key}.#{inner}" } : [ key.to_s ] }
+    assert_empty held.map { |key| "mind_graph.script.summary.#{key}" } - messages.keys
     assert_equal %w[all_posts capped capped_local card.close card.focus card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more card.notes.replies card.notes.sending
                     card.notes.title card.notes.unread card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts card.tags card.unpin isolated isolated_only list.empty list.posts list.select_post list.select_tag list.tags load_failed loading more no_connections
-                    release_pinned retired_type retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+                    card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle list.empty list.posts list.select_post list.select_tag list.tags load_failed loading more no_connections
+                    release_pinned retired_type retry search.count search.failed search.none search.post search.tag
+                    summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type
+                    summary.hidden_lines.lists summary.hidden_lines.related summary.hidden_lines.tag summary.hidden_lines.tree summary.local summary.more summary.none_yet summary.nothing
+                    summary.pages summary.pair summary.posts summary.posts_of summary.series summary.site summary.tags summary.types summary.whole worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 
@@ -101,7 +111,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--mind-graph--graph'] > *", count: 3
     assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(1) #mind-graph-search"
     assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(2) canvas"
-    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(3)[data-mind-graph-list][role='region'][aria-label='Posts and tags in this graph']:empty"
+    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(3)[data-mind-graph-list][role='region'][aria-label='Pages, posts, tags and post types in this graph']:empty"
     assert_select "details", count: 0
     assert_select "button[data-mind-graph-release][hidden][data-action='admin--mind-graph--graph#releasePinned']:empty"
     assert_select "[role='group'][aria-label='Zoom'] button", count: 3
@@ -178,7 +188,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a viewer who can read no post sees 'No posts yet.' and no canvas, however many exist" do
+  test "a viewer who can read no post and no page sees 'No pages or posts yet.' and no canvas, however many exist" do
     create_post(title: "Hidden from them")
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
     access_control_grants(:author_posts_create).update!(scope: { "own" => true })
@@ -189,8 +199,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
+    assert_select "[data-mind-graph-empty=no-content]", text: "No pages or posts yet."
     assert_select "canvas", count: 0
+    assert_select "dialog#mind-graph-status-key", count: 0
     assert_select "[data-controller='admin--mind-graph--graph']", count: 0
     assert_not_includes response.body, "Hidden from them"
   end
@@ -211,30 +222,30 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Hidden from them"
   end
 
-  test "with no posts at all, 'No posts yet.' instead of an empty canvas" do
+  test "with no page and no post at all, 'No pages or posts yet.' instead of an empty canvas" do
     sign_in_as(users(:one))
 
     get "/cs-studio/mind_graph"
 
     assert_response :success
-    assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
+    assert_select "[data-mind-graph-empty=no-content]", text: "No pages or posts yet."
     assert_select "[data-controller~='admin--mind-graph--graph']", count: 0
   end
 
-  test "the legend names only the content types of the viewer's posts, plus the shapes" do
+  test "the legend names only the content types of the viewer's posts, plus the keys" do
     sign_in_as(users(:one))
     create_post(title: "A", content_type: "resume_entry")
 
     get "/cs-studio/mind_graph"
 
-    assert_select ".admin-mind-graph-legend [data-legend-type]", count: 1
-    assert_select "[data-legend-type='resume_entry']", text: /#{ContentTypes.fetch("resume_entry").label}/
-    assert_select "[data-legend='tag']", text: /Tag/
-    assert_select "[data-legend='hollow']", text: /Draft or scheduled/
-    assert_select "[data-legend='related']", text: /Related post/
-    assert_select "[data-legend='tag-edge']", text: /Shares a tag/
-    assert_select "[data-legend='notes']", text: /Open notes/
+    assert_select "[data-mind-graph-legend] ul[aria-label='Legend'] [data-legend-type]", count: 1
+    assert_select "ul[aria-label='Legend'] [data-legend-type='resume_entry']", text: /#{ContentTypes.fetch("resume_entry").label}/
+    assert_select "ul[aria-label='Legend'] [data-legend='pinned']", text: /Pinned/
+    assert_select "ul[aria-label='Legend'] [data-legend='notes']", text: /Open notes/
     assert_select "[data-legend='retired']", count: 0
+    # The five states are no part of the legend's row: they are the Status key's.
+    assert_select "[data-mind-graph-legend] [data-legend-state]", count: 0
+    assert_not_includes response.body, "Draft or scheduled"
   end
 
   test "the legend names no content type of a post the viewer can't read" do
@@ -246,7 +257,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-legend-type]", count: 1
+    assert_select "ul[aria-label='Legend'] [data-legend-type]", count: 1
     assert_select "[data-legend-type='resume_entry']", count: 0
   end
 
@@ -256,24 +267,72 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-legend='retired']", text: /Retired type/
+    assert_select "ul[aria-label='Legend'] [data-legend='retired']", text: /Retired type/
     assert_select "[data-legend-type]", count: 0
   end
 
-  test "the filter is All, Related and Tags, with All chosen" do
+  # Pages spec §6 (design answer F6): the toggles replace the radio group
+  # completely, everything on, and "Links in text" is not built.
+  test "the legend's toggles are checkboxes in two groups, all on, and the radios are gone" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+    create_page(title: "Blog")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-controller='admin--mind-graph--graph'] fieldset[data-legend-group=nodes] input[type=checkbox][name=mind_graph_nodes][checked]", count: 4
+    assert_select "[data-controller='admin--mind-graph--graph'] fieldset[data-legend-group=lines] input[type=checkbox][name=mind_graph_lines][checked]", count: 4
+    assert_select "input[type=radio]", count: 0
+    assert_select "input[name=mind_graph_filter]", count: 0
+    assert_not_includes response.body, "Links in text"
+  end
+
+  # Pages spec §2: no type the viewer cannot read.
+  test "a viewer who reads pages and no post gets the toggles of pages only" do
+    create_post(title: "Hidden from them")
+    create_page(title: "Theirs to read")
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph"
+
+    assert_equal %w[page type tree lists], css_select("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+  end
+
+  test "a viewer who reads posts and no page gets the toggles of posts only" do
+    create_post(title: "Theirs to read")
+    create_page(title: "Hidden from them")
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ 0 ] })
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph"
+
+    assert_equal %w[post tag related tag], css_select("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
+    assert_not_includes response.body, "Hidden from them"
+  end
+
+  # Third design answers and H6: status is not a filter; its key is a dialog
+  # the legend's "Status" link opens. Outside the graph's element, so it is
+  # no part of the box's Tab order and the graph's script resets nothing in it.
+  test "the status key is in the page once, a closed dialog outside the graph's element" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
-    assert_select "fieldset input[type=radio][name=mind_graph_filter]", count: 3
-    assert_select "input#mind-graph-filter-all[checked]"
-    assert_select "label[for=mind-graph-filter-related]", text: "Related"
-    assert_select "label[for=mind-graph-filter-tag]", text: "Tags"
+    assert_select "dialog#mind-graph-status-key", count: 1
+    assert_select "dialog#mind-graph-status-key[open]", count: 0
+    assert_select "[data-controller='admin--mind-graph--graph'] dialog", count: 0
+    assert_select "dialog#mind-graph-status-key li[data-legend-state]", count: 5
+    assert_select "dialog#mind-graph-status-key h2", text: "Status key"
+    assert_select "[data-mind-graph-legend] button[data-legend-status][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status"
   end
 
-  # Mind graph canvas spec §5.7: the tab order is the search, the filter, the
-  # zoom buttons, then the canvas. The buttons sit in the canvas's corner on
+  # Mind graph canvas spec §5.7: the tab order is the search, the filter (the
+  # legend's toggles, then its "Status" button, which is named by its text),
+  # the zoom buttons, then the canvas. (A swatch is a canvas too, and no stop:
+  # only the graph's own canvas has a `tabindex`.) The buttons sit in the canvas's corner on
   # screen, but they come BEFORE it in the document, which is what the Tab key
   # follows -- as the search does, though on screen it stands on the right.
   # ("Release N pinned" is first among the buttons, hidden until a node is
@@ -285,10 +344,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    order = css_select("[data-controller='admin--mind-graph--graph'] input[type=search], [data-controller='admin--mind-graph--graph'] input[type=radio], [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas")
-      .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name }
-    assert_equal [ "input", "input", "input", "input", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    order = css_select("[data-controller='admin--mind-graph--graph'] input[type=search], [data-controller='admin--mind-graph--graph'] input[type=checkbox], [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas[tabindex]")
+      .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name == "input" ? (node["type"] == "search" ? "search" : node["data-name"]) : node.name }
+    assert_equal [ "search", "Posts", "Tags", "Related", "Shares a tag", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
     assert_equal "search", css_select("[data-controller='admin--mind-graph--graph'] input, [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas").first["type"]
+    assert_select "[data-controller='admin--mind-graph--graph'] canvas[data-swatch][tabindex]", count: 0
     # Nothing is taken out of the Tab order or moved within it; only the card
     # can be handed the focus by the script (`tabindex="-1"`).
     assert_equal [ "aside" ], css_select("[data-controller='admin--mind-graph--graph'] [tabindex]:not([tabindex='0'])").map(&:name)
@@ -398,7 +458,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     assert_select "[data-mind-graph-focus]", count: 0
     assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-search][data-url^='/cs-studio/mind_graph/search'] input[type=search]#mind-graph-search"
-    assert_select "label.sr-only[for=mind-graph-search]", text: "Find a post or tag"
+    assert_select "label.sr-only[for=mind-graph-search]", text: "Find a page, post or tag"
     assert_select "[data-mind-graph-search] [data-mind-graph-results][hidden]:empty"
   end
 
@@ -411,9 +471,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph", params: { post: post.id }
 
-    order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=radio] button canvas].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }.join(", "))
-      .map { |node| { "button" => node["aria-label"] || "hidden", "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
-    assert_equal [ "search", "link:2", "link:Whole graph", "radio", "radio", "radio", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=checkbox] button canvas[tabindex]].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }.join(", "))
+      .map { |node| { "button" => node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip), "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
+    assert_equal [ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
   end
 
   # Spec §5.7: the list comes after the canvas (and the card), so it is the
@@ -426,7 +486,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-list]:empty"
-    order = css_select("[data-controller='admin--mind-graph--graph'] canvas, [data-controller='admin--mind-graph--graph'] [data-mind-graph-card], [data-controller='admin--mind-graph--graph'] [data-mind-graph-list]").map(&:name)
+    order = css_select("[data-controller='admin--mind-graph--graph'] canvas[tabindex], [data-controller='admin--mind-graph--graph'] [data-mind-graph-card], [data-controller='admin--mind-graph--graph'] [data-mind-graph-list]").map(&:name)
     assert_equal %w[canvas aside div], order
   end
 
@@ -448,15 +508,15 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
   end
 
   # The canvas's name as the server wrote it rides beside it, for the
-  # controller to put back on a page Turbo restored (the script writes the
-  # counts into `aria-label`).
+  # controller to put back on a page Turbo restored (the script writes its
+  # summary of what is in view into `aria-label`).
   test "the canvas carries its own name twice: as its name, and for the reset" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
-    assert_select "canvas[aria-label='Post relationship graph'][data-label='Post relationship graph']"
+    assert_select "canvas[role=img][aria-label='Mind graph'][data-label='Mind graph']"
   end
 
   test "the search has a live region that stays in the page, apart from the list of links" do

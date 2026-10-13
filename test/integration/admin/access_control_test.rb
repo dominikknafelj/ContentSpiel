@@ -50,13 +50,39 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a branch editor without post permissions sees no Posts or Mind graph" do
+  # Pages in the mind graph, spec §2: the screen opens for someone who may
+  # read a page OR a post, and the sidebar's link is shown to the same
+  # people (the ruling on Task 3's review): either right alone is enough.
+  test "a branch editor without post permissions sees no Posts, and the Mind graph, which opens for pages alone" do
     grant_branch("pages.edit")
     sign_in_as(users(:editor_branch))
 
     get "/cs-studio/api_tokens"
 
-    assert_equal [ "Dashboard", "Pages", "Translations", "AI assistant" ], sidebar_labels
+    assert_equal [ "Dashboard", "Pages", "Translations", "Mind graph", "AI assistant" ], sidebar_labels
+    get "/cs-studio/mind_graph"
+    assert_response :success
+  end
+
+  test "the Mind graph's link is shown for posts.read alone and for pages.read alone, and to someone who holds neither it is not, and the screen is a 403" do
+    sign_in_as(users(:editor_branch))
+    get "/cs-studio/api_tokens"
+    assert_not_includes sidebar_labels, "Mind graph", "the group holds no grant yet"
+    get "/cs-studio/mind_graph"
+    assert_response :forbidden
+
+    posts = AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
+    get "/cs-studio/api_tokens"
+    assert_equal [ "Dashboard", "Posts", "Translations", "Mind graph", "AI assistant" ], sidebar_labels, "posts.read alone"
+    get "/cs-studio/mind_graph"
+    assert_response :success
+
+    posts.destroy!
+    grant_branch("pages.read")
+    get "/cs-studio/api_tokens"
+    assert_equal [ "Dashboard", "Pages", "Translations", "Mind graph", "AI assistant" ], sidebar_labels, "pages.read alone"
+    get "/cs-studio/mind_graph"
+    assert_response :success
   end
 
   # `AccessControl.holds?` doesn't count a grant whose named content types are

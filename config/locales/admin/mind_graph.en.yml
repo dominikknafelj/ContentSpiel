@@ -2,11 +2,30 @@
 # view's own lazy-lookup scope, `script` what `mind_graph/app.js` and its
 # modules show (handed over through the element's `data-messages`).
 #
-# `show.canvas_label` names the canvas until the data has arrived; `script.
-# summary` is the whole name it has afterwards (the same words, then what is
-# drawn), so the script never joins two strings with punctuation of its own;
-# `script.list.select_post` and `select_tag` are a row's whole accessible name
-# for the same reason: what it is, how connected, and what pressing it does.
+# `show.canvas_label` names the canvas until the data has arrived, and is the
+# summary's first words. `script.summary.*` is the name it has afterwards
+# (`mind_graph/summary.js`; design answers G6 and H5): WHOLE SENTENCES and
+# the parts of one, and the script puts one space between two sentences and
+# nothing else of its own. "Mind graph: 9 pages, 3 post types, 13 posts and 4
+# tags, 27 connections. Showing everything." is `whole`, then `everything`;
+# "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts.
+# 92 more are in the list." is `local`, then `more`. A kind that is switched
+# off adds its `hidden` sentence and a kind of line its `hidden_lines` one
+# ("Showing everything. Tags hidden." are both said, in that order:
+# "everything" means no cap, not no filters). With nothing in view the name
+# is `nothing`, then `all_hidden` when every kind is switched off or
+# `none_yet` when there is nothing to draw. In the view the 3,000-line rule
+# opened, `around_home` and `site` follow ("Showing the area around Home. The
+# site has 212 pages, 2,040 posts and 64 tags."). `%{kinds}` is the counts of
+# what is in view, joined by `pair` and `series` (so there is no comma before
+# "and", and another language can join otherwise); `%{figure}` is a count as
+# the sentence's language groups it, `count` only chooses the form.
+# `script.legend.toggle` is a toggle's whole accessible name once its count
+# is known ("Pages, 200").
+#
+# `script.list.select_post` and `select_tag` are a row's whole accessible name,
+# so the script never joins two strings with punctuation of its own: what it
+# is, how connected, and what pressing it does.
 # `script.list.posts` and `tags` are a group's heading with how many it holds.
 #
 # `show.zoom_out`, `zoom_in` and `fit` are the zoom buttons' whole names (their
@@ -28,21 +47,16 @@ en:
     mind_graph:
       show:
         title: "Mind graph"
-        intro: "How your posts relate to each other. Scroll or pinch to zoom, drag to move."
-        no_posts: "No posts yet."
-        filter:
-          legend: "Show connections"
-          all: "All"
-          related: "Related"
-          tag: "Tags"
-        canvas_label: "Post relationship graph"
+        intro: "How your pages, posts and tags connect. Scroll or pinch to zoom, drag to move."
+        no_content: "No pages or posts yet."
+        canvas_label: "Mind graph"
         zoom: "Zoom"
         zoom_in: "Zoom in"
         zoom_out: "Zoom out"
         fit: "Fit all"
         fit_short: "Fit"
         card_label: "Selected in the graph"
-        list_label: "Posts and tags in this graph"
+        list_label: "Pages, posts, tags and post types in this graph"
         focus:
           around_post: "Around “%{title}”"
           around_tag: "Around the tag “%{title}”"
@@ -51,8 +65,8 @@ en:
           depth_n: "Depth %{depth}"
           whole: "Whole graph"
         search:
-          label: "Find a post or tag"
-          placeholder: "Find a post or tag…"
+          label: "Find a page, post or tag"
+          placeholder: "Find a page, post or tag…"
       script:
         loading: "Loading the graph…"
         load_failed: "The graph could not be loaded."
@@ -70,7 +84,48 @@ en:
         release_pinned:
           one: "Release %{count} pinned"
           other: "Release %{count} pinned"
-        summary: "Post relationship graph: %{posts} posts and tags, %{edges} connections."
+        summary:
+          whole: "Mind graph: %{kinds}, %{connections}."
+          local: "Mind graph around %{title}, depth %{depth}: %{kinds}."
+          everything: "Showing everything."
+          nothing: "Mind graph: nothing to show."
+          all_hidden: "All types are hidden."
+          none_yet: "No pages, posts or tags yet."
+          around_home: "Showing the area around Home."
+          site: "The site has %{kinds}."
+          more:
+            one: "%{figure} more is in the list."
+            other: "%{figure} more are in the list."
+          pages:
+            one: "%{figure} page"
+            other: "%{figure} pages"
+          types:
+            one: "%{figure} post type"
+            other: "%{figure} post types"
+          posts:
+            one: "%{figure} post"
+            other: "%{figure} posts"
+          posts_of: "%{figure} of %{total} posts"
+          tags:
+            one: "%{figure} tag"
+            other: "%{figure} tags"
+          connections:
+            one: "%{figure} connection"
+            other: "%{figure} connections"
+          pair: "%{first} and %{last}"
+          series: "%{first}, %{rest}"
+          hidden:
+            page: "Pages hidden."
+            post: "Posts hidden."
+            tag: "Tags hidden."
+            type: "Post types hidden."
+          hidden_lines:
+            tree: "Tree lines hidden."
+            lists: "Lists lines hidden."
+            related: "Related lines hidden."
+            tag: "Shares-a-tag lines hidden."
+        legend:
+          toggle: "%{name}, %{count}"
         all_posts: "All posts"
         more: "+%{count} more"
         retired_type: "%{name} (retired)"

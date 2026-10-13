@@ -1,37 +1,59 @@
-<ul class="admin-mind-graph-legend m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0 text-sm text-dim" aria-label="<%= t(".label") %>">
-  <% type_names.each do |name| %>
-    <li data-legend-type="<%= name %>"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: name) %></li>
+<%# The legend is the filter (pages in the mind graph, spec §6): two groups of
+    native checkboxes, everything on, then the "Status" link, then the keys
+    that are not controls. In the document in that order, which is the Tab
+    order: the toggles, "Status", and nothing after it here.
+    A toggle's count is the script's: the page holds no graph data. Until it
+    is written the toggle's name is its label; then the script gives the
+    input one name with the count in it ("Pages, 200"), which the
+    controller's `reset` takes back. The count itself is hidden from a
+    screen reader, which would otherwise hear it twice.
+
+    STATUS IS NOT A FILTER (the third design answers): the five looks are a
+    key of their own, a dialog (`StatusKeyComponent`, design answer H6),
+    and here is only the "Status" link that opens it: a button that reads as
+    a link, wired to the one dialog controller on <body>.
+
+    Every swatch is an empty canvas (`SwatchComponent`) that
+    `admin--mind-graph--swatches` has the graph's own renderer draw. %>
+<div data-mind-graph-legend data-controller="admin--mind-graph--swatches" class="admin-mind-graph-legend flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 text-sm text-dim">
+  <% [ [ :nodes, node_toggles, t(".show") ], [ :lines, line_toggles, t(".lines") ] ].each do |group, kinds, name| %>
+    <% next if kinds.empty? %>
+    <fieldset data-legend-group="<%= group %>" class="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-0 p-0">
+      <legend class="sr-only"><%= name %></legend>
+      <% kinds.each do |kind| %>
+        <% label = t(group == :nodes ? ".nodes.#{kind}" : ".edges.#{kind}") %>
+        <label data-legend-toggle="<%= kind %>" class="inline-flex cursor-pointer items-center gap-1.5">
+          <%= render Admin::Ui::CheckboxComponent.new(name: "mind_graph_#{group}", value: kind, checked: true, id: "mind-graph-#{group}-#{kind}",
+                data: { action: "change->admin--mind-graph--graph#filter", name: label }) %>
+          <%= render Admin::MindGraphScreen::SwatchComponent.new(swatch_name(group, kind)) %>
+          <span><%= label %></span>
+          <span data-legend-count aria-hidden="true" class="font-cs-mono text-label text-meta"></span>
+        </label>
+      <% end %>
+    </fieldset>
   <% end %>
-  <li class="inline-flex items-center gap-1.5" data-legend="tag">
-    <svg class="mg-key mg-tag" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1" y="1" width="8" height="8"/></svg>
-    <%= t(".tag") %>
-  </li>
-  <li class="inline-flex items-center gap-1.5" data-legend="hollow">
-    <svg class="mg-key" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle class="mg-key-hollow" cx="6" cy="6" r="4"/></svg>
-    <%= t(".hollow") %>
-  </li>
-  <% if retired? %>
-    <li class="inline-flex items-center gap-1.5" data-legend="retired">
-      <svg class="mg-key" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle class="mg-key-retired" cx="6" cy="6" r="4"/><line class="mg-key-retired" x1="2.5" y1="9.5" x2="9.5" y2="2.5"/></svg>
-      <%= t(".retired") %>
+  <%= tag.button t(".status"), type: "button", aria: { haspopup: "dialog" },
+        class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        data: { legend_status: true, **dialog_trigger(Admin::MindGraphScreen::StatusKeyComponent::ID) } %>
+  <ul class="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0" aria-label="<%= t(".label") %>">
+    <% type_names.each do |name| %>
+      <li data-legend-type="<%= name %>"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: name) %></li>
+    <% end %>
+    <% if retired? %>
+      <li class="inline-flex items-center gap-1.5" data-legend="retired">
+        <%= render Admin::MindGraphScreen::SwatchComponent.new(:retired) %>
+        <%= t(".retired") %>
+      </li>
+    <% end %>
+    <li class="inline-flex items-center gap-1.5" data-legend="pinned">
+      <%= render Admin::MindGraphScreen::SwatchComponent.new(:pinned) %>
+      <%= t(".pinned") %>
     </li>
-  <% end %>
-  <li class="inline-flex items-center gap-1.5" data-legend="related">
-    <svg class="mg-key" width="22" height="8" viewBox="0 0 22 8" aria-hidden="true"><line class="mg-edge mg-edge-related" x1="0" y1="4" x2="22" y2="4"/></svg>
-    <%= t(".related") %>
-  </li>
-  <li class="inline-flex items-center gap-1.5" data-legend="tag-edge">
-    <svg class="mg-key" width="22" height="8" viewBox="0 0 22 8" aria-hidden="true"><line class="mg-edge mg-edge-tag" x1="0" y1="4" x2="22" y2="4"/></svg>
-    <%= t(".tag_edge") %>
-  </li>
-  <li class="inline-flex items-center gap-1.5" data-legend="pinned">
-    <svg class="mg-key" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle class="mg-key-pinned-node" cx="5" cy="7" r="4"/><circle class="mg-key-pin" cx="8.5" cy="3.5" r="2.5"/></svg>
-    <%= t(".pinned") %>
-  </li>
-  <%# A post with open notes (notes spec §4.4): the count badge the canvas
-      draws on the mark's top-left corner, opposite the pin. %>
-  <li class="inline-flex items-center gap-1.5" data-legend="notes">
-    <svg class="mg-key" width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><circle class="mg-key-pinned-node" cx="9" cy="7" r="4"/><rect class="mg-key-notes" x="0.5" y="0.5" width="9" height="6" rx="3"/></svg>
-    <%= t(".notes") %>
-  </li>
-</ul>
+    <%# A post or a page with open notes (notes spec §4.4): the count badge the
+        canvas draws on the mark's top-left corner, opposite the pin. %>
+    <li class="inline-flex items-center gap-1.5" data-legend="notes">
+      <%= render Admin::MindGraphScreen::SwatchComponent.new(:notes) %>
+      <%= t(".notes") %>
+    </li>
+  </ul>
+</div>

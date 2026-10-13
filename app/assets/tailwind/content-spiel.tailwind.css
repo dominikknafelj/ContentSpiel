@@ -618,27 +618,14 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
   padding-right: 14px;
 }
 
-/* The mind graph's LEGEND (round 3, D27; mind graph canvas spec §5.1). The
-   graph itself is drawn on a canvas, which no stylesheet reaches: it reads the
-   same `--cs-*` tokens through `app/javascript/mind_graph/theme.js` and draws
-   the shapes in `mind_graph/renderer.js`, whose header says what each one
-   means. These rules are what is left in CSS: the small inline SVG swatches of
-   `Admin::MindGraphScreen::LegendComponent`, which must look like what the canvas
-   draws -- a tag is a square outlined in `meta`; a related edge is solid and a
-   shared tag's dashed (line style, not colour alone); a draft or scheduled
-   post is a dashed ring; a post whose type is no longer registered is a `meta`
-   ring WITH A STROKE THROUGH IT, so it differs from a ring of slots 7-12 by
-   shape; a pinned node carries a small ink dot with a surface ring at its
-   top-right (here on a faint stand-in for the node). (A type's own dot is
-   `Admin::Ui::ContentTypeDotComponent`.) Change one side and the other with it. */
-.mg-tag rect { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 1.5; }
-.mg-edge { fill: none; }
-.mg-edge-related { stroke: var(--cs-ink); stroke-opacity: 0.35; stroke-width: 1.5; }
-.mg-edge-tag { stroke: var(--cs-meta); stroke-opacity: 0.8; stroke-width: 1; stroke-dasharray: 4 3; }
-.mg-key { flex-shrink: 0; overflow: visible; }
-.mg-key .mg-edge-related, .mg-key .mg-edge-tag { stroke-opacity: 1; }
-.mg-key-hollow { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 2; stroke-dasharray: 3 2.5; }
-.mg-key-retired { fill: none; stroke: var(--cs-meta); stroke-width: 1.5; }
-.mg-key-pinned-node { fill: none; stroke: var(--cs-meta); stroke-width: 1; }
-.mg-key-pin { fill: var(--cs-ink); stroke: var(--cs-surface); stroke-width: 1.5; }
-.mg-key-notes { fill: var(--cs-surface); stroke: var(--cs-line-strong); stroke-width: 1; }
+/* The mind graph's LEGEND and its STATUS KEY (pages in the mind graph, spec
+   §6). The graph is drawn on a canvas, which no stylesheet reaches: it reads
+   the `--cs-*` tokens through `app/javascript/mind_graph/theme.js` and draws
+   the marks in `mind_graph/marks.js` and the lines in `mind_graph/
+   renderer.js`. A SWATCH IS DRAWN THE SAME WAY, by the same code, on a small
+   canvas of its own (`Admin::MindGraphScreen::SwatchComponent`,
+   `mind_graph/swatches.js`): no look is written a second time in CSS or
+   SVG, so none can drift from the canvas. All that is left here is that a
+   swatch keeps its size in a row that wraps. (A type's own dot is
+   `Admin::Ui::ContentTypeDotComponent`.) */
+.mg-swatch { display: block; flex-shrink: 0; }
