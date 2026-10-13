@@ -599,8 +599,12 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
       assert_selector "details[data-shared-fields] dd", text: "a.rb", visible: :all
       assert_equal "    a = 1", Nokogiri::HTML5.fragment(rendered_content).at_css("details[data-shared-fields] dd pre").text
       assert_no_selector "[name='block[settings][code]'], [name='block[settings][language]'], [name='block[settings][filename]']", visible: :all
-      assert_selector "input[name='block[caption]']"
+      assert_selector "input[name='block[caption]']:not([readonly]):not([disabled])"
       assert_no_selector "[data-controller='admin--ui--override-field']"
+      # Design answer C6: the line above the code, its language linked to the
+      # default tab as the header's own tab is (no `locale`, a top-level visit).
+      assert_equal "Code isn't translated. Edit it on the English tab.", Capybara.string(rendered_content).find("details[data-shared-fields] p[data-code-note]", visible: :all).text(:all)
+      assert_selector "details[data-shared-fields] p[data-code-note] a[href='/cs-studio/pages/#{page.id}'][data-turbo-frame='_top']", exact_text: "English", visible: :all
     end
   end
 end

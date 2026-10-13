@@ -145,6 +145,10 @@ module Admin
         end
       end
 
+      # The post's editor on the default language's tab (see
+      # `BlockCardComponent#primary_url`).
+      def primary_url = helpers.admin_post_path(post)
+
       # This post's own typed-field value, in whichever locale is being
       # edited -- `fields(locale:)` reads the *literal* locale (no fallback
       # chain), the same admin/MCP rule `Admin::EditorScreen::BlockCardComponent#value_for`

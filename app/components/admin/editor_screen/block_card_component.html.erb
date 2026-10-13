@@ -151,7 +151,7 @@
         <% end %>
 
         <%# Same-in-every-language fields: read-only on a translation tab (see `#schema_fields`). %>
-        <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields) %>
+        <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields, primary_url: primary_url) %>
 
         <% uses_columns.each do |column| %>
           <% case column

@@ -7,5 +7,6 @@
   <% if thumbnail_url %>
     <%= tag.img src: thumbnail_url, alt: "", class: "size-6 shrink-0 rounded-cs border border-line object-cover" %>
   <% end %>
-  <span class="truncate"><%= line %></span>
+  <%# The parts stand directly against each other: white space between them would be drawn. %>
+  <span class="truncate"><% parts.each do |text, look| %><%= look ? tag.span(text, class: look) : text %><% end %></span>
 </span>

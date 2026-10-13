@@ -109,22 +109,43 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_selector attention
   end
 
-  test "a code block is its file name, else its language, else its first line, else says there is no code, and needs no attention" do
+  # Design answer C7.
+  test "a code block is its file name; else its language and its first line of code, or the line alone for plain text; and an empty one says Empty" do
     render_summary block("code", settings: { "language" => "yaml", "filename" => "config/deploy.yml", "code" => "service: site" })
     assert_equal "config/deploy.yml", page.find(line).text
+    assert_no_selector "#{line} span", visible: :all
 
-    render_summary block("code", settings: { "language" => "yaml", "code" => "service: site" })
-    assert_equal "YAML", page.find(line).text
+    render_summary block("code", settings: { "language" => "ruby", "code" => "    class Post < ApplicationRecord\nend" })
+    assert_equal "Ruby · class Post < ApplicationRecord", page.find(line).text
+    assert_selector "#{line}.truncate > span.font-cs-mono", exact_text: "class Post < ApplicationRecord", count: 1
+    assert_equal "Ruby · ", Nokogiri::HTML5.fragment(rendered_content).at_css(line).children.first.text, "the language is in the tile's own face, straight in the line"
 
     render_summary block("code", settings: { "code" => "    first line\nsecond line" })
     assert_equal "first line", page.find(line).text
+    assert_selector "#{line} > span.font-cs-mono", exact_text: "first line"
 
     render_summary block("code", settings: { "code" => "x" * 200 })
     assert_equal 80, page.find(line).text.length
+    assert_selector "#{line}.truncate", count: 1
 
     render_summary block("code")
-    assert_equal "No code yet", page.find(line).text
+    assert_selector "#{line} > span.text-meta", exact_text: "Empty"
+    assert_equal "Empty", page.find(line).text
     assert_no_selector attention
     assert_no_selector "img"
+
+    render_summary block("code", settings: { "language" => "ruby" })
+    assert_equal "Empty", page.find(line).text, "a language chosen for code that is not there yet is still an empty block"
+  end
+
+  test "a code block's line that looks like markup is text, and a refused save says so after it" do
+    render_summary block("code", settings: { "language" => "html", "code" => "<b>bold</b> & <script>x</script>" }), invalid: true
+
+    assert_equal "HTML · <b>bold</b> & <script>x</script> · Needs fixing", page.find(line).text
+    assert_no_selector "#{line} b, #{line} script", visible: :all
+    assert_selector attention
+
+    render_summary block("code"), invalid: true
+    assert_equal "Empty · Needs fixing", page.find(line).text
   end
 end

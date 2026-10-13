@@ -309,6 +309,11 @@ module Admin
         end
       end
 
+      # The page's editor on the default language's tab, where the shared
+      # fields are edited: the address the header's language tab has for it
+      # (`HeaderComponent#language_url`: no `locale:` for the default).
+      def primary_url = helpers.admin_page_path(page)
+
       # This block's own value for a schema field, in whichever locale is
       # being edited -- `settings_object(locale:)` reads the *literal* locale
       # (no fallback chain), the same admin/MCP rule `ContentBlock`'s own
