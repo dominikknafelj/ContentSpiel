@@ -55,3 +55,38 @@ export const orderOf = (nodes, indexes) =>
 
 // The nodes whose label is always shown and uses up none of the budget.
 export const freeOf = (nodes, indexes) => new Set(indexes.filter((index) => labelled(nodes[index]) && rank(nodes[index]) < 2))
+
+// WHAT THE LEGEND SHOWS (pages spec §6). `on.nodes` and `on.lines` are the
+// names of the toggles that are switched on. A kind of node that is off:
+// its nodes are not shown, nor any line that touches one. A kind of line
+// that is off: its lines are not shown, AND NOTHING ELSE -- a node is hidden
+// by its own toggle only. "+N more" stands for posts and goes with them. A
+// hub's faint line to what it brings in (`brings`, a page's local view) is
+// part of how a page lists: it has no toggle of its own and follows
+// "Lists" (design answer H1: "they follow the Lists toggle").
+//
+// Nothing here knows the layout: a hidden node keeps its place there
+// (`layout_worker.js`, `filter`), so switching a kind back on does not
+// shuffle the picture, and the anchor (Home, or a local view's focus) is
+// the worker's by its id, whatever is switched off around it.
+export const NODE_TOGGLES = [ "page", "post", "tag", "type" ]
+export const LINE_TOGGLES = [ "tree", "lists", "related", "tag" ]
+
+const toggleOf = (node) => (node.kind === "more" ? "post" : node.kind)
+const lineToggleOf = (edge) => (edge.kind === "brings" ? "lists" : edge.kind)
+
+export function visible({ nodes, edges, on }) {
+  const visibleNodes = nodes.flatMap((node, index) => (on.nodes.has(toggleOf(node)) ? [ index ] : []))
+  const shown = new Set(visibleNodes)
+  const visibleEdges = edges.flatMap((edge, index) => (on.lines.has(lineToggleOf(edge)) && shown.has(edge.source) && shown.has(edge.target) ? [ index ] : []))
+  return { visibleNodes, visibleEdges, order: orderOf(nodes, visibleNodes), free: freeOf(nodes, visibleNodes) }
+}
+
+// How many of each kind THIS RESPONSE holds: what a toggle says beside its
+// name, on or off, so that one that is off still says what switching it on
+// brings. "Post types" counts the type nodes and "All posts"; "+N more" is
+// not a post, and a hub's faint line is not a Lists line.
+export function counts(nodes, edges) {
+  const tally = (names, items) => Object.fromEntries(names.map((name) => [ name, items.filter((item) => item.kind === name).length ]))
+  return { nodes: tally(NODE_TOGGLES, nodes), lines: tally(LINE_TOGGLES, edges) }
+}

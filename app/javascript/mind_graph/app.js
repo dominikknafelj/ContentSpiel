@@ -10,7 +10,9 @@
 // `data-zoom`, `data-labelled`, `data-selected` (the selected node's id, or
 // empty), `data-neighbours` (the ids of the selection's direct neighbours
 // by the edges shown, comma-separated, or empty; written when the selection
-// or the filter changes, never per frame), `data-hovered` (the hovered node's
+// or the filter changes, never per frame), `data-nodes` and `data-edges`
+// (how many the legend's toggles show; written by the toggle itself, before
+// the layout has moved), `data-hovered` (the hovered node's
 // id, or empty) and `data-pinned` (how many nodes are pinned).
 // `element.mindGraph.screenPosition(id)` answers where a visible node is, in
 // client coordinates (null for one the filter hides, and for every node until
@@ -34,6 +36,18 @@
 // not hold it, nothing shows it as pinned, and nothing here can release it.
 // Dragged, it is pinned where it is dropped like any node, and released it
 // eases back to the centre.
+//
+// THE LEGEND IS THE FILTER (pages spec §6). Its checkboxes say which kinds
+// of node and of line are shown, and `graph_data.js`'s `visible` is the one
+// place that decides what that means; the state is the checkboxes' own and
+// nothing here keeps a copy. A toggle changes what is drawn, the list
+// beside the canvas and the canvas's name, and leaves each toggle's COUNT
+// as it is: a count is what the response holds, written once per load
+// (`writeCounts`). The layout keeps a hidden node's place, so switching a
+// kind back on does not shuffle the picture. THE CANVAS'S NAME is the
+// summary of what is in view (`summary.js`); after a toggle the same words
+// go into the notice's live region, hidden from the eye, which is how the
+// change is announced.
 //
 // A LABEL'S WIDTH is measured in the font the label is drawn in
 // (`renderer.js`, `labelFont`): a tag's in mono, and the selected node's in
@@ -93,7 +107,8 @@ import { placeCard } from "mind_graph/card_placement"
 import { readTheme, watchTheme } from "mind_graph/theme"
 import { draw, radiusFor, labelFont } from "mind_graph/renderer"
 import { collisionRadius, boxOf, moreWidth } from "mind_graph/marks"
-import { nodesOf, orderOf, freeOf, anchorOf } from "mind_graph/graph_data"
+import { nodesOf, anchorOf, visible, counts } from "mind_graph/graph_data"
+import { summaryOf } from "mind_graph/summary"
 import { attachInput } from "mind_graph/input"
 import { createCard } from "mind_graph/card"
 import { attachSearch } from "mind_graph/search_box"
@@ -121,7 +136,9 @@ export function labelFor(node) {
 }
 
 export function mount(element) {
-  const canvas = element.querySelector("canvas")
+  // The graph's own canvas, by its target: the legend's swatches are
+  // canvases too, and come before it in the document.
+  const canvas = element.querySelector("[data-admin--mind-graph--graph-target='canvas']")
   const notice = element.querySelector("[data-admin--mind-graph--graph-target='notice']")
   const context = canvas.getContext("2d")
   const text = messages(element)
@@ -244,7 +261,12 @@ export function mount(element) {
   })
   const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text, status: search.querySelector("[data-mind-graph-status]") })
 
-  const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
+  // The legend's toggles (pages spec §6): the state is the checkboxes' own,
+  // so Back restores what the person had chosen. `switched(name, true)` is
+  // the kinds that are on, `switched(name, false)` those that are off, each
+  // in the legend's order.
+  const toggles = (name) => Array.from(element.querySelectorAll(`[data-mind-graph-legend] input[name="${name}"]`))
+  const switched = (name, on) => toggles(name).filter((input) => input.checked === on).map((input) => input.value)
   const setState = (value) => { element.dataset.state = value }
 
   // A figure that goes into a sentence is written the way the sentence's
@@ -396,15 +418,15 @@ export function mount(element) {
     return nodeAt({ positions: state.positions, indexes: state.visibleNodes, radii: state.radii, boxes: state.boxes, camera: state.camera, sx: x, sy: y, labels: state.labels, widths: state.widths })
   }
 
-  // What the filter shows: every edge of the chosen kind, and under "All"
-  // every node, otherwise only the nodes such an edge touches.
+  // What the legend shows (`graph_data.js`): a kind of node that is off takes
+  // its nodes and their lines; a kind of line that is off takes its lines
+  // and nothing else.
   function applyFilter() {
-    const chosen = mode()
-    state.visibleEdges = state.edges.flatMap((edge, index) => (chosen === "all" || edge.kind === chosen ? [ index ] : []))
-    const touched = new Set(state.visibleEdges.flatMap((index) => [ state.edges[index].source, state.edges[index].target ]))
-    state.visibleNodes = state.nodes.flatMap((_, index) => (chosen === "all" || touched.has(index) ? [ index ] : []))
-    state.order = orderOf(state.nodes, state.visibleNodes)
-    state.free = freeOf(state.nodes, state.visibleNodes)
+    const shownNow = visible({ nodes: state.nodes, edges: state.edges, on: { nodes: new Set(switched("mind_graph_nodes", true)), lines: new Set(switched("mind_graph_lines", true)) } })
+    state.visibleNodes = shownNow.visibleNodes
+    state.visibleEdges = shownNow.visibleEdges
+    state.order = shownNow.order
+    state.free = shownNow.free
     // The selection goes with a node the filter hides; one that stays keeps
     // its place, but its neighbours are the ones the shown edges give it now,
     // so nothing stays lit (or dimmed) by an edge that is no longer drawn.
@@ -422,6 +444,43 @@ export function mount(element) {
     list.mark(state.selected >= 0 ? state.nodes[state.selected].id : null)
     pinsChanged()
     syncHover()
+    summarise()
+  }
+
+  // The canvas is one image to a screen reader, and its name says what is on
+  // it NOW (`summary.js`; design answers G6 and H5). After a toggle
+  // (`announce`) the same words are put into the notice's polite live
+  // region, in a line hidden from the eye, beside whatever the notice shows.
+  function summarise({ announce = false } = {}) {
+    const summary = summaryOf({
+      nodes: state.nodes, visibleNodes: state.visibleNodes, lines: state.visibleEdges.length, data: state.data,
+      off: { nodes: switched("mind_graph_nodes", false), lines: switched("mind_graph_lines", false) }, toggles: toggles("mind_graph_nodes").length,
+      // The view the 3,000-line rule opened (the server says so on the element).
+      aroundHome: Boolean(element.dataset.openedLines)
+    }, { text, number })
+    canvas.setAttribute("aria-label", summary)
+    if (!announce) return
+
+    notice.querySelector("[data-mind-graph-announced]")?.remove()
+    const line = document.createElement("p")
+    line.className = "sr-only"
+    line.dataset.mindGraphAnnounced = ""
+    line.textContent = summary
+    notice.append(line)
+  }
+
+  // Each toggle's count beside its name, and its whole name for a screen
+  // reader ("Pages, 200"). What the RESPONSE holds, so switching a toggle
+  // changes none of them. The controller's `reset` takes both back.
+  function writeCounts() {
+    const held = counts(state.nodes, state.edges)
+    for (const [ name, group ] of [ [ "mind_graph_nodes", held.nodes ], [ "mind_graph_lines", held.lines ] ]) {
+      for (const input of toggles(name)) {
+        const count = number(group[input.value] ?? 0)
+        input.closest("label").querySelector("[data-legend-count]").textContent = count
+        input.setAttribute("aria-label", text.t("mind_graph.script.legend.toggle", { name: input.dataset.name, count }))
+      }
+    }
   }
 
   function select(index) {
@@ -597,8 +656,7 @@ export function mount(element) {
     element.dataset.hovered = ""
     select(-1)
     applyFilter()
-    // The canvas is one image to a screen reader, and its name says what is on it.
-    canvas.setAttribute("aria-label", text.t("mind_graph.script.summary", { posts: state.nodes.length, edges: state.edges.length }))
+    writeCounts()
 
     // The two views cut differently (`PostGraph::Global` keeps the best
     // connected, `PostGraph::Local` the nearest to the focus), so each has its
@@ -641,8 +699,8 @@ export function mount(element) {
         },
         // Only a `settled` that answers everything sent so far arrives here
         // (`layout_client.js`), so with a filter sent right behind `start` --
-        // Back to a screen whose control says "Related" -- the fit is made on
-        // the filtered layout, not on the one before it.
+        // Back to a screen whose legend has "Tags" switched off -- the fit is
+        // made on the filtered layout, not on the one before it.
         onSettled: () => {
           if (!state.fitted) fitAll()
           element.setAttribute("data-settled", "")
@@ -663,7 +721,7 @@ export function mount(element) {
     layout.start(state.nodes.map((node) => ({ id: node.id, radius: collisionRadius(node), anchor: node.id === anchor })),
       state.edges.map((edge) => ({ source: state.nodes[edge.source].id, target: state.nodes[edge.target].id, kind: edge.kind })),
       { reducedMotion: reducedMotion.matches })
-    if (mode() !== "all") sendFilter()
+    if (state.visibleNodes.length < state.nodes.length || state.visibleEdges.length < state.edges.length) sendFilter()
   }
 
   function sendFilter() {
@@ -825,13 +883,15 @@ export function mount(element) {
     zoomOut: () => zoomBy(1 / BUTTON_ZOOM),
     fit: fitAll,
     releasePinned: () => unpin(Array.from(state.pinned)),
-    // The control changed: hand the layout only what is shown now. The camera
-    // stays where it is. The list and the counts follow the control whenever
-    // there is data, a layout or not: when the worker could not start, the
-    // list is all there is, and it must show what the control says.
+    // A toggle of the legend changed: hand the layout only what is shown
+    // now. The camera stays where it is. The list, `data-nodes` and
+    // `data-edges` and the canvas's name follow the legend whenever there is
+    // data, a layout or not: when the worker could not start, the list is
+    // all there is, and it must show what the legend says.
     filter() {
       if (!state.data) return
       applyFilter()
+      summarise({ announce: true })
       rehover()
       if (!layout) return
       element.removeAttribute("data-settled")
