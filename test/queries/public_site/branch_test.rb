@@ -19,6 +19,14 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
 
   def titles(node) = node.reading_order.map(&:title)
 
+  # The pages CS Studio's tree draws under `page`, in the order it draws them:
+  # the node component's own `children`, over the list the tree component
+  # hands it (`Admin::PagesScreen::TreeComponent#load_visible`: every page,
+  # grouped by parent, in whatever order the table gave them).
+  def studio_tree_children(page)
+    Admin::PagesScreen::TreeNodeComponent.new(page: page, children_by_parent: Page.all.to_a.group_by(&:parent_id), locale: "en").children
+  end
+
   test "the branch is nested as the tree is, in the tree's order, with addresses" do
     tree = branch.under(@guide)
 
@@ -229,7 +237,7 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
 
     assert_equal [ @write.id, last.id, @start.id ], in_branch
     assert_equal @guide.children.kept.published.pluck(:id), in_branch, "the public tree's own order (closure_tree's)"
-    assert_equal AccessControl.preload_branches(Page.all.to_a).select { |page| page.parent_id == @guide.id }.map(&:id), in_branch, "CS Studio's tree"
+    assert_equal studio_tree_children(@guide).map(&:id), in_branch, "CS Studio's tree"
   end
 
   test "under takes a node for its top and for the shown page" do
