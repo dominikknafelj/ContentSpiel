@@ -163,8 +163,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     selection = rule.(".content-block--code pre::selection,\n.content-block--code pre ::selection")
     assert_match(/background:\s*var\(--th-accent\);\s*color:\s*var\(--th-on-accent\);/m, selection)
 
-    assert_match(/color-scheme:\s*light;/, rule.(".content-block--code"))
-    assert_match(/color-scheme:\s*dark;/, rule.(%([data-theme="dark"] .content-block--code)))
+    assert_no_match(/color-scheme/, css, "the page's scheme is the layout's (`scheme-light dark:scheme-dark` on <body>) and is inherited; only a strong band says another, in sections.css")
 
     ring = rule.(".content-block--code .code-head button:focus-visible,\n.content-block--code pre:focus-visible")
     assert_match(/outline:\s*2px solid var\(--th-accent\);/, ring)

@@ -27,8 +27,9 @@ import { messages } from "i18n/messages"
 // is then the field's description).
 //
 // What it writes into the page is recomputed from the field when it connects
-// (the words, `hidden`, the colour, the description); the announcement is the
-// one thing that is not, so it is emptied when the script disconnects.
+// (the words, `hidden`, the colour, the description). The announcement is
+// the one thing with nothing to recompute it from, so it is emptied when the
+// script connects and when it disconnects.
 const HIDDEN = 0
 const SHOWN = 1
 const OVER = 2
@@ -39,6 +40,9 @@ export default class extends Controller {
 
   connect() {
     this.announcer = this.hasAnnouncerTarget ? this.announcerTarget : null
+    // A page shown again from a copy that kept an announcement says nothing
+    // old, and the next step up changes the region and is said.
+    if (this.announcer) this.announcer.textContent = ""
     this.state = this.paint()
   }
 

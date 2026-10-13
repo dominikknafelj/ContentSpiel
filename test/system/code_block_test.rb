@@ -153,16 +153,18 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
 
   # The other way a page is left: by a link. Turbo copies the page a task
   # after it says so (`turbo:before-cache`) and shows that copy again on
-  # Back. Whether the script was disconnected before the copy was made is a
-  # race, so at the event the script takes back everything it wrote: the
-  # words, and `hidden` on the button and on the strip it revealed, so the
-  # copy is what the server drew. Turbo also copies a page that is NOT left
-  # (a link to an anchor in it), so two tasks later the script puts the
-  # button and the strip back, with the focus the button had.
+  # Back, so at the event the script takes back its WORDS, which no later
+  # `connect` could tell from the server's. `hidden` it leaves alone: Turbo
+  # also copies a page that is NOT left (a link to an anchor in it), and a
+  # strip hidden there, for however short a time, is a jump of everything
+  # below it. A copy may therefore hold a button the script revealed; the
+  # page shown from it runs `connect`, which decides both `hidden`s again
+  # (the last lines here: a copy with everything revealed, in a browser with
+  # no clipboard).
   #
   # The first block has no file name and no language (the strip is the
   # script's), the second has a file name (only the button is).
-  test "before Turbo copies the page everything the script wrote is taken back, the strip it revealed included, and on a page that stays it is put back" do
+  test "before Turbo copies the page the words are taken back and nothing is hidden, and a page shown from a copy decides again what is shown" do
     add_code(CODE, settings: { "code" => CODE })
     add_code(CODE, settings: { "filename" => "greet.rb", "code" => CODE })
     open_page
@@ -173,40 +175,86 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     find("#{FIGURE} button", match: :first).click
     assert_selector "#{FIGURE} button", exact_text: "Copied"
 
-    # A page that stays: the event, then the two tasks, and the button is
-    # back with the focus it had.
-    page.execute_script("#{figure_js(0)}.querySelector('button').focus(); document.dispatchEvent(new CustomEvent('turbo:before-cache'))")
-    await_js("#{figure_js(0)}.querySelector('button').hidden === false")
-    assert_equal [ "Copy", "", false, false ], state(0)
-    assert_equal [ "Copy", "", false, false ], state(1)
-    assert page.evaluate_script("document.activeElement === #{figure_js(0)}.querySelector('button')"), "the focus the button had is put back with it"
-
     # In one task: the event, and what the page is at that moment.
-    find("#{FIGURE} button", match: :first).click
-    assert_selector "#{FIGURE} button", exact_text: "Copied"
     in_the_event = page.evaluate_script(<<~JS)
       (() => {
+        #{figure_js(0)}.querySelector("button").focus()
         document.dispatchEvent(new CustomEvent("turbo:before-cache"))
         return Array.from(document.querySelectorAll("#{FIGURE}")).map((figure) => [figure.querySelector("button").textContent, figure.querySelector("[role=status]").textContent, figure.querySelector("button").hidden, figure.querySelector(".code-head").hidden])
       })()
     JS
-    assert_equal [ [ "Copy", "", true, true ], [ "Copy", "", true, false ] ], in_the_event
-    await_js("#{figure_js(0)}.querySelector('button').hidden === false")
+    assert_equal [ [ "Copy", "", false, false ], [ "Copy", "", false, false ] ], in_the_event
+    assert page.evaluate_script("document.activeElement === #{figure_js(0)}.querySelector('button')"), "the button keeps the focus it had"
 
-    # Turbo's own copy of a page that stays, made by Turbo's own code: the
-    # copy holds what the server drew, and the page has its button back.
-    copied = page.evaluate_async_script("const done = arguments[arguments.length - 1]; Turbo.session.view.cacheSnapshot().then((snapshot) => done(snapshot.element.outerHTML))")
-    figures = Nokogiri::HTML5(copied).css(FIGURE)
-    assert_equal 2, figures.size
-    assert figures[0].at_css(".code-head").key?("hidden"), "the strip the script revealed is hidden in Turbo's copy"
-    assert_not figures[1].at_css(".code-head").key?("hidden"), "a strip the server drew is in the copy as drawn"
-    figures.each do |figure|
-      assert figure.at_css("button").key?("hidden"), "the button is hidden in Turbo's copy"
-      assert_equal "Copy", figure.at_css("button").text
-      assert_equal "", figure.at_css("[role=status]").text
-    end
-    await_js("#{figure_js(0)}.querySelector('button').hidden === false && #{figure_js(1)}.querySelector('button').hidden === false")
-    assert_equal [ "Copy", "", false, false ], state(0)
+    # A copy that kept what the script revealed, shown where nothing can be
+    # copied: `connect` hides the button and the strip again.
+    disconnect
+    page.execute_script("document.querySelectorAll('#{FIGURE} button, #{FIGURE} .code-head').forEach((element) => { element.hidden = false })")
+    clipboard("undefined")
+    page.execute_script("document.querySelectorAll('#{FIGURE}').forEach((figure) => figure.setAttribute('data-controller', 'code-copy'))")
+    await_connected
+    assert_equal [ [ "Copy", "", true, true ], [ "Copy", "", true, false ] ], [ state(0), state(1) ]
+  end
+
+  # A PAGE THAT STAYS. Turbo takes a copy of the page it is on when the
+  # browser itself goes to an anchor in it (`historyPoppedWithEmptyState`: a
+  # link Turbo does not drive, a typed fragment, Back between two anchors).
+  # Nothing of a code block may move then: no `hidden` is touched, by the
+  # event or after it, and the page ends at the anchor.
+  test "when the browser goes to an anchor in a page that stays, Turbo copies the page and no strip or button is touched, and the page ends at the anchor" do
+    add_code(CODE, settings: { "code" => CODE })
+    add_code(CODE, settings: { "filename" => "greet.rb", "code" => CODE })
+    open_page
+    clipboard("{ writeText: () => Promise.resolve() }")
+    reconnect
+    page.execute_script(<<~JS)
+      const main = document.querySelector("main")
+      main.insertAdjacentHTML("afterbegin", '<a id="to-foot" href="#foot" data-turbo="false">To the foot</a>')
+      main.insertAdjacentHTML("beforeend", '<div style="height: 3000px"></div><h2 id="foot">Foot</h2><div style="height: 3000px"></div>')
+      window.__hidden = []
+      window.__caches = 0
+      window.__count = () => { window.__caches += 1 }
+      window.__watch = new MutationObserver((records) => records.forEach((record) => window.__hidden.push(record.target.className || record.target.tagName)))
+      document.querySelectorAll("#{FIGURE}").forEach((figure) => window.__watch.observe(figure, { subtree: true, attributes: true, attributeFilter: ["hidden"] }))
+      document.addEventListener("turbo:before-cache", window.__count)
+    JS
+    before = [ state(0), state(1) ]
+    assert_equal [ [ "Copy", "", false, false ], [ "Copy", "", false, false ] ], before
+
+    find("#to-foot").click
+    await_js("window.__caches > 0 && location.hash === '#foot'")
+    await_frames
+    await_frames
+
+    assert page.evaluate_script("document.getElementById('to-foot') !== null"), "the page stayed: it was not drawn again"
+    assert_equal [], page.evaluate_script("window.__watch.takeRecords().length ? ['pending'] : window.__hidden"), "no element of a code block had its hidden attribute changed"
+    assert_equal before, [ state(0), state(1) ]
+    assert_in_delta 0, page.evaluate_script("document.getElementById('foot').getBoundingClientRect().top"), 2, "the page ends at the anchor"
+  ensure
+    page.execute_script("window.__watch?.disconnect(); document.removeEventListener('turbo:before-cache', window.__count); delete window.__watch; delete window.__hidden; delete window.__caches; delete window.__count")
+  end
+
+  # A LINK TO AN ANCHOR that Turbo drives is a visit: Turbo 8 fetches the
+  # page and draws it again (`locationWithActionIsSamePage` is false), so the
+  # script connects to new elements. The strips above the anchor are the
+  # script's to reveal, and the page must still end at the anchor: they are
+  # revealed before Turbo scrolls, not after.
+  test "a link to an anchor in the page, which Turbo draws again, ends at the anchor with every strip and button shown" do
+    8.times { add_code(CODE, settings: { "code" => CODE }) }
+    target = add_code(CODE, settings: { "filename" => "greet.rb", "code" => CODE })
+    8.times { add_code(CODE, settings: { "code" => CODE }) }
+    open_page
+    assert_selector "#{FIGURE} .code-head button", exact_text: "Copy", count: 17
+    page.execute_script(%(document.querySelector("main").insertAdjacentHTML("afterbegin", '<a id="to-file" href="#code-#{target.id}-file">To the file</a>')))
+
+    find("#to-file").click
+    assert_no_selector "#to-file"
+    await_connected
+    await_js("location.hash === '#code-#{target.id}-file'")
+    await_frames
+
+    assert_selector "#{FIGURE} .code-head button", exact_text: "Copy", count: 17
+    assert_in_delta 0, page.evaluate_script("document.getElementById('code-#{target.id}-file').getBoundingClientRect().top"), 2, "the page ends at the anchor, with the strips above it already there"
   end
 
   test "a page left by a link comes back on Back with the button at rest, and a press there says Copy first and copies" do
@@ -226,13 +274,15 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
       figure = Nokogiri::HTML5(html).at_css(FIGURE)
       assert_equal "Copy", figure.at_css("button").text
       assert_equal "", figure.at_css("[role=status]").text
-      assert figure.at_css(".code-head").key?("hidden"), "the copy Turbo kept does not hold a strip the script revealed"
-      assert figure.at_css("button").key?("hidden")
     end
 
+    # Whether the copy holds the strip shown or hidden is a race between the
+    # script's disconnect and Turbo's clone, and does not matter: the page
+    # shown from it connects, and has its strip and its button.
     page.go_back
     await_connected
     assert_selector "#{FIGURE} .code-head button", exact_text: "Copy"
+    assert_equal [ "Copy", "", false, false ], state
     assert_equal "", status_text
     page.execute_script("delete window.__copied")
     restore_after(60_000)

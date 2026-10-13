@@ -88,9 +88,10 @@
    its ink thinned out. The accent is re-valued, so the ink that is written
    ON it is too: the band's own colour, which is to the band's accent what
    the band is to it (9.9:1 light, 6.4:1 dark). A code block's selected text
-   is that pair. And the band is the other scheme: a code block says which
-   scheme its scrollbar is drawn for (`code.css`), so it is told here that
-   on this ground it is the opposite one. */
+   is that pair. And the band is the other scheme: a code block's
+   scrollbar is drawn for the scheme the layout declares on <body>, which
+   on this ground is the wrong one, so the block is told the opposite here
+   (the only `color-scheme` a code block is given). */
 .content-section--strong {
   background: var(--th-band-strong);
   color: var(--th-on-band-strong);

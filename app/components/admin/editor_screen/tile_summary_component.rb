@@ -24,6 +24,12 @@ module Admin
     # (`truncate` on the element around the parts), after the count that
     # every tile's text is cut at (`LENGTH`).
     #
+    # THE TILE IS THE ONLY PLACE a closed block has a line of its content. A
+    # card of the page's own list that is collapsed
+    # (`admin--editor--blocks#toggle`) shows its type's label and nothing
+    # else, for every type, so the Code block's line (design answer C7,
+    # "tile and collapsed card") is here and not on the card.
+    #
     # It is its own component with its own id because it is the one part of
     # a tile that a save changes: `Admin::ContentBlocksController#update`
     # replaces it (`dom_id`) with every answer for a block in a section. The

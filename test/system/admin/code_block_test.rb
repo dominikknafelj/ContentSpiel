@@ -281,6 +281,19 @@ class Admin::CodeBlockSystemTest < ApplicationSystemTestCase
 
     assert_selector "##{code_id(block)}-count.text-meta", exact_text: "18,412 of 20,000 characters"
     assert_equal [ "", "#{code_id(block)}-count" ], [ announced(block), described_by(block) ]
+
+    # A page shown again from a copy that kept an announcement: the script
+    # empties the region when it connects, so the old count is not standing
+    # there and the next step up is said.
+    page.execute_script(<<~JS, code_id(block))
+      const wrapper = document.getElementById(arguments[0]).parentElement
+      wrapper.removeAttribute("data-controller")
+      Promise.resolve().then(() => { wrapper.querySelector("[aria-live]").textContent = "20,412 of 20,000 characters · 412 over"; wrapper.setAttribute("data-controller", "admin--editor--code-limit") })
+    JS
+    await_js("window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('#{code_id(block)}').parentElement, 'admin--editor--code-limit') && document.getElementById('#{code_id(block)}').parentElement.querySelector('[aria-live]').textContent === ''")
+    paste(block, 20_412)
+    assert_selector "##{code_id(block)}-count", exact_text: "20,412 of 20,000 characters · 412 over"
+    assert_equal "20,412 of 20,000 characters · 412 over", announced(block)
   end
 
   # Design answer C6: on a translation tab the code is read-only in its

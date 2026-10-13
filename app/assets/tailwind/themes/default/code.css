@@ -8,15 +8,18 @@
    tokens for what is inside it (`sections.css`), so nothing here knows a
    band.
 
-   `overflow-x: auto` on the `pre` is what keeps a long line inside the
-   block, in a column of a section as at full width: the line scrolls in the
-   `pre` (which is focusable, so a keyboard can scroll it) and the page
-   never scrolls sideways. A scrolling box asks for no width on behalf of
-   what scrolls in it, so the figure needs no `min-width: 0` of its own, and
-   it had one that did nothing: the figure is a block wherever it is drawn,
-   never a flex or grid item (`test/system/code_block_test.rb` holds the
-   long line at a phone's width, in a column too, and fails without the
-   `pre`'s rule).
+   A LONG LINE scrolls in the `pre` (`overflow-x: auto`; the `pre` is
+   focusable, so a keyboard can scroll it) and the page never scrolls
+   sideways. The figure is a block wherever the default theme draws it,
+   never a flex or grid item, so it is as wide as what holds it and needs no
+   `min-width: 0` of its own (it had one that did nothing). In a column of a
+   section what holds it is a grid item, and a grid item would by itself be
+   as wide as its longest line, a `pre` that scrolls included: there it is
+   the tracks' `minmax(0, …)` and the column's `min-width: 0` in
+   `sections.css` that keep the column, and so the block, narrow. A theme
+   that makes the figure itself a flex or grid item has to give it
+   `min-width: 0` (`test/system/code_block_test.rb` holds the long line at
+   a phone's width, in a column too).
 
    THE HEAD STRIP is there only when it has something to show (design answer
    C1). A head with nothing but the Copy button is `hidden` in the markup
@@ -25,21 +28,19 @@
    is a whole box by itself and gives its top edge and corners to a head that
    is shown; the 1px line between them is the head's (C8).
 
-   `color-scheme` follows the theme's own switch (`data-theme` on the root),
-   so the `pre`'s scrollbar is drawn for the ground it is on. Selected text is
-   the accent with its own ink, the one pair of tokens that is a background
-   and a text colour made for each other, for every token inside the code:
-   a browser's default selection colour can leave a syntax colour unreadable.
+   No `color-scheme` here: the `pre`'s scrollbar is drawn for the scheme the
+   layout declares on <body> and the block inherits, and only a strong band,
+   which is the page inverted, says the other one for the block
+   (`sections.css`). Selected text is the accent with its own ink, the one
+   pair of tokens that is a background and a text colour made for each
+   other, for every token inside the code: a browser's default selection
+   colour can leave a syntax colour unreadable.
 
    The seven `--th-syn-*` tokens are the theme's (`tokens.css`). A `color`
    whose token is not declared is invalid when computed and so the span
    inherits the code's ink: a role with no token reads as plain text. */
 .content-block--code {
   margin-block: 2.5rem;
-  color-scheme: light;
-}
-[data-theme="dark"] .content-block--code {
-  color-scheme: dark;
 }
 .content-block--code .code-head {
   display: flex;

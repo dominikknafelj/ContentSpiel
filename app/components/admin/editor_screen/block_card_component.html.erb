@@ -41,6 +41,9 @@
           directly after the name, on the left, where the notes drawer cannot cover it
           (notes handoff), and the rest of the row is the spacer after it. %>
       <div class="flex min-w-0 flex-1 items-center gap-2">
+        <%# Collapsed, a card shows this label and no line of the block's content, for any type:
+            a closed block's one line is on its tile in a section (`TileSummaryComponent`),
+            which is why the Code block's line (design answer C7) is drawn there only. %>
         <button type="button" class="min-w-0 truncate text-left text-sm font-semibold text-ink"
                 aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--editor--blocks#toggle">
           <%= label %>
