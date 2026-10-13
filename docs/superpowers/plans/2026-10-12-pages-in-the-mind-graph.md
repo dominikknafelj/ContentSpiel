@@ -10,23 +10,25 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-12-pages-in-the-mind-graph-design.md` (approved 2026-10-12, revised the same day). Every look value is the design answer's: `/Users/dknafelj/src/ContentSpiel/.superpowers/design-answers/2026-10-12-pages-in-mind-graph.md` (read-only, in the main checkout; binding). Read all three of its parts: **the third, "The drawing, and third answers", replaces what F2, F3's first lines and the first answer's status looks said**, and this plan holds the third part's values. The designer's drawing, `Studio Mind Graph Pages.dc.html` in the "Content Spiel design system" project, is the reference for anything the words leave open; an implementer does not open it but asks the controller, who does.
 
+**Revised again 2026-10-12** for the fourth design answers (H1 to H7), which answered the seven questions the third left open: a "+N more" pill PER TARGET, each with its own count and its own rows (Tasks 2, 3, 4, 5, 6, 8); a "Post types" row's mark, number and order (Tasks 3, 7); a ring type's hub and a retired hub's dashed ring (Task 5); a pill that grows to fit, with a grouped figure (Task 5); the summary's remaining forms (Task 6, and the site's counts in Task 6's step for `Local`); the status key as a dialog in the chip's words (Tasks 6, 8); a retired type's row name (Task 7).
+
 **Revised 2026-10-12** for the third design answers and the owner's decision of a fourth list group. What moved: the status looks (warn means "scheduled": Tasks 5, 6, 8); ring types, the hub's ring, a retired type's hub, the "+N more" pill and the Lists line's dash (Task 5); a hub's faint lines in a page's local view, in place of a lists line from the page to each post (Tasks 2, 3, 4, 5, 7, 8); the scheduled change's date in the data (Task 3) and on the card's chip (Task 8); the "Status" popover and the summary's three forms (Task 6); the list's "Post types" group, the not-in-view row's name and the error line with "Try again" (Task 7); "Show everything" out of the address once drawn (Task 8).
 
 ## Global Constraints
 
 - Work only in the worktree `/Users/dknafelj/src/ContentSpiel-graph`, branch `pages-in-graph`. Read `CLAUDE.md` first; its rules bind. Read `docs/reference/cs-studio-shell-and-dashboard.md` ("Mind graph") before any task, `docs/reference/publishing.md` before Task 2, `docs/reference/design-system.md` and `docs/reference/i18n.md` before Tasks 5 to 8. A step names a place by its content, never by a line number.
 - Every test command is prefixed `PGGSSENCMODE=disable`. One file, a system test included, is `bin/rails test <path>` (never `bin/rails test:system <path>`). A browser test needs `bin/rails tailwindcss:build` first. Never two test runners at once on this machine (the worktrees share the test databases), and check `sysctl -n vm.loadavg` before a browser run.
-- **A node's id is its kind and its database id**: `page-12`, `post-12`, `tag-12`, `type-blog`, `all-posts` (and the one `more` node of a page's local view). One rule in the payload's `id`, an edge's `source` and `target`, `data-selected`, `data-labelled`, `data-neighbours`, `data-hovered`, `data-node-id` and a search row. The address keeps one parameter per kind (`?page=12`, `?post=12`, `?tag=12`), read as decimal numbers; `page` wins over `post`, which wins over `tag`.
+- **A node's id is its kind and its database id**: `page-12`, `post-12`, `tag-12`, `type-blog`, `all-posts` (and a page's local view's pills, `more-<target>`: `more-type-blog`, `more-tag-12`, `more-all-posts`). One rule in the payload's `id`, an edge's `source` and `target`, `data-selected`, `data-labelled`, `data-neighbours`, `data-hovered`, `data-node-id` and a search row. The address keeps one parameter per kind (`?page=12`, `?post=12`, `?tag=12`), read as decimal numbers; `page` wins over `post`, which wins over `tag`.
 - **The graph reads the rows, not the published copies** (spec decision 3, approved). No `Publishing.published`, `published_all` or `Publishing::Listing` in `app/queries/post_graph/`.
 - A page is read only through `AccessControl.scope(actor, "pages.read", Page.all)`, a post only through `AccessControl.scope(actor, "posts.read", Post.all)`. What is outside is no node, no count, no row, and no line is drawn to it. A focus outside the scope, in the trash or unknown is a 404, never a 403. Every query takes `actor:` with no default.
 - **The statement count never grows with the number of pages or posts.** Never one statement per page, per block or per post. Every read that is new has a `capture_sql` test at two sizes.
 - **A node's state is `Publishing::State`'s.** Nothing under `app/queries/post_graph/` or `app/javascript/mind_graph/` compares `published_at` with a clock or with nil (Task 2 adds the source guard).
 - **No colour in any source.** The canvas reads token values from the page through `mind_graph/theme.js`; a module names a theme KEY (`"dim"`), never a value. No hex, `rgb()` or `hsl()` (`test/lib/admin_design_rules_test.rb`).
-- **Every look value is the design answer's**, copied: page 14×10 (Home 18×13) with the card's radius; type hub 12px with a `--cs-surface` inner ring 1.5px wide whose outer edge is 1.5px inside the hub's radius; the status table of spec §4 (**warn means "scheduled"**: a scheduled record's centre dot, 4px across, and a scheduled change's corner dot are `--cs-warn`; unpublished changes' corner dot is `--cs-dim`; a corner dot is 5px across, its centre 1px in from the corner, with a 1.5px surface ring); a ring type as its filled-type mark inside a 1.5px ring; a retired type's hub an outline in `--cs-dim` with a 4px dim centre dot; "+N more" a 60×16 pill; Tree solid 1px `--cs-line-strong`, Lists `--cs-dim` at 1.5px with round caps and a dash of 0.1 / 3.5, Related solid 1.5px ink, Shares a tag dashed `--cs-meta`, a hub's faint lines 1px `--cs-line`; labels 12px sans `--cs-ink` for a page, mono for a tag, sans `--cs-dim` for a post.
+- **Every look value is the design answer's**, copied: page 14×10 (Home 18×13) with the card's radius; type hub 12px with a `--cs-surface` inner ring 1.5px wide whose outer edge is 1.5px inside the hub's radius; the status table of spec §4 (**warn means "scheduled"**: a scheduled record's centre dot, 4px across, and a scheduled change's corner dot are `--cs-warn`; unpublished changes' corner dot is `--cs-dim`; a corner dot is 5px across, its centre 1px in from the corner, with a 1.5px surface ring); a ring type as its filled-type mark inside a 1.5px ring; a ring type's HUB a 1.5px ring in the hue round a filled centre 6px across; a retired type's hub a DASHED outline in `--cs-dim` with a 4px dim centre dot; "+N more" a 16px-high pill that grows to fit its words (8px each side, at least 60px), one per target, its figure grouped; Tree solid 1px `--cs-line-strong`, Lists `--cs-dim` at 1.5px with round caps and a dash of 0.1 / 3.5, Related solid 1.5px ink, Shares a tag dashed `--cs-meta`, a hub's faint lines 1px `--cs-line`; labels 12px sans `--cs-ink` for a page, mono for a tag, sans `--cs-dim` for a post.
 - **A design question that comes up while building is not decided by the implementer.** Stop, build the value this plan names (or the nearest value of the design answer) behind a named constant, and report the question to the controller, who puts it to the design system's owner. Tasks 5 to 8 each list the readings this plan already made, to be reported with a screenshot.
 - Every new CS Studio string is a locale key: the legend's in `config/locales/admin/mind_graph_screen.en.yml`, the view's and the script's in `config/locales/admin/mind_graph.en.yml`, and every script key is written out in the view's `messages_data(...)` call (`test/lib/admin_i18n_test.rb`, `test/lib/script_messages_test.rb`). A name or a title reaches the page as text (`textContent`), never as markup.
 - `d3-force` and `pin_all_from "app/javascript/mind_graph"` stay `preload: false`; nothing but the worker imports d3-force, by URL (`test/integration/public_javascript_test.rb`).
-- Whatever the script writes into the page is taken back in `graph_controller.js`'s `reset()`: Turbo's snapshot keeps it. (The "Status" popover is `Admin::Ui::MenuComponent`'s and is opened and closed by `admin--ui--menu`, whose own `disconnect` leaves a closed panel in a snapshot: the graph's script writes nothing there.)
+- Whatever the script writes into the page is taken back in `graph_controller.js`'s `reset()`: Turbo's snapshot keeps it. (The "Status" key is a dialog, `Admin::Ui::DialogComponent`, opened by the one `admin--ui--dialog` controller on `<body>` and closed natively: the graph's script writes nothing there, and it stands outside the graph's element.)
 - The document order of the box stays search, graph, list (the Tab order).
 - The Stimulus identifier stays `admin--mind-graph--graph`; no controller file is added, moved or renamed (`test/lib/source_layout_test.rb`).
 - Queries hand up data and ids, never a URL, a route helper, a component or a colour (`test/lib/dependency_direction_test.rb`). A URL is built by the controller, or by the `url_for:` callable it passes.
@@ -53,10 +55,12 @@ What the spec implies and its own "Testing" list does not name, most likely firs
 5. **A row for a post the canvas does not draw, pressed twice or already drawn.** A "not in view" row adds its post once; a second press selects it; a row whose post IS drawn selects and adds nothing; a row added in a page's local view is joined by one line to the hub that brings it in (Task 7: `"Not listed on any page shows the posts no page lists in place of the groups, and a row that is not in view adds its post once"`, `"list: a row that is not in view is named with its type and asks to be added, one in view selects, and the checkbox reports its change"`; Task 8: `"around a page, more opens the list with the posts that are not drawn, a row adds its post to its hub, and Open in Posts leads there"`).
 6. **A junk focus.** `page=010`, `page=0x1A`, `page[]=1`, a negative number, a trashed page, a page outside the scope: 404 from the page, `data`, `listed` alike, never a 500 (Task 4: `"a page focus that is a list, hexadecimal, trashed or out of scope is not found, and 010 is page 10"` for the query and `"a page focus that is a list, hexadecimal, trashed or out of scope is 404, and 010 is page 10"` for the three requests).
 7. **A title with markup in it**, a page's, a type's stored name, a path: text in the list, the card, the search rows and the focus bar (Task 7: `"the list's Pages group is the tree, a page's title and path with markup in them are text in the list, the search and the card"`; Task 4: `"a focus title with markup in it is escaped"`, with a page).
-8. **A row that is not in view, for someone who does not see the canvas.** Its name must say what the post is and that pressing adds it ("…, blog post, not in view. Activate to add it to the graph."), with the type's name and never a bare "post"; pressing it must leave the focus somewhere that says what happened (the card of the post it added), and the row itself must then read as an ordinary row; a retired type's stored name with markup in it is text. And a read that fails must say so IN THE LIST with a button that tries again, which takes the focus nowhere unexpected and works a second time (Task 7: `"list: a row that is not in view is named with its type and asks to be added, one in view selects, and the checkbox reports its change"`, `"list: a failed read says so in the list with Try again, and pressing it asks again"`, `"a failed read of the unlisted posts says so in the list, and Try again loads them"`).
-9. **The "Status" key by keyboard.** It is a button in the Tab order between the toggles and the zoom buttons; Enter or Space opens the key and moves the focus into it; Escape closes it and gives the focus back to the button; it holds no control, so nothing in it can be switched; and a page Turbo restores shows it closed (Task 6: `"the status looks are a key behind a Status button, not controls and not in the legend's row"`, `"the Status key opens from the keyboard, takes the focus, and Escape gives it back"`, and the two Tab-order tests).
-10. **A local view's faint lines in the wrong place.** A hub's line to a post is drawn only around a page: none in the whole graph, none around a post or a tag; a post a block lists by tag gets no second line beside its tag's; a row added from the list gets the line of ITS hub (`via`), not of the first hub on the canvas; and with "Lists" or "Post types" off the faint lines go too, pill included (Task 3: `"a type node joins only the pages that list it, never a post of its type"`; Task 4: `"depth 2 around a page draws the twenty newest posts it lists, each joined to the hub that brings it in, and counts the rest behind more"`, `"a post the page lists through a tag is joined to the tag by its own line and by no other"`; Task 6: `"graph data: a line switched off hides only the lines, and a kind switched off hides its nodes and every line that touches one"`; Task 8: `"around a page, more opens the list with the posts that are not drawn, a row adds its post to its hub, and Open in Posts leads there"`).
+8. **A row that is not in view, for someone who does not see the canvas.** Its name must say what the post is and that pressing adds it ("…, blog post, not in view. Activate to add it to the graph."), with the type's name and never a bare "post"; pressing it must leave the focus somewhere that says what happened (the card of the post it added), and the row itself must then read as an ordinary row; a retired type's stored name with markup in it is text. And a read that fails must say so IN THE LIST with a button that tries again, which takes the focus nowhere unexpected and works a second time (Task 7: `"list: a row that is not in view is named with its type and asks to be added, one in view selects, and the checkbox reports its change"` (a retired type's row says "…, retired type"), `"list: a failed read says so in the list with Try again, and pressing it asks again"`, `"a failed read of the unlisted posts says so in the list, and Try again loads them"`).
+9. **The "Status" key by keyboard.** "Status" is a button in the Tab order between the toggles and the zoom buttons; Enter or Space opens the key, a dialog named "Status key" (design answer H6); the focus is inside it and cannot leave it while it is open; Escape or its Close button closes it and the focus is back on "Status"; it holds no control but Close, so nothing in it can be switched; and it uses the chip's words, "Live, unpublished changes" and "Live, change scheduled", with no date (Task 6: `"the status key is a dialog named Status key that holds the five looks in the chip's words and no control"`, `"the legend's Status button opens the key and is no filter"`, `"the Status key opens from the keyboard as a dialog, and Escape gives the focus back"`, and the two Tab-order tests).
+10. **A local view's faint lines in the wrong place.** A hub's line to a post is drawn only around a page: none in the whole graph, none around a post or a tag; a post a block lists by tag gets no second line beside its tag's; a row added from the list gets the line of ITS hub (`via`), not of the first hub on the canvas; and with "Lists" or "Post types" off the faint lines go too, every pill included (Task 3: `"a type node joins only the pages that list it, never a post of its type"`; Task 4: `"depth 2 around a page draws the twenty newest posts it lists, each joined to the hub that brings it in, and counts the rest behind more"`, `"a post the page lists through a tag is joined to the tag by its own line and by no other"`; Task 6: `"graph data: a line switched off hides only the lines, and a kind switched off hides its nodes and every line that touches one"`; Task 8: `"around a page, more opens the list with the posts that are not drawn, a row adds its post to its hub, and Open in Posts leads there"`).
 11. **"Show everything" and the address.** Once the whole graph is drawn `everything=1` leaves the address, replaced through Turbo's history and never pushed (Back must still leave the screen, not step through two addresses), and only on the address that asked for everything (Task 8: `"a site with too many lines opens around Home, says why, and Show everything draws the whole graph and is not kept in the address"`).
+12. **Two pills on one page.** A page with two list blocks has a pill per target, each on its own hub or tag, each counting only what its target brings in beyond the twenty the view draws; a target that brings in nothing more has none; a press on one lists ITS posts and none of the other's, and "Open in Posts" filters by that block; a post two blocks list is counted once, with the first block that lists it; a junk `target=` answers no rows and is never echoed (Task 2: `"what is left out is counted per target, by the target that brings each post in, and each target has its own block's filter"`; Task 4: `"a page with two list blocks has a pill per target, each on its own hub or tag with its own count, and a target that brings in nothing more has none"`, `"listed is the posts one target of a page brings in beyond the twenty its local view draws, each with that target, and the filter of the target's block"`; Task 8: `"a page with two list blocks has two pills, and each opens the list with its own posts and its own way to Posts"`).
+13. **A figure of four digits in the pill.** "+1,980 more" does not fit sixty pixels: the pill is as wide as its measured words and 8px each side, the figure has its thousands separator in the pill and in the summary, the layout keeps the wider box clear, and a press near its end is the pill's (Task 5: `"marks: a type hub is a 12px circle in its colour with a surface ring, a ring type's a ring round a centre, All posts filled in dim, a retired type's a dashed outline in dim, a tag a square, more a pill with its words"`, `"marks: a page's, a type's and the pill's size does not follow its connections, the pill is as wide as its words need and never under 60, and the layout keeps a box's diagonal clear"`; Task 8: `"a pill with a figure of four digits is wider than sixty pixels, is pressed anywhere on it, and its figure is grouped"`).
 
 ## File Map
 
@@ -73,7 +77,8 @@ What the spec implies and its own "Testing" list does not name, most likely firs
 | `app/values/publishing/state.rb` | A state can be handed the pending time it would otherwise read |
 | `app/controllers/admin/mind_graph_controller.rb`, `config/routes.rb` | The permission (`pages.read` or `posts.read`), `page=`, `everything=1`, `lines=`, `unlisted`, `listed`; a scheduled change's short date (`change_on`) |
 | `app/views/admin/mind_graph/show.html.erb` | The frame: the legend in place of the radios, the new templates and messages |
-| `app/components/admin/mind_graph_screen/legend_component.rb`, `.html.erb` | The toggles, the "Status" popover with the five looks, and the keys |
+| `app/components/admin/mind_graph_screen/legend_component.rb`, `.html.erb` | The toggles, the "Status" link, and the keys |
+| `app/components/admin/mind_graph_screen/status_key_component.rb`, `.html.erb` (new) | The status key: a dialog named "Status key" with the five looks, in the chip's words |
 | `app/assets/tailwind/content-spiel.tailwind.css` | The legend's `.mg-*` swatches, on tokens |
 | `config/locales/admin/mind_graph.en.yml`, `mind_graph_screen.en.yml` | Every string |
 | `app/javascript/mind_graph/ids.js` (new) | `nodeId(kind, id)`, `recordId(id)` |
@@ -375,7 +380,7 @@ PostGraph::OPEN_AROUND_HOME_ABOVE  # 3_000
 PostGraph::LISTED_IN_VIEW          # 20
 PostGraph::ROW_LIMIT               # 200
 PostGraph::ALL_POSTS               # "all-posts"
-PostGraph::MORE                    # "more"
+PostGraph::MORE                    # "more": the kind of a pill's id, PostGraph.node_id(MORE, target) => "more-type-blog"
 PostGraph.paths(page_ids, locale:) # => { page_id => "/about" }: the current path in `locale`, else the default language's; one statement
 
 PostGraph::Tree.new(rows)          # rows: [[id, parent_id, position], …] of the READABLE pages
@@ -398,7 +403,9 @@ PostGraph::Listings.new(page_ids:, post_rows:, tag_links:)
   #listed_count(page_id)
   #listed?(post_id)
   #unlisted            # [post_id, …] newest first
-  #filter_of(page_id)  # { type: "blog" | nil, tag: "ruby" | nil } of the page's first list block; {} with none
+  #left_out(page_id)   # { target => count }: what each target brings in BEYOND the LISTED_IN_VIEW newest posts of the page; a target with none is not in it
+  #left_out_of(page_id, target) # [post_id, …] newest first: those posts, of one target
+  #filter_of(page_id, target = nil)  # { type: "blog" | nil, tag: "ruby" | nil } of the page's first list block (with `target`: the first that points at it); {} with none
   #type_count(name)    # readable posts whose stored type is `name`
   #post_count          # readable posts a block with no filter lists
 
@@ -761,6 +768,32 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     assert_equal "all-posts", listings.target_of(@page.id, @plain.id), "only the block with no filter lists it now"
   end
 
+  # Design answer H1: one pill per target, each counting only what that
+  # target brings in beyond the posts the view draws.
+  test "what is left out is counted per target, by the target that brings each post in, and each target has its own block's filter" do
+    list_block(@page, tag: "pill")
+    list_block(@page, content_type: "resume_entry")
+    pills = 15.times.map { |index| create_post(title: "Pill #{index}", tags: [ "pill" ]) }
+    entries = 15.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    pills.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 1).hours.ago) }   # version: none (a test sets a time) # changes: none (a test sets a time)
+    entries.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 2).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+
+    result = listings
+
+    # The setup's @entry, published a moment ago, is the newest; then the
+    # hours alternate. The twenty newest: @entry, ten pills, nine entries.
+    assert_equal 31, result.listed_count(@page.id)
+    assert_equal({ tag("pill") => 5, "type-resume_entry" => 6 }, result.left_out(@page.id))
+    assert_equal pills.last(5).map(&:id), result.left_out_of(@page.id, tag("pill"))
+    assert_equal entries.last(6).map(&:id), result.left_out_of(@page.id, "type-resume_entry")
+    assert_empty result.left_out_of(@page.id, "type-blog")
+    assert_empty result.left_out(create_page(title: "Other").id)
+    assert_equal({ type: nil, tag: "pill" }, result.filter_of(@page.id, tag("pill")))
+    assert_equal({ type: "resume_entry", tag: nil }, result.filter_of(@page.id, "type-resume_entry"))
+    assert_equal({ type: nil, tag: "pill" }, result.filter_of(@page.id), "with no target, the first block's")
+    assert_equal({}, result.filter_of(@page.id, "type-blog"))
+  end
+
   test "listed and unlisted are each other's rest, and with no list block every post is unlisted" do
     assert_equal [ @ruby, @plain, @entry, @draft ].map(&:id).sort, listings.unlisted.sort
 
@@ -814,9 +847,10 @@ end
   # The most rows one of the list's reads answers (`unlisted`, `listed`).
   ROW_LIMIT = 200
 
-  # The one node a list block with no filter points at, and the one "+N
-  # more" node of a page's local view: neither is a record, so neither has a
-  # database id to add.
+  # The one node a list block with no filter points at: no record, so no
+  # database id to add. And the kind of a "+N more" pill of a page's local
+  # view, ONE PER TARGET (design answer H1): its id is the kind and the
+  # target it hangs off, `node_id(MORE, "type-blog")` => "more-type-blog".
   ALL_POSTS = "all-posts"
   MORE = "more"
 
@@ -915,8 +949,22 @@ module PostGraph
     def listed?(post_id) = listed.include?(post_id)
     def unlisted = newest_first(@post_rows.map(&:first).reject { |id| listed?(id) })
 
-    def filter_of(page_id)
-      settings = @settings.fetch(page_id, []).first or return {}
+    # What each target of the page brings in beyond the `shown` newest posts
+    # the local view draws (design answer H1: one "+N more" pill per target,
+    # each counting only its own): `{ target => count }`.
+    def left_out(page_id, shown: LISTED_IN_VIEW)
+      posts_of(page_id).drop(shown).group_by { |post_id| target_of(page_id, post_id) }.transform_values(&:size)
+    end
+
+    def left_out_of(page_id, target, shown: LISTED_IN_VIEW)
+      posts_of(page_id).drop(shown).select { |post_id| target_of(page_id, post_id) == target }
+    end
+
+    # The filter of the page's first list block, or of the first that points
+    # at `target`: what "Open in Posts" filters the Posts screen by.
+    def filter_of(page_id, target = nil)
+      all = @settings.fetch(page_id, [])
+      settings = (target ? all.find { |candidate| target(candidate) == target } : all.first) or return {}
       { type: settings.content_type.presence&.to_s, tag: settings.tag.to_s.strip.presence }
     end
 
@@ -1136,10 +1184,10 @@ The data changes; the screen draws what it drew. The script is told to leave out
 
 ```ruby
 PostGraph::Builder.new(site:, locale:, url_for:, now: Time.current)
-  #plan(post_ids:, relations:, tag_links:, tag_counts:, min_tag_edges:, page_ids: [], lists: [], brought: [], keep_tag: nil, more: nil)
+  #plan(post_ids:, relations:, tag_links:, tag_counts:, min_tag_edges:, page_ids: [], lists: [], brought: [], keep_tag: nil, more: [])
        # => Builder::Plan; NO statement. plan.edges is every line of the response.
-       #    lists: [[page_id, target], …]   brought: [[target, post_id], …]   more: { page_id:, count:, from: target } | nil
-  #build(plan)   # => { nodes:, tags:, pages:, types:, edges: } (+ more:); seven statements
+       #    lists: [[page_id, target], …]   brought: [[target, post_id], …]   more: [{ page_id:, target:, count: }, …]
+  #build(plan)   # => { nodes:, tags:, pages:, types:, edges: } (+ more: [ … ] when there is a pill); seven statements
   #post_nodes(post_ids, degree: {}, related_count: {}, tag_count: {})   # => [post node, …] by id; three statements
 
 PostGraph::Global.call(actor:, url_for:, locale: Locales.default, cap: CAP, everything: false, open_above: OPEN_AROUND_HOME_ABOVE)
@@ -1156,16 +1204,17 @@ tags[]:   { id: "tag-<id>", name, count, degree }
 pages[]:  { id: "page-<id>", title, path: "/about"|nil, depth, home: true|false, parent: "page-<id>"|nil, order, status, changes, change_at,
             url, degree, child_count, listed_count, open_notes }                      in tree order
 types[]:  { id: "type-<name>"|"all-posts", name: "<stored name>"|nil, label: "<the type's label, or its stored name>"|nil,
-            colour_index: Integer|nil, count, degree }                                "all-posts" first, then registry order
+            colour_index: Integer|nil, count, degree }                                colour-slot order, then retired types by name, "all-posts" LAST (design answer H2: the list's order)
 edges[]:  { source, target, kind: "related"|"tag"|"tree"|"lists"|"brings" }
           tree: child -> parent; lists: page -> tag | type | all-posts
-          brings: type | all-posts -> post, and type | all-posts | tag -> "more"      only in a page's local view (Task 4)
-more:     { id: "more", count, page: "page-<id>" }                    only in a page's local view (Task 4)
+          brings: type | all-posts -> post, and type | all-posts | tag -> its "more-<target>"   only in a page's local view (Task 4)
+more:     [{ id: "more-<target>", count, page: "page-<id>", target: "type-<name>"|"all-posts"|"tag-<id>" }, …]
+          one pill PER TARGET that brings in more than the view draws; only in a page's local view (Task 4), and no key at all without one
 ```
 
 `changes` is `"unpublished"` for `Publishing::State#state == :live_with_changes`, `"scheduled"` for `:live_change_scheduled`, nil otherwise: with `status` it names each of the five looks. `change_at` is the time the scheduled change comes into force (the pending copy's `live_at`) in that last state and nil in every other; the query hands up the time and no words, and the controller adds `change_on`, the same day as CS Studio's short date ("14 Oct"), to every node that has one, for the card's chip (design answer G4). A type with no `colour_index` that is not "all-posts" is a retired one: the script draws its hub by that (design answer G1), and no key says so twice. `url_for:` is called with a `Post` or a `Page`.
 
-**A `brings` line** (the third design answers, "Local view lines"): in a page's local view the hub that brings a post in draws a faint line to it, and "+N more" hangs off its hub the same way; no lists line joins the page to a post. The whole graph has none: there a type node joins only pages.
+**A `brings` line** (the third design answers, "Local view lines"): in a page's local view the hub that brings a post in draws a faint line to it, and each "+N more" hangs off its own hub the same way, one pill per target (design answer H1); no lists line joins the page to a post. The whole graph has none: there a type node joins only pages.
 
 - [ ] **Step 1: the failing tests of the global view.** In `test/queries/post_graph/global_test.rb` add the helper
 
@@ -1216,10 +1265,10 @@ more:     { id: "more", count, page: "page-<id>" }                    only in a 
     assert_equal [ { source: page_id(by_tag), target: page_id(home), kind: "tree" }, { source: page_id(by_type), target: page_id(home), kind: "tree" },
                    { source: page_id(home), target: "all-posts", kind: "lists" }, { source: page_id(by_tag), target: tag, kind: "lists" },
                    { source: page_id(by_type), target: "type-resume_entry", kind: "lists" } ].sort_by(&:to_s), lines.sort_by(&:to_s)
-    assert_equal [ "all-posts", "type-resume_entry" ], result[:types].map { |type| type[:id] }
+    assert_equal [ "type-resume_entry", "all-posts" ], result[:types].map { |type| type[:id] }, "All posts is last"
     assert_equal({ id: "type-resume_entry", name: "resume_entry", label: ContentTypes.fetch("resume_entry").label,
-                   colour_index: ContentTypes.fetch("resume_entry").colour_index, count: 0, degree: 1 }, result[:types].last)
-    assert_equal({ id: "all-posts", name: nil, label: nil, colour_index: nil, count: 1, degree: 1 }, result[:types].first)
+                   colour_index: ContentTypes.fetch("resume_entry").colour_index, count: 0, degree: 1 }, result[:types].first)
+    assert_equal({ id: "all-posts", name: nil, label: nil, colour_index: nil, count: 1, degree: 1 }, result[:types].last)
   end
 
   test "a type node joins only the pages that list it, never a post of its type" do
@@ -1241,7 +1290,7 @@ more:     { id: "more", count, page: "page-<id>" }                    only in a 
     result = graph
 
     assert_equal 1, result[:types].count { |type| type[:id] == "all-posts" }
-    assert_equal 3, result[:types].first[:degree]
+    assert_equal 3, result[:types].last[:degree]
   end
 
   test "a listed tag is a node whenever its page is readable, and the one post that carries it is drawn" do
@@ -1281,6 +1330,19 @@ more:     { id: "more", count, page: "page-<id>" }                    only in a 
     list_block(create_page(title: "Old"), content_type: "gone/thing")
 
     assert_equal [ { id: "type-gone/thing", name: "gone/thing", label: "gone/thing", colour_index: nil, count: 0, degree: 1 } ], graph[:types]
+  end
+
+  # Design answer H2: the order the list's "Post types" group shows.
+  test "post types come in colour-slot order, then the retired ones, then All posts last" do
+    page = create_page(title: "Lists")
+    list_block(page)
+    list_block(page, content_type: "zz/gone")
+    list_block(page, content_type: "aa/gone")
+    ContentTypes.names.each { |name| list_block(page, content_type: name.to_s) }
+
+    registered = ContentTypes.names.map(&:to_s).sort_by { |name| ContentTypes.fetch(name).colour_index }.map { |name| "type-#{name}" }
+
+    assert_equal registered + [ "type-aa/gone", "type-zz/gone", "all-posts" ], graph[:types].map { |type| type[:id] }
   end
 ```
 
@@ -1476,10 +1538,11 @@ module PostGraph
     #   answers). The caller leaves out a post a TAG brings in: its "tag"
     #   line to that tag is among `tag_links` already, and two lines between
     #   the same two nodes would be one drawn twice.
-    # - `more`: `{ page_id:, count:, from: target }` for "+N more", which
-    #   hangs off the hub `from` by the same faint line.
+    # - `more`: `[{ page_id:, target:, count: }, …]`, ONE "+N more" PILL PER
+    #   TARGET (design answer H1), each hanging off its own hub or tag by the
+    #   same faint line and counting only what that target brings in.
     # - a tree line needs both pages drawn, and the parent readable (`Tree`).
-    def plan(post_ids:, relations:, tag_links:, tag_counts:, min_tag_edges:, page_ids: [], lists: [], brought: [], keep_tag: nil, more: nil)
+    def plan(post_ids:, relations:, tag_links:, tag_counts:, min_tag_edges:, page_ids: [], lists: [], brought: [], keep_tag: nil, more: [])
       drawn = post_ids.to_set
       pages = page_ids.to_set
       related = relations.select { |post_id, related_id| drawn.include?(post_id) && drawn.include?(related_id) }
@@ -1497,7 +1560,7 @@ module PostGraph
               tree.map { |id, parent| { source: page.call(id), target: page.call(parent), kind: "tree" } } +
               lists.map { |page_id, target| { source: page.call(page_id), target: target, kind: "lists" } } +
               brought.map { |target, post_id| { source: target, target: post.call(post_id), kind: "brings" } } +
-              (more ? [ { source: more[:from], target: MORE, kind: "brings" } ] : [])
+              more.map { |pill| { source: pill[:target], target: PostGraph.node_id(MORE, pill[:target]), kind: "brings" } }
       Plan.new(post_ids: post_ids, page_ids: page_ids, related: related, by_tag: by_tag, tag_counts: tag_counts, lists: lists, more: more, edges: edges)
     end
 
@@ -1520,7 +1583,8 @@ module PostGraph
         types: type_nodes(plan.lists, degree),
         edges: edges
       }
-      graph[:more] = { id: MORE, count: plan.more[:count], page: PostGraph.node_id(:page, plan.more[:page_id]) } if plan.more
+      pills = plan.more.reject { |pill| gone.include?(pill[:target]) }
+      graph[:more] = pills.map { |pill| { id: PostGraph.node_id(MORE, pill[:target]), count: pill[:count], page: PostGraph.node_id(:page, pill[:page_id]), target: pill[:target] } } if pills.any?
       graph
     end
 
@@ -1593,11 +1657,19 @@ module PostGraph
     end
 
     # A post type a drawn lists line points at, and the one "All posts"
-    # node. No statement: the counts are the site's readable posts.
+    # node. No statement: the counts are the site's readable posts. In the
+    # order the list shows them (design answer H2): the types by their
+    # colour slot (the order in Settings), then the retired ones by name,
+    # then "All posts" last.
     def type_nodes(lists, degree)
-      registered = ContentTypes.names.map(&:to_s)
       targets = lists.map(&:last).uniq.reject { |target| target.start_with?("tag-") }
-      targets.sort_by { |target| target == ALL_POSTS ? [ 0, 0, "" ] : [ 1, registered.index(target.delete_prefix("type-")) || registered.size, target ] }.map do |target|
+      place = ->(target) do
+        next [ 2, 0, "" ] if target == ALL_POSTS
+
+        slot = ContentTypes.find(target.delete_prefix("type-"))&.colour_index
+        slot ? [ 0, slot, target ] : [ 1, 0, target ]
+      end
+      targets.sort_by(&place).map do |target|
         if target == ALL_POSTS
           { id: ALL_POSTS, name: nil, label: nil, colour_index: nil, count: @site.listings.post_count, degree: degree.fetch(target, 0) }
         else
@@ -1848,14 +1920,15 @@ PostGraph::Focus.find(actor:, page: nil, post: nil, tag: nil, locale: Locales.de
 PostGraph::Local.call(actor:, focus:, url_for:, depth: 1, locale: Locales.default, cap: CAP)
   # around a page: depth 1 its parent, its children and its lists targets; depth 2 adds the grandparent, the siblings, the
   # grandchildren, the LISTED_IN_VIEW newest posts it lists (each joined by a `brings` line to the type hub or "All posts" that
-  # brings it in; one a tag brings in has its tag line) and `more` when there are others, hanging off the hub of the page's first target
+  # brings it in; one a tag brings in has its tag line) and one `more` pill per target that brings in others, each hanging off its own hub or tag
 PostGraph::Rows.new(actor:, url_for:, locale: Locales.default, limit: ROW_LIMIT)
   #unlisted          # => { total:, rows: [post node, …] } newest first
-  #listed(page_id)   # => { total:, rows: [post node + via: target, …], filter: { type:, tag: } }: the posts the page lists beyond the first LISTED_IN_VIEW;
-                     #    `via` is `Listings#target_of`: the hub that brings the row's post in, for the line it gets when it is added to the canvas
+  #listed(page_id, target)   # => { total:, rows: [post node + via: target, …], filter: { type:, tag: } }: the posts THAT TARGET brings in beyond the page's first
+                     #    LISTED_IN_VIEW (the rows of one pill); `via` is the target, for the line a row gets when it is added to the canvas;
+                     #    `filter` is the filter of the block that points at the target. A target the page does not list answers no rows
 ```
 
-Routes: `GET mind_graph/unlisted` and `GET mind_graph/listed?page=<id>`, JSON by default. `listed` answers `{ total, rows, posts_url }`; `posts_url` is the Posts screen filtered by the page's first list block's type and tag. Both go through the controller's `with_dates` (Task 3), so a row with a scheduled change carries `change_on`.
+Routes: `GET mind_graph/unlisted` and `GET mind_graph/listed?page=<id>&target=<target>`, JSON by default. `listed` answers `{ total, rows, posts_url }`; `posts_url` is the Posts screen filtered by the type and tag of the block that points at the target. Both go through the controller's `with_dates` (Task 3), so a row with a scheduled change carries `change_on`.
 
 - [ ] **Step 1: the focus's failing tests.** In `test/queries/post_graph/focus_test.rb`:
 
@@ -1994,14 +2067,14 @@ Routes: `GET mind_graph/unlisted` and `GET mind_graph/listed?page=<id>`, JSON by
     result = local(page_focus(@blog), depth: 2)
 
     assert_equal posts.first(20).map { |post| "post-#{post.id}" }.sort, ids(result)
-    assert_equal({ id: "more", count: 3, page: "page-#{@blog.id}" }, result[:more])
+    assert_equal [ { id: "more-type-resume_entry", count: 3, page: "page-#{@blog.id}", target: "type-resume_entry" } ], result[:more]
     lists = result[:edges].select { |edge| edge[:kind] == "lists" }
     brings = result[:edges].select { |edge| edge[:kind] == "brings" }
     assert_equal [ { source: "page-#{@blog.id}", target: "type-resume_entry", kind: "lists" } ], lists, "the page's one lists line, and none to a post"
-    assert_equal 21, brings.size, "twenty posts and more"
+    assert_equal 21, brings.size, "twenty posts and the pill"
     assert brings.all? { |edge| edge[:source] == "type-resume_entry" }
-    assert_includes brings, { source: "type-resume_entry", target: "more", kind: "brings" }
-    assert_equal ids(result), (brings.map { |edge| edge[:target] } - [ "more" ]).sort
+    assert_includes brings, { source: "type-resume_entry", target: "more-type-resume_entry", kind: "brings" }
+    assert_equal ids(result), (brings.map { |edge| edge[:target] } - [ "more-type-resume_entry" ]).sort
     assert_equal [ 20, 20 ], result.values_at(:total, :shown)
     assert_empty local(page_focus(@blog), depth: 1)[:nodes]
     assert_empty local(page_focus(@blog), depth: 1)[:edges].select { |edge| edge[:kind] == "brings" }
@@ -2021,21 +2094,43 @@ Routes: `GET mind_graph/unlisted` and `GET mind_graph/listed?page=<id>`, JSON by
     assert_nil result[:more]
   end
 
-  test "a page that lists by nothing brings its posts in through All posts, and more hangs off a tag when the tag's block is the page's first" do
+  # Design answer H1: ONE PILL PER TARGET, each counting only what its own
+  # target brings in. Not one pill on the first block's hub.
+  test "a page with two list blocks has a pill per target, each on its own hub or tag with its own count, and a target that brings in nothing more has none" do
+    tree
+    list_block(@docs, tag: "pill")
+    list_block(@docs, content_type: "resume_entry")
+    list_block(@docs, tag: "few")
+    pills = 15.times.map { |index| create_post(title: "Pill #{index}", tags: [ "pill" ]) }
+    entries = 15.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    create_post(title: "Few", tags: [ "few" ]).update_columns(published_at: 1.minute.ago)                  # version: none (a test sets a time) # changes: none (a test sets a time)
+    pills.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 1).hours.ago) }   # version: none (a test sets a time) # changes: none (a test sets a time)
+    entries.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 2).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    pill = "tag-#{Tag.find_by!(name: "pill").id}"
+
+    result = local(page_focus(@docs), depth: 2)
+
+    # The twenty newest: "Few", ten pills and nine entries. Left out: five
+    # pills and six entries.
+    assert_equal [ { id: "more-#{pill}", count: 5, page: "page-#{@docs.id}", target: pill },
+                   { id: "more-type-resume_entry", count: 6, page: "page-#{@docs.id}", target: "type-resume_entry" } ], result[:more], "in the order of the page's targets; the tag few has no pill"
+    to_pills = result[:edges].select { |edge| edge[:target].start_with?("more-") }
+    assert_equal [ { source: pill, target: "more-#{pill}", kind: "brings" }, { source: "type-resume_entry", target: "more-type-resume_entry", kind: "brings" } ], to_pills
+    assert_equal 9, result[:edges].count { |edge| edge[:kind] == "brings" && edge[:target].start_with?("post-") }, "the nine entries hang off the type; the tagged posts have their tag lines"
+  end
+
+  test "a page that lists by nothing brings its posts in through All posts, pill included" do
     tree
     list_block(@blog)
-    list_block(@docs, tag: "many")
-    list_block(@docs, content_type: "blog")
-    21.times { |index| create_post(title: "Many #{index}", tags: [ "many" ]) }
-    many = "tag-#{Tag.find_by!(name: "many").id}"
+    21.times { |index| create_post(title: "Many #{index}") }
 
     all = local(page_focus(@blog), depth: 2)
-    through_tag = local(page_focus(@docs), depth: 2)
+    brings = all[:edges].select { |edge| edge[:kind] == "brings" }
 
-    assert all[:edges].select { |edge| edge[:kind] == "brings" }.all? { |edge| edge[:source] == "all-posts" }
-    assert_equal ids(all), (all[:edges].select { |edge| edge[:kind] == "brings" }.map { |edge| edge[:target] } - [ "more" ]).sort
-    assert_equal [ { source: many, target: "more", kind: "brings" } ], through_tag[:edges].select { |edge| edge[:kind] == "brings" && edge[:target] == "more" }
-    assert through_tag[:more][:count].positive?
+    assert brings.all? { |edge| edge[:source] == "all-posts" }
+    assert_equal ids(all), (brings.map { |edge| edge[:target] } - [ "more-all-posts" ]).sort
+    assert_equal [ "more-all-posts" ], all[:more].map { |more| more[:id] }
+    assert all[:more].first[:count].positive?
   end
 
   test "around a page nothing outside the viewer's scope is drawn: not the parent, not a child, not a post it lists" do
@@ -2101,7 +2196,7 @@ Routes: `GET mind_graph/unlisted` and `GET mind_graph/listed?page=<id>`, JSON by
       @pages = {}
       @types = Set.new
       @listed = []
-      @more = nil
+      @more = []
       @focus.kind == "page" ? walk_around_page : walk
 
       post_ids = @posts.keys
@@ -2140,8 +2235,10 @@ Routes: `GET mind_graph/unlisted` and `GET mind_graph/listed?page=<id>`, JSON by
     # its parent, its children and what its blocks list. Depth 2 adds one
     # more step along the tree (the grandparent, the siblings, the
     # grandchildren) and the newest LISTED_IN_VIEW posts it lists; the
-    # others are counted behind "more", which hangs off the hub of the
-    # page's first target. No line joins the page to a post: `brought`.
+    # others are counted behind "+N more", ONE PILL PER TARGET (design
+    # answer H1), each on its own hub or tag with what that target brings
+    # in, in the order of the page's targets. No line joins the page to a
+    # post: `brought`.
     def walk_around_page
       tree = @site.tree
       id = @focus.id
@@ -2157,7 +2254,8 @@ Routes: `GET mind_graph/unlisted` and `GET mind_graph/listed?page=<id>`, JSON by
         @posts[post_id] = 2
         @listed << [ id, post_id ]
       end
-      @more = { page_id: id, count: listed.size - LISTED_IN_VIEW, from: @site.listings.targets(id).first } if listed.size > LISTED_IN_VIEW
+      left = @site.listings.left_out(id)
+      @more = @site.listings.targets(id).filter_map { |target| { page_id: id, target: target, count: left[target] } if left[target] }
     end
 
     def step_onto_targets(page_id, level)
@@ -2262,29 +2360,32 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     assert_equal [ "post-#{@new.id}" ], rows.unlisted[:rows].map { |row| row[:id] }, "to someone who reads the whole tree it is listed"
   end
 
-  test "listed is the posts a page lists beyond the twenty its local view draws, each with the hub that brings it in, and the filter of its first list block" do
+  test "listed is the posts one target of a page brings in beyond the twenty its local view draws, each with that target, and the filter of the target's block" do
     posts = 22.times.map { |index| create_post(title: "News #{index}", tags: [ "news" ]) }
     posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).minutes.from_now) } # version: none (a test sets a time) # changes: none (a test sets a time)
 
-    result = rows.listed(@blog.id)
+    news = "tag-#{Tag.find_by!(name: "news").id}"
+    result = rows.listed(@blog.id, news)
 
     assert_equal 3, result[:total], "twenty-three listed, twenty drawn"
     assert_equal [ posts[1], posts[0], @listed ].map { |post| "post-#{post.id}" }, result[:rows].map { |row| row[:id] }
     assert_equal({ type: "blog", tag: "news" }, result[:filter])
     assert result[:rows].all? { |row| row[:listed] }
-    assert_equal [ "tag-#{Tag.find_by!(name: "news").id}" ], result[:rows].map { |row| row[:via] }.uniq, "a block with a tag and a type points at the tag"
+    assert_equal [ news ], result[:rows].map { |row| row[:via] }.uniq, "a block with a tag and a type points at the tag"
     assert(rows.unlisted[:rows].none? { |row| row.key?(:via) })
+    assert_equal({ total: 0, rows: [], filter: {} }, rows.listed(@blog.id, "type-blog"), "a target the page does not list has no pill and no rows")
+    assert_equal({ total: 0, rows: [], filter: {} }, rows.listed(@blog.id, "<junk>"))
   end
 
   test "a page that lists twenty or fewer has no rows, and a page with no list block an empty filter" do
-    assert_equal({ total: 0, rows: [], filter: { type: "blog", tag: "news" } }, rows.listed(@blog.id))
-    assert_equal({ total: 0, rows: [], filter: {} }, rows.listed(root_page.id))
+    assert_equal({ total: 0, rows: [], filter: { type: "blog", tag: "news" } }, rows.listed(@blog.id, "tag-#{Tag.find_by!(name: "news").id}"))
+    assert_equal({ total: 0, rows: [], filter: {} }, rows.listed(root_page.id, "all-posts"))
   end
 
   test "each read costs eight statements, with a few rows and with thirty more" do
     viewer = users(:one)
     22.times { |index| create_post(title: "News #{index}", tags: [ "news" ]) } # so that `listed` has rows: a read with none asks for no notes
-    count = -> { [ capture_sql { rows(actor: viewer).unlisted }.size, capture_sql { rows(actor: viewer).listed(@blog.id) }.size ] }
+    count = -> { [ capture_sql { rows(actor: viewer).unlisted }.size, capture_sql { rows(actor: viewer).listed(@blog.id, "tag-#{Tag.find_by!(name: "news").id}") }.size ] }
 
     few = count.call
     30.times { |index| create_post(title: "More #{index}", tags: ([ "news" ] if index.even?).to_a) }
@@ -2309,9 +2410,12 @@ end
 #   viewer, not for the site: someone who reads part of the tree is told a
 #   post is unlisted when a page they cannot read lists it, since saying
 #   otherwise would disclose that page (spec, Risks).
-# - `listed(page_id)`: the posts that page lists beyond the LISTED_IN_VIEW
-#   its local view draws: the rows behind "+N more". The caller has found
-#   the page through `Focus`, so it is readable.
+# - `listed(page_id, target)`: the posts ONE TARGET of that page brings in
+#   beyond the LISTED_IN_VIEW its local view draws: the rows behind that
+#   target's "+N more" pill (design answer H1: a pill per target). The
+#   caller has found the page through `Focus`, so it is readable; `target`
+#   is compared with the page's own targets and nothing else is done with
+#   it, so a junk one answers no rows.
 #
 # Newest first, the first `limit` with the whole `total`. A row is a post's
 # node exactly as the graph's data has it (`Builder#post_nodes`), with no
@@ -2334,10 +2438,11 @@ module PostGraph
       answer(site, site.listings.unlisted)
     end
 
-    def listed(page_id)
+    def listed(page_id, target)
       site = Site.load(actor: @actor)
       listings = site.listings
-      answer(site, listings.posts_of(page_id).drop(LISTED_IN_VIEW), via: ->(post_id) { listings.target_of(page_id, post_id) }).merge(filter: listings.filter_of(page_id))
+      target = target.to_s
+      answer(site, listings.left_out_of(page_id, target), via: ->(_post_id) { target }).merge(filter: listings.filter_of(page_id, target))
     end
 
     private
@@ -2386,12 +2491,14 @@ end
       render json: with_dates(list_rows.unlisted)
     end
 
-    # The rows behind a page's "+N more", and where the Posts screen shows
-    # the same posts as far as its filters go: by the type and the tag of
-    # the page's first list block.
+    # The rows behind one of a page's "+N more" pills (`target=`: a pill per
+    # target, design answer H1), and where the Posts screen shows the same
+    # posts as far as its filters go: by the type and the tag of the block
+    # that points at the target. `target` is only ever compared: a junk one
+    # answers no rows.
     def listed
       page = PostGraph::Focus.find(actor: Current.actor, page: params[:page], locale: admin_locale) or raise ActiveRecord::RecordNotFound
-      rows = list_rows.listed(page.id)
+      rows = list_rows.listed(page.id, params[:target].to_s)
       render json: with_dates(rows.except(:filter)).merge(posts_url: admin_posts_path(**admin_url_options, **rows[:filter].compact))
     end
 ```
@@ -2409,8 +2516,8 @@ end
 - [ ] **Step 8: the integration tests.** In `test/integration/admin/mind_graph_data_test.rb`:
   - `"page= and depth= answer that page's neighbourhood"`: a page with a child and a list block; `get "/cs-studio/mind_graph/data", params: { page: page.id, depth: 2 }`; `data["focus"]` is `{ "kind" => "page", "id" => page.id, "node_id" => "page-#{page.id}", "title" => …, "depth" => 2 }`; the child and Home are in `data["pages"]`.
   - `"a page focus that is a list, hexadecimal, trashed or out of scope is 404, and 010 is page 10"`: for the page, `data` and `listed`, each of `page[]=1`, `page=0x1A`, a trashed page's id, an unknown id → `:not_found`; `page=0<id>` → success with that page as the focus. (Follow `"an id with a leading zero is that id, and a hexadecimal one is not found"` in the same file.)
-  - `"unlisted answers the posts no page lists, with the total"` and `"listed answers the rows behind more and the Posts screen's address"`: `get "/cs-studio/mind_graph/unlisted"` → `data.keys.sort == %w[rows total]`, the rows' ids; `get "/cs-studio/mind_graph/listed", params: { page: blog.id }` with 22 listed posts and a block of `"content_type" => "blog", "tag" => "news"` → `data["total"] == 2`, every row's `"via"` is `"tag-#{Tag.find_by!(name: "news").id}"`, and `data["posts_url"] == "/cs-studio/posts?tag=news&type=blog"` (compare the query as a Hash: `Rack::Utils.parse_query(URI(data["posts_url"]).query)`), and no key `filter`.
-  - `"listed without a page, and both reads without a session or a permission"`: `listed` with no `page` → 404; signed out → redirect to sign-in for both; a viewer with neither permission → 403 for both.
+  - `"unlisted answers the posts no page lists, with the total"` and `"listed answers the rows behind more and the Posts screen's address"`: `get "/cs-studio/mind_graph/unlisted"` → `data.keys.sort == %w[rows total]`, the rows' ids; `get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "tag-#{Tag.find_by!(name: "news").id}" }` with 22 listed posts and a block of `"content_type" => "blog", "tag" => "news"` → `data["total"] == 2`, every row's `"via"` is `"tag-#{Tag.find_by!(name: "news").id}"`, and `data["posts_url"] == "/cs-studio/posts?tag=news&type=blog"` (compare the query as a Hash: `Rack::Utils.parse_query(URI(data["posts_url"]).query)`), and no key `filter`.
+  - `"listed without a page, and both reads without a session or a permission"`: `listed` with no `page` → 404; `listed` with a page and no `target`, `target[]=x` or `target=<script>` → success with `"total" => 0`, no rows and nothing of the junk in the body; signed out → redirect to sign-in for both; a viewer with neither permission → 403 for both.
 
   In `test/integration/admin/mind_graph_test.rb`: `"a page focus is named as a page, and its depth links keep the page"` (`get "/cs-studio/mind_graph", params: { page: page.id }` → the bar holds `Around the page “About”`, the depth-2 link is `/cs-studio/mind_graph?depth=2&page=#{page.id}` in the form the tag's test compares, and `data-url` carries `page=#{page.id}`); and `"a focus title with markup in it is escaped"` gains a page titled `<b>x</b>`.
 
@@ -2439,21 +2546,18 @@ After this task a page is on the canvas. The radios still filter (Task 6 replace
 | a corner dot 5px across, its centre 1px in from the mark's bottom-right corner (on the 45° line for a circle), with a 1.5px surface ring; dim for unpublished changes, warn for a scheduled change | radius 2.5 on a surface disk of radius 4; a page's at its corner less 1 each way, a circle's at `(radius - 1) / √2` right and down | `CORNER_DOT`, `CORNER_INSET`, `CORNER_RING` |
 | the hub's inner ring: 1.5px wide, its outer edge 1.5px inside the hub's 6px radius | a 1.5px surface stroke centred at radius 3.75 (from 3 to 4.5) | `TYPE_RING` |
 | a ring type: a filled-type mark inside a 1.5px ring; live, the ring at radius 7 with a filled radius-4 disk | the ring at the mark's radius, the type's mark at 4/7 of it, drawn by the same rule as a filled post's | `OUTLINE`, `INNER` |
-| a retired type's hub: an outline circle in dim, 1.5px, on surface, with a 4px dim centre dot; "(retired)" at the end of its label | surface disk of radius 6, 1.5px `dim` stroke, a dot of radius 2; the label through the message `retired_type` | `drawType`, `CENTRE_DOT` |
-| "+N more": a 60×16 pill, surface, a 1px line-strong border, the words in 10px mono dim | a round-ended box (corner radius 8), `theme.line`, `theme.countFont` (the 10px mono the notes badge has), `theme.dim` | `MORE_BOX` |
+| a retired type's hub: an outline circle in dim, 1.5px, DASHED (H3), on surface, with a 4px dim centre dot; "(retired)" at the end of its label | surface disk of radius 6, 1.5px dashed `dim` stroke, a dot of radius 2; the label through the message `retired_type` | `drawType`, `CENTRE_DOT` |
+| the hub of a ring type (slots 7 to 12; H3): a 1.5px ring in the hue around a filled 6px centre, not filled | surface disk of radius 6, 1.5px solid stroke in the hue, a filled disk of radius 3 | `drawType`, `RING_HUB_CENTRE` |
+| a ring type's inner mark (H3): 4/7 of the outer radius at every size, rounded to the nearest 0.5px; a draft's outer ring solid; the corner dot on the outer ring | 4, 5.5, 7.5 and 9 for the radii 7, 10, 13 and 16 | `innerRadius` |
+| "+N more": a 16px-high pill, surface, a 1px line-strong border, the words in 10px mono dim; it GROWS TO FIT, 8px padding each side, at least 60px wide; the figure with a thousands separator, "+1,980 more" (H4) | a round-ended box (corner radius 8) as wide as its measured words plus 16, never under 60; `theme.line`, `theme.countFont` (the 10px mono the notes badge has), `theme.dim`; the figure through `number()` | `MORE_HEIGHT`, `MORE_MIN_WIDTH`, `MORE_PADDING`, `moreWidth` |
 | the Lists line: 1.5px, round caps, dash 0.1 / 3.5 | as given | `LINE_STYLES.lists` (`renderer.js`) |
 | a hub's faint line to "+N more": 1px `--cs-line` | as given, `theme.faint` | `LINE_STYLES.brings` (`renderer.js`) |
 
 | A reading this plan makes | Built as | Constant |
 |---|---|---|
 | "DASHED, 1.5px" | dashes of 3 and gaps of 2.5, the dash a draft has today | `DRAFT_DASH`, `OUTLINE` |
-| a ring type at the larger sizes (radius 10, 13, 16) | the inner mark stays 4/7 of the radius | `INNER` |
-| a ring type as a draft | the inner mark is the dashed outline; the ring round it stays solid | `drawPost` |
-| the corner dot on a ring type | on the outer ring's corner, where the notes badge and the pin stand too | `drawMark` |
-| a hub's faint lines to its POSTS (the answer gives the pill's line) | the same 1px `--cs-line`; no toggle of their own, they go with "Lists" (Task 6) | `LINE_STYLES.brings` |
-| a type hub for a type drawn as a ring (slots 7 to 12) | filled with that slot's hue, like slots 1 to 6 | `drawType` |
-| the pill with a long figure | fixed at 60 wide, the figure not grouped ("+1980 more" is the whole width) | `MORE_BOX` |
-| a retired hub's outline | a stroke centred on the hub's radius, like every other outline here | `drawType` |
+| "a filled 6px centre" of a ring type's hub | 6px ACROSS (radius 3): a centre of radius 6 would be the whole hub | `RING_HUB_CENTRE` |
+| a retired hub's dashed ring | the draft's dash (3 / 2.5), a stroke centred on the hub's radius like every other outline here | `drawType` |
 | "a fixed bonus over a post with equal links" | half a link | `PAGE_BONUS` (`graph_data.js`) |
 
 **Files:**
@@ -2467,13 +2571,14 @@ After this task a page is on the canvas. The radios still filter (Task 6 replace
 
 ```js
 // mind_graph/marks.js
-radiusFor(node)          // half a page's width (7; Home 9), half the pill's (30), 6 for a type hub, else one of the four steps by degree
+radiusFor(node)          // half a page's width (7; Home 9), half the pill's (30 at the least), 6 for a type hub, else one of the four steps by degree
 collisionRadius(node)    // half a box's diagonal (a page, the pill), else radiusFor(node): what the layout keeps clear
-boxOf(node)              // { width, height } for a page and for "+N more", null for anything else
+boxOf(node)              // { width, height } for a page and for "+N more" (its `node.width`, else the least, 60), null for anything else
+moreWidth(wordsWidth)    // a pill's width for its measured words: 8px each side, never under 60
 drawMark(context, theme, node, x, y, radius)
 
 // mind_graph/graph_data.js
-nodesOf(data, { allPosts, more, retired })   // payload -> [{ …, kind: "page"|"post"|"tag"|"type"|"more", title }]; `more(count)` answers the pill's words,
+nodesOf(data, { allPosts, more, retired })   // payload -> [{ …, kind: "page"|"post"|"tag"|"type"|"more", title }]; `more(count)` answers a pill's words (one node per pill),
                                      // `retired(name)` a retired type's label ("Old type (retired)")
 rank(node)                           // 0 Home, 1 a top-level page or a type node, 2 the rest
 orderOf(nodes, indexes)              // indexes sorted: rank, then degree (a page half a link ahead), then index; "more" is left out: the pill carries its words
@@ -2578,7 +2683,7 @@ LINE_STYLES, HIDE_TAG_LINES_BELOW    // 0.4
 
   # Third design answers, "Ring types": the type's mark inside a 1.5px ring,
   # so the five looks are a filled post's, drawn at 4/7 of the radius.
-  test "marks: a ring type is its type's mark inside a thin ring, in the same five looks, and a retired type's has its stroke" do
+  test "marks: a ring type is its type's mark inside a thin ring, in the same five looks, a retired type's has its stroke, and the inner mark is 4/7 rounded to half a pixel" do
     ring = [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "cat-1", 1.5, SOLID ] ]
     live, draft, scheduled, changed, pending, retired, retired_draft = marks_drawn([
       { colour_index: 7 }, { colour_index: 7, status: "draft" }, { colour_index: 7, status: "scheduled" }, { colour_index: 7, changes: "unpublished" },
@@ -2593,32 +2698,39 @@ LINE_STYLES, HIDE_TAG_LINES_BELOW    // 0.4
     grey = [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "meta", 1.5, SOLID ] ]
     assert_equal grey + [ [ "fill", "circle", 4, "meta" ], [ "stroke", "line", "meta", 1.5, SOLID ] ], retired
     assert_equal grey + [ [ "fill", "circle", 4, "surface" ], [ "stroke", "circle", 4, "meta", 1.5, DASHED ], [ "stroke", "line", "meta", 1.5, SOLID ] ], retired_draft
+    # Design answer H3: at every size, to the nearest half pixel.
+    inner = marks_drawn([ { colour_index: 7, degree: 1 }, { colour_index: 7, degree: 4 }, { colour_index: 7, degree: 9 }, { colour_index: 7, degree: 20 } ]).map { |drawn| [ drawn[0][2], drawn[2][2] ] }
+    assert_equal [ [ 7, 4 ], [ 10, 5.5 ], [ 13, 7.5 ], [ 16, 9 ] ], inner
   end
 
-  # Design answers G1, G2 and G3: the hub's inner ring, a retired type's hub
-  # (it differs from All posts by fill, not by shade), and the pill.
-  test "marks: a type hub is a 12px circle in its colour with a surface ring, All posts filled in dim, a retired type's an outline in dim, a tag a square, more a pill with its words" do
-    type, ring_type, all, retired, tag, more = marks_drawn([
+  # Design answers G1 to G3, H3 and H4: the hub's inner ring; a ring type's
+  # hub, a ring in the hue round a filled centre; a retired type's hub, the
+  # same shape in dim with a DASHED ring, so the two differ by more than
+  # colour; "All posts" filled; and the pill, which grows to fit its words.
+  test "marks: a type hub is a 12px circle in its colour with a surface ring, a ring type's a ring round a centre, All posts filled in dim, a retired type's a dashed outline in dim, a tag a square, more a pill with its words" do
+    type, ring_type, all, retired, tag, more, long = marks_drawn([
       { kind: "type", id: "type-blog" }, { kind: "type", id: "type-b", colour_index: 8 }, { kind: "type", id: "all-posts", colour_index: nil },
-      { kind: "type", id: "type-gone", colour_index: nil }, { kind: "tag" }, { kind: "more", title: "+92 more" }
+      { kind: "type", id: "type-gone", colour_index: nil }, { kind: "tag" }, { kind: "more", title: "+92 more" }, { kind: "more", title: "+1,980 more", width: 82 }
     ])
 
     assert_equal [ [ "fill", "circle", 6, "cat-1" ], [ "stroke", "circle", 3.75, "surface", 1.5, SOLID ] ], type
-    assert_equal [ [ "fill", "circle", 6, "cat-2" ], [ "stroke", "circle", 3.75, "surface", 1.5, SOLID ] ], ring_type
+    assert_equal [ [ "fill", "circle", 6, "surface" ], [ "stroke", "circle", 6, "cat-2", 1.5, SOLID ], [ "fill", "circle", 3, "cat-2" ] ], ring_type
     assert_equal [ [ "fill", "circle", 6, "dim" ], [ "stroke", "circle", 3.75, "surface", 1.5, SOLID ] ], all
-    assert_equal [ [ "fill", "circle", 6, "surface" ], [ "stroke", "circle", 6, "dim", 1.5, SOLID ], [ "fill", "circle", 2, "dim" ] ], retired
+    assert_equal [ [ "fill", "circle", 6, "surface" ], [ "stroke", "circle", 6, "dim", 1.5, DASHED ], [ "fill", "circle", 2, "dim" ] ], retired
     assert_equal [ [ "fill", "box", 9, 9, "surface" ], [ "stroke", "box", 9, 9, "meta", 1.5, SOLID ] ], tag
     assert_equal [ [ "fill", "box", 60, 16, 8, "surface" ], [ "stroke", "box", 60, 16, 8, "line", 1, SOLID ], [ "text", "+92 more", "count", "dim" ] ], more
+    assert_equal [ [ "fill", "box", 82, 16, 8, "surface" ], [ "stroke", "box", 82, 16, 8, "line", 1, SOLID ], [ "text", "+1,980 more", "count", "dim" ] ], long
   end
 
-  test "marks: a page's, a type's and the pill's size does not follow its connections, and the layout keeps a box's diagonal clear" do
+  test "marks: a page's, a type's and the pill's size does not follow its connections, the pill is as wide as its words need and never under 60, and the layout keeps a box's diagonal clear" do
     sizes = js_module("mind_graph/marks", <<~JS)
-      [ { kind: "page", degree: 1 }, { kind: "page", degree: 40 }, { kind: "page", home: true, degree: 2 }, { kind: "type", degree: 30 }, { kind: "more", degree: 1 } ]
+      [ { kind: "page", degree: 1 }, { kind: "page", degree: 40 }, { kind: "page", home: true, degree: 2 }, { kind: "type", degree: 30 }, { kind: "more", degree: 1 }, { kind: "more", width: 82 } ]
         .map((node) => [ m.radiusFor(node), Math.round(m.collisionRadius(node) * 100) / 100 ])
     JS
 
-    assert_equal [ [ 7, 8.6 ], [ 7, 8.6 ], [ 9, 11.1 ], [ 6, 6 ], [ 30, 31.05 ] ], sizes
-    assert_equal [ { "width" => 60, "height" => 16 }, nil ], js_module("mind_graph/marks", '[m.boxOf({ kind: "more" }), m.boxOf({ kind: "type" })]')
+    assert_equal [ [ 7, 8.6 ], [ 7, 8.6 ], [ 9, 11.1 ], [ 6, 6 ], [ 30, 31.05 ], [ 41, 41.77 ] ], sizes
+    assert_equal [ { "width" => 60, "height" => 16 }, { "width" => 82, "height" => 16 }, nil ], js_module("mind_graph/marks", '[m.boxOf({ kind: "more" }), m.boxOf({ kind: "more", width: 82 }), m.boxOf({ kind: "type" })]')
+    assert_equal [ 60, 60, 82, 83 ], js_module("mind_graph/marks", "[m.moreWidth(20), m.moreWidth(44), m.moreWidth(66), m.moreWidth(66.2)]"), "8px each side, a whole number of pixels, never under 60 (design answer H4)"
   end
 
   test "hit test: a box is pressed on the box, not on a circle as wide as it" do
@@ -2696,12 +2808,13 @@ LINE_STYLES, HIDE_TAG_LINES_BELOW    // 0.4
     nodes = js_module("mind_graph/graph_data", <<~JS)
       m.nodesOf({ nodes: [ { id: "post-1", title: "P" } ], tags: [ { id: "tag-1", name: "t" } ], pages: [ { id: "page-1", title: "Home", home: true } ],
                   types: [ { id: "all-posts", label: null, colour_index: null }, { id: "type-blog", label: "Blog", colour_index: 1 }, { id: "type-gone/thing", label: "gone/thing", colour_index: null } ],
-                  more: { id: "more", count: 3, page: "page-1" } },
+                  more: [ { id: "more-type-blog", count: 3, page: "page-1", target: "type-blog" }, { id: "more-tag-1", count: 1980, page: "page-1", target: "tag-1" } ] },
                 { allPosts: "All posts", more: (count) => `+${count} more`, retired: (name) => `${name} (retired)` }).map((node) => [ node.id, node.kind, node.title ])
     JS
 
     assert_equal [ [ "page-1", "page", "Home" ], [ "post-1", "post", "P" ], [ "tag-1", "tag", "t" ], [ "all-posts", "type", "All posts" ],
-                   [ "type-blog", "type", "Blog" ], [ "type-gone/thing", "type", "gone/thing (retired)" ], [ "more", "more", "+3 more" ] ], nodes
+                   [ "type-blog", "type", "Blog" ], [ "type-gone/thing", "type", "gone/thing (retired)" ], [ "more-type-blog", "more", "+3 more" ], [ "more-tag-1", "more", "+1980 more" ] ], nodes,
+      "a pill per target; the figure's separator is the caller's (`more`), which the app gives it"
     assert_equal [ "post-1" ], js_module("mind_graph/graph_data", 'm.nodesOf({ nodes: [ { id: "post-1", title: "P" } ], tags: [], edges: [] }, {}).map((node) => node.id)'),
       "a payload without pages, types or more is the graph of posts and tags"
   end
@@ -2819,9 +2932,10 @@ const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", dim: "--cs-dim", warn: "--c
 //   does not follow its connections;
 // - a POST TYPE a page lists is a hub: a 12px circle in the type's hue with a
 //   surface ring inside it, so it is not one more post. "All posts" is the
-//   same, filled in `dim`. A RETIRED type's hub is an OUTLINE in `dim` on
-//   surface with a small `dim` centre: it differs from "All posts" by fill,
-//   not by shade;
+//   same, filled in `dim`. A RING TYPE's hub is a ring in the hue round a
+//   filled centre; a RETIRED type's is a DASHED ring in `dim` round a small
+//   `dim` centre: it differs from "All posts" by fill, not by shade, and
+//   from a ring type's hub by its dashes;
 // - a TAG is a square; "+N more" is a pill with its words inside it.
 //
 // THE STATE, one rule for a page and a post (spec §4; never worked out
@@ -2841,8 +2955,13 @@ const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", dim: "--cs-dim", warn: "--c
 const STEPS = [ [ 2, 7, 4.5 ], [ 5, 10, 6 ], [ 12, 13, 8.25 ], [ Infinity, 16, 10.5 ] ]
 const PAGE_BOX = { width: 14, height: 10 }
 const HOME_BOX = { width: 18, height: 13 }
-// "+N more" (design answer G2): a pill, the same whatever its figure.
-const MORE_BOX = { width: 60, height: 16 }
+// "+N more" (design answers G2, H4): a pill that grows to fit its words,
+// 8px each side, and is never narrower than 60.
+const MORE_HEIGHT = 16
+const MORE_MIN_WIDTH = 60
+const MORE_PADDING = 8
+// A ring type's hub (H3): a ring in the hue round a filled centre 6px across.
+const RING_HUB_CENTRE = 3
 const TYPE_RADIUS = 6
 // The design answer's exact readings (G3). The hub's inner ring is 1.5px
 // wide with its outer edge 1.5px inside the hub's radius: from 3 to 4.5.
@@ -2855,13 +2974,18 @@ const CORNER_DOT = 2.5
 const CORNER_INSET = 1
 const CORNER_RING = 1.5
 const OUTLINE = 1.5
-// A ring type's inner mark: radius 4 in a ring of radius 7 (G3), and the
-// same share at the larger sizes (a reading: pages plan, Task 5).
-const INNER = 4 / 7
+// A ring type's inner mark: 4/7 of the outer radius at every size, rounded
+// to the nearest half pixel (G3, H3): 4 in 7, 5.5 in 10, 7.5 in 13, 9 in 16.
+const innerRadius = (radius) => Math.round((radius * 4 / 7) * 2) / 2
 // A reading: the dash a draft has today.
 const DRAFT_DASH = [ 3, 2.5 ]
 
-export const boxOf = (node) => (node.kind === "page" ? (node.home ? HOME_BOX : PAGE_BOX) : node.kind === "more" ? MORE_BOX : null)
+// A pill's width for its words as the canvas measures them (`app.js` writes
+// the answer on the node as `width`).
+export const moreWidth = (wordsWidth) => Math.max(MORE_MIN_WIDTH, Math.ceil(wordsWidth) + MORE_PADDING * 2)
+
+export const boxOf = (node) =>
+  node.kind === "page" ? (node.home ? HOME_BOX : PAGE_BOX) : node.kind === "more" ? { width: node.width ?? MORE_MIN_WIDTH, height: MORE_HEIGHT } : null
 
 // Four sizes by degree for a post and a tag: small differences in size can't
 // be read, so a hub is one of four steps, not a point on a scale. A box's
@@ -2961,7 +3085,7 @@ function drawPost(context, theme, node, x, y, radius) {
     fill(context, theme.surface)
     outline(context, hue)
     context.beginPath()
-    context.arc(x, y, radius * INNER, 0, Math.PI * 2)
+    context.arc(x, y, innerRadius(radius), 0, Math.PI * 2)
     look(context, theme, node, hue, x, y)
   } else {
     look(context, theme, node, hue, x, y)
@@ -2978,18 +3102,23 @@ function drawPost(context, theme, node, x, y, radius) {
 }
 
 function drawType(context, theme, node, x, y) {
-  // A retired type (no colour, and not "All posts"; design answer G1): an
-  // outline in `dim` on surface with a `dim` centre dot. "All posts" is
-  // FILLED in `dim`: the two differ by fill, not by shade.
-  if (node.id !== "all-posts" && node.colour_index == null) {
+  const retired = node.id !== "all-posts" && node.colour_index == null
+  const slot = node.colour_index == null ? null : (node.colour_index - 1) % 12
+  // A RING TYPE's hub (slots 7-12; design answer H3) is not filled: a ring
+  // in the hue round a filled centre. A RETIRED type's (G1, H3) is the same
+  // shape in `dim` with a DASHED ring and a smaller centre, so the two
+  // differ by more than colour; and "All posts" is FILLED in `dim`, so it
+  // differs from a retired hub by fill, not by shade.
+  if (retired || slot >= 6) {
+    const hue = retired ? theme.dim : theme.categories[slot % 6]
     context.beginPath()
     context.arc(x, y, TYPE_RADIUS, 0, Math.PI * 2)
     fill(context, theme.surface)
-    outline(context, theme.dim)
-    return dot(context, theme.dim, x, y, CENTRE_DOT)
+    outline(context, hue, { dashed: retired })
+    return dot(context, hue, x, y, retired ? CENTRE_DOT : RING_HUB_CENTRE)
   }
 
-  dot(context, node.id === "all-posts" ? theme.dim : theme.categories[((node.colour_index - 1) % 12) % 6], x, y, TYPE_RADIUS)
+  dot(context, node.id === "all-posts" ? theme.dim : theme.categories[slot], x, y, TYPE_RADIUS)
   context.beginPath()
   context.arc(x, y, TYPE_RING.radius, 0, Math.PI * 2)
   outline(context, theme.surface, { width: TYPE_RING.width })
@@ -2999,7 +3128,7 @@ function drawType(context, theme, node, x, y) {
 // it and its words inside, in the small mono style the notes badge has.
 // `save` and `restore` leave the text settings as the labels expect them.
 function drawMore(context, theme, node, x, y) {
-  const { width, height } = MORE_BOX
+  const { width, height } = boxOf(node)
   context.save()
   context.beginPath()
   if (typeof context.roundRect === "function") context.roundRect(x - width / 2, y - height / 2, width, height, height / 2)
@@ -3170,7 +3299,7 @@ export function chooseLabels({ order, positions, widths, radii, camera, width, h
 //
 // A node is `{ …what the server sent, kind, title }`; `kind` is "page",
 // "post", "tag", "type" (a post type a page lists, and the one "All posts"
-// node) or "more" (the one "+N more" of a page's local view). Pages come
+// node) or "more" (a "+N more" pill of a page's local view, one per target). Pages come
 // first, in tree order as the server sends them.
 
 // A page's fixed bonus over a post with as many links, in links.
@@ -3187,7 +3316,7 @@ export function nodesOf(data, { allPosts, more, retired }) {
     ...data.nodes.map((node) => ({ ...node, kind: "post" })),
     ...data.tags.map((tag) => ({ ...tag, title: tag.name, kind: "tag" })),
     ...(data.types || []).map((type) => ({ ...type, title: type.id === "all-posts" ? allPosts : retiredType(type) ? retired(type.label) : type.label, kind: "type" })),
-    ...(data.more ? [ { ...data.more, title: more(data.more.count), kind: "more", degree: 1 } ] : [])
+    ...(data.more || []).map((pill) => ({ ...pill, title: more(pill.count), kind: "more", degree: 1 }))
   ]
 }
 
@@ -3296,14 +3425,22 @@ function rest(node) {
 ```js
     state.nodes = nodesOf(data, {
       allPosts: text.t("mind_graph.script.all_posts"),
-      more: (count) => text.t("mind_graph.script.more", { count }),
+      more: (count) => text.t("mind_graph.script.more", { count: number(count) }),
       retired: (name) => text.t("mind_graph.script.retired_type", { name })
     })
     indexOf = new Map(state.nodes.map((node, index) => [ node.id, index ]))
     state.edges = data.edges.map((edge) => ({ kind: edge.kind, source: indexOf.get(edge.source), target: indexOf.get(edge.target) }))
 ```
 
-    after `state.radii = state.nodes.map(radiusFor)`, `state.boxes = state.nodes.map(boxOf)` (import `boxOf` with `collisionRadius`); and in the loop that sets each node's label, the pill has none, since its words are inside it:
+    BEFORE `state.radii = state.nodes.map(radiusFor)`, each pill is given its width from its words as the canvas measures them (design answer H4; import `moreWidth` and `boxOf` with `collisionRadius`):
+
+```js
+    // A pill grows to fit its words: measured in the font they are drawn in.
+    context.font = state.theme.countFont
+    for (const node of state.nodes) if (node.kind === "more") node.width = moreWidth(context.measureText(node.title).width)
+```
+
+    after the radii, `state.boxes = state.nodes.map(boxOf)`; and in the loop that sets each node's label, the pill has none, since its words are inside it:
 
 ```js
       node.label = node.kind === "more" ? "" : labelFor(node)
@@ -3357,7 +3494,7 @@ function rest(node) {
         retired_type: "%{name} (retired)"
 ```
 
-  (`more` takes `count` as a figure, not as a plural: it has one form; `retired_type` is a retired type's hub's whole label, the design answer's "(retired)" at its end), and the three keys join the `messages_data(...)` call in `show.html.erb` (`"mind_graph.script.all_posts", "mind_graph.script.more", "mind_graph.script.retired_type"`) and the list of keys in `"the script's messages ride on the element"` in `test/integration/admin/mind_graph_test.rb`. Add `app/javascript/mind_graph/marks.js` and `app/javascript/mind_graph/graph_data.js` to `CONVERTED` in `test/lib/admin_i18n_test.rb`.
+  (`more` takes `count` as a figure the script has already grouped, "+1,980 more" (design answer H4), not as a plural: it has one form; `retired_type` is a retired type's hub's whole label, the design answer's "(retired)" at its end), and the three keys join the `messages_data(...)` call in `show.html.erb` (`"mind_graph.script.all_posts", "mind_graph.script.more", "mind_graph.script.retired_type"`) and the list of keys in `"the script's messages ride on the element"` in `test/integration/admin/mind_graph_test.rb`. Add `app/javascript/mind_graph/marks.js` and `app/javascript/mind_graph/graph_data.js` to `CONVERTED` in `test/lib/admin_i18n_test.rb`.
 
 - [ ] **Step 9: run the module tests and the guards.**
 
@@ -3448,12 +3585,13 @@ git commit -m "feat: the mind graph draws pages, post types and their lines, one
 
 ### Task 6: the legend is the filter
 
-The three radios go. Four toggles for the kinds of node and four for the kinds of line, each with its count, everything on. A line switched off hides the line; a kind switched off hides its nodes and every line that touches one. **Status is not a filter** (third design answers): the five looks leave the legend's row, and a "Status" link opens them as a popover, the key. The canvas's name becomes the designer's summary in its three forms (G6).
+The three radios go. Four toggles for the kinds of node and four for the kinds of line, each with its count, everything on. A line switched off hides the line; a kind switched off hides its nodes and every line that touches one. **Status is not a filter** (third design answers): the five looks leave the legend's row, and a "Status" link opens the key, a dialog named "Status key" in the chip's own words (H6). The canvas's name becomes the designer's summary (G6, H5).
 
-**Design readings to report** (with a screenshot of the legend in both themes, at 1,440 and at 1,000 pixels of width, and of the open Status key): the order and wrapping of the two groups, the "Status" link and the keys in one row; the swatch of each toggle; the place of the count (after the name, in the small mono label style); the key as `Admin::Ui::MenuComponent`'s list popover, hanging from the link's left edge, a row per look with the canvas's mark at its smallest size; that a hub's faint lines go with the "Lists" toggle and are not counted beside it. **Wording this plan had to add, which the designer did not give**: the key's name for a screen reader, "Status key"; the summary with nothing in view, "Mind graph: nothing in view."; one "more", "%{figure} more is in the list."; "Pages hidden.", "Posts hidden." and "Post types hidden." after the designer's "Tags hidden."; and two choices: where the whole graph is cut at the cap, the cap's own sentence stands where "Showing everything." would, and a LINE kind that is off is not named (the number of connections says it).
+**Design readings to report** (with a screenshot of the legend in both themes, at 1,440 and at 1,000 pixels of width, and of the open Status key): the order and wrapping of the two groups, the "Status" link and the keys in one row; the swatch of each toggle; the place of the count (after the name, in the small mono label style); the key as CS Studio's one dialog (`Admin::Ui::DialogComponent`, modal, at its narrowest width), a row per look with the canvas's mark at its smallest size. **Wording the designer did not give**: "Tree lines hidden.", "Lists lines hidden." and "Related lines hidden." after the designer's "Shares-a-tag lines hidden."; "Pages hidden.", "Posts hidden." and "Post types hidden." after "Tags hidden."; one "more", "%{figure} more is in the list.". **A choice to report**: where the whole graph is cut at the 2,000-post cap (`everything=1` on a very large site) the summary never says "Showing everything." (H5) and says the notice's own cap sentence in its place; the designer's "Showing the area around Home." is said in the view the 3,000-line rule opened, with the site's counts.
 
 **Files:**
-- Modify: `app/components/admin/mind_graph_screen/legend_component.rb`, `legend_component.html.erb`, `app/assets/tailwind/content-spiel.tailwind.css`, `config/locales/admin/mind_graph_screen.en.yml`, `config/locales/admin/mind_graph.en.yml`, `app/views/admin/mind_graph/show.html.erb`, `app/controllers/admin/mind_graph_controller.rb` (nothing but the comment: `@pages` is already set), `app/javascript/mind_graph/graph_data.js`, `app/javascript/mind_graph/app.js`, `app/javascript/controllers/admin/mind_graph/graph_controller.js`, `test/components/previews/admin/mind_graph_screen/legend_component_preview.rb`
+- Create: `app/components/admin/mind_graph_screen/status_key_component.rb`, `status_key_component.html.erb`, `test/components/admin/mind_graph_screen/status_key_component_test.rb`
+- Modify: `app/queries/post_graph/local.rb` (the site's counts, for the summary), `app/components/admin/mind_graph_screen/legend_component.rb`, `legend_component.html.erb`, `app/assets/tailwind/content-spiel.tailwind.css`, `config/locales/admin/mind_graph_screen.en.yml`, `config/locales/admin/mind_graph.en.yml`, `app/views/admin/mind_graph/show.html.erb`, `app/controllers/admin/mind_graph_controller.rb` (nothing but the comment: `@pages` is already set), `app/javascript/mind_graph/graph_data.js`, `app/javascript/mind_graph/app.js`, `app/javascript/controllers/admin/mind_graph/graph_controller.js`, `test/components/previews/admin/mind_graph_screen/legend_component_preview.rb`
 - Test: `test/components/admin/mind_graph_screen/legend_component_test.rb`, `test/integration/admin/mind_graph_test.rb`, `test/integration/trash_visibility_test.rb`, `test/system/admin/mind_graph_modules_test.rb`, `test/system/admin/mind_graph_test.rb`
 
 **Interfaces:**
@@ -3466,9 +3604,11 @@ Admin::MindGraphScreen::LegendComponent.new(content_types:, pages: false)
 #   fieldset[data-legend-group="nodes"]  label[data-legend-toggle="page"|"post"|"tag"|"type"]  input[type=checkbox][name="mind_graph_nodes"][value][data-name]
 #   fieldset[data-legend-group="lines"]  label[data-legend-toggle="tree"|"lists"|"related"|"tag"]  input[type=checkbox][name="mind_graph_lines"][value][data-name]
 #   each label holds span[data-legend-count] (empty until the script writes it)
-#   [data-controller="admin--ui--menu"]: button "Status" [aria-controls="mind-graph-status-key"], and
-#     #mind-graph-status-key[role=list][aria-label="Status key"][hidden]: [role=listitem] > [data-legend-state=<state>] ×5, no control in it
+#   button[data-legend-status] "Status" [aria-haspopup="dialog"], a trigger of the dialog "mind-graph-status-key"
 #   ul[aria-label="Legend"]: li[data-legend-type=<name>]…, li[data-legend="retired"|"pinned"|"notes"]
+Admin::MindGraphScreen::StatusKeyComponent.new
+# markup: dialog#mind-graph-status-key (Admin::Ui::DialogComponent, title "Status key"): ul > li[data-legend-state=<state>] ×5, no control but the dialog's Close
+PostGraph::Local.call(…)   # its answer gains site: { pages:, posts:, tags: }: what the viewer can read of the whole site, from PostGraph::Site (no statement)
 ```
 
 ```js
@@ -3586,31 +3726,14 @@ export function counts(nodes, edges) {
   end
 
   # Third design answers: status is not a filter. The five looks are a key
-  # behind a "Status" link, CS Studio's own list popover.
-  test "the status looks are a key behind a Status button, not controls and not in the legend's row" do
+  # behind a "Status" link (H6: a dialog), not in the legend's row.
+  test "the legend's Status button opens the key and is no filter" do
     legend
-    key = "#mind-graph-status-key[role=list][aria-label='Status key']"
 
-    assert_selector "[data-controller='admin--ui--menu'] button[type=button][aria-expanded=false][aria-controls=mind-graph-status-key]", text: "Status"
-    assert_no_selector "button[aria-haspopup]", visible: :all
-    assert_selector "#{key}[hidden][tabindex='-1']", visible: :all
-    assert_equal [ "Live", "Draft", "Scheduled", "Live with changes", "Live with a change scheduled" ], page.all("#{key} [role=listitem]", visible: :all).map { |item| item.text(:all).squish }
-    assert_equal %w[live draft scheduled live_with_changes live_change_scheduled], page.all("#{key} [data-legend-state]", visible: :all).map { |item| item["data-legend-state"] }
-    assert_no_selector "#{key} input, #{key} button, #{key} a", visible: :all
-    assert_no_selector "ul[aria-label='Legend'] [data-legend-state]", visible: :all
-    assert_no_selector "fieldset [data-legend-state]", visible: :all
+    assert_selector "button[type=button][data-legend-status][aria-haspopup=dialog][data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status"
+    assert_no_selector "[data-legend-state]", visible: :all
+    assert_no_selector "dialog", visible: :all
     assert_no_text "Draft or scheduled"
-  end
-
-  test "each status look's swatch is the canvas's mark on the tokens' classes: a centre for scheduled, a corner dot with its ring for the two looks of a live record" do
-    legend
-    key = "#mind-graph-status-key"
-
-    assert_selector "#{key} [data-legend-state] svg.mg-key.mg-state circle.mg-state-mark[r='7']", count: 5, visible: :all
-    assert_selector "#{key} [data-legend-state=draft] svg.mg-state-draft", visible: :all
-    assert_selector "#{key} [data-legend-state=scheduled] svg.mg-state-scheduled circle.mg-state-centre[r='2']", visible: :all
-    assert_selector "#{key} [data-legend-state=live_with_changes] svg.mg-state-live-with-changes circle.mg-state-corner[r='2.5']", visible: :all
-    assert_selector "#{key} [data-legend-state=live_change_scheduled] svg.mg-state-live-change-scheduled circle.mg-state-corner-ring[r='4']", visible: :all
   end
 
   test "a viewer who reads no page has no toggle for pages, post types, the tree or lists; one who reads no post none for posts, tags, related or shared tags" do
@@ -3622,7 +3745,42 @@ export function counts(nodes, edges) {
   end
 ```
 
-  Run: `PGGSSENCMODE=disable bin/rails test test/components/admin/mind_graph_screen/legend_component_test.rb`; expected FAIL with `unknown keyword: :pages`.
+  And a new file, `test/components/admin/mind_graph_screen/status_key_component_test.rb`:
+
+```ruby
+require "test_helper"
+
+# The Mind graph's status key (pages in the mind graph, spec §6; design
+# answer H6): a dialog named "Status key" with the five looks, in the words
+# the card's chip uses.
+class Admin::MindGraphScreen::StatusKeyComponentTest < ViewComponent::TestCase
+  def key = render_inline(Admin::MindGraphScreen::StatusKeyComponent.new)
+
+  test "the status key is a dialog named Status key that holds the five looks in the chip's words and no control" do
+    key
+    dialog = "dialog#mind-graph-status-key[aria-labelledby='mind-graph-status-key-title']"
+
+    assert_selector "#{dialog} h2#mind-graph-status-key-title", text: "Status key", visible: :all
+    assert_equal [ "Live", "Draft", "Scheduled", "Live, unpublished changes", "Live, change scheduled" ], page.all("#{dialog} li[data-legend-state]", visible: :all).map { |item| item.text(:all).squish }
+    assert_equal %w[live draft scheduled live_with_changes live_change_scheduled], page.all("#{dialog} li[data-legend-state]", visible: :all).map { |item| item["data-legend-state"] }
+    assert_no_selector "#{dialog} .admin-dialog__body input, #{dialog} .admin-dialog__body button, #{dialog} .admin-dialog__body a", visible: :all
+  end
+
+  test "each status look's swatch is the canvas's mark on the tokens' classes: a centre for scheduled, a corner dot with its ring for the two looks of a live record" do
+    key
+
+    assert_selector "[data-legend-state] svg.mg-key.mg-state circle.mg-state-mark[r='7']", count: 5, visible: :all
+    assert_selector "[data-legend-state=draft] svg.mg-state-draft", visible: :all
+    assert_selector "[data-legend-state=scheduled] svg.mg-state-scheduled circle.mg-state-centre[r='2']", visible: :all
+    assert_selector "[data-legend-state=live_with_changes] svg.mg-state-live-with-changes circle.mg-state-corner[r='2.5']", visible: :all
+    assert_selector "[data-legend-state=live_change_scheduled] svg.mg-state-live-change-scheduled circle.mg-state-corner-ring[r='4']", visible: :all
+  end
+end
+```
+
+  (If the directory's other component tests subclass something else than `ViewComponent::TestCase`, subclass that.)
+
+  Run: `PGGSSENCMODE=disable bin/rails test test/components/admin/mind_graph_screen`; expected FAIL with `unknown keyword: :pages` and `uninitialized constant Admin::MindGraphScreen::StatusKeyComponent`.
 
 - [ ] **Step 4: the strings.** `config/locales/admin/mind_graph_screen.en.yml`'s `legend` becomes (the header comment says what each group is; the `notes` key stays where it is, in `notes.en.yml`):
 
@@ -3642,18 +3800,19 @@ export function counts(nodes, edges) {
             related: "Related"
             tag: "Shares a tag"
           status: "Status"
-          status_key: "Status key"
+          retired: "Retired type"
+          pinned: "Pinned"
+        status_key:
+          title: "Status key"
           states:
             live: "Live"
             draft: "Draft"
             scheduled: "Scheduled"
-            live_with_changes: "Live with changes"
-            live_change_scheduled: "Live with a change scheduled"
-          retired: "Retired type"
-          pinned: "Pinned"
+            live_with_changes: "Live, unpublished changes"
+            live_change_scheduled: "Live, change scheduled"
 ```
 
-  (`status` is the link that opens the key, the designer's word; `status_key` the key's own name for a screen reader, this plan's; `states` are the key's five rows.)
+  (`legend.status` is the link that opens the key; `status_key` is the new component's scope, beside `legend` in the same file: `title` the dialog's name and `states` its five rows. All the designer's (H6): the key uses the CHIP's wording, one set of words, and the date stands only on the chip.)
 
   (`tag`, `hollow`, `related` and `tag_edge` go.) In `config/locales/admin/mind_graph.en.yml`: under `show`, `intro`, `no_posts` (renamed `no_content`), `canvas_label`, `list_label` and the search's two change, and the whole `filter:` block goes:
 
@@ -3674,7 +3833,11 @@ export function counts(nodes, edges) {
           whole: "Mind graph: %{kinds}, %{connections}."
           local: "Mind graph around %{title}, depth %{depth}: %{kinds}."
           everything: "Showing everything."
-          nothing: "Mind graph: nothing in view."
+          nothing: "Mind graph: nothing to show."
+          all_hidden: "All types are hidden."
+          none_yet: "No pages, posts or tags yet."
+          around_home: "Showing the area around Home."
+          site: "The site has %{kinds}."
           more:
             one: "%{figure} more is in the list."
             other: "%{figure} more are in the list."
@@ -3701,18 +3864,22 @@ export function counts(nodes, edges) {
             post: "Posts hidden."
             tag: "Tags hidden."
             type: "Post types hidden."
+          hidden_lines:
+            tree: "Tree lines hidden."
+            lists: "Lists lines hidden."
+            related: "Related lines hidden."
+            tag: "Shares-a-tag lines hidden."
         legend:
           toggle: "%{name}, %{count}"
 ```
 
-  Bring the file's header comment up to date: `show.canvas_label` names the canvas until the data has arrived and is the summary's first words; `script.summary.*` are WHOLE SENTENCES and the parts of one, and the script puts one space between two sentences and nothing else of its own: "Mind graph: 9 pages, 3 post types, 13 posts and 4 tags, 27 connections. Showing everything." is `whole`, then `everything`; "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts. 92 more are in the list." is `local`, then `more`; a kind that is switched off adds its `hidden` sentence. `%{kinds}` is the counts of what is in view, joined by `pair` and `series` (so there is no comma before "and", and another language can join otherwise); `%{figure}` is a count as the sentence's language groups it, `count` only chooses the form. `script.legend.toggle` is a toggle's whole accessible name once its count is known.
+  Bring the file's header comment up to date: `show.canvas_label` names the canvas until the data has arrived and is the summary's first words; `script.summary.*` are WHOLE SENTENCES and the parts of one, and the script puts one space between two sentences and nothing else of its own: "Mind graph: 9 pages, 3 post types, 13 posts and 4 tags, 27 connections. Showing everything." is `whole`, then `everything`; "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts. 92 more are in the list." is `local`, then `more`; a kind that is switched off adds its `hidden` sentence and a kind of line its `hidden_lines` one ("Showing everything. Tags hidden." are both said, in that order: "everything" means no cap, not no filters). With nothing in view the name is `nothing`, then `all_hidden` when every kind is switched off or `none_yet` when the site has nothing to draw. In the view the 3,000-line rule opened, `around_home` and `site` follow ("Showing the area around Home. The site has 212 pages, 2,040 posts and 64 tags."). `%{kinds}` is the counts of what is in view, joined by `pair` and `series` (so there is no comma before "and", and another language can join otherwise); `%{figure}` is a count as the sentence's language groups it, `count` only chooses the form. `script.legend.toggle` is a toggle's whole accessible name once its count is known.
 
-- [ ] **Step 5: the component, its swatches and the frame.** `legend_component.rb` (keep `retired?` and `type_names`, and rewrite the class comment: the legend is the filter; which toggles a viewer gets; the counts are the script's; status is not a filter, and its key is a list popover behind the "Status" link):
+- [ ] **Step 5: the component, its swatches and the frame.** `legend_component.rb` (keep `retired?` and `type_names`, and rewrite the class comment: the legend is the filter; which toggles a viewer gets; the counts are the script's; status is not a filter, and its key is a dialog of its own, `StatusKeyComponent`, which the "Status" link opens). `STATES` is not this component's any more: it is the key's.
 
 ```ruby
       NODES = %i[page post tag type].freeze
       LINES = %i[tree lists related tag].freeze
-      STATES = %i[live draft scheduled live_with_changes live_change_scheduled].freeze
       # What hangs on pages, and what on posts: a viewer who can read none of
       # a kind gets no toggle for it (pages spec §2).
       OF_PAGES = %i[page type tree lists].freeze
@@ -3744,13 +3911,9 @@ export function counts(nodes, edges) {
     controller's `reset` takes back.
 
     STATUS IS NOT A FILTER (the third design answers): the five looks are a
-    key, opened as a popover by a "Status" link. It is the shared list
-    popover (`Admin::Ui::MenuComponent`, `list: true`): a button that reads
-    as a link; pressed, the key opens and takes the focus as one list;
-    Escape closes it and gives the focus back; it holds nothing to press.
-    `admin--ui--menu` opens and closes it and leaves it closed in a page
-    Turbo keeps, so the graph's script writes nothing here. A swatch is the
-    canvas's mark at its smallest size (radius 7), in the same pixels. %>
+    key of their own, a dialog (`StatusKeyComponent`, design answer H6),
+    and here is only the "Status" link that opens it: a button that reads as
+    a link, wired to the one dialog controller on <body>. %>
 <div data-mind-graph-legend class="admin-mind-graph-legend flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 text-sm text-dim">
   <% [ [ :nodes, node_toggles, t(".show") ], [ :lines, line_toggles, t(".lines") ] ].each do |group, kinds, name| %>
     <% next if kinds.empty? %>
@@ -3768,22 +3931,9 @@ export function counts(nodes, edges) {
       <% end %>
     </fieldset>
   <% end %>
-  <%= render Admin::Ui::MenuComponent.new(label: t(".status"), list: true, list_label: t(".status_key"), align: :left, panel_id: "mind-graph-status-key",
-        button_class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent") do |menu| %>
-    <% STATES.each do |state| %>
-      <% menu.with_item do %>
-        <span class="flex items-center gap-2 whitespace-nowrap px-2 py-1 text-sm text-ink" data-legend-state="<%= state %>">
-          <svg class="mg-key mg-state mg-state-<%= state.to_s.dasherize %>" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-            <circle class="mg-state-mark" cx="8" cy="8" r="7"/>
-            <circle class="mg-state-centre" cx="8" cy="8" r="2"/>
-            <circle class="mg-state-corner-ring" cx="12.24" cy="12.24" r="4"/>
-            <circle class="mg-state-corner" cx="12.24" cy="12.24" r="2.5"/>
-          </svg>
-          <%= t(".states.#{state}") %>
-        </span>
-      <% end %>
-    <% end %>
-  <% end %>
+  <%= tag.button t(".status"), type: "button", aria: { haspopup: "dialog" },
+        class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        data: { legend_status: true, **dialog_trigger(Admin::MindGraphScreen::StatusKeyComponent::ID) } %>
   <ul class="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0" aria-label="<%= t(".label") %>">
     <% type_names.each do |name| %>
       <li data-legend-type="<%= name %>"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: name) %></li>
@@ -3826,6 +3976,56 @@ export function counts(nodes, edges) {
 
   (If `tag.svg` / `tag.circle` are refused by Action View's tag builder in this version, write the eight swatches out in the template with a `case`; the classes and sizes are the contract, not the helper.)
 
+  The key. `status_key_component.rb`:
+
+```ruby
+module Admin
+  module MindGraphScreen
+    # The Mind graph's status key (pages in the mind graph, spec §6; design
+    # answers "Status in the legend" and H6): the five looks a page or a post
+    # can have on the canvas, each with its name. Status is NOT a filter, so
+    # the looks are no toggles and not in the legend's row: the legend's
+    # "Status" link opens this, CS Studio's one dialog, named "Status key".
+    #
+    # The names are THE CHIP'S WORDS (H6: one set of words): "Live,
+    # unpublished changes" and "Live, change scheduled"; the day of a
+    # scheduled change stands only on a card's chip. A swatch is the
+    # canvas's mark at its smallest size, in the same pixels (`marks.js`),
+    # on the legend's token classes (`.mg-state-*`).
+    #
+    # It is rendered once, by the screen's view, OUTSIDE the graph's element:
+    # the Tab order of the box is the search, the graph and the list, and a
+    # closed dialog's Close button is no stop in it.
+    class StatusKeyComponent < AdminComponent
+      ID = "mind-graph-status-key".freeze
+      STATES = %i[live draft scheduled live_with_changes live_change_scheduled].freeze
+    end
+  end
+end
+```
+
+  `status_key_component.html.erb`:
+
+```erb
+<%= render Admin::Ui::DialogComponent.new(id: Admin::MindGraphScreen::StatusKeyComponent::ID, title: t(".title")) do %>
+  <ul class="m-0 flex list-none flex-col gap-2 p-0">
+    <% Admin::MindGraphScreen::StatusKeyComponent::STATES.each do |state| %>
+      <li class="flex items-center gap-2 text-sm text-ink" data-legend-state="<%= state %>">
+        <svg class="mg-key mg-state mg-state-<%= state.to_s.dasherize %>" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <circle class="mg-state-mark" cx="8" cy="8" r="7"/>
+          <circle class="mg-state-centre" cx="8" cy="8" r="2"/>
+          <circle class="mg-state-corner-ring" cx="12.24" cy="12.24" r="4"/>
+          <circle class="mg-state-corner" cx="12.24" cy="12.24" r="2.5"/>
+        </svg>
+        <%= t(".states.#{state}") %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>
+```
+
+  In `show.html.erb`, after the box's closing `</div>` and inside the `else` branch: `<%= render Admin::MindGraphScreen::StatusKeyComponent.new %>`, with a comment that says why it stands outside the graph's element.
+
   In `app/assets/tailwind/content-spiel.tailwind.css`, beside the other `.mg-*` rules (`.mg-tag rect` and `.mg-key-hollow` go with the entries that used them):
 
 ```css
@@ -3859,9 +4059,17 @@ export function counts(nodes, edges) {
       </div>
 ```
 
-  the empty state reads `t(".no_content")` with `data-mind-graph-empty="no-content"`; and in the `messages_data(...)` call `"mind_graph.script.summary"` goes (it is a group now) and these join: `"mind_graph.script.legend.toggle"`, `"mind_graph.script.summary.whole"`, `"mind_graph.script.summary.local"`, `"mind_graph.script.summary.everything"`, `"mind_graph.script.summary.nothing"`, `"mind_graph.script.summary.more"`, `"mind_graph.script.summary.pages"`, `"mind_graph.script.summary.types"`, `"mind_graph.script.summary.posts"`, `"mind_graph.script.summary.posts_of"`, `"mind_graph.script.summary.tags"`, `"mind_graph.script.summary.connections"`, `"mind_graph.script.summary.pair"`, `"mind_graph.script.summary.series"`, `"mind_graph.script.summary.hidden.page"`, `"mind_graph.script.summary.hidden.post"`, `"mind_graph.script.summary.hidden.tag"`, `"mind_graph.script.summary.hidden.type"`. Update the preview (`legend_component_preview.rb`) to pass `pages: true`, and add a preview without pages.
+  the empty state reads `t(".no_content")` with `data-mind-graph-empty="no-content"`; and in the `messages_data(...)` call `"mind_graph.script.summary"` goes (it is a group now) and these join: `"mind_graph.script.legend.toggle"`, `"mind_graph.script.summary.whole"`, `"mind_graph.script.summary.local"`, `"mind_graph.script.summary.everything"`, `"mind_graph.script.summary.nothing"`, `"mind_graph.script.summary.all_hidden"`, `"mind_graph.script.summary.none_yet"`, `"mind_graph.script.summary.around_home"`, `"mind_graph.script.summary.site"`, `"mind_graph.script.summary.hidden_lines.tree"`, `"mind_graph.script.summary.hidden_lines.lists"`, `"mind_graph.script.summary.hidden_lines.related"`, `"mind_graph.script.summary.hidden_lines.tag"`, `"mind_graph.script.summary.more"`, `"mind_graph.script.summary.pages"`, `"mind_graph.script.summary.types"`, `"mind_graph.script.summary.posts"`, `"mind_graph.script.summary.posts_of"`, `"mind_graph.script.summary.tags"`, `"mind_graph.script.summary.connections"`, `"mind_graph.script.summary.pair"`, `"mind_graph.script.summary.series"`, `"mind_graph.script.summary.hidden.page"`, `"mind_graph.script.summary.hidden.post"`, `"mind_graph.script.summary.hidden.tag"`, `"mind_graph.script.summary.hidden.type"`. Update the preview (`legend_component_preview.rb`) to pass `pages: true`, and add a preview without pages.
 
   Run: `PGGSSENCMODE=disable bin/rails test test/components/admin/mind_graph_screen/legend_component_test.rb`; expected PASS.
+
+  The site's counts, for the summary of the view the 3,000-line rule opens (design answer H5: "The site has 212 pages, 2,040 posts and 64 tags."). In `app/queries/post_graph/local.rb`, the answer's `merge(...)` gains one key, from what the site has loaded and with no statement:
+
+```ruby
+                                site: { pages: @site.pages.size, posts: @site.post_rows.size, tags: @site.tag_counts.size },
+```
+
+  (what the VIEWER can read of the site: the pages and posts of their scope, and the tags a readable post carries), the header comment says so, and in `test/queries/post_graph/local_test.rb` the test `"depth 1 around a page: its parent, its children and what its blocks list, and no post"` gains `assert_equal({ pages: Page.count, posts: Post.count, tags: PostTag.distinct.count(:tag_id) }, result[:site])`; where that file compares a whole answer, the answer gains `site:`. Run `PGGSSENCMODE=disable bin/rails test test/queries/post_graph/local_test.rb`; expected PASS.
 
 - [ ] **Step 6: the app follows the checkboxes.** In `app/javascript/mind_graph/app.js`:
   - Import `visible, counts` with the others from `mind_graph/graph_data`. `mode` goes. In its place:
@@ -3895,37 +4103,58 @@ export function counts(nodes, edges) {
     items.length > 1 ? text.t("mind_graph.script.summary.pair", { first: items.at(-2), last: items.at(-1) }) : items[0])
 
   // The canvas is one image to a screen reader, and its name says what is on
-  // it NOW (design answer G6): the counts in view by type, then the lines,
-  // then the scope.
+  // it NOW (design answers G6 and H5): the counts in view by type, then the
+  // lines, then the scope.
   //   the whole graph   "Mind graph: 9 pages, 3 post types, 13 posts and 4 tags, 27 connections. Showing everything."
   //   a local view      "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts. 92 more are in the list."
-  //   a kind that is off adds its sentence: "Tags hidden."
+  //   opened by the 3,000-line rule, that view adds
+  //                     "Showing the area around Home. The site has 212 pages, 2,040 posts and 64 tags."
+  //   a kind that is off adds "Tags hidden.", a kind of line "Shares-a-tag lines hidden.";
+  //     "Showing everything. Tags hidden." are both said: "everything" means no cap, not no filters
+  //   nothing in view   "Mind graph: nothing to show. All types are hidden." (every kind is off)
+  //                     "Mind graph: nothing to show. No pages, posts or tags yet." (there is nothing)
   // A kind with nothing in view is left out. "N of M posts" and the "more"
-  // sentence are a page's that lists more than its view draws. Where the
-  // whole graph is cut at the cap, the cap's sentence stands where "Showing
-  // everything." would. After a toggle the same words are put into the
+  // sentence are a page's that lists more than its view draws; "more"
+  // counts every pill in view together. "Showing everything." is NEVER said
+  // at the cap: a whole graph cut at the 2,000 posts says the notice's own
+  // cap sentence there. After a toggle the same words are put into the
   // notice's polite live region, hidden from the eye: that is how a change
   // of the legend is announced.
   function summarise({ announce = false } = {}) {
     const inView = state.visibleNodes.map((index) => state.nodes[index])
     const drawn = (kind) => inView.filter((node) => node.kind === kind).length
     const focus = state.data.focus
-    const more = inView.find((node) => node.kind === "more")
-    const listed = more && focus?.kind === "page" ? state.nodes[state.focusIndex]?.listed_count : null
+    const more = inView.filter((node) => node.kind === "more").reduce((sum, pill) => sum + pill.count, 0)
+    const listed = more > 0 && focus?.kind === "page" ? state.nodes[state.focusIndex]?.listed_count : null
     const counted = (key, count, extra = {}) => text.t(`mind_graph.script.summary.${key}`, { count, figure: number(count), ...extra })
     const kinds = [ [ "pages", drawn("page") ], [ "types", drawn("type") ], [ listed ? "posts_of" : "posts", drawn("post"), { total: number(listed ?? 0) } ], [ "tags", drawn("tag") ] ]
       .filter(([ , count ]) => count > 0).map(([ key, count, extra ]) => counted(key, count, extra))
+    const off = (name) => Array.from(element.querySelectorAll(`input[name="${name}"]:not(:checked)`), (input) => input.value)
+    const kindsOff = off("mind_graph_nodes")
+    const allOff = kindsOff.length > 0 && kindsOff.length === element.querySelectorAll('input[name="mind_graph_nodes"]').length
 
     const sentences = []
-    if (kinds.length === 0) sentences.push(text.t("mind_graph.script.summary.nothing"))
-    else if (focus) sentences.push(text.t("mind_graph.script.summary.local", { title: focus.title, depth: focus.depth, kinds: series(kinds) }))
-    else sentences.push(text.t("mind_graph.script.summary.whole", { kinds: series(kinds), connections: counted("connections", state.visibleEdges.length) }))
-    if (more) sentences.push(counted("more", more.count))
-    if (!focus) {
+    if (kinds.length === 0) {
+      sentences.push(text.t("mind_graph.script.summary.nothing"))
+      if (state.nodes.length === 0) sentences.push(text.t("mind_graph.script.summary.none_yet"))
+      else if (allOff) sentences.push(text.t("mind_graph.script.summary.all_hidden"))
+    } else if (focus) {
+      sentences.push(text.t("mind_graph.script.summary.local", { title: focus.title, depth: focus.depth, kinds: series(kinds) }))
+      if (more > 0) sentences.push(counted("more", more))
+      // The view the 3,000-line rule opened: where it is, and what the site holds.
+      if (element.dataset.openedLines && state.data.site) {
+        const site = [ [ "pages", state.data.site.pages ], [ "posts", state.data.site.posts ], [ "tags", state.data.site.tags ] ].filter(([ , count ]) => count > 0).map(([ key, count ]) => counted(key, count))
+        sentences.push(text.t("mind_graph.script.summary.around_home"), text.t("mind_graph.script.summary.site", { kinds: series(site) }))
+      }
+    } else {
+      sentences.push(text.t("mind_graph.script.summary.whole", { kinds: series(kinds), connections: counted("connections", state.visibleEdges.length) }))
       const cut = state.data.shown < state.data.total
       sentences.push(cut ? text.t("mind_graph.script.capped", { shown: number(state.data.shown), total: number(state.data.total) }) : text.t("mind_graph.script.summary.everything"))
     }
-    for (const input of element.querySelectorAll('input[name="mind_graph_nodes"]:not(:checked)')) sentences.push(text.t(`mind_graph.script.summary.hidden.${input.value}`))
+    if (state.nodes.length > 0 && !(kinds.length === 0 && allOff)) {
+      for (const kind of kindsOff) sentences.push(text.t(`mind_graph.script.summary.hidden.${kind}`))
+      for (const kind of off("mind_graph_lines")) sentences.push(text.t(`mind_graph.script.summary.hidden_lines.${kind}`))
+    }
     const summary = sentences.join(" ")
     canvas.setAttribute("aria-label", summary)
     if (!announce) return
@@ -3973,12 +4202,12 @@ export function counts(nodes, edges) {
 
 - [ ] **Step 7: the integration tests.** In `test/integration/admin/mind_graph_test.rb`:
   - `"the filter is All, Related and Tags, with All chosen"` becomes `"the legend's toggles are checkboxes in two groups, all on, and the radios are gone"`: with a post and a page, `assert_select "fieldset[data-legend-group=nodes] input[type=checkbox][name=mind_graph_nodes][checked]", count: 4`, the same for `lines`, `assert_select "input[type=radio]", count: 0`, `assert_select "input[name=mind_graph_filter]", count: 0`, and the body does not include `"Links in text"`.
-  - `"the tab order is the search, the filter, the zoom buttons, then the canvas"`: the selector's `input[type=radio]` becomes `input[type=checkbox]`, and with only a post created the expected order is `[ "input", "input", "input", "input", "input", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ]` (the search, then Posts, Tags, Related, Shares a tag, then the "Status" button, which has no `aria-label` and is named by its text). Its last assertion, the elements with a `tabindex` that is not 0, becomes `[ "div", "aside" ]`: the Status key's panel takes the focus when it is opened (`tabindex="-1"`), and comes before the card in the document.
+  - `"the tab order is the search, the filter, the zoom buttons, then the canvas"`: the selector's `input[type=radio]` becomes `input[type=checkbox]`, and with only a post created the expected order is `[ "input", "input", "input", "input", "input", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ]` (the search, then Posts, Tags, Related, Shares a tag, then the "Status" button, which has no `aria-label` and is named by its text). Its last assertion stays `[ "aside" ]`: the key's dialog is outside the graph's element.
   - `"in a local view the tab order is the search, the bar's links, the filter, the zoom buttons, the canvas"`: `input[type=radio]` becomes `input[type=checkbox]`, the mapping of a button becomes `node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)`, and the expected order is `[ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ]`.
-  - new `"the status key is in the page closed, as a list that offers nothing to press"`: with a post, `assert_select "[data-mind-graph-legend] button[aria-controls='mind-graph-status-key'][aria-expanded='false']", text: "Status"`, `assert_select "#mind-graph-status-key[role=list][hidden] [role=listitem]", count: 5`, `assert_select "#mind-graph-status-key input, #mind-graph-status-key button, #mind-graph-status-key a", count: 0`.
+  - new `"the status key is in the page once, a closed dialog outside the graph's element"`: with a post, `assert_select "dialog#mind-graph-status-key", count: 1`, `assert_select "dialog#mind-graph-status-key[open]", count: 0`, `assert_select "[data-controller='admin--mind-graph--graph'] dialog", count: 0`, `assert_select "dialog#mind-graph-status-key li[data-legend-state]", count: 5`, and `assert_select "[data-mind-graph-legend] button[data-legend-status][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status"`; and for a viewer who can read neither a page nor a post (the empty state) no such dialog is in the page.
   - `"the legend names only the content types of the viewer's posts, plus the shapes"` and its two neighbours look for the types in `ul[aria-label='Legend'] [data-legend-type]`; the shapes they name are now `pinned` and `notes` (the five states are in the Status key, which the test above reads).
   - new `"a viewer who reads pages and no post gets the toggles of pages only"` (`label[data-legend-toggle]` values `%w[page type tree lists]`).
-  - `"the script's messages ride on the element"`: `summary` is gone from the key list, and `legend.toggle` and the eighteen `summary.*` keys of Step 5 are in it; where the test reads a sentence, `summary.whole` is `"Mind graph: %{kinds}, %{connections}."`.
+  - `"the script's messages ride on the element"`: `summary` is gone from the key list, and `legend.toggle` and every `summary.*` key of Step 5 are in it; where the test reads a sentence, `summary.whole` is `"Mind graph: %{kinds}, %{connections}."`.
   - the tests that read `"No posts yet."` read `"No pages or posts yet."`, and `[data-mind-graph-empty='no-content']`.
   - `"the canvas carries its own name twice …"` and `"the list comes last and empty"`: the new names (`Mind graph`, `Pages, posts, tags and post types in this graph`); the search's label in its test.
 
@@ -4025,6 +4254,7 @@ export function counts(nodes, edges) {
     toggle "Related"
     shows.call(7, 4)
     assert screen_position(a.id), "a line switched off hid a node"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 pages, 1 post type, 3 posts and 1 tag, 4 connections. Showing everything. Related lines hidden.']"
     toggle "Related"
 
     toggle "Tags"
@@ -4064,7 +4294,7 @@ export function counts(nodes, edges) {
 
 | Test | Was | Becomes | And its figures |
 |---|---|---|---|
-| `"Back to the graph draws it once, with the filter the control shows"` | "Related" | `toggle "Tags"` | before: `data-nodes` 3 and the name `Mind graph: 2 posts and 1 tag, 3 connections. Showing everything.`; after the toggle 2 nodes, 1 line, `Mind graph: 2 posts, 1 connection. Showing everything. Tags hidden.`; in the restored page before its data: the canvas is named `Mind graph`, every `[data-legend-count]` is empty, no legend input has an `aria-label`, `input[name=mind_graph_nodes][value=tag]` is still unchecked (`assert_no_selector "… [value=tag]:checked", visible: :all`) and the Status key is closed (`assert_no_selector "#mind-graph-status-key", visible: :visible`); after the data 2 nodes and 1 line again, the name with `Tags hidden.` again, and `legend_counts` reads `Tags 1` |
+| `"Back to the graph draws it once, with the filter the control shows"` | "Related" | `toggle "Tags"` | before: `data-nodes` 3 and the name `Mind graph: 2 posts and 1 tag, 3 connections. Showing everything.`; after the toggle 2 nodes, 1 line, `Mind graph: 2 posts, 1 connection. Showing everything. Tags hidden.`; in the restored page before its data: the canvas is named `Mind graph`, every `[data-legend-count]` is empty, no legend input has an `aria-label`, `input[name=mind_graph_nodes][value=tag]` is still unchecked (`assert_no_selector "… [value=tag]:checked", visible: :all`); after the data 2 nodes and 1 line again, the name with `Tags hidden.` again, and `legend_counts` reads `Tags 1` |
 | `"a filter change with a node selected recomputes its neighbours"` | "Related", then "All" | `toggle "Shares a tag"` twice | off: the selection stays and the neighbours are `[ nid(c) ]`; on: `[ nid(c), tag_id ].sort` |
 | `"a filter that hides the selected node clears the selection and closes the card"` | "Related" | `toggle "Tags"` | unchanged |
 | `"a filter change keeps the pins of the nodes that remain and forgets the others"` | "Related", then "All" | `toggle "Tags"` twice | unchanged: one pin left, and none comes back |
@@ -4076,33 +4306,32 @@ export function counts(nodes, edges) {
   The Status key, the Review Focus's ninth line:
 
 ```ruby
-  # Third design answers: status is not a filter. The key is a popover behind
-  # a "Status" button in the legend, and the keyboard reaches all of it.
-  test "the Status key opens from the keyboard, takes the focus, and Escape gives it back" do
+  # Third design answers and H6: status is not a filter. The key is a dialog
+  # named "Status key" behind the legend's "Status" link, in the chip's words.
+  test "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" do
     create_post(title: "Alpha", tags: [ "t" ])
     create_post(title: "Beta", tags: [ "t" ])
     visit admin_mind_graph_path
     await_graph
-    key = "#{GRAPH} #mind-graph-status-key"
-    assert_no_selector key, visible: :visible
+    key = "dialog#mind-graph-status-key"
+    assert_no_selector "#{key}[open]", visible: :all
     before = [ graph["data-nodes"], graph["data-edges"] ]
 
     button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status")
     button.execute_script("this.focus()")
     page.driver.browser.keyboard.type(:Enter)
 
-    assert_selector "#{key}[role=list]", visible: :visible
-    assert_equal [ "Live", "Draft", "Scheduled", "Live with changes", "Live with a change scheduled" ], all("#{key} [role=listitem]").map { |item| item.text.squish }
-    await_js("document.activeElement?.id === 'mind-graph-status-key'")
-    assert_equal "true", button["aria-expanded"]
-    assert_no_selector "#{key} input, #{key} button, #{key} a"
+    assert_selector "#{key}[open] h2", text: "Status key"
+    assert_equal [ "Live", "Draft", "Scheduled", "Live, unpublished changes", "Live, change scheduled" ], all("#{key} li[data-legend-state]").map { |item| item.text.squish }
+    await_js("document.querySelector('#mind-graph-status-key').contains(document.activeElement)")
+    assert_no_selector "#{key} .admin-dialog__body input, #{key} .admin-dialog__body button, #{key} .admin-dialog__body a"
     assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "the key filters nothing"
 
     page.driver.browser.keyboard.type(:Escape)
 
-    assert_no_selector key, visible: :visible
+    assert_no_selector "#{key}[open]", visible: :all
     await_js("document.activeElement?.textContent.trim() === 'Status'")
-    assert_equal "false", button["aria-expanded"]
+    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "Escape closed the key and nothing of the graph"
   end
 ```
 
@@ -4143,10 +4372,11 @@ export function counts(nodes, edges) {
 
     assert_selector "#{GRAPH}[data-nodes='0'][data-edges='0']"
     assert_selector "#{LIST} p", text: "Nothing is drawn yet."
-    assert_selector "#{CANVAS}[aria-label='Mind graph: nothing in view. Pages hidden. Posts hidden. Tags hidden. Post types hidden.']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: nothing to show. All types are hidden.']"
     assert_nil screen_position(a.id)
     toggle "Posts"
     assert_selector "#{GRAPH}[data-nodes='2']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts, 0 connections. Showing everything. Pages hidden. Tags hidden. Post types hidden.']"
     await_graph
   end
 ```
@@ -4156,13 +4386,13 @@ export function counts(nodes, edges) {
   Run: `bin/rails tailwindcss:build && sysctl -n vm.loadavg`, then `PGGSSENCMODE=disable PARALLEL_WORKERS=6 bin/rails test test/system/admin/mind_graph_test.rb test/system/admin/mind_graph_modules_test.rb`
   Expected: PASS.
 
-- [ ] **Step 9: look at it, and report.** The legend in both themes at 1,440 and 1,000 pixels of width, with one and with eight toggles; Space on a focused toggle switches it; a screen reader's name for one (the accessibility tree in the browser's inspector: "Pages, 2"); the Status key open, in both themes, its five swatches beside the same five looks on the canvas; the canvas's name in the accessibility tree for the whole graph, for a page's local view at depth 2 with a pill, and with "Tags" off. Report the screenshots, the readings and the added wording named at the head of this task. Change no value.
+- [ ] **Step 9: look at it, and report.** The legend in both themes at 1,440 and 1,000 pixels of width, with one and with eight toggles; Space on a focused toggle switches it; a screen reader's name for one (the accessibility tree in the browser's inspector: "Pages, 2"); the Status key open as a dialog, in both themes, its five swatches beside the same five looks on the canvas, and its words beside a card's chip; the canvas's name in the accessibility tree for the whole graph, for a page's local view at depth 2 with a pill, and with "Tags" off. Report the screenshots, the readings and the added wording named at the head of this task. Change no value.
 
 - [ ] **Step 10: commit.**
 
 ```bash
 git add app/components/admin/mind_graph_screen app/assets/tailwind/content-spiel.tailwind.css config/locales/admin app/views/admin/mind_graph/show.html.erb app/controllers/admin/mind_graph_controller.rb app/javascript test/components test/integration/admin/mind_graph_test.rb test/integration/trash_visibility_test.rb test/system/admin
-git commit -m "feat: the mind graph's legend is its filter — eight toggles with counts in place of the three radios, the status key behind a link, and a summary that says what is in view"
+git commit -m "feat: the mind graph's legend is its filter — eight toggles with counts in place of the three radios, the status key in a dialog behind a link, and a summary that says what is in view"
 ```
 
 ---
@@ -4170,12 +4400,12 @@ git commit -m "feat: the mind graph's legend is its filter — eight toggles wit
 
 **The list has four groups** (the owner's decision of 2026-10-12): Pages, Posts, Tags, Post types. The search keeps three: a search row opens its local view, and a post type has none.
 
-**Design readings to report** (screenshots of the open results and of the list, both themes): the group headings of the results in the list's own heading style; a page's marker in a row as a 10 by 7 ink card (`PAGE_MARK`); a page's indent of 12 pixels per level; the place of "Not listed on any page" as a checkbox row above the groups; "not in view" where a row's count stands; the error line as a paragraph with a small secondary button under it, in the list. From the designer, verbatim (G5): a row's accessible name when its post is not drawn, `"%{title}, %{type} post, not in view. Activate to add it to the graph."`, and `"The list couldn't be loaded."` with `"Try again"`. **A reading**: `%{type}` is the type's label in lower case as the messages' language lowers it ("Blog" reads "blog post"), and a retired type's stored name.
+**Design readings to report** (screenshots of the open results and of the list, both themes): the group headings of the results in the list's own heading style; a page's marker in a row as a 10 by 7 ink card (`PAGE_MARK`); a page's indent of 12 pixels per level; the place of "Not listed on any page" as a checkbox row above the groups; "not in view" where a row's count stands; the error line as a paragraph with a small secondary button under it, in the list. From the designer, verbatim (G5, H7): a row's accessible name when its post is not drawn, `"%{title}, %{type} post, not in view. Activate to add it to the graph."`, with the type's label in lower case ("blog post"), and for a post of a RETIRED type its stored name in lower case followed by "retired type" ("talk, retired type"); `"The list couldn't be loaded."` with `"Try again"`.
 
-**AN OPEN DESIGN QUESTION, not to be decided here** (spec, "Open design questions", 1): the designer's file gives no look for a row of the "Post types" group. Until the controller has the answer, build a row with THE SAME SHAPE AS A TAGS ROW (the mark, the name, the number of connections), its mark the type's dot as `Admin::Ui::ContentTypeDotComponent` gives it and "All posts" a dim dot (`ALL_POSTS_MARK`), the rows in the order the data has them ("All posts" first, then the registry's order); report it with a screenshot. And **two strings nobody gave**: the group's heading `"Post types · %{count}"` (the legend's own words for the kind) and a row's name `"%{title}: post type, %{count} connections. Shows it in the graph."` (the other rows' sentence).
+**A row of the "Post types" group is the designer's** (H2): its mark is a smaller copy of the hub as the canvas draws it, 10px with the inner ring ("All posts" filled dim, a ring type's a ring round a centre, a retired type's a dim dashed outline with a centre dot); its number is the count of POSTS of that type on the site, where a tag's row has its number ("All posts" shows the site's total); the rows come in colour-slot order, then the retired types, then "All posts" last, which is the order the data has them in (Task 3). **Readings to report**: the hub's parts at 10px are the canvas's scaled by 10/12 (`.mg-hub`); "on the site" is what the viewer can read of it, as every count of this screen is. **Strings nobody gave**: the group's heading `"Post types · %{count}"` (the legend's own words for the kind) and a row's name `"%{title}: post type, %{count} posts. Shows it in the graph."` (the other rows' sentence, with what its number counts). **Still open, and built the plain way**: H7's "a name capitalised by design (a brand) stays as stored" cannot be told from the data, so every type's label is lowered as the messages' language lowers it.
 
 **Files:**
-- Modify: `app/queries/post_graph/search.rb`, `app/controllers/admin/mind_graph_controller.rb` (no code: `search` already builds the URL from `kind` and `record_id`), `app/views/admin/mind_graph/show.html.erb`, `config/locales/admin/mind_graph.en.yml`, `app/javascript/mind_graph/search_box.js`, `node_list.js`, `card.js` (one constant), `app.js`, `layout_worker.js`, `layout_client.js`
+- Modify: `app/queries/post_graph/search.rb`, `app/controllers/admin/mind_graph_controller.rb` (no code: `search` already builds the URL from `kind` and `record_id`), `app/views/admin/mind_graph/show.html.erb`, `config/locales/admin/mind_graph.en.yml`, `app/javascript/mind_graph/search_box.js`, `node_list.js`, `card.js` (one constant and `hubMark`), `app.js`, `layout_worker.js`, `layout_client.js`, `app/assets/tailwind/content-spiel.tailwind.css` (`.mg-hub`)
 - Test: `test/queries/post_graph/search_test.rb`, `test/integration/admin/mind_graph_data_test.rb`, `test/integration/admin/mind_graph_test.rb`, `test/integration/trash_visibility_test.rb`, `test/system/admin/mind_graph_modules_test.rb`, `test/system/admin/mind_graph_test.rb`
 
 **Interfaces:**
@@ -4198,7 +4428,7 @@ createList(container, { text, dotClasses, typeLabels, retryClass, onSelect, onHo
   //    typeLabels: a type's human name by its stored name (the view's `data-type-labels`); retryClass: the small secondary button's classes
 // card.js
 PAGE_MARK        // the class string of a page's small mark in a row and a card
-ALL_POSTS_MARK   // of "All posts" in a row and a card: a dim dot
+hubMark(node)    // an element: the small copy of a post type's hub (10px) for a row and a card; "All posts", a ring type's and a retired type's each as the canvas has it
 // layout worker: { type: "add", node: { id, radius, x, y }, edges: [{ source, target, kind }] };  layout.add(node, edges)
 // view: data-unlisted-url on the controller's element
 ```
@@ -4301,9 +4531,10 @@ ALL_POSTS_MARK   // of "All posts" in a row and a card: a dim dot
             one: "%{title}: tag, %{count} connection. Shows it in the graph."
             other: "%{title}: tag, %{count} connections. Shows it in the graph."
           select_type:
-            one: "%{title}: post type, %{count} connection. Shows it in the graph."
-            other: "%{title}: post type, %{count} connections. Shows it in the graph."
+            one: "%{title}: post type, %{count} post. Shows it in the graph."
+            other: "%{title}: post type, %{count} posts. Shows it in the graph."
           add_post: "%{title}, %{type} post, not in view. Activate to add it to the graph."
+          add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
         search:
           count:
             one: "%{count} result"
@@ -4316,7 +4547,7 @@ ALL_POSTS_MARK   // of "All posts" in a row and a card: a dim dot
             tag: "Tags"
 ```
 
-  (`search.post` and `search.tag` go: the group's heading names the kind.) In `show.html.erb`'s `messages_data(...)`: remove `"mind_graph.script.search.post"` and `"mind_graph.script.search.tag"`; add `"mind_graph.script.search.groups.page"`, `"mind_graph.script.search.groups.post"`, `"mind_graph.script.search.groups.tag"`, `"mind_graph.script.list.pages"`, `"mind_graph.script.list.types"`, `"mind_graph.script.list.unlisted"`, `"mind_graph.script.list.not_in_view"`, `"mind_graph.script.list.open_in_posts"`, `"mind_graph.script.list.failed"`, `"mind_graph.script.list.try_again"`, `"mind_graph.script.list.select_page"`, `"mind_graph.script.list.select_type"`, `"mind_graph.script.list.add_post"`. (`add_post` is the designer's sentence, G5: `%{type}` is the post TYPE's name, so the row says "blog post" and never a bare "post". `failed` and `try_again` are the designer's too.) Say in the locale file's header comment that `script.list.add_post` and the `select_*` keys are a row's whole accessible name. On the controller's element, beside the other templates:
+  (`search.post` and `search.tag` go: the group's heading names the kind.) In `show.html.erb`'s `messages_data(...)`: remove `"mind_graph.script.search.post"` and `"mind_graph.script.search.tag"`; add `"mind_graph.script.search.groups.page"`, `"mind_graph.script.search.groups.post"`, `"mind_graph.script.search.groups.tag"`, `"mind_graph.script.list.pages"`, `"mind_graph.script.list.types"`, `"mind_graph.script.list.unlisted"`, `"mind_graph.script.list.not_in_view"`, `"mind_graph.script.list.open_in_posts"`, `"mind_graph.script.list.failed"`, `"mind_graph.script.list.try_again"`, `"mind_graph.script.list.select_page"`, `"mind_graph.script.list.select_type"`, `"mind_graph.script.list.add_post"`, `"mind_graph.script.list.add_retired_post"`. (`add_post` is the designer's sentence, G5: `%{type}` is the post TYPE's name, so the row says "blog post" and never a bare "post"; `add_retired_post` is its form for a post of a retired type, H7: "talk, retired type". `select_type`'s `count` is the type's posts, the number its row shows. `failed` and `try_again` are the designer's too.) Say in the locale file's header comment that `script.list.add_post` and the `select_*` keys are a row's whole accessible name. On the controller's element, beside the other templates:
 
 ```erb
        data-unlisted-url="<%= unlisted_admin_mind_graph_path(**admin_url_options) %>"
@@ -4330,8 +4561,36 @@ ALL_POSTS_MARK   // of "All posts" in a row and a card: a dim dot
 // A page's mark where a mark is an element (a row of the list, a search
 // result, the card): a small card in ink, as the canvas draws it.
 export const PAGE_MARK = "h-[7px] w-[10px] shrink-0 rounded-cs bg-ink"
-// "All posts" where a mark is an element: a type's dot, in `dim`.
-export const ALL_POSTS_MARK = "h-[7px] w-[7px] shrink-0 rounded-full bg-dim"
+// A post type's hub where a mark is an element (a row of the list's "Post
+// types" group, the type's card; design answer H2): a smaller copy of the
+// hub as the canvas draws it, 10px, with its inner ring. The shapes are the
+// stylesheet's (`.mg-hub`, on tokens); the hue comes in as a token's NAME,
+// never a value. "All posts" is filled dim, a ring type's (slots 7-12) a
+// ring round a centre, a retired type's a dashed dim outline with a centre.
+export function hubMark(node) {
+  const mark = document.createElement("span")
+  mark.setAttribute("aria-hidden", "true")
+  const slot = node.colour_index == null ? null : (node.colour_index - 1) % 12
+  mark.className = `mg-hub${node.id === "all-posts" ? " mg-hub-all" : slot == null ? " mg-hub-retired" : slot >= 6 ? " mg-hub-ring" : ""}`
+  if (slot != null) mark.style.setProperty("--mg-hue", `var(--cs-cat-${(slot % 6) + 1})`)
+  return mark
+}
+```
+
+  and in `app/assets/tailwind/content-spiel.tailwind.css`, beside the legend's `.mg-*` rules:
+
+```css
+/* A post type's hub as an element, 10px (design answer H2): the canvas's hub
+   scaled by 10/12, so its inner ring is 1.25px wide, 1.25px in. */
+.mg-hub { position: relative; display: inline-block; flex: none; box-sizing: border-box; width: 10px; height: 10px; border-radius: var(--cs-radius-pill); background: var(--mg-hue); }
+.mg-hub::after { content: ""; position: absolute; inset: 1.25px; box-sizing: border-box; border: 1.25px solid var(--cs-surface); border-radius: var(--cs-radius-pill); }
+.mg-hub-all { --mg-hue: var(--cs-dim); }
+/* A ring type's: a ring in the hue round a filled centre 5px across. */
+.mg-hub-ring { background: var(--cs-surface); border: 1.25px solid var(--mg-hue); }
+.mg-hub-ring::after { inset: 1.25px; border: 0; background: var(--mg-hue); }
+/* A retired type's: a dashed dim ring round a small dim centre. */
+.mg-hub-retired { background: var(--cs-surface); border: 1.25px dashed var(--cs-dim); }
+.mg-hub-retired::after { inset: 2.1px; border: 0; background: var(--cs-dim); }
 ```
 
   In `app/javascript/mind_graph/search_box.js`: `attachSearch(field, list, { url, text, status, dotClasses })` (the app passes its `dotClasses`), `KIND_KEYS` goes, and `onRows` draws groups. The header comment says: grouped Pages / Posts / Tags, each row with its kind's mark, a page with its path under its title; the rows are still plain links.
@@ -4395,12 +4654,13 @@ const LINK = "flex items-center gap-2 rounded-cs px-2 py-1.5 text-sm text-ink ho
 // FOUR GROUPS: "Pages · N" first, in TREE order with an indent per level
 // (not by connections: a tree is read by its order), then "Posts · N" and
 // "Tags · N", best-connected first as on the canvas, then "Post types · N":
-// a row for each post-type node and for "All posts", in the order the data
-// has them, so each has a keyboard path to its card (the owner's decision
-// of 2026-10-12). THE LOOK OF A ROW OF THAT GROUP IS AN OPEN DESIGN QUESTION
-// (pages spec, "Open design questions", 1): until it is answered it has the
-// shape of a Tags row -- the mark, the name, the connections. "+N more" has
-// no row: pressed on the canvas, it IS the list.
+// a row for each post-type node and for "All posts", so each has a keyboard
+// path to its card (the owner's decision of 2026-10-12). A ROW OF THAT
+// GROUP is the design answer's (H2): its mark a small copy of the hub
+// (`hubMark`), its number the POSTS of that type the viewer can read (a
+// tag's row has its connections there), in the order the data has them --
+// colour-slot order, then retired types, then "All posts" last. "+N more"
+// has no row: pressed on the canvas, it IS the list.
 //
 // ABOVE THE GROUPS, "Not listed on any page" (pages spec §7): while it is
 // on, the list shows the rows the app hands `showRows` IN PLACE OF the
@@ -4413,7 +4673,8 @@ const LINK = "flex items-center gap-2 rounded-cs px-2 py-1.5 text-sm text-ink ho
 // the data has it, so no request is made). Its name is the design answer's
 // (G5): "Small sites, long lives, blog post, not in view. Activate to add
 // it to the graph." -- with the post TYPE's name, as the messages' language
-// lowers it. One that is drawn selects, like any row.
+// lowers it; a post of a RETIRED type says "talk, retired type" (H7). One
+// that is drawn selects, like any row.
 //
 // A READ THAT FAILED (G5) is said IN THE LIST, not in a toast: the line and
 // a small "Try again" button under it (`fail`), in a `role="alert"` so it
@@ -4423,11 +4684,12 @@ const LINK = "flex items-center gap-2 rounded-cs px-2 py-1.5 text-sm text-ink ho
 // onSelect, onHover, onAdd, onUnlisted })` answers `{ render(nodes),
 // showRows({ heading, rows, inView, link }), fail(line, { label, onRetry,
 // focus }), focus(), setUnlisted(on), mark(id), row(id), destroy() }`.
-import { dotClass, TAG_MARK, PAGE_MARK, ALL_POSTS_MARK } from "mind_graph/card"
+import { dotClass, hubMark, TAG_MARK, PAGE_MARK } from "mind_graph/card"
 
 const byDegree = (a, b) => b.degree - a.degree || String(a.title).localeCompare(String(b.title))
 const byTree = (a, b) => a.order - b.order
-// The order the data has them: "All posts" first, then the registry's.
+// The order the data has them (design answer H2): colour-slot order, then
+// the retired types, then "All posts" last.
 const asGiven = () => 0
 const ROW = "flex w-full cursor-pointer items-center gap-2 px-3 py-1 text-left text-sm text-ink hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current]:bg-accent-tint aria-[current]:font-semibold"
 const NAMES = { page: "mind_graph.script.list.select_page", post: "mind_graph.script.list.select_post", tag: "mind_graph.script.list.select_tag", type: "mind_graph.script.list.select_type" }
@@ -4468,24 +4730,30 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
     wrapper.append(element("h2", "m-0 px-3 pb-1 pt-3 font-cs-mono text-label uppercase tracking-mono text-meta", title), list)
     return wrapper
   }
-  // A post-type row's mark is PROVISIONAL (the open design question in the
-  // header): the type's dot, a retired type's neutral ring, "All posts" dim.
-  const markOf = (node) => (node.kind === "page" ? PAGE_MARK : node.kind === "tag" ? TAG_MARK : node.id === "all-posts" ? ALL_POSTS_MARK : dotClass(dotClasses, node))
-  // A post's type as a row that is not in view names it: the type's human
-  // name (a retired type's stored one; `hasOwn`, because a stored name is
-  // data), in lower case as the messages' language lowers it.
-  const typeName = (node) => String(Object.hasOwn(typeLabels, node.type) ? typeLabels[node.type] : node.type ?? "").toLocaleLowerCase(text.locale())
+  const markOf = (node) => (node.kind === "page" ? PAGE_MARK : node.kind === "tag" ? TAG_MARK : dotClass(dotClasses, node))
+  // A post's type as a row that is not in view names it (design answers G5,
+  // H7): the type's label in lower case, as the messages' language lowers
+  // it ("blog post"); a RETIRED type has no label, and is its stored name in
+  // lower case with its own sentence ("talk, retired type"). `hasOwn`,
+  // because a stored name is data.
+  const lower = (words) => String(words ?? "").toLocaleLowerCase(text.locale())
+  const addName = (node) => Object.hasOwn(typeLabels, node.type)
+    ? text.t("mind_graph.script.list.add_post", { title: node.title, type: lower(typeLabels[node.type]) })
+    : text.t("mind_graph.script.list.add_retired_post", { title: node.title, type: lower(node.type) })
+  // What stands at a row's end, and what its name counts: a post type's is
+  // its posts (H2), every other row's its connections.
+  const figure = (node) => (node.kind === "type" ? node.count ?? 0 : node.degree)
   const row = (node, { notInView = false } = {}) => {
     const item = document.createElement("li")
     const button = element("button", ROW)
     button.type = "button"
     button.dataset.nodeId = node.id
-    button.setAttribute("aria-label", notInView ? text.t("mind_graph.script.list.add_post", { title: node.title, type: typeName(node) }) : text.t(NAMES[node.kind], { title: node.title, count: node.degree }))
+    button.setAttribute("aria-label", notInView ? addName(node) : text.t(NAMES[node.kind], { title: node.title, count: figure(node) }))
     // A page stands under its parent: indented by its depth in the tree.
     if (node.kind === "page") button.style.paddingInlineStart = `${ROW_PADDING + (node.depth || 0) * INDENT}px`
-    const mark = element("span", markOf(node))
+    const mark = node.kind === "type" ? hubMark(node) : element("span", markOf(node))
     mark.setAttribute("aria-hidden", "true")
-    const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 font-cs-mono text-label text-meta", node.degree)
+    const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 font-cs-mono text-label text-meta", figure(node))
     button.append(mark, element("span", "min-w-0 flex-1 truncate", node.title), trailing)
     item.append(button)
     rows.set(node.id, button)
@@ -4586,7 +4854,7 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
 }
 ```
 
-  (An id is a string now, so the second map of ids the old file kept is gone; the group's heading reads `"mind_graph.script.list.pages"`, `…posts`, `…tags` and `…types`, which `test/lib/script_messages_test.rb` accepts as `list.${…}` against the served keys. `sort` with `asGiven` keeps the given order: the sort is stable. `line` is still used by `render` for the empty list.)
+  (An id is a string now, so the second map of ids the old file kept is gone; the group's heading reads `"mind_graph.script.list.pages"`, `…posts`, `…tags` and `…types`, which `test/lib/script_messages_test.rb` accepts as `list.${…}` against the served keys. `sort` with `asGiven` keeps the given order, which is the server's and the design answer's (H2): the sort is stable. `line` is still used by `render` for the empty list.)
 
 - [ ] **Step 6: the worker learns `add`.** In `layout_worker.js`, the header's "Messages in" gains `{ type: "add", node: { id, radius, x, y }, edges: [{ source, target, kind }] }   one more node, placed where the page says, with its lines`; in `handle`:
 
@@ -4773,21 +5041,21 @@ function add(node, givenEdges) {
         list.render([ { id: "post-1", kind: "post", title: "Post", degree: 1, colour_index: 1 }, { id: "tag-1", kind: "tag", title: "tag", degree: 2 },
                       { id: "page-3", kind: "page", title: "Child", degree: 9, depth: 2, order: 2 }, { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0 },
                       { id: "page-2", kind: "page", title: "Docs", degree: 2, depth: 1, order: 1 }, { id: "page-9", kind: "page", title: "Stray", degree: 0, depth: 1, order: 3 },
-                      { id: "all-posts", kind: "type", title: "All posts", degree: 1, colour_index: null }, { id: "type-blog", kind: "type", title: "Blog", degree: 4, colour_index: 1 },
-                      { id: "type-gone", kind: "type", title: "gone (retired)", degree: 1, colour_index: null }, { id: "more", kind: "more", title: "+3 more", degree: 1 } ])
-        return { rows: read(), marks: Array.from(list.row("all-posts").closest("ul").querySelectorAll("button > span[aria-hidden]"), (mark) => mark.className) }
+                      { id: "type-blog", kind: "type", title: "Blog", degree: 4, count: 112, colour_index: 1 }, { id: "type-talk", kind: "type", title: "Talk", degree: 9, count: 1, colour_index: 8 },
+                      { id: "type-gone", kind: "type", title: "gone (retired)", degree: 1, count: 0, colour_index: null }, { id: "all-posts", kind: "type", title: "All posts", degree: 1, count: 2040, colour_index: null },
+                      { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1 } ])
+        return { rows: read(), marks: Array.from(list.row("all-posts").closest("ul").querySelectorAll("button > span[aria-hidden]"), (mark) => [ mark.className, mark.style.getPropertyValue("--mg-hue") ]) }
       })()
     JS
 
     assert_equal [ "list.pages(4)", [ "Home", "1", "12px", "list.select_page(Home,1)" ], [ "Docs", "2", "24px", "list.select_page(Docs,2)" ],
                    [ "Child", "9", "36px", "list.select_page(Child,9)" ], [ "Stray", "0", "24px", "list.select_page(Stray,0)" ],
                    "list.posts(1)", [ "Post", "1", "", "list.select_post(Post,1)" ], "list.tags(1)", [ "tag", "2", "", "list.select_tag(tag,2)" ],
-                   "list.types(3)", [ "All posts", "1", "", "list.select_type(All posts,1)" ], [ "Blog", "4", "", "list.select_type(Blog,4)" ],
-                   [ "gone (retired)", "1", "", "list.select_type(gone (retired),1)" ] ], rows["rows"],
-      "a page whose parent is not in the data is listed after the tree, indented once; the post types keep the data's order, not their connections'; more has no row"
-    assert_match(/bg-dim/, rows["marks"][0], "All posts is a dim dot")
-    assert_match(/\bdot\b/, rows["marks"][1], "a type's dot is its colour slot's")
-    assert_match(/border-meta/, rows["marks"][2], "a retired type's is the neutral ring")
+                   "list.types(4)", [ "Blog", "112", "", "list.select_type(Blog,112)" ], [ "Talk", "1", "", "list.select_type(Talk,1)" ],
+                   [ "gone (retired)", "0", "", "list.select_type(gone (retired),0)" ], [ "All posts", "2040", "", "list.select_type(All posts,2040)" ] ], rows["rows"],
+      "a page whose parent is not in the data is listed after the tree, indented once; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill has no row"
+    assert_equal [ [ "mg-hub", "var(--cs-cat-1)" ], [ "mg-hub mg-hub-ring", "var(--cs-cat-2)" ], [ "mg-hub mg-hub-retired", "" ], [ "mg-hub mg-hub-all", "" ] ], rows["marks"],
+      "a small copy of the hub: a ring type's a ring, a retired type's dashed, All posts dim; the hue is a token's name"
   end
 
   test "list: a row that is not in view is named with its type and asks to be added, one in view selects, and the checkbox reports its change" do
@@ -4808,8 +5076,8 @@ function add(node, givenEdges) {
     JS
 
     assert_equal [ "Posts · 3", [ "Drawn", "3", "", "list.select_post(Drawn,3)" ], [ "<b>Absent</b>", "list.not_in_view()", "", "list.add_post(<b>Absent</b>,blog)" ],
-                   [ "Old", "list.not_in_view()", "", "list.add_post(Old,<i>gone</i>)" ] ], result["rows"],
-      "the type's human name in lower case, and a retired type's stored name: never a bare 'post'"
+                   [ "Old", "list.not_in_view()", "", "list.add_retired_post(Old,<i>gone</i>)" ] ], result["rows"],
+      "the type's label in lower case, and for a retired type its stored name in lower case in its own sentence: never a bare 'post'"
     assert_equal [ [ "select", "post-1" ], [ "add", "post-2" ], [ "add", "post-3" ], [ "unlisted", true ] ], result["calls"]
     assert_equal [ [ "/posts?type=blog", "Open in Posts" ], 0, true, "list.unlisted()" ], result.values_at("link", "markup", "checked", "label")
   end
@@ -4909,7 +5177,9 @@ function add(node, givenEdges) {
     find("#{LIST} label", text: "Not listed on any page").click
     within(LIST) do
       assert_equal [ "PAGES · 2", "POSTS · 4", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
-      assert_row "#{ContentTypes.fetch("blog").label}: post type, 1 connection. Shows it in the graph."
+      assert_row "#{ContentTypes.fetch("blog").label}: post type, 2 posts. Shows it in the graph."
+      assert_selector "button[data-node-id='type-blog'] span.mg-hub[aria-hidden='true']"
+      assert_equal "2", find("button[data-node-id='type-blog']").all("span").last.text, "the number of posts of the type, where a tag's row has its connections"
     end
     # The fourth group is the keyboard's way to a post type's node: its row
     # selects it, as any row does.
@@ -4975,7 +5245,7 @@ function add(node, givenEdges) {
   Run: `bin/rails tailwindcss:build && sysctl -n vm.loadavg`, then `PGGSSENCMODE=disable PARALLEL_WORKERS=6 bin/rails test test/system/admin/mind_graph_test.rb`
   Expected: PASS.
 
-- [ ] **Step 10: look at it, report, commit.** Screenshots of the open search with all three groups, of the list with its four groups, of the list with rows that are not in view, and of the error line with "Try again" (stop the server while "Not listed on any page" is switched on), both themes; with a screen reader or the inspector's accessibility tree, the name of a row that is not in view. The readings, the open question about the "Post types" rows and the two strings nobody gave, all named at the head of this task, go to the controller. Then:
+- [ ] **Step 10: look at it, report, commit.** Screenshots of the open search with all three groups, of the list with its four groups, of the list with rows that are not in view, and of the error line with "Try again" (stop the server while "Not listed on any page" is switched on), both themes; with a screen reader or the inspector's accessibility tree, the name of a row that is not in view. The readings, the two strings nobody gave and the one point of H7 that is still open, all named at the head of this task, go to the controller. Then:
 
 ```bash
 git add app/queries/post_graph/search.rb app/views/admin/mind_graph/show.html.erb config/locales/admin/mind_graph.en.yml app/javascript/mind_graph test/queries/post_graph/search_test.rb test/integration test/system/admin
@@ -4986,7 +5256,9 @@ git commit -m "feat: the mind graph's search finds pages, and its list has four 
 
 ### Task 8: a page's card, a post type's card, "+N more", and the graph that opens around Home
 
-**The status chip on a card is the design answer's** (G4): it keeps its three dots and adds the second state after the label. Live with unpublished changes reads "● Live · Unpublished changes", with no second dot; live with a change scheduled reads "● Live · ● Change scheduled 14 Oct", with a warn dot before the second part. The date is the data's `change_on` (Task 3: the controller's, in CS Studio's short date format).
+**The status chip on a card is the design answer's** (G4, H6): it keeps its three dots and adds the second state after the label, and its words are the status key's, one set: "Live, unpublished changes" and "Live, change scheduled 14 Oct" (the date only here). To the eye it is G4's row, "● Live · unpublished changes" with no second dot and "● Live · ● change scheduled 14 Oct" with a warn dot before the second part; a screen reader is given H6's sentence whole. The date is the data's `change_on` (Task 3: the controller's, in CS Studio's short date format). **To report**: G4 writes the chip with "·" and dots, H6 with a comma; this builds both, the one for the eye and the other for the ear, and the second part in lower case as H6 writes it.
+
+**A pill per target** (design answer H1): a page with two list blocks has two "+N more" pills, each on its own hub or tag, and a press on one opens the list with ITS posts (`listed?page=…&target=…`).
 
 **"Show everything" is not remembered after a reload** (the third answers, "Large site notice"): once the whole graph is drawn the script takes `everything=1` out of the address, so a reload asks again and opens around Home.
 
@@ -4998,7 +5270,7 @@ git commit -m "feat: the mind graph's search finds pages, and its list has four 
 
 **Interfaces:**
 - Consumes: `GET mind_graph/listed` and `PostGraph::Global`'s `open` answer (Tasks 3, 4); `showRowsFrom`, `showGroups`, `reveal` (Task 7); `recordId`, `fill`, `PAGE_MARK`.
-- Produces: on the controller's element `data-page-focus-url`, `data-page-notes-url`, `data-listed-url`, `data-open-url` (with `__ID__`, and `__LINES__` in the last), `data-opened-lines` (a number, only when the address's `lines=` is one); in the address `lines=<n>`, and `everything=1` only until the whole graph is drawn.
+- Produces: on the controller's element `data-page-focus-url`, `data-page-notes-url`, `data-listed-url` (with `__ID__` and `__TARGET__`), `data-open-url` (with `__ID__`, and `__LINES__`), `data-opened-lines` (a number, only when the address's `lines=` is one); in the address `lines=<n>`, and `everything=1` only until the whole graph is drawn.
 
 ```js
 cardNotes(node, { text, type, url, recordUrl, onChange })   // type: "post" | "page"; `recordUrl` was `postUrl`
@@ -5017,7 +5289,7 @@ createCard(container, { …, urls })                           // urls gains pag
 
     assert_equal "/cs-studio/mind_graph?page=__ID__", element["data-page-focus-url"]
     assert_equal "/cs-studio/notes/page/__ID__/threads", element["data-page-notes-url"]
-    assert_equal "/cs-studio/mind_graph/listed?page=__ID__", element["data-listed-url"]
+    assert_equal "/cs-studio/mind_graph/listed?page=__ID__&target=__TARGET__", element["data-listed-url"]
     assert_equal "/cs-studio/mind_graph?lines=__LINES__&page=__ID__", element["data-open-url"]
     assert_equal "/cs-studio/mind_graph", element["data-path"], "the screen's own path: the script takes everything=1 out of the address only while the address is this screen's"
     assert_nil element["data-opened-lines"]
@@ -5123,7 +5395,7 @@ createCard(container, { …, urls })                           // urls gains pag
 ```erb
        data-page-focus-url="<%= admin_mind_graph_path(**admin_url_options, page: "__ID__") %>"
        data-page-notes-url="<%= admin_record_note_threads_data_path("page", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
-       data-listed-url="<%= listed_admin_mind_graph_path(**admin_url_options, page: "__ID__") %>"
+       data-listed-url="<%= listed_admin_mind_graph_path(**admin_url_options, page: "__ID__", target: "__TARGET__") %>"
        data-open-url="<%= admin_mind_graph_path(**admin_url_options, page: "__ID__", lines: "__LINES__") %>"
        data-path="<%= admin_mind_graph_path %>"
        <% if @opened_lines %>data-opened-lines="<%= @opened_lines %>"<% end %>
@@ -5161,11 +5433,13 @@ createCard(container, { …, urls })                           // urls gains pag
             draft: "Draft"
             scheduled: "Scheduled"
             live: "Live"
-            unpublished_changes: "Unpublished changes"
-            change_scheduled: "Change scheduled %{date}"
+            unpublished_changes: "unpublished changes"
+            change_scheduled: "change scheduled %{date}"
+            live_with_changes: "Live, unpublished changes"
+            live_change_scheduled: "Live, change scheduled %{date}"
 ```
 
-  (`status.draft`, `scheduled` and `live` are there today: the chip's first part, with its dot. The two new keys are its SECOND part, the design answer's words, G4. "All posts"'s card line, "N posts", is `card.tag_posts`, which has both forms already.) Add to `messages_data(...)`: `"mind_graph.script.opened"`, `"mind_graph.script.card.open_page"`, `"mind_graph.script.card.child_pages"`, `"mind_graph.script.card.lists_posts"`, `"mind_graph.script.card.status.unpublished_changes"`, `"mind_graph.script.card.status.change_scheduled"`; and to the key list of `"the script's messages ride on the element"`. Bring the locale file's header comment up to date (`script.opened`: `%{figure}` is the grouped count; `script.card.status.change_scheduled`: `%{date}` is the node's `change_on`, a day the server has already written in the short date format, so the script formats no date).
+  (`status.draft`, `scheduled` and `live` are there today: the chip's first part, with its dot. `unpublished_changes` and `change_scheduled` are its SECOND part as the eye reads it after the "·", G4; `live_with_changes` and `live_change_scheduled` are the whole chip as a screen reader is given it, H6's words, the status key's with the day added. "All posts"'s card line, "N posts", is `card.tag_posts`, which has both forms already.) Add to `messages_data(...)`: `"mind_graph.script.opened"`, `"mind_graph.script.card.open_page"`, `"mind_graph.script.card.child_pages"`, `"mind_graph.script.card.lists_posts"`, `"mind_graph.script.card.status.unpublished_changes"`, `"mind_graph.script.card.status.change_scheduled"`, `"mind_graph.script.card.status.live_with_changes"`, `"mind_graph.script.card.status.live_change_scheduled"`; and to the key list of `"the script's messages ride on the element"`. Bring the locale file's header comment up to date (`script.opened`: `%{figure}` is the grouped count; `script.card.status.change_scheduled`: `%{date}` is the node's `change_on`, a day the server has already written in the short date format, so the script formats no date).
 
   Run the two integration files; expected PASS.
 
@@ -5179,24 +5453,32 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
 ```
 
 ```js
-  // The status chip (design answer G4): `Admin::Ui::StatusChipComponent`'s,
+  // The status chip (design answers G4 and H6): `Admin::Ui::StatusChipComponent`'s,
   // class for class, with its three dots, and for a live record that has
   // more to say the second state after the label:
-  //   "● Live · Unpublished changes"          no second dot
-  //   "● Live · ● Change scheduled 14 Oct"    a warn dot: warn means "scheduled"
-  // The day is the server's (`change_on`, CS Studio's short date). The "·"
-  // is hidden from a screen reader, which reads "Live Unpublished changes".
+  //   "● Live · unpublished changes"          no second dot
+  //   "● Live · ● change scheduled 14 Oct"    a warn dot: warn means "scheduled"
+  // Those two rows are for the eye and hidden from a screen reader, which is
+  // given the status key's own words in one sentence (H6: one set of
+  // words): "Live, unpublished changes", "Live, change scheduled 14 Oct".
+  // The day is the server's (`change_on`, CS Studio's short date).
   function statusChip(node) {
     const chip = element("span", "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5 text-xs text-ink")
-    chip.dataset.status = stateOf(node)
-    chip.append(mark(`h-1.5 w-1.5 rounded-full ${STATUS_DOTS[node.status]}`), text.t(`mind_graph.script.card.status.${node.status}`))
-    if (node.status !== "live" || !node.changes) return chip
+    const state = stateOf(node)
+    chip.dataset.status = state
+    chip.append(mark(`h-1.5 w-1.5 rounded-full ${STATUS_DOTS[node.status]}`))
+    if (state === node.status) {
+      chip.append(text.t(`mind_graph.script.card.status.${node.status}`))
+      return chip
+    }
 
-    const separator = element("span", "text-meta", "·")
-    separator.setAttribute("aria-hidden", "true")
-    chip.append(separator)
-    if (node.changes === "scheduled") chip.append(mark(`h-1.5 w-1.5 rounded-full ${STATUS_DOTS.scheduled}`), text.t("mind_graph.script.card.status.change_scheduled", { date: node.change_on ?? "" }))
-    else chip.append(text.t("mind_graph.script.card.status.unpublished_changes"))
+    const date = node.change_on ?? ""
+    const seen = element("span", "inline-flex items-center gap-1.5")
+    seen.setAttribute("aria-hidden", "true")
+    seen.append(text.t("mind_graph.script.card.status.live"), element("span", "text-meta", "·"))
+    if (node.changes === "scheduled") seen.append(mark(`h-1.5 w-1.5 rounded-full ${STATUS_DOTS.scheduled}`), text.t("mind_graph.script.card.status.change_scheduled", { date }))
+    else seen.append(text.t("mind_graph.script.card.status.unpublished_changes"))
+    chip.append(seen, element("span", "sr-only", text.t(`mind_graph.script.card.status.${state}`, { date })))
     return chip
   }
 ```
@@ -5233,12 +5515,11 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
   function type(node) {
     const counts = element("p", "m-0 flex")
     counts.append(label(text.t("mind_graph.script.card.tag_posts", { count: node.count ?? 0 })))
-    const dot = node.id === "all-posts" ? ALL_POSTS_MARK : dotClass(dotClasses, node)
-    return [ heading(mark(dot)), title(node), counts, actions() ]
+    return [ heading(hubMark(node)), title(node), counts, actions() ]
   }
 ```
 
-  and `show` chooses by kind: `container.replaceChildren(...({ tag, post, page, type }[node.kind])(node), closeButton())` (a `more` node never reaches `show`: Step 5). `createCard`'s `urls` gains `pageFocus` and `pageNotes`, which the app reads from `element.dataset.pageFocusUrl` and `element.dataset.pageNotesUrl`. (`PAGE_MARK` and `ALL_POSTS_MARK` are `card.js`'s own constants from Task 7; `recordId` is already imported. A retired type's title already ends "(retired)": `nodesOf` wrote it in Task 5, and its dot is the neutral ring `dotClass` gives a type with no colour.)
+  and `show` chooses by kind: `container.replaceChildren(...({ tag, post, page, type }[node.kind])(node), closeButton())` (a `more` node never reaches `show`: Step 5). `createCard`'s `urls` gains `pageFocus` and `pageNotes`, which the app reads from `element.dataset.pageFocusUrl` and `element.dataset.pageNotesUrl`. (`PAGE_MARK` and `hubMark` are `card.js`'s own from Task 7; `recordId` is already imported. A retired type's title already ends "(retired)": `nodesOf` wrote it in Task 5.)
 
 - [ ] **Step 5: "+N more", and the graph that opens around Home.** In `app/javascript/mind_graph/app.js`:
   - `import { fill } from "mind_graph/card"` and `import { recordId } from "mind_graph/ids"`.
@@ -5247,10 +5528,11 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
 ```js
     // "+N more" is not something to select (design answer F4): it opens the
     // list beside the canvas with the posts it stands for, each a row "not
-    // in view", and "Open in Posts →" under them.
+    // in view", and "Open in Posts →" under them. A PILL PER TARGET (H1):
+    // the read is asked for this pill's target, and answers its posts only.
     if (index >= 0 && state.nodes[index].kind === "more") {
       list.setUnlisted(false)
-      showRowsFrom(fill(element.dataset.listedUrl, "__ID__", recordId(state.nodes[index].page)), { postsLink: true })
+      showRowsFrom(fill(fill(element.dataset.listedUrl, "__ID__", recordId(state.nodes[index].page)), "__TARGET__", state.nodes[index].target), { postsLink: true })
       return
     }
 ```
@@ -5324,7 +5606,7 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
 
     within("[data-mind-graph-card]") do
       assert_selector "span.font-cs-mono", text: PublicPath.current.where(record: blog).pick(:path)
-      assert_equal "Live · Unpublished changes", find(".admin-status-chip[data-status='live_with_changes']").text.squish
+      assert_equal "Live · unpublished changes", find(".admin-status-chip[data-status='live_with_changes'] span[aria-hidden='true'].inline-flex").text.squish
       assert_selector "h2", text: "Blog"
       assert_text(/1 child page\s*·\s*lists 2 posts/i)
       assert_selector "[data-mind-graph-card-notes][data-notes-type=page][data-notes-id='#{blog.id}'] li[data-note-row]", text: "Check the intro"
@@ -5338,36 +5620,41 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
   end
 ```
 
-  (The chip reads "Live · Unpublished changes" because the block was added to a live page; if the page is plain live in this setup, publish nothing and assert the state the graph's data gives: read `Publishing::State.of(blog.reload).state` in the test and derive the expected words from it, "Live" alone for `:live`.)
+  (The chip reads "Live · unpublished changes" because the block was added to a live page; if the page is plain live in this setup, publish nothing and assert the state the graph's data gives: read `Publishing::State.of(blog.reload).state` in the test and derive the expected words from it, "Live" alone for `:live`.)
 
 ```ruby
-  # Design answer G4: the chip keeps its three dots and says the second state
-  # after the label. Warn means "scheduled": the second dot is a scheduled
-  # change's, and unpublished changes have none.
-  test "the card's chip says Unpublished changes for a live record that has them, and Change scheduled with its day behind a warn dot" do
+  # Design answers G4 and H6: the chip keeps its three dots and says the
+  # second state after the label; warn means "scheduled", so the second dot
+  # is a scheduled change's and unpublished changes have none. A screen
+  # reader is given the status key's own words, with the day.
+  test "the card's chip says unpublished changes for a live record that has them, and change scheduled with its day behind a warn dot, in the key's words" do
     changed = create_page(title: "Changed")
     pending = create_page(title: "Pending")
     plain = create_page(title: "Plain")
     at = 3.days.from_now
+    day = I18n.l(at, format: :"admin.short")
     Publishing::Version.take!(pending, live_at: at)
     [ changed, pending ].each { |record| record.update_columns(unpublished_changes_at: Time.current) } # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
     visit admin_mind_graph_path
     await_graph
     dots = -> { all("[data-mind-graph-card] .admin-status-chip span.rounded-full").map { |dot| dot[:class][/bg-\w+/] } }
+    heard = ->(chip) { chip.find(".sr-only", visible: :all).text(:all).squish }
 
     click_node(nid(plain))
     assert_equal "Live", find("[data-mind-graph-card] .admin-status-chip[data-status='live']").text.squish
     assert_equal %w[bg-ok], dots.call
 
     click_node(nid(changed))
-    assert_equal "Live · Unpublished changes", find("[data-mind-graph-card] .admin-status-chip[data-status='live_with_changes']").text.squish
+    chip = find("[data-mind-graph-card] .admin-status-chip[data-status='live_with_changes']")
+    assert_equal "Live · unpublished changes", chip.find("span[aria-hidden='true'].inline-flex").text.squish
+    assert_equal "Live, unpublished changes", heard.call(chip)
     assert_equal %w[bg-ok], dots.call, "no second dot"
 
     click_node(nid(pending))
     chip = find("[data-mind-graph-card] .admin-status-chip[data-status='live_change_scheduled']")
-    assert_equal "Live · Change scheduled #{I18n.l(at, format: :"admin.short")}", chip.text.squish
+    assert_equal "Live · change scheduled #{day}", chip.find("span[aria-hidden='true'].inline-flex").text.squish
+    assert_equal "Live, change scheduled #{day}", heard.call(chip)
     assert_equal %w[bg-ok bg-warn], dots.call, "a warn dot before the second part"
-    assert_equal "·", chip.find("span[aria-hidden='true']:not(.rounded-full)").text
   end
 ```
 
@@ -5413,11 +5700,11 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
     lines = graph["data-edges"].to_i
     assert_equal 23, lines, "the tree line to Home, the lists line to the type, and the hub's faint lines to twenty posts and to more"
     assert_nil screen_position(posts.last.id)
-    assert screen_position("more"), "more is not drawn"
+    assert screen_position("more-type-resume_entry"), "the pill is not drawn"
     assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 20 of 22 posts. 2 more are in the list.']"
-    assert_not_includes graph["data-labelled"].split(","), "more", "the pill carries its words: it has no label beside it"
+    assert_not_includes graph["data-labelled"].split(","), "more-type-resume_entry", "the pill carries its words: it has no label beside it"
 
-    click_node("more")
+    click_node("more-type-resume_entry")
 
     assert_equal "", graph["data-selected"], "more is not selected"
     assert_no_selector "[data-mind-graph-card]", visible: :visible
@@ -5441,6 +5728,81 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
 
     click_frame_link "Open in Posts →"
     assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(current_url).query).slice("type", "tag"))
+  end
+
+  # Design answer H1: ONE PILL PER TARGET. A page with two list blocks has
+  # two pills, each on its own hub or tag, each with its own posts.
+  test "a page with two list blocks has two pills, and each opens the list with its own posts and its own way to Posts" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "tag" => "pill" })
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 1, settings: { "content_type" => "resume_entry" })
+    pills = 15.times.map { |index| create_post(title: "Pill #{index}", tags: [ "pill" ]) }
+    entries = 15.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    pills.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 1).hours.ago) }   # version: none (a test sets a time) # changes: none (a test sets a time)
+    entries.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 2).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    tag = "tag-#{Tag.find_by!(name: "pill").id}"
+    visit admin_mind_graph_path(page: blog.id, depth: 2)
+    await_graph
+
+    # The twenty newest are ten of each; five of each are left out.
+    [ "more-#{tag}", "more-type-resume_entry" ].each { |id| assert screen_position(id), "#{id} is not drawn" }
+    assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 20 of 30 posts and 1 tag. 10 more are in the list.']"
+
+    click_node("more-type-resume_entry")
+    within(LIST) do
+      assert_equal [ "POSTS · 5" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal entries.last(5).map(&:title), all("li button span.truncate").map(&:text)
+      assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
+    end
+
+    click_node("more-#{tag}")
+    within(LIST) do
+      assert_equal pills.last(5).map(&:title), all("li button span.truncate").map(&:text), "the other pill's posts, and none of the first's"
+      assert_equal({ "tag" => "pill" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
+    end
+    lines = graph["data-edges"].to_i
+    find("#{LIST} button[data-node-id='#{nid(pills.last)}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(pills.last)}'][data-edges='#{lines + 1}']"
+    assert_equal [ tag ], graph["data-neighbours"].split(","), "a post a tag brings in gets its own line to that tag"
+    await_graph
+  end
+
+  # Design answer H4: the pill grows to fit and its figure has a thousands
+  # separator. The data is played by the test (nobody makes two thousand
+  # posts for it); every other request goes to the real fetch.
+  test "a pill with a figure of four digits is wider than sixty pixels, is pressed anywhere on it, and its figure is grouped" do
+    home = root_page
+    visit admin_tags_path
+    await_admin_controllers
+    played = {
+      nodes: [], tags: [], edges: [ { source: "page-#{home.id}", target: "type-blog", kind: "lists" }, { source: "type-blog", target: "more-type-blog", kind: "brings" } ],
+      pages: [ { id: "page-#{home.id}", title: "Home", path: "/", depth: 0, home: true, parent: nil, order: 0, status: "live", changes: nil, url: "/page", degree: 1, child_count: 0, listed_count: 2000, open_notes: 0 } ],
+      types: [ { id: "type-blog", name: "blog", label: "Blog", colour_index: 1, count: 2000, degree: 2 } ],
+      more: [ { id: "more-type-blog", count: 1980, page: "page-#{home.id}", target: "type-blog" } ],
+      total: 0, shown: 0, site: { pages: 1, posts: 2000, tags: 0 }, focus: { kind: "page", id: home.id, node_id: "page-#{home.id}", title: "Home", depth: 2 }
+    }
+    page.execute_script(<<~JS, played.to_json)
+      const original = window.fetch
+      const played = arguments[0]
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/data")) return original(url, options)
+        return Promise.resolve(new Response(played, { headers: { "Content-Type": "application/json" } }))
+      }
+    JS
+    page.execute_script("window.Turbo.visit(#{admin_mind_graph_path(page: home.id, depth: 2).to_json})")
+    assert_selector "[data-mind-graph-focus]", text: "Around the page “Home”"
+    await_graph
+
+    assert_selector "#{CANVAS}[aria-label='Mind graph around Home, depth 2: 1 page and 1 post type. 1,980 more are in the list.']"
+    at = screen_position("more-type-blog")
+    hub = screen_position("type-blog")
+    # 37 pixels from its centre, on the side away from its hub: on a pill
+    # that grew to fit "+1,980 more", and off one of sixty (30 and the
+    # slack of 4).
+    page.driver.browser.mouse.click(x: at["x"] + (hub["x"] > at["x"] ? -37 : 37), y: at["y"])
+
+    within(LIST) { assert_selector "h2", text: /posts · 0/i }
+    assert_equal "", graph["data-selected"], "the press was the pill's: it opened the list and selected nothing"
   end
 
   # Pages spec, decision 6: a site with more than 3,000 lines opens around
@@ -5597,8 +5959,8 @@ end
   - "The modules and what each owns": `ids.js`, `graph_data.js`, `marks.js`; the worker's `kind`, `anchor`, `held`, `add`;
   - the looks: the five states and that warn means "scheduled" in all of them, a ring type as its mark inside a ring, the hubs (a type's, "All posts", a retired type's), the pill, the corners, the lines' five styles (the Lists line's round dots; a hub's faint `brings` lines, which only a page's local view has), the label order and `free`, and the hit test's boxes;
   - "Selecting, and the card": a page's and a type's card; the chip's second part and where its date comes from (`change_at` from the query, `change_on` from the controller); "+N more";
-  - the legend: the toggles, and the status key as `Admin::Ui::MenuComponent`'s list popover, which the graph's script neither opens nor resets; the canvas's summary and its three forms;
-  - the list: four groups, the tree order, the "Post types" group (and that its rows' look is provisional until the design system's owner has answered), "Not listed on any page", rows not in view and their name, the error line with "Try again";
+  - the legend: the toggles, and the status key as a dialog of its own (`StatusKeyComponent`, outside the graph's element, in the chip's words), which the graph's script neither opens nor resets; the canvas's summary and every form of it;
+  - the list: four groups, the tree order, the "Post types" group (a row's mark `hubMark`, its number the type's posts, the order the data's), "Not listed on any page", rows not in view and their name, the error line with "Try again";
   - the address: `everything=1` taken out once the whole graph is drawn, by Turbo's history, and why it is asked again on `turbo:load`;
   - "Testing it": `graphPosition`, `marks_drawn`, `lines_drawn`, `toggle`, and that a toggle's effect is read without `await_graph`.
   The file's first line ("Describes: …") gains nothing: the directories are the same.
@@ -5610,14 +5972,14 @@ end
   - The graph's data costs a fixed number of statements, thirteen for the global view, whatever the number of pages and posts (`test/queries/post_graph/global_test.rb`: "the global graph costs thirteen statements", "the statement count is the same for 3 pages and for 30, and for 3 posts and for 30"); a new read of pages or posts for the graph goes into `PostGraph::Site`, not into a loop.
   - "Not listed on any page" and a page's `listed_count` are true for the viewer, not for the site: they are computed from the pages and posts the viewer may read, because saying more would disclose a page (`test/queries/post_graph/rows_test.rb`: "unlisted is true for the viewer: a post only a page they cannot read lists is a row, and a trashed post is none").
   - A node's id is its kind and its database id everywhere (`post-12`), written by `PostGraph.node_id` and taken apart only in `mind_graph/ids.js`.
-  - The legend's counts and the toggles' names are the script's and are taken back in `reset()`; the checkboxes' state is the person's and is kept (`test/system/admin/mind_graph_test.rb`: "Back to the graph draws it once, with the filter the control shows"). The status key is `Admin::Ui::MenuComponent`'s list popover and not the graph's: its own controller closes it, and `reset()` does not touch it.
-  - A hub's line to a post (`brings`) exists only in a page's local view; in the whole graph a type node joins only pages, and no lists line joins a page to a post anywhere (`test/queries/post_graph/global_test.rb`: "a type node joins only the pages that list it, never a post of its type"; `test/queries/post_graph/local_test.rb`: "depth 2 around a page draws the twenty newest posts it lists, each joined to the hub that brings it in, and counts the rest behind more").
+  - The legend's counts and the toggles' names are the script's and are taken back in `reset()`; the checkboxes' state is the person's and is kept (`test/system/admin/mind_graph_test.rb`: "Back to the graph draws it once, with the filter the control shows"). The status key is a dialog outside the graph's element and not the graph's: `reset()` does not touch it, and its five names are the chip's words (`status_key.states` and `script.card.status` must be changed together).
+  - A hub's line to a post (`brings`) exists only in a page's local view; in the whole graph a type node joins only pages, and no lists line joins a page to a post anywhere (`test/queries/post_graph/global_test.rb`: "a type node joins only the pages that list it, never a post of its type"; `test/queries/post_graph/local_test.rb`: "depth 2 around a page draws the twenty newest posts it lists, each joined to the hub that brings it in, and counts the rest behind more"). "+N more" is one pill per target, each counting what its own target brings in ("a page with two list blocks has a pill per target, each on its own hub or tag with its own count, and a target that brings in nothing more has none").
   - A scheduled change's day reaches the card as `change_on`, written by the controller with `I18n.l` and the `admin.short` format from the query's `change_at`; no query and no script formats a date (`test/integration/admin/mind_graph_data_test.rb`: "a scheduled change's day is in the data as CS Studio's short date, and a node without one has no such key").
   - `everything=1` does not stay in the Mind graph's address: the script replaces the address through Turbo's history once the whole graph is drawn, so a reload opens a large site around Home again (`test/system/admin/mind_graph_test.rb`: "a site with too many lines opens around Home, says why, and Show everything draws the whole graph and is not kept in the address"). **No guard** for a link elsewhere that is built with `everything=1` and expected to last.
 
   And in the existing Mind graph rule, "search, graph, list" stays; add that the legend's toggles are part of the graph's column and come before the zoom buttons. In "Setup & Commands" nothing changes. Run `PGGSSENCMODE=disable bin/rails test test/lib` (the guards read `CLAUDE.md` and `docs/reference`: every identifier and test name written there must exist).
 
-- [ ] **Step 6: the roadmap.** In `docs/roadmap.md`: version 1's item 5 says step one is built (the date, the pull request once it has a number); a row under "Shipped" in the table's own form, naming this spec; the row "Mind graph, pages, step two: links in the text as lines …" stays under "Dashboard and CS Studio"; a new row there, "Mind graph: the look of a Post types row in the list", says it is built in the shape of a Tags row until the design system's owner has answered, and is removed when the answer is built; the row "Mind graph: saved positions …" is "Should" with the measured figure if Step 2 found more than three seconds, and otherwise says "measured on <date> at 200 pages and 2,000 posts: <figure> to rest, not needed".
+- [ ] **Step 6: the roadmap.** In `docs/roadmap.md`: version 1's item 5 says step one is built (the date, the pull request once it has a number); a row under "Shipped" in the table's own form, naming this spec; the row "Mind graph, pages, step two: links in the text as lines …" stays under "Dashboard and CS Studio"; the row "Mind graph: saved positions …" is "Should" with the measured figure if Step 2 found more than three seconds, and otherwise says "measured on <date> at 200 pages and 2,000 posts: <figure> to rest, not needed".
 
 - [ ] **Step 7: the spec's "As built".** At the end of `docs/superpowers/specs/2026-10-12-pages-in-the-mind-graph-design.md`, a section "As built" (and the status line at the top says "built", with the branch): the measured table of Step 2 and how each figure was taken; every place the build left the text, each with its reason. Those this plan already knows:
   - `changes` in the data is `nil`, `"unpublished"` or `"scheduled"`, not a boolean: with `status` it names the fifth state, which a boolean could not; `Publishing::State.of` takes `pending_at:`.
@@ -5627,10 +5989,12 @@ end
   - The five status looks are tested against a recording context, and one of them from the canvas's pixels; the spec's "Testing" asked for all of them from pixels.
   - A local view around a page costs no walk statement; `Local` reads the tag links from the site, so its fixed part is the global view's thirteen.
   - The statement count is thirteen on a site with a page and a list block that names a tag; one or two fewer where there is nothing to ask.
-  - The list's "Post types" rows are built in the shape of a Tags row, and what the design system's owner answered to the open question about their look.
+  - A "+N more" pill is one per target; the payload's `more` is a list, a pill's id is `more-<target>`, and `listed` takes `target=`.
+  - The status key is CS Studio's modal dialog, where the third answers said "popover" and the fourth "a dialog".
+  - The chip is G4's row for the eye and H6's sentence for a screen reader.
   - In a page's local view a post a block lists by TAG has no faint line: its "Shares a tag" line to that tag is the line. A row added from "+N more" gets its hub's line through `via`.
   - The readings this plan made of the design answer (Task 5's second table; Task 6's and Task 7's lists), with what the design system's owner answered to each after looking at the drawing.
-  - The wording nobody gave (Task 6: "Status key", "Mind graph: nothing in view.", the singular of "more", the three other "… hidden." sentences; Task 7: "Post types · N" and a post type row's name), with what was answered.
+  - The wording nobody gave (Task 6: the singular of "more", the three other "… hidden." sentences and the three other "… lines hidden."; Task 7: "Post types · N" and a post type row's name), with what was answered; and the two points still open: a type name "capitalised by design", and what the summary says where a whole graph is cut at the 2,000 posts.
   - The canvas is named "Mind graph" before its data has come, the summary's first words, where the first text of the spec said "Graph of pages, posts and tags".
   - `LINKS.tree` as tuned.
 
@@ -5656,7 +6020,7 @@ git commit -m "docs: pages in the mind graph — the reference, the rules, the r
 | Spec | Task |
 |---|---|
 | "What changes" 1 (post looks), §4 status (warn means "scheduled"), ring types, type hubs, a retired type's hub, the "+N more" pill, the exact readings | 5 |
-| "What changes" 2, 3 (legend as controls, a line hides only lines), §6, decision 8; status not a filter and the "Status" popover; "What changes" 8 and the summary's three forms | 6 |
+| "What changes" 2, 3 (legend as controls, a line hides only lines), §6, decision 8; status not a filter and the "Status" key, a dialog; "What changes" 8 and the summary in all its forms | 6 |
 | "What changes" 4 (grouped search; the list's four groups), §3 search, §7 search | 7 |
 | "What changes" 5 (label colours, mono tags), §4 labels and priority | 5 |
 | "What changes" 6 (typed ids; `pages.read` or `posts.read`), decision 4, §2 | 1, 3 |
@@ -5677,12 +6041,13 @@ git commit -m "docs: pages in the mind graph — the reference, the rules, the r
 | §8 strings | 4, 5, 6, 7, 8 (each key written out) |
 | "Testing": the measurement | 9 |
 | "Documentation" | 9 |
-| The open design questions (a Post types row; the faint lines; a ring type's readings; the pill's width; the summary beyond its three forms; the key's name; the row's type name) | 7 (the row, provisional in a Tags row's shape); 3, 4, 5 (the lines); 5 (the readings, the pill); 6 (the summary, the key); 7 (the type name): each reported in its task |
+| The fourth answers, H1 to H7 (a pill per target; a Post types row; a ring type's hub and the retired hub's dashes; the pill's width and figure; the summary's other forms; the key as a dialog in the chip's words; a retired type's row name) | H1: 2, 3, 4, 5, 6, 8; H2: 3, 7; H3: 5; H4: 5; H5: 6; H6: 6, 8; H7: 7 |
+| What is still open (a type name capitalised by design; the summary at the 2,000-post cap) | 7 and 6: built the plain way, reported |
 
-No gap. Three things the spec leaves open and this plan settles, each reported in the task that builds it and written into "As built" (Task 9, Step 7): the form of `changes`; how the notice's figure reaches the view around Home; how `everything=1` leaves the address (Turbo's history, and again on `turbo:load`). The third design answers closed two that were open before: a retired type's hub and the look of "+N more" are the designer's now, and no provisional constant stands for either.
+No gap. Three things the spec leaves open and this plan settles, each reported in the task that builds it and written into "As built" (Task 9, Step 7): the form of `changes`; how the notice's figure reaches the view around Home; how `everything=1` leaves the address (Turbo's history, and again on `turbo:load`). The third and fourth design answers closed what was open before: a retired type's hub, the look and the number of the "+N more" pills, a "Post types" row and the status key are the designer's now, and no provisional constant stands for any.
 
 **2. Placeholder scan.** No "TBD", no "similar to Task N", no step that says to write tests without saying which. Where a step changes many lines by one rule (Task 1, Steps 1, 5 and 8; Task 6, Step 8's table) the rule, the command that finds the lines and the lines that are different are all given. Two expected values are derived in the test from the record instead of written as a literal, each with the reason (a page's path; a page's state after a block is added to it).
 
-**3. Type consistency.** `PostGraph.node_id(kind, id)` (Task 1) is the only writer of an id in Ruby, `recordId` the only reader in JavaScript. `Builder#plan` / `#build` / `#post_nodes` (Task 3) are called with the same keywords in `Global` (3), `Local` (3, 4) and `Rows` (4): `brought:` is `[[target, post_id]]` and `more:` carries `from:` in the builder (3) and in `Local` (4), and nothing passes `listed:` any more. `Listings#edges` is `[[page_id, target]]` in Tasks 2, 3 and 4, and `Listings#target_of(page_id, post_id)` (2) is what `Local#brought` and `Rows#listed`'s `via` (4) ask. The edge kind is `"brings"` in the builder (3), `LINE_STYLES` (5), `visible`'s `lineToggleOf` (6), `addPost` (7) and the worker's test (7). The payload's keys in Task 3's "Interfaces" are the ones `nodesOf` (5), `visible` and `counts` (6), the list (7) and the cards (8) read: `home`, `depth`, `order`, `parent`, `status`, `changes`, `change_on` (the controller's, from `change_at`), `child_count`, `listed_count`, `count`, `label`, `colour_index`, `page`, `via`. The theme's keys are `dim`, `warn`, `faint`, `line` in `theme.js`, `marks.js`, `renderer.js` and both recording themes of the module tests. `boxOf` (5) is what `radiusFor`, `collisionRadius`, the renderer's ring, the hit test's `boxes` and `addPost` (7) use. The checkboxes are `mind_graph_nodes` and `mind_graph_lines` in the component, the app, `reset()` and the tests; the status key is `#mind-graph-status-key` in the component, its test, the integration test and the browser test. The summary's keys are `mind_graph.script.summary.*` in the locale file, `messages_data` and `summarise` (6). `list.fail(line, { label, onRetry, focus })` and `list.focus()` are the list's (7) and `showRowsFrom`'s (7, 8). `ALL_POSTS_MARK` is `card.js`'s (7), used by the list (7) and the type's card (8). `cardNotes` takes `type` and `recordUrl` from Task 8 on; Tasks 1 to 7 leave its `postUrl`.
+**3. Type consistency.** `PostGraph.node_id(kind, id)` (Task 1) is the only writer of an id in Ruby, `recordId` the only reader in JavaScript. `Builder#plan` / `#build` / `#post_nodes` (Task 3) are called with the same keywords in `Global` (3), `Local` (3, 4) and `Rows` (4): `brought:` is `[[target, post_id]]` and `more:` is a list of `{ page_id:, target:, count: }` in the builder (3) and in `Local` (4), and nothing passes `listed:` or `from:` any more. A pill's id is `PostGraph.node_id(MORE, target)`, "more-type-blog", in the builder (3), `nodesOf` (5) and every test; the payload's `more` is a list in the builder (3), `nodesOf` (5), `summarise` (6, which adds the pills' counts) and the played payloads (8). `Listings#left_out` and `#left_out_of` (2) are what `Local` and `Rows#listed(page_id, target)` (4) ask, and `data-listed-url` carries `__TARGET__` (8). `Listings#edges` is `[[page_id, target]]` in Tasks 2, 3 and 4, and `Listings#target_of(page_id, post_id)` (2) is what `Local#brought` and `Rows#listed`'s `via` (4) ask. The edge kind is `"brings"` in the builder (3), `LINE_STYLES` (5), `visible`'s `lineToggleOf` (6), `addPost` (7) and the worker's test (7). The payload's keys in Task 3's "Interfaces" are the ones `nodesOf` (5), `visible` and `counts` (6), the list (7) and the cards (8) read: `home`, `depth`, `order`, `parent`, `status`, `changes`, `change_on` (the controller's, from `change_at`), `child_count`, `listed_count`, `count`, `label`, `colour_index`, `page`, `via`. The theme's keys are `dim`, `warn`, `faint`, `line` in `theme.js`, `marks.js`, `renderer.js` and both recording themes of the module tests. `boxOf` (5) is what `radiusFor`, `collisionRadius`, the renderer's ring, the hit test's `boxes` and `addPost` (7) use. The checkboxes are `mind_graph_nodes` and `mind_graph_lines` in the component, the app, `reset()` and the tests; the status key is `#mind-graph-status-key` everywhere. The summary's keys are `mind_graph.script.summary.*` in the locale file, `messages_data` and `summarise` (6). `list.fail(line, { label, onRetry, focus })` and `list.focus()` are the list's (7) and `showRowsFrom`'s (7, 8). `hubMark` is `card.js`'s (7), used by the list (7) and the type's card (8), on the stylesheet's `.mg-hub` (7). `moreWidth` and `boxOf` are `marks.js`'s (5), and the app writes a pill's `width` (5). The key is `Admin::MindGraphScreen::StatusKeyComponent` with `ID` "mind-graph-status-key" in the component, the legend's trigger, the view and the three kinds of test (6); its two long names are the chip's sentences without the day (6, 8). `cardNotes` takes `type` and `recordUrl` from Task 8 on; Tasks 1 to 7 leave its `postUrl`.
 
-**4. Review Focus.** Each of the eleven lines names its tests, and each test is written in the task that owns the code: 1 in Tasks 2, 3 and 7; 2 in Task 2 (and Task 3 for the retired type's node); 3 in Tasks 3 and 8; 4 in Task 6; 5 in Tasks 7 and 8; 6 in Task 4; 7 in Task 7; 8 in Task 7; 9 in Task 6; 10 in Tasks 3, 4, 6 and 8; 11 in Task 8.
+**4. Review Focus.** Each of the thirteen lines names its tests, and each test is written in the task that owns the code: 1 in Tasks 2, 3 and 7; 2 in Task 2 (and Task 3 for the retired type's node); 3 in Tasks 3 and 8; 4 in Task 6; 5 in Tasks 7 and 8; 6 in Task 4; 7 in Task 7; 8 in Task 7; 9 in Task 6; 10 in Tasks 3, 4, 6 and 8; 11 in Task 8; 12 in Tasks 2, 4 and 8; 13 in Tasks 5 and 8.
