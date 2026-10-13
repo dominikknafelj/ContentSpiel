@@ -13,6 +13,9 @@
 //     "everything" means no cap, not no filters
 //   nothing in view   "Mind graph: nothing to show. All types are hidden." (every kind is off)
 //                     "Mind graph: nothing to show. No pages, posts or tags yet." (there is nothing)
+//                     "Mind graph: nothing to show. 2 posts have no connections yet." (posts, and no
+//                       connection among them: the notice's own sentence. A READING: neither of
+//                       the designer's two is true there, and the notice says this beside it)
 //
 // A kind with nothing in view is left out. "N of M posts" and the "more"
 // sentence are a page's that lists more than its view draws: M is the
@@ -57,7 +60,11 @@ export function summaryOf({ nodes, visibleNodes, lines, data, off, toggles, arou
   const sentences = []
   if (kinds.length === 0) {
     sentences.push(text.t("mind_graph.script.summary.nothing"))
-    if (nodes.length === 0) sentences.push(text.t("mind_graph.script.summary.none_yet"))
+    // Nothing to draw. Either there is nothing, or every post there is has
+    // no connection: then the notice over the canvas says so, and this says
+    // the same in the same words, not that there are no posts.
+    if (nodes.length === 0 && data.isolated > 0) sentences.push(text.t("mind_graph.script.isolated_only", { count: data.isolated, figure: number(data.isolated) }))
+    else if (nodes.length === 0) sentences.push(text.t("mind_graph.script.summary.none_yet"))
     else if (allOff) sentences.push(text.t("mind_graph.script.summary.all_hidden"))
   } else if (focus) {
     sentences.push(text.t("mind_graph.script.summary.local", { title: focus.title, depth: focus.depth, kinds: series(kinds) }))

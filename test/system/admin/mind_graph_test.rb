@@ -346,6 +346,54 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert screen_position(home)
   end
 
+  # A TOGGLE IS A FILTER ON WHAT IS DRAWN, NOT A NEW LAYOUT (the ruling on
+  # Task 6's review, which departs from spec §5). The layout is computed once
+  # over everything the data holds: switching a kind or a kind of line off or
+  # on sends the worker nothing, warms nothing up, and leaves every node --
+  # shown or hidden -- exactly where it was, so what is switched back on
+  # comes back where it was and nothing that stays leaves the view.
+  test "a toggle moves nothing: after each of the eight, off and on again, every node is where it was and the layout was told nothing" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    a, b, c = 3.times.map { |i| create_post(title: "P#{i}") }
+    PostRelation.create!(post: a, related_post: b)
+    [ b, c ].each { |post| PostTag.create!(post: post, tag: Tag.find_or_create_by!(name: "t")) }
+    ids = [ home, blog, a, b, c, Tag.find_by!(name: "t") ].map { |record| nid(record) } + [ "type-blog" ]
+    visit admin_mind_graph_path
+    await_graph
+    places = -> { page.evaluate_script("#{ids.to_json}.map((id) => { const at = document.querySelector(#{GRAPH.to_json}).mindGraph.graphPosition(id); return [ at.x, at.y ] })") }
+    on_screen = -> { ids.map { |id| screen_position(id) } }
+    before = places.call
+    seen = on_screen.call
+    box = canvas_box
+    assert_equal 7, before.uniq.size, "the layout has not placed the nodes apart"
+    record_worker_messages
+
+    [ "Pages", "Posts", "Tags", "Post types", "Tree", "Lists", "Related", "Shares a tag" ].each do |name|
+      shown = [ graph["data-nodes"], graph["data-edges"] ]
+      toggle name
+      assert_no_selector "#{GRAPH}[data-nodes='#{shown[0]}'][data-edges='#{shown[1]}']"
+      await_frames
+      assert_equal before, places.call, "#{name} off moved a node"
+      assert_selector "#{GRAPH}[data-settled]"
+      on_screen.call.each_with_index do |point, index|
+        next unless point
+
+        assert_equal seen[index], point, "#{name} off: #{ids[index]} is drawn somewhere else"
+        assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{name} off: #{ids[index]} left the view"
+      end
+
+      toggle name
+      assert_selector "#{GRAPH}[data-nodes='7'][data-edges='5'][data-settled]"
+      await_frames
+      assert_equal before, places.call, "#{name} on again moved a node"
+      assert_equal seen, on_screen.call, "#{name} on again: a node did not come back where it was"
+    end
+
+    assert_equal [], worker_messages, "a toggle sent the layout a message"
+  end
+
   # The legend by the keyboard: a toggle is a checkbox, a Tab stop that Space
   # switches, and the graph follows it as it follows a click.
   test "Space on a focused toggle switches it" do
@@ -397,7 +445,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "Escape closed the key and nothing of the graph"
   end
 
-  test "a kind switched off takes the selection, the pins and the hover of its nodes with it, and switched on again brings the node back unpinned" do
+  test "a kind switched off takes the selection and the card of its node with it, and switched on again the node is back where it was, pinned as it was and not selected" do
     blog = create_page(title: "Blog")
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
@@ -407,17 +455,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     click_node(nid(blog))
     assert_equal [ nid(blog), "1" ], [ graph["data-selected"], graph["data-pinned"] ]
+    dropped = screen_position(nid(blog))
 
     toggle "Pages"
 
-    assert_selector "#{GRAPH}[data-selected=''][data-pinned='0'][data-hovered='']"
+    assert_selector "#{GRAPH}[data-selected=''][data-pinned='1'][data-hovered='']"
     assert_no_selector "[data-mind-graph-card]", visible: :visible
-    assert_no_button "Release 1 pinned"
+    assert_nil screen_position(nid(blog))
 
     toggle "Pages"
-    await_graph
-    assert screen_position(nid(blog)), "the page did not come back"
-    assert_equal "0", graph["data-pinned"], "a pin came back with the node"
+    assert_selector "#{GRAPH}[data-selected=''][data-pinned='1']"
+    assert_equal dropped, screen_position(nid(blog)), "the page did not come back where it was dropped"
   end
 
   test "with every kind off nothing is drawn and the list says so" do
@@ -463,6 +511,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # Nothing is drawn, so there are no "other" posts: the plain sentence.
     assert_text "2 posts have no connections yet."
     assert_no_text "other posts"
+    # The canvas's name says what the notice says, not that there are no posts.
+    assert_selector "#{CANVAS}[aria-label='Mind graph: nothing to show. 2 posts have no connections yet.']"
     assert_equal "0", graph["data-nodes"]
   end
 
@@ -1045,7 +1095,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_selector CANVAS, count: 1
     # The swatches are drawn again in the restored page: a snapshot keeps a
     # canvas and none of its pixels.
-    await_js("Array.from(document.querySelectorAll(#{"#{GRAPH} canvas[data-swatch]".to_json})).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))")
+    # So are the Status key's, outside the graph's element: the whole body is
+    # the snapshot's.
+    drawn = ->(selector) { "Array.from(document.querySelectorAll(#{selector.to_json})).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))" }
+    assert_equal [ 6, 5 ], page.evaluate_script("[ document.querySelectorAll(#{"#{GRAPH} canvas[data-swatch]".to_json}).length, document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]').length ]")
+    await_js(drawn.call("#{GRAPH} canvas[data-swatch]"))
+    await_js(drawn.call("#mind-graph-status-key canvas[data-swatch]"))
     assert_equal 1, page.evaluate_script("window.graphFetches")
     box = canvas_box
     [ a, b ].each do |post|
@@ -1085,11 +1140,18 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     before = pixels_of(posts.first).first
     draws = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.draws()")
     theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
+    # A swatch is a canvas too: it holds colours, not tokens, so the
+    # legend's and the Status key's are drawn again with the theme (the key
+    # is a closed dialog outside the graph's element, with its own painter).
+    swatches = "Array.from(document.querySelectorAll('[data-mind-graph-legend] canvas[data-swatch], #mind-graph-status-key canvas[data-swatch]'), (canvas) => canvas.toDataURL())"
+    await_js("#{swatches}.length === 11 && document.querySelector('#mind-graph-status-key canvas').getContext('2d').getImageData(0, 0, 18, 18).data.some((value) => value > 0)")
+    painted = page.evaluate_script(swatches)
     begin
       page.execute_script("document.documentElement.setAttribute('data-theme', #{(theme == "dark" ? "light" : "dark").to_json})")
       await_js("document.querySelector(#{GRAPH.to_json}).mindGraph.draws() > #{draws}")
 
       assert_not_equal before, pixels_of(posts.first).first, "the post's dot kept the other theme's colour"
+      await_js("(() => { const before = #{painted.to_json}; return #{swatches}.every((drawing, index) => drawing !== before[index]) })()")
     ensure
       page.execute_script("document.documentElement.setAttribute('data-theme', #{theme.to_json})")
     end
@@ -1466,7 +1528,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # Pins are for nodes on screen: the filter keeps those of the nodes that
   # stay (and the node stays put through the new layout) and forgets those of
   # the nodes it hides.
-  test "a filter change keeps the pins of the nodes that remain and forgets the others" do
+  test "a toggle keeps every pin, also of a node it hides, which comes back pinned where it was dropped" do
     a, b, c = 3.times.map { |i| create_post(title: "P#{i}") }
     PostRelation.create!(post: a, related_post: b)
     [ b, c ].each { |post| PostTag.create!(post: post, tag: Tag.find_or_create_by!(name: "t")) }
@@ -1474,22 +1536,21 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    dropped = drag_node(a, by: [ 70, -60 ])
+    drag_node(a, by: [ 70, -60 ])
     drag_node(tag_id, by: [ -60, 50 ])
     assert_equal "2", graph["data-pinned"]
     await_graph
+    dropped = [ screen_position(a), screen_position(tag_id) ]
 
     toggle "Tags"
-    assert_equal "1", graph["data-pinned"], "the hidden tag's pin was kept"
-    assert_button "Release 1 pinned"
-    await_graph
-    at = screen_position(a)
-    assert_in_delta dropped["x"], at["x"], 2, "a pinned node that the filter still shows moved"
-    assert_in_delta dropped["y"], at["y"], 2
+    assert_selector "#{GRAPH}[data-nodes='3'][data-pinned='2'][data-settled]"
+    assert_button "Release 2 pinned"
+    assert_nil screen_position(tag_id)
+    assert_equal dropped[0], screen_position(a), "a pinned node that is still shown moved"
 
     toggle "Tags"
-    await_graph
-    assert_equal "1", graph["data-pinned"], "a pin came back with the node"
+    assert_selector "#{GRAPH}[data-nodes='4'][data-pinned='2'][data-settled]"
+    assert_equal dropped, [ screen_position(a), screen_position(tag_id) ], "the tag did not come back where it was dropped"
   end
 
   # Pins live in the page that made them. Turbo's snapshot holds the count and

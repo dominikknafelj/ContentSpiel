@@ -1406,6 +1406,54 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ (0..6).to_a, [] ], shown["noLines"], "with every line off every node is still there"
   end
 
+  # THE WHOLE MATRIX: every combination of the four kinds and the four kinds
+  # of line, 256 of them, each held to the rule in the test's own words
+  # (worked out in the page, in one call; the answer is the combinations
+  # that broke a rule, with which). The site has every kind of node and of
+  # line, a pill and both of a hub's faint lines, and Home.
+  MATRIX = <<~JS.freeze
+    (() => {
+      const nodes = [ { id: "page-1", kind: "page", home: true, depth: 0 }, { id: "page-2", kind: "page", depth: 1 }, { id: "post-1", kind: "post" }, { id: "post-2", kind: "post" },
+                      { id: "tag-1", kind: "tag" }, { id: "type-blog", kind: "type" }, { id: "more-type-blog", kind: "more" } ]
+      const edges = [ { kind: "tree", source: 1, target: 0 }, { kind: "lists", source: 1, target: 5 }, { kind: "lists", source: 1, target: 4 }, { kind: "brings", source: 5, target: 6 },
+                      { kind: "related", source: 2, target: 3 }, { kind: "tag", source: 2, target: 4 }, { kind: "tag", source: 3, target: 4 }, { kind: "brings", source: 5, target: 2 } ]
+      const kinds = [ "page", "post", "tag", "type" ], lines = [ "tree", "lists", "related", "tag" ]
+      const toggle = (node) => (node.kind === "more" ? "post" : node.kind)
+      const lineToggle = (edge) => (edge.kind === "brings" ? "lists" : edge.kind)
+      const held = JSON.stringify(m.counts(nodes, edges))
+      const before = JSON.stringify([ nodes, edges ])
+      const broken = []
+      let combinations = 0
+      for (let bits = 0; bits < 256; bits += 1) {
+        combinations += 1
+        const on = { nodes: new Set(kinds.filter((_, index) => bits & (1 << index))), lines: new Set(lines.filter((_, index) => bits & (16 << index))) }
+        const shown = m.visible({ nodes, edges, on })
+        const said = (what) => broken.push([ bits, what ])
+        const drawn = new Set(shown.visibleNodes)
+        nodes.forEach((node, index) => { if (drawn.has(index) !== on.nodes.has(toggle(node))) said(`node ${node.id}`) })
+        edges.forEach((edge, index) => {
+          const expected = on.lines.has(lineToggle(edge)) && on.nodes.has(toggle(nodes[edge.source])) && on.nodes.has(toggle(nodes[edge.target]))
+          if (shown.visibleEdges.includes(index) !== expected) said(`edge ${index}`)
+        })
+        if (shown.visibleEdges.some((index) => !drawn.has(edges[index].source) || !drawn.has(edges[index].target))) said("a line to a hidden node")
+        if (JSON.stringify(m.counts(nodes, edges)) !== held) said("the counts moved")
+        if (JSON.stringify([ nodes, edges ]) !== before) said("the data was changed")
+        if (m.anchorOf({ pages: nodes.filter((node) => node.kind === "page") }) !== "page-1") said("the anchor")
+        if (drawn.has(0) !== on.nodes.has("page")) said("Home")
+        if (shown.order.some((index) => !drawn.has(index)) || Array.from(shown.free).some((index) => !drawn.has(index))) said("a label for a hidden node")
+        if (shown.order.includes(6)) said("the pill has a label")
+      }
+      return { combinations, broken }
+    })()
+  JS
+
+  test "graph data: over every combination of the four kinds and the four kinds of line a hidden kind's nodes and lines are gone, a line needs both its ends and its own kind, the counts and the anchor stay" do
+    result = js_module("mind_graph/graph_data", MATRIX)
+
+    assert_equal 256, result["combinations"]
+    assert_equal [], result["broken"].first(5), "#{result["broken"].size} combinations broke a rule (bits: page, post, tag, type, then tree, lists, related, tag)"
+  end
+
   test "graph data: what is shown comes with the order of its labels and the free set, and the pill has no label" do
     shown = js_module("mind_graph/graph_data", GRAPH_DATA)
 
@@ -1486,6 +1534,31 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal "Mind graph: nothing to show. All types are hidden.", all, "every kind is off: that is said once, and no line is named"
     assert_equal "Mind graph: nothing to show. No pages, posts or tags yet.", none, "nothing to draw: no toggle is named"
     assert_equal "Mind graph around Blog, depth 2: 2 pages and 1 post type. Posts hidden.", pills, "the pill goes with the posts: neither N of M nor more is said"
+  end
+
+  # A viewer with fewer than four toggles (`PostGraph::Kinds`): "all" is all
+  # of THEIRS. And the one case neither of the designer's two sentences is
+  # true of: nothing is drawn because no post has a connection. The summary
+  # then says what the notice over the canvas says, in the notice's words,
+  # so a screen reader does not hear "No pages, posts or tags yet." beside
+  # "2 posts have no connections yet.".
+  test "summary: with every toggle a viewer has switched off all types are hidden, and unconnected posts are not no posts" do
+    posts = node_set(posts: 3, tags: 1)
+    two_off, one_off, three_of_three, isolated, one_isolated, empty = summaries(
+      { nodes: posts, visible: [], lines: 0, data: WHOLE, off: { nodes: %w[post tag], lines: [] }, toggles: 2 },
+      { nodes: posts, visible: [ 3 ], lines: 0, data: WHOLE, off: { nodes: %w[post], lines: [] }, toggles: 2 },
+      { nodes: node_set(pages: 2, tags: 1, types: 1), visible: [], lines: 0, data: WHOLE, off: { nodes: %w[page tag type], lines: %w[tree] }, toggles: 3 },
+      { nodes: [], lines: 0, data: { shown: 0, total: 0, isolated: 2 } },
+      { nodes: [], lines: 0, data: { shown: 0, total: 0, isolated: 1 }, off: { nodes: %w[tag], lines: [] } },
+      { nodes: [], lines: 0, data: { shown: 0, total: 0, isolated: 0 } }
+    )
+
+    assert_equal "Mind graph: nothing to show. All types are hidden.", two_off
+    assert_equal "Mind graph: 1 tag, 0 connections. Showing everything. Posts hidden.", one_off, "one of two is not all"
+    assert_equal "Mind graph: nothing to show. All types are hidden.", three_of_three
+    assert_equal "Mind graph: nothing to show. 2 posts have no connections yet.", isolated
+    assert_equal "Mind graph: nothing to show. 1 post has no connections yet.", one_isolated
+    assert_equal "Mind graph: nothing to show. No pages, posts or tags yet.", empty
   end
 
   test "summary: the view the 3,000-line rule opened says where it is and what the site holds, and no other view does" do
@@ -2131,19 +2204,19 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   # The canvas's name for each given case, in the locale file's words. A
   # case: `nodes`, `visible` (indexes; every node unless given), `lines`,
-  # `data`, `off` (nothing unless given), `around_home`. The viewer has all
-  # four toggles.
+  # `data`, `off` (nothing unless given), `around_home`, `toggles` (how many
+  # kinds the viewer has a toggle for: four unless given).
   def summaries(*cases)
     keys = I18n.t("admin.mind_graph.script.summary").flat_map { |key, value| value.is_a?(Hash) && !value.key?(:other) ? value.keys.map { |inner| "#{key}.#{inner}" } : [ key ] }
-    messages = Class.new { include Admin::MessagesHelper }.new.messages_data("mind_graph.script.capped", *keys.map { |key| "mind_graph.script.summary.#{key}" })
-    given = cases.map { |one| { visible: one[:nodes].each_index.to_a, off: ALL_ON, around_home: false }.merge(one) }
+    messages = Class.new { include Admin::MessagesHelper }.new.messages_data("mind_graph.script.capped", "mind_graph.script.isolated_only", *keys.map { |key| "mind_graph.script.summary.#{key}" })
+    given = cases.map { |one| { visible: one[:nodes].each_index.to_a, off: ALL_ON, around_home: false, toggles: 4 }.merge(one) }
     result = page.evaluate_async_script(<<~JS, messages, given)
       const [json, cases, done] = arguments
       Promise.all([ import("mind_graph/summary"), import("i18n/messages") ]).then(([ { summaryOf }, { messages } ]) => {
         const holder = document.createElement("div")
         holder.setAttribute("data-messages", json)
         const tools = { text: messages(holder), number: (value) => new Intl.NumberFormat("en").format(value) }
-        done(cases.map((one) => summaryOf({ nodes: one.nodes, visibleNodes: one.visible, lines: one.lines, data: one.data, off: one.off, toggles: 4, aroundHome: one.around_home }, tools)))
+        done(cases.map((one) => summaryOf({ nodes: one.nodes, visibleNodes: one.visible, lines: one.lines, data: one.data, off: one.off, toggles: one.toggles, aroundHome: one.around_home }, tools)))
       }).catch((error) => done({ error: String(error) }))
     JS
     flunk "summary: #{result["error"]}" if result.is_a?(Hash)

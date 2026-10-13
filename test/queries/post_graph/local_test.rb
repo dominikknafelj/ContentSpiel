@@ -156,21 +156,34 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert_equal({ pages: Page.count, posts: Post.count, tags: PostTag.distinct.count(:tag_id) }, result[:site])
   end
 
+  # What the call in the test below costs, exactly (depth 1 around a page
+  # that lists one tag, for a narrowed viewer): the site's five, the tags
+  # blocks name, and the pages' addresses, notes and pending copies. The
+  # site's counts are sizes of rows already loaded, so a count that asked
+  # the database would make it ten.
+  SITE_STATEMENTS = 9
+
   # Design answer H5: "The site has 212 pages, 2,040 posts and 64 tags." is
   # said of what the VIEWER can read, from the site's rows.
-  test "the site's counts are the viewer's: the pages and posts of their scope, the tags those posts carry, nothing in the trash, and no statement more" do
+  test "the site's counts are the viewer's: the pages and posts of their scope, the tags those posts carry or those pages list, nothing in the trash, and no statement more" do
     tree
     author = users(:author)
     PostTag.create!(post: Post.create!(title: "Other", slug: "other", content_type: "blog", author: users(:one)), tag: Tag.find_or_create_by!(name: "not-the-authors"))
     mine = Post.create!(title: "Mine", slug: "mine", content_type: "blog", author: author)
     PostTag.create!(post: mine, tag: Tag.find_or_create_by!(name: "the-authors"))
+    # A tag only a page lists is drawn for whoever reads the page, so it is
+    # one of the site's tags for them: one such tag on a page the author
+    # reads, one on a page they do not.
+    listed, unseen = %w[only-listed listed-out-of-scope].map { |name| Tag.find_or_create_by!(name: name) }
+    list_block(@guide, tag: listed.name)
+    list_block(@blog, tag: unseen.name)
     access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ @guide.id ] })
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
     access_control_grants(:author_posts_create).update!(scope: { "own" => true })
     focus = as(author) { page_focus(@guide, actor: author) }
     counts = lambda do
       posts = AccessControl.scope(author, "posts.read", Post.all)
-      { pages: AccessControl.scope(author, "pages.read", Page.all).count, posts: posts.count, tags: PostTag.where(post_id: posts.select(:id)).distinct.count(:tag_id) }
+      { pages: AccessControl.scope(author, "pages.read", Page.all).count, posts: posts.count, tags: (PostTag.where(post_id: posts.select(:id)).distinct.pluck(:tag_id) | [ listed.id ]).size }
     end
     site = -> { as(author) { local(focus, actor: author) }[:site] }
 
@@ -178,14 +191,18 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert_equal scoped, site.call
     assert_operator scoped[:pages], :<, Page.count, "the scope must leave a page out, or this holds nothing"
     assert_operator scoped[:posts], :<, Post.count
-    assert_operator scoped[:tags], :<, PostTag.distinct.count(:tag_id)
+    assert_operator scoped[:tags], :<, Tag.count - 1, "a tag out of the scope must exist besides the one a hidden page lists"
     assert_operator scoped.values.min, :>, 0
+    assert_equal 2, scoped[:tags], "the tag the author's post carries and the one their page lists; not the one a page they cannot read lists"
 
-    statements = as(author) { capture_sql { local(focus, actor: author) } }.size
-    assert_operator statements, :<=, 9, "the ceiling of depth 1 around a page is as it was: the counts ask nothing"
+    # The counts ask nothing (`SITE_STATEMENTS`, the exact figure).
+    statements = as(author) { capture_sql { local(focus, actor: author) } }
+    assert_equal SITE_STATEMENTS, statements.size, statements.join("\n")
     @intro.update_column(:trashed_at, Time.current) # version: none (a test's own row)
     mine.update_column(:trashed_at, Time.current) # version: none (a test's own row)
     assert_equal({ pages: scoped[:pages] - 1, posts: scoped[:posts] - 1, tags: scoped[:tags] - 1 }, site.call, "nothing in the trash is counted, nor a tag only a trashed post carries")
+    @guide.content_blocks.destroy_all
+    assert_equal 0, site.call[:tags], "nor a tag no page lists any more"
   end
 
   test "depth 2 around a page adds the grandparent, the siblings and the grandchildren, each with its tree line" do
@@ -442,6 +459,8 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert_operator @result[:more].size, :>=, 1
     assert_equal [ 9, 13 ], few
     assert_equal [ 9, 13 ], many
+    # The answer holds the site's counts at either size, for the same statements.
+    assert_equal({ pages: Page.count, posts: Post.count, tags: PostTag.distinct.count(:tag_id) }, @result[:site])
   end
 
   # The exact count at a plain shape, named: a page that lists NOTHING, on a
