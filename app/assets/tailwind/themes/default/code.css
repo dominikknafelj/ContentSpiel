@@ -8,17 +8,36 @@
    tokens for what is inside it (`sections.css`), so nothing here knows a
    band.
 
-   `min-width: 0` on the figure and `overflow-x: auto` on the `pre` are what
-   keep a long line inside the block, in a column of a section as at full
-   width: the line scrolls in the `pre` (which is focusable, so a keyboard
-   can scroll it) and the page never scrolls sideways.
+   `overflow-x: auto` on the `pre` is what keeps a long line inside the
+   block: the line scrolls in the `pre` (which is focusable, so a keyboard
+   can scroll it) and the page never scrolls sideways. In a column of a
+   section it is the column's own `min-width: 0` (`sections.css`) that keeps
+   the column from growing with the line; the figure is a block in both
+   places and needs no rule for it
+   (`test/system/code_block_test.rb` holds both at a phone's width).
+
+   THE HEAD STRIP is there only when it has something to show (design answer
+   C1). A head with nothing but the Copy button is `hidden` in the markup
+   and shown by the script; `display: flex` below would otherwise show it, so
+   the `[hidden]` rule is the block's own and depends on no reset. The `pre`
+   is a whole box by itself and gives its top edge and corners to a head that
+   is shown; the 1px line between them is the head's (C8).
+
+   `color-scheme` follows the theme's own switch (`data-theme` on the root),
+   so the `pre`'s scrollbar is drawn for the ground it is on. Selected text is
+   the accent with its own ink, the one pair of tokens that is a background
+   and a text colour made for each other, for every token inside the code:
+   a browser's default selection colour can leave a syntax colour unreadable.
 
    The seven `--th-syn-*` tokens are the theme's (`tokens.css`). A `color`
    whose token is not declared is invalid when computed and so the span
    inherits the code's ink: a role with no token reads as plain text. */
 .content-block--code {
-  min-width: 0;
   margin-block: 2.5rem;
+  color-scheme: light;
+}
+[data-theme="dark"] .content-block--code {
+  color-scheme: dark;
 }
 .content-block--code .code-head {
   display: flex;
@@ -26,12 +45,14 @@
   gap: var(--th-sp-3);
   padding: var(--th-sp-2) var(--th-sp-3);
   border: 1px solid var(--th-line);
-  border-bottom: 0;
   border-radius: var(--th-radius) var(--th-radius) 0 0;
   background: var(--th-sunken);
   font-family: var(--th-mono);
   font-size: var(--th-t-small);
   color: var(--th-dim);
+}
+.content-block--code .code-head[hidden] {
+  display: none;
 }
 .content-block--code .code-file {
   min-width: 0;
@@ -84,12 +105,21 @@
   white-space: pre;
   tab-size: 2;
   border: 1px solid var(--th-line);
-  border-radius: 0 0 var(--th-radius) var(--th-radius);
+  border-radius: var(--th-radius);
   background: var(--th-sunken);
   font-family: var(--th-mono);
   font-size: var(--th-t-small);
   line-height: 1.6;
   color: var(--th-ink);
+}
+.content-block--code .code-head:not([hidden]) + pre {
+  border-top: 0;
+  border-radius: 0 0 var(--th-radius) var(--th-radius);
+}
+.content-block--code pre::selection,
+.content-block--code pre ::selection {
+  background: var(--th-accent);
+  color: var(--th-on-accent);
 }
 .content-block--code figcaption {
   margin-top: var(--th-sp-2);

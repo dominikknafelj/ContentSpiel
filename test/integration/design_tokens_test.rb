@@ -141,11 +141,51 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes Rails.root.join("app/assets/tailwind/themes/default/theme.css").read, %(@import "./code.css";)
     refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, css)
     CodeHighlight::ROLES.each { |role| assert_match(/\.syn-#{role}\s*\{\s*color:\s*var\(--th-syn-#{role}\);/, css) }
-    assert_match(/\.content-block--code\s*\{[^}]*min-width:\s*0;/, css)
+    assert_no_match(/\.content-block--code\s*\{[^}]*min-width/, css, "the figure is a block wherever it is drawn: what keeps a column narrow is the column's own rule")
+    assert_match(/\.content-section__column\s*\{\s*min-width:\s*0;/, Rails.root.join("app/assets/tailwind/themes/default/sections.css").read)
     assert_match(/\.content-block--code pre\s*\{[^}]*overflow-x:\s*auto;[^}]*white-space:\s*pre;/m, css)
     assert_match(/\.content-block--code \.code-status\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;[^}]*overflow:\s*hidden;[^}]*clip-path:\s*inset\(50%\);/m, css,
       "the status line is hidden from sight by the block's own rule, so a theme's template needs no scanned utility")
     assert_match(/\.content-block--code \.code-head\s*\{[^}]*color:\s*var\(--th-dim\);/m, css, "meta on the sunken ground is 4.3:1 in the light theme; the head reads as dim")
+  end
+
+  # Design answers C1 and C8, each a rule on tokens.
+  test "the code block's head is hidden where it is bare and ruled off from the code, selected code is the accent pair, the scrollbar follows the theme and the focus ring is the accent" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/code.css").read.gsub(%r{/\*.*?\*/}m, "")
+    rule = ->(selector) { css[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
+
+    assert_match(/display:\s*none;/, rule.(".content-block--code .code-head[hidden]"), "a hidden head stays hidden although the head is a flex row")
+    head = rule.(".content-block--code .code-head")
+    assert_match(/border:\s*1px solid var\(--th-line\);/, head)
+    assert_no_match(/border-bottom/, head, "the 1px line under the strip is the head's own border")
+    assert_match(/border-top:\s*0;/, rule.(".content-block--code .code-head:not([hidden]) + pre"), "one line between the strip and the code, not two")
+    assert_match(/border:\s*1px solid var\(--th-line\);[^}]*border-radius:\s*var\(--th-radius\);/m, rule.(".content-block--code pre"), "without a strip the code is a whole box")
+
+    selection = rule.(".content-block--code pre::selection,\n.content-block--code pre ::selection")
+    assert_match(/background:\s*var\(--th-accent\);\s*color:\s*var\(--th-on-accent\);/m, selection)
+
+    assert_match(/color-scheme:\s*light;/, rule.(".content-block--code"))
+    assert_match(/color-scheme:\s*dark;/, rule.(%([data-theme="dark"] .content-block--code)))
+
+    ring = rule.(".content-block--code .code-head button:focus-visible,\n.content-block--code pre:focus-visible")
+    assert_match(/outline:\s*2px solid var\(--th-accent\);/, ring)
+    assert_no_match(/danger|warn/, css, "no answer of the button has a colour of its own: Not copied is as neutral as Copied")
+  end
+
+  # The strong band is the page inverted: what is written on its accent is
+  # the band's own colour, and a code block in it is the other scheme.
+  test "in a strong band the ink on the accent is the band's colour, readable on the band's accent, and a code block's scheme is the opposite one" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/sections.css").read
+
+    assert_match(/\.content-section--strong\s*\{[^}]*--th-on-accent:\s*var\(--th-band-strong\);/m, css)
+    assert_match(/^\.content-section--strong \.content-block--code\s*\{\s*color-scheme:\s*dark;/, css)
+    assert_match(/^\[data-theme="dark"\] \.content-section--strong \.content-block--code\s*\{\s*color-scheme:\s*light;/, css)
+    theme_tokens.each do |theme, tokens|
+      ratio = contrast(resolve_colour(tokens, "--th-band-strong"), resolve_colour(tokens, "--th-on-band-strong-accent"))
+      assert_operator ratio, :>=, 4.5, "selected code in a strong band (#{theme}) is #{ratio.round(2)}:1"
+      ratio = contrast(resolve_colour(tokens, "--th-accent"), resolve_colour(tokens, "--th-on-accent"))
+      assert_operator ratio, :>=, 4.5, "selected code on the page (#{theme}) is #{ratio.round(2)}:1"
+    end
   end
 
   private

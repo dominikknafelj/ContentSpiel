@@ -21,7 +21,8 @@ class Blocks::CodeComponentTest < ActiveSupport::TestCase
     block = code_block
     draw(block)
 
-    assert_selector "figure.content-block.content-block--code[data-controller='code-copy'][data-code-copy-copied-value='Copied'][data-code-copy-failed-value='Not copied']"
+    assert_selector "figure.content-block.content-block--code[data-controller='code-copy'][data-code-copy-label-value='Copy'][data-code-copy-copied-value='Copied'][data-code-copy-failed-value='Not copied']"
+    assert_selector ".code-head:not([hidden]):not([data-code-copy-target])", visible: :all
     assert_selector ".code-head .code-file#code-#{block.id}-file", text: "app/hi.rb"
     assert_selector ".code-head .code-language", text: "Ruby"
     assert_selector ".code-head button[type='button'][hidden][data-code-copy-target='button'][data-action='code-copy#copy'][aria-label='Copy code'][aria-describedby='code-#{block.id}-file']",
@@ -39,12 +40,39 @@ class Blocks::CodeComponentTest < ActiveSupport::TestCase
     assert_equal "", rendered_content.strip
   end
 
-  test "the head is drawn without a file name or a language: it holds the button, which then describes itself by nothing" do
+  # Design answer C1: a strip with nothing to show is not drawn. The server
+  # writes it `hidden`, with the button in it, as the script's `strip` target:
+  # the script shows the two together where it can copy, and a page without
+  # the script shows the code alone.
+  test "with no file name and no language the head is hidden in the markup and is the script's to show, with the button in it describing itself by nothing" do
     draw(code_block({ "filename" => nil, "language" => nil }))
 
-    assert_selector ".code-head button[data-code-copy-target='button']", visible: :all
+    assert_selector ".code-head[hidden][data-code-copy-target='strip'] button[hidden][data-code-copy-target='button']", visible: :all
+    assert_no_selector ".code-head", visible: :visible
     assert_no_selector ".code-file, .code-language, button[aria-describedby]", visible: :all
     assert_empty fragment.css("pre span"), "no language is plain text"
+    assert_equal "figure", fragment.at_css("pre").parent.name
+    assert_equal CODE, fragment.at_css("pre").text
+  end
+
+  test "a file name alone and a language alone each draw the head as it is: not hidden, not the script's, only the button hidden" do
+    [ { "language" => nil }, { "filename" => nil }, { "filename" => "  " } ].each do |settings|
+      draw(code_block(settings))
+
+      assert_selector ".code-head:not([hidden]):not([data-code-copy-target]) button[hidden]", visible: :all
+      assert_selector ".code-head > span:not(.code-status)", count: 1
+    end
+  end
+
+  # A stored language that is no longer on the list has no label: with no
+  # file name beside it there is nothing to show.
+  test "a language that is not on the list and no file name is a hidden head" do
+    block = code_block({ "filename" => nil })
+    block.update_columns(settings: block.settings.merge("language" => "cobol")) # version: none (a test writes the row a list that shrank would leave)
+
+    draw(block.reload)
+
+    assert_selector ".code-head[hidden][data-code-copy-target='strip']", visible: :all
   end
 
   test "source, file name and caption that look like markup are text: one pre, no script, no element the template did not write" do

@@ -12,10 +12,15 @@ module Blocks
   # class to the page (`test/components/blocks/code_component_test.rb`).
   # The file name and the caption are escaped text too.
   #
-  # The head is always drawn, since it holds the Copy button; the button is
-  # `hidden` in the markup and `code-copy` shows it where there is a
-  # clipboard, so without JavaScript the code is all there and only the
-  # button is missing.
+  # THE HEAD STRIP is drawn only when it has something to show (design
+  # answer C1): a file name or a language. With neither (`bare?`) the strip is
+  # in the markup `hidden`, holding nothing but the Copy button, and it is
+  # the script's `strip` target: `code-copy` shows it together with the
+  # button where there is a clipboard. So a page without JavaScript, or
+  # without a clipboard, shows the code alone and never an empty box, and
+  # the server never draws an empty strip that is seen. With a file name or
+  # a language the strip is drawn as it is and only the button is `hidden`
+  # until the script shows it.
   class CodeComponent < ApplicationComponent
     def initialize(block:, page:)
       @block = block
@@ -49,7 +54,15 @@ module Blocks
 
     def file_id = "code-#{block.id}-file"
 
-    # One of the block's four public strings, in the visitor's language where
+    # Nothing to show in the head but the button: see the class comment.
+    def bare? = filename.blank? && language_label.nil?
+
+    # `hidden`, and the script's to show, only for a head that is bare.
+    def head_attributes = bare? ? { hidden: true, data: { code_copy_target: "strip" } } : {}
+
+    # One of the block's four public strings (the button's word is handed to the
+    # script as well, as its `label` value, so the script never reads it back from
+    # the page), in the visitor's language where
     # `config/locales/public.<locale>.yml` has it, in English otherwise.
     def string(key)
       full = "public.blocks.code.#{key}"

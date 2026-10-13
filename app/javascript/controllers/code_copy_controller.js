@@ -4,12 +4,17 @@ import { Controller } from "@hotwired/stimulus"
 // A controller of the site's own, like `theme`: a public page loads it, and a
 // theme that replaces the block's template keeps the button by writing the
 // same markup (the identifier, the `button`, `source` and `status` targets,
-// the `copy` action, the two values).
+// the `copy` action, the three values, and the `strip` target on a head that
+// holds nothing but the button).
 //
 // The button is `hidden` in the markup and shown here only where there is a
 // clipboard to write to, so nobody sees a button that does nothing: a page
 // without JavaScript, or on plain http away from localhost, has the code
-// and no button.
+// and no button. A head strip with no file name and no language is `hidden`
+// in the markup too and is the `strip` target: it is shown and hidden with
+// the button, so nobody sees an empty strip either. Whether a strip is this
+// script's to show is said by the server (it is a target or it is not),
+// never read from the page.
 //
 // WHAT IS COPIED is the `source` target's `textContent`: the `pre`, whose
 // text is the code as stored and nothing else. The template writes nothing
@@ -18,36 +23,52 @@ import { Controller } from "@hotwired/stimulus"
 // `textContent` is the text of the nodes as they are, where `innerText`
 // would be what the layout made of them. So: no markup, the indentation,
 // tabs and blank lines as typed, and no line break added or lost at the end.
+// It is read BEFORE the clipboard is asked: only the clipboard's refusal is
+// "Not copied", and a template without the `source` target is an error in
+// the console, for the theme's author, and nothing the visitor is told.
 //
-// The words are the server's (`copied` and `failed` values), so this file
-// holds no English. `restore` is how long the answer stays, in milliseconds.
+// The words are the server's (`label`, `copied` and `failed` values), so
+// this file holds no English and the button's word at rest is never read
+// back from the page: an answer that lands in a page Turbo is about to copy
+// cannot become the word the button returns to, and `connect` writes the
+// word again, so a copy that kept "Copied" comes back saying "Copy". `restore` is how long the
+// answer stays, in milliseconds; the status line is emptied with it, so the
+// next press is announced again.
 //
-// EVERYTHING THIS WRITES INTO THE PAGE IS TAKEN BACK, at two moments, since
-// Turbo shows a copy of a page again on Back and this script would connect
-// to a button that says "Copied" and take that for its own word:
-//   - `turbo:before-cache`, before Turbo copies the page: the words only.
-//     The button stays, because Turbo also copies a page that is NOT left (a
-//     link to an anchor of the same page), and a button hidden there would
-//     be gone for good.
-//   - `disconnect`: the words, and the button hidden as the server drew it.
-// The copy is made a task after the first and the page is taken out of the
-// document about then, so either can come first; the first alone leaves the
-// button shown in the copy, which `connect` decides again anyway.
+// EVERYTHING THIS WRITES INTO THE PAGE IS TAKEN BACK before Turbo copies
+// the page, and when the script is taken off: the button's word, the status
+// line, and `hidden` on the button and on the strip, so the copy Turbo keeps
+// is what the server drew. Two moments, since either can come first:
+//   - `turbo:before-cache`, a task before Turbo copies the page;
+//   - `disconnect`.
+// Turbo also copies a page that is NOT left (a link to an anchor in it,
+// Back between two anchors), and what was hidden for the copy would then be
+// gone for good. So after `turbo:before-cache` the button and the strip are
+// PUT BACK, two tasks later, where the script is still connected. Two and
+// not one: Turbo makes its copy one task after the event
+// (`PageView#cacheSnapshot` awaits a zero timeout), and a timeout set here
+// in the event runs before Turbo's, one set from that one after it. Focus
+// that was on the button is put back with it.
+// `test/system/code_block_test.rb` holds this against Turbo's own
+// `cacheSnapshot`, which is where a change in Turbo's timing would show.
 //
-// The button and the status line are kept as fields and not read as targets
-// later: a controller taken off its element (the attribute removed) finds no
-// target any more, and `disconnect` has to reach both.
+// The button, the strip and the status line are kept as fields and not read
+// as targets later: a controller taken off its element (the attribute
+// removed) finds no target any more, and `disconnect` has to reach them.
 export default class extends Controller {
-  static targets = [ "button", "source", "status" ]
-  static values = { copied: String, failed: String, restore: { type: Number, default: 2000 } }
+  static targets = [ "button", "source", "status", "strip" ]
+  static values = { label: String, copied: String, failed: String, restore: { type: Number, default: 2000 } }
 
   connect() {
     this.button = this.buttonTarget
     this.status = this.hasStatusTarget ? this.statusTarget : null
-    this.label = this.button.textContent
-    this.button.hidden = !navigator.clipboard?.writeText
+    this.strip = this.hasStripTarget ? this.stripTarget : null
+    // A template that hands no `label` keeps the word it wrote on the button.
+    this.word = this.hasLabelValue ? this.labelValue : this.button.textContent
+    this.reset()
+    this.show(this.able)
 
-    this.rest = () => this.reset()
+    this.rest = () => this.beforeCache()
     document.addEventListener("turbo:before-cache", this.rest)
     this.live = true
   }
@@ -55,14 +76,16 @@ export default class extends Controller {
   disconnect() {
     this.live = false
     document.removeEventListener("turbo:before-cache", this.rest)
+    clearTimeout(this.putBack)
     this.reset()
-    this.button.hidden = true
+    this.show(false)
   }
 
   async copy() {
+    const text = this.sourceTarget.textContent
     let answer = this.copiedValue
     try {
-      await navigator.clipboard.writeText(this.sourceTarget.textContent)
+      await navigator.clipboard.writeText(text)
     } catch (error) {
       answer = this.failedValue
     }
@@ -82,7 +105,31 @@ export default class extends Controller {
 
   reset() {
     clearTimeout(this.timer)
-    this.button.textContent = this.label
+    this.button.textContent = this.word
     if (this.status) this.status.textContent = ""
+  }
+
+  // The button, and the strip where it is this script's.
+  show(shown) {
+    this.button.hidden = !shown
+    if (this.strip) this.strip.hidden = !shown
+  }
+
+  beforeCache() {
+    const focused = document.activeElement === this.button
+    this.reset()
+    this.show(false)
+    clearTimeout(this.putBack)
+    this.putBack = setTimeout(() => {
+      this.putBack = setTimeout(() => {
+        if (!this.live) return
+        this.show(this.able)
+        if (focused && this.able) this.button.focus({ preventScroll: true })
+      }, 0)
+    }, 0)
+  }
+
+  get able() {
+    return Boolean(navigator.clipboard?.writeText)
   }
 }
