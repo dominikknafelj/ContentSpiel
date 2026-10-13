@@ -128,6 +128,29 @@ class Blocks::CodeComponentTest < ActiveSupport::TestCase
     assert_equal CODE, fragment.at_css("pre").text
   end
 
+  # Fences of Markdown in Markdown, 650 deep: what overflowed a request's
+  # thread before the depth was counted (`test/values/code_highlight_test.rb`).
+  def nested_fences(levels = 650)
+    indents = Array.new(levels) { |index| index.zero? ? "" : index.to_s(2).tr("01", " \t") }
+    (indents.map { |indent| "#{indent}```md\n" } + [ "x\n" ] + indents.reverse.map { |indent| "#{indent}```\n" }).join
+  end
+
+  # Final re-review C1. Drawn on a thread, as a request draws it: on the main
+  # thread the stack is eight times as deep and the text simply lexes.
+  test "a Markdown block of fences nested hundreds deep is drawn as its text on a thread, and raises nothing" do
+    code = nested_fences
+    block = code_block({ "language" => "markdown", "filename" => nil, "code" => code })
+    html = nil
+
+    log = capture_log { html = Thread.new { render_inline(Blocks::CodeComponent.new(block: block, page: root_page)).to_html }.value }
+
+    drawn = Nokogiri::HTML5.fragment(html)
+    assert_equal code.delete_suffix("\n"), drawn.at_css("pre").text
+    assert_empty drawn.css("pre span")
+    assert_equal "Markdown", drawn.at_css(".code-language").text
+    assert_match(/CodeHighlight: the markdown lexer raised CodeHighlight::TooDeep for block #{block.id}; /, log)
+  end
+
   test "a lexer that raises still draws the code" do
     raising = Class.new { def self.lex(_code) = raise("boom") }
 

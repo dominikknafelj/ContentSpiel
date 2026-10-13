@@ -437,6 +437,27 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select ".content-section__column figure.content-block--code .code-language", text: "YAML"
   end
 
+  # Fences of Markdown in Markdown, 650 deep: what overflowed a request's
+  # thread before the depth was counted (`test/values/code_highlight_test.rb`).
+  def nested_fences(levels = 650)
+    indents = Array.new(levels) { |index| index.zero? ? "" : index.to_s(2).tr("01", " \t") }
+    (indents.map { |indent| "#{indent}```md\n" } + [ "x\n" ] + indents.reverse.map { |indent| "#{indent}```\n" }).join
+  end
+
+  # Final re-review C1: this page was a 500. The request is made on a thread,
+  # as a server makes it; an integration test's own thread is the main one,
+  # whose stack is deep enough for the text to lex.
+  test "a page that holds a Markdown block of fences nested hundreds deep answers 200 with the code as text, on a thread" do
+    code = nested_fences
+    @root.content_blocks.create!(block_type: :code, position: 0, settings: { "language" => "markdown", "code" => code })
+
+    Thread.new { get "/" }.join
+
+    assert_response :success
+    assert_equal code.delete_suffix("\n"), Nokogiri::HTML5(response.body).at_css("figure.content-block--code pre").text
+    assert_select "figure.content-block--code pre span", count: 0
+  end
+
   test "a code block on a live page is read from its published copy: a save shows nothing until it is published, and counts as a change" do
     page = create_page(title: "Docs")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "code", settings: { "language" => "ruby", "code" => "first = 1" } }).record

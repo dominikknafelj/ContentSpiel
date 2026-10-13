@@ -214,6 +214,82 @@ class CodeHighlightTest < ActiveSupport::TestCase
     end
   end
 
+  # Fences that name Markdown again, each with another indentation, so each
+  # is a fence inside the one before: `levels` lexers, one inside the other.
+  def nested_fences(levels)
+    indents = Array.new(levels) { |index| index.zero? ? "" : index.to_s(2).tr("01", " \t") }
+    raise "two levels share an indentation" unless indents.uniq.size == levels
+
+    (indents.map { |indent| "#{indent}```md\n" } + [ "x\n" ] + indents.reverse.map { |indent| "#{indent}```\n" }).join
+  end
+
+  # Final re-review C1. A request runs on a thread, whose stack is an eighth
+  # of the main thread's: 500 nested fences overflowed it in 50 ms, long
+  # before the deadline, and `SystemStackError` is no `StandardError`, so it
+  # left `lines` and the public page was a 500. On the main thread the same
+  # text lexes, which is why this test lexes inside a thread.
+  test "nested fences are cut at a small depth and drawn plain, on a thread as a request runs on, and nothing overflows" do
+    code = nested_fences(650)
+    assert_operator code.length, :<=, CodeHighlight::MAX_CHARACTERS
+    assert_equal 8, CodeHighlight::MAX_DEPTH
+
+    with_memory_cache do
+      answer = nil
+      log = capture_log { answer = Thread.new { CodeHighlight.lines(code, "markdown", block_id: 44) }.value }
+
+      assert_equal CodeHighlight.lines(code, nil), answer
+      assert_match(/CodeHighlight: the markdown lexer raised CodeHighlight::TooDeep for block 44; drawn as plain text for 5 minutes/, log)
+      assert Rails.cache.read(CodeHighlight.failure_key(code, "markdown"))
+      assert_nil Thread.new { Thread.current[CodeHighlight::CHECK] }.value
+    end
+  end
+
+  test "lexers nested as an honest sample nests them are coloured: a fence of ERB in Markdown in Markdown, with a script in it" do
+    code = "```md\n ```erb\n <script>var a = 1 // c</script><%= @x %>\n ```\n```\n"
+
+    with_memory_cache do
+      roles = Thread.new { CodeHighlight.lines(code, "markdown") }.value.flatten(1).map(&:first).compact.uniq
+      assert_equal %w[comment constant embed keyword tag], roles.sort
+      assert_nil Rails.cache.read(CodeHighlight.failure_key(code, "markdown"))
+    end
+  end
+
+  # The backstop behind the depth: whatever else recurses in a lexer.
+  test "a stack that overflows inside a lexer is a failure like any other: plain, remembered, logged by its class" do
+    bottomless = Class.new { def self.lex(code) = lex(code) }
+
+    with_memory_cache do
+      answer = nil
+      log = capture_log do
+        with_singleton_override(Rouge::Lexer, :find, ->(_tag) { bottomless }) { answer = Thread.new { CodeHighlight.lines("def a", "ruby", block_id: 45) }.value }
+      end
+
+      assert_equal [ [ [ nil, "def a" ] ] ], answer
+      assert_match(/raised SystemStackError for block 45/, log)
+      assert Rails.cache.read(CodeHighlight.failure_key("def a", "ruby"))
+    end
+  end
+
+  test "what is not a failure of the lex is not swallowed: no memory, a script error, an exit and a signal pass" do
+    [ NoMemoryError, NotImplementedError, SystemExit, Interrupt ].each do |error|
+      raising = Class.new { define_singleton_method(:lex) { |_code| raise error } }
+      with_singleton_override(Rouge::Lexer, :find, ->(_tag) { raising }) do
+        assert_raises(error) { CodeHighlight.lines("def a", "ruby") }
+      end
+      assert_nil Thread.current[CodeHighlight::CHECK]
+    end
+  end
+
+  test "a lex inside a lex leaves the outer one its deadline" do
+    seen = nil
+    CodeHighlight.within_budget do |outer|
+      CodeHighlight.within_budget { |inner| assert_not_same outer, inner }
+      seen = Thread.current[CodeHighlight::CHECK]
+      assert_same outer, seen
+    end
+    assert_nil Thread.current[CodeHighlight::CHECK]
+  end
+
   test "one match past Regexp.timeout is a failure like any other: plain, remembered, and Rails sets that timeout" do
     assert_equal 1.0, Regexp.timeout, "load_defaults 8.1 sets it; the file's comment counts on it"
     slow = Class.new { def self.lex(_code) = raise(Regexp::TimeoutError, "regexp match timeout") }
