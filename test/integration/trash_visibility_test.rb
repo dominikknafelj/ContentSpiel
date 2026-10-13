@@ -595,7 +595,12 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/data"
     assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, "post-#{@gone_post.id}"
     assert(response.parsed_body["nodes"].none? { |node| node["id"] == "post-#{@gone_post.id}" })
-    assert_empty response.parsed_body["edges"]
+    assert_empty response.parsed_body["edges"].select { |edge| %w[related tag].include?(edge["kind"]) }
+    pages = response.parsed_body["pages"].map { |page| page["id"] }
+    assert_includes pages, "page-#{@kept_page.id}"
+    assert_not_includes pages, "page-#{@gone_page.id}"
+    assert_no_match(/page-#{@gone_page.id}\b/, response.body, "a line to a trashed page, or its id as a parent")
+    assert_not_includes response.body, "Gone page"
     get "/cs-studio/mind_graph/data", params: { post: @gone_post.id }
     assert_response :not_found
     get "/cs-studio/notes/post/#{@gone_post.id}/threads"
@@ -634,7 +639,23 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/data"
     data = response.parsed_body
     assert_empty data["tags"], "one kept post is not a connection"
-    assert_empty data["edges"]
+    assert_empty data["edges"].select { |edge| %w[related tag].include?(edge["kind"]) }
+  end
+
+  test "a trashed page's child is drawn in the mind graph without a line to it, and a trashed page lists nothing" do
+    sign_in_as users(:one)
+    child = create_page(title: "Child of gone", parent: @kept_page)
+    Page.where(id: @kept_page.id).update_all(trashed_at: Time.current) # version: none (a test trashes one page and leaves its child) # changes: none (a test trashes one page)
+    Page.where(id: @blog.id).update_all(trashed_at: Time.current)      # version: none (a test trashes one page) # changes: none (a test trashes one page)
+
+    get "/cs-studio/mind_graph/data"
+    data = response.parsed_body
+
+    assert_nil data["pages"].find { |page| page["id"] == "page-#{child.id}" }.fetch("parent")
+    assert_no_match(/page-#{@kept_page.id}\b|page-#{@blog.id}\b/, response.body)
+    assert_empty data["edges"].select { |edge| edge["kind"] == "lists" }
+    assert_empty data["types"]
+    assert(data["nodes"].none? { |node| node["listed"] })
   end
 
   # What the mind graph loads of the site (pages in the mind graph, Task 2):

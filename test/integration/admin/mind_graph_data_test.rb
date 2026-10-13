@@ -31,6 +31,58 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     assert_equal [ 2, 2, 1 ], data.values_at("total", "shown", "isolated")
     assert_equal "/cs-studio/posts/#{a.id}", data["nodes"].first["url"]
     assert_nil data["focus"]
+    assert_equal [ [], [] ], data.values_at("pages", "types")
+  end
+
+  test "pages, post types and the two new lines are in the data, with a page's editor url" do
+    sign_in_as(users(:one))
+    blog = create_page(title: "Blog")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+
+    get "/cs-studio/mind_graph/data"
+
+    assert_response :success
+    assert_equal [ "page-#{root_page.id}", "page-#{blog.id}" ], data["pages"].map { |page| page["id"] }
+    assert_equal "/cs-studio/pages/#{blog.id}", data["pages"].last["url"]
+    assert_equal [ "type-blog" ], data["types"].map { |type| type["id"] }
+    assert_includes data["edges"], { "source" => "page-#{blog.id}", "target" => "page-#{root_page.id}", "kind" => "tree" }
+    assert_includes data["edges"], { "source" => "page-#{blog.id}", "target" => "type-blog", "kind" => "lists" }
+    assert_nil data["open"], "the whole graph, whatever its size, until the script knows the other answer"
+  end
+
+  # Until the script knows the `open` answer (pages plan, Task 8) the screen
+  # asks for everything: a site over the threshold would otherwise be
+  # answered with an address this script cannot follow. The threshold is
+  # put at nothing here, so any graph is over it.
+  test "the data is the whole graph however many lines it holds" do
+    sign_in_as(users(:one))
+    create_page(title: "Blog")
+    whole = PostGraph::Global.method(:call)
+    assert whole.call(actor: users(:one), url_for: ->(_record) { "" }, open_above: 0).key?(:open), "without the option such a site is told where to open"
+
+    with_singleton_override(PostGraph::Global, :call, ->(**options) { whole.call(**options, open_above: 0) }) do
+      get "/cs-studio/mind_graph/data"
+    end
+
+    assert_response :success
+    assert_nil data["open"]
+    assert_equal 2, data["pages"].size
+  end
+
+  # Design answer G4: the card's chip says the day a scheduled change comes
+  # into force. The query hands up the time; the controller writes the day.
+  test "a scheduled change's day is in the data as CS Studio's short date, and a node without one has no such key" do
+    sign_in_as(users(:one))
+    blog = create_page(title: "Blog")
+    at = 3.days.from_now
+    Publishing::Version.take!(blog, live_at: at)
+    blog.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+
+    get "/cs-studio/mind_graph/data"
+    page = data["pages"].find { |node| node["id"] == "page-#{blog.id}" }
+
+    assert_equal [ "live", "scheduled", I18n.l(at, format: :"admin.short") ], page.values_at("status", "changes", "change_on")
+    assert(data["pages"].reject { |node| node == page }.none? { |node| node.key?("change_on") })
   end
 
   # Notes spec §4.4: every post node says how many open notes its post has,
@@ -141,13 +193,19 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     with_locales(%w[en de], default: "en")
     a = create_post(title: "A")
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    page = create_page(title: "Page")
 
     get "/cs-studio/mind_graph/data", params: { locale: "de" }
 
     assert_equal "/cs-studio/posts/#{a.id}?locale=de", data["nodes"].first["url"]
+    assert_equal "/cs-studio/pages/#{page.id}?locale=de", data["pages"].find { |node| node["id"] == "page-#{page.id}" }["url"]
   end
 
-  test "a viewer without posts.read is refused, as on the screen itself" do
+  # The fixtures' branch editor holds no grant at all; `pages.read` is then
+  # given alone.
+  test "a viewer with neither pages.read nor posts.read is refused, and one with pages.read alone is answered" do
+    create_post(title: "Not theirs")
+    blog = create_page(title: "Blog")
     sign_in_as(users(:editor_branch))
 
     get "/cs-studio/mind_graph"
@@ -156,6 +214,15 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     get "/cs-studio/mind_graph/search", params: { q: "a" }
     assert_response :forbidden
+
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.read", scope: {})
+    get "/cs-studio/mind_graph/data"
+
+    assert_response :success
+    assert_empty data["nodes"]
+    assert_equal [ "page-#{root_page.id}", "page-#{blog.id}" ], data["pages"].map { |page| page["id"] }
+    assert_equal [ 0, 0, 0 ], data.values_at("total", "shown", "isolated"), "a post they cannot read is not counted as left out either"
+    assert_not_includes response.body, "Not theirs"
   end
 
   test "search answers rows with the url of each row's local view" do

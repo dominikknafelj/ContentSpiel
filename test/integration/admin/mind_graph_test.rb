@@ -181,6 +181,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     create_post(title: "Hidden from them")
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
     access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    # And no page: a page they read would be something to draw (the next test).
+    create_page(title: "A page hidden from them")
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ 0 ] })
     sign_in_as(users(:author))
 
     get "/cs-studio/mind_graph"
@@ -188,6 +191,22 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
     assert_select "canvas", count: 0
     assert_select "[data-controller='admin--mind-graph--graph']", count: 0
+    assert_not_includes response.body, "Hidden from them"
+  end
+
+  # Pages spec §2: a graph of pages alone is a graph.
+  test "a viewer who reads pages and no post gets the canvas" do
+    create_post(title: "Hidden from them")
+    create_page(title: "Theirs to read")
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph"
+
+    assert_response :success
+    assert_select "[data-controller='admin--mind-graph--graph'] canvas"
+    assert_select "[data-mind-graph-empty]", count: 0
     assert_not_includes response.body, "Hidden from them"
   end
 

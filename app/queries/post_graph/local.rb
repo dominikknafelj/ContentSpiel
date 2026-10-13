@@ -19,9 +19,12 @@
 # farther ones, and among equals the better connected.
 #
 # Cost: three queries per depth level (the relations touching the frontier,
-# the frontier posts' tags, the frontier tags' posts) plus six whatever the
-# size (one of them the nodes' open notes, in the builder) -- never one per
-# node.
+# the frontier posts' tags, the frontier tags' posts) plus nine whatever the
+# size -- the site's five, the relations among the posts reached, the tags'
+# names and the posts' open notes, pending copies and rows -- never one per
+# node. The tag links and the readable counts are the site's, narrowed here
+# in Ruby. (No page is drawn in a local view yet, so the builder reads
+# nothing of pages: the walk gains them in the pages plan's Task 4.)
 module PostGraph
   class Local
     def self.call(...) = new(...).call
@@ -36,20 +39,20 @@ module PostGraph
     end
 
     def call
-      @readable = AccessControl.scope(@actor, "posts.read", Post.all).select(:id)
+      @site = Site.load(actor: @actor)
+      @readable = @site.readable_posts.select(:id)
       walk
 
       post_ids = @posts.keys
       relations = PostRelation.where(post_id: post_ids, related_post_id: post_ids).order(:id).pluck(:post_id, :related_post_id)
-      tag_links = PostTag.where(tag_id: @tags.keys, post_id: post_ids).order(:tag_id, :post_id).pluck(:tag_id, :post_id)
-      tag_counts = PostTag.where(tag_id: @tags.keys, post_id: @readable).group(:tag_id).count
+      tag_links = @site.tag_links.select { |tag_id, post_id| @tags.key?(tag_id) && @posts.key?(post_id) }
 
       kept = cut(post_ids, relations, tag_links)
-      graph = Builder.new(locale: @locale, url_for: @url_for)
-                     .call(post_ids: kept, relations: relations, tag_links: tag_links, tag_counts: tag_counts,
-                           min_tag_edges: 1, keep_tag: (@focus.id if @focus.kind == "tag"))
-      graph.merge(total: post_ids.size, shown: kept.size,
-                  focus: { kind: @focus.kind, id: @focus.id, node_id: @focus.node_id, title: @focus.title, depth: @depth })
+      builder = Builder.new(site: @site, locale: @locale, url_for: @url_for)
+      plan = builder.plan(post_ids: kept, relations: relations, tag_links: tag_links, tag_counts: @site.tag_counts,
+                          min_tag_edges: 1, keep_tag: (@focus.id if @focus.kind == "tag"))
+      builder.build(plan).merge(total: post_ids.size, shown: kept.size,
+                                focus: { kind: @focus.kind, id: @focus.id, node_id: @focus.node_id, title: @focus.title, depth: @depth })
     end
 
     private

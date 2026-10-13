@@ -6,9 +6,13 @@ module Admin
   # related-posts picker, not here. Each node's editor URL is built through the
   # route helper with the editing language kept (`admin_url_options`).
   #
-  # Needs `posts.read` somewhere, and shows only the posts the actor may
-  # read, with no edge to one they can't (every `PostGraph` query's `actor:`,
-  # access-control design spec §3.3).
+  # Opens for someone who may read a page or a post somewhere (pages in the
+  # mind graph, spec §2): a graph of pages alone is a graph. Each kind is
+  # then narrowed by its own scope in the queries (every `PostGraph` query's
+  # `actor:`, access-control design spec §3.3), so only the pages and posts
+  # the actor may read are shown, with no line to one they can't. A node's
+  # editor URL is built here (`editor_url`, called with a `Post` or a
+  # `Page`): a query knows no routes.
   #
   # `data` and `search` are the screen's JSON reads (mind graph canvas spec
   # §3.1) with the screen's own permission and scope: `data` answers the
@@ -19,11 +23,14 @@ module Admin
   # `RecordNotFound`, which `Admin::BaseController` answers with the 404 page,
   # or a bare 404 for a non-HTML request.
   class MindGraphController < BaseController
-    before_action -> { require_permission("posts.read") }
+    # The screen opens for someone who may read a page or a post anywhere
+    # (pages spec §2): a graph of pages alone is a graph. Each kind is then
+    # narrowed by its own scope in the queries.
+    before_action :require_graph_access
 
     # The frame only: the graph itself is fetched by the script from `data`.
     # What the page needs from the database is whether this viewer can read a
-    # post at all ("No posts yet."), which content types their posts have (the
+    # post or a page at all ("No posts yet." when neither), which content types their posts have (the
     # legend names only those, so it discloses no type they can't see) and the
     # focus, which is not found when it is outside their scope. `@type_labels`
     # is the human name of each of those types that is still registered, for
@@ -34,6 +41,7 @@ module Admin
       @depth = params[:depth].to_s == "2" ? 2 : 1
       @content_types = AccessControl.scope(Current.actor, "posts.read", Post.all).distinct.pluck(:content_type)
       @type_labels = @content_types.filter_map { |name| (definition = ContentTypes.find(name)) && [ name, definition.label ] }.to_h
+      @pages = AccessControl.scope(Current.actor, "pages.read", Page.all).exists?
     end
 
     def data
@@ -42,9 +50,12 @@ module Admin
         if focus
           PostGraph::Local.call(actor: Current.actor, focus: focus, depth: params[:depth], locale: admin_locale, url_for: editor_url)
         else
-          PostGraph::Global.call(actor: Current.actor, locale: admin_locale, url_for: editor_url)
+          # `everything: true` until the script knows the `open` answer and a
+          # page's local view is drawn (pages plan, Task 8): until then the
+          # whole graph is what this screen can show.
+          PostGraph::Global.call(actor: Current.actor, locale: admin_locale, url_for: editor_url, everything: true)
         end
-      render json: graph
+      render json: with_dates(graph)
     end
 
     def search
@@ -54,6 +65,25 @@ module Admin
 
     private
 
-    def editor_url = ->(post) { admin_post_path(post, **admin_url_options) }
+    def require_graph_access
+      forbidden! unless can?("pages.read") || can?("posts.read")
+    end
+
+    # A scheduled change's day as CS Studio writes a short date ("14 Oct"),
+    # for the card's chip (pages spec §7, design answer G4). Wording, so it
+    # is put on HERE: the queries hand up the time (`change_at`) and no words.
+    # `nodes` and `pages` are the graph's, `rows` the list's two reads'; an
+    # answer that holds none of them (`open`) is left as it is.
+    def with_dates(answer)
+      answer.merge(answer.slice(:nodes, :pages, :rows).transform_values { |nodes| nodes.map { |node| dated(node) } })
+    end
+
+    def dated(node)
+      node[:change_at] ? node.merge(change_on: I18n.l(node[:change_at], format: :"admin.short")) : node
+    end
+
+    def editor_url
+      ->(record) { record.is_a?(Page) ? admin_page_path(record, **admin_url_options) : admin_post_path(record, **admin_url_options) }
+    end
   end
 end

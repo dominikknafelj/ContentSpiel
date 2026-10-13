@@ -32,7 +32,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "7", graph["data-edges"], "one related and six tag edges"
     assert_selector "#{CANVAS}[aria-label='Post relationship graph: 7 posts and tags, 7 connections.']"
     box = canvas_box
-    (posts.map(&:id) + [ "tag-#{Tag.find_by!(name: "shared").id}" ]).each do |id|
+    (posts + [ Tag.find_by!(name: "shared") ]).map { |record| nid(record) }.each do |id|
       point = screen_position(id)
       assert point, "no position for #{id}"
       assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{id} is outside the canvas: #{point} in #{box}"
@@ -169,7 +169,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     before = graph["data-zoom"].to_f
-    first_id = Post.order(:id).first.id
+    first_id = nid(Post.order(:id).first)
     corner = canvas_box.first(2).map { |edge| edge + 12 }
 
     # Ferrum's mouse has no wheel (its `scroll_to` is `window.scrollTo`), so the
@@ -184,7 +184,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: corner[0] + 60, y: corner[1] + 40)
     mouse.up
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(first_id).to_json}); return Math.abs(p.x - #{moved_from["x"] + 60}) < 2 && Math.abs(p.y - #{moved_from["y"] + 40}) < 2 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{moved_from["x"] + 60}) < 2 && Math.abs(p.y - #{moved_from["y"] + 40}) < 2 })()")
   end
 
   # Mind graph canvas spec §4.4: with the canvas focused, + and - zoom around
@@ -193,7 +193,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     visit admin_mind_graph_path
     await_graph
-    first_id = Post.order(:id).first.id
+    first_id = nid(Post.order(:id).first)
     zoom = -> { graph["data-zoom"].to_f }
     fitted = zoom.call
 
@@ -206,9 +206,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     from = screen_position(first_id)
     canvas.send_keys(:right)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(first_id).to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"]}) < 1 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"]}) < 1 })()")
     canvas.send_keys(:down)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(first_id).to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
   end
 
   test "the filter hands the layout only what is shown" do
@@ -222,18 +222,18 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     find("label", text: "Related").click
     await_graph
     assert_equal [ "2", "1" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert_nil screen_position(c.id), "a hidden node has no place on screen"
+    assert_nil screen_position(c), "a hidden node has no place on screen"
     assert_nil screen_position("tag-#{Tag.find_by!(name: "t").id}"), "a hidden tag has no place on screen"
 
     find("label", text: "Tags").click
     await_graph
     assert_equal [ "3", "2" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert_nil screen_position(a.id)
+    assert_nil screen_position(a)
 
     find("label", text: "All").click
     await_graph
     assert_equal [ "4", "3" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert screen_position(a.id)
+    assert screen_position(a)
   end
 
   test "posts with no connection are counted, not drawn" do
@@ -244,7 +244,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_equal "2", graph["data-nodes"]
-    assert_nil screen_position(alone.id)
+    assert_nil screen_position(alone)
     # "Other", and "isn't shown": beside two connected posts the bare "1 post
     # has no connections yet." read as a contradiction.
     assert_text "1 other post has no connections yet and isn't shown."
@@ -404,6 +404,31 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "2", graph["data-nodes"]
   end
 
+  # The data holds pages, post types and their lines from now on (pages plan,
+  # Task 3); the canvas draws them from Task 5. Until then a line whose end
+  # the script does not make is left out, and nothing throws. And one number
+  # is three nodes: the post and the tag of id 12 are each selected by their
+  # own id, with their own neighbours.
+  test "a post and a tag of one database id are two nodes, and a line to a page or a post type is left out" do
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(SHARED_ID_GRAPH)
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+
+    assert_equal [ "3", "3" ], [ graph["data-nodes"], graph["data-edges"] ], "two posts and the tag; the two lists lines are not drawn"
+    assert_nil screen_position("page-12")
+    assert_nil screen_position("type-blog")
+    click_node("post-12")
+    assert_equal "post-12", graph["data-selected"]
+    assert_equal %w[post-13 tag-12], graph["data-neighbours"].split(",").sort
+    click_node("tag-12")
+    assert_equal "tag-12", graph["data-selected"]
+    assert_equal %w[post-12 post-13], graph["data-neighbours"].split(",").sort
+    assert_raises(ArgumentError) { nid(12) }
+  end
+
   # A notice line is a chip around its own words, not a bar as wide as the
   # longest line beside it, and an action of the card is a button around its
   # own word, so a click beside it is not a click on it. The line is `w-fit`,
@@ -418,7 +443,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     stub_graph_data(CAPPED_GRAPH)
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     await_graph
-    click_node(1)
+    click_node("post-1")
     assert_selector "[data-mind-graph-card] a", text: "Open post"
 
     widths = page.evaluate_script(<<~JS)
@@ -507,7 +532,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"].to_s
-    assert_nil screen_position(post.id), "an unplaced node has no place on screen"
+    assert_nil screen_position(post), "an unplaced node has no place on screen"
   end
 
   # Spec §6: the list is filled before the layout starts, so a worker that
@@ -721,7 +746,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal 1, page.evaluate_script("window.graphFetches")
     box = canvas_box
     [ a, b ].each do |post|
-      point = screen_position(post.id)
+      point = screen_position(post)
       assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{post.id} is outside the canvas after Back: #{point} in #{box}"
     end
   end
@@ -740,7 +765,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       press "Fit all"
       box = canvas_box
       posts.each do |post|
-        point = screen_position(post.id)
+        point = screen_position(post)
         assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{post.id} is outside the resized canvas: #{point} in #{box}"
       end
       assert_equal 255, pixels_of(posts.first).first[3], "nothing is drawn at the new size"
@@ -775,7 +800,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_no_selector "[data-mind-graph-card]", visible: :visible
 
-    click_node(a.id)
+    click_node(a)
 
     assert_equal nid(a), graph["data-selected"]
     within("[data-mind-graph-card]") do
@@ -807,7 +832,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
 
     card = find("[data-mind-graph-card]")
     # Close is the last child, so Tab meets the actions before it; on screen
@@ -848,7 +873,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card] [data-status='draft']", text: "Draft"
   end
@@ -883,19 +908,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     corner = page.evaluate_script("(() => { const r = document.querySelector(#{CANVAS.to_json}).getBoundingClientRect(); return [r.left + 6, r.top + 6] })()")
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card]"
     page.driver.browser.mouse.click(x: corner[0], y: corner[1])
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"]
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card]"
     escape_on_canvas
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"]
 
-    click_node(a.id)
+    click_node(a)
     within("[data-mind-graph-card]") { press "Close" }
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"]
@@ -911,7 +936,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     6.times { press "Zoom out" }
     last = spokes.last
 
-    click_node(last.id)
+    click_node(last)
 
     # The neighbours are said directly; a neighbour's LABEL may give way to
     # another's where the two would overlap (no overlap wins), the selected
@@ -931,7 +956,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     before = { b => pixels_of(b).first, c => pixels_of(c).first }
 
-    click_node(a.id)
+    click_node(a)
 
     assert_equal before[b], pixels_of(b).first, "a neighbour stays at full strength"
     assert_operator pixels_of(c).first[3], :<, before[c][3] / 2, "a node that is neither selected nor a neighbour dims"
@@ -951,7 +976,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_equal "", graph["data-neighbours"].to_s
 
-    click_node(a.id)
+    click_node(a)
     assert_equal [ nid(c), tag_id ].sort, neighbours.call
 
     find("label", text: "Related").click
@@ -991,7 +1016,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
 
     within("[data-mind-graph-card]") { assert_text %(</script><img src=x onerror="window.pwned=1"> "quoted" 🎉) }
     assert_no_selector "[data-mind-graph-card] img", visible: :all
@@ -1003,7 +1028,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    from = screen_position(a.id)
+    from = screen_position(a)
     zoom = graph["data-zoom"]
     record_worker_messages
 
@@ -1042,17 +1067,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_equal "0", graph["data-pinned"]
     assert_no_selector "[data-mind-graph-release]", visible: :visible
-    neighbour = screen_position(b.id)
+    neighbour = screen_position(b)
     unpinned_corner = pin_pixel(a)
 
-    dropped = drag_node(a.id, by: [ 90, 70 ])
+    dropped = drag_node(a, by: [ 90, 70 ])
     assert_equal "1", graph["data-pinned"]
     await_graph
 
-    at = screen_position(a.id)
+    at = screen_position(a)
     assert_in_delta dropped["x"], at["x"], 2, "the node did not stay where it was dropped"
     assert_in_delta dropped["y"], at["y"], 2
-    moved = screen_position(b.id)
+    moved = screen_position(b)
     assert_operator Math.hypot(moved["x"] - neighbour["x"], moved["y"] - neighbour["y"]), :>, 20, "the neighbour did not follow the dragged node"
     assert_equal "1", graph["data-pinned"]
     assert_button "Release 1 pinned"
@@ -1070,9 +1095,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    dropped = drag_node(a.id, by: [ 110, 60 ])
+    dropped = drag_node(a, by: [ 110, 60 ])
     await_graph
-    click_node(a.id)
+    click_node(a)
     within("[data-mind-graph-card]") do
       assert_no_button "Pin", exact: true
       press "Unpin"
@@ -1081,14 +1106,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "0", graph["data-pinned"]
     assert_no_selector "[data-mind-graph-release]", visible: :visible
     await_graph
-    freed = screen_position(a.id)
+    freed = screen_position(a)
     assert_operator Math.hypot(freed["x"] - dropped["x"], freed["y"] - dropped["y"]), :>, 5, "an unpinned node stayed exactly where it was held"
 
     # Pin from the card: where it stands, and nothing moves.
     within("[data-mind-graph-card]") { press "Pin" }
     assert_equal "1", graph["data-pinned"]
     await_graph
-    assert_equal freed, screen_position(a.id)
+    assert_equal freed, screen_position(a)
     within("[data-mind-graph-card]") { assert_button "Unpin" }
     press "Release 1 pinned"
     assert_equal "0", graph["data-pinned"]
@@ -1098,11 +1123,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     escape_on_canvas
 
     # Two pinned: the button counts them, and a double click frees the one.
-    drag_node(a.id, by: [ 40, 80 ])
-    drag_node(c.id, by: [ -50, 40 ])
+    drag_node(a, by: [ 40, 80 ])
+    drag_node(c, by: [ -50, 40 ])
     assert_button "Release 2 pinned"
     await_graph
-    point = screen_position(c.id)
+    point = screen_position(c)
     mouse = page.driver.browser.mouse
     mouse.click(x: point["x"], y: point["y"])
     mouse.click(x: point["x"], y: point["y"], count: 2)
@@ -1122,7 +1147,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     record_worker_messages
-    point = screen_position(a.id)
+    point = screen_position(a)
 
     mouse = page.driver.browser.mouse
     mouse.click(x: point["x"], y: point["y"])
@@ -1145,7 +1170,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    dropped = drag_node(a.id, by: [ 70, -60 ])
+    dropped = drag_node(a, by: [ 70, -60 ])
     drag_node(tag_id, by: [ -60, 50 ])
     assert_equal "2", graph["data-pinned"]
     await_graph
@@ -1154,7 +1179,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "1", graph["data-pinned"], "the hidden tag's pin was kept"
     assert_button "Release 1 pinned"
     await_graph
-    at = screen_position(a.id)
+    at = screen_position(a)
     assert_in_delta dropped["x"], at["x"], 2, "a pinned node that the filter still shows moved"
     assert_in_delta dropped["y"], at["y"], 2
 
@@ -1170,7 +1195,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    drag_node(a.id, by: [ 80, 60 ])
+    drag_node(a, by: [ 80, 60 ])
     assert_button "Release 1 pinned"
     await_graph
 
@@ -1195,20 +1220,20 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
-    assert_card_beside(a.id, side: "right")
+    click_node(a)
+    assert_card_beside(a, side: "right")
 
     box = canvas_box
     mouse = page.driver.browser.mouse
-    before = screen_position(a.id)
+    before = screen_position(a)
     mouse.move(x: box[0] + 200, y: box[3] - 12)
     mouse.down
     mouse.move(x: box[0] + 160, y: box[3] - 42)
     mouse.move(x: box[0] + 120, y: box[3] - 72)
     mouse.up
     await_frames
-    assert_in_delta before["x"] - 80, screen_position(a.id)["x"], 2, "the view did not pan"
-    assert_card_beside(a.id, side: "right")
+    assert_in_delta before["x"] - 80, screen_position(a)["x"], 2, "the view did not pan"
+    assert_card_beside(a, side: "right")
 
     zoom = graph["data-zoom"]
     # (A zoom is around the canvas's middle, so it moves the node; the card
@@ -1216,7 +1241,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     press "Zoom in"
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.zoom !== #{zoom.to_json}")
     await_frames
-    assert_card_beside(a.id)
+    assert_card_beside(a)
     assert_equal nid(a), graph["data-selected"]
   end
 
@@ -1227,12 +1252,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
-    assert_card_beside(a.id, side: "right")
+    click_node(a)
+    assert_card_beside(a, side: "right")
 
     # Pan the node to 60 px from the right edge, by a drag on empty space.
     box = canvas_box
-    node = screen_position(a.id)
+    node = screen_position(a)
     shift = box[2] - 60 - node["x"]
     mouse = page.driver.browser.mouse
     mouse.move(x: box[0] + 12, y: box[3] - 12)
@@ -1242,8 +1267,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.up
     await_frames
 
-    assert_in_delta box[2] - 60, screen_position(a.id)["x"], 2
-    assert_card_beside(a.id, side: "left")
+    assert_in_delta box[2] - 60, screen_position(a)["x"], 2
+    assert_card_beside(a, side: "left")
     card = element_box("[data-mind-graph-card]")
     assert_operator card["right"], :<, box[2]
   end
@@ -1253,20 +1278,20 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card]", visible: :visible
 
     # Towards the card and over where it stands, in small steps as a hand
     # moves: the first few pixels make the press a drag, which takes the card
     # out of the way before the pointer gets there.
-    drag_node(a.id, by: [ 60, 90 ], release: false, steps: 12)
+    drag_node(a, by: [ 60, 90 ], release: false, steps: 12)
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal nid(a), graph["data-selected"], "the drag cleared the selection"
     page.driver.browser.mouse.up
 
     assert_selector "[data-mind-graph-card]", visible: :visible
     await_graph
-    assert_card_beside(a.id, side: "right")
+    assert_card_beside(a, side: "right")
     within("[data-mind-graph-card]") { assert_button "Unpin" }
   end
 
@@ -1280,7 +1305,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{nid(a)}')")
     label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{nid(a).to_json})")
-    node = screen_position(a.id)
+    node = screen_position(a)
     point = [ label["left"] + 12, (label["top"] + label["bottom"]) / 2 ]
     assert_operator point[0] - node["x"], :>, 13, "the point is inside the dot's own target"
 
@@ -1309,7 +1334,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: c, related_post: d)
     visit admin_mind_graph_path
     await_graph
-    point = screen_position(a.id)
+    point = screen_position(a)
     # 9.5 px left of the centre: outside the 7 px dot, on the hover's ring.
     ring_before = pixel_at(point["x"] - 9.5, point["y"])
     others = [ c, d ].to_h { |post| [ post, pixels_of(post).first ] }
@@ -1340,7 +1365,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     hidden = posts.find { |post| labelled.exclude?(nid(post)) }
     assert hidden, "every post is labelled: nothing to show"
 
-    point = screen_position(hidden.id)
+    point = screen_position(hidden)
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(hidden)}'")
     hovered = nid(hidden)
@@ -1368,10 +1393,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       await_graph
       assert_equal %w[tick settled], worker_answers, "the layout was shown in more than one step"
 
-      neighbours = [ screen_position(b.id), screen_position(c.id) ]
-      dropped = drag_node(a.id, by: [ 90, 70 ], release: false)
+      neighbours = [ screen_position(b), screen_position(c) ]
+      dropped = drag_node(a, by: [ 90, 70 ], release: false)
       await_frames
-      assert_equal neighbours, [ screen_position(b.id), screen_position(c.id) ], "a neighbour moved while the node was still held"
+      assert_equal neighbours, [ screen_position(b), screen_position(c) ], "a neighbour moved while the node was still held"
       drags = worker_answers.size - 2
       assert_operator drags, :>=, 1
       assert_equal [ "tick" ], worker_answers.last(drags).uniq, "a drag was answered by something other than the node's own move"
@@ -1380,8 +1405,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       await_graph
       assert_equal %w[tick settled], worker_answers.last(2)
       assert_equal drags + 4, worker_answers.size, "the drop was shown in more than one step: #{worker_answers}"
-      assert_not_equal neighbours, [ screen_position(b.id), screen_position(c.id) ], "the drop did not lay the neighbours out again"
-      at = screen_position(a.id)
+      assert_not_equal neighbours, [ screen_position(b), screen_position(c) ], "the drop did not lay the neighbours out again"
+      at = screen_position(a)
       assert_in_delta dropped["x"], at["x"], 2
       assert_in_delta dropped["y"], at["y"], 2
     end
@@ -1414,7 +1439,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     # The focus is put on a link of the card by script: Cuprite's `send_keys`
     # CLICKS an element that is not focused, and a click here would follow the
@@ -1436,16 +1461,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: b)
     visit admin_mind_graph_path
     await_graph
-    before = [ screen_position(a.id), screen_position(b.id) ]
+    before = [ screen_position(a), screen_position(b) ]
     record_worker_messages
 
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card]"
     await_frames
     assert_equal [], worker_messages, "a click sent the layout something"
     assert_selector "#{GRAPH}[data-settled]"
-    assert_equal before, [ screen_position(a.id), screen_position(b.id) ]
+    assert_equal before, [ screen_position(a), screen_position(b) ]
   end
 
   test "hovering a node shows its full title" do
@@ -1454,7 +1479,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    point = screen_position(a.id)
+    point = screen_position(a)
 
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
 
@@ -1470,7 +1495,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     click_frame_link { within("[data-mind-graph-card]") { click_link "Open post" } }
     assert_current_path admin_post_path(a)
 
@@ -1488,7 +1513,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
     click_frame_link { within("[data-mind-graph-card]") { click_link "Focus" } }
 
     assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
@@ -1517,7 +1542,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     alone = create_post(title: "Hidden gem")
     visit admin_mind_graph_path
     await_graph
-    assert_nil screen_position(alone.id)
+    assert_nil screen_position(alone)
 
     fill_in "Find a post or tag", with: "hidden"
     click_frame_link { within("[data-mind-graph-results]") { click_link "Hidden gem" } }
@@ -1665,7 +1690,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(a, body: "Check the dates, @[#{users(:one).id}]") }
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row][data-unread]", text: "Check the dates"
     # The heading is in the small upper-case label style: matched whatever the case, as the card's counts are.
@@ -1697,7 +1722,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card-notes][data-admin--notes--live-target=record][data-notes-type=post][data-notes-id='#{a.id}'] textarea"
     assert_no_selector "[data-mind-graph-card-notes] li[data-note-row]"
     await_notes_live
@@ -1739,7 +1764,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 3
     assert_selector "[data-mind-graph-card-notes] a[data-note-more][href$='/posts/#{a.id}?notes=open']", text: "+2 more"
     # The notes arrive after the card was first measured: it is measured
@@ -1750,7 +1775,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_operator card["top"], :>=, canvas[1] + 7, "the card with its notes reaches above the canvas"
 
     escape_on_canvas # the open card may stand over the other node
-    click_node(b.id)
+    click_node(b)
     assert_selector "[data-mind-graph-card-notes] textarea"
     assert_no_selector "[data-mind-graph-card-notes] li"
     assert_no_selector "[data-mind-graph-card-notes] h3" # zero threads: only the field (handoff)
@@ -1764,7 +1789,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(a, body: "<img src=x onerror='window.pwned = 2'> see") }
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 2'> see"
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 1'>"
@@ -1780,7 +1805,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     within("[data-mind-graph-card-notes]") do
       find("textarea").send_keys("Ask @[#{stranger.id}]")
@@ -1804,7 +1829,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     key = "cs-note-draft:#{users(:one).id}:graph-Post-#{a.id}"
 
-    click_node(a.id)
+    click_node(a)
     find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
     assert_eventually { page.evaluate_script("JSON.parse(window.sessionStorage.getItem(#{key.to_json}) || '{}').body") == "Half a thought" }
     find("[data-mind-graph-card-notes] textarea").send_keys(:escape)
@@ -1838,7 +1863,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     find("[data-mind-graph-card-notes] textarea").send_keys("On its way")
     page.execute_script(<<~JS)
       const original = window.fetch
@@ -1887,7 +1912,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_equal "undefined", page.evaluate_script("typeof CanvasRenderingContext2D.prototype.roundRect")
     assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row]", text: "Check the dates"
   ensure
     page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
@@ -1919,12 +1944,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 1
     find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
     page.execute_script("document.querySelector('[data-mind-graph-card-notes]').dataset.same = 'yes'; window.notesFetches = 0; window.realFetch = window.fetch; window.fetch = (...args) => { if (String(args[0]).includes('/notes/')) window.notesFetches += 1; return window.realFetch(...args) }")
 
-    click_node(a.id)
+    click_node(a)
     await_frames
 
     assert_equal nid(a), graph["data-selected"]
@@ -1943,7 +1968,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     bare = notes_badge_pixel(a)
-    click_node(a.id)
+    click_node(a)
     within("[data-mind-graph-card-notes]") do
       find("textarea").send_keys("Check the dates")
       press "Add note"
@@ -1957,6 +1982,23 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   # What the endpoint answers for a site over the cap, cut down to two nodes:
   # the counts are the point.
+  # A post, a tag and a page of ONE database id (pages spec, decision 4: the
+  # three tables count on their own), with the lines the data holds from now
+  # on: a page's to a tag and to a post type. The page and the type are not
+  # drawn yet (pages plan, Task 5).
+  SHARED_ID_GRAPH = <<~JS.freeze
+    ({
+      nodes: [ { id: "post-12", title: "Twelve", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, listed: true, url: "/twelve", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 },
+               { id: "post-13", title: "Thirteen", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, listed: true, url: "/thirteen", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 } ],
+      tags: [ { id: "tag-12", name: "twelve", count: 2, degree: 3 } ],
+      pages: [ { id: "page-12", title: "Page twelve", path: "/twelve", depth: 0, home: true, parent: null, order: 0, status: "live", changes: null, change_at: null, url: "/pages/12", degree: 2, child_count: 0, listed_count: 2, open_notes: 0 } ],
+      types: [ { id: "type-blog", name: "blog", label: "Blog post", colour_index: 1, count: 2, degree: 1 } ],
+      edges: [ { source: "post-12", target: "post-13", kind: "related" }, { source: "post-12", target: "tag-12", kind: "tag" }, { source: "post-13", target: "tag-12", kind: "tag" },
+               { source: "page-12", target: "tag-12", kind: "lists" }, { source: "page-12", target: "type-blog", kind: "lists" } ],
+      total: 2, shown: 2, isolated: 0
+    })
+  JS
+
   CAPPED_GRAPH = <<~JS.freeze
     ({
       nodes: [ { id: "post-1", title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: "post-2", title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
@@ -2076,7 +2118,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     box = canvas_box
     centre = [ (box[0] + box[2]) / 2, (box[1] + box[3]) / 2 ]
-    from = screen_position(a.id)
+    from = screen_position(a)
     assert_operator Math.hypot(from["x"] - centre[0], from["y"] - centre[1]), :>, 20, "the node is in the middle already: nothing to see"
     zoom = graph["data-zoom"]
 
@@ -2088,7 +2130,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_selector "#{LIST} button[aria-current='true']", text: "Alpha", count: 1
     assert_selector "[data-mind-graph-card] h2", text: "Alpha"
     await_frames
-    assert_card_beside(a.id, side: "right")
+    assert_card_beside(a, side: "right")
     assert_current_path admin_mind_graph_path
 
     # Another row moves the mark; clearing the selection takes it away.
@@ -2111,7 +2153,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_not page.evaluate_script(row_in_view), "the row is in view before anything is selected: the list is not long enough for this test"
     scrolled = page.evaluate_script("window.scrollY")
 
-    click_node(last.id)
+    click_node(last)
 
     assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(last)}']"
     await_js(row_in_view)
@@ -2124,7 +2166,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    point = screen_position(a.id)
+    point = screen_position(a)
     ring_before = pixel_at(point["x"] - 9.5, point["y"])
 
     find("#{LIST} button", text: "Alpha").hover
@@ -2190,7 +2232,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_frames
     assert_current_path admin_mind_graph_path
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card] a", text: "Open post"
     # In the note's field Enter is the field's own.
     field = find("[data-mind-graph-card] textarea")
@@ -2214,7 +2256,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path(post: a.id)
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card] a", text: "Open post"
 
     stops = page.evaluate_script(<<~JS)
@@ -2331,14 +2373,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # The canvas's colour where a pinned node's mark is: up and to the right of
   # the centre of a 7 px dot.
   def pin_pixel(post)
-    point = screen_position(post.id)
+    point = screen_position(post)
     pixel_at(point["x"] + 5.04, point["y"] - 5.04)
   end
 
   # The canvas's colour where a node's notes badge is: up and to the LEFT of
   # the centre of a 7 px dot (the pin's corner is up and to the right).
   def notes_badge_pixel(post)
-    point = screen_position(post.id)
+    point = screen_position(post)
     pixel_at(point["x"] - 5.04, point["y"] - 5.04)
   end
 
@@ -2402,14 +2444,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script("if (window.RealWorker) { window.Worker = window.RealWorker; delete window.RealWorker }")
   end
 
-  # A node's id as the data and the page write it (pages spec, decision 4). A
-  # bare number in this file is always a post's id.
-  def nid(record)
-    case record
-    when Integer then "post-#{record}"
-    when String then record
-    when Tag then "tag-#{record.id}"
-    else "#{record.class.name.underscore}-#{record.id}"
+  # A node's id as the data and the page write it (pages spec, decision 4):
+  # of a record (a post, a tag, a page), or the id itself as a string
+  # ("post-12", "type-blog"). NEVER of a bare number: 12 is a post, a tag
+  # and a page at once, and a helper that read it as a post would press the
+  # wrong node for the other two and call it found. A number is refused.
+  def nid(node)
+    case node
+    when String then node
+    when ApplicationRecord then "#{node.class.name.underscore}-#{node.id}"
+    else raise ArgumentError, "a node is named by its record or by its id as a string (\"post-12\"), not by #{node.inspect}: a bare number names no kind"
     end
   end
 
@@ -2438,7 +2482,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   # A post's mark at its centre and four pixels to the left of it.
   def pixels_of(post)
-    point = screen_position(post.id)
+    point = screen_position(post)
     [ pixel_at(point["x"], point["y"]), pixel_at(point["x"] - 4, point["y"]) ]
   end
 end

@@ -295,7 +295,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     data = response.parsed_body
     assert_equal [ "post-#{@own_post.id}", "post-#{second_own.id}" ].sort, data["nodes"].map { |node| node["id"] }.sort
-    assert_equal [ { "source" => "post-#{@own_post.id}", "target" => "post-#{second_own.id}", "kind" => "related" } ], data["edges"]
+    # The author reads every page, so the tree's lines are theirs to see
+    # (pages in the mind graph); what must not be there is an end at the post
+    # they cannot read.
+    assert_equal [ { "source" => "post-#{@own_post.id}", "target" => "post-#{second_own.id}", "kind" => "related" } ], data["edges"].reject { |edge| edge["kind"] == "tree" }
+    assert_equal 3, data["edges"].count { |edge| edge["kind"] == "tree" }
+    assert_no_match(/post-#{@other_post.id}\b|Other post/, response.body)
   end
 
   test "the post editor names no related post the actor can't read" do

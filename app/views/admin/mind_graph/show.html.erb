@@ -14,14 +14,14 @@
     (`--admin-top-offset`), so the page does not scroll and the canvas and the
     list each take what is left. Below that width the list stands under the
     canvas, the box is as tall as its content and the page scrolls. %>
-<div class="<%= "flex min-h-[560px] flex-col min-[1100px]:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if @content_types.any? %>">
+<div class="<%= "flex min-h-[560px] flex-col min-[1100px]:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if @content_types.any? || @pages %>">
 <div class="mb-4">
   <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
   <p class="mt-1 text-meta"><%= t(".intro") %></p>
 </div>
 
-<% if @content_types.empty? %>
-  <%# For THIS viewer: a viewer who can read no post sees this, whatever the site holds. %>
+<% if @content_types.empty? && !@pages %>
+  <%# For THIS viewer: a viewer who can read no post and no page sees this, whatever the site holds. %>
   <div class="rounded-cs border border-line bg-surface p-6 text-meta" data-mind-graph-empty="no-posts"><%= t(".no_posts") %></div>
 <% else %>
   <%# One box, three parts: the SEARCH, the GRAPH (a local view's focus bar,

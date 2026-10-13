@@ -513,7 +513,11 @@ export function mount(element) {
     state.data = data
     state.nodes = [ ...data.nodes.map((node) => ({ ...node, kind: "post" })), ...data.tags.map((tag) => ({ ...tag, title: tag.name, kind: "tag" })) ]
     indexOf = new Map(state.nodes.map((node, index) => [ node.id, index ]))
+    // A line to a node this script does not make yet (a page, a post type:
+    // pages plan, Task 5) is left out, so the graph of posts and tags is the
+    // one it was.
     state.edges = data.edges.map((edge) => ({ kind: edge.kind, source: indexOf.get(edge.source), target: indexOf.get(edge.target) }))
+      .filter((edge) => edge.source != null && edge.target != null)
     state.positions = new Float32Array(state.nodes.length * 2)
     state.radii = state.nodes.map(radiusFor)
     context.font = state.theme.font

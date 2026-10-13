@@ -3,10 +3,24 @@ require "test_helper"
 # `PostGraph::Global` (mind graph canvas spec §3.3): the best-connected
 # readable posts up to a cap, their tags and edges, and what was left out.
 class PostGraph::GlobalTest < ActiveSupport::TestCase
-  def graph(actor: nil, cap: PostGraph::CAP) = PostGraph::Global.call(actor: actor, cap: cap, url_for: ->(post) { "/cs-studio/posts/#{post.id}" })
+  def graph(actor: nil, cap: PostGraph::CAP, **options)
+    PostGraph::Global.call(actor: actor, cap: cap, url_for: ->(record) { "/cs-studio/#{record.class.name.underscore.pluralize}/#{record.id}" }, **options)
+  end
 
   def relate(a, b) = PostRelation.create!(post: a, related_post: b)
   def pid(post) = "post-#{post.id}"
+  def page_id(page) = "page-#{page.id}"
+
+  # A block that names a type nobody registers any more cannot be saved, and
+  # exists all the same (it was saved while the type was there): such a name
+  # is stored around the validation, as in `listings_test.rb`.
+  def list_block(page, **settings)
+    stored = settings.stringify_keys
+    retired = stored["content_type"].present? && ContentTypes.find(stored["content_type"]).nil?
+    block = ContentBlock.create!(owner: page, block_type: :post_list, position: page.content_blocks.count, settings: retired ? stored.except("content_type") : stored)
+    block.update_column(:settings, stored) if retired
+    block
+  end
 
   test "a connected post is a node with its title, type, colour index, status, url and degree" do
     a = create_post(title: "Alpha", content_type: "resume_entry")
@@ -16,8 +30,8 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     node = graph[:nodes].find { |n| n[:id] == pid(a) }
 
     assert_equal({ id: pid(a), title: "Alpha", type: "resume_entry", colour_index: ContentTypes.fetch("resume_entry").colour_index,
-                   status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1, related_count: 1, tag_count: 0,
-                   open_notes: 0 }, node)
+                   status: "live", changes: nil, change_at: nil, listed: false, url: "/cs-studio/posts/#{a.id}",
+                   degree: 1, related_count: 1, tag_count: 0, open_notes: 0 }, node)
   end
 
   # The selection card says "N related · N tags": the two halves of `degree`,
@@ -179,7 +193,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
   end
 
   test "no posts: empty lists and zero counts" do
-    assert_equal({ nodes: [], tags: [], edges: [], total: 0, shown: 0, isolated: 0 }, graph)
+    assert_equal({ nodes: [], tags: [], pages: [], types: [], edges: [], total: 0, shown: 0, isolated: 0 }, graph)
   end
 
   test "the number of statements does not grow with the posts" do
@@ -236,15 +250,412 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     assert_empty statements.grep(/note_deliveries/)
   end
 
-  # Five statements before notes (the readable ids, the relations, the tag
-  # links, the posts, the tags' names); the notes add ONE.
-  test "the global graph costs six statements" do
+  test "every readable page is a node, in tree order, with its path, depth, parent and counts" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    child = create_page(title: "Child", parent: blog)
+    list_block(blog, content_type: "blog")
+    create_post(title: "A")
+    as(users(:two)) { Notes::Start.call(blog, body: "A note") }
+
+    pages = graph[:pages]
+
+    assert_equal [ page_id(home), page_id(blog), page_id(child) ], pages.map { |page| page[:id] }
+    assert_equal({ id: page_id(blog), title: "Blog", path: "/blog", depth: 1, home: false, parent: page_id(home), order: 1, status: "live",
+                   url: "/cs-studio/pages/#{blog.id}", degree: 3, child_count: 1, listed_count: 1, open_notes: 1 }, pages[1].except(:changes, :change_at))
+    assert_equal [ true, nil, 0, 1 ], pages[0].values_at(:home, :parent, :depth, :child_count)
+  end
+
+  test "a tree line joins a page to its parent, and a lists line a page to its tag, its type or All posts" do
+    home = root_page
+    by_tag = create_page(title: "By tag")
+    by_type = create_page(title: "By type")
+    list_block(home)
+    list_block(by_tag, tag: "ruby")
+    list_block(by_type, content_type: "resume_entry")
+    create_post(title: "A", tags: [ "ruby" ])
+    tag = "tag-#{Tag.find_by!(name: "ruby").id}"
+
+    result = graph
+    lines = result[:edges].reject { |edge| %w[related tag].include?(edge[:kind]) }
+
+    assert_equal [ { source: page_id(by_tag), target: page_id(home), kind: "tree" }, { source: page_id(by_type), target: page_id(home), kind: "tree" },
+                   { source: page_id(home), target: "all-posts", kind: "lists" }, { source: page_id(by_tag), target: tag, kind: "lists" },
+                   { source: page_id(by_type), target: "type-resume_entry", kind: "lists" } ].sort_by(&:to_s), lines.sort_by(&:to_s)
+    assert_equal [ "type-resume_entry", "all-posts" ], result[:types].map { |type| type[:id] }, "All posts is last"
+    assert_equal({ id: "type-resume_entry", name: "resume_entry", label: ContentTypes.fetch("resume_entry").label,
+                   colour_index: ContentTypes.fetch("resume_entry").colour_index, count: 0, degree: 1 }, result[:types].first)
+    assert_equal({ id: "all-posts", name: nil, label: nil, colour_index: nil, count: 1, degree: 1 }, result[:types].last)
+  end
+
+  test "a type node joins only the pages that list it, never a post of its type" do
+    list_block(create_page(title: "Blog"), content_type: "blog")
+    a = create_post(title: "A")
+    relate(a, create_post(title: "B"))
+
+    result = graph
+    ends = result[:edges].select { |edge| [ edge[:source], edge[:target] ].include?("type-blog") }
+
+    assert_equal [ "lists" ], ends.map { |edge| edge[:kind] }
+    assert ends.all? { |edge| edge[:source].start_with?("page-") }
+    assert_empty result[:edges].select { |edge| edge[:kind] == "brings" }, "a hub's lines to its posts are a page's local view's, never the whole graph's"
+  end
+
+  test "one All posts node however many pages list everything" do
+    3.times { |index| list_block(create_page(title: "All #{index}")) }
+
+    result = graph
+
+    assert_equal 1, result[:types].count { |type| type[:id] == "all-posts" }
+    assert_equal 3, result[:types].last[:degree]
+  end
+
+  test "a listed tag is a node whenever its page is readable, and the one post that carries it is drawn" do
+    list_block(create_page(title: "Ruby"), tag: "ruby")
+    post = create_post(title: "Only one", tags: [ "ruby" ])
+    tag = Tag.find_by!(name: "ruby")
+
+    result = graph
+
+    assert_equal [ { id: "tag-#{tag.id}", name: "ruby", count: 1, degree: 2 } ], result[:tags], "one readable post carries it: the count stays the readable posts"
+    assert_equal [ pid(post) ], result[:nodes].map { |node| node[:id] }
+    assert_equal 0, result[:isolated]
+  end
+
+  test "a listed tag no readable post carries is still a node, with a count of nothing" do
+    list_block(create_page(title: "Empty"), tag: "empty")
+    tag = Tag.create!(name: "empty")
+
+    assert_equal [ { id: "tag-#{tag.id}", name: "empty", count: 0, degree: 1 } ], graph[:tags]
+  end
+
+  test "a lists line is not a post's connection: a post only a page lists is still isolated, and a drawn post says whether a page lists it" do
+    list_block(create_page(title: "Blog"), content_type: "blog")
+    a = create_post(title: "A")
+    relate(a, create_post(title: "B"))
+    create_post(title: "Alone")
+    entry = create_post(title: "Entry", content_type: "resume_entry")
+    relate(entry, a)
+
+    result = graph
+
+    assert_equal 1, result[:isolated]
+    assert_equal({ pid(a) => true, pid(entry) => false }, result[:nodes].to_h { |node| [ node[:id], node[:listed] ] }.slice(pid(a), pid(entry)))
+  end
+
+  test "a retired type a block names is a type node with no colour" do
+    list_block(create_page(title: "Old"), content_type: "gone/thing")
+
+    assert_equal [ { id: "type-gone/thing", name: "gone/thing", label: "gone/thing", colour_index: nil, count: 0, degree: 1 } ], graph[:types]
+  end
+
+  # Design answer H2: the order the list's "Post types" group shows.
+  test "post types come in colour-slot order, then the retired ones, then All posts last" do
+    page = create_page(title: "Lists")
+    list_block(page)
+    list_block(page, content_type: "zz/gone")
+    list_block(page, content_type: "aa/gone")
+    ContentTypes.names.each { |name| list_block(page, content_type: name.to_s) }
+
+    registered = ContentTypes.names.map(&:to_s).sort_by { |name| ContentTypes.fetch(name).colour_index }.map { |name| "type-#{name}" }
+
+    assert_equal registered + [ "type-aa/gone", "type-zz/gone", "all-posts" ], graph[:types].map { |type| type[:id] }
+  end
+
+  test "status and changes are Publishing::State's, for a page and a post, in each of the five states, and only a scheduled change has its time" do
+    looks = { draft: [ "draft", nil ], scheduled: [ "scheduled", nil ], live: [ "live", nil ],
+              live_with_changes: [ "live", "unpublished" ], live_change_scheduled: [ "live", "scheduled" ] }
+    facts = { draft: [ nil, false, false ], scheduled: [ 3.days.from_now, false, false ], live: [ 1.day.ago, false, false ],
+              live_with_changes: [ 1.day.ago, false, true ], live_change_scheduled: [ 1.day.ago, true, true ] }
+    records = facts.to_h do |state, (time, pending, mark)|
+      page = create_page(title: "Page #{state}")
+      post = create_post(title: "Post #{state}", tags: [ "t" ])
+      [ page, post ].each do |record|
+        Publishing::Version.take!(record, live_at: 2.days.from_now) if pending
+        record.update_columns(published_at: time, unpublished_changes_at: (Time.current if mark)) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+      end
+      [ state, [ page, post ] ]
+    end
+
+    result = graph
+
+    records.each do |state, (page, post)|
+      assert_equal state, Publishing::State.of(page.reload).state
+      assert_equal looks[state], result[:pages].find { |node| node[:id] == page_id(page) }.values_at(:status, :changes), "page #{state}"
+      assert_equal looks[state], result[:nodes].find { |node| node[:id] == pid(post) }.values_at(:status, :changes), "post #{state}"
+      times = [ result[:pages].find { |node| node[:id] == page_id(page) }, result[:nodes].find { |node| node[:id] == pid(post) } ].map { |node| node[:change_at] }
+      if state == :live_change_scheduled
+        times.each { |at| assert_in_delta 2.days.from_now.to_f, at.to_f, 60, "the pending copy's live_at" }
+      else
+        assert_equal [ nil, nil ], times, state.to_s
+      end
+    end
+  end
+
+  test "a page whose parent is outside the scope is drawn without a tree line and names no parent" do
+    hidden = create_page(title: "Hidden")
+    seen = create_page(title: "Seen", parent: hidden)
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ seen.id ] })
+
+    result = as(users(:author)) { graph(actor: users(:author)) }
+
+    assert_equal [ page_id(seen) ], result[:pages].map { |page| page[:id] }
+    assert_equal [ nil, 1, false ], result[:pages].first.values_at(:parent, :depth, :home)
+    assert_empty result[:edges].select { |edge| edge[:kind] == "tree" }
+    assert_no_match(/page-#{hidden.id}\b/, result.to_json)
+    # `Site#pages` are records that carry the unreadable parent's id: the
+    # payload takes a parent from the tree alone, so no key holds that id.
+    assert_not result[:pages].first.key?(:parent_id)
+    assert_not_includes result[:pages].first.values, hidden.id
+  end
+
+  test "a tag only an unreadable page lists is no node, and the page's lines are gone with it" do
+    hidden = create_page(title: "Hidden")
+    seen = create_page(title: "Seen")
+    list_block(hidden, tag: "secret")
+    list_block(hidden, content_type: "resume_entry")
+    Tag.create!(name: "secret")
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ seen.id ] })
+
+    result = as(users(:author)) { graph(actor: users(:author)) }
+
+    assert_empty result[:tags]
+    assert_empty result[:types]
+    assert_empty result[:edges]
+  end
+
+  test "a trashed page is no node, its lines are gone, and its child is drawn without a line to it" do
+    gone = create_page(title: "Gone")
+    child = create_page(title: "Child", parent: gone)
+    list_block(gone, content_type: "blog")
+    Page.where(id: gone.id).update_all(trashed_at: Time.current) # version: none (a test trashes one page and leaves its child) # changes: none (a test trashes one page)
+
+    result = graph
+
+    assert_equal [ page_id(root_page), page_id(child) ], result[:pages].map { |page| page[:id] }
+    assert_nil result[:pages].last[:parent]
+    assert_empty result[:edges]
+    assert_empty result[:types]
+  end
+
+  test "the global graph costs thirteen statements" do
+    page = create_page(title: "Blog")
+    list_block(page, tag: "shared")
     a = create_post(title: "A", tags: %w[shared])
     relate(a, create_post(title: "B", tags: %w[shared]))
-    as(users(:two)) { Notes::Start.call(a, body: "A note") }
-
+    as(users(:two)) { Notes::Start.call(a, body: "A note"); Notes::Start.call(page, body: "A note") }
     viewer = users(:one) # loaded here, so the fixture's own read is not counted
 
-    assert_equal 6, capture_sql { graph(actor: viewer) }.size
+    statements = capture_sql { graph(actor: viewer) }
+
+    # The site's five (posts, tag links, pages, list blocks, the tags they
+    # name), the relations, and the builder's seven (the tags' names; the
+    # pages' paths, notes and pending copies; the posts' notes, pending
+    # copies and rows).
+    assert_equal 13, statements.size, statements.join("\n")
+  end
+
+  test "the statement count is the same for 3 pages and for 30, and for 3 posts and for 30" do
+    viewer = users(:one)
+    pages = ->(count) { count.times { |index| list_block(create_page(title: "Page #{count}-#{index}"), tag: "shared") } }
+    posts = ->(count) { count.times { |index| create_post(title: "Post #{count}-#{index}", tags: %w[shared]) } }
+    pages.call(3)
+    posts.call(3)
+    few = capture_sql { graph(actor: viewer) }.size
+
+    pages.call(27)
+    more_pages = capture_sql { graph(actor: viewer) }.size
+    posts.call(27)
+    more_posts = capture_sql { graph(actor: viewer) }.size
+
+    assert_equal [ few, few ], [ more_pages, more_posts ]
+  end
+
+  test "above the threshold the answer is where to open, with the number of lines, and no graph" do
+    home = root_page
+    3.times { |index| create_page(title: "Page #{index}") }
+    Tag.create!(name: "listed")
+    list_block(home, tag: "listed")
+
+    statements = capture_sql { @answer = graph(open_above: 3) }
+
+    assert_equal({ open: page_id(home), edges: 4 }, @answer, "three tree lines and one lists line")
+    assert_equal 6, statements.size, "the site's five and the relations: no node is built"
+    assert_equal 4, graph(open_above: 4)[:edges].size, "exactly the threshold is not above it"
+  end
+
+  test "everything=1 answers the whole graph whatever its size" do
+    3.times { |index| create_page(title: "Page #{index}") }
+
+    assert_equal 4, graph(open_above: 2, everything: true)[:pages].size
+  end
+
+  test "over the threshold without a readable Home the whole graph is answered" do
+    branch = create_page(title: "Branch")
+    3.times { |index| create_page(title: "Leaf #{index}", parent: branch) }
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ branch.id ] })
+
+    result = as(users(:author)) { graph(actor: users(:author), open_above: 2) }
+
+    assert_nil result[:open]
+    assert_equal 4, result[:pages].size
+  end
+
+  test "over the threshold with no page at all the graph of posts is answered" do
+    assert_not Page.exists?, "this test is about a site with no page: `create_post` makes none"
+    a = create_post(title: "A")
+    relate(a, create_post(title: "B"))
+
+    result = graph(open_above: 0)
+
+    assert_nil result[:open]
+    assert_equal [ [], 1 ], [ result[:pages], result[:edges].size ]
+  end
+
+  # The posts half of the rights rule, by a viewer narrowed by POST rights:
+  # an unreadable post is no node, is in no count and at the end of no line,
+  # and a tag only unreadable posts carry is no node.
+  test "a post outside the viewer's posts scope is no node, in no count and at no line's end, and a tag only such posts carry is no node" do
+    %i[author_posts_read author_posts_create author_posts_edit].each { |grant| access_control_grants(grant).update!(scope: { "content_types" => [ "blog" ] }) }
+    mine = 2.times.map { |index| create_post(title: "Mine #{index}", tags: [ "shared" ]) }
+    theirs = 2.times.map { |index| create_post(title: "Theirs #{index}", content_type: "resume_entry", tags: %w[shared secret]) }
+    relate(mine.first, theirs.first)
+    relate(theirs.first, theirs.last)
+    page = create_page(title: "Lists")
+    list_block(page)
+    list_block(page, content_type: "resume_entry")
+    shared, secret = %w[shared secret].map { |name| Tag.find_by!(name: name) }
+    assert_equal 2, graph[:tags].size, "for trusted code both tags are nodes: what follows is the scope's doing"
+
+    result = as(users(:author)) { graph(actor: users(:author)) }
+
+    assert_equal mine.map { |post| pid(post) }, result[:nodes].map { |node| node[:id] }
+    assert_equal [ { id: "tag-#{shared.id}", name: "shared", count: 2, degree: 2 } ], result[:tags]
+    assert_equal [ 2, 2, 0 ], result.values_at(:total, :shown, :isolated)
+    assert_equal [ [ "type-resume_entry", 0 ], [ "all-posts", 2 ] ], result[:types].map { |type| type.values_at(:id, :count) }
+    assert_equal 2, result[:pages].find { |node| node[:id] == page_id(page) }[:listed_count]
+    assert_empty result[:edges].select { |edge| edge[:kind] == "related" }
+    theirs.each { |post| assert_no_match(/post-#{post.id}\b/, result.to_json) }
+    assert_no_match(/tag-#{secret.id}\b|secret|Theirs/, result.to_json)
+  end
+
+  # A node's id is its kind AND its database id (pages spec, decision 4): the
+  # three tables count on their own, so one number names a page, a post and
+  # a tag at once on any site. Each is its own node with its own lines.
+  test "a post, a tag and a page of one database id are three nodes, each with its own lines" do
+    home = root_page
+    id = [ Page, Post, Tag ].map { |model| model.maximum(:id).to_i }.max + 1
+    %w[pages posts tags].each { |table| Page.connection.set_pk_sequence!(table, id - 1) }
+    page = create_page(title: "Same")
+    tag = Tag.create!(name: "same")
+    post = create_post(title: "Same post", tags: [ "same" ])
+    other = create_post(title: "Other", tags: [ "same" ])
+    relate(post, other)
+    list_block(page, tag: "same")
+    assert_equal [ id, id, id ], [ page.id, tag.id, post.id ], "the test is about one number for all three"
+
+    result = graph
+    nodes = (result[:nodes] + result[:tags] + result[:pages]).index_by { |node| node[:id] }
+
+    assert_equal [ "page-#{home.id}", "page-#{id}", "post-#{id}", "post-#{other.id}", "tag-#{id}" ].sort, nodes.keys.sort
+    assert_equal [ { source: "post-#{id}", target: "post-#{other.id}", kind: "related" },
+                   { source: "post-#{id}", target: "tag-#{id}", kind: "tag" }, { source: "post-#{other.id}", target: "tag-#{id}", kind: "tag" },
+                   { source: "page-#{id}", target: "page-#{home.id}", kind: "tree" }, { source: "page-#{id}", target: "tag-#{id}", kind: "lists" } ], result[:edges]
+    assert_equal({ "post-#{id}" => 2, "tag-#{id}" => 3, "page-#{id}" => 2 }, nodes.slice("post-#{id}", "tag-#{id}", "page-#{id}").transform_values { |node| node[:degree] })
+    assert_equal [ "Same post", "same", "Same" ], [ nodes["post-#{id}"][:title], nodes["tag-#{id}"][:name], nodes["page-#{id}"][:title] ]
+    assert_equal [ 1, 1 ], nodes["post-#{id}"].values_at(:related_count, :tag_count)
+    assert_equal [ 2, 2 ], [ nodes["page-#{id}"][:listed_count], nodes["tag-#{id}"][:count] ]
+  end
+
+  # `Publishing::State` trusts a pending time it is handed, so the graph must
+  # hand it exactly what the state would have read itself. Every combination
+  # of the three facts that state's own exhaustive test lists (3 x 2 x 2),
+  # on a page and on a post; and every record here has a copy IN FORCE (the
+  # services took one), which is no pending copy.
+  test "for every combination of the time, a pending copy and the mark, a node's status, changes and change_at are what Publishing::State answers by itself" do
+    times = { none: nil, future: 3.days.from_now, past: 1.day.ago }
+    combinations = times.keys.product([ false, true ], [ false, true ])
+    assert_equal 12, combinations.size
+    records = combinations.to_h do |time, pending, mark|
+      pair = [ create_page(title: "Page #{time} #{pending} #{mark}"), create_post(title: "Post #{time} #{pending} #{mark}", tags: [ "t" ]) ]
+      pair.each do |record|
+        Publishing::Version.take!(record, live_at: 2.days.from_now) if pending
+        record.update_columns(published_at: times.fetch(time), unpublished_changes_at: (Time.current if mark)) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+      end
+      [ [ time, pending, mark ], pair ]
+    end
+
+    result = graph
+    nodes = (result[:pages] + result[:nodes]).index_by { |node| node[:id] }
+
+    seen = records.flat_map do |facts, pair|
+      pair.map do |record|
+        state = Publishing::State.of(record.reload)
+        node = nodes.fetch(PostGraph.node_id(record.class.name.underscore, record.id))
+        expected = [ state.status, PostGraph::Builder::CHANGES[state.state], (state.pending_at if state.state == :live_change_scheduled) ]
+        assert_equal expected, node.values_at(:status, :changes, :change_at), "#{record.class} #{facts.inspect}"
+        state.state
+      end
+    end
+    assert_equal Publishing::State::STATES.sort, seen.uniq.sort, "every state was among them"
+    assert_equal 4, seen.count(:live_change_scheduled), "a pending copy shows on a live record alone"
+  end
+
+  # Two sizes far apart in everything that could cost a statement each: the
+  # pages, the list blocks on a page (one of them in a section), the posts,
+  # the tags, the notes and the pending copies of pages and of posts.
+  test "the statement count is thirteen for a small site and for one ten times its size in pages, blocks, posts, tags, notes and pending copies" do
+    viewer = users(:one)
+    grow = ->(pages:, blocks:, posts:, tags:, pending:) do
+      made = pages.times.map do |index|
+        page = create_page(title: "Page #{pages}-#{index}")
+        section = ContentBlock.create!(owner: page, block_type: :section, position: 0, settings: { "layout" => "two" })
+        ContentBlock.create!(owner: page, block_type: :post_list, position: 0, section_id: section.id, section_column: 1, settings: { "content_type" => "blog" })
+        (blocks - 1).times { |block| list_block(page, tag: "tag #{(index + block) % tags}") }
+        page
+      end
+      written = posts.times.map { |index| create_post(title: "Post #{posts}-#{index}", tags: [ "tag #{index % tags}", "tag #{(index + 1) % tags}" ]) }
+      written.each_cons(2) { |a, b| relate(a, b) }
+      (made.first(pending) + written.first(pending)).each do |record|
+        Publishing::Version.take!(record, live_at: 2.days.from_now)
+        record.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+      end
+      as(users(:two)) { (made.first(pending) + written.first(pending)).each { |record| Notes::Start.call(record, body: "A note") } }
+    end
+
+    grow.call(pages: 3, blocks: 2, posts: 3, tags: 2, pending: 1)
+    few = capture_sql { @small = graph(actor: viewer) }
+    grow.call(pages: 30, blocks: 4, posts: 40, tags: 20, pending: 10)
+    many = capture_sql { @large = graph(actor: viewer) }
+
+    assert_equal [ 4, 3, 2 ], [ @small[:pages].size, @small[:nodes].size, @small[:tags].size ]
+    assert_equal [ 34, 43, 20 ], [ @large[:pages].size, @large[:nodes].size, @large[:tags].size ]
+    assert_equal 22, (@large[:pages] + @large[:nodes]).count { |node| node[:changes] == "scheduled" }
+    assert_equal 13, few.size, few.join("\n")
+    assert_equal 13, many.size, many.join("\n")
+  end
+
+  # Anyone but an owner costs one statement more, their grants, read once.
+  test "for a viewer with a scope the count is the same for a small branch and a large one" do
+    branch = create_page(title: "Branch")
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ branch.id ] })
+    grow = ->(count) do
+      count.times { |index| list_block(create_page(title: "Leaf #{count}-#{index}", parent: branch), tag: "shared") }
+      count.times { |index| create_post(title: "Post #{count}-#{index}", tags: %w[shared]) }
+    end
+    ask = -> do
+      Current.reset
+      Locales.default # the site's settings, read once a request by whatever asks first: not the graph's
+      as(users(:author)) { capture_sql { @answer = graph(actor: users(:author)) } }
+    end
+
+    grow.call(2)
+    few = ask.call
+    small = @answer[:pages].size
+    grow.call(25)
+    many = ask.call
+
+    assert_equal [ 3, 28 ], [ small, @answer[:pages].size ]
+    assert_equal [ 14, 14 ], [ few.size, many.size ], many.join("\n")
   end
 end
