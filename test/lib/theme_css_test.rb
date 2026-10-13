@@ -293,6 +293,38 @@ class ThemeCssTest < ActiveSupport::TestCase
     end
   end
 
+  # Two containers that share app/assets/builds (a compose file's `css` and
+  # `web` services over one mount) are each pid 1 with a main thread of the
+  # same id: a file beside the stamp named for the two was ONE file, and
+  # one build renamed the other's half-written stamp into place. So the
+  # name is random per write, and it is never left behind.
+  test "the file a stamp is written to beside it has a name of its own each time, a dot file there, and is gone afterwards, also when the write fails" do
+    Dir.mktmpdir("root") do |root|
+      folder = ThemeFolder.new(PLAIN)
+      builds = File.join(root, File.dirname(ThemeFolder::STAMP))
+      rename = File.method(:rename)
+      beside = []
+      with_singleton_override(File, :rename, ->(from, to) { beside << from.to_s; rename.call(from, to) }) do
+        3.times { ThemeCss.stamp!(folder, root: root) }
+      end
+
+      assert_equal 3, beside.uniq.size, "one process and one thread, three names: #{beside.inspect}"
+      beside.each do |file|
+        assert_equal builds, File.dirname(file), "beside the stamp, so the rename is one step on one filesystem"
+        assert_match(/\A\.theme\.stamp\.\h{16}\z/, File.basename(file), "a dot file: anything else there is an asset")
+      end
+      assert_equal [ ".theme.stamp" ], Dir.children(builds)
+
+      # A write that fails at its last step (here: the stamp's own name is
+      # taken by a folder that is not empty) raises and leaves nothing.
+      FileUtils.rm_f(File.join(root, ThemeFolder::STAMP))
+      FileUtils.mkdir_p(File.join(root, ThemeFolder::STAMP, "taken"))
+      assert_raises(SystemCallError) { ThemeCss.stamp!(folder, root: root) }
+      assert_equal [ ".theme.stamp" ], Dir.children(builds)
+      assert_equal [ "taken" ], Dir.children(File.join(root, ThemeFolder::STAMP))
+    end
+  end
+
   # No reader meets half a stamp: it is written beside and renamed into
   # place. A plain write empties the file first, and whoever read it then
   # (the keeper, System status, a boot) read an empty stamp, which is
@@ -377,7 +409,7 @@ class ThemeCssTest < ActiveSupport::TestCase
 
         keeping(folder, root: root, build: -> { true }) do |keeper|
           let_it_ask(keeper)
-          assert_operator glanced, :>, 3
+          assert_operator glanced, :>=, 3, "once when it started and once in each of the two turns it has ended since"
           assert_equal 0, hashed
 
           # Put in place in ONE step (written beside, then renamed): a plain
@@ -577,13 +609,21 @@ class ThemeCssTest < ActiveSupport::TestCase
       sleep 0.01 until yield || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
     end
 
-    # Long enough for a keeper that asks every hundredth of a second to have
-    # asked several times.
+    # Until the keeper has ended TWO turns since this was called: the one it
+    # may have been in the middle of (its reading of the stamp can be older
+    # than what the test did just before) and a whole one after it. So what
+    # the test did has been looked at, or nothing would ever be. A turn, not
+    # a time: this was a third of a second of sleeping, and a keeper that
+    # had not had its turn by then (a starved runner) failed the test with
+    # the signature of the defect it guards. The limit is for a keeper that
+    # is dead or stuck, and then the test fails here and says so.
     def let_it_ask(keeper)
-      turns = 0
-      while keeper.alive? && turns < 30
+      turns = -> { keeper.thread_variable_get(:turns).to_i }
+      asked = turns.call
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 30
+      until turns.call >= asked + 2
+        flunk "the keeper ended no two turns in 30 seconds (alive: #{keeper.alive?})" if !keeper.alive? || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
         sleep 0.01
-        turns += 1
       end
     end
 end

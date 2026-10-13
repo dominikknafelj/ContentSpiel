@@ -1,5 +1,6 @@
 require "pathname"
 require "fileutils"
+require "securerandom"
 
 # The public stylesheet's build (theming spec §4). ONE stylesheet, built from
 # an entry file this module writes:
@@ -110,13 +111,20 @@ module ThemeCss
   # interpreter's lock to a waiting thread at exactly that `open`, so
   # within one process it was no rare moment. The file beside is a dot
   # file too (app/assets/builds is on the asset load path, where anything
-  # else is an asset), named for the process and the thread that write it.
+  # else is an asset), and its name ends in random characters: the process's
+  # id and the thread's would be ONE name in two containers that share the
+  # folder (a container's first process is pid 1, and the main thread has
+  # the same id in every fresh Ruby), and one would rename the other's
+  # half-written file into place. Whatever happens, it is not left behind:
+  # after the rename it is gone, and after a failure it is deleted.
   def stamp!(folder, root:, fingerprint: folder.fingerprint)
     path = Pathname(root).join(ThemeFolder::STAMP)
     FileUtils.mkdir_p(path.dirname)
-    beside = Pathname("#{path}.#{Process.pid}-#{Thread.current.object_id}")
+    beside = Pathname("#{path}.#{SecureRandom.hex(8)}")
     beside.write("#{fingerprint}\n")
     File.rename(beside, path)
+  ensure
+    FileUtils.rm_f(beside) if beside
   end
 
   def unstamp!(root:)
@@ -185,6 +193,13 @@ module ThemeCss
   # not yet made, anything else) is said once, by its class and without a
   # path, and the turn is tried again: a thread that died would leave the
   # watch running with a stamp nobody keeps.
+  #
+  # The thread counts the turns it has ENDED (`thread_variable_get(:turns)`:
+  # one that found nothing changed, one that built, one that raised). The
+  # watch does not read it. It is there for whoever must know that the
+  # keeper has looked since something happened, which is the tests: they
+  # waited a third of a second for that instead, and a keeper that had not
+  # had its turn by then failed them as the defect above did.
   def keep_stamped(folder, root:, build:, every: 1, log: ->(line) { warn line })
     return nil unless folder.configured?
 
@@ -193,6 +208,7 @@ module ThemeCss
     said = false
 
     Thread.new do
+      Thread.current.thread_variable_set(:turns, 0)
       loop do
         sleep every
         begin
@@ -218,6 +234,8 @@ module ThemeCss
         rescue StandardError => error
           log.call("theme_css:watch: the stylesheet's stamp could not be kept (#{error.class}); it will be tried again") unless said
           said = true
+        ensure
+          Thread.current.thread_variable_set(:turns, Thread.current.thread_variable_get(:turns) + 1)
         end
       end
     end
