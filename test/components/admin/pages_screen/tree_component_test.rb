@@ -182,6 +182,26 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "li[data-page-id='#{draft.id}'] > div .admin-status-chip", text: "Draft"
   end
 
+  # A row can be without a position (a half-written one; the column takes
+  # NULL). The tree sorted its rows in Ruby by the bare column and raised for
+  # it, a 500 for the whole Pages screen, where the public site's menu and
+  # branch draw such a page last, as Postgres sorts a NULL.
+  test "a page without a position is drawn last among its siblings, as the public site orders it, and pages of one position by id" do
+    first = create_page(title: "First row")
+    lost = create_page(title: "Lost its place")
+    second = create_page(title: "Second row")
+    twin = create_page(title: "Twin row")
+    lost.update_columns(position: nil) # version: none (a test takes a position away, as only a half-written row has none)
+    twin.update_columns(position: second.reload.position) # version: none (a test gives two rows one position)
+
+    render_tree
+
+    assert_equal [ "First row", "Second row", "Twin row", "Lost its place" ],
+      page.all("#tree a").map(&:text).map(&:strip).select { |text| [ "First row", "Lost its place", "Second row", "Twin row" ].include?(text) }
+    branch = PublicSite::Branch.new(urls: PublicSite::Urls.new, locale: "en").under(root_page)
+    assert_equal [ first.id, second.id, twin.id, lost.id ], branch.children.map(&:id).select { |id| [ first.id, lost.id, second.id, twin.id ].include?(id) }
+  end
+
   test "a page without children shows no child count" do
     parent = create_page(title: "Parent")
     create_page(title: "Child", parent: parent)
