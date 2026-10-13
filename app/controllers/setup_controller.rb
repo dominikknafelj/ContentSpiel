@@ -40,6 +40,13 @@ class SetupController < ApplicationController
   # trusted nil actor on `:setup`.
   before_action :act_as_signed_in_user, only: %i[show update]
 
+  # The built-in groups, before any step past the token writes: a database
+  # built by loading the schema has none (`Groups::EnsureBuiltIns` says why),
+  # and one built with `db:schema:load` alone ran no seed either. Not for the
+  # token step, which anyone may post to. Declared after `require_step_access`,
+  # so it runs for nobody that one turned away.
+  before_action :ensure_built_in_groups, only: :update, unless: -> { @step == "token" }
+
   rate_limit to: 10, within: 3.minutes, only: :update, store: RATE_LIMIT_STORE,
     if: -> { params[:step] == "token" },
     with: -> { redirect_to setup_step_path("token"), alert: "Too many attempts. Try again in a few minutes." }
@@ -100,6 +107,15 @@ class SetupController < ApplicationController
 
     def act_as_signed_in_user
       Current.actor = Current.user if Current.user
+    end
+
+    # The answer is not read: with nothing missing it is a success that wrote
+    # nothing, and someone who may not make groups (a signed-in user who is
+    # no owner, on a site whose setup was never finished) gets the service's
+    # `access.denied` and goes on with the step. The one step that needs a
+    # group says so itself when it is not there (`#update_mcp_token`).
+    def ensure_built_in_groups
+      Groups::EnsureBuiltIns.call
     end
 
     def first_step
@@ -244,8 +260,17 @@ class SetupController < ApplicationController
     def update_mcp_token
       # The first account is an owner, so its token gets the Admin group
       # (it can be narrowed to another group in CS Studio later).
-      admin = AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME)
+      #
+      # `find_by`, not `find_by!`: a missing group is this installation's
+      # state, not a wrong address, and `RecordNotFound` is answered as a 404
+      # with nothing a person can act on (how a schema-loaded database showed
+      # up before `#ensure_built_in_groups`). It can still be absent when
+      # whoever is signed in may not make groups; then the step says what is
+      # missing and what puts it back, and can be skipped as before.
+      admin = AccessControl::Group.find_by(name: AccessControl::Seeds::ADMIN_NAME)
       name = params[:token_name].to_s
+      return missing_admin_group(name) unless admin
+
       result = ApiTokens::Issue.call(Current.user, group: admin, name: name)
 
       unless result.ok?
@@ -258,6 +283,13 @@ class SetupController < ApplicationController
       session[:setup_token_name] = token.name
       response.set_header("Cache-Control", "no-store")
       render :mcp_token_created
+    end
+
+    def missing_admin_group(name)
+      @token_name = name
+      @token_error = "This site has no \"#{AccessControl::Seeds::ADMIN_NAME}\" group, which a token made here belongs to. " \
+        "Run bin/rails db:seed on the server to create the built-in groups, then try again, or skip this step and create a token in CS Studio later."
+      render :mcp_token, status: :unprocessable_entity
     end
 
     # `StarterContents::Add` (locked and idempotent, final fix wave,

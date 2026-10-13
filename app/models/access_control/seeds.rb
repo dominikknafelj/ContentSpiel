@@ -1,10 +1,15 @@
 module AccessControl
   # The four seeded groups (design spec §5, exact names per Global
   # Constraints) and the one-time backfill of existing data onto the new
-  # access-control columns (design spec §6). Two call sites:
+  # access-control columns (design spec §6). One call site:
   # `db/migrate/20260928060000_seed_access_control_groups.rb` (the data
-  # migration) and `db/seeds.rb` (dev seeds, via `ensure_built_in_groups!`
-  # alone -- there's nothing to backfill in a fresh dev database).
+  # migration).
+  #
+  # A migration is not how a database gets its groups, though: every way of
+  # building one loads `db/schema.rb`, which holds no rows. The groups of a
+  # new site are made by `Groups::EnsureBuiltIns` (from `db/seeds.rb` in
+  # every environment, and by the setup wizard), which reads `BUILT_IN` and
+  # `grants_of` here and creates only a group that is missing.
   #
   # Built on the real `AccessControl::Group`/`Membership`/`Grant`/`User`/
   # `ApiToken`/`Post` models, not migration-local SQL-only shadow classes.
@@ -122,6 +127,11 @@ module AccessControl
         first_owner = User.where(owner: true).order(:id).first
         Post.where(author_id: nil).update_all(author_id: first_owner.id) if first_owner # version: none (the public site shows no author) # changes: none (an author is not in a copy)
       end
+
+      # The grants a built-in group starts with, `:all` resolved against the
+      # registry as it is now (what `Groups::EnsureBuiltIns` writes for a
+      # group it makes).
+      def grants_of(name) = grants_for(BUILT_IN.fetch(name))
 
       private
 
