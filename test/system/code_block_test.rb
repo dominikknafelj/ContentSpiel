@@ -366,9 +366,8 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
   end
 
   # A phone's width, where a sideways scroll is likeliest, and the second
-  # block in a column of a section: what keeps the column from growing with
-  # the line is the column's own `min-width: 0` (`sections.css`), and what
-  # scrolls the line is the `pre`.
+  # block in a column of a section. What keeps the line in is the `pre`,
+  # which scrolls it: a scrolling box asks for no width for what is in it.
   test "a long line scrolls inside the block and the page never scrolls sideways, at full width and in a column, on a wide window and on a phone's" do
     long = %(x = "#{"a" * 300}")
     add_code(long)

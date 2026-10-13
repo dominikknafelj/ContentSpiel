@@ -129,7 +129,7 @@
                   errors: field_errors(type_field), id_prefix: error_prefix, **translation(type_field.name)
                 ) %>
             <%= render Admin::Ui::ChipInputComponent.new(
-                  name: "block[settings][#{tag_field.name}]", id: field_id(tag_field.name), label: tag_field.name.humanize,
+                  name: "block[settings][#{tag_field.name}]", id: field_id(tag_field.name), label: tag_field.label,
                   search_url: tag_search_url, chips: tag_chips(tag_field), single: true, create: false, noun: "tag",
                   placeholder: "Any", errors: field_errors(tag_field)
                 ) %>

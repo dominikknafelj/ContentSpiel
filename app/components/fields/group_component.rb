@@ -22,7 +22,7 @@ module Fields
     # rendering a group-of-groups recursively is future work a type that
     # actually has one can opt into with its own component.
     def rows
-      value.definition.fields.reject(&:group?).map { |field| [ field.name.humanize, value.public_send(field.name) ] }
+      value.definition.fields.reject(&:group?).map { |field| [ field.label, value.public_send(field.name) ] }
     end
 
     private

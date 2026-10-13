@@ -1,5 +1,5 @@
 <fieldset class="rounded-cs border border-line p-3">
-  <legend class="<%= setup_label_class %>"><%= field.name.humanize %></legend>
+  <legend class="<%= setup_label_class %>"><%= field.label %></legend>
   <% subfields.each do |subfield| %>
     <%= render Admin::Ui::FieldComponent.new(
           field: subfield,

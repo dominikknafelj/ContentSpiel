@@ -9,12 +9,14 @@
    band.
 
    `overflow-x: auto` on the `pre` is what keeps a long line inside the
-   block: the line scrolls in the `pre` (which is focusable, so a keyboard
-   can scroll it) and the page never scrolls sideways. In a column of a
-   section it is the column's own `min-width: 0` (`sections.css`) that keeps
-   the column from growing with the line; the figure is a block in both
-   places and needs no rule for it
-   (`test/system/code_block_test.rb` holds both at a phone's width).
+   block, in a column of a section as at full width: the line scrolls in the
+   `pre` (which is focusable, so a keyboard can scroll it) and the page
+   never scrolls sideways. A scrolling box asks for no width on behalf of
+   what scrolls in it, so the figure needs no `min-width: 0` of its own, and
+   it had one that did nothing: the figure is a block wherever it is drawn,
+   never a flex or grid item (`test/system/code_block_test.rb` holds the
+   long line at a phone's width, in a column too, and fails without the
+   `pre`'s rule).
 
    THE HEAD STRIP is there only when it has something to show (design answer
    C1). A head with nothing but the Copy button is `hidden` in the markup

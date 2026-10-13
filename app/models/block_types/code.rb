@@ -14,7 +14,7 @@ module BlockTypes
       BlockTypes.register :code do |t|
         t.label "Code"
         t.field :language, :select, options: CodeHighlight::LANGUAGES, blank: "Plain text"
-        t.field :filename, :string
+        t.field :filename, :string, label: "File name"
         t.field :code, :code, max: CodeHighlight::MAX_CHARACTERS
         t.uses :caption
         t.capability :code

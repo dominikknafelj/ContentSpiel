@@ -59,4 +59,28 @@ class ContentModel::CodeFieldTest < ActiveSupport::TestCase
     assert fields("language" => "").valid?
     assert fields("language" => "ruby").valid?
   end
+
+  # Design answer C5: a field is called what its type says ("File name"),
+  # and its name humanised where the type says nothing.
+  test "a field's label is the one its type gives it, and its name humanised otherwise" do
+    definition = ContentModel::BlockTypeDefinition.new("sample").tap do |t|
+      t.field :filename, :string, label: "File name"
+      t.field :role_type, :string
+    end
+
+    assert_equal [ "File name", "Role type" ], definition.fields.map(&:label)
+    assert_equal "Filename", ContentModel::Definition::Field.new(name: "filename", type: :string, options: {}).label
+  end
+
+  test "a label is a string with something in it" do
+    [ nil, "", "  ", :file_name, 1 ].each do |label|
+      assert_raises(ArgumentError, label.inspect) { ContentModel::BlockTypeDefinition.new("sample").field(:filename, :string, label: label) }
+    end
+  end
+
+  test "the Code block calls its file name File name, and no other built-in field has a label of its own" do
+    labelled = [ BlockTypes, ContentTypes, FieldGroups ].flat_map { |registry| registry.all.flat_map { |type| type.fields.select { |field| field.options.key?(:label) }.map { |field| [ type.name, field.name, field.label ] } } }
+
+    assert_equal [ [ "code", "filename", "File name" ] ], labelled
+  end
 end

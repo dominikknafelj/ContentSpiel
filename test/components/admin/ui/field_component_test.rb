@@ -88,4 +88,13 @@ class Admin::Ui::FieldComponentTranslationTest < ViewComponent::TestCase
     assert_text "English changed since this was translated."
     refute_selector "button", text: "Still correct — mark up to date"
   end
+
+  # Design answer C5 (`label:` on a schema field).
+  test "the label is the field's own where its type gives one, and its name humanised otherwise" do
+    render_inline Admin::Ui::FieldComponent.new(field: Field.new(name: "filename", type: :string, options: { label: "File name" }), form_name: "block[settings]", value: nil, locale: "en")
+    assert_selector "label[for='block_settings-filename']", exact_text: "File name"
+
+    render_inline Admin::Ui::FieldComponent.new(field: Field.new(name: "role_type", type: :string, options: {}), form_name: "block[settings]", value: nil, locale: "en")
+    assert_selector "label[for='block_settings-role_type']", exact_text: "Role type"
+  end
 end

@@ -218,19 +218,33 @@ class Post < ApplicationRecord
   # How a typed field's error names it: `fields.company` -> "Company",
   # `fields.speakers.0.name` -> "Speakers, row 1: name" (a `groups` row),
   # `fields.address.street` -> "Address: street" (a `group`). Rails would
-  # otherwise print the dotted path ("Fields speakers 0 name ...").
+  # otherwise print the dotted path ("Fields speakers 0 name ..."). Each
+  # name is the field's own label where its type gives one (`label:`, read
+  # from the type of the post Rails hands over as `base:`), as its input's is.
   def self.human_attribute_name(attribute, options = {})
     parts = attribute.to_s.split(".")
     return super unless parts.first == "fields" && parts.size > 1
 
-    _, field, *rest = parts
-    label = field.humanize
+    _, name, *rest = parts
+    base = options[:base]
+    field = base.definition&.fields&.find { |candidate| candidate.name == name } if base.respond_to?(:definition)
+    label = field ? field.label : name.humanize
     return label if rest.empty?
 
     row = rest.first.match?(/\A\d+\z/) ? rest.shift.to_i + 1 : nil
-    sub = rest.join(" ").humanize.downcase
+    sub = sub_label(field, rest)
     row ? "#{label}, row #{row}: #{sub}" : "#{label}: #{sub}"
   end
+
+  # A group's own field as its input labels it (`Field#label`), lower-cased
+  # for the middle of a sentence; its name humanised where the group or the
+  # field is not found.
+  def self.sub_label(field, rest)
+    group = field && field.group? ? FieldGroups.find(field.options[:of]) : nil
+    named = group&.fields&.find { |candidate| candidate.name == rest.join(".") }
+    (named ? named.label : rest.join(" ").humanize).downcase
+  end
+  private_class_method :sub_label
 
   # field name => message, for input a typed field couldn't be built from.
   def rejected_field_inputs = (@rejected_field_inputs ||= {})

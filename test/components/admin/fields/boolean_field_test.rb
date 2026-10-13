@@ -24,4 +24,11 @@ class Admin::Fields::BooleanFieldTest < ViewComponent::TestCase
 
     assert_selector "input[type=hidden][name='post[fields][featured]'][value='0'] + input.cs-toggle[type=checkbox][role=switch][checked]", visible: :all
   end
+
+  test "the switch is named by the field's own label where its type gives one" do
+    field = Field.new(name: "featured", type: :boolean, options: { label: "Show on the front page" })
+    render_inline Admin::Fields::BooleanField.new(field:, form_name: "post[fields]", value: true, locale: "en")
+
+    assert_selector "label[for='post_fields-featured']", exact_text: "Show on the front page"
+  end
 end

@@ -52,4 +52,28 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
       assert_includes schema.dig(:properties, :content_type, :enum), "test/event"
     end
   end
+
+  # Design answer C5 (`label:` on a schema field): a message names a typed
+  # field, and a group's own field, as their inputs do.
+  test "a typed field's error names it by the field's own label, the group's field included" do
+    FieldGroups.register("test/host") { |c| c.field :name, :string, required: true, label: "Full name" }
+    ContentTypes.register "test/talk" do |t|
+      t.label "Talk"
+      t.list_component Posts::BlogListComponent
+      t.detail_component Posts::DetailComponent
+      t.field :room, :string, required: true, label: "Meeting room"
+      t.field :hosts, :groups, of: "test/host", label: "Speakers"
+      t.field :chair, :group, of: "test/host"
+    end
+
+    bad = Posts::Save.call(attributes: { content_type: "test/talk", fields: { hosts: [ { name: "" } ], chair: { name: "" } } }, translations: { "en" => { title: "Bad" } })
+
+    assert_not bad.ok?
+    assert_includes bad.errors, "Meeting room can't be blank"
+    assert_includes bad.errors, "Speakers, row 1: full name can't be blank"
+    assert_includes bad.errors, "Chair: full name can't be blank"
+    assert_equal "Hosts", Post.human_attribute_name("fields.hosts"), "asked without the post, the name humanised"
+  ensure
+    Rails.application.reloader.prepare!
+  end
 end

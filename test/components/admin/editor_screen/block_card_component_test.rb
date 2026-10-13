@@ -547,6 +547,8 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "select##{prefix}-language option[value='']", text: "Plain text"
     assert_selector "select##{prefix}-language option", count: 21
     assert_selector "input##{prefix}-filename[name='block[settings][filename]'][value='a.rb']"
+    assert_selector "label[for='#{prefix}-filename']", exact_text: "File name"
+    assert_no_text "Filename"
     assert_selector "textarea##{prefix}-code[name='block[settings][code]']"
     assert_equal "    a = 1", Nokogiri::HTML5.fragment(rendered_content).at_css("textarea##{prefix}-code").text
     assert_selector "##{prefix}-code-errors", visible: :all
@@ -592,7 +594,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
       render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
 
       assert_selector "details[data-shared-fields] summary", text: "Shared fields (3)"
-      assert_equal %w[Language Filename Code], Capybara.string(rendered_content).all("details[data-shared-fields] dt", visible: :all).map { |node| node.text(:all) }
+      assert_equal [ "Language", "File name", "Code" ], Capybara.string(rendered_content).all("details[data-shared-fields] dt", visible: :all).map { |node| node.text(:all) }
       assert_selector "details[data-shared-fields] dd", text: "Ruby", visible: :all
       assert_selector "details[data-shared-fields] dd", text: "a.rb", visible: :all
       assert_equal "    a = 1", Nokogiri::HTML5.fragment(rendered_content).at_css("details[data-shared-fields] dd pre").text

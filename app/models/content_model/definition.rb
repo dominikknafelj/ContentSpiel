@@ -20,18 +20,27 @@ module ContentModel
     # `blank:` is the label of a select's empty choice ("Plain text"); without
     # it the choice has no label. `max:` counts characters for a `:code` field
     # and is a number's upper bound for an `:integer`.
-    OPTIONS = %i[required default min max translated options of blank].freeze
+    #
+    # `label:` is what CS Studio calls the field where the name humanised
+    # would read wrong ("File name" for `filename`): a literal in the type's
+    # definition, as a type's own label and a select's choices are. Everything
+    # that names a field to a person asks `Field#label`, never the name: the
+    # input's label, a translation tab's shared fields, a group's rows on the
+    # public page, and a validation message (`ContentBlock` and `Post`
+    # `.human_attribute_name`).
+    OPTIONS = %i[required default min max translated options of blank label].freeze
 
     # One field in the schema: `options` carries everything but name/type
     # (`required:`, `default:`, `min:`/`max:`, `translated:`, `options:` for
     # `select`, `of:` for a `group`/`groups`). Kept as a plain `Data` (not a
     # full class) because the schema itself is meant to be inert data -- see
     # the class comment -- and these three predicates are the only
-    # behaviour callers need off a field.
+    # behaviour callers need off a field, with the name a person reads (`label`).
     Field = Data.define(:name, :type, :options) do
       def translated? = options[:translated] == true
       def required? = options[:required] == true
       def group? = GROUP_TYPES.include?(type)
+      def label = options[:label].presence || name.humanize
     end
 
     attr_reader :name, :fields, :uses_columns
@@ -65,6 +74,7 @@ module ContentModel
       raise ArgumentError, "#{type} fields can't have a default (there's no one canonical default for a nested value)" if GROUP_TYPES.include?(type) && options.key?(:default)
       raise ArgumentError, "select fields need `options:`" if type == :select && options[:options].blank?
       raise ArgumentError, "code fields can't be translated (the code is the same in every language)" if type == :code && options[:translated]
+      raise ArgumentError, "`label:` is the field's name as a person reads it, a string" if options.key?(:label) && !(options[:label].is_a?(String) && options[:label].present?)
       raise ArgumentError, "`blank:` names the empty choice of a select that isn't required" if options.key?(:blank) && (type != :select || options[:required])
 
       @fields << Field.new(name: name.to_s, type: type, options: options)

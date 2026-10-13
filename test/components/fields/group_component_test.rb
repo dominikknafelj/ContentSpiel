@@ -17,4 +17,12 @@ class Fields::GroupComponentTest < ActiveSupport::TestCase
     assert_selector "dt", text: "Url"
     assert_selector "dd", text: "https://example.com"
   end
+
+  test "a row is named by the field's own label where its type gives one" do
+    definition = ContentModel::FieldGroupDefinition.new("cta").tap { |t| t.field :url, :url, label: "Address" }
+
+    render_inline(Fields::GroupComponent.new(value: ContentModel::FieldSet.for(definition).new({ "url" => "https://example.com" })))
+
+    assert_selector "dt", exact_text: "Address"
+  end
 end
