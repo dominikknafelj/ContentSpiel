@@ -50,7 +50,17 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Starter content"
     press "Add starter content"
 
-    assert_selector "h1", text: "Review"
+    # The answer to this press is the slowest of the wizard: the POST is
+    # `StarterContents::Add`, the same service as CS Studio's "Create starter
+    # pages" (three pages, their posts and blocks and every derived row: 639
+    # statements, about a second cold on an idle laptop), and only then the
+    # redirect to this step. On a two-core runner that is more than
+    # Capybara's default 2 s, and nothing was wrong: the failed run still
+    # showed "Starter content" as the heading (the same failure comes from
+    # delaying the service by 2.5 s). So this one assertion waits longer,
+    # as the one after "Create starter pages" does
+    # (test/system/admin/tokens_related_posts_and_starter_pages_test.rb).
+    assert_selector "h1", text: "Review", wait: 10
     assert_text "Blog, Resume and Now pages"
     assert_text "claude-desktop (created)"
     press "Finish setup"
