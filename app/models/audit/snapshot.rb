@@ -40,7 +40,8 @@ module Audit
     IGNORED_CHANGES = %w[created_at updated_at unpublished_changes_at translation_sources translation_original_changed_at ai_api_key_saved_at].freeze
 
     # The columns that hold a type's schema fields (`ContentBlock#settings`,
-    # `Post#metadata`), read with the record's `definition`: see `summarised`.
+    # `Post#metadata`), whose changes are read with the record's
+    # `definition`: see `typed_changes`.
     TYPED_COLUMNS = %w[settings metadata].freeze
 
     FILTER_MASK = Object.new.freeze
@@ -51,18 +52,25 @@ module Audit
     def for(record)
       return nil if record.nil?
 
-      without_code(without_source_text(scrub(serialize(record).as_json)), record)
+      without_source_text(scrub(serialize(record).as_json))
     end
 
-    # A `:code` field's source (up to 20,000 characters, `CodeHighlight::
-    # MAX_CHARACTERS`) never reaches the log, in a snapshot or in a changes
-    # row: it is recorded as `{ "digest" => SHA-256, "length" => characters }`
-    # (final review I2). A content screen autosaves at every pause in typing,
-    # each save is an event, and this log is append-only in Postgres too, so
-    # what one event stores is stored for good: before this, ten minutes of
-    # work on a long sample were tens of megabytes. The digest still says
-    # that the code changed and whether two events held the same code; the
-    # code itself is on the row and in the published copy.
+    # A `:code` FIELD IN A CHANGES ROW is two digests and two lengths, never
+    # the source, as a rich-text body is two digests there
+    # (`field_changes_for`); THE SNAPSHOT HOLDS THE SOURCE, whole, as it
+    # holds a body: it is the version basis the header of this file promises,
+    # and a typed-fields hash round-trips exactly.
+    #
+    # What it was and what it costs (final review I2, and its re-review):
+    # the source is a key of `settings`, a plain column, so a changes row
+    # held the whole old and the whole new settings, beside the snapshot:
+    # three copies of up to 20,000 characters, about 60 KB an event. A
+    # typing session is ONE event, rewritten at each save (`*.updated`
+    # events coalesce), so what stays in the log is one event for a session
+    # and block: about 60 KB then, about 20.5 KB now, the one copy in the
+    # snapshot (more for characters of several bytes, less once Postgres
+    # compresses it). A post's snapshot holds every language's whole body
+    # and has no cap, so that is the order the log already keeps.
     #
     # Decided by the field's TYPE in the record's definition (a block type's
     # or a post type's schema, and one level into a field group), never by
@@ -71,17 +79,6 @@ module Audit
     # type that declares no code field is recorded as it is. A record whose
     # type is not registered any more has no schema to ask and is recorded as
     # stored.
-    #
-    # This is the one value a snapshot summarises that it used to hold: a
-    # rich-text body is still there whole (it is the version basis), and so a
-    # snapshot of a record with a code field is not a version of its code.
-    def without_code(hash, record)
-      fields = schema_fields(record)
-      return hash unless code_in?(fields)
-
-      TYPED_COLUMNS.reduce(hash) { |result, column| result.key?(column) ? result.merge(column => summarised(result[column], fields)) : result }
-    end
-
     def schema_fields(record) = record.respond_to?(:definition) ? record.definition&.fields.to_a : []
 
     def code_in?(fields) = fields.any? { |field| field.type == :code || (field.group? && code_in?(group_fields(field))) }
@@ -134,7 +131,7 @@ module Audit
     #   for a locale that didn't exist on that side) -- the full document
     #   lives in the snapshot, and a whole-document diff in every changes
     #   row would bloat the log for no reader's benefit;
-    # - a `:code` field of a type's schema (see `without_code`) under the
+    # - a `:code` field of a type's schema (see `schema_fields`) under the
     #   column and the field, `{ "settings code" => { "digest_before",
     #   "digest_after", "length_before", "length_after" } }`, only when the
     #   code changed; the column's other keys stay `{ "settings" =>
@@ -270,7 +267,7 @@ module Audit
 
     # A typed column's change with its code fields taken out and named on
     # their own (see `field_changes_for`). A code field inside a field group
-    # stays where it is, as its summary.
+    # stays where it is, as its digest and its length.
     def typed_changes(column, old, new, fields)
       codes = fields.select { |field| field.type == :code }.map(&:name)
       result = codes.each_with_object({}) do |name, changed|

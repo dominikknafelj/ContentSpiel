@@ -155,9 +155,11 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       Audit::Snapshot.field_changes_for(post)["de body"])
   end
 
-  # Final review I2: a Code block's source is a key of `settings`, a plain
-  # column, so every autosave wrote it three times into a log nobody can
-  # prune (the settings' old and new hash, and the snapshot).
+  # Final review I2, as the re-review settled it: a Code block's source is a
+  # key of `settings`, a plain column, so an event held it three times (the
+  # settings' old and new hash in the changes, and the snapshot). The
+  # changes hold digests now, as a body's do, and the snapshot holds the
+  # source once, as it holds a body: it is the version basis.
   def code_block(settings)
     saved = ContentBlocks::Save.call(create_page(title: "With code").content_blocks.new, attributes: { block_type: "code", settings: settings })
     assert saved.ok?, saved.errors.to_sentence
@@ -166,7 +168,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
 
   def summary_of(code) = { "digest" => Digest::SHA256.hexdigest(code), "length" => code.length }
 
-  test "one save of a 20,000-character source writes a small event that holds none of the source" do
+  test "one save of a 20,000-character source writes small changes that hold none of it, and a snapshot that holds it once" do
     first = "x = 1 # SOURCE-ONE\n" + "a" * 19_000
     second = ("y = 2 # SOURCE-TWO\n" + "b" * 19_981)
     assert_equal 20_000, second.length
@@ -176,19 +178,22 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       assert ContentBlocks::Save.call(block, attributes: { settings: { "language" => "ruby", "filename" => "a.rb", "code" => second } }).ok?
     end
     event = Audit::Event.where(action: "block.updated").order(:id).last
-    stored = event.attributes.to_json
+    changes = event.field_changes.to_json
 
-    assert_operator stored.bytesize, :<, 2_000, "the event is a few hundred bytes, not three copies of the source"
-    assert_not_includes stored, "SOURCE-ONE"
-    assert_not_includes stored, "SOURCE-TWO"
-    assert_not_includes stored, "b" * 50
+    assert_operator changes.bytesize, :<, 500, "the changes are two digests and two lengths"
+    assert_not_includes changes, "SOURCE-ONE"
+    assert_not_includes changes, "SOURCE-TWO"
+    assert_not_includes changes, "b" * 50
     assert_equal second, block.reload.settings["code"], "the row itself holds the source"
+    assert_operator event.attributes.to_json.bytesize, :<, 22_000, "one copy of the source, in the snapshot: about 20.5 KB, where it was about 60"
+    assert_equal 1, event.attributes.to_json.scan("SOURCE-TWO").size
+    assert_not_includes event.attributes.to_json, "SOURCE-ONE", "the code as it was before is nowhere in the event"
     assert_equal({
       "digest_before" => Digest::SHA256.hexdigest(first), "digest_after" => Digest::SHA256.hexdigest(second),
       "length_before" => first.length, "length_after" => 20_000
     }, event.field_changes["settings code"])
     assert_not event.field_changes.key?("settings"), "nothing else of the settings changed"
-    assert_equal({ "language" => "ruby", "filename" => "a.rb", "code" => summary_of(second) }, event.snapshot["settings"])
+    assert_equal({ "language" => "ruby", "filename" => "a.rb", "code" => second }, event.snapshot["settings"], "the snapshot is the block as it stood, code included")
   end
 
   test "the digest of a code field differs when the source differs, and the other settings are recorded as before" do
@@ -197,7 +202,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
 
     assert_equal({ "digest_before" => nil, "digest_after" => Digest::SHA256.hexdigest("a = 1"), "length_before" => nil, "length_after" => 5 }, created.field_changes["settings code"])
     assert_equal [ {}, { "language" => "ruby" } ], created.field_changes["settings"]
-    assert_equal summary_of("a = 1"), created.snapshot.dig("settings", "code")
+    assert_equal "a = 1", created.snapshot.dig("settings", "code")
 
     assert ContentBlocks::Save.call(block, attributes: { settings: { "language" => "python", "filename" => "a.py", "code" => "a = 2" } }).ok?
     changes = Audit::Snapshot.field_changes_for(block)
@@ -228,7 +233,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert_equal "not a code field", Audit::Snapshot.for(block).dig("settings", "code"), "the field's TYPE decides, never the key's name"
   end
 
-  test "a post type's code field gets the same treatment, by its type, and so does one inside a field group" do
+  test "a post type's code field gets the same treatment in the changes, by its type, and so does one inside a field group" do
     FieldGroups.register "test/sample" do |c|
       c.field :name, :string
       c.field :listing, :code
@@ -246,10 +251,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert saved.ok?, saved.errors.to_sentence
     post = saved.record
 
-    snapshot = Audit::Snapshot.for(post)
-    assert_equal summary_of("a = 1"), snapshot.dig("metadata", "source")
-    assert_equal "n", snapshot.dig("metadata", "note")
-    assert_equal [ { "name" => "s", "listing" => summary_of("b = 2") } ], snapshot.dig("metadata", "samples")
+    assert_equal({ "source" => "a = 1", "note" => "n", "samples" => [ { "name" => "s", "listing" => "b = 2" } ] }, Audit::Snapshot.for(post)["metadata"], "the snapshot round-trips")
 
     assert Posts::Save.call(post, attributes: { fields: { source: "a = 3", note: "n", samples: [ { name: "s", listing: "b = 4" } ] } }).ok?
     changes = Audit::Snapshot.field_changes_for(post)
