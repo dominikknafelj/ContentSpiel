@@ -693,9 +693,29 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === 'more-type-blog'")
     await_frames
     assert_not_includes graph["data-labelled"].split(","), "more-type-blog", "a pill has no label beside it"
+    # Pressed near its end, the pill is not selected (design answer F4): it
+    # opens the list with its posts, asked for by its page's NUMBER and its
+    # target (the pill carries the page as a node's id, "page-12"). The read
+    # is played here, since page 12 is the stub's; every other request goes
+    # to the real fetch.
+    page.execute_script(<<~JS)
+      const real = window.fetch
+      window.listedAsked = []
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/listed")) return real(url, options)
+        window.listedAsked.push(String(url))
+        const rows = [ { id: "post-99", title: "Ninety-nine", type: "blog", colour_index: 1, status: "live", degree: 0, related_count: 0, tag_count: 0, open_notes: 0, url: "/ninety-nine", via: "type-blog" } ]
+        return Promise.resolve(new Response(JSON.stringify({ total: 1980, rows, posts_url: "/cs-studio/posts?type=blog" }), { headers: { "Content-Type": "application/json" } }))
+      }
+    JS
     mouse.click(x: pill["x"] + (width / 2) - 2, y: pill["y"] + 5)
-    assert_equal "more-type-blog", graph["data-selected"]
-    assert_selector "[data-mind-graph-card] h2", exact_text: "+1,980 more"
+    within(LIST) do
+      assert_equal [ "POSTS · 1,980" ], all("h2").map { |heading| heading.text.upcase }, "the read's whole total, grouped, though it answered one row"
+      assert_row "Ninety-nine, #{ContentTypes.fetch("blog").label.downcase} post, not in view. Activate to add it to the graph."
+    end
+    assert_equal [ "/cs-studio/mind_graph/listed?page=12&target=type-blog" ], page.evaluate_script("window.listedAsked")
+    assert_equal "", graph["data-selected"], "more is not selected"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
   end
 
   # A notice line is a chip around its own words, not a bar as wide as the
@@ -1843,15 +1863,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     fill_in "Find a page, post or tag", with: "rub"
     within("[data-mind-graph-results]") do
-      assert_link "ruby"
-      assert_text "Tag"
+      # A row's text is its label; its kind is the heading of its group.
+      assert_selector "[data-search-group=tag] a", exact_text: "ruby"
+      assert_equal [ "TAGS" ], all("[data-search-group] > p").map { |heading| heading.text.upcase }
     end
 
     assert_selector "[data-mind-graph-status]", text: "1 result", visible: :all
 
     fill_in "Find a page, post or tag", with: "zzzz"
-    assert_selector "[data-mind-graph-results]", text: "No post or tag matches."
-    assert_selector "[data-mind-graph-status]", text: "No post or tag matches.", visible: :all
+    assert_selector "[data-mind-graph-results]", text: "No page, post or tag matches."
+    assert_selector "[data-mind-graph-status]", text: "No page, post or tag matches.", visible: :all
 
     find_field("Find a page, post or tag").send_keys(:escape)
     assert_no_selector "[data-mind-graph-results]", visible: :visible
@@ -1964,6 +1985,241 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_frame_link { within("nav[aria-label='Modules']") { click_link "Posts" } }
 
     assert page.evaluate_script("window.searchSignals.every((signal) => signal.aborted)"), "the request was left open after the screen was left"
+  end
+
+  # --- pages in the search and the list (pages in the mind graph, spec §5, §7) ---
+
+  test "search finds a page, groups its rows under Pages, Posts and Tags, shows a page's path, and opens the page's neighbourhood" do
+    docs = create_page(title: "Ruby docs")
+    create_post(title: "Ruby notes", tags: [ "ruby" ])
+    create_post(title: "Other", tags: [ "ruby" ])
+    visit admin_mind_graph_path
+    await_graph
+
+    fill_in "Find a page, post or tag", with: "ruby"
+
+    within("#{GRAPH} [data-mind-graph-results]") do
+      assert_equal %w[PAGES POSTS TAGS], all("[data-search-group] > p").map { |heading| heading.text.upcase }
+      assert_selector "[data-search-group=page] a", text: "Ruby docs"
+      assert_selector "[data-search-group=page] a span.font-cs-mono", text: PublicPath.current.where(record: docs).pick(:path)
+      assert_selector "[data-search-group=post] a", text: "Ruby notes"
+      assert_selector "[data-search-group=tag] a", text: "ruby"
+      # Each row's mark: a page's is the renderer's small canvas, a post's
+      # its type's dot, a tag's the square. All decoration.
+      assert_selector "a > [aria-hidden='true']", count: 3
+      assert_selector "[data-search-group=page] a > canvas[data-mark=page]"
+      assert_selector "[data-search-group] ul[role=list][aria-labelledby]", count: 3
+    end
+    assert_marks_drawn "#{GRAPH} [data-mind-graph-results]"
+    click_frame_link { find("#{GRAPH} [data-search-group=page] a").click }
+
+    assert_current_path admin_mind_graph_path(page: docs.id)
+    assert_selector "[data-mind-graph-focus]", text: "Around the page “Ruby docs”"
+    await_graph
+    assert_equal nid(docs), graph["data-labelled"].split(",").first, "the focus is labelled first"
+  end
+
+  test "Not listed on any page shows the posts no page lists in place of the groups, and a row that is not in view adds its post once" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    listed = create_post(title: "Listed")
+    PostRelation.create!(post: listed, related_post: create_post(title: "Also listed"))
+    drawn = create_post(title: "Entry drawn", content_type: "resume_entry")
+    PostRelation.create!(post: drawn, related_post: listed)
+    alone = create_post(title: "Entry alone", content_type: "resume_entry")
+    visit admin_mind_graph_path
+    await_graph
+    assert_nil screen_position(alone), "a post with no connection is not drawn"
+    before = [ graph["data-nodes"], graph["data-edges"] ]
+    assert_equal %w[6 4], before, "two pages, three posts and the type; the tree's line, the lists line and two related"
+
+    find("#{LIST} label", text: "Not listed on any page").click
+
+    within(LIST) do
+      assert_equal [ "POSTS · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_selector "button[data-node-id='#{nid(drawn)}']:not([data-not-in-view])", text: "Entry drawn"
+      assert_row "Entry drawn: post, 1 connection. Shows it in the graph."
+      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: /Entry alone\s*not in view/
+      assert_row "Entry alone, #{ContentTypes.fetch("resume_entry").label.downcase} post, not in view. Activate to add it to the graph."
+      assert_no_selector "button", text: "Listed"
+    end
+    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "the canvas is left as it is"
+
+    find("#{LIST} button[data-node-id='#{nid(alone)}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='7'][data-edges='4']"
+    assert_selector "[data-mind-graph-card] h2", text: "Entry alone"
+    # The page does not know the added post's connections (its row was read
+    # with none counted), so its card says nothing of them.
+    assert_no_selector "[data-mind-graph-card]", text: /related/i
+    assert_selector "[data-mind-graph-card]:focus", wait: 2
+    assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
+    await_graph
+    assert screen_position(alone)
+
+    # Closing the card gives the focus back to the row that opened it, which
+    # is a new element since the rows were drawn again.
+    find("[data-mind-graph-card-close]").click
+    await_js("document.activeElement?.dataset.nodeId === #{nid(alone).to_json}")
+
+    find("#{LIST} button[data-node-id='#{nid(alone)}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='7']"
+    assert_equal "Posts 4", legend_counts[1], "the count of posts follows what the graph holds"
+
+    # The rows follow the legend: with the posts switched off none is in view.
+    toggle "Posts"
+    assert_selector "#{LIST} button[data-not-in-view]", count: 2
+    toggle "Posts"
+    assert_no_selector "#{LIST} button[data-not-in-view]"
+
+    find("#{LIST} label", text: "Not listed on any page").click
+    within(LIST) do
+      assert_equal [ "PAGES · 2", "POSTS · 4", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_row "#{ContentTypes.fetch("blog").label}: post type, 2 posts. Shows it in the graph."
+      assert_selector "button[data-node-id='type-blog'] > canvas[data-mark=type][data-mark-of='#{ContentTypes.fetch("blog").colour_index}'][aria-hidden='true']"
+      assert_equal "2", find("button[data-node-id='type-blog']").all("span").last.text, "the number of posts of the type, where a tag's row has its connections"
+    end
+    # The fourth group is the keyboard's way to a post type's node: its row
+    # selects it, as any row does.
+    find("#{LIST} button[data-node-id='type-blog']").click
+    assert_selector "#{GRAPH}[data-selected='type-blog']"
+    assert_selector "[data-mind-graph-card] h2", text: ContentTypes.fetch("blog").label
+  end
+
+  # Design answer G5: a read that fails says so in the list, not in a toast,
+  # with a small "Try again" button. The stub answers the first request for
+  # the unlisted posts itself and hands every other request to the real fetch.
+  test "a failed read of the unlisted posts says so in the list, Try again loads them, and Back shows the groups again" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    visit admin_mind_graph_path
+    await_graph
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.unlistedFailures = 1
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/unlisted") || window.unlistedFailures <= 0) return original(url, options)
+        window.unlistedFailures -= 1
+        return Promise.resolve(new Response("", { status: 500 }))
+      }
+    JS
+
+    find("#{LIST} label", text: "Not listed on any page").click
+
+    within(LIST) do
+      assert_selector "[role=alert] p", text: "The list couldn't be loaded."
+      assert_no_selector "button[data-node-id]"
+      assert_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+      press "Try again"
+      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
+      assert_no_selector "[role=alert]"
+    end
+    await_js("document.activeElement?.dataset.nodeId === #{nid(alone).to_json}")
+    assert_equal "ready", graph["data-state"], "the graph itself is untouched by the list's failed read"
+    assert_no_selector ".admin-toast", wait: 0
+
+    # Whatever the script wrote into the list is the visit's that was left:
+    # Back shows the groups, and the filter is off.
+    click_frame_link { within("nav[aria-label='Modules']") { click_link "Posts" } }
+    page.go_back
+    await_graph
+    within(LIST) do
+      assert_equal [ "PAGES · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+      assert_selector "input[data-mind-graph-unlisted]", count: 1, visible: :all
+    end
+  end
+
+  test "the list's Pages group is the tree, a page's title and path with markup in them are text in the list, the search and the card" do
+    docs = create_page(title: "<b>Docs</b>")
+    create_page(title: "Guide", parent: docs)
+    visit admin_mind_graph_path
+    await_graph
+
+    within(LIST) do
+      assert_equal [ "PAGES · 3" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "Home", "<b>Docs</b>", "Guide" ], all("li button span.truncate").map(&:text)
+      assert_no_selector "b"
+      # A tree for a screen reader too: a page's row is in a list inside its
+      # parent's item, three levels deep here.
+      assert_selector "ul[role=list] > li > ul[role=list] > li > ul[role=list] > li > button[data-node-id='#{nid(Page.find_by!(parent: docs))}']"
+      assert_selector "li > button > canvas[data-mark=page][aria-hidden='true']", count: 3
+    end
+    assert_marks_drawn LIST
+    # In the Tab order the filter's checkbox is the list's first stop, after
+    # the canvas, and the rows follow it.
+    stops = page.evaluate_script(<<~JS)
+      Array.from(document.querySelector(#{GRAPH.to_json}).querySelectorAll("input, button, a[href], canvas[tabindex='0']"))
+        .filter((element) => element.checkVisibility() && !element.closest("[hidden]") && (element.tagName === "CANVAS" || element.closest("[data-mind-graph-list]")))
+        .map((element) => element.tagName === "CANVAS" ? "canvas" : element.type === "checkbox" ? "checkbox" : "row")
+    JS
+    assert_equal %w[canvas checkbox row row row], stops
+
+    click_node(nid(docs))
+    assert_selector "[data-mind-graph-card] h2", text: "<b>Docs</b>"
+    assert_no_selector "[data-mind-graph-card] b"
+    fill_in "Find a page, post or tag", with: "docs"
+    assert_selector "#{GRAPH} [data-search-group=page] a", text: "<b>Docs</b>"
+    assert_no_selector "#{GRAPH} [data-mind-graph-results] b"
+  end
+
+  # Pages spec §7, design answers F4, F5 and the third answers: around a page
+  # at depth 2 the twenty newest posts it lists are drawn, each hanging off
+  # the hub that brings it in; the rest stand behind "+N more", which hangs
+  # off the same hub and opens the list; a row there adds its post, joined
+  # to its hub and not to the page.
+  test "around a page, more opens the list with the posts that are not drawn, a row adds its post to its hub, and Open in Posts leads there" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
+    posts = 22.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    visit admin_mind_graph_path(page: blog.id, depth: 2)
+    await_graph
+    assert_selector "[data-mind-graph-focus]", text: "Around the page “Blog”"
+    lines = graph["data-edges"].to_i
+    assert_equal 23, lines, "the tree line to Home, the lists line to the type, and the hub's faint lines to twenty posts and to more"
+    assert_nil screen_position(posts.last)
+    assert screen_position("more-type-resume_entry"), "the pill is not drawn"
+
+    click_node("more-type-resume_entry")
+
+    within(LIST) do
+      assert_equal [ "POSTS · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "Entry 20", "Entry 21" ], all("li button span.truncate").map(&:text)
+      assert_selector "button[data-not-in-view]", count: 2
+      assert_row "Entry 21, #{ContentTypes.fetch("resume_entry").label.downcase} post, not in view. Activate to add it to the graph."
+      assert_selector "a[data-mind-graph-posts-link]", text: "Open in Posts →"
+      assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+    end
+    assert_equal "", graph["data-selected"], "more is not selected"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+
+    find("#{LIST} button[data-node-id='#{nid(posts.last)}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(posts.last)}'][data-edges='#{lines + 1}']"
+    assert_equal [ "type-resume_entry" ], graph["data-neighbours"].split(","), "the added post is joined to the hub that brings it in, and not to the page"
+    within(LIST) { assert_row "Entry 21: post, 1 connection. Shows it in the graph." }
+    await_graph
+    assert screen_position(posts.last)
+
+    # The added line is the hub's, and follows "Lists" as the others do.
+    toggle "Lists"
+    assert_selector "#{GRAPH}[data-edges='1']"
+    toggle "Lists"
+
+    # The way back to the groups: Escape on the canvas clears the selection,
+    # and with nothing selected it lets the pill's rows go.
+    escape_on_canvas
+    assert_selector "#{GRAPH}[data-selected='']"
+    within(LIST) { assert_selector "a[data-mind-graph-posts-link]" }
+    escape_on_canvas
+    within(LIST) do
+      assert_equal [ "PAGES · 2", "POSTS · 21", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_no_selector "a[data-mind-graph-posts-link]"
+    end
+
+    await_graph
+    click_node("more-type-resume_entry")
+    click_frame_link "Open in Posts →"
+    assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(current_url).query).slice("type", "tag"))
   end
 
   # --- notes (notes spec §4.4) ------------------------------------------------
@@ -2370,6 +2626,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_row "shared: tag, 2 connections. Shows it in the graph."
       assert_selector "li button > span[aria-hidden='true']", count: 4
       assert_no_selector "a", visible: :all
+      # Nobody reads a page here (there is none), so "Not listed on any
+      # page" would say nothing: the filter is not offered.
+      assert_no_selector "input, label", visible: :all
     end
 
     toggle "Tags"
@@ -2593,6 +2852,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # A row of the list by its accessible name (Capybara's button locator does
   # not read `aria-label`).
   def assert_row(name) = assert_selector("button[aria-label=#{name.to_json}]")
+
+  # Every mark of a row inside `selector` that is a canvas has been drawn:
+  # something is on each one (a canvas that was never painted is all zeros).
+  def assert_marks_drawn(selector)
+    await_js(<<~JS)
+      (() => {
+        const canvases = Array.from(document.querySelectorAll(#{"#{selector} canvas[data-mark]".to_json}))
+        return canvases.length > 0 && canvases.every((canvas) => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))
+      })()
+    JS
+  end
 
   # A real click where the node is drawn.
   def click_node(id)
