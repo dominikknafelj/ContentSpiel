@@ -22,10 +22,18 @@ class SetupFreshDatabaseTest < ActionDispatch::IntegrationTest
     assert_equal [ "setup" ], events.pluck(:channel).uniq
     assert_equal 4, events.count
 
+    # The normal case never shows the missing-group message: the wizard has
+    # made the groups itself by now.
+    get setup_step_path("mcp_token")
+    assert_response :success
+    assert_select "#token-name-error", count: 0
+    assert_no_match(/db:seed/, response.body)
+
     assert_difference "ApiToken.count", 1 do
       patch setup_step_path("mcp_token"), params: { token_name: "claude-desktop" }
     end
     assert_response :success
+    assert_no_match(/db:seed/, response.body)
     token = ApiToken.authenticate(css_select("#mcp-token").first.text.strip)
     assert_equal "Admin", token.group.name
     assert_predicate token.group, :built_in?
@@ -35,7 +43,10 @@ class SetupFreshDatabaseTest < ActionDispatch::IntegrationTest
 
     get admin_groups_path
     assert_response :success
-    [ "Admin", "Author", "Editor", "Read only" ].each { |name| assert_includes response.body, name }
+    # The names as the screen's rows link them, not as words anywhere on the page.
+    rows = css_select("a[href^='/cs-studio/groups/']").map { |link| link.text.strip }
+    [ "Admin", "Author", "Editor", "Read only" ].each { |name| assert_includes rows, name }
+    assert_no_match(/translation missing/i, response.body)
   end
 
   test "a wizard resumed on a site whose first account was made before the groups were: the next step makes them" do
@@ -72,5 +83,10 @@ class SetupFreshDatabaseTest < ActionDispatch::IntegrationTest
     assert_select "input[name=token_name][value=?]", "claude-desktop"
     assert_select "a[href=?]", setup_step_path("starter_content"), text: "Skip"
     assert_select "#mcp-token", count: 0
+    # The whole sentence a person reads, and the page it stands on.
+    assert_equal 'This site has no "Admin" group, which a token made here belongs to. Run bin/rails db:seed on the server to create the built-in groups, ' \
+      "then try again, or skip this step and create a token in CS Studio later.", css_select("#token-name-error").first.text.strip
+    assert_select "h1", text: /Connect an AI agent/
+    assert_no_match(/translation missing/i, response.body)
   end
 end
