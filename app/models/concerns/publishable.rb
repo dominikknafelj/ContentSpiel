@@ -32,7 +32,7 @@ module Publishable
     # The mark that the rows have moved on from what is published
     # (`unpublished_changes_at`, drafts spec §4.4). After the save, so that
     # `saved_changes` says what it wrote; a save marks, and a `touch` (which
-    # runs no save callback: every block write touches its page, a post is
+    # runs no save callback: every block write that changes something touches its page, a post is
     # touched for its tags) marks around the callbacks.
     after_save :note_unpublished_changes
     after_touch :note_unpublished_changes_on_touch

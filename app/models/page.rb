@@ -229,7 +229,7 @@ class Page < ApplicationRecord
 
   # The settings form's autosave base (live-editing spec §3.3). Moved whenever a
   # column the settings form can change is about to change, and by nothing else:
-  # - a `touch` (every block write touches its page) runs no save callbacks, and
+  # - a `touch` (every block write that writes something touches its page) runs no save callbacks, and
   #   `update_columns` and `update_all` go around them on purpose
   #   (`Translations::Confirm`'s bookkeeping must not make an open form stale);
   # - a MOVE IN THE TREE is not a change of the page's settings (final review
