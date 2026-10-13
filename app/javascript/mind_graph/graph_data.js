@@ -65,10 +65,11 @@ export const freeOf = (nodes, indexes) => new Set(indexes.filter((index) => labe
 // part of how a page lists: it has no toggle of its own and follows
 // "Lists" (design answer H1: "they follow the Lists toggle").
 //
-// Nothing here knows the layout: a hidden node keeps its place there
-// (`layout_worker.js`, `filter`), so switching a kind back on does not
-// shuffle the picture, and the anchor (Home, or a local view's focus) is
-// the worker's by its id, whatever is switched off around it.
+// Nothing here knows the layout, and THE LAYOUT KNOWS NOTHING OF THIS: it
+// is computed once over every node and line, and a toggle is a filter on
+// what is drawn (`app.js`). So a hidden node keeps its place and comes back
+// where it was, and the anchor (Home, or a local view's focus) is held at
+// the centre whatever is switched off, itself included.
 export const NODE_TOGGLES = [ "page", "post", "tag", "type" ]
 export const LINE_TOGGLES = [ "tree", "lists", "related", "tag" ]
 

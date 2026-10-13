@@ -43,8 +43,27 @@
 // nothing here keeps a copy. A toggle changes what is drawn, the list
 // beside the canvas and the canvas's name, and leaves each toggle's COUNT
 // as it is: a count is what the response holds, written once per load
-// (`writeCounts`). The layout keeps a hidden node's place, so switching a
-// kind back on does not shuffle the picture. THE CANVAS'S NAME is the
+// (`writeCounts`).
+//
+// A TOGGLE IS A FILTER ON WHAT IS DRAWN, NOT A NEW LAYOUT (the ruling on the
+// review of the pages plan's Task 6). THIS DEPARTS FROM THE PAGES SPEC §5,
+// which hands a toggle "to the worker as today's filter is": that was the
+// old radios' way, it re-ran the layout on every change, and with eight
+// toggles, four of them of lines alone, the picture reshuffled when a line
+// was hidden and a node nobody touched could leave the view. So THE LAYOUT
+// IS COMPUTED ONCE, OVER EVERYTHING THE DATA HOLDS, and a toggle sends the
+// worker nothing: no node moves, nothing warms up, `data-settled` stays,
+// the camera stays. Every node keeps its place, shown or not, and what is
+// switched back on comes back where it was. What a toggle changes is
+// `state.visibleNodes` and `state.visibleEdges`, which the renderer, the
+// hit test, the labels, the list and the summary read. A PIN IS THE
+// LAYOUT'S, so a toggle does not touch it either: a pinned node that is
+// hidden is still held, still counted by "Release N pinned", and comes
+// back pinned (letting it go would warm the layout up). The selection and
+// the hover are of what is drawn, and go with a node that is hidden. The
+// price: a cluster does not close up when what held it apart is hidden.
+// (A post ADDED from the list is a change of the graph itself, and the
+// layout is told of that: `addPost`.) THE CANVAS'S NAME is the
 // summary of what is in view (`summary.js`); after a toggle the same words
 // go into the notice's live region, hidden from the eye, which is how the
 // change is announced.
@@ -107,8 +126,8 @@
 // Unpin, "Release N pinned" beside the zoom buttons lets all of them go, and
 // a double click on a pinned node lets that one go. Pins live in this page
 // only -- `state.pinned`, nothing stored -- so a reload or leaving the screen
-// forgets them, and a filter change forgets those of the nodes it hides (the
-// worker lets go of them too). The node is held where it was grabbed, not by
+// forgets them. A toggle of the legend does not: a pin is the layout's, and a
+// toggle changes only what is drawn. The node is held where it was grabbed, not by
 // its centre: a drag by the label must not make the mark jump to the pointer.
 // While its own node is dragged the card is out of the way, and comes back
 // with the drop.
@@ -466,11 +485,9 @@ export function mount(element) {
     // its place, but its neighbours are the ones the shown edges give it now,
     // so nothing stays lit (or dimmed) by an edge that is no longer drawn.
     if (state.selected >= 0) select(state.visibleNodes.includes(state.selected) ? state.selected : -1)
-    // A pin is for a node on screen: one the filter hides is let go (the
-    // worker does the same with its `filter`), the others stay.
-    const shown = new Set(state.visibleNodes)
-    state.pinned.forEach((index) => { if (!shown.has(index)) state.pinned.delete(index) })
+    // (A pin is the layout's and stays, also on a node that is hidden.)
     // Nor is a node the filter hides hovered any longer, by either source.
+    const shown = new Set(state.visibleNodes)
     if (rowHover >= 0 && !shown.has(rowHover)) rowHover = -1
     if (pointerHover >= 0 && !shown.has(pointerHover)) pointerHover = -1
     element.dataset.nodes = state.visibleNodes.length
@@ -590,8 +607,9 @@ export function mount(element) {
     writeCounts()
     if (layout) {
       element.removeAttribute("data-settled")
+      // The layout holds every node, whatever the legend hides, so the
+      // post's hub is there for its line also while "Post types" is off.
       layout.add({ id: node.id, radius: collisionRadius(node), x: at[0], y: at[1] }, lines.map((line) => ({ source: state.nodes[line.source].id, target: state.nodes[line.target].id, kind: line.kind })))
-      if (state.visibleNodes.length < state.nodes.length || state.visibleEdges.length < state.edges.length) sendFilter()
     } else if (element.dataset.state === "ready") {
       // Nothing was drawn, so no layout was started: there is something now.
       element.removeAttribute("data-settled")
@@ -879,9 +897,8 @@ export function mount(element) {
           requestDraw()
         },
         // Only a `settled` that answers everything sent so far arrives here
-        // (`layout_client.js`), so with a filter sent right behind `start` --
-        // Back to a screen whose legend has "Tags" switched off -- the fit is
-        // made on the filtered layout, not on the one before it.
+        // (`layout_client.js`). The fit is of what is SHOWN: Back to a
+        // screen whose legend has "Tags" switched off fits what is drawn.
         onSettled: () => {
           if (!state.fitted) fitAll()
           element.setAttribute("data-settled", "")
@@ -891,8 +908,8 @@ export function mount(element) {
     } catch (error) {
       return workerFailed(error.message)
     }
-    // The worker handles its messages strictly in order, so the filter may
-    // follow `start` at once.
+    // EVERY node and line of the data, whatever the legend shows: a toggle
+    // is no business of the layout's.
     // The worker can't ask about motion itself, so it is told (as the page
     // found it now; a change of the setting applies from the next load).
     // What the layout keeps clear around a node is its mark's reach (a box's
@@ -902,11 +919,6 @@ export function mount(element) {
     layout.start(state.nodes.map((node) => ({ id: node.id, radius: collisionRadius(node), anchor: node.id === anchor })),
       state.edges.map((edge) => ({ source: state.nodes[edge.source].id, target: state.nodes[edge.target].id, kind: edge.kind })),
       { reducedMotion: reducedMotion.matches })
-    if (state.visibleNodes.length < state.nodes.length || state.visibleEdges.length < state.edges.length) sendFilter()
-  }
-
-  function sendFilter() {
-    layout?.filter(state.visibleNodes.map((index) => state.nodes[index].id), state.visibleEdges)
   }
 
   // Loud on purpose: the system tests fail on any console error, so a worker
@@ -1074,19 +1086,17 @@ export function mount(element) {
     zoomOut: () => zoomBy(1 / BUTTON_ZOOM),
     fit: fitAll,
     releasePinned: () => unpin(Array.from(state.pinned)),
-    // A toggle of the legend changed: hand the layout only what is shown
-    // now. The camera stays where it is. The list, `data-nodes` and
-    // `data-edges` and the canvas's name follow the legend whenever there is
-    // data, a layout or not: when the worker could not start, the list is
-    // all there is, and it must show what the legend says.
+    // A toggle of the legend changed: what is drawn changes, and nothing
+    // else. The layout is told nothing and the camera stays where it is.
+    // The list, `data-nodes` and `data-edges` and the canvas's name follow
+    // the legend whenever there is data, a layout or not: when the worker
+    // could not start, the list is all there is, and it must show what the
+    // legend says.
     filter() {
       if (!state.data) return
       applyFilter()
       summarise({ announce: true })
       rehover()
-      if (!layout) return
-      element.removeAttribute("data-settled")
-      sendFilter()
       requestDraw()
     },
     destroy() {

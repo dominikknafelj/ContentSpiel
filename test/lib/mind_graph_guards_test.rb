@@ -92,4 +92,20 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
       assert(changed.match?(COLUMN) || changed.match?(SCOPES) || changed.match?(COPIES), line)
     end
   end
+  # A TOGGLE OF THE LEGEND IS A FILTER ON WHAT IS DRAWN, NOT A NEW LAYOUT (the
+  # ruling on the pages plan's Task 6): the layout is computed once over
+  # everything the data holds, so no script of the page hands the worker a
+  # `filter`. (The worker and its client still know the message; the browser
+  # test "a toggle moves nothing" holds what this cannot see.)
+  FILTER_SENT = /\blayout\??\.filter\(|type: "filter"/
+
+  test "no script of the mind graph but the layout's own client sends the worker a filter" do
+    senders = Dir[Rails.root.join("app/javascript/mind_graph/*.js"), Rails.root.join("app/javascript/controllers/admin/mind_graph/*.js")]
+      .reject { |path| %w[layout_client.js layout_worker.js].include?(File.basename(path)) }
+      .select { |path| File.read(path).lines.reject { |line| line.strip.start_with?("//") }.join.match?(FILTER_SENT) }
+
+    assert_empty senders.map { |path| File.basename(path) }
+    assert_match FILTER_SENT, "    layout?.filter(state.visibleNodes.map((index) => state.nodes[index].id), state.visibleEdges)"
+    assert_match FILTER_SENT, File.read(Rails.root.join("app/javascript/mind_graph/layout_client.js")), "the client no longer knows the message: this guard and its exception can go"
+  end
 end
