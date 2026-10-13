@@ -67,15 +67,20 @@ class Admin::Fields::CodeFieldTest < ViewComponent::TestCase
     assert_selector counter, exact_text: "21,500 of 20,000 characters · 1,500 over"
   end
 
-  # Task 2's review, Minor 5: nine tenths in whole numbers. As a float,
-  # `70 * 0.9` is 62.99… and the counter would show one character early.
-  test "the counter starts at nine tenths of the limit, counted in whole numbers" do
+  # Task 2's review, Minor 5: nine tenths in whole numbers, rounded down.
+  # (The review's example, `70 * 0.9` as 62.99…, is not what Ruby computes:
+  # no limit up to three million gives the float another answer, so this
+  # test holds the boundary and cannot tell the two spellings apart.)
+  test "the counter starts at nine tenths of the limit, rounded down" do
     render_field("x" * 62, max: 70)
     assert_selector "#{counter}[hidden]", visible: :all
     assert_equal "63", page.find("[data-controller='admin--editor--code-limit']")["data-admin--editor--code-limit-from-value"]
 
     render_field("x" * 63, max: 70)
     assert_selector "#{counter}:not([hidden])", exact_text: "63 of 70 characters"
+
+    render_field("x" * 14, max: 15)
+    assert_equal "13", page.find("[data-controller='admin--editor--code-limit']")["data-admin--editor--code-limit-from-value"], "13.5 is 13"
   end
 
   test "the counter is the field's description only while it shows, and the line that announces it is a polite region the server leaves empty" do

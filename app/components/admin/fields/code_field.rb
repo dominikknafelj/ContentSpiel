@@ -41,8 +41,8 @@ module Admin
 
       def counter? = limit.present?
 
-      # Nine tenths of the limit, in whole numbers (a float's `70 * 0.9` is
-      # 62.99…, one character early).
+      # Nine tenths of the limit, rounded down, in whole numbers: nothing to
+      # round and nothing to trust a float with.
       def threshold = limit * 9 / 10
 
       # Characters as the server counts them (`String#length`), which is what
