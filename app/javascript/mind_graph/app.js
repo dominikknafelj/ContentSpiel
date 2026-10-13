@@ -389,22 +389,35 @@ export function mount(element) {
   // The lines over the canvas's top-left corner (a polite live region). A line is a string or a node
   // (the Retry button); always `textContent`, never markup.
   //
-  // A LINE THAT SAYS WHAT IT SAID IS LEFT AS IT IS: the region is live, and
-  // a paragraph written again is announced again. So a sentence that did
-  // not change when a post was added (`notify`) is not said a second time;
-  // only a line whose words changed, or a new one, is written.
+  // A LINE THAT SAYS WHAT IT SAID IS LEFT WHERE IT IS: the region is live,
+  // and a paragraph that is added is announced, also one that was only taken
+  // out and put back. So a sentence that did not change when a post was
+  // added (`notify`) is not touched at all: it is found BY ITS WORDS, not by
+  // its place (a line before it may have come or gone), it stays in the
+  // document, and only the lines that are new are inserted around it and
+  // the ones no longer said removed. The announced summary's line is never
+  // kept: it goes with every write, as before.
   function say(...lines) {
-    const next = lines.filter(Boolean)
-    const now = Array.from(notice.children)
-    notice.replaceChildren(...next.map((line, index) => {
-      const held = now[index]
-      if (!(line instanceof Node) && held && !held.hasAttribute("data-mind-graph-announced") && held.childElementCount === 0 && held.textContent === line) return held
+    const kept = new Map()
+    for (const held of notice.children) if (!held.hasAttribute("data-mind-graph-announced") && held.childElementCount === 0 && !kept.has(held.textContent)) kept.set(held.textContent, held)
+    const wanted = lines.filter(Boolean).map((line) => {
+      if (!(line instanceof Node) && kept.has(line)) {
+        const held = kept.get(line)
+        kept.delete(line)
+        return held
+      }
       const paragraph = document.createElement("p")
       paragraph.className = "m-0 w-fit rounded-cs bg-surface px-1"
       if (line instanceof Node) paragraph.append(line)
       else paragraph.textContent = line
       return paragraph
-    }))
+    })
+    for (const held of Array.from(notice.children)) if (!wanted.includes(held)) held.remove()
+    let next = notice.firstChild
+    for (const paragraph of wanted) {
+      if (paragraph === next) next = next.nextSibling
+      else notice.insertBefore(paragraph, next)
+    }
   }
 
   // One redraw per animation frame, and only when something asked for one.
@@ -710,7 +723,9 @@ export function mount(element) {
     const hub = row.via == null ? -1 : indexOf.get(row.via) ?? -1
     const index = state.nodes.length
     const lines = hub < 0 ? [] : state.nodes[hub].kind === "tag" ? [ { kind: "tag", source: index, target: hub } ] : [ { kind: "brings", source: hub, target: index } ]
-    const node = { ...row, kind: "post", degree: lines.length, related_count: null, tag_count: null }
+    // `added`: the person put it there, which the canvas's name says of a
+    // post no page lists (`summary.js`).
+    const node = { ...row, kind: "post", degree: lines.length, related_count: null, tag_count: null, added: true }
     node.label = labelFor(node)
     node.cut = !node.label.startsWith(String(node.title))
     state.nodes.push(node)

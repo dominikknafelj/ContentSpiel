@@ -117,8 +117,13 @@ module PostGraph
                           keep_tag: (@focus.id if @focus.kind == "tag"), more: @more)
       graph = builder.build(plan)
       raise ActiveRecord::RecordNotFound if @focus.kind == "tag" && graph[:tags].none? { |tag| tag[:id] == @focus.node_id }
+      # So is a post focus that went between the site's read and the nodes'
+      # (`Builder#build` gives it no node): not found, never a view around
+      # nothing. Any other post that went is in no figure.
+      raise ActiveRecord::RecordNotFound if @focus.kind == "post" && graph[:nodes].none? { |node| node[:id] == @focus.node_id }
 
-      graph.merge(total: post_ids.size, shown: kept.size,
+      went = kept.size - graph[:nodes].size
+      graph.merge(total: post_ids.size - went, shown: graph[:nodes].size,
                   site: { pages: @site.pages.size, posts: @site.post_rows.size, tags: (@site.tag_counts.keys.to_set | @site.listings.tag_ids).size },
                   focus: { kind: @focus.kind, id: @focus.id, node_id: @focus.node_id, title: @focus.title, depth: @depth })
     end

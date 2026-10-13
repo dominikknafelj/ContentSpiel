@@ -702,6 +702,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     JS
     lines = -> { all("#{GRAPH} [role=status] p:not([data-mind-graph-announced])").map { |line| [ line.text, line["data-heard"] ] } }
     heard = -> { page.execute_script("document.querySelectorAll(#{"#{GRAPH} [role=status] p".to_json}).forEach((line) => { line.dataset.heard = 'before' })") }
+    # What is ADDED to the live region is what a screen reader is read: every paragraph put in, by its words.
+    watch = <<~JS
+      window.noticeAdded = []
+      new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => window.noticeAdded.push(node.textContent))))
+        .observe(document.querySelector(#{"#{GRAPH} [data-admin--mind-graph--graph-target='notice']".to_json}), { childList: true })
+    JS
+    added = -> { page.evaluate_script("window.noticeAdded.splice(0)") }
 
     with_reduced_motion do
       within("nav[aria-label='Modules']") { click_link "Mind graph" }
@@ -709,12 +716,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_equal [ "Showing the 2,000 best-connected of 6,000 posts.", "1,214 other posts have no connections yet and aren't shown." ], lines.call.map(&:first)
       find("#{LIST} label", text: "Not listed on any page").click
       assert_selector "#{LIST} button[data-not-in-view]", count: 2
+      page.execute_script(watch)
 
       heard.call
       find("#{LIST} button[data-node-id='post-50']").click
       assert_selector "#{GRAPH}[data-selected='post-50'][data-nodes='3']"
       assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", nil ], [ "1,214 other posts have no connections yet and aren't shown.", "before" ] ], lines.call,
         "one more is shown; the other sentence is the element it was"
+      assert_equal [ "Showing the 2,001 best-connected of 6,000 posts." ], added.call, "and it was never taken out and put back: only the sentence that changed is put into the live region"
       assert_includes find(CANVAS)["aria-label"], "Showing the 2,001 best-connected of 6,000 posts."
 
       heard.call
@@ -722,6 +731,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_selector "#{GRAPH}[data-selected='post-51'][data-nodes='4']"
       assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", "before" ], [ "1,213 other posts have no connections yet and aren't shown.", nil ] ], lines.call,
         "one fewer isn't shown; the cap's sentence is the element it was"
+      assert_equal [ "1,213 other posts have no connections yet and aren't shown." ], added.call
     end
   end
 
@@ -2757,6 +2767,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     blog = create_page(title: "Blog")
     ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "tag" => "pill" })
     ContentBlock.create!(owner: blog, block_type: :post_list, position: 1, settings: { "content_type" => "resume_entry" })
+    stray = create_post(title: "Stray") # no page lists it: a plain post with no tag
     pills = 15.times.map { |index| create_post(title: "Pill #{index}", tags: [ "pill" ]) }
     entries = 15.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
     pills.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 1).hours.ago) }   # version: none (a test sets a time) # changes: none (a test sets a time)
@@ -2827,6 +2838,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       within(LIST) do
         assert_equal [ [ "more-#{tag}", "+4 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("button[data-more]").map { |button| [ button["data-node-id"], button.text ] }
       end
+      # A post the person adds from "Not listed on any page" is in view and is
+      # not one the page lists: it is counted beside them, so 21 and 9 still
+      # make the page's 30.
+      find("#{LIST} label", text: "Not listed on any page").click
+      find("#{LIST} button[data-node-id='#{nid(stray)}'][data-not-in-view]").click
+      assert_selector "#{GRAPH}[data-selected='#{nid(stray)}']"
+      assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 21 of 30 posts, 1 post and 1 tag. 9 more are in the list.']"
       await_graph
     end
   end

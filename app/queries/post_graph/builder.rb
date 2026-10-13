@@ -115,21 +115,39 @@ module PostGraph
       Plan.new(post_ids: post_ids, page_ids: page_ids, related: related, by_tag: by_tag, tag_counts: tag_counts, lists: lists, more: more, edges: edges)
     end
 
+    # THE NODES ARE READ FIRST, AND WHAT WENT BETWEEN THE TWO READS GOES
+    # WHOLE. The plan was made from the site as it was loaded; a tag deleted
+    # since has no name, and a post trashed or taken out of the viewer's
+    # scope since has no node (`post_nodes` reads through the scope again).
+    # Neither may be left as the end of a line: the page looks every end up
+    # among its nodes, and a line to nothing fails the whole load. So both
+    # are `gone`: their lines are dropped, a pill on a gone tag with them,
+    # and every count is made from what is left (a post's related posts and
+    # tags, a tag's posts, every node's degree), so the counts agree with
+    # the lines. The callers' own figures follow the nodes too (`Global`,
+    # `Local`: `total`, `shown`).
     def build(plan)
       names = Tag.where(id: plan.by_tag.keys).pluck(:id, :name).to_h
-      # A tag deleted between the two statements: no node, and no line to it.
+      posts = post_nodes(plan.post_ids)
+      present = posts.to_set { |node| node[:id] }
+      missing = plan.post_ids.reject { |id| present.include?(PostGraph.node_id(:post, id)) }.to_set
       gone = (plan.by_tag.keys - names.keys).to_set { |tag_id| PostGraph.node_id(:tag, tag_id) }
+      gone.merge(missing.map { |id| PostGraph.node_id(:post, id) })
       edges = gone.empty? ? plan.edges : plan.edges.reject { |edge| gone.include?(edge[:target]) || gone.include?(edge[:source]) }
       degree = Hash.new(0)
       edges.each { |edge| degree[edge[:source]] += 1; degree[edge[:target]] += 1 }
       related_count = Hash.new(0)
-      plan.related.each { |post_id, related_id| related_count[post_id] += 1; related_count[related_id] += 1 }
+      plan.related.each { |post_id, related_id| (related_count[post_id] += 1; related_count[related_id] += 1) unless missing.include?(post_id) || missing.include?(related_id) }
       tag_count = Hash.new(0)
-      plan.by_tag.each { |tag_id, rows| rows.each { |_tag_id, post_id| tag_count[post_id] += 1 } if names.key?(tag_id) }
+      lost = Hash.new(0)
+      plan.by_tag.each do |tag_id, rows|
+        rows.each { |_tag_id, post_id| missing.include?(post_id) ? lost[tag_id] += 1 : (tag_count[post_id] += 1 if names.key?(tag_id)) }
+      end
+      record_id = plan.post_ids.index_by { |id| PostGraph.node_id(:post, id) }
 
       graph = {
-        nodes: post_nodes(plan.post_ids, degree: degree, related_count: related_count, tag_count: tag_count),
-        tags: names.map { |tag_id, name| tag_node(tag_id, name, plan, degree) }.sort_by { |tag| [ tag[:name].to_s.downcase, tag[:id] ] },
+        nodes: posts.map { |node| node.merge(degree: degree.fetch(node[:id], 0), related_count: related_count.fetch(record_id[node[:id]], 0), tag_count: tag_count.fetch(record_id[node[:id]], 0)) },
+        tags: names.map { |tag_id, name| tag_node(tag_id, name, plan, degree, lost[tag_id]) }.sort_by { |tag| [ tag[:name].to_s.downcase, tag[:id] ] },
         pages: page_nodes(plan.page_ids, degree),
         types: type_nodes(plan.lists, degree),
         edges: edges
@@ -173,9 +191,11 @@ module PostGraph
 
     private
 
-    def tag_node(tag_id, name, plan, degree)
+    # `lost`: how many of the tag's drawn posts went between the two reads;
+    # they are no longer posts that carry it.
+    def tag_node(tag_id, name, plan, degree, lost = 0)
       id = PostGraph.node_id(:tag, tag_id)
-      { id: id, name: name, count: plan.tag_counts.fetch(tag_id, plan.by_tag[tag_id].size), degree: degree.fetch(id, 0) }
+      { id: id, name: name, count: [ plan.tag_counts.fetch(tag_id, plan.by_tag[tag_id].size) - lost, 0 ].max, degree: degree.fetch(id, 0) }
     end
 
     # The pages are the site's own, loaded once; what is read here is their

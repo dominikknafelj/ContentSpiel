@@ -2153,9 +2153,13 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const listing = [ { id: "page-1", kind: "page", listed_count: 112 }, ...Array.from({ length: 20 }, (_, index) => ({ id: `post-${index}`, kind: "post", listed: true })), { id: "more-type-a", kind: "more", count: 92, target: "type-a" } ]
         const named = () => summaryOf({ nodes: listing, visibleNodes: listing.map((_, index) => index), lines: 0, data: { focus, shown: 20, total: 20 }, off: { nodes: [], lines: [] }, toggles: 4 }, { text, number: String })
         const before = named()
-        listing.push({ id: "post-900", kind: "post", listed: false })
+        // A post the view itself draws that no page lists (a related post) is counted as before.
+        listing[1].listed = false
+        const drawn = named()
+        listing[1].listed = true
+        listing.push({ id: "post-900", kind: "post", listed: false, added: true })
         const beside = named()
-        done({ seen, pills, isolated, shown, before, beside })
+        done({ seen, pills, isolated, shown, before, beside, drawn })
       }).catch((error) => done({ error: String(error) }))
     JS
     flunk result["error"] if result["error"]
@@ -2174,6 +2178,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_no_match(/ posts\(/, result["before"].sub(/\Alocal\(/, ""), "with every post listed there is no second count")
     assert_match(/posts_of\(20 20 112\).*posts\(1 1\)/, result["beside"], "20 of 112 and 92 more still add up to 112: the unlisted post is counted beside them, and is counted")
     assert_match(/more\(92 92\)/, result["beside"])
+    assert_equal result["before"], result["drawn"], "only a post the person added is counted apart: the sentence does not change where nothing was added"
     assert_equal [ -1, 1, -1, 0, -1, 0, -1, 3, -1, 3, -1, 2, -1, "none" ], result["isolated"],
       "a row that says its post has no connection takes one from those that aren't shown, never below none; one the cap cut, and one that says nothing, take none; at the cap an unconnected one still does; a local view counts none"
   end

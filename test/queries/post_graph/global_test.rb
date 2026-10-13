@@ -691,4 +691,47 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     assert_equal [ 3, 28 ], [ small, @answer[:pages].size ]
     assert_equal [ 14, 14 ], [ few.size, many.size ], many.join("\n")
   end
+
+  # Every end of every line is a node the answer holds, and every count is
+  # the count of the answer's own lines: what the page relies on when it
+  # looks an end up among its nodes.
+  def assert_whole(graph)
+    ids = (graph[:nodes] + graph[:tags] + graph[:pages] + graph[:types] + graph.fetch(:more, [])).to_set { |node| node[:id] }
+    loose = graph[:edges].reject { |edge| ids.include?(edge[:source]) && ids.include?(edge[:target]) }
+    assert_empty loose, "a line names an id that has no node"
+    degree = Hash.new(0)
+    graph[:edges].each { |edge| degree[edge[:source]] += 1; degree[edge[:target]] += 1 }
+    (graph[:nodes] + graph[:tags] + graph[:pages] + graph[:types]).each { |node| assert_equal degree[node[:id]], node[:degree], "#{node[:id]}: its degree is not the number of its lines" }
+    graph[:nodes].each do |node|
+      lines = graph[:edges].select { |edge| [ edge[:source], edge[:target] ].include?(node[:id]) }
+      assert_equal [ lines.count { |edge| edge[:kind] == "related" }, lines.count { |edge| edge[:kind] == "tag" } ], node.values_at(:related_count, :tag_count), "#{node[:id]}: its two counts are not its lines"
+    end
+  end
+
+  # Trashes `post` between the site's read and the nodes' (the builder is
+  # made after the site is loaded), as an editor's press in another request
+  # would.
+  def vanishing(post)
+    build = PostGraph::Builder.method(:new)
+    with_singleton_override(PostGraph::Builder, :new, ->(**options) { post.update_column(:trashed_at, Time.current); build.call(**options) }) { yield } # version: none (a test trashes a post between two reads) # changes: none (a test)
+  end
+
+  test "a post that is trashed between the site's read and the nodes' goes whole: no node, no line to it, and every count is of what is left" do
+    list_block(create_page(title: "Blog"), content_type: "blog", tag: "t")
+    a, b, c = %w[A B C].map { |title| create_post(title: title, tags: [ "t" ]) }
+    relate(a, b)
+    relate(b, c)
+    whole = graph
+    assert_whole whole
+    assert_equal [ 3, 3, 3 ], [ whole[:nodes].size, whole[:shown], whole[:total] ]
+
+    result = vanishing(b) { graph }
+
+    assert_equal [ pid(a), pid(c) ], result[:nodes].map { |node| node[:id] }.sort
+    assert_no_match(/#{pid(b)}\b/, result.to_json, "nothing of the answer names it")
+    assert_whole result
+    assert_equal [ 2, 2 ], result.values_at(:shown, :total), "it is not one of the posts shown, nor of the connected ones"
+    assert_equal 2, result[:tags].find { |tag| tag[:name] == "t" }[:count], "nor one of the posts that carry the tag"
+    assert_equal [ [ 1, 0, 1 ] ] * 2, result[:nodes].map { |node| node.values_at(:degree, :related_count, :tag_count) }
+  end
 end

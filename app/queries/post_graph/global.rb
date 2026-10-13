@@ -76,7 +76,12 @@ module PostGraph
       # readable Home there is nowhere to open, and the whole graph it is.
       return { open: PostGraph.node_id(:page, site.home.id), edges: plan.edges.size } if !@everything && site.home && plan.edges.size > @open_above
 
-      builder.build(plan).merge(total: weight.size, shown: kept.size, isolated: site.post_rows.size - weight.size)
+      # A post that went between the site's read and the nodes' has no node
+      # (`Builder#build`); it is not one of the connected posts any more,
+      # and not one of those shown.
+      graph = builder.build(plan)
+      went = kept.size - graph[:nodes].size
+      graph.merge(total: weight.size - went, shown: graph[:nodes].size, isolated: site.post_rows.size - weight.size)
     end
   end
 end

@@ -53,11 +53,14 @@ export function summaryOf({ nodes, visibleNodes, lines, data, off, toggles, arou
   const focus = data.focus
   const more = inView.filter((node) => node.kind === "more").reduce((sum, pill) => sum + pill.count, 0)
   const listed = more > 0 && focus?.kind === "page" ? nodes.find((node) => node.id === focus.node_id)?.listed_count ?? null : null
-  // "N of M posts" is of the posts the page LISTS: a post added from "Not
-  // listed on any page" (`listed: false`, the row's own word) is in view and
-  // is none of them, so it is counted beside them, as posts are counted
-  // anywhere else ("20 of 112 posts and 1 post"): N and "more" add up to M.
-  const unlisted = listed == null ? 0 : inView.filter((node) => node.kind === "post" && node.listed === false).length
+  // "N of M posts" is of the posts the page LISTS: a post THE PERSON ADDED
+  // from "Not listed on any page" (`added`, written by `app.js`, and
+  // `listed: false`, the row's own word) is in view and is none of them, so
+  // it is counted beside them, as posts are counted anywhere else ("20 of
+  // 112 posts and 1 post"): N and "more" add up to M. Only an added one: a
+  // post the view itself draws is counted as it always was, whoever lists
+  // it, so the sentence changes only when the person changed the picture.
+  const unlisted = listed == null ? 0 : inView.filter((node) => node.kind === "post" && node.added === true && node.listed === false).length
   const kinds = [ [ "pages", drawn("page") ], [ "types", drawn("type") ], [ listed == null ? "posts" : "posts_of", drawn("post") - unlisted, { total: number(listed ?? 0) } ],
                   [ "posts", unlisted ], [ "tags", drawn("tag") ] ]
     .filter(([ , count ]) => count > 0).map(([ key, count, extra ]) => counted(key, count, extra))
