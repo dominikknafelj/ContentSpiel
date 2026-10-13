@@ -54,6 +54,21 @@
   color: var(--th-accent);
   cursor: pointer;
 }
+/* The status line ("Copied", "Not copied") is for a screen reader only: the
+   button's own word changes for the eye. Hidden by this rule and not by a
+   utility, so a theme that writes its own template, or scans other folders,
+   keeps it hidden by writing the class. */
+.content-block--code .code-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .content-block--code .code-head button:hover {
   color: var(--th-accent-hover);
 }

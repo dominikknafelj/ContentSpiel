@@ -10,7 +10,7 @@
     <% end %>
     <%= tag.button string(:copy), type: "button", hidden: true, aria: { label: string(:copy_code), describedby: (file_id if filename.present?) },
           data: { code_copy_target: "button", action: "code-copy#copy" } %>
-    <span class="sr-only" role="status" data-code-copy-target="status"></span>
+    <span class="code-status" role="status" data-code-copy-target="status"></span>
   </div>
   <pre tabindex="0" data-code-copy-target="source"><code><% lines.each_with_index do |line, index| %><%= "\n" if index.positive? %><% line.each do |role, text| %><% if role %><%= tag.span(text, class: "syn-#{role}") %><% else %><%= text %><% end %><% end %><% end %></code></pre>
   <% if caption.present? %>
