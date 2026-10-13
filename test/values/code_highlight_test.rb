@@ -61,6 +61,17 @@ class CodeHighlightTest < ActiveSupport::TestCase
     end
   end
 
+  # Task 1's review, Minor 6: a role is handed out by reference where the
+  # cache stores nothing, and a template that wrote to one would change the
+  # table for the whole process.
+  test "a role cannot be written to: the table's strings are frozen, and so is the role a line carries" do
+    assert CodeHighlight::RULES.all? { |rule| rule.frozen? && rule.all?(&:frozen?) }
+    assert CodeHighlight::ROLES.all?(&:frozen?)
+    role = CodeHighlight.lines("def", "ruby").first.first.first
+    assert_equal "keyword", role
+    assert_raises(FrozenError) { role << "x" }
+  end
+
   test "no language, a blank one and a language that is not on the list are plain text, tabs and angle brackets as they are" do
     plain = [ [ [ nil, "a < b" ] ], [ [ nil, "\tc" ] ] ]
 

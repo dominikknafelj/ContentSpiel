@@ -72,11 +72,12 @@ module CodeHighlight
   # The seven roles, each a theme token (`--th-syn-<role>`) and a class
   # (`syn-<role>`). Strings, so the cached lines read the same whatever
   # serializer the cache store uses.
-  ROLES = %w[comment keyword string constant tag attribute embed].freeze
+  ROLES = %w[comment keyword string constant tag attribute embed].map(&:freeze).freeze
 
   # Rouge's token names by prefix, most specific first. `Comment.Preproc` is
   # `embed`, which is what makes ERB's delimiters stand out. Everything that
-  # matches none is plain.
+  # matches none is plain. The strings are frozen: a role is handed out by
+  # reference, and a template must not be able to write to the table.
   RULES = [
     [ "Comment.Preproc", "embed" ],
     [ "Comment", "comment" ],
@@ -88,7 +89,7 @@ module CodeHighlight
     [ "Name.Constant", "constant" ],
     [ "Name.Tag", "tag" ],
     [ "Name.Attribute", "attribute" ]
-  ].freeze
+  ].map { |prefix, role| [ prefix.freeze, role.freeze ].freeze }.freeze
 
   module_function
 
