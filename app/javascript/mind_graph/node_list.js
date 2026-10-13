@@ -56,7 +56,13 @@
 // renderer the graph is drawn by (`swatches.js`: `markCanvas`, painted once
 // the rows are in the document), so a hub's row cannot show a look the
 // canvas does not have. A post's is its type's dot and a tag's the square,
-// CS Studio's own (`card.js`).
+// CS Studio's own (`card.js`). NOTHING HERE IS LAZY, AND THE BOUND IS THE
+// PAGES AND THE HUBS: one canvas and one drawing for each, made again with
+// the rows on every redraw (a legend toggle, a post added, a theme change),
+// never for a post or a tag, of which there can be two thousand. Measured
+// on 2026-10-13 at 204 pages and 4 hubs: 208 canvases painted in 1.4 to
+// 1.8 ms, inside a redraw of the whole list (2,202 rows) of about 30 ms.
+// A site of several thousand pages is where this would be looked at again.
 //
 // ABOVE THE GROUPS, "Not listed on any page" (pages spec §7), a checkbox:
 // while it is on, the list shows the rows the app hands `showRows` IN PLACE
@@ -80,6 +86,10 @@
 // the focus was in the rows it is put on "Try again": the row or the button
 // that was pressed is gone, and the keyboard is not left on nothing.
 //
+// WHILE A READ IS OUT the rows' region is `aria-busy` (`setBusy`, the
+// app's to say): its rows are about to be replaced. No words: nobody gave
+// any for a pending list.
+//
 // THE FOCUS IS NOT LOST when the rows are drawn again (a post was added, a
 // kind was switched, "Try again" brought the rows): `render` and `showRows`
 // replace the rows' own region and never the checkbox, and when the focus
@@ -91,7 +101,7 @@
 // typeLabels, retryClass, unlisted, onSelect, onHover, onAdd, onMore,
 // onUnlisted })` answers `{ render(nodes), showRows({ heading, rows, inView,
 // link, back }), fail(line, { label, onRetry, focus, back }), clear(),
-// setUnlisted(on), mark(id), row(id), destroy() }`: `render` replaces the
+// setUnlisted(on), setBusy(on), mark(id), row(id), destroy() }`: `render` replaces the
 // rows with the four groups (the app calls it once per load and once per
 // filter change), `clear` empties the rows while another graph is loaded,
 // `mark` moves the mark to the row of `id` (null for none). `back` is
@@ -379,6 +389,11 @@ export function createList(container, { text, number = String, dotClasses, typeL
       body.replaceChildren()
     },
     setUnlisted(on) { unlisted.checked = on },
+    // A read of the rows is out: what the region holds is about to change.
+    setBusy(on) {
+      if (on) body.setAttribute("aria-busy", "true")
+      else body.removeAttribute("aria-busy")
+    },
     mark,
     row: (id) => rows.get(id) || null,
     destroy() {

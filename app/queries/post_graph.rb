@@ -14,6 +14,17 @@
 # - `PostGraph::Site`: the readable posts and pages, loaded once (pages in
 #   the mind graph, spec §1), with `PostGraph::Tree` (the page tree as far as
 #   the viewer reads it) and `PostGraph::Listings` (which page lists what).
+# - `PostGraph::Kinds`: which kinds of node and of line a viewer may be
+#   shown at all, by what they read: the legend's toggles ask it.
+#
+# WHAT IT COSTS, measured on 2026-10-13 at 204 pages and 2,005 posts (the
+# pages spec's "As built" has the table and how each figure was taken): the
+# whole graph at most thirteen statements and 0.14 s, of which the rows are
+# a tenth and the rest is Ruby building 2,202 nodes and 6,204 lines; the
+# answer that says where to open instead six statements and 0.05 s; a local
+# view, a search and each of the list's reads under 0.06 s. Every read but
+# the search loads the site (`Site`, with `Listings`), so what `Listings`
+# costs is paid by each: its header says how that is bounded.
 #
 # Shape (every `id`, `source`, `target`, `parent` and `page` is a node's id,
 # `node_id`'s):
@@ -107,6 +118,11 @@ module PostGraph
   # `{ page_id => "/about" }`; a page with an address in neither is not in
   # it. One statement, `PublicSite::Paths.current_paths`' (the stored rows'
   # one read for several records), so the read is written once.
+  #
+  # `page_ids` IS AN ARRAY OF IDS THE CALLER HAS NARROWED: this knows
+  # nothing of rights and answers the address of any page id it is given, so
+  # a caller hands it the ids of pages the viewer reads and no other. (A
+  # relation would be loaded first, a second statement: hand over ids.)
   def self.paths(page_ids, locale:)
     PublicSite::Paths.current_paths("Page", page_ids.to_a)
                      .transform_values { |paths| paths[locale.to_s] || paths[Locales.default.to_s] }.compact

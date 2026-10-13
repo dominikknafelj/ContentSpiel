@@ -36,6 +36,19 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
   def legend(content_types: %w[blog], pages: true) = render_inline(Admin::MindGraphScreen::LegendComponent.new(content_types: content_types, pages: pages))
 
   # Pages spec §6 (design answers part one §4, F6): the legend is the filter.
+  # Spec decision 8: "a new visit starts from the defaults". Firefox puts a
+  # form's state back on a reload, so there a toggle switched off would have
+  # stayed off (the graph agrees with the checkbox either way: the state is
+  # read from it). `autocomplete="off"` is what tells a browser not to
+  # (Task 6's review, M12). What a browser does with it is not tested here:
+  # the suite's browser restores nothing.
+  test "every toggle asks the browser not to put its state back on a reload" do
+    legend
+
+    assert_selector "[data-mind-graph-legend] input[type=checkbox]", count: 8
+    assert_selector "[data-mind-graph-legend] input[type=checkbox][autocomplete=off]", count: 8
+  end
+
   test "the kinds of node and of line are checkboxes in two named groups, all on, each with its name and an empty count" do
     legend
 

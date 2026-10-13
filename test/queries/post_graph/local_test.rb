@@ -488,6 +488,31 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert_raises(ActiveRecord::RecordNotFound) { local(tag) }
   end
 
+  # Task 4's fix round, concern 1: a deleted focus tag was noticed only
+  # where the builder reads the tags' names, after the whole graph had been
+  # worked out and asked for. The site's rows already say it (no readable
+  # post carries the tag any more and no block's name finds it), so it is
+  # not found at once, like a page and a post: the site's statements and no
+  # other. And a tag that is still there but that nothing the viewer reads
+  # uses any more (its last post trashed meanwhile) is the same answer.
+  test "a focus tag that went meanwhile is not found before anything but the site is read, and neither is one nothing readable uses any more" do
+    gone = tag_focus("solo")
+    Tag.find_by!(name: "solo").destroy!
+    site = capture_sql { PostGraph::Site.load(actor: nil) }.size
+
+    statements = capture_sql { assert_raises(ActiveRecord::RecordNotFound) { local(gone, depth: 2) } }
+
+    assert_equal site, statements.size, statements.join("\n")
+
+    post = create_post(title: "Carries it", tags: [ "lonely" ])
+    unused = tag_focus("lonely")
+    post.update_column(:trashed_at, Time.current) # version: none (a test trashes a post) # changes: none (a test trashes a post)
+
+    statements = capture_sql { assert_raises(ActiveRecord::RecordNotFound) { local(unused) } }
+
+    assert_equal site, statements.size, statements.join("\n")
+  end
+
   # Payload note 4 of Task 3: a tag a readable page lists is a node whatever
   # carries it, so it is a focus too, and its local view is the page.
   test "a listed tag no readable post carries is a focus: its local view is the page that lists it, and the tag counts nothing" do

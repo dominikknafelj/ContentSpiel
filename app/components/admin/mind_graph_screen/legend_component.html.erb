@@ -13,6 +13,11 @@
     and here is only the "Status" link that opens it: a button that reads as
     a link, wired to the one dialog controller on <body>.
 
+    A NEW VISIT STARTS FROM THE DEFAULTS (pages spec, decision 8), in every
+    browser: `autocomplete="off"` keeps Firefox from putting a toggle's state
+    back on a reload. (Back is another matter: the snapshot's checkboxes are
+    the person's, and the script reads them.)
+
     Every swatch is an empty canvas (`SwatchComponent`) that
     `admin--mind-graph--swatches` has the graph's own renderer draw. %>
 <div data-mind-graph-legend data-controller="admin--mind-graph--swatches" class="admin-mind-graph-legend flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 text-sm text-dim">
@@ -23,7 +28,7 @@
       <% kinds.each do |kind| %>
         <% label = t(group == :nodes ? ".nodes.#{kind}" : ".edges.#{kind}") %>
         <label data-legend-toggle="<%= kind %>" class="inline-flex cursor-pointer items-center gap-1.5">
-          <%= render Admin::Ui::CheckboxComponent.new(name: "mind_graph_#{group}", value: kind, checked: true, id: "mind-graph-#{group}-#{kind}",
+          <%= render Admin::Ui::CheckboxComponent.new(name: "mind_graph_#{group}", value: kind, checked: true, id: "mind-graph-#{group}-#{kind}", autocomplete: "off",
                 data: { action: "change->admin--mind-graph--graph#filter", name: label }) %>
           <%= render Admin::MindGraphScreen::SwatchComponent.new(swatch_name(group, kind)) %>
           <span><%= label %></span>

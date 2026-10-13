@@ -566,8 +566,15 @@ export function mount(element) {
     list.mark(state.selected >= 0 ? state.nodes[state.selected].id : null)
   }
 
-  function showGroups() {
+  // A read that is still out is let go: its answer will not be drawn
+  // (`asked`), and the list is no longer waiting for it.
+  function letGo() {
     asked += 1
+    list.setBusy(false)
+  }
+
+  function showGroups() {
+    letGo()
     rowsShown = null
     failed = null
     list.setUnlisted(false)
@@ -587,7 +594,13 @@ export function mount(element) {
   }
 
   // One of the list's reads (`unlisted`, or a pill's `listed`). A plain
-  // `fetch`, ended with everything else when the screen is left. A read
+  // `fetch`, ended with everything else when the screen is left, and GIVEN
+  // UP after `LOAD_TIMEOUT_MS` like the graph's own load (a TimeoutError is
+  // a failure like any other): without a limit a request that stalled left
+  // the checkbox ticked over the groups for good, and nothing was ever
+  // said. WHILE IT IS OUT the rows' region is busy (`list.setBusy`,
+  // `aria-busy`): what is in it is about to be replaced. That is all the
+  // pending state there is; nobody gave words for one. A read
   // that fails says so in the list with "Try again" (design answer G5),
   // which asks for the same read; `again` says the ask came from that
   // button: if the read fails once more, the new button takes the focus the
@@ -599,11 +612,14 @@ export function mount(element) {
   // any: the server names the address also when it found none.
   async function showRowsFrom(url, { pill = null, again = false } = {}) {
     const mine = (asked += 1)
+    list.setBusy(true)
     try {
-      const response = await fetch(url, { headers: { Accept: "application/json" }, signal: aborter.signal })
+      const signal = AbortSignal.any([ aborter.signal, AbortSignal.timeout(LOAD_TIMEOUT_MS) ])
+      const response = await fetch(url, { headers: { Accept: "application/json" }, signal })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const answer = await response.json()
       if (destroyed || mine !== asked) return
+      list.setBusy(false)
       failed = null
       // A pill's rows are named by what the pill hangs off, and have a way
       // back; the checkbox's are "Posts", and the checkbox is their way back.
@@ -617,6 +633,7 @@ export function mount(element) {
       drawList()
     } catch (error) {
       if (destroyed || error.name === "AbortError" || mine !== asked) return
+      list.setBusy(false)
       rowsShown = null
       failed = { pill }
       list.fail(text.t("mind_graph.script.list.failed"), {
@@ -695,7 +712,7 @@ export function mount(element) {
     if (pill >= 0) {
       sizePill(pill)
       if (state.nodes[pill].count <= 0 && rowsShown?.pill === state.nodes[pill].id) {
-        asked += 1
+        letGo()
         rowsShown = null
       }
     }
@@ -995,7 +1012,7 @@ export function mount(element) {
     element.dataset.hovered = ""
     select(-1)
     // A new load shows the groups: a read's rows were the load's before.
-    asked += 1
+    letGo()
     rowsShown = null
     failed = null
     list.setUnlisted(false)
@@ -1062,7 +1079,7 @@ export function mount(element) {
     layout?.stop()
     layout = null
     select(-1)
-    asked += 1
+    letGo()
     rowsShown = null
     failed = null
     state.data = null

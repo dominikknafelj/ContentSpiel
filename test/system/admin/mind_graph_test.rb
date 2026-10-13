@@ -22,6 +22,32 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
+  # A test that stubs `window.fetch` or `AbortSignal.timeout` remembers the
+  # real one (`window.realFetch`, `window.realTimeout`: every stub in this
+  # file writes it before it replaces anything), and it is put back here,
+  # whatever happened in the test. Nothing depended on it (the next test's
+  # first visit is a new document), which is why a stub that stayed was
+  # never noticed (Task 7's review, M9); a test that goes on in the same
+  # window after its stub's work is done, or a session that is one day kept
+  # between tests, would have met it.
+  teardown do
+    page.execute_script(<<~JS)
+      if (window.realFetch) { window.fetch = window.realFetch; delete window.realFetch }
+      if (window.realTimeout) { AbortSignal.timeout = window.realTimeout; delete window.realTimeout }
+    JS
+  rescue Ferrum::Error, Capybara::CapybaraError
+    # The browser has gone with the test: there is no window to put right.
+  end
+
+  test "every stub of fetch in this file remembers the real one, so the teardown can put it back" do
+    source = File.read(__FILE__)
+    stubs = source.lines.each_with_index.select { |line, _| line.match?(/window\.fetch = \(/) }.map { |_, index| index }
+
+    assert_operator stubs.size, :>, 12
+    forgetful = stubs.reject { |index| source.lines[[ index - 12, 0 ].max..index].join.match?(/window\.realFetch (?:\?\?=|=) /) }
+    assert_empty forgetful.map { |index| "line #{index + 1}" }
+  end
+
   test "the graph loads, settles, and the first view fits every node inside the canvas" do
     posts = 6.times.map { |i| create_post(title: "Post #{i}", tags: [ "shared" ]) }
     PostRelation.create!(post: posts[0], related_post: posts[1])
@@ -555,6 +581,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.failGraph = true
       window.fetch = (url, options) => (window.failGraph && String(url).includes("/mind_graph/data") ? Promise.reject(new TypeError("Failed to fetch")) : original(url, options))
     JS
@@ -577,6 +604,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => (String(url).includes("/mind_graph/data") ? Promise.resolve(new Response("", { status: 500 })) : original(url, options))
     JS
 
@@ -598,6 +626,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
+      window.realTimeout ??= AbortSignal.timeout
       const timeout = AbortSignal.timeout.bind(AbortSignal)
       window.hangGraph = true
       window.askedFor = []
@@ -755,6 +785,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # to the real fetch.
     page.execute_script(<<~JS)
       const real = window.fetch
+      window.realFetch ??= real
       window.listedAsked = []
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/listed")) return real(url, options)
@@ -972,6 +1003,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     count_workers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.holdGraph = true
       window.heldRequests = 0
       window.abortedRequests = 0
@@ -1069,6 +1101,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       window.graphFetches = 0
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/data")) return original(url, options)
         window.graphFetches += 1
@@ -1963,6 +1996,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => String(url).includes("/mind_graph/search") ? Promise.reject(new TypeError("Failed to fetch")) : original(url, options)
     JS
 
@@ -1982,7 +2016,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     field.fill_in with: "hidden"
     assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
     # Hold the next answer back, so what is on screen meanwhile is the point.
-    page.execute_script("const original = window.fetch; window.fetch = (url, options) => String(url).includes('/mind_graph/search') ? new Promise(() => {}) : original(url, options)")
+    page.execute_script("const original = window.fetch; window.realFetch ??= original; window.fetch = (url, options) => String(url).includes('/mind_graph/search') ? new Promise(() => {}) : original(url, options)")
 
     field.send_keys("x")
 
@@ -2037,6 +2071,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       window.searchSignals = []
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/search")) return original(url, options)
         window.searchSignals.push(options.signal)
@@ -2176,11 +2211,23 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # the real fetch.
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.unlistedAsked = 0
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/unlisted")) return original(url, options)
         window.unlistedAsked += 1
-        if (window.unlistedAsked === 1) return new Promise((resolve) => { window.releaseUnlisted = () => original(url, options).then((response) => { resolve(response); window.unlistedReleased = true }) })
+        if (window.unlistedAsked === 1) {
+          // The held answer says when the page has READ it: its `json()` is
+          // wrapped, and the flag is set in the turn the page's own
+          // continuation runs in, so what follows it is not a wait.
+          return new Promise((resolve) => {
+            window.releaseUnlisted = () => original(url, options).then((response) => {
+              const json = response.json.bind(response)
+              response.json = () => json().then((body) => { window.unlistedRead = body.rows.length; return body })
+              resolve(response)
+            })
+          })
+        }
         if (window.unlistedAsked === 2) return Promise.resolve(new Response("", { status: 500 }))
         return original(url, options)
       }
@@ -2192,7 +2239,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_js("window.unlistedAsked === 1")
     filter.click
     page.execute_script("window.releaseUnlisted()")
-    await_js("window.unlistedReleased === true")
+    # NOT "released, then three frames": reading the body can take longer
+    # than that on a slow machine, and the assertion below would then pass
+    # before the late answer had come at all (Task 7's review, M9). The page
+    # has read the answer when the flag is set, and has acted on it (or
+    # dropped it) in that same turn, before any frame.
+    await_js("window.unlistedRead === 1", wait: 10)
     await_frames
     within(LIST) do
       assert_equal [ "PAGES · 2" ], all("h2").map { |heading| heading.text.upcase }, "the late answer replaced the groups"
@@ -2235,6 +2287,64 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
       assert_selector "input[data-mind-graph-unlisted]", count: 1, visible: :all
     end
+  end
+
+  # Task 7's review, M4: the graph's own load gives up after fifteen seconds;
+  # a read of the list had no limit, so a request that stalled left the box
+  # ticked over the groups for good and the designer's line was never said.
+  # The stub never answers but honours its signal, as `fetch` does; the
+  # fifteen seconds are made 50 milliseconds as in the graph's own test. And
+  # while a read is out the rows' region says so (`aria-busy`), which is all
+  # the pending state there is: nobody gave words for one.
+  test "a read of the list that gets no answer is given up after fifteen seconds and says so in the list, and the list is busy while a read is out" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    visit admin_mind_graph_path
+    await_graph
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.realFetch ??= original
+      window.realTimeout ??= AbortSignal.timeout
+      const timeout = AbortSignal.timeout.bind(AbortSignal)
+      window.listMode = "hang"
+      window.askedFor = []
+      AbortSignal.timeout = (milliseconds) => { window.askedFor.push(milliseconds); return timeout(window.listMode === "hang" ? 50 : milliseconds) }
+      window.fetch = (url, options) => {
+        if (window.listMode === "real" || !String(url).includes("/mind_graph/unlisted")) return original(url, options)
+        if (window.listMode === "hang") return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => reject(options.signal.reason)))
+        return new Promise((resolve) => { window.releaseList = () => resolve(original(url, options)) })
+      }
+    JS
+
+    find("#{LIST} label", text: "Not listed on any page").click
+    within(LIST) do
+      assert_selector "[role=alert] p", text: "The list couldn't be loaded."
+      assert_button "Try again"
+      assert_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+      assert_no_selector "[aria-busy='true']", wait: 0
+    end
+    assert_equal [ 15_000 ], page.evaluate_script("window.askedFor"), "the read is given fifteen seconds"
+    assert_equal "ready", graph["data-state"]
+
+    page.execute_script("window.listMode = 'hold'")
+    within(LIST) { press "Try again" }
+    assert_selector "#{LIST} [aria-busy='true']"
+    page.execute_script("window.listMode = 'real'; window.releaseList()")
+    within(LIST) do
+      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
+      assert_no_selector "[aria-busy='true']", wait: 0
+    end
+
+    # A read that is let go while it is out leaves nothing busy behind.
+    page.execute_script("window.listMode = 'hold'")
+    filter = find("#{LIST} label", text: "Not listed on any page")
+    filter.click
+    assert_no_selector "#{LIST} button[data-node-id='#{nid(alone)}']"
+    filter.click
+    assert_selector "#{LIST} [aria-busy='true']"
+    filter.click
+    assert_no_selector "#{LIST} [aria-busy='true']"
+    assert_equal [ "PAGES · 2" ], within(LIST) { all("h2").map { |heading| heading.text.upcase } }
   end
 
   test "the list's Pages group is the tree, a page's title and path with markup in them are text in the list, the search and the card" do
@@ -2386,6 +2496,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # The first read fails (the stub answers it and puts the real fetch back).
     page.execute_script(<<~JS)
       const real = window.fetch
+      window.realFetch ??= real
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/listed")) return real(url, options)
         window.fetch = real
@@ -2528,6 +2639,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       # (The stub fails the one read and puts the real fetch back.)
       page.execute_script(<<~JS)
         const real = window.fetch
+      window.realFetch ??= real
         window.fetch = (url, options) => {
           if (!String(url).includes("/mind_graph/listed")) return real(url, options)
           window.fetch = real
@@ -2728,6 +2840,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         assert_selector "h1", text: "Tags"
         page.execute_script(<<~JS)
           const real = window.fetch
+      window.realFetch ??= real
           window.fetch = (url, options) => {
             if (!String(url).includes("/mind_graph/data")) return real(url, options)
             window.fetch = real
@@ -2802,6 +2915,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       window.__noteReads = 0
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (...args) => {
         if (String(args[0].url || args[0]).includes("/notes/post/") && !args[1]?.method) window.__noteReads += 1
         return original(...args)
@@ -2932,6 +3046,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     find("[data-mind-graph-card-notes] textarea").send_keys("On its way")
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (...args) => {
         if (String(args[1]?.method || "GET").toUpperCase() !== "POST" || window.__held) return original(...args)
         window.__held = true
@@ -3104,6 +3219,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   def stub_graph_data(payload)
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/data")) return original(url, options)
         if (window.failGraph) return Promise.reject(new TypeError("Failed to fetch"))

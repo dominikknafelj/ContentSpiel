@@ -91,11 +91,21 @@ class PostGraph::SearchTest < ActiveSupport::TestCase
     assert many.none? { |sql| sql.include?('"pages".*') || sql.include?('"posts".*') }, "a whole row was loaded"
   end
 
-  test "a typed % or _ is a character, not a wildcard" do
-    create_post(title: "Plain")
+  # For a page, a post and a tag alike (Task 7's review, M9: this test held
+  # no page and no backslash, so a page search that stopped escaping would
+  # not have been noticed here). A wildcard that was one would find every
+  # row; a character finds only the row that has it.
+  test "a typed %, _ or backslash is a character, not a wildcard, for a page, a post and a tag" do
+    create_post(title: "Plain", tags: [ "plain" ])
+    create_page(title: "Plain page")
+    percent = create_page(title: "50% off")
+    under = create_post(title: "snake_case", tags: [ "a_b" ])
+    slash = create_post(title: "back\\slash")
 
-    assert_empty search("%")
-    assert_empty search("_")
+    assert_equal [ "page-#{percent.id}" ], search("%").map { |row| row[:id] }
+    assert_equal [ "post-#{under.id}", "tag-#{Tag.find_by!(name: 'a_b').id}" ], search("_").map { |row| row[:id] }
+    assert_equal [ "post-#{slash.id}" ], search("\\").map { |row| row[:id] }
+    assert_empty search("%_")
   end
 
   test "an unreadable or trashed post is not listed, nor a tag only such posts carry" do

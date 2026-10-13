@@ -94,10 +94,13 @@ module PostGraph
       @more = []
       # A focus that went between the request's finding it and the site's
       # being loaded (trashed, or taken out of the viewer's scope) is not
-      # found, as it would be a moment later, whatever its kind: a page and
-      # a post are asked of the site's own rows, which everything after is
-      # derived from (no statement); a tag that was deleted is found
-      # missing below, where the builder reads the tags' names.
+      # found, as it would be a moment later, whatever its kind, and before
+      # anything more is read: each is asked of the site's own rows, which
+      # everything after is derived from (no statement). A tag is a focus
+      # while a readable post carries it or a readable page's block names it
+      # (`Focus`'s own rule); a deleted one does neither. (A tag deleted
+      # between the site's load and the builder's read of the names is
+      # still caught below: a second net, for a narrower moment.)
       raise ActiveRecord::RecordNotFound unless focus_readable?
 
       @focus.kind == "page" ? walk_around_page : walk
@@ -126,7 +129,7 @@ module PostGraph
       case @focus.kind
       when "page" then @site.page(@focus.id).present?
       when "post" then @site.stamps.key?(@focus.id)
-      else true
+      else @site.tag_counts.key?(@focus.id) || @site.listings.tag_ids.include?(@focus.id)
       end
     end
 
