@@ -12,3 +12,8 @@ export function recordId(id) {
   const text = String(id)
   return text.slice(text.indexOf("-") + 1)
 }
+
+// The one node that has no record: what a list block with no filter points
+// at (`PostGraph::ALL_POSTS`). Its id is named here and nowhere else in the
+// scripts (`test/lib/mind_graph_guards_test.rb`).
+export const ALL_POSTS = "all-posts"

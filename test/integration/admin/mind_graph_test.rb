@@ -178,7 +178,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
                     card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
                     card.status.change_scheduled card.status.draft card.status.live card.status.live_change_scheduled card.status.live_with_changes card.status.scheduled card.status.unpublished_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
-                    list.add_post list.add_retired_post list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
+                    list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
                     list.select_page list.select_post list.select_tag list.select_type
                     list.tags list.try_again list.types list.unlisted load_failed loading more no_connections opened.everything_name opened.line
                     release_pinned retired_type retry search.count search.failed search.groups.page search.groups.post search.groups.tag search.none

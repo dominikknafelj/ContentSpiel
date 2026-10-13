@@ -388,8 +388,17 @@ export function mount(element) {
 
   // The lines over the canvas's top-left corner (a polite live region). A line is a string or a node
   // (the Retry button); always `textContent`, never markup.
+  //
+  // A LINE THAT SAYS WHAT IT SAID IS LEFT AS IT IS: the region is live, and
+  // a paragraph written again is announced again. So a sentence that did
+  // not change when a post was added (`notify`) is not said a second time;
+  // only a line whose words changed, or a new one, is written.
   function say(...lines) {
-    notice.replaceChildren(...lines.filter(Boolean).map((line) => {
+    const next = lines.filter(Boolean)
+    const now = Array.from(notice.children)
+    notice.replaceChildren(...next.map((line, index) => {
+      const held = now[index]
+      if (!(line instanceof Node) && held && !held.hasAttribute("data-mind-graph-announced") && held.childElementCount === 0 && held.textContent === line) return held
       const paragraph = document.createElement("p")
       paragraph.className = "m-0 w-fit rounded-cs bg-surface px-1"
       if (line instanceof Node) paragraph.append(line)
@@ -566,7 +575,7 @@ export function mount(element) {
       const pill = rowsShown.pill == null ? null : state.nodes[indexOf.get(rowsShown.pill)]
       list.showRows({
         heading: pill ? text.t("mind_graph.script.list.more_heading", { target: pill.of, count: number(pill.count) }) : rowsShown.heading, link: rowsShown.link, inView: drawn, rows: rowsShown.rows.map((row) => (drawn(row.id) ? state.nodes[indexOf.get(row.id)] : row)),
-        back: rowsShown.pill ? wayBack() : null
+        back: rowsShown.pill ? wayBack() : null, addable: Boolean(state.data)
       })
     } else {
       list.render(state.visibleNodes.map((index) => state.nodes[index]))
@@ -683,7 +692,14 @@ export function mount(element) {
   // graph", and with posts hidden the press would add a node nobody sees,
   // or do nothing at all. The checkbox is the state, so it follows; the
   // change is announced as a toggle's is.
+  //
+  // WITHOUT A GRAPH THERE IS NOTHING TO ADD TO (it is still being read, its
+  // read failed, or "Show everything" is on its way): the press does
+  // nothing, and the list draws such a row as one that only says it is not
+  // in view (`drawList`, `addable`). The checkbox's rows are kept when the
+  // graph arrives (`show`), and are then rows that add.
   function addPost(row) {
+    if (!state.data) return
     const switchedOn = showPosts()
     const known = indexOf.get(row.id)
     if (known != null) {
@@ -1027,11 +1043,17 @@ export function mount(element) {
     state.hovered = pointerHover = rowHover = -1
     element.dataset.hovered = ""
     select(-1)
-    // A new load shows the groups: a read's rows were the load's before.
-    letGo()
-    rowsShown = null
-    failed = null
-    list.setUnlisted(false)
+    // A pill's rows, or its read, were of the graph before this one and go
+    // with it. THE CHECKBOX'S ROWS STAY: "Not listed on any page" is a read
+    // of its own, a person may have ticked it while the graph was still on
+    // its way, and what they asked for is not taken from them when it
+    // arrives (the rows are drawn again by `applyFilter`, now as rows that
+    // can add their post).
+    if (rowsShown?.pill || failed?.pill) {
+      letGo()
+      rowsShown = null
+      failed = null
+    }
     showOpened()
     applyFilter()
     writeCounts()

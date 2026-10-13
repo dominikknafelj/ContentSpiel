@@ -34,7 +34,7 @@
 //
 // LABEL_GAP and LABEL_HEIGHT are also the hit test's (`hit_test.js`): a drawn
 // label is part of its node's target.
-export const LABEL_BUDGET = 40
+const LABEL_BUDGET = 40
 export const LABEL_GAP = 4
 export const LABEL_HEIGHT = 14
 

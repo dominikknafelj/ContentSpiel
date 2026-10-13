@@ -45,6 +45,10 @@ module PostGraph
     def neighbours(id) = [ parent(id), *children(id) ].compact
     def depth(id) = @depth.fetch(id)
     def rank(id) = @rank.fetch(id)
+    # Whether the tree holds this page. A second statement of the same
+    # request can answer a page the tree's own read did not see yet (made,
+    # restored or brought into the scope in between): it is asked first.
+    def ranked?(id) = @rank.key?(id)
 
     private
 

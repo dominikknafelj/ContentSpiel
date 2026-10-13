@@ -142,4 +142,19 @@ class PostGraph::SearchTest < ActiveSupport::TestCase
 
     assert_empty search("  ")
   end
+
+  # The tree is one statement and the matching pages another. A page made,
+  # restored or brought into the scope between the two is in the second and
+  # not in the first: it is left out of this answer (it was not there a
+  # moment ago), never a KeyError and a 500 for that keystroke.
+  test "a page that appears between the tree's read and the matches' is left out of the answer, and nothing raises" do
+    early = create_page(title: "Ruby early")
+    late = create_page(title: "Ruby late")
+    build = PostGraph::Tree.method(:new)
+
+    result = with_singleton_override(PostGraph::Tree, :new, ->(rows) { build.call(rows.reject { |id, *| id == late.id }) }) { search("ruby") }
+
+    assert_equal [ "page-#{early.id}" ], result.map { |row| row[:id] }
+    assert_equal %w[Ruby\ early Ruby\ late], search("ruby").map { |row| row[:label] }, "and the next keystroke finds it"
+  end
 end

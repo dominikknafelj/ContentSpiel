@@ -38,7 +38,7 @@ module PostGraph
 
       readable_pages = AccessControl.scope(@actor, "pages.read", Page.all)
       tree = Tree.new(readable_pages.pluck(:id, :parent_id, :position))
-      pages = readable_pages.title_matching_any_locale(@text).select(:id, :title).sort_by { |page| tree.rank(page.id) }.first(@limit)
+      pages = readable_pages.title_matching_any_locale(@text).select(:id, :title).select { |page| tree.ranked?(page.id) }.sort_by { |page| tree.rank(page.id) }.first(@limit)
       paths = PostGraph.paths(pages.map(&:id), locale: @locale)
 
       readable = AccessControl.scope(@actor, "posts.read", Post.all)

@@ -140,14 +140,17 @@ module PostGraph
     end
 
     # A post's node, for each id handed in (already narrowed by the read
-    # scope, which leaves the trash out). Three statements whatever the
+    # scope, which leaves the trash out), READ THROUGH THE SCOPE AGAIN: a
+    # post trashed, or taken out of the viewer's scope, between the site's
+    # read and this one has no node, as a focus that went meanwhile is not
+    # found. Three statements whatever the
     # number: the posts' open threads, their pending copies, and the posts
     # with the columns a node is made from. `PostGraph::Rows` asks for it
     # with no counts: a row that is not drawn has no line yet.
     def post_nodes(post_ids, degree: {}, related_count: {}, tag_count: {})
       notes = Notes::Counts.by_container("Post", post_ids.to_a)
       pending = pending_copies("Post", post_ids)
-      Post.where(id: post_ids).select(*COLUMNS).order(:id).map do |post|
+      @site.readable_posts.where(id: post_ids).select(*COLUMNS).order(:id).map do |post|
         id = PostGraph.node_id(:post, post.id)
         state = Publishing::State.of(post, now: @now, pending_at: pending[post.id])
         {

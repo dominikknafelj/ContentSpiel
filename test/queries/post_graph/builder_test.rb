@@ -111,4 +111,13 @@ class PostGraph::BuilderTest < ActiveSupport::TestCase
     assert_equal [ pid(@a), pid(@b) ], @nodes.map { |node| node[:id] }
     assert_equal [ [ 0, 0, 0, 1, true ], [ 0, 0, 0, 0, true ] ], @nodes.map { |node| node.values_at(:degree, :related_count, :tag_count, :open_notes, :listed) }
   end
+
+  # The ids are the site's, narrowed a moment before; the posts are read
+  # again through the same scope, so one that went in between has no node.
+  test "a post trashed after the site was loaded has no node: the posts are read again through the scope" do
+    assert_equal [ pid(@a), pid(@b) ], builder(@site).post_nodes([ @a.id, @b.id ]).map { |node| node[:id] }
+    @a.update_column(:trashed_at, Time.current) # version: none (a test trashes a post behind a loaded site) # changes: none (a test)
+
+    assert_equal [ pid(@b) ], builder(@site).post_nodes([ @a.id, @b.id ]).map { |node| node[:id] }
+  end
 end

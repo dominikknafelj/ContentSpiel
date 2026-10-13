@@ -211,12 +211,18 @@ export function createList(container, { text, number = String, dotClasses, typeL
     mark.setAttribute("aria-hidden", "true")
     return mark
   }
-  const row = (node, { notInView = false } = {}) => {
+  // The same row while there is no graph to add its post to (the graph is
+  // still being read, or its read failed): what it is, and that it is not
+  // in view, with no word of activating it.
+  const absentName = (node) => Object.hasOwn(typeLabels, node.type)
+    ? text.t("mind_graph.script.list.absent_post", { title: node.title, type: lower(typeLabels[node.type]) })
+    : text.t("mind_graph.script.list.absent_retired_post", { title: node.title, type: lower(node.type) })
+  const row = (node, { notInView = false, addable = true } = {}) => {
     const item = document.createElement("li")
     const button = element("button", ROW)
     button.type = "button"
     button.dataset.nodeId = node.id
-    button.setAttribute("aria-label", notInView ? addName(node) : text.t(NAMES[node.kind], { title: node.title, count: figure(node) }))
+    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: node.title, count: figure(node) }))
     // A page stands under its parent: indented by its depth in the tree.
     if (node.kind === "page") button.style.paddingInlineStart = `${ROW_PADDING + (node.depth || 0) * INDENT}px`
     const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 font-cs-mono text-label text-meta", figure(node))
@@ -225,7 +231,10 @@ export function createList(container, { text, number = String, dotClasses, typeL
     rows.set(node.id, button)
     if (notInView) {
       button.dataset.notInView = ""
-      absent.set(node.id, node)
+      // Without a graph the row adds nothing and says so: it is there to be
+      // read, and is drawn again as one that adds once the graph has come.
+      if (addable) absent.set(node.id, node)
+      else button.setAttribute("aria-disabled", "true")
     }
     return item
   }
@@ -284,7 +293,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
   const rowOf = (event) => event.target.closest?.("button[data-node-id]")
   const click = (event) => {
     const button = rowOf(event)
-    if (!button) return
+    if (!button || button.getAttribute("aria-disabled") === "true") return
     if (button.dataset.more != null) onMore(button.dataset.nodeId)
     else if (absent.has(button.dataset.nodeId)) onAdd(absent.get(button.dataset.nodeId))
     else onSelect(button.dataset.nodeId)
@@ -348,13 +357,15 @@ export function createList(container, { text, number = String, dotClasses, typeL
       else if (loose.length) parts.push(listOf(loose))
       put(...parts)
     },
+    // `addable: false`: there is no graph to add a post to, and a row that
+    // is not in view only says so.
     // A filter's rows in place of the groups. `inView(id)`: whether the
     // canvas draws that post now. `back`: the rows are a pill's, and this
     // is the way back to the groups.
-    showRows({ heading, rows: given, inView, link = null, back = null }) {
+    showRows({ heading, rows: given, inView, link = null, back = null, addable = true }) {
       forget()
       goBack = back?.onBack ?? null
-      const parts = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id) }))), { back }) ]
+      const parts = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id), addable }))), { back }) ]
       if (link) {
         const anchor = element("a", "mx-3 mt-2 inline-block text-sm text-accent underline", link.label)
         anchor.href = link.href

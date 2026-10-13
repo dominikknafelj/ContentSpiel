@@ -142,4 +142,25 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
     ].each { |line| assert_match FILTER_SENT, line }
     [ "    const freed = message.ids.map(find).filter(Boolean)", "    filter: refilter," ].each { |line| assert_no_match FILTER_SENT, line }
   end
+
+  # "All posts" has no record, so its id is a word the scripts must agree on
+  # with the server (`PostGraph::ALL_POSTS`). It is written once, in
+  # `ids.js`; every other script asks for the constant.
+  test "the id of All posts is written in one script, ids.js, and is the server's" do
+    scripts = Dir[Rails.root.join("app/javascript/mind_graph/*.js"), Rails.root.join("app/javascript/controllers/admin/mind_graph/*.js")]
+    naming = scripts.select { |path| File.read(path).lines.reject { |line| line.strip.start_with?("//") }.any? { |line| line.include?(%("#{PostGraph::ALL_POSTS}")) } }
+
+    assert_equal [ "ids.js" ], naming.map { |path| File.basename(path) }
+    assert_includes File.read(Rails.root.join("app/javascript/mind_graph/ids.js")), %(export const ALL_POSTS = "#{PostGraph::ALL_POSTS}")
+  end
+
+  # An export says "something else reads this". Four constants were exported
+  # and imported by nothing, so a reader looked for the reader; they are the
+  # file's own now.
+  test "the layout's and the drawing's own constants are exported by nothing" do
+    exported = { "renderer.js" => "HIDE_TAG_LINES_BELOW", "labels.js" => "LABEL_BUDGET", "camera.js" => "MIN_ZOOM|MAX_ZOOM" }.select do |file, names|
+      File.read(Rails.root.join("app/javascript/mind_graph", file)).match?(/^export const (?:#{names})\b/)
+    end
+    assert_empty exported.keys
+  end
 end

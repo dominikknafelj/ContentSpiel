@@ -36,6 +36,7 @@
 //
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`),
 // and a value of the table is a theme KEY.
+import { ALL_POSTS } from "mind_graph/ids"
 
 // Up to this many connections: a post's radius, a tag's half side. The
 // posts' are the sizes of the design review's mock (2026-10-08).
@@ -245,7 +246,7 @@ function drawPost(context, theme, node, look, x, y, radius) {
 }
 
 function drawType(context, theme, node, x, y) {
-  const retired = node.id !== "all-posts" && node.colour_index == null
+  const retired = node.id !== ALL_POSTS && node.colour_index == null
   const slot = node.colour_index == null ? null : (node.colour_index - 1) % 12
   const hub = { radius: TYPE_RADIUS }
   // A RING TYPE's hub (slots 7-12; design answer H3) is not filled: a ring
@@ -262,7 +263,7 @@ function drawType(context, theme, node, x, y) {
     return dot(context, hue, x, y, retired ? CENTRE_DOT : RING_HUB_CENTRE)
   }
 
-  dot(context, node.id === "all-posts" ? theme.dim : theme.categories[slot], x, y, TYPE_RADIUS)
+  dot(context, node.id === ALL_POSTS ? theme.dim : theme.categories[slot], x, y, TYPE_RADIUS)
   // The inner ring is given by its edges (3 to 4.5), not by a shape's.
   trace(context, { radius: TYPE_RING.radius }, x, y)
   stroke(context, theme.surface, { width: TYPE_RING.width })

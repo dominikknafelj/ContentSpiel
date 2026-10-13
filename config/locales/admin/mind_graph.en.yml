@@ -32,7 +32,10 @@
 # TYPE's label in lower case, so the row says "blog post" and never a bare
 # "post"; `add_retired_post` is its form for a post of a type that is no
 # longer registered (H7: "talk, retired type"), where `%{type}` is the
-# stored name in lower case. `not_in_view` stands where such a row's count
+# stored name in lower case. `absent_post` and `absent_retired_post` are the
+# same rows' names while there is no graph to add a post to (it is still
+# being read, or its read failed): the design's sentence without its second
+# half, since activating such a row adds nothing. `not_in_view` stands where such a row's count
 # would. `script.list.pages`, `posts`, `tags` and `types` are a group's
 # heading with how many it holds; `posts` is also the heading of the rows a
 # filter shows ("Not listed on any page", a "+N more" pill), where the
@@ -241,6 +244,8 @@ en:
             other: "%{title}: post type, %{count} posts. Shows it in the graph."
           add_post: "%{title}, %{type} post, not in view. Activate to add it to the graph."
           add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
+          absent_post: "%{title}, %{type} post, not in view."
+          absent_retired_post: "%{title}, %{type}, retired type, not in view."
         search:
           count:
             one: "%{count} result"

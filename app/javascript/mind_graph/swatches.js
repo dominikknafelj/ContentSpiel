@@ -41,6 +41,7 @@
 // and the tag's square, as everywhere in CS Studio.
 import { draw, radiusFor } from "mind_graph/renderer"
 import { readTheme } from "mind_graph/theme"
+import { ALL_POSTS } from "mind_graph/ids"
 
 const post = (more = {}) => ({ kind: "post", colour_index: 1, status: "live", ...more })
 
@@ -54,7 +55,7 @@ export const SCENES = {
   page: { node: { kind: "page", status: "live" } },
   post: { node: post(), hue: "dim" },
   tag: { node: { kind: "tag" } },
-  type: { node: { kind: "type", id: "all-posts" } },
+  type: { node: { kind: "type", id: ALL_POSTS } },
   "line-tree": { line: "tree" },
   "line-lists": { line: "lists" },
   "line-related": { line: "related" },
@@ -120,9 +121,9 @@ export const ROW_MARKS = {
 
 // The node a row's mark is drawn from: its kind, and for a post type what
 // tells its hub (`marks.js`, `drawType`). Nothing of the record itself.
-const markOf = (node) => (node.id === "all-posts" ? "all-posts" : node.colour_index == null ? "retired" : String(node.colour_index))
+const markOf = (node) => (node.id === ALL_POSTS ? ALL_POSTS : node.colour_index == null ? "retired" : String(node.colour_index))
 const markNode = (kind, of) =>
-  kind === "page" ? { kind, status: "live" } : { kind, id: of === "all-posts" ? "all-posts" : "type", colour_index: /^\d+$/.test(of) ? Number(of) : null }
+  kind === "page" ? { kind, status: "live" } : { kind, id: of === ALL_POSTS ? ALL_POSTS : "type", colour_index: /^\d+$/.test(of) ? Number(of) : null }
 
 // An empty canvas for the mark of `node` (a page or a post type), sized for
 // the page; `paintMarks` draws it once it is in the document (a canvas

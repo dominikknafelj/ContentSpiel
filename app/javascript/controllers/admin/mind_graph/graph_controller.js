@@ -78,6 +78,12 @@ export default class extends Controller {
     // for good, if this load then fails. The server's own name is kept in
     // `data-label`, and is the name until there is something to count.
     if (this.hasCanvasTarget && this.canvasTarget.dataset.label) this.canvasTarget.setAttribute("aria-label", this.canvasTarget.dataset.label)
+    // The pointer's shape over a node is the script's too. As Turbo works
+    // today the app's `destroy()` has cleared it before the page is copied
+    // (the copy is made a tick after the controller is disconnected), so a
+    // restored page was found without it; it is taken back here all the
+    // same, so that this does not rest on when Turbo copies.
+    if (this.hasCanvasTarget) this.canvasTarget.style.cursor = ""
     // The legend's counts and the names made of them are the visit that was
     // left. The checkboxes themselves are the person's choice and are kept:
     // the graph shows what the legend says.

@@ -1901,6 +1901,34 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ [ "/posts?type=blog", "Open in Posts" ], 0, true, "list.unlisted()" ], result.values_at("link", "markup", "checked", "label")
   end
 
+  # A row is offered as one that adds only while there is a graph to add to:
+  # while the graph is being read, or after its read failed, a row that is
+  # not in view says so and no more, and a press on it does nothing.
+  test "list: without a graph a row that is not in view is named without the add, is marked as doing nothing and asks for nothing, and drawn again with a graph it adds" do
+    result = js_module("mind_graph/node_list", <<~JS)
+      (() => {
+        const { container, calls, list } = #{LIST_SCRIPT}
+        document.body.append(container)
+        const rows = [ { id: "post-2", title: "Absent", degree: 0, colour_index: 1, type: "blog" }, { id: "post-3", title: "Old", degree: 0, colour_index: null, type: "Gone" } ]
+        const read = () => Array.from(container.querySelectorAll("button[data-node-id]"), (button) => [ button.getAttribute("aria-label"), button.hasAttribute("data-not-in-view"), button.getAttribute("aria-disabled") ?? "-", button.lastChild.textContent ])
+        list.showRows({ heading: "Posts · 2", rows, inView: () => false, addable: false })
+        const without = read()
+        container.querySelectorAll("button[data-node-id]").forEach((button) => button.click())
+        const pressed = calls.slice()
+        list.showRows({ heading: "Posts · 2", rows, inView: () => false })
+        const withGraph = read()
+        container.querySelectorAll("button[data-node-id]").forEach((button) => button.click())
+        container.remove()
+        return { without, pressed, withGraph, calls }
+      })()
+    JS
+
+    assert_equal [ [ "list.absent_post(Absent,blog)", true, "true", "list.not_in_view()" ], [ "list.absent_retired_post(Old,gone)", true, "true", "list.not_in_view()" ] ], result["without"]
+    assert_equal [], result["pressed"], "a press asks the app for nothing: not to add, not to select"
+    assert_equal [ [ "list.add_post(Absent,blog)", true, "-", "list.not_in_view()" ], [ "list.add_retired_post(Old,gone)", true, "-", "list.not_in_view()" ] ], result["withGraph"]
+    assert_equal [ [ "add", "post-2" ], [ "add", "post-3" ] ], result["calls"]
+  end
+
   # Design answer G5: the error line is in the list, with a small button.
   test "list: a failed read says so in the list with Try again, and pressing it asks again" do
     result = js_module("mind_graph/node_list", <<~JS)
@@ -2115,7 +2143,19 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const isolated = [ data.countAdded([], whole, lone("post-1")), whole.isolated, data.countAdded([], whole, lone("post-2")), whole.isolated, data.countAdded([], whole, lone("post-3")), whole.isolated,
                            data.countAdded([], capped, { id: "post-4", unconnected: false }), capped.isolated, data.countAdded([], capped, { id: "post-5" }), capped.isolated,
                            data.countAdded([], capped, lone("post-6")), capped.isolated, data.countAdded([], around, lone("post-7")), around.isolated ?? "none" ]
-        done({ seen, pills, isolated })
+        // "Showing the 2,000 best-connected of 2,040 posts.": a connected post the cut left out is one more shown.
+        const cut = { shown: 2000, total: 2040, isolated: 3 }
+        const uncut = { shown: 5, total: 5, isolated: 0 }
+        const nearby = { focus, shown: 20, total: 40 }
+        const shown = [ [ cut, { id: "post-1", unconnected: false } ], [ cut, lone("post-2") ], [ cut, { id: "post-3" } ], [ uncut, { id: "post-4", unconnected: false } ], [ nearby, { id: "post-5", unconnected: false } ] ]
+          .map(([ held, row ]) => { data.countAdded([], held, row); return [ held.shown, held.isolated ?? "none" ] })
+        // "N of M posts" is of the posts the page lists: one added from "Not listed on any page" is counted beside them.
+        const listing = [ { id: "page-1", kind: "page", listed_count: 112 }, ...Array.from({ length: 20 }, (_, index) => ({ id: `post-${index}`, kind: "post", listed: true })), { id: "more-type-a", kind: "more", count: 92, target: "type-a" } ]
+        const named = () => summaryOf({ nodes: listing, visibleNodes: listing.map((_, index) => index), lines: 0, data: { focus, shown: 20, total: 20 }, off: { nodes: [], lines: [] }, toggles: 4 }, { text, number: String })
+        const before = named()
+        listing.push({ id: "post-900", kind: "post", listed: false })
+        const beside = named()
+        done({ seen, pills, isolated, shown, before, beside })
       }).catch((error) => done({ error: String(error) }))
     JS
     flunk result["error"] if result["error"]
@@ -2128,6 +2168,12 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ "posts_of(20 20 23)", "posts_of(21 21 23)", "posts_of(22 22 23)", "posts(23 23 0)" ], result["seen"].map { |_counts, _pills, summary| summary[/posts(?:_of)?\([\d ]+\)/] },
       "N of M: N is the posts drawn, M what the page lists; with every pill gone the page lists no more than is drawn and the plain count is said"
     assert_equal [ 23, 23, 24, -1, -1, -1 ], result["pills"], "which pill was counted down (its index), and none for a row with no pill to count"
+    assert_equal [ [ 2001, 3 ], [ 2001, 2 ], [ 2001, 2 ], [ 5, 0 ], [ 20, "none" ] ], result["shown"],
+      "at the cap a connected post that is added is one more of those shown, and an unconnected one, and a row that says nothing, are not; with nothing cut, and in a local view, the figure stays"
+    assert_match(/posts_of\(20 20 112\)/, result["before"])
+    assert_no_match(/ posts\(/, result["before"].sub(/\Alocal\(/, ""), "with every post listed there is no second count")
+    assert_match(/posts_of\(20 20 112\).*posts\(1 1\)/, result["beside"], "20 of 112 and 92 more still add up to 112: the unlisted post is counted beside them, and is counted")
+    assert_match(/more\(92 92\)/, result["beside"])
     assert_equal [ -1, 1, -1, 0, -1, 0, -1, 3, -1, 3, -1, 2, -1, "none" ], result["isolated"],
       "a row that says its post has no connection takes one from those that aren't shown, never below none; one the cap cut, and one that says nothing, take none; at the cap an unconnected one still does; a local view counts none"
   end

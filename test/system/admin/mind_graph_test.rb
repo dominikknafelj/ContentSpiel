@@ -676,6 +676,109 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "2", graph["data-nodes"]
   end
 
+  # The whole-branch review's M3 and M9. At the posts' cap a connected post
+  # the cut left out, added from the list, is one more of those shown, and
+  # an unconnected one is one fewer of those that aren't: each sentence
+  # follows its own figure. And the notice is a live region: a sentence that
+  # still says what it said is left as it is (the same element), so a
+  # screen reader is not read both again for every post a person adds.
+  # The two reads are played (nobody builds a site over the cap); every
+  # other request goes to the real fetch, and the list's stub puts it back.
+  test "at the cap an added post moves the figure of its own sentence and no other, and a sentence that did not change is not written again" do
+    create_post(title: "A")
+    create_page(title: "Blog") # a viewer who reads a page has the filter's checkbox
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(CAPPED_GRAPH)
+    page.execute_script(<<~JS)
+      const real = window.fetch
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/unlisted")) return real(url, options)
+        window.fetch = real
+        const row = (id, title, unconnected) => ({ id, title, type: "blog", colour_index: 1, status: "live", changes: null, listed: false, url: "/row", degree: 0, related_count: 0, tag_count: 0, open_notes: 0, unconnected })
+        return Promise.resolve(new Response(JSON.stringify({ total: 2, rows: [ row("post-50", "Cut by the cap", false), row("post-51", "No connection", true) ] }), { headers: { "Content-Type": "application/json" } }))
+      }
+    JS
+    lines = -> { all("#{GRAPH} [role=status] p:not([data-mind-graph-announced])").map { |line| [ line.text, line["data-heard"] ] } }
+    heard = -> { page.execute_script("document.querySelectorAll(#{"#{GRAPH} [role=status] p".to_json}).forEach((line) => { line.dataset.heard = 'before' })") }
+
+    with_reduced_motion do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      await_graph
+      assert_equal [ "Showing the 2,000 best-connected of 6,000 posts.", "1,214 other posts have no connections yet and aren't shown." ], lines.call.map(&:first)
+      find("#{LIST} label", text: "Not listed on any page").click
+      assert_selector "#{LIST} button[data-not-in-view]", count: 2
+
+      heard.call
+      find("#{LIST} button[data-node-id='post-50']").click
+      assert_selector "#{GRAPH}[data-selected='post-50'][data-nodes='3']"
+      assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", nil ], [ "1,214 other posts have no connections yet and aren't shown.", "before" ] ], lines.call,
+        "one more is shown; the other sentence is the element it was"
+      assert_includes find(CANVAS)["aria-label"], "Showing the 2,001 best-connected of 6,000 posts."
+
+      heard.call
+      find("#{LIST} button[data-node-id='post-51']").click
+      assert_selector "#{GRAPH}[data-selected='post-51'][data-nodes='4']"
+      assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", "before" ], [ "1,213 other posts have no connections yet and aren't shown.", nil ] ], lines.call,
+        "one fewer isn't shown; the cap's sentence is the element it was"
+    end
+  end
+
+  # The whole-branch review's I1. "Not listed on any page" is a read of its
+  # own and its checkbox is there before the graph is: its rows can come
+  # while the graph is still being read, or after that read failed. There is
+  # then nothing to add a post to, so a row only says it is not in view, a
+  # press does nothing and raises nothing, and once the graph has come the
+  # same rows, still there, add their post. The graph's first read is held
+  # by the test and then failed; every other request goes to the real fetch.
+  test "a row of Not listed on any page pressed while the graph is being read, and after that read failed, does nothing and raises nothing, and adds its post once the graph is there" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    row = "#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]"
+    blog = ContentTypes.fetch("blog").label.downcase
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const real = window.fetch
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/data")) return real(url, options)
+        window.fetch = real
+        return new Promise((resolve, reject) => { window.failGraphRead = () => reject(new TypeError("Failed to fetch")) })
+      }
+    JS
+
+    with_reduced_motion do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      assert_selector "#{GRAPH}[data-state='loading']"
+      await_js("typeof window.failGraphRead === 'function'")
+      find("#{LIST} label", text: "Not listed on any page").click
+      assert_selector "#{row}[aria-disabled='true'][aria-label='Alone, #{blog} post, not in view.']", text: /Alone\s*not in view/
+
+      find(row).click
+      await_frames
+      assert_selector "#{GRAPH}[data-state='loading']:not([data-nodes])"
+      assert_selector "#{row}[aria-disabled='true']", count: 1
+      assert_no_selector "[data-mind-graph-card]", visible: :visible, wait: 0
+
+      page.execute_script("window.failGraphRead()")
+      assert_selector "#{GRAPH}[data-state='failed']"
+      find(row).click
+      await_frames
+      assert_selector "#{row}[aria-disabled='true']", count: 1
+      assert_selector "#{LIST} input[data-mind-graph-unlisted]:checked", visible: :all
+
+      # The graph comes: what the person asked for is still there, and now it adds.
+      press "Retry"
+      await_graph
+      assert_selector "#{LIST} input[data-mind-graph-unlisted]:checked", visible: :all
+      assert_selector "#{row}:not([aria-disabled])"
+      within(LIST) { assert_row "Alone, #{blog} post, not in view. Activate to add it to the graph." }
+      find(row).click
+      assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='3']"
+      assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
+    end
+  end
+
   # A local view is cut differently (`PostGraph::Local#cut`: the nearest posts
   # first, then the better connected), so it has a sentence of its own: "best-
   # connected" would be untrue of it.

@@ -8,6 +8,7 @@
 // target). The payload has no `kind`: a node's is the array it came in
 // (`app/queries/post_graph.rb`). Pages come first, in tree order as the
 // server sends them.
+import { ALL_POSTS } from "mind_graph/ids"
 
 // A page's fixed bonus over a post with as many links, in links (design
 // answer, part one §6: "a fixed bonus"; half a link is a READING).
@@ -16,7 +17,7 @@ const PAGE_BONUS = 0.5
 // A type that is no longer registered has no colour slot, and is not "All
 // posts" (design answer G1): its hub is drawn as an outline (`marks.js`) and
 // its label ends "(retired)", in the messages' words.
-const retiredType = (type) => type.id !== "all-posts" && type.colour_index == null
+const retiredType = (type) => type.id !== ALL_POSTS && type.colour_index == null
 
 // `allPosts` is the one "All posts" node's name, `more(count)` a pill's
 // words and `retired(name)` a retired type's label: the page's messages,
@@ -26,7 +27,7 @@ export function nodesOf(data, { allPosts, more, retired }) {
     ...(data.pages || []).map((page) => ({ ...page, kind: "page" })),
     ...data.nodes.map((node) => ({ ...node, kind: "post" })),
     ...data.tags.map((tag) => ({ ...tag, title: tag.name, kind: "tag" })),
-    ...(data.types || []).map((type) => ({ ...type, title: type.id === "all-posts" ? allPosts : retiredType(type) ? retired(type.label) : type.label, kind: "type" })),
+    ...(data.types || []).map((type) => ({ ...type, title: type.id === ALL_POSTS ? allPosts : retiredType(type) ? retired(type.label) : type.label, kind: "type" })),
     ...(data.more || []).map((pill) => ({ ...pill, title: more(pill.count), kind: "more", degree: 1 }))
   ]
 }
@@ -117,8 +118,10 @@ export function counts(nodes, edges) {
 //   WHOLE graph such a post is one the notice counts (`data.isolated`): one
 //   fewer isn't shown. The row says it because the page cannot work it out:
 //   at the posts' cap a post that is not drawn may as well be a connected
-//   one the cut left out, which the notice never counted. A local view
-//   counts no such posts at all.
+//   one the cut left out, which the notice never counted; such a row
+//   (`unconnected: false`, at the cap) raises the other figure of the
+//   notice instead, how many of the connected posts are shown
+//   (`data.shown`). A local view counts no such posts at all.
 //
 // Answers the index of the pill it counted down, or -1.
 export function countAdded(nodes, data, row) {
@@ -127,7 +130,11 @@ export function countAdded(nodes, data, row) {
     if (pill >= 0) nodes[pill].count -= 1
     return pill
   }
-  if (row.unconnected === true && !data.focus && data.isolated > 0) data.isolated -= 1
+  if (data.focus) return -1
+  if (row.unconnected === true) data.isolated = Math.max(0, data.isolated - 1)
+  // A connected post the cut at the cap left out: "Showing the 2,000
+  // best-connected of N posts" shows one more.
+  else if (row.unconnected === false && data.shown < data.total) data.shown += 1
   return -1
 }
 

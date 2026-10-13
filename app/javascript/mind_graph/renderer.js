@@ -72,7 +72,7 @@ export const LINE_STYLES = {
 // part one §6): zoomed out they are most of the ink and say the least. A
 // DRAWING rule only: the filter, its counts and a selection's neighbours do
 // not change with it.
-export const HIDE_TAG_LINES_BELOW = 0.4
+const HIDE_TAG_LINES_BELOW = 0.4
 // The font a node's label is drawn in, and so the font its width is measured
 // in (`app.js`): a tag's is mono, like a tag everywhere else in CS Studio,
 // and the selected node's is semibold in its own face.
