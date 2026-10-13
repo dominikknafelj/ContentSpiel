@@ -170,7 +170,8 @@ Where the code left the text above, and which document now describes it. "The re
 **§2, colouring.**
 
 - **`CodeHighlight.lines(code, language, block_id: nil)`**: a third, optional argument, because the log line of a lexer that raised names the block and the id has to come from the caller. Roles are Strings, not Symbols, so the cached value is the same whatever the cache store's serializer does.
-- **A failure is never cached** (`skip_nil: true`); the spec's `Rails.cache.fetch` cached whatever the block answered, so one failed lex was plain text under the code's own key until the code changed. In consequence the failure is logged at each call that fails, not "once".
+- **A failure is cached for five minutes under a key of its own** (`failure_key`, `FAILURE_TTL`), never under the code's key: the spec's `Rails.cache.fetch` cached whatever the block answered, so one failed lex was plain text until the code changed; caching no failure at all, the second version, made a block that always fails cost every request its timeout (final review I1). The failure is logged once per entry.
+- **One whole lex has a deadline** (`LEX_SECONDS`, half a second, checked inside Rouge's regex lexers at every step), which the spec left for "the day a slow input is found": `Regexp.timeout`, which Rails already sets to one second, bounds one match only. Lexers that Rouge's listed lexers hand text to (a Markdown fence names any of Rouge's) run under the same deadline.
 - **Two more inputs are plain text**: bytes that are not text are scrubbed to U+FFFD before anything else, and code over `MAX_CHARACTERS` is neither lexed nor cached. Neither is reachable through the services.
 - Rouge's tag for a Dockerfile is `docker`; the label is "Dockerfile".
 
