@@ -7,7 +7,7 @@
 // hands over the vendored file's URL (`d3Url`) with `start`, and it is
 // imported once, dynamically. That file is one self-contained bundle.
 //
-// Messages in:  { type: "start", d3Url, nodes: [{ id, radius, anchor }], edges: [{ source, target, kind }], reducedMotion }
+// Messages in:  { type: "start", d3Url, nodes: [{ id, radius, anchor }], edges: [{ source, target, kind }], reducedMotion, springs, ease }
 //               { type: "filter", nodeIds: [...], edgeIndexes: [...] }
 //               { type: "drag", id, x, y }   the node is held under the pointer
 //               { type: "drop", id }         the pointer let go: the node STAYS where it is
@@ -23,8 +23,10 @@
 // node on screen. Which nodes are pinned is the page's to know and to show.
 //
 // LINES AND THE ANCHOR (pages in the mind graph, spec §5). A line's `kind`
-// chooses its spring: a tree line is short and stiff (`LINKS.tree`), so a
-// subtree stays together; every other kind is as before. The node marked
+// chooses its spring from `springs` (`{ kind: { distance, strength } }`,
+// handed over with `start`: `layout_parameters.js`, where the values and
+// their reasons are): a tree line is short and stiff, so a subtree stays
+// together; a kind that is not named there is as before. The node marked
 // `anchor` (Home) is HELD AT THE CENTRE while the layout runs: `fx` / `fy`
 // are 0. It is not a pin: the page shows none and counts none, so nothing
 // the page forgets or releases can let it go. Dragged or pinned it is held
@@ -32,7 +34,8 @@
 // back to the centre, not to the forces. A `filter` that hides it lets it
 // go like any node, and one that shows it again puts it back. BACK TO THE
 // CENTRE IS EASED: the anchor is held a little nearer with every tick
-// (`EASE`), so it travels like every other released node and its subtree
+// (`ease`, `{ keep, within }`, handed over with `start`), so it travels
+// like every other released node and its subtree
 // is not yanked after it; with reduced motion, and at `start`, it is simply
 // there. The page chooses the anchor: Home in the whole graph, the focus in
 // a local view. No pinning by
@@ -83,18 +86,8 @@ const FINAL_TICKS = Math.round(FINAL_STRETCH_MS / FRAME_MS)
 // How warm the layout is while a node is held, and what an unpin or (with
 // reduced motion) a drop warms it up to: d3's own drag uses the same figure.
 const HELD_ALPHA = 0.3
-// A line's spring by kind: its length at rest and how hard it pulls. A kind
-// that is not named here has d3's own (90, and a strength that falls with
-// the number of lines at its ends). The tree's are the spec's starting
-// values, tuned at the measurement (pages plan, Task 9).
+// A line's length at rest where its kind names none (`springs`).
 const DISTANCE = 90
-const LINKS = { tree: { distance: 40, strength: 0.9 } }
-// How much of its way to the centre a released anchor has left after a
-// tick, and how near counts as there. From 500 units away that is some
-// forty ticks, two thirds of a second at frame pace; the layout it warmed
-// up takes about 250 to cool down, so the ease always ends first.
-const EASE = 0.85
-const EASED = 0.5
 
 let d3 = null
 let simulation = null
@@ -107,6 +100,10 @@ let pace = "frame"
 // With reduced motion, the positions last posted: what a `drag` moves one
 // node of, while the simulation's own are ahead of what is shown.
 let shown = null
+// A line's spring by its kind, and how a released anchor eases back: the
+// page's, from `start` (`layout_parameters.js`).
+let springs = {}
+let ease = { keep: 0, within: 0 }
 // The anchor while it is on its way back to the centre, else null.
 let easing = null
 
@@ -133,6 +130,8 @@ async function handle(message) {
   if (message.type === "start") {
     d3 ||= await import(message.d3Url)
     reduced = Boolean(message.reducedMotion)
+    springs = message.springs
+    ease = message.ease
     start(message.nodes, message.edges)
   } else if (message.type === "filter") {
     filter(new Set(message.nodeIds), new Set(message.edgeIndexes))
@@ -176,7 +175,7 @@ async function handle(message) {
     const freed = message.ids.map(find).filter(Boolean)
     if (!freed.length) return idle()
     // The anchor goes back to the centre, every other node to the forces.
-    freed.forEach((node) => rest(node, { ease: true }))
+    freed.forEach((node) => rest(node, { eased: true }))
     simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), HELD_ALPHA))
     pace = "frame"
     run()
@@ -197,11 +196,11 @@ function start(givenNodes, givenEdges) {
   easing = null
   nodes.forEach((node) => rest(node))
   shown = null
-  const link = d3.forceLink(edges.slice()).id((node) => node.id).distance((edge) => LINKS[edge.kind]?.distance ?? DISTANCE)
+  const link = d3.forceLink(edges.slice()).id((node) => node.id).distance((edge) => springs[edge.kind]?.distance ?? DISTANCE)
   // d3's own strength, kept for every kind that names none: it reads the
   // force's own count of lines per node, which `links()` refreshes.
   const ordinary = link.strength()
-  link.strength((edge, index, all) => LINKS[edge.kind]?.strength ?? ordinary(edge, index, all))
+  link.strength((edge, index, all) => springs[edge.kind]?.strength ?? ordinary(edge, index, all))
   simulation = d3.forceSimulation(nodes)
     // `distanceMax` bounds each node's repulsion to its surroundings: without
     // it every node pushes every other, which is what makes a large graph slow
@@ -218,17 +217,22 @@ function start(givenNodes, givenEdges) {
 
 // Where a node that nobody holds is kept: the anchor at the centre, every
 // other node nowhere.
-// `ease`: the anchor is somewhere else (it was dragged, or let go while a
-// filter hid it) and travels back.
-function rest(node, { ease = false } = {}) {
+// `eased`: the anchor is somewhere else (it was dragged, or let go while a
+// filter hid it) and travels back -- from where it is HELD, if it is: a
+// node dropped and released before the next tick is not yet where it was
+// put (`x` follows `fx` only with a tick), and would be taken for a node
+// that never left.
+function rest(node, { eased = false } = {}) {
+  const fromX = node.fx ?? node.x
+  const fromY = node.fy ?? node.y
   node.held = false
   if (easing === node) easing = null
   if (!node.anchor) {
     node.fx = null
     node.fy = null
-  } else if (ease && !reduced && Number.isFinite(node.x) && Math.hypot(node.x, node.y) > EASED) {
-    node.fx = node.x
-    node.fy = node.y
+  } else if (eased && !reduced && Number.isFinite(fromX) && Math.hypot(fromX, fromY) > ease.within) {
+    node.fx = fromX
+    node.fy = fromY
     easing = node
   } else {
     node.fx = 0
@@ -240,9 +244,9 @@ function rest(node, { ease = false } = {}) {
 // while it is on its way there.
 function tick() {
   if (easing) {
-    easing.fx *= EASE
-    easing.fy *= EASE
-    if (Math.hypot(easing.fx, easing.fy) <= EASED) {
+    easing.fx *= ease.keep
+    easing.fy *= ease.keep
+    if (Math.hypot(easing.fx, easing.fy) <= ease.within) {
       easing.fx = 0
       easing.fy = 0
       easing = null
@@ -256,7 +260,7 @@ function filter(nodeIds, edgeIndexes) {
     // A shown anchor that nobody holds is at the centre (again: a filter
     // that hid it had let it go).
     if (nodeIds.has(node.id)) {
-      if (node.anchor && !node.held && easing !== node) rest(node, { ease: true })
+      if (node.anchor && !node.held && easing !== node) rest(node, { eased: true })
       return
     }
     node.held = false

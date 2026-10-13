@@ -689,11 +689,6 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   # ---- Pages in the mind graph (spec §4; design answers, all four parts) ----
 
   SOLID = [].freeze
-  # Where the tree line of the test below rests, and where d3's own strength
-  # would rest it (one half for that line, where the tree's is 0.9): measured on
-  # this layout, which is deterministic.
-  TREE_REST = 47.7
-  TREE_REST_DEFAULT = 51.8
   DASHED = [ 3, 2.5 ].freeze
 
   # Pages spec §4, the status table: one rule for a page and a post, and warn
@@ -1162,73 +1157,105 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal %w[page-1 none none page-2 post-9 tag-3 page-1], anchors
   end
 
+  # The layout's own figures, as the page hands them to the worker: a tree
+  # line rests at 40 with a strength of 0.9, and a released anchor keeps 85%
+  # of its way with each tick until it is within half a unit. Held as VALUES,
+  # because a layout's measured outcome says them only roughly; the two tests
+  # below hold that the worker does what the values say.
+  test "layout parameters: the tree's spring and the anchor's ease are the configured values" do
+    assert_equal({ "SPRINGS" => { "tree" => { "distance" => 40, "strength" => 0.9 } }, "EASE" => { "keep" => 0.85, "within" => 0.5 } },
+      js_module("mind_graph/layout_parameters", "({ SPRINGS: m.SPRINGS, EASE: m.EASE })"))
+  end
+
   # A released anchor EASES back to the centre like every other released
   # node, a little nearer with each tick, where it used to be there in the
   # next frame with its subtree yanked after it. (With reduced motion it is
   # simply there: the test above.)
+  #
+  # NOTHING IS WAITED OUT. The drag, the drop and the release are sent right
+  # behind `start` (the worker takes its messages in order), the ease is
+  # handed over SHORTER than the real one (half the way kept per tick: ten
+  # ticks from 500 away, where the real one takes forty), and the script
+  # ends with the tick that shows the anchor at the centre, not with the
+  # layout's cooling down. About a fifth of a second of layout.
   test "a released anchor eases back to the centre tick by tick" do
-    result = using_wait_time(40) do
-      page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
-        const [workerUrl, d3Url, done] = arguments
-        import("mind_graph/layout_client").then(({ createLayout }) => {
-          let settled = 0
-          const back = []
+    result = page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
+      const [workerUrl, d3Url, done] = arguments
+      import("mind_graph/layout_client").then(({ createLayout }) => {
+        // The anchor's distance from the centre at each tick, until `enough`
+        // says so or forty ticks have come (two thirds of a second: a
+        // release that showed nothing by then shows nothing).
+        const released = (options, enough) => new Promise((resolve, reject) => {
+          const seen = []
           const layout = createLayout({
             workerUrl, d3Url,
-            onTick: (positions) => { if (settled === 1) back.push(Math.hypot(positions[0], positions[1])) },
-            // Dragged 500 away, dropped and released at once: every tick from
-            // then on is the anchor where it was dropped, or on its way back.
-            onSettled: () => {
-              settled += 1
-              if (settled === 1) { layout.drag("page-1", 300, -400); layout.drop("page-1"); layout.unpin([ "page-1" ]) }
-              else { layout.stop(); done({ back }) }
+            onTick: (positions) => {
+              seen.push(Math.hypot(positions[0], positions[1]))
+              if (enough(seen) || seen.length >= 40) { layout.stop(); resolve(seen) }
             },
-            onError: (message) => done({ error: message })
+            onSettled: () => {},
+            onError: reject
           })
-          // More than three hundred nodes, so the first layout is computed in
-          // slices and not shown tick by tick: the test is about the release.
-          const posts = Array.from({ length: 300 }, (_, index) => ({ id: `post-${index}`, radius: 7 }))
-          layout.start([ { id: "page-1", radius: 11, anchor: true }, { id: "page-2", radius: 9 }, ...posts ],
-                       [ { source: "page-2", target: "page-1", kind: "tree" }, ...posts.slice(1).map((post, index) => ({ source: posts[index].id, target: post.id, kind: "related" })) ])
+          layout.start([ { id: "page-1", radius: 11, anchor: true }, { id: "page-2", radius: 9 }, { id: "post-1", radius: 7 } ],
+                       [ { source: "page-2", target: "page-1", kind: "tree" }, { source: "post-1", target: "page-1", kind: "lists" } ], options)
+          layout.drag("page-1", 300, -400)
+          layout.drop("page-1")
+          layout.unpin([ "page-1" ])
         })
-      JS
-    end
+        const away = (seen) => seen.some((distance) => distance > 0)
+        Promise.all([ released({ ease: { keep: 0.5, within: 0.5 } }, (seen) => away(seen) && seen.at(-1) === 0), released({}, away) ])
+          .then(([ short, own ]) => done({ short, own })).catch((error) => done({ error: String(error) }))
+      })
+    JS
 
     assert_nil result["error"]
-    back = result["back"]
-    assert_operator back.first, :>, 350, "the released anchor was at the centre in the next frame: it jumped"
-    assert_operator back.count { |distance| distance > 1 }, :>=, 15, "the anchor was back in fewer than fifteen frames"
-    assert_equal back, back.sort.reverse, "the anchor did not come nearer with every tick"
+    # From its first tick away: the ticks before the release was taken up
+    # show it at the centre. It was dropped 500 away, and each tick keeps
+    # half: 250, 125, … and the tenth is within half a unit, so the centre.
+    back = result["short"].drop_while(&:zero?)
+    assert_not_empty back, "the released anchor was never seen away from the centre: it jumped"
+    assert_in_delta 250, back[0], 0.01, "the first tick after the release is not half the way back from where the anchor was dropped: #{back}"
+    assert_in_delta 125, back[1], 0.01, "the second tick is not half of what was left: #{back}"
+    assert_equal 10, back.size, "nine ticks on the way and the tenth at the centre: the ease handed over was not the one used (#{back})"
+    assert back.each_cons(2).all? { |before, after| after < before }, "the anchor did not come strictly nearer with every tick: #{back}"
     assert_equal 0, back.last, "the anchor did not end at the centre"
+    # And with the layout's own ease, which the client sends when a caller
+    # names none: 85% of the way is left after the first tick.
+    assert_in_delta 425, result["own"].drop_while(&:zero?).first.to_f, 0.01, "the layout's own ease is not what a release uses: #{result["own"]}"
   end
 
-  # The tree's spring is STIFF as well as short. Home with two children, one
-  # of which has two of its own: d3's own strength for the line from that
-  # child to Home is one half (it falls with the lines at a line's ends), the
-  # tree's is 0.9, and against the same repulsion the stiffer spring holds
-  # the child nearer its rest length of 40. The figures are this layout's,
-  # which is deterministic.
-  test "the layout's tree line is stiff: a page with children of its own is held nearer its parent than d3's own strength would hold it" do
-    result = using_wait_time(40) do
-      page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
-        const [workerUrl, d3Url, done] = arguments
-        import("mind_graph/layout_client").then(({ createLayout }) => {
+  # The tree's spring is the one it is handed, in both its figures. Home with
+  # two children, one of which has two of its own, laid out three times with
+  # reduced motion (no tick is shown, so no clock is in it): with the
+  # layout's own springs, with a tree line as weak as a twentieth, and with
+  # one as long as any other line. A RELATION, not a figure: the stiff, short
+  # line holds the branching page nearer Home than either of the others, by
+  # more than any rounding or any change of tick count could move.
+  test "the layout's tree line is as stiff and as short as its spring says: a weaker one and a longer one each rest the page farther from its parent" do
+    result = page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
+      const [workerUrl, d3Url, done] = arguments
+      import("mind_graph/layout_client").then(({ createLayout }) => {
+        const tree = (source, target) => ({ source, target, kind: "tree" })
+        const rest = (options) => new Promise((resolve, reject) => {
           let last = null
           const layout = createLayout({
             workerUrl, d3Url,
             onTick: (positions) => { last = Array.from(positions) },
-            onSettled: () => { layout.stop(); done({ distance: Math.hypot(last[2], last[3]) }) },
-            onError: (message) => done({ error: message })
+            onSettled: () => { layout.stop(); resolve(Math.hypot(last[2], last[3])) },
+            onError: reject
           })
-          const tree = (source, target) => ({ source, target, kind: "tree" })
           layout.start([ "page-1", "page-2", "page-3", "page-4", "page-5" ].map((id, index) => ({ id, radius: 9, anchor: index === 0 })),
-                       [ tree("page-2", "page-1"), tree("page-3", "page-1"), tree("page-4", "page-2"), tree("page-5", "page-2") ], { reducedMotion: true })
+                       [ tree("page-2", "page-1"), tree("page-3", "page-1"), tree("page-4", "page-2"), tree("page-5", "page-2") ], { reducedMotion: true, ...options })
         })
-      JS
-    end
+        Promise.all([ rest({}), rest({ springs: { tree: { distance: 40, strength: 0.05 } } }), rest({ springs: { tree: { distance: 90, strength: 0.9 } } }) ])
+          .then(([ own, weak, long ]) => done({ own, weak, long })).catch((error) => done({ error: String(error) }))
+      })
+    JS
 
     assert_nil result["error"]
-    assert_in_delta TREE_REST, result["distance"], 1.5, "the tree line from a branching page to Home rests elsewhere: its strength changed (d3's own would rest it at about #{TREE_REST_DEFAULT})"
+    assert_operator result["own"], :<, result["weak"] - 10, "a tree line a twentieth as strong rests the page no farther from Home: the strength handed over is not used (#{result})"
+    assert_operator result["own"], :<, result["long"] - 10, "a tree line of 90 rests the page no farther from Home than one of 40: the distance handed over is not used (#{result})"
+    assert_operator result["own"], :>, 40, "the page rests nearer Home than its line's rest length, against the repulsion (#{result})"
   end
 
   private

@@ -162,6 +162,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/ids.js
     app/javascript/mind_graph/marks.js
     app/javascript/mind_graph/graph_data.js
+    app/javascript/mind_graph/layout_parameters.js
     app/components/admin/editor_screen/section_card_component.rb
     app/components/admin/editor_screen/section_card_component.html.erb
     app/components/admin/editor_screen/section_group_component.rb
