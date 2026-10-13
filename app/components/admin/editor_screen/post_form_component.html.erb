@@ -75,7 +75,7 @@
     <%# On a translation tab the fields that are the same in every language are not inputs but
         one collapsed, read-only list (`schema_fields` above already left them out), so this
         tab's autosave can never send -- and never change -- a shared value. %>
-    <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields) %>
+    <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields, primary_url: primary_url) %>
 
     </section>
   <% end %>

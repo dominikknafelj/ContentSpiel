@@ -14,6 +14,10 @@ class TranslationStateParityTest < ActiveSupport::TestCase
     end
   end
 
+  def stored_state(record, locale)
+    Translations::State.where(record_type: record.class.polymorphic_name, record_id: record.id, locale: locale).pick(:state)
+  end
+
   def upload_image
     file = Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")
     result = Media::Upload.call(file: file)
@@ -236,6 +240,33 @@ class TranslationStateParityTest < ActiveSupport::TestCase
       assert Trash::Move.call(asset).ok?
       assert Trash::Purge.call(asset.reload).ok?
       assert_empty Translations::State.where(record_type: "Media::Asset", record_id: id)
+    end
+  end
+
+  # Code block spec §1: the caption is the block's only translated field and
+  # is optional; the code is the same in every language.
+  test "a code block's caption is tracked like an image's, never missing, and a change of the code changes no state" do
+    as_owner do
+      page = create_page(title: "Docs", translations: { "de" => { title: "Doku" }, "es" => { title: "Documentos" } })
+      block = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "code", settings: { "language" => "ruby", "code" => "a = 1" } }).record
+      assert_parity page
+      assert_equal "complete", stored_state(page, "de")
+
+      assert ContentBlocks::Save.call(block, translations: { "en" => { caption: "A sample" } }).ok?
+      assert_parity page
+      assert_equal "complete", stored_state(page, "de"), "a caption left untranslated is a choice, not a gap"
+
+      assert ContentBlocks::Save.call(block, translations: { "de" => { caption: "Ein Beispiel" } }).ok?
+      assert ContentBlocks::Save.call(block, translations: { "en" => { caption: "Another sample" } }).ok?
+      assert_parity page
+      assert_equal "outdated", stored_state(page, "de")
+      assert_equal "complete", stored_state(page, "es")
+      assert_equal :outdated, block.reload.translation_state(:caption, "de")
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "code" => "a = 2", "filename" => "a.rb", "language" => "python" } }).ok?
+      assert_parity page
+      assert_equal "outdated", stored_state(page, "de")
+      assert_equal "complete", stored_state(page, "es")
     end
   end
 end

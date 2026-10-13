@@ -421,4 +421,95 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
 
     assert_select "body.overflow-x-clip"
   end
+
+  test "a code block is drawn with its head and its code coloured, at the top level and in a column of a section" do
+    section = @root.content_blocks.create!(block_type: :section, position: 0, settings: { "layout" => "two" })
+    @root.content_blocks.create!(block_type: :code, position: 1, settings: { "language" => "ruby", "filename" => "a.rb", "code" => "def top; end" })
+    @root.content_blocks.create!(block_type: :code, position: 0, section: section, section_column: 2, settings: { "language" => "yaml", "code" => "inside: column" })
+
+    get "/"
+
+    assert_response :success
+    assert_select "main figure.content-block--code", count: 2
+    assert_select "figure.content-block--code .code-file", text: "a.rb"
+    assert_select "figure.content-block--code pre span.syn-keyword", text: "def"
+    assert_select ".content-section__column figure.content-block--code pre", text: "inside: column"
+    assert_select ".content-section__column figure.content-block--code .code-language", text: "YAML"
+  end
+
+  # Fences of Markdown in Markdown, 650 deep: what overflowed a request's
+  # thread before the depth was counted (`test/values/code_highlight_test.rb`).
+  def nested_fences(levels = 650)
+    indents = Array.new(levels) { |index| index.zero? ? "" : index.to_s(2).tr("01", " \t") }
+    (indents.map { |indent| "#{indent}```md\n" } + [ "x\n" ] + indents.reverse.map { |indent| "#{indent}```\n" }).join
+  end
+
+  # Final re-review C1: this page was a 500. The request is made on a thread,
+  # as a server makes it; an integration test's own thread is the main one,
+  # whose stack is deep enough for the text to lex.
+  test "a page that holds a Markdown block of fences nested hundreds deep answers 200 with the code as text, on a thread" do
+    code = nested_fences
+    @root.content_blocks.create!(block_type: :code, position: 0, settings: { "language" => "markdown", "code" => code })
+
+    Thread.new { get "/" }.join
+
+    assert_response :success
+    assert_equal code.delete_suffix("\n"), Nokogiri::HTML5(response.body).at_css("figure.content-block--code pre").text
+    assert_select "figure.content-block--code pre span", count: 0
+  end
+
+  # Final re-review I1. A block drawn plain because the request's budget for
+  # lexing was spent is coloured by the next request, so the first answer
+  # must not be what a 304 confirms.
+  test "a page on which a code block was late carries no ETag that confirms it: the next request draws the block coloured" do
+    @root.content_blocks.create!(block_type: :code, position: 0, settings: { "language" => "ruby", "code" => "def top; end" })
+
+    get "/"
+    assert_select "figure.content-block--code pre span.syn-keyword", text: "def"
+    usual = response.headers["ETag"]
+    assert usual.present?
+    get "/", headers: { "If-None-Match" => usual }
+    assert_response :not_modified
+
+    with_singleton_override(CodeHighlight, :request_budget, -> { 0 }) { get "/" }
+    assert_response :success
+    assert_select "figure.content-block--code pre", text: "def top; end"
+    assert_select "figure.content-block--code pre span", count: 0
+    late = response.headers["ETag"]
+    assert_not_equal usual, late, "the content's ETag is not on a page drawn late"
+
+    get "/", headers: { "If-None-Match" => late.to_s }
+    assert_response :success
+    assert_select "figure.content-block--code pre span.syn-keyword", text: "def"
+    assert_equal usual, response.headers["ETag"]
+    assert_nil Current.lex_seconds_left, "the budget does not outlive its request"
+  end
+
+  test "a code block on a live page is read from its published copy: a save shows nothing until it is published, and counts as a change" do
+    page = create_page(title: "Docs")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "code", settings: { "language" => "ruby", "code" => "first = 1" } }).record
+    publish_changes(page)
+    path = PublicSite::Urls.new.path_for(page, "en")
+
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "code" => "second = 2" } }).ok?
+    get path
+
+    assert_select "figure.content-block--code pre", text: "first = 1"
+    assert page.reload.unpublished_changes_at.present?, "a save on a live page marks it"
+    assert_equal [ :changed ], Publishing::Changes.of(page).blocks.map(&:kind)
+    assert_equal "ruby", block.reload.settings["language"], "a save of the code alone leaves the other settings"
+
+    publish_changes(page)
+    get path
+    assert_select "figure.content-block--code pre", text: "second = 2"
+  end
+
+  test "an empty code block draws nothing on the page" do
+    @root.content_blocks.create!(block_type: :code, position: 0)
+
+    get "/"
+
+    assert_response :success
+    assert_select "figure.content-block--code", count: 0
+  end
 end

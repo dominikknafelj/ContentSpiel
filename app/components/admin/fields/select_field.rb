@@ -13,6 +13,10 @@ module Admin
 
         Array(options).map { |v| [ v.to_s, v ] }
       end
+
+      # The empty choice of a select that is not required: unnamed, unless
+      # the field says what it means (`blank: "Plain text"`).
+      def blank_choice = field.required? ? false : (field.options[:blank] || true)
     end
   end
 end

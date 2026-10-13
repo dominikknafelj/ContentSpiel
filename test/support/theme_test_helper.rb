@@ -13,6 +13,17 @@ module ThemeTestHelper
 
   def with_plain_theme(&block) = Theme.with(plain_theme, &block)
 
+  # A third theme, of two files (`test/fixtures/themes/code`): its own
+  # template for the Code block, written from the contract's names alone
+  # and the markup the copy script asks for, and a stylesheet that declares
+  # the seven syntax tokens again. The second theme deliberately has
+  # neither, so every test of it is a test of the default Code block.
+  CODE = Rails.root.join("test/fixtures/themes/code")
+
+  def code_theme = Theme.load(ThemeFolder.new(CODE))
+
+  def with_code_theme(&block) = Theme.with(code_theme, &block)
+
   # A copy of the second theme in a directory of its own, for a test that
   # adds, changes or removes a file. Yields the directory as a Pathname.
   def with_theme_copy

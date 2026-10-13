@@ -9,6 +9,7 @@ Rails.application.config.to_prepare do
 
   BlockTypes::RichText.register
   BlockTypes::Image.register
+  BlockTypes::Code.register
   BlockTypes::PostList.register
   BlockTypes::Section.register
 

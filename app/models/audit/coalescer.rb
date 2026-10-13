@@ -66,14 +66,16 @@ module Audit
 
     # Per field: the original old value and the latest new value (spec
     # §4.2). A body summary (`{digest_before, digest_after}`) merges the
-    # same way. A field that ends up back where it started is kept -- the
+    # same way, and so does a code field's (which has `length_before` and
+    # `length_after` too): every `…_before` of the first, the rest of the
+    # last. A field that ends up back where it started is kept -- the
     # edits did happen, and the log shouldn't pretend otherwise.
     def merge(existing, incoming)
       existing.merge(incoming) do |_field, old, new|
         if old.is_a?(Array) && new.is_a?(Array)
           [ old.first, new.last ]
         elsif old.is_a?(Hash) && new.is_a?(Hash) && old.key?("digest_before")
-          { "digest_before" => old["digest_before"], "digest_after" => new["digest_after"] }
+          new.merge(old.select { |key, _| key.end_with?("_before") })
         else
           new
         end

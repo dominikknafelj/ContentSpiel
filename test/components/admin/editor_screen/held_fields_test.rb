@@ -113,7 +113,8 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     "input->admin--editor--slug-preview#update",
     "focusout->admin--rich-text--editor#containFocus",
     "click->admin--ui--menu#select",
-    "click->admin--ui--menu#close"
+    "click->admin--ui--menu#close",
+    "input->admin--editor--code-limit#update"
   ].freeze
 
   def assert_survives(html)
@@ -134,6 +135,17 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true)
 
     assert_survives(rendered_content)
+  end
+
+  test "Admin::Fields::CodeField, rewritten: the code is read-only with its indentation and its counter's action is the one left" do
+    field = ContentModel::Definition::Field.new(name: "code", type: :code, options: { max: 20_000 })
+    render_inline Admin::Ui::FieldComponent.new(field: field, form_name: "block[settings]", value: "    indented\n\tb", locale: "en", id_prefix: "block-1")
+
+    assert_survives(rendered_content)
+    rewritten = Nokogiri::HTML5.fragment(held(rendered_content))
+    assert rewritten.at_css("textarea[name='block[settings][code]'][readonly]")
+    assert_equal "    indented\n\tb", rewritten.at_css("textarea").text
+    assert_equal [ "input->admin--editor--code-limit#update" ], rewritten.css("[data-action]").map { |node| node["data-action"] }
   end
 
   test "Admin::Ui::ChipInputComponent and RelatedPostsComponent (a post's tags, a block's tag), rewritten" do
@@ -204,5 +216,23 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     assert_same Admin::EditorScreen::HeldFields::ALLOWED_ACTIONS, rules[:allowed_actions]
     assert_same Admin::EditorScreen::HeldFields::READONLY_TYPES, rules[:readonly_types]
     assert_same Admin::EditorScreen::HeldFields::HIDDEN_TYPES, rules[:hidden_types]
+  end
+
+  test "a code block's card, rewritten; held by someone else its code is read-only with its indentation, its select disabled, and no save is wired" do
+    page = create_page(title: "Held code")
+    block = page.content_blocks.create!(block_type: "code", position: 0, settings: { "language" => "ruby", "filename" => "a.rb", "code" => "    indented\n\tb" })
+    as_owner { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true) }
+    assert_survives(rendered_content)
+
+    reserve(block, page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en") }
+
+    assert_selector "fieldset.admin-held textarea[name='block[settings][code]'][readonly]"
+    assert_equal "    indented\n\tb", Nokogiri::HTML5.fragment(rendered_content).at_css("textarea[name='block[settings][code]']").text
+    assert_selector "fieldset.admin-held select[name='block[settings][language]'][disabled]"
+    assert_selector "fieldset.admin-held input[name='block[settings][filename]'][readonly]"
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
+    left = Nokogiri::HTML5.fragment(rendered_content).css("fieldset.admin-held [data-action]").flat_map { |node| node["data-action"].split }
+    assert_equal [ "input->admin--editor--code-limit#update" ], left, "the counter, which reads, is left in a held code card, and nothing else is"
   end
 end

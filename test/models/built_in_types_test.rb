@@ -2,10 +2,24 @@ require "test_helper"
 
 class BuiltInTypesTest < ActiveSupport::TestCase
   test "built-ins are registered" do
-    assert_equal %w[rich_text image post_list section], BlockTypes.names
+    assert_equal %w[rich_text image code post_list section], BlockTypes.names
     assert_equal %w[blog resume_entry now_update], ContentTypes.names
     assert BlockTypes.fetch(:post_list).capability?(:lists_posts)
     assert_equal %w[image caption alt], BlockTypes.fetch(:image).uses_columns
+  end
+
+  test "code is a block of three settings and a caption, none of them required, the code never translated" do
+    code = BlockTypes.fetch(:code)
+
+    assert_equal "Code", code.label
+    assert_equal [ %w[language select], %w[filename string], %w[code code] ], code.fields.map { |field| [ field.name, field.type.to_s ] }
+    assert_equal %w[caption], code.uses_columns
+    assert code.capability?(:code)
+    assert_equal Blocks::CodeComponent, code.component
+    assert code.fields.none? { |field| field.required? || field.translated? }
+    assert_equal CodeHighlight::LANGUAGES, code.fields.first.options[:options]
+    assert_equal "Plain text", code.fields.first.options[:blank]
+    assert_equal 20_000, code.fields.last.options[:max]
   end
 
   test "section is the one container type, and its columns follow its layout" do
@@ -23,6 +37,31 @@ class BuiltInTypesTest < ActiveSupport::TestCase
 
     error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| t.label "Band"; t.capability :container } }
     assert_equal "a container block type needs `columns`", error.message
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # The editor's tile asks a `:code` type's settings for three fields by name
+  # (`TileSummaryComponent#code_line`), without a guard.
+  test "a type with the code capability and without its three fields is refused, and the message names what is missing" do
+    saved = BlockTypes.all.dup
+
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.field :code, :code; t.capability :code } }
+    assert_equal "a code block type needs language and filename field(s)", error.message
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.capability :code } }
+    assert_equal "a code block type needs language and filename and code field(s)", error.message
+    assert_nil BlockTypes.find(:test_listing), "a refused type is not registered"
+
+    BlockTypes.register(:test_listing) do |t|
+      t.label "Listing"
+      t.field :language, :string
+      t.field :filename, :string
+      t.field :code, :code
+      t.capability :code
+      t.component Blocks::CodeComponent
+    end
+    assert BlockTypes.find(:test_listing).capability?(:code)
   ensure
     BlockTypes.reset!
     saved.each { |definition| BlockTypes.registry_put(definition) }

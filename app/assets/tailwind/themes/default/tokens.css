@@ -56,6 +56,21 @@
   --th-on-band-strong: var(--th-paper);
   --th-on-band-strong-dim: #c9c8c2;
   --th-on-band-strong-accent: oklch(0.80 0.09 250);
+  /* The Code block's seven syntax colours (code block spec §5), one per role
+     `CodeHighlight::ROLES` names: `code.css` colours `.syn-<role>` by
+     `--th-syn-<role>`. Code stands on the sunken ground, and on the surface
+     in a tinted band (which is the sunken ground itself); on both the lowest
+     is the comment, 5.7:1 here and 5.5:1 in the dark block. A strong band
+     makes the seven one colour (`sections.css`).
+     `test/integration/design_tokens_test.rb` holds all 42 pairs, the three
+     grounds in both themes, at 4.5:1 or better. */
+  --th-syn-comment: oklch(0.47 0.01 270);
+  --th-syn-keyword: oklch(0.45 0.12 250);
+  --th-syn-string: oklch(0.43 0.10 150);
+  --th-syn-constant: oklch(0.46 0.10 65);
+  --th-syn-tag: oklch(0.42 0.07 200);
+  --th-syn-attribute: oklch(0.44 0.10 300);
+  --th-syn-embed: oklch(0.46 0.15 25);
 }
 
 [data-theme="dark"] {
@@ -90,6 +105,14 @@
   --th-on-band-strong: #0f1012;
   --th-on-band-strong-dim: #45464b;
   --th-on-band-strong-accent: oklch(0.45 0.12 250);
+  /* The syntax colours again. */
+  --th-syn-comment: oklch(0.68 0.01 270);
+  --th-syn-keyword: oklch(0.76 0.10 250);
+  --th-syn-string: oklch(0.78 0.11 150);
+  --th-syn-constant: oklch(0.80 0.10 75);
+  --th-syn-tag: oklch(0.78 0.07 200);
+  --th-syn-attribute: oklch(0.76 0.09 300);
+  --th-syn-embed: oklch(0.76 0.11 25);
 }
 
 :root {

@@ -1,7 +1,12 @@
 <%# The theme 404 (spec §6.4): PagesController renders this, at :not_found
     status, for any path PublicSite::Resolver couldn't match to a record or a
-    redirect. @page and @post are both nil here, so the layout's hreflang
-    block and this page's own header render nothing that assumes either. %>
+    redirect, and for a record it found that has no page to be drawn on.
+    @page and @post are NOT always nil here: `assign_record` assigns both
+    before it finds that no block lists the post, and the preview answers 404
+    for a post whose listing page the editor may not read. So this template
+    prints nothing of either, and the layout decides what describes a record
+    by the response's status (`page_found?`), never by `@page`
+    (docs/reference/theming.md, "The head"). %>
 <header class="mb-12">
   <h1 class="mt-3 font-semibold leading-tight tracking-tight text-h1">Page not found</h1>
   <p class="mt-4 max-w-2xl text-lg text-dim">

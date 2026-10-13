@@ -1,0 +1,20 @@
+# The public site's own strings: what the default theme's templates say to a
+# visitor that no editor typed. Read in the visitor's language, with English
+# as the fallback (`Blocks::CodeComponent#string`), so a language without a
+# `public.<locale>.yml` shows English and never "translation missing".
+#
+# This file starts ahead of the roadmap's item on translating the public site
+# (item 7 of "Next"): the Code block's four strings are the first keys, the
+# site's other strings are still literals in the templates, and that item
+# moves them here and adds German and Spanish.
+en:
+  public:
+    blocks:
+      # The Code block's copy button: its label, its accessible name, and
+      # what it says for two seconds after a press (or when the browser
+      # refuses the clipboard).
+      code:
+        copy: "Copy"
+        copy_code: "Copy code"
+        copied: "Copied"
+        failed: "Not copied"

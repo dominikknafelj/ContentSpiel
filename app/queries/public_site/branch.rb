@@ -182,7 +182,10 @@ module PublicSite
 
     # THE ORDER IS THE TREE'S OWN: by position, a page without one last (as
     # Postgres sorts a NULL, which is what closure_tree's `order: "position"`
-    # gives the menu, the subpage list and CS Studio's tree), then by id.
+    # gives the menu and the subpage list), then by id. CS Studio's tree and
+    # the New page dialog's list sort in Ruby by this same key
+    # (`Admin::PagesScreen::TreeNodeComponent#children`,
+    # `Admin::EditorScreen::NewPageFormComponent#choices`).
     def in_tree_order(pages) = pages.sort_by { |page| [ page.position.nil? ? 1 : 0, page.position.to_i, page.id ] }
 
     def build(page, depth, context)

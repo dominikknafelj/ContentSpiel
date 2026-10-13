@@ -85,7 +85,13 @@
    set as well as the ink token because the text colour a block inherits was
    computed on <body>, before the token changed. Lines and the code block's
    background are the band's text colour thinned out, as the page's own are
-   its ink thinned out. */
+   its ink thinned out. The accent is re-valued, so the ink that is written
+   ON it is too: the band's own colour, which is to the band's accent what
+   the band is to it (9.9:1 light, 6.4:1 dark). A code block's selected text
+   is that pair. And the band is the other scheme: a code block's
+   scrollbar is drawn for the scheme the layout declares on <body>, which
+   on this ground is the wrong one, so the block is told the opposite here
+   (the only `color-scheme` a code block is given). */
 .content-section--strong {
   background: var(--th-band-strong);
   color: var(--th-on-band-strong);
@@ -94,11 +100,24 @@
   --th-meta: var(--th-on-band-strong-dim);
   --th-accent: var(--th-on-band-strong-accent);
   --th-accent-hover: var(--th-on-band-strong);
+  --th-on-accent: var(--th-band-strong);
   --th-line: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
   --th-line-strong: color-mix(in srgb, var(--th-on-band-strong) 24%, transparent);
   --th-sunken: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
   --th-surface: color-mix(in srgb, var(--th-on-band-strong) 6%, transparent);
+  /* Code on this band is one colour (code block spec, decision 8): the band
+     turns the page's colours round, and a second set of seven values for it
+     would be fourteen more to keep readable. The comment keeps its step back. */
+  --th-syn-comment: var(--th-on-band-strong-dim);
+  --th-syn-keyword: var(--th-on-band-strong);
+  --th-syn-string: var(--th-on-band-strong);
+  --th-syn-constant: var(--th-on-band-strong);
+  --th-syn-tag: var(--th-on-band-strong);
+  --th-syn-attribute: var(--th-on-band-strong);
+  --th-syn-embed: var(--th-on-band-strong);
 }
+.content-section--strong .content-block--code { color-scheme: dark; }
+[data-theme="dark"] .content-section--strong .content-block--code { color-scheme: light; }
 
 /* `content` keeps the band inside the content column; `full` runs it edge to
    edge and puts the content back on the page's content width. The content

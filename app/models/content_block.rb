@@ -7,7 +7,7 @@
 # spec §3). Which columns matter depends on the type: `body` (per-locale JSON
 # documents, see `HasRichTextBody`) for rich_text,
 # `media_asset` + `caption`/`alt` for image, `settings`/`translated_settings` for
-# post_list.
+# post_list, `settings` + `caption` for code.
 class ContentBlock < ApplicationRecord
   extend Mobility
 
@@ -145,11 +145,21 @@ class ContentBlock < ApplicationRecord
   # error slot, the flash and MCP alike. Rails would otherwise print the
   # dotted path as "Settings limit ...". Everything else -- the block's own
   # columns -- goes to Rails' default.
+  #
+  # The label is the field's own (`ContentModel::Definition::Field#label`:
+  # "File name" for a Code block's `filename`), read from the type of the
+  # block the message is about. Rails hands that block over as `base:` when
+  # it builds a full message; asked without one (or for a type that is gone)
+  # the answer is the name humanised, which is what a field without a
+  # `label:` is called anyway.
   def self.human_attribute_name(attribute, options = {})
     name = attribute.to_s
     return super unless name.start_with?("settings.") && name.size > "settings.".size
 
-    name.delete_prefix("settings.").humanize
+    name = name.delete_prefix("settings.")
+    base = options[:base]
+    field = base.definition&.fields&.find { |candidate| candidate.name == name } if base.respond_to?(:definition)
+    field ? field.label : name.humanize
   end
 
   # This block's registered type, or nil for a stored `block_type` that isn't

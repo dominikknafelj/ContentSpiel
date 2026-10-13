@@ -26,7 +26,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "block_type is a string checked against the BlockTypes registry" do
-    assert_equal %w[rich_text image post_list section], BlockTypes.names
+    assert_equal %w[rich_text image code post_list section], BlockTypes.names
   end
 
   test "a block belongs to an owner" do
@@ -285,6 +285,20 @@ class ContentBlockTest < ActiveSupport::TestCase
     assert_includes block.errors.full_messages, "Limit must be greater than or equal to 1"
     assert_equal "Limit", ContentBlock.human_attribute_name("settings.limit")
     assert_equal "Block type", ContentBlock.human_attribute_name("block_type")
+  end
+
+  # Design answer C5: a message names the field as its input does.
+  test "a typed setting's error names its field by the field's own label where its type gives one" do
+    block = ContentBlock.new(owner: @page, block_type: "code", position: 0, settings: { "code" => "x" * (CodeHighlight::MAX_CHARACTERS + 1) })
+    block.valid?
+    block.errors.add("settings.filename", :invalid)
+
+    assert_includes block.errors.full_messages, "File name is invalid"
+    assert_equal "File name", ContentBlock.human_attribute_name("settings.filename", base: block)
+    assert_equal "Filename", ContentBlock.human_attribute_name("settings.filename"), "asked without the block, the name humanised"
+    assert_equal "Code", ContentBlock.human_attribute_name("settings.code", base: block)
+    gone = ContentBlock.new(owner: @page, block_type: "gone/type", position: 0)
+    assert_equal "Filename", ContentBlock.human_attribute_name("settings.filename", base: gone)
   end
 
   def section_on(page, layout: "two", position: 0)

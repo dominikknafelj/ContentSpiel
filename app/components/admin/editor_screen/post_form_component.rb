@@ -141,9 +141,13 @@ module Admin
         return [] unless translation_tab?
 
         (definition&.fields || []).reject(&:translated?).map do |field|
-          [ field.name.humanize, Admin::EditorScreen::SharedFieldsComponent.display(field, default_fields_object&.public_send(field.name)) ]
+          [ field.label, Admin::EditorScreen::SharedFieldsComponent.display(field, default_fields_object&.public_send(field.name)) ]
         end
       end
+
+      # The post's editor on the default language's tab (see
+      # `BlockCardComponent#primary_url`).
+      def primary_url = helpers.admin_post_path(post)
 
       # This post's own typed-field value, in whichever locale is being
       # edited -- `fields(locale:)` reads the *literal* locale (no fallback

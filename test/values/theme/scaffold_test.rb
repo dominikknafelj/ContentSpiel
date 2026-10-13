@@ -21,12 +21,13 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
   end
 
   # A page that every component of the contract draws: the scaffold copies
-  # eight, and a comparison on a text and one blog list would not notice the
+  # nine, and a comparison on a text and one blog list would not notice the
   # day the copy of the image block, the section or the other two lists is
   # not what the default theme draws. An image, a section of three columns
   # (tinted, full width) holding a text, an image and a blog list, a resume
-  # list, a "now" list, an image block with no image, a struck text; and a
-  # post of each type, whose own page is the detail component.
+  # list, a "now" list, an image block with no image, a struck text, a code
+  # block with a file name, a language and a caption and one with none; and
+  # a post of each type, whose own page is the detail component.
   def wide_page
     wide = create_page(title: "Wide", translations: { "es" => { title: "Ancho", slug: "ancho" } })
     asset = create_media_asset
@@ -44,6 +45,8 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     add.("post_list", { settings: { "content_type" => "now_update" } })
     add.("image")
     add.("rich_text", {}, { "en" => { body: rich_doc("Kept and ~~struck~~ words, a [link](https://example.com)\n\n- one\n- two\n\n> quoted") } })
+    add.("code", { settings: { "language" => "erb", "filename" => "show.html.erb", "code" => "<p class=\"a\"><%= 1 %></p>\n<%# note %>" } }, { "en" => { caption: "A template" } })
+    add.("code", { settings: { "code" => "plain words" } })
     publish_changes(wide)
 
     result = Posts::Save.call(attributes: { content_type: "resume_entry", published: true,
@@ -112,7 +115,8 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     paths = [ "/", "/blog", "/blog/first-post", "/wide", "/wide/engineer", "/wide/doing-now", "/de/", "/es/ancho", "/no-such-page" ]
     default = paths.index_with { |path| body_of(path) }
     # What the comparison is ON: each of these is on a compared page.
-    { "/wide" => [ "content-block--image", "<s>struck</s>", "Engineer", "Updated ", "First post", "In a column", "<figcaption" ],
+    { "/wide" => [ "content-block--image", "<s>struck</s>", "Engineer", "Updated ", "First post", "In a column", "<figcaption",
+                   "content-block--code", "show.html.erb", %(<span class="syn-embed">), "A template", %(data-code-copy-target="strip"), "plain words" ],
       "/wide/engineer" => [ "Engineer" ], "/wide/doing-now" => [ "Doing now" ], "/blog/first-post" => [ "First post" ],
       "/es/ancho" => [ "Ancho" ] }.each do |path, words|
       get path

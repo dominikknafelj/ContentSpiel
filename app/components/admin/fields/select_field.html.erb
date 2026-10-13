@@ -1,1 +1,1 @@
-<%= select_tag input_name, options_for_select(option_pairs, value), id: input_id, class: setup_select_class, include_blank: !field.required?, required: field.required? %>
+<%= select_tag input_name, options_for_select(option_pairs, value), id: input_id, class: setup_select_class, include_blank: blank_choice, required: field.required? %>

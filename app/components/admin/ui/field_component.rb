@@ -69,7 +69,9 @@ module Admin
         @translation_record = translation_record
       end
 
-      def label_text = field.name.humanize
+      # The field's own label where its type gives one (`label: "File name"`),
+      # its name humanised otherwise (`ContentModel::Definition::Field#label`).
+      def label_text = field.label
 
       def input_id = "#{id_prefix}-#{field.name}"
 

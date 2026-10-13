@@ -41,6 +41,9 @@
           directly after the name, on the left, where the notes drawer cannot cover it
           (notes handoff), and the rest of the row is the spacer after it. %>
       <div class="flex min-w-0 flex-1 items-center gap-2">
+        <%# Collapsed, a card shows this label and no line of the block's content, for any type:
+            a closed block's one line is on its tile in a section (`TileSummaryComponent`),
+            which is why the Code block's line (design answer C7) is drawn there only. %>
         <button type="button" class="min-w-0 truncate text-left text-sm font-semibold text-ink"
                 aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--editor--blocks#toggle">
           <%= label %>
@@ -129,7 +132,7 @@
                   errors: field_errors(type_field), id_prefix: error_prefix, **translation(type_field.name)
                 ) %>
             <%= render Admin::Ui::ChipInputComponent.new(
-                  name: "block[settings][#{tag_field.name}]", id: field_id(tag_field.name), label: tag_field.name.humanize,
+                  name: "block[settings][#{tag_field.name}]", id: field_id(tag_field.name), label: tag_field.label,
                   search_url: tag_search_url, chips: tag_chips(tag_field), single: true, create: false, noun: "tag",
                   placeholder: "Any", errors: field_errors(tag_field)
                 ) %>
@@ -151,7 +154,7 @@
         <% end %>
 
         <%# Same-in-every-language fields: read-only on a translation tab (see `#schema_fields`). %>
-        <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields) %>
+        <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields, primary_url: primary_url) %>
 
         <% uses_columns.each do |column| %>
           <% case column
@@ -165,7 +168,7 @@
             <%= render Admin::Columns::PlainColumnComponent.new(
                   name: "caption", id: field_id("caption"), html_name: field_html_name("caption"),
                   value: column_value("caption"), original: column_original("caption"), errors: column_errors("caption"), locale: locale,
-                  placeholder: column_placeholder("caption"), override: "caption", **translation("caption")
+                  **caption_options, **translation("caption")
                 ) %>
           <% when "alt" %>
             <%= render Admin::Columns::PlainColumnComponent.new(

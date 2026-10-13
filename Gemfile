@@ -130,6 +130,13 @@ gem "rack-attack", "~> 6.8"
 
 gem "view_component", "~> 4.15"
 
+# Colours the Code block's source on the server (code block spec §2). It was
+# in the bundle only through Lookbook, a development and test gem; a
+# visitor's request runs it now, so it is a dependency of its own.
+# `require: false`: requiring Rouge loads every one of its lexers, so it is
+# required by the one file that names it (`app/values/code_highlight.rb`).
+gem "rouge", "~> 5.1", require: false
+
 gem "lookbook", "~> 2.3", groups: [ :development, :test ]
 
 # The official Anthropic SDK -- the built-in AI translation provider

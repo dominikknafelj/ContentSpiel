@@ -179,6 +179,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/delete_block_dialog_component.rb
     app/components/admin/editor_screen/delete_block_dialog_component.html.erb
     app/javascript/controllers/admin/editor/section_controller.js
+    app/components/admin/fields/code_field.rb
+    app/components/admin/fields/code_field.html.erb
+    app/javascript/controllers/admin/editor/code_limit_controller.js
     app/components/admin/notes_screen/avatar_component.rb
     app/components/admin/notes_screen/body_component.rb
     app/components/admin/notes_screen/body_component.html.erb

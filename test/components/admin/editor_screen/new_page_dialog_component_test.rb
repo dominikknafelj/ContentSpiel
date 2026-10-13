@@ -64,6 +64,18 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_equal [ "Home", "  About", "    Team", "  Other" ], options.map(&:text)
   end
 
+  # Final re-review M5: the one list of siblings in CS Studio that put a
+  # page without a position FIRST (`position.to_i` is 0), where the tree,
+  # the public branch and SQL's `ORDER BY position` put it last.
+  test "a page without a position is offered last among its siblings, as the tree draws it" do
+    @about.update_columns(position: nil) # version: none (a test takes a position away, as only a half-written row has none)
+    render_form
+
+    assert_equal [ "Other", "About", "Team" ], page.all("#new-page-inside option", visible: :all).map { |option| option["data-title"] } - [ "Home" ]
+    tree = Admin::PagesScreen::TreeNodeComponent.new(page: root_page, children_by_parent: Page.kept.to_a.group_by(&:parent_id), locale: "en").children.map(&:id)
+    assert_equal [ @other.id, @about.id ], tree
+  end
+
   test "a page with no title in this language reads (untitled), as in the tree" do
     blank = Page.create!(parent: root_page, page_type: :standard, title: "x", slug: "blank-one")
     blank.update_columns(title: {})

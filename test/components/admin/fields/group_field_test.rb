@@ -36,4 +36,14 @@ class Admin::Fields::GroupFieldTest < ViewComponent::TestCase
   ensure
     Rails.application.reloader.prepare!
   end
+
+  test "the group is named by the field's own label where its type gives one, and by its name otherwise" do
+    with_test_types do
+      render_inline Admin::Fields::GroupField.new(field: Field.new(name: "speaker", type: :group, options: { of: "test/speaker", label: "Main speaker" }), form_name: "post[fields]", value: nil, locale: "en")
+      assert_selector "fieldset > legend", exact_text: "Main speaker"
+
+      render_inline Admin::Fields::GroupField.new(field: Field.new(name: "speaker", type: :group, options: { of: "test/speaker" }), form_name: "post[fields]", value: nil, locale: "en")
+      assert_selector "fieldset > legend", exact_text: "Speaker"
+    end
+  end
 end

@@ -1,0 +1,10 @@
+<%= tag.div(data: wrapper_data) do %>
+  <%= tag.textarea value, name: input_name, id: input_id, class: input_class, rows: rows, wrap: "off",
+        spellcheck: "false", autocapitalize: "off", autocomplete: "off", required: field.required?,
+        aria: { describedby: described_by }, data: input_data %>
+  <% if counter? %>
+    <%= tag.p counter_text, id: counter_id, hidden: !counter_shown?, class: counter_class, data: { "admin--editor--code-limit-target": "output" } %>
+    <%# Written by the script at two moments only (see the component); empty as the server draws it. %>
+    <%= tag.p "", class: "sr-only", aria: { live: "polite" }, data: { "admin--editor--code-limit-target": "announcer" } %>
+  <% end %>
+<% end %>

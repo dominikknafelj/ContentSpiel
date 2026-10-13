@@ -305,9 +305,14 @@ module Admin
         return [] unless translation_tab?
 
         definition.fields.reject(&:translated?).map do |field|
-          [ field.name.humanize, Admin::EditorScreen::SharedFieldsComponent.display(field, default_settings_object&.public_send(field.name)) ]
+          [ field.label, Admin::EditorScreen::SharedFieldsComponent.display(field, default_settings_object&.public_send(field.name)) ]
         end
       end
+
+      # The page's editor on the default language's tab, where the shared
+      # fields are edited: the address the header's language tab has for it
+      # (`HeaderComponent#language_url`: no `locale:` for the default).
+      def primary_url = helpers.admin_page_path(page)
 
       # This block's own value for a schema field, in whichever locale is
       # being edited -- `settings_object(locale:)` reads the *literal* locale
@@ -376,6 +381,14 @@ module Admin
         when "caption" then Admin::Columns::MediaColumnComponent.default_caption(block.media_asset, locale)
         end
       end
+
+      # A caption is a per-use override of a library text only where the type
+      # also uses an image: then the library image's caption is the input's
+      # placeholder and the field gets the help line, Reset and the library's
+      # text (`admin/shared/_override_field`). A type with a caption and no
+      # image (the Code block) has no library text behind it, so its caption
+      # is a plain translated field.
+      def caption_options = uses_columns.include?("image") ? { placeholder: column_placeholder("caption"), override: "caption" } : {}
 
       # The image column itself -- a class method so `Admin
       # ::ContentBlocksController` re-renders a refused choice from exactly

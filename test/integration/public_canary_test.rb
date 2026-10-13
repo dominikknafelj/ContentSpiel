@@ -77,6 +77,8 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
       assert Pages::Save.call(page, attributes: { hero_media_asset_id: @picture.id }).ok?
       text(page, "Alpha opening")
       block(page, "image", media_asset_id: @picture.id, translations: LOCALES.index_with { |locale| { alt: "Alt #{locale}", caption: "Caption #{locale}" } })
+      block(page, "code", settings: { "language" => "ruby", "filename" => "app/models/sample.rb", "code" => "sample = 1" },
+        translations: LOCALES.index_with { |locale| { caption: "Code caption #{locale}" } })
       section = block(page, "section", settings: { "layout" => "two" })
       text(page, "Left of the section", section_id: section.id, section_column: 1)
       block(page, "image", media_asset_id: @picture.id, section_id: section.id, section_column: 2)
@@ -198,6 +200,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     sitemap_before = sitemap
     assert_operator before.size, :>=, 20, "the site is too small to mean anything"
     assert_includes before.values.flatten.join, "Deletable words en"
+    assert_includes before.values.flatten.join, "Code caption de", "the site has a Code block on it"
     deleted_text = "Deletable words"
 
     overwrite_rows!

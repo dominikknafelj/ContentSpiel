@@ -1,0 +1,143 @@
+/* The Code block (code block spec §4, `Blocks::CodeComponent`). Plain rules
+   on tokens, not utilities: the span classes are built from role names
+   (`syn-keyword`), which no utility scan would find, and a theme that
+   replaces the block's template keeps these by writing the same classes.
+
+   The code and its head stand on the sunken ground, so the head reads as
+   `dim`: `meta` on sunken is 4.3:1 in the light theme. A band re-values the
+   tokens for what is inside it (`sections.css`), so nothing here knows a
+   band.
+
+   A LONG LINE scrolls in the `pre` (`overflow-x: auto`; the `pre` is
+   focusable, so a keyboard can scroll it) and the page never scrolls
+   sideways. The figure is a block wherever the default theme draws it,
+   never a flex or grid item, so it is as wide as what holds it and needs no
+   `min-width: 0` of its own (it had one that did nothing). In a column of a
+   section what holds it is a grid item, and a grid item would by itself be
+   as wide as its longest line, a `pre` that scrolls included: there it is
+   the tracks' `minmax(0, …)` and the column's `min-width: 0` in
+   `sections.css` that keep the column, and so the block, narrow. A theme
+   that makes the figure itself a flex or grid item has to give it
+   `min-width: 0` (`test/system/code_block_test.rb` holds the long line at
+   a phone's width, in a column too).
+
+   THE HEAD STRIP is there only when it has something to show (design answer
+   C1). A head with nothing but the Copy button is `hidden` in the markup
+   and shown by the script; `display: flex` below would otherwise show it, so
+   the `[hidden]` rule is the block's own and depends on no reset. The `pre`
+   is a whole box by itself and gives its top edge and corners to a head that
+   is shown; the 1px line between them is the head's (C8).
+
+   No `color-scheme` here: the `pre`'s scrollbar is drawn for the scheme the
+   layout declares on <body> and the block inherits, and only a strong band,
+   which is the page inverted, says the other one for the block
+   (`sections.css`). Selected text is the accent with its own ink, the one
+   pair of tokens that is a background and a text colour made for each
+   other, for every token inside the code: a browser's default selection
+   colour can leave a syntax colour unreadable.
+
+   The seven `--th-syn-*` tokens are the theme's (`tokens.css`). A `color`
+   whose token is not declared is invalid when computed and so the span
+   inherits the code's ink: a role with no token reads as plain text. */
+.content-block--code {
+  margin-block: 2.5rem;
+}
+.content-block--code .code-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--th-sp-3);
+  padding: var(--th-sp-2) var(--th-sp-3);
+  border: 1px solid var(--th-line);
+  border-radius: var(--th-radius) var(--th-radius) 0 0;
+  background: var(--th-sunken);
+  font-family: var(--th-mono);
+  font-size: var(--th-t-small);
+  color: var(--th-dim);
+}
+.content-block--code .code-head[hidden] {
+  display: none;
+}
+.content-block--code .code-file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--th-ink);
+}
+.content-block--code .code-language {
+  font-size: var(--th-t-label);
+  letter-spacing: var(--th-track-mono);
+  text-transform: uppercase;
+}
+.content-block--code .code-head button {
+  margin-inline-start: auto;
+  padding: 0 var(--th-sp-1);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--th-accent);
+  cursor: pointer;
+}
+/* The status line ("Copied", "Not copied") is for a screen reader only: the
+   button's own word changes for the eye. Hidden by this rule and not by a
+   utility, so a theme that writes its own template, or scans other folders,
+   keeps it hidden by writing the class. */
+.content-block--code .code-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  /* `clip` for a browser that does not know `clip-path`; one that knows both uses both. */
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.content-block--code .code-head button:hover {
+  color: var(--th-accent-hover);
+}
+.content-block--code .code-head button:focus-visible,
+.content-block--code pre:focus-visible {
+  outline: 2px solid var(--th-accent);
+  outline-offset: 2px;
+}
+.content-block--code pre {
+  margin: 0;
+  padding: var(--th-sp-3);
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+  border: 1px solid var(--th-line);
+  border-radius: var(--th-radius);
+  background: var(--th-sunken);
+  font-family: var(--th-mono);
+  font-size: var(--th-t-small);
+  line-height: 1.6;
+  color: var(--th-ink);
+}
+.content-block--code .code-head:not([hidden]) + pre {
+  border-top: 0;
+  border-radius: 0 0 var(--th-radius) var(--th-radius);
+}
+.content-block--code pre::selection,
+.content-block--code pre ::selection {
+  background: var(--th-accent);
+  color: var(--th-on-accent);
+}
+.content-block--code figcaption {
+  margin-top: var(--th-sp-2);
+  font-family: var(--th-mono);
+  font-size: var(--th-t-label);
+  letter-spacing: var(--th-track-mono);
+  text-transform: uppercase;
+  color: var(--th-meta);
+}
+.content-block--code .syn-comment { color: var(--th-syn-comment); }
+.content-block--code .syn-keyword { color: var(--th-syn-keyword); }
+.content-block--code .syn-string { color: var(--th-syn-string); }
+.content-block--code .syn-constant { color: var(--th-syn-constant); }
+.content-block--code .syn-tag { color: var(--th-syn-tag); }
+.content-block--code .syn-attribute { color: var(--th-syn-attribute); }
+.content-block--code .syn-embed { color: var(--th-syn-embed); }

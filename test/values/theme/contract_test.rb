@@ -50,16 +50,20 @@ class Theme::ContractTest < ActiveSupport::TestCase
     assert_empty left_over, "Theme::Contract::COMPONENTS lists #{left_over.inspect}, which no block or content type hands out"
   end
 
+  # The type is one nobody will build. It was "code" with
+  # `Blocks::CodeComponent` while the Code block was the next thing to join;
+  # the day that block was registered this test raised `DuplicateType`, and
+  # with its line in COMPONENTS the assertion would no longer have failed.
   test "a block type registered with a component the list does not hold fails, and the message names the missing entry" do
-    component = unlisted_component("Blocks::CodeComponent")
-    BlockTypes.register("code") do |t|
-      t.label "Code"
+    component = unlisted_component("Blocks::MarqueeComponent")
+    BlockTypes.register("marquee") do |t|
+      t.label "Marquee"
       t.component component
     end
 
     error = assert_raises(Minitest::Assertion) { assert_every_registered_component_is_listed }
 
-    assert_includes error.message, %(Theme::Contract::COMPONENTS has no entry for "blocks/code_component")
+    assert_includes error.message, %(Theme::Contract::COMPONENTS has no entry for "blocks/marquee_component")
     assert_includes error.message, "Add its line to COMPONENTS in app/values/theme/contract.rb"
   ensure
     Rails.application.reloader.prepare!
@@ -90,6 +94,65 @@ class Theme::ContractTest < ActiveSupport::TestCase
     end
     Theme::Contract::COMPONENT_HELPERS.each do |name|
       assert ApplicationComponent.method_defined?(name), "a component's template cannot call #{name}"
+    end
+  end
+
+  # THE CODE BLOCK, the first block to join (decision 18, code block spec
+  # §5): its component's line and its seven tokens. Beside the spec's
+  # eight names the line holds `string`: a theme has no Ruby of its own,
+  # and the copy script takes its words from the template. NOT on it, and
+  # not methods of the component at all: `head_attributes`, `file_id` and
+  # `bare?`. They were the default template's layout (when its head strip
+  # is the script's to show, what its file name's id is), which is the
+  # thing a replaced template changes; the default template writes both
+  # out from promised names, so `theme:new`'s copy shows an author how.
+  test "the Code block is in the contract: its template is replaceable with the methods it may call, and its seven syntax tokens are themed tokens in the highlighter's order" do
+    assert_equal %w[block page lines code language language_label filename caption string], Theme::Contract::COMPONENTS.fetch("blocks/code_component")
+    assert_equal CodeHighlight::ROLES.map { |role| "syn-#{role}" }, Theme::Contract::THEMED_TOKENS.grep(/\Asyn-/)
+    CodeHighlight::ROLES.each { |role| assert_includes Theme::Contract::TOKENS, "--th-syn-#{role}" }
+    assert_empty Theme::Contract::FIXED_TOKENS.grep(/\Asyn-/), "a syntax colour has a light and a dark value"
+    assert_empty Theme::Contract::COMPONENTS.fetch("blocks/code_component") & %w[head_attributes file_id bare? settings]
+    %i[head_attributes file_id bare?].each do |name|
+      assert_not Blocks::CodeComponent.method_defined?(name) || Blocks::CodeComponent.private_method_defined?(name), "#{name} is the default template's own layout, written out in the template"
+    end
+  end
+
+  # The copy `theme:new` writes is the contract's example: a method of the
+  # component that a default template calls and its line does not name
+  # would put every scaffolded theme on a name the CMS may rename. Read
+  # from each template's ERB tags, the words of their strings left out: a
+  # word there that is a method the component's own class defines. Not
+  # seen: a call inside a string's interpolation (the Code block's
+  # `"code-#{block.id}-file"`), one written `self.name`, and a method a
+  # component inherits from a base of its own.
+  def component_methods_called(path)
+    component = path.camelize.constantize
+    own = (component.instance_methods(false) + component.private_instance_methods(false)).map(&:to_s) - %w[initialize render? call]
+    code = Rails.root.join("app/components/#{path}.html.erb").read.scan(/<%(?!#)(.*?)%>/m).join("\n").gsub(/"[^"]*"/, %(""))
+    own.select { |name| code.match?(/(?<![\w.:@])#{Regexp.escape(name)}(?![\w:])/) }
+  end
+
+  test "a default component template calls no method of its component that its line does not name" do
+    Theme::Contract::COMPONENTS.each do |path, methods|
+      assert_empty component_methods_called(path) - methods, "#{path}.html.erb calls a method of its component that Theme::Contract::COMPONENTS does not list for it"
+    end
+    assert_equal %w[caption filename language_label lines string], component_methods_called("blocks/code_component").sort,
+      "the reading sees what the Code block's template calls (and so could fail)"
+  end
+
+  # What the reference promises of those methods: each is safe for an empty
+  # block (a theme's template may call it without a guard), and the four
+  # words are there in a language that has no file of its own.
+  test "each method the Code block's template may call answers for a block with no settings, and its four words are never missing" do
+    page = root_page
+    component = Blocks::CodeComponent.new(block: ContentBlock.new(owner: page, block_type: "code"), page: page)
+    render_inline(component)
+
+    assert_equal [], component.send(:lines)
+    %i[code language language_label filename caption].each { |name| assert_nil component.send(name), name.to_s }
+    assert_equal false, component.render?, "and the component draws nothing without code, so a template never meets one"
+    I18n.with_locale(:de) do
+      assert_equal [ "Copy", "Copy code", "Copied", "Not copied" ], %i[copy copy_code copied failed].map { |key| component.send(:string, key) }
     end
   end
 
@@ -146,7 +209,7 @@ class Theme::ContractTest < ActiveSupport::TestCase
   end
 
   test "the default theme's styles and templates hold no colour literal: tokens.css is the one place" do
-    styles = %w[theme.css prose.css sections.css].map { |name| Rails.root.join("app/assets/tailwind/themes/default", name) }
+    styles = %w[theme.css prose.css sections.css code.css].map { |name| Rails.root.join("app/assets/tailwind/themes/default", name) }
     styles.each { |path| assert_no_match COLOUR, path.read, "#{path.basename} holds a colour" }
 
     templates = Theme::Contract::TEMPLATES.keys.map { |path| Rails.root.join("app/views", path) } +

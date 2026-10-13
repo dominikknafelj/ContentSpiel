@@ -1,0 +1,16 @@
+# CS Studio's schema field inputs, `app/components/admin/fields/` (docs/reference/i18n.md).
+# Keys are `admin.components.fields.<class name without Admin::Fields::, underscored>`.
+# YAML: a value with a `%{...}` in it is double-quoted.
+en:
+  admin:
+    components:
+      fields:
+        # Under a code field, from nine tenths of its limit: "18,412 of 20,000
+        # characters", and over it "20,412 of 20,000 characters · 412 over".
+        # Every number arrives formatted for the reader's language. The server
+        # writes the line once and `admin--editor--code-limit` keeps it
+        # current, and says it once, politely, when it appears and when the
+        # text passes the limit.
+        code_field:
+          count: "%{used} of %{limit} characters"
+          over: "%{used} of %{limit} characters · %{over} over"
