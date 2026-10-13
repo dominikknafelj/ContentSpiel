@@ -66,17 +66,54 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     assert_equal({ total: 0, rows: [], filter: {} }, rows.listed(root_page.id, "all-posts"))
   end
 
-  test "each read costs eight statements, with a few rows and with thirty more" do
+  # EIGHT IS A CEILING (the site's five and the nodes' three). The two sizes
+  # differ in the pages (and their children), the list blocks on a page, a
+  # section, the tags blocks name, the posts and their notes: a statement
+  # per page, per block or per row would show.
+  test "each read costs eight statements, on a small site and on one with thirty more pages, their blocks and sections, and thirty more posts" do
     viewer = users(:one)
     22.times { |index| create_post(title: "News #{index}", tags: [ "news" ]) } # so that `listed` has rows: a read with none asks for no notes
     news = "tag-#{Tag.find_by!(name: "news").id}" # looked up out here: inside the block it would be counted
-    count = -> { [ capture_sql { rows(actor: viewer).unlisted }.size, capture_sql { rows(actor: viewer).listed(@blog.id, news) }.size ] }
+    count = -> { [ capture_sql { @unlisted = rows(actor: viewer).unlisted }.size, capture_sql { @behind = rows(actor: viewer).listed(@blog.id, news) }.size ] }
 
     few = count.call
-    30.times { |index| create_post(title: "More #{index}", tags: ([ "news" ] if index.even?).to_a) }
+    assert_equal [ 2, 3 ], [ @unlisted[:total], @behind[:total] ]
+    30.times do |index|
+      page = create_page(title: "Page #{index}", parent: index.even? ? @blog : root_page)
+      list_block(page, tag: "topic #{index % 6}")
+      section = ContentBlock.create!(owner: page, block_type: :section, position: 5, settings: { "layout" => "two" })
+      ContentBlock.create!(owner: page, block_type: :post_list, position: 0, section_id: section.id, section_column: 2, settings: { "content_type" => "resume_entry", "tag" => "news" })
+    end
+    list_block(@blog, tag: "topic 0")
+    posts = 30.times.map { |index| create_post(title: "More #{index}", tags: index.even? ? [ "news" ] : (index % 3 == 0 ? [ "topic #{index % 6}" ] : [])) }
+    as(users(:two)) { posts.last(4).each { |post| Notes::Start.call(post, body: "A note") } }
 
     assert_equal [ 8, 8 ], few
     assert_equal [ 8, 8 ], count.call
+    assert_equal [ 12, 18 ], [ @unlisted[:total], @behind[:total] ]
+  end
+
+  # The exact count at a plain shape, named: with no row to answer, the
+  # nodes' three are not asked for, and on a site where no list block names
+  # a tag neither are the tags blocks name.
+  test "a read with no row costs the site's statements alone: five, and four on a site where no block names a tag" do
+    viewer = users(:one)
+    @old.update_column(:trashed_at, Time.current)
+    @new.update_column(:trashed_at, Time.current)
+    count = -> { [ capture_sql { @unlisted = rows(actor: viewer).unlisted }.size, capture_sql { @behind = rows(actor: viewer).listed(@blog.id, "type-blog") }.size ] }
+
+    assert_equal [ 5, 5 ], count.call
+    assert_equal [ 0, 0 ], [ @unlisted[:total], @behind[:total] ]
+    @blog.content_blocks.destroy_all
+    assert_equal 4, capture_sql { rows(actor: viewer).listed(@blog.id, "type-blog") }.size
+  end
+
+  # Review m5: as `Local` answers for a focus that went meanwhile.
+  test "listed for a page trashed after the caller found it is not found, not an empty answer" do
+    @blog.update_column(:trashed_at, Time.current)
+
+    assert_raises(ActiveRecord::RecordNotFound) { rows.listed(@blog.id, "tag-#{Tag.find_by!(name: "news").id}") }
+    assert_raises(ActiveRecord::RecordNotFound) { rows.listed(0, "all-posts") }
   end
 
   # A viewer who is not an owner costs one more in a request, constant:
@@ -101,5 +138,6 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     assert_equal [ 8, 8 ], read.call
     assert_equal [ 16, 17 ], [ @unlisted[:total], @behind[:total] ]
     assert_no_match(/Listed|Old|New\b/, [ @unlisted, @behind ].to_json)
+    assert_no_match(/#{[ @listed, @old, @new ].map { |post| "post-#{post.id}\\b" }.join("|")}/, [ @unlisted, @behind ].to_json, "nor their ids")
   end
 end

@@ -40,12 +40,14 @@ module PostGraph
     end
     private_class_method :listed?
 
-    # An id as the URL writes it: decimal, whatever it begins with. Without the
-    # base, Ruby reads a prefix -- `?post=010` would be post 8 and `0x1A` post
-    # 26, each a post other than the one the URL names. Anything that is not a
-    # decimal number (a word, a list from `post[]=1`) is nil, which finds
-    # nothing.
-    def self.id_from(value) = Integer(value.to_s, 10, exception: false)
+    # An id as the URL writes it: DECIMAL DIGITS AND NOTHING ELSE, whatever it
+    # begins with. Without the base, Ruby reads a prefix -- `?post=010` would
+    # be post 8 and `0x1A` post 26, each a post other than the one the URL
+    # names; and with it `Integer` still reads an underscore between digits,
+    # spaces round the number and a sign, so `1_0`, ` 10 ` and `+10` would
+    # all be 10. Anything that is not digits (a word, a list from
+    # `post[]=1`) is nil, which finds nothing.
+    def self.id_from(value) = value.to_s.match?(/\A\d+\z/) ? Integer(value.to_s, 10) : nil
     private_class_method :id_from
 
     def initialize(kind, id, title)

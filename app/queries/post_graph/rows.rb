@@ -19,8 +19,15 @@
 # line counted: the page adds a row that is not drawn to the canvas without
 # another request. A row of `listed` also says which hub brings its post in
 # (`via`, `Listings#target_of`): added to the canvas it gets that hub's line
-# (third design answers). Eight statements each: the site's five and the
-# nodes' three.
+# (third design answers). AT MOST eight statements each, a ceiling: the
+# site's five and the nodes' three. A read with no row does not ask for the
+# nodes (five), and a site where no list block names a tag does not ask for
+# the tags blocks name.
+#
+# `listed` for a page that is not among the site's rows (trashed, or taken
+# out of the viewer's scope, since the caller found it) is not found, as
+# `Local` answers for a focus that went meanwhile: never an empty answer
+# that reads as "nothing more".
 module PostGraph
   class Rows
     def initialize(actor:, url_for:, locale: Locales.default, limit: ROW_LIMIT)
@@ -37,6 +44,8 @@ module PostGraph
 
     def listed(page_id, target)
       site = Site.load(actor: @actor)
+      raise ActiveRecord::RecordNotFound unless site.page(page_id)
+
       listings = site.listings
       target = target.to_s
       answer(site, listings.left_out_of(page_id, target), via: ->(_post_id) { target }).merge(filter: listings.filter_of(page_id, target))

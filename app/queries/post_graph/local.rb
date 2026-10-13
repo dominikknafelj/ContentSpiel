@@ -23,9 +23,17 @@
 # tag line and no other), plus a "+N more" pill FOR EACH TARGET that brings
 # in more (design answer H1), hanging off its hub or tag the same way and
 # counting only what that target brings in: the pills' counts add up to what
-# the twenty left out. No line joins the page to a post. A post drawn around
-# a page shows the tags the page lists and no other of its own: the view is
-# the page's, and a post's own neighbourhood is its own local view.
+# the twenty left out. No line joins the page to a post.
+#
+# WHAT LINES A POST DRAWN AROUND A PAGE HAS. Its hub's `brings` line, when a
+# type block or "All posts" brings it in; its `tag` line to EVERY tag the
+# page lists that it carries, so a post a type block brings in that also
+# carries a listed tag has both (and is counted once, with the upper block:
+# drawn posts plus the pills' counts are the page's `listed_count`); and its
+# `related` line to any other post among the twenty. So its `degree` can be
+# `related_count + tag_count + 1`. What it does not show is a tag the page
+# does not list, or a related post that is not among the twenty: the view
+# is the page's, and a post's own neighbourhood is its own local view.
 #
 # Only readable posts and pages are ever stepped onto (`Site`'s rows, and
 # `readable` for the statements), so an unreadable or trashed post or page is
@@ -41,7 +49,10 @@
 # more than `LISTED_IN_VIEW` posts are reached, so the cap cuts nothing
 # there.) The pages are never cut.
 #
-# Cost, never one statement per node. AT MOST the global view's thirteen
+# Cost, never one statement per node, and A CEILING, not a figure: nine at
+# depth 1 around a page and thirteen at depth 2, whatever the neighbourhood
+# (`local_test.rb` holds both at two sizes, and seven for a page that lists
+# nothing on a site with no list block). AT MOST the global view's thirteen
 # (the site's five, the relations among the posts reached, the builder's
 # seven), plus three per depth level around a post or a tag (the relations
 # touching the frontier, the frontier posts' tags, the frontier tags'
@@ -73,6 +84,14 @@ module PostGraph
       @types = Set.new
       @listed = []
       @more = []
+      # A focus that went between the request's finding it and the site's
+      # being loaded (trashed, or taken out of the viewer's scope) is not
+      # found, as it would be a moment later, whatever its kind: a page and
+      # a post are asked of the site's own rows, which everything after is
+      # derived from (no statement); a tag that was deleted is found
+      # missing below, where the builder reads the tags' names.
+      raise ActiveRecord::RecordNotFound unless focus_readable?
+
       @focus.kind == "page" ? walk_around_page : walk
 
       post_ids = @posts.keys
@@ -85,11 +104,22 @@ module PostGraph
       plan = builder.plan(post_ids: kept, relations: relations, tag_links: tag_links, tag_counts: @site.tag_counts, min_tag_edges: 1,
                           page_ids: @pages.keys, lists: lists, brought: brought(kept),
                           keep_tag: (@focus.id if @focus.kind == "tag"), more: @more)
-      builder.build(plan).merge(total: post_ids.size, shown: kept.size,
-                                focus: { kind: @focus.kind, id: @focus.id, node_id: @focus.node_id, title: @focus.title, depth: @depth })
+      graph = builder.build(plan)
+      raise ActiveRecord::RecordNotFound if @focus.kind == "tag" && graph[:tags].none? { |tag| tag[:id] == @focus.node_id }
+
+      graph.merge(total: post_ids.size, shown: kept.size,
+                  focus: { kind: @focus.kind, id: @focus.id, node_id: @focus.node_id, title: @focus.title, depth: @depth })
     end
 
     private
+
+    def focus_readable?
+      case @focus.kind
+      when "page" then @site.page(@focus.id).present?
+      when "post" then @site.stamps.key?(@focus.id)
+      else true
+      end
+    end
 
     def reached?(target)
       target.start_with?("tag-") ? @tags.key?(target.delete_prefix("tag-").to_i) : @types.include?(target)
@@ -119,11 +149,6 @@ module PostGraph
     def walk_around_page
       tree = @site.tree
       id = @focus.id
-      # Trashed, or taken out of the viewer's scope, between the request's
-      # finding the focus and the site's being loaded: not found, as it
-      # would be a moment later.
-      raise ActiveRecord::RecordNotFound unless @site.page(id)
-
       @pages[id] = 0
       near = tree.neighbours(id)
       near.each { |page_id| @pages[page_id] = 1 }
@@ -164,8 +189,10 @@ module PostGraph
       1.upto(@depth) do |level|
         reached_posts = []
         reached_tags = []
-        # No `any?` guards: an empty frontier is a cheap `IN (NULL)` statement, and
-        # skipping it would make the statement count depend on the shape.
+        # No `any?` guards are needed: for an empty frontier Rails sends no
+        # statement (`IN ()` is a contradiction it answers itself), which is
+        # why the count in the header is a ceiling: a tag focus does not ask
+        # for the frontier posts' tags at level 1.
         touching = PostRelation.where(post_id: post_frontier).or(PostRelation.where(related_post_id: post_frontier))
         reached_posts.concat(touching.where(post_id: @readable, related_post_id: @readable).pluck(:post_id, :related_post_id).flatten)
         reached_tags.concat(PostTag.where(post_id: post_frontier).distinct.pluck(:tag_id))

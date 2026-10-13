@@ -674,10 +674,15 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
       assert_response :success, path
     end
 
-    # `@blog` lists the blog posts: the kept one is listed, so it is no row,
-    # and the trashed one is no row whatever lists it.
+    # `@blog` lists the blog posts, so neither blog post could be a row here.
+    # Two posts of a type NO page lists tell the trash apart: the kept one
+    # is the one row, and the trashed one is no row and not in the total.
+    kept_entry = create_post(title: "Kept entry", content_type: "resume_entry")
+    gone_entry = create_post(title: "Gone entry", content_type: "resume_entry")
+    gone_entry.update!(trashed_at: Time.current)
     get "/cs-studio/mind_graph/unlisted"
-    assert_equal [ 0, [] ], response.parsed_body.values_at("total", "rows")
+    assert_equal [ 1, [ "post-#{kept_entry.id}" ] ], [ response.parsed_body["total"], response.parsed_body["rows"].map { |row| row["id"] } ]
+    assert_no_match(/Gone entry|post-#{gone_entry.id}\b/, response.body)
 
     # Behind the pill: with twenty newer posts the oldest KEPT post is the
     # one left out. The trashed post is older still and is not counted.
@@ -702,7 +707,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     # A trashed page lists nothing: its posts are unlisted, the kept ones.
     @blog.update_column(:trashed_at, Time.current)
     get "/cs-studio/mind_graph/unlisted"
-    assert_equal 21, response.parsed_body["total"]
+    assert_equal 22, response.parsed_body["total"], "the twenty-one kept blog posts and the kept entry"
     assert_includes response.parsed_body["rows"].map { |row| row["id"] }, "post-#{@kept_post.id}"
     assert_not_includes response.parsed_body["rows"].map { |row| row["id"] }, "post-#{@gone_post.id}"
     assert_not_includes response.body, "Gone post"

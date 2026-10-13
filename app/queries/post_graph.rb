@@ -30,7 +30,13 @@
 #                                  name, then "all-posts" last
 #   edges[]: { source, target, kind: "related" | "tag" | "tree" | "lists" |
 #              "brings" }   tree: child -> parent; lists: page -> tag, type
-#                           or all-posts; brings: a page's local view only
+#                           or all-posts; brings: a page's local view only,
+#                           hub -> post (or -> its pill). There a post can
+#                           have a brings line AND tag lines (a type block
+#                           brings it in and it carries a listed tag) and
+#                           related lines: degree = related_count +
+#                           tag_count + 1. One a tag brings in has no brings
+#                           line.
 #   more[]:  { id: "more-<target>", count, page, target }   one pill per
 #              target, a page's local view only; no key without one
 #

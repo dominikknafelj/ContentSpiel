@@ -438,4 +438,77 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     assert_equal [ 0, [] ], data.values_at("total", "rows")
     assert_not_includes response.body, "Theirs"
   end
+
+  # Review I1: a viewer who reads the page and only some of the posts it
+  # lists. The local view, the rows behind its pill and the unlisted rows
+  # count their posts alone, and nothing of another post is in any body.
+  test "around a page, behind its pill and among the unlisted, a viewer is shown and counted only the posts they read" do
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    author = users(:author)
+    blog = create_page(title: "Blog")
+    list_block(blog, content_type: "resume_entry")
+    mine = ->(post) { post.tap { post.update_column(:author_id, author.id) } }
+    own = 23.times.map { |index| mine.call(create_post(title: "Mine #{index}", content_type: "resume_entry")) }
+    loose = mine.call(create_post(title: "Mine loose"))
+    theirs = 22.times.map { |index| create_post(title: "Theirs #{index}", content_type: "resume_entry") } + [ create_post(title: "Theirs loose") ]
+    nothing_of_theirs = /Theirs|#{theirs.map { |post| "post-#{post.id}\\b" }.join("|")}/
+    sign_in_as(author)
+
+    get "/cs-studio/mind_graph/data", params: { page: blog.id, depth: 2 }
+    assert_response :success
+    assert_equal own.last(20).map { |post| pid(post) }.sort, data["nodes"].map { |node| node["id"] }.sort
+    assert_equal [ [ "more-type-resume_entry", 3 ] ], data["more"].map { |pill| pill.values_at("id", "count") }
+    assert_equal 23, data["pages"].find { |node| node["id"] == "page-#{blog.id}" }["listed_count"]
+    assert_equal [ 23 ], data["types"].map { |type| type["count"] }
+    assert_no_match nothing_of_theirs, response.body
+
+    get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "type-resume_entry" }
+    assert_equal [ 3, own.first(3).reverse.map { |post| pid(post) } ], [ data["total"], data["rows"].map { |row| row["id"] } ]
+    assert_no_match nothing_of_theirs, response.body
+
+    get "/cs-studio/mind_graph/unlisted"
+    assert_equal [ 1, [ pid(loose) ] ], [ data["total"], data["rows"].map { |row| row["id"] } ]
+    assert_no_match nothing_of_theirs, response.body
+
+    sign_in_as(users(:one))
+    get "/cs-studio/mind_graph/data", params: { page: blog.id, depth: 2 }
+    assert_equal [ 45, [ 25 ] ], [ data["pages"].find { |node| node["id"] == "page-#{blog.id}" }["listed_count"], data["more"].map { |pill| pill["count"] } ], "to someone who reads every post"
+  end
+
+  # Review m6: decimal digits only, for the three parameters, from the page
+  # and from the reads.
+  test "an id with an underscore, a space or a sign in it is 404, for page=, post= and tag=" do
+    sign_in_as(users(:one))
+    page = 10.times.map { |index| create_page(title: "Page #{index}") }.last
+    post = 10.times.map { |index| create_post(title: "Post #{index}", tags: [ "t#{index}" ]) }.last
+    tag = Tag.find_by!(name: "t9")
+
+    { page: page, post: post, tag: tag }.each do |kind, record|
+      paths = [ "/cs-studio/mind_graph", "/cs-studio/mind_graph/data", *("/cs-studio/mind_graph/listed" if kind == :page) ]
+      paths.each do |path|
+        get path, params: { kind => record.id }
+        assert_response :success, "#{path} #{kind}"
+        [ record.id.to_s.insert(1, "_"), " #{record.id}", "#{record.id} ", "+#{record.id}" ].each do |value|
+          get path, params: { kind => value }
+          assert_response :not_found, "#{path} #{kind}=#{value.inspect}"
+        end
+      end
+    end
+  end
+
+  # Review m5: a page that goes between the two reads of `listed` is a 404.
+  test "listed for a page that is trashed while the request runs is 404" do
+    sign_in_as(users(:one))
+    blog = create_page(title: "Blog")
+    list_block(blog, content_type: "blog")
+    found = PostGraph::Focus.method(:find)
+    trash_after = ->(**options) { found.call(**options).tap { blog.update_column(:trashed_at, Time.current) } }
+
+    with_singleton_override(PostGraph::Focus, :find, trash_after) do
+      get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "type-blog" }
+    end
+
+    assert_response :not_found
+  end
 end

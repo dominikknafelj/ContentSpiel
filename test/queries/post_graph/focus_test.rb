@@ -101,7 +101,7 @@ class PostGraph::FocusTest < ActiveSupport::TestCase
     gone.update_column(:trashed_at, Time.current)
     access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ page.id ] })
 
-    [ [ "1" ], "0x1A", "about", "-#{page.id}", "0", gone.id, Page.maximum(:id) + 1 ].each do |value|
+    [ [ "1" ], "0x#{page.id.to_s(16)}", "0x1A", "about", "-#{page.id}", "0", gone.id, Page.maximum(:id) + 1 ].each do |value|
       assert_raises(ActiveRecord::RecordNotFound, value.inspect) { PostGraph::Focus.find(actor: nil, page: value) }
     end
     assert_raises(ActiveRecord::RecordNotFound) { as(users(:author)) { PostGraph::Focus.find(actor: users(:author), page: hidden.id) } }
@@ -121,6 +121,24 @@ class PostGraph::FocusTest < ActiveSupport::TestCase
     as(users(:author)) do
       assert_equal "tag", PostGraph::Focus.find(actor: users(:author), tag: listed.id).kind
       assert_raises(ActiveRecord::RecordNotFound) { PostGraph::Focus.find(actor: users(:author), tag: secret.id) }
+    end
+  end
+
+  # Review m6: an id is DECIMAL DIGITS and nothing else. Ruby's `Integer`
+  # also reads an underscore between digits, spaces round the number and a
+  # sign: `?page=1_0` would be page 10.
+  test "an id with an underscore, a space, a sign or a line break in it names nothing, for a page, a post and a tag" do
+    page = 10.times.map { |index| create_page(title: "Page #{index}") }.last
+    post = 10.times.map { |index| create_post(title: "Post #{index}", tags: [ "t#{index}" ]) }.last
+    tag = Tag.find_by!(name: "t9")
+    spellings = ->(id) { [ id.to_s.insert(1, "_"), " #{id}", "#{id} ", "+#{id}", "#{id}\n", "\t#{id}" ] }
+    [ page, post, tag ].each { |record| assert_operator record.id, :>=, 10 }
+
+    { page: page, post: post, tag: tag }.each do |kind, record|
+      assert_equal record.id, PostGraph::Focus.find(actor: nil, kind => record.id.to_s).id
+      spellings.call(record.id).each do |value|
+        assert_raises(ActiveRecord::RecordNotFound, "#{kind}=#{value.inspect} was found") { PostGraph::Focus.find(actor: nil, kind => value) }
+      end
     end
   end
 end

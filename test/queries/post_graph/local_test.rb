@@ -293,25 +293,147 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert_equal [ "page-#{@blog.id}" ], page_ids(local(post_focus(@centre), depth: 2))
   end
 
-  test "a page's local view costs the same with 3 listed posts and with 30: nine statements at depth 1, thirteen at depth 2" do
+  # The page's side of the scope is the test above; this is the POSTS' side.
+  # The viewer reads the page and only their own posts of the ones it lists:
+  # every number about the page is counted over those alone.
+  test "around a page a viewer who reads only some of the posts it lists is shown and counted those alone: the nodes, each pill, each hub's count and the page's listed count" do
     tree
-    list_block(@blog, tag: "many")
+    list_block(@blog, content_type: "resume_entry")
+    list_block(@blog, tag: "mixed")
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    author = users(:author)
+    mine = ->(post) { post.tap { post.update_column(:author_id, author.id) } }
+    entries = 23.times.map { |index| mine.call(create_post(title: "Mine entry #{index}", content_type: "resume_entry")) }
+    tagged = 2.times.map { |index| mine.call(create_post(title: "Mine tagged #{index}", tags: [ "mixed" ])) }
+    theirs = 22.times.map { |index| create_post(title: "Theirs entry #{index}", content_type: "resume_entry") } +
+             5.times.map { |index| create_post(title: "Theirs tagged #{index}", tags: [ "mixed" ]) }
+    mixed = "tag-#{Tag.find_by!(name: "mixed").id}"
+
+    result = as(author) { local(page_focus(@blog, actor: author), depth: 2, actor: author) }
+    page = result[:pages].find { |node| node[:id] == "page-#{@blog.id}" }
+
+    # Their twenty-five, newest first: the two tagged and eighteen entries
+    # are drawn, five entries are behind the type's pill.
+    assert_equal (tagged + entries.last(18)).map { |post| pid(post) }.sort, ids(result)
+    assert_equal [ { id: "more-type-resume_entry", count: 5, page: "page-#{@blog.id}", target: "type-resume_entry" } ], result[:more]
+    assert_equal 25, page[:listed_count]
+    assert_equal [ 23 ], result[:types].map { |type| type[:count] }
+    assert_equal [ [ mixed, 2 ] ], result[:tags].map { |tag| tag.values_at(:id, :count) }
+    assert_equal [ 20, 20 ], result.values_at(:total, :shown)
+    assert_no_match(/Theirs|#{theirs.map { |post| "post-#{post.id}\\b" }.join("|")}/, result.to_json)
+
+    whole = local(page_focus(@blog), depth: 2)
+    assert_equal [ 52, [ 45 ], [ 7 ] ], [ whole[:pages].find { |node| node[:id] == "page-#{@blog.id}" }[:listed_count], whole[:types].map { |type| type[:count] }, whole[:tags].map { |tag| tag[:count] } ],
+                 "to someone who reads every post the same page lists fifty-two"
+    assert_equal 32, whole[:more].sum { |pill| pill[:count] }
+  end
+
+  # Review m3 and m4: what a drawn post's lines can be. A post the page's
+  # TYPE block brings in that also carries a tag the page lists has both its
+  # hub's `brings` line and its `tag` line, and is counted once, with the
+  # upper block; and two drawn posts that are related have their line.
+  test "a post a type block brings in that also carries a listed tag has both lines and is counted once, and related posts among the drawn have their line" do
+    tree
+    list_block(@blog, content_type: "resume_entry")
+    list_block(@blog, tag: "pill")
+    entries = 22.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry", tags: ([ "pill" ] if [ 0, 20, 21 ].include?(index)).to_a) }
+    entries.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    only_tagged = create_post(title: "Tagged", tags: [ "pill" ])
+    relate(entries[1], entries[2])
+    relate(entries[1], entries[21]) # one end is behind the pill: no line
+    pill = "tag-#{Tag.find_by!(name: "pill").id}"
+    both = entries[0]
+
+    result = local(page_focus(@blog), depth: 2)
+    nodes = result[:nodes].index_by { |node| node[:id] }
+    page = result[:pages].find { |node| node[:id] == "page-#{@blog.id}" }
+
+    assert_equal ([ only_tagged ] + entries.first(19)).map { |post| pid(post) }.sort, ids(result)
+    assert_equal [ { source: pid(both), target: pill, kind: "tag" }, { source: "type-resume_entry", target: pid(both), kind: "brings" } ],
+                 result[:edges].select { |edge| [ edge[:source], edge[:target] ].include?(pid(both)) }
+    assert_equal [ 2, 0, 1 ], nodes[pid(both)].values_at(:degree, :related_count, :tag_count), "one more than the two halves: the hub's line"
+    assert_equal [ { source: pid(only_tagged), target: pill, kind: "tag" } ], result[:edges].select { |edge| [ edge[:source], edge[:target] ].include?(pid(only_tagged)) }
+    assert_equal [ { id: "more-type-resume_entry", count: 3, page: "page-#{@blog.id}", target: "type-resume_entry" } ], result[:more],
+                 "the two left-out posts that carry the tag as well are counted with the type, once: the tag has no pill"
+    assert_equal page[:listed_count], result[:nodes].size + result[:more].sum { |pill_node| pill_node[:count] }
+    assert_equal [ { source: pid(entries[1]), target: pid(entries[2]), kind: "related" } ], result[:edges].select { |edge| edge[:kind] == "related" }
+    assert_equal [ 1, 1 ], [ nodes[pid(entries[1])][:related_count], nodes[pid(entries[2])][:related_count] ]
+    assert_equal 2, nodes[pid(entries[1])][:degree], "its hub's line and its related line"
+  end
+
+  # THE STATEMENT COUNT IS A CEILING: nine at depth 1 and thirteen at depth
+  # 2, whatever the neighbourhood. The two sizes differ in everything a walk
+  # over neighbours could ask a statement for: the focus's children (2 and
+  # 12), their children (none and 24), its siblings (1 and 8), the list
+  # blocks on the focus (1 and 8, two of them in a section) and on its
+  # neighbours, the tags listed (1 and 6), the posts, the notes and the
+  # pending copies. The larger is the richest shape: every statement of the
+  # ceiling is sent.
+  test "a page's local view costs nine statements at depth 1 and thirteen at depth 2, around two children and one sibling and around twelve children with their children and eight siblings" do
+    parent = create_page(title: "Parent")
+    focused = create_page(title: "Focus", parent: parent)
+    children = 2.times.map { |index| create_page(title: "Child #{index}", parent: focused) }
+    create_page(title: "Sibling 0", parent: parent)
+    list_block(focused, tag: "many")
     3.times { |index| create_post(title: "Few #{index}", tags: [ "many" ]) }
-    as(users(:two)) { Notes::Start.call(@blog, body: "A note") }
+    as(users(:two)) { Notes::Start.call(focused, body: "A note") }
     viewer = users(:one)
-    focus = page_focus(@blog, actor: viewer)
-    count = ->(depth) { capture_sql { local(focus, depth: depth, actor: viewer) }.size }
+    focus = page_focus(focused, actor: viewer)
+    count = ->(depth) { capture_sql { @result = local(focus, depth: depth, actor: viewer) }.size }
 
     few = [ count.call(1), count.call(2) ]
-    27.times { |index| create_post(title: "Many #{index}", tags: [ "many" ]) }
+    assert_equal 6, @result[:pages].size, "Home, the parent, the focus, its two children and its sibling"
 
-    # The walk around a page asks nothing. Depth 2: the site's five, the
-    # relations among the posts drawn and the builder's seven. Depth 1: no
-    # post is drawn, and a statement for no ids is not sent, so the relations
-    # and the posts' notes, pending copies and rows are not asked for: the
-    # site's five, the tags' names and the pages' three.
+    children += 10.times.map { |index| create_page(title: "Child #{index + 2}", parent: focused) }
+    grandchildren = children.flat_map { |child| 2.times.map { |index| create_page(title: "Grandchild #{child.id} #{index}", parent: child) } }
+    siblings = 7.times.map { |index| create_page(title: "Sibling #{index + 1}", parent: parent) }
+    section = ContentBlock.create!(owner: focused, block_type: :section, position: 1, settings: { "layout" => "two" })
+    ContentBlock.create!(owner: focused, block_type: :post_list, position: 0, section_id: section.id, section_column: 1, settings: { "tag" => "extra 0" })
+    ContentBlock.create!(owner: focused, block_type: :post_list, position: 0, section_id: section.id, section_column: 2, settings: { "content_type" => "resume_entry" })
+    4.times { |index| list_block(focused, tag: "extra #{index + 1}") }
+    list_block(focused)
+    (children + siblings + grandchildren.first(6)).each_with_index { |page, index| list_block(page, tag: "extra #{index % 5}"); list_block(page, content_type: "blog") }
+    posts = 27.times.map { |index| create_post(title: "Many #{index}", tags: [ "many", "extra #{index % 5}" ], content_type: index.even? ? "blog" : "resume_entry") }
+    posts.each_cons(2).first(5).each { |a, b| relate(a, b) }
+    as(users(:two)) do
+      (children.first(4) + siblings.first(2)).each { |page| Notes::Start.call(page, body: "A note") }
+      posts.last(3).each { |post| Notes::Start.call(post, body: "A note") }
+    end
+    (children.first(3) + posts.last(3)).each { |record| Publishing::Version.take!(record, live_at: 2.days.from_now) }
+
+    many = [ count.call(1), count.call(2) ]
+
+    assert_equal 3 + 12 + 24 + 8, @result[:pages].size, "Home, the parent and the focus, its children, theirs, and its siblings"
+    assert_equal [ 20, 6, 2 ], [ @result[:nodes].size, @result[:tags].size, @result[:types].size ]
+    assert_operator @result[:more].size, :>=, 1
     assert_equal [ 9, 13 ], few
-    assert_equal [ 9, 13 ], [ count.call(1), count.call(2) ]
+    assert_equal [ 9, 13 ], many
+  end
+
+  # The exact count at a plain shape, named: a page that lists NOTHING, on a
+  # site where no list block names a tag. No tag is asked for by name, none
+  # is a node, no post is drawn: the site's posts, tag links, pages and
+  # blocks, and the pages' addresses, notes and pending copies. Seven, at
+  # either depth.
+  test "around a page that lists nothing, on a site with no list block, the local view costs seven statements at either depth" do
+    tree
+    viewer = users(:one)
+    focus = page_focus(@docs, actor: viewer)
+
+    assert_equal [ 7, 7 ], [ 1, 2 ].map { |depth| capture_sql { local(focus, depth: depth, actor: viewer) }.size }
+  end
+
+  # Review m5: a focus that goes between the request's finding it and the
+  # site's being loaded is not found, whatever its kind.
+  test "a post trashed and a tag deleted after it was found as the focus are not found, as a page is" do
+    post = post_focus(@centre)
+    tag = tag_focus("solo")
+    @centre.update_column(:trashed_at, Time.current)
+    Tag.find_by!(name: "solo").destroy!
+
+    assert_raises(ActiveRecord::RecordNotFound) { local(post, depth: 2) }
+    assert_raises(ActiveRecord::RecordNotFound) { local(tag) }
   end
 
   # Payload note 4 of Task 3: a tag a readable page lists is a node whatever
