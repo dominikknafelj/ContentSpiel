@@ -49,6 +49,22 @@ class Admin::AuditScreen::ChangesComponentTest < ViewComponent::TestCase
     assert_no_text "bbb222"
   end
 
+  # What `Audit::Snapshot` records for a `:code` field (final review I2): a
+  # row of its own that says the code changed, never a digest shown as if
+  # it were the code.
+  test "a code field's change is Changed under the column and the field, never its digests or lengths" do
+    render_changes("settings code" => { "digest_before" => "aaa111", "digest_after" => "bbb222", "length_before" => 18_000, "length_after" => 18_004 },
+      "settings" => [ { "language" => "ruby" }, { "language" => "python" } ])
+
+    assert_selector "tbody tr", count: 2
+    assert_selector "tr", text: /settings code\s*Changed/
+    assert_no_text "aaa111"
+    assert_no_text "bbb222"
+    assert_no_text "18000"
+    assert_no_text "18004"
+    assert_text "python"
+  end
+
   test "other values read old -> new as text" do
     render_changes("published" => [ false, true ], "group_ids" => [ [ 1 ], [ 1, 2 ] ], "owner" => [ nil, true ])
 

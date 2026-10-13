@@ -155,6 +155,126 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       Audit::Snapshot.field_changes_for(post)["de body"])
   end
 
+  # Final review I2: a Code block's source is a key of `settings`, a plain
+  # column, so every autosave wrote it three times into a log nobody can
+  # prune (the settings' old and new hash, and the snapshot).
+  def code_block(settings)
+    saved = ContentBlocks::Save.call(create_page(title: "With code").content_blocks.new, attributes: { block_type: "code", settings: settings })
+    assert saved.ok?, saved.errors.to_sentence
+    saved.record
+  end
+
+  def summary_of(code) = { "digest" => Digest::SHA256.hexdigest(code), "length" => code.length }
+
+  test "one save of a 20,000-character source writes a small event that holds none of the source" do
+    first = "x = 1 # SOURCE-ONE\n" + "a" * 19_000
+    second = ("y = 2 # SOURCE-TWO\n" + "b" * 19_981)
+    assert_equal 20_000, second.length
+    block = code_block("language" => "ruby", "filename" => "a.rb", "code" => first)
+
+    assert_difference -> { Audit::Event.where(action: "block.updated").count }, 1 do
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "language" => "ruby", "filename" => "a.rb", "code" => second } }).ok?
+    end
+    event = Audit::Event.where(action: "block.updated").order(:id).last
+    stored = event.attributes.to_json
+
+    assert_operator stored.bytesize, :<, 2_000, "the event is a few hundred bytes, not three copies of the source"
+    assert_not_includes stored, "SOURCE-ONE"
+    assert_not_includes stored, "SOURCE-TWO"
+    assert_not_includes stored, "b" * 50
+    assert_equal second, block.reload.settings["code"], "the row itself holds the source"
+    assert_equal({
+      "digest_before" => Digest::SHA256.hexdigest(first), "digest_after" => Digest::SHA256.hexdigest(second),
+      "length_before" => first.length, "length_after" => 20_000
+    }, event.field_changes["settings code"])
+    assert_not event.field_changes.key?("settings"), "nothing else of the settings changed"
+    assert_equal({ "language" => "ruby", "filename" => "a.rb", "code" => summary_of(second) }, event.snapshot["settings"])
+  end
+
+  test "the digest of a code field differs when the source differs, and the other settings are recorded as before" do
+    block = code_block("language" => "ruby", "code" => "a = 1")
+    created = Audit::Event.where(action: "block.created").order(:id).last
+
+    assert_equal({ "digest_before" => nil, "digest_after" => Digest::SHA256.hexdigest("a = 1"), "length_before" => nil, "length_after" => 5 }, created.field_changes["settings code"])
+    assert_equal [ {}, { "language" => "ruby" } ], created.field_changes["settings"]
+    assert_equal summary_of("a = 1"), created.snapshot.dig("settings", "code")
+
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "language" => "python", "filename" => "a.py", "code" => "a = 2" } }).ok?
+    changes = Audit::Snapshot.field_changes_for(block)
+
+    assert_not_equal changes.dig("settings code", "digest_before"), changes.dig("settings code", "digest_after")
+    assert_equal Digest::SHA256.hexdigest("a = 2"), changes.dig("settings code", "digest_after")
+    assert_equal [ { "language" => "ruby" }, { "language" => "python", "filename" => "a.py" } ], changes["settings"]
+
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "language" => "python", "filename" => "b.py", "code" => "a = 2" } }).ok?
+    changes = Audit::Snapshot.field_changes_for(block)
+    assert_not changes.key?("settings code"), "code that did not change is not named"
+    assert_equal [ { "language" => "python", "filename" => "a.py" }, { "language" => "python", "filename" => "b.py" } ], changes["settings"]
+    assert_equal "a = 2", block.settings["code"], "taking a snapshot changes nothing of the record"
+  end
+
+  test "a block type without a code field is recorded exactly as before, a key called code included" do
+    page = create_page(title: "No code field")
+    saved = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "post_list", settings: { "limit" => 3 } })
+    assert saved.ok?, saved.errors.to_sentence
+    block = saved.record
+    before = block.settings.deep_dup
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "limit" => 5 } }).ok?
+
+    assert_equal [ before, block.settings ], Audit::Snapshot.field_changes_for(block)["settings"]
+    assert_equal block.settings, Audit::Snapshot.for(block)["settings"]
+
+    block.update_columns(settings: block.settings.merge("code" => "not a code field")) # version: none (a test's row) # changes: none (a test's row)
+    assert_equal "not a code field", Audit::Snapshot.for(block).dig("settings", "code"), "the field's TYPE decides, never the key's name"
+  end
+
+  test "a post type's code field gets the same treatment, by its type, and so does one inside a field group" do
+    FieldGroups.register "test/sample" do |c|
+      c.field :name, :string
+      c.field :listing, :code
+    end
+    ContentTypes.register "test/snippet" do |t|
+      t.label "Snippet"
+      t.list_component Posts::BlogListComponent
+      t.detail_component Posts::DetailComponent
+      t.field :source, :code, max: 100
+      t.field :note, :string
+      t.field :samples, :groups, of: "test/sample"
+    end
+    saved = Posts::Save.call(attributes: { content_type: "test/snippet", fields: { source: "a = 1", note: "n", samples: [ { name: "s", listing: "b = 2" } ] } },
+      translations: { "en" => { title: "Snippet" } })
+    assert saved.ok?, saved.errors.to_sentence
+    post = saved.record
+
+    snapshot = Audit::Snapshot.for(post)
+    assert_equal summary_of("a = 1"), snapshot.dig("metadata", "source")
+    assert_equal "n", snapshot.dig("metadata", "note")
+    assert_equal [ { "name" => "s", "listing" => summary_of("b = 2") } ], snapshot.dig("metadata", "samples")
+
+    assert Posts::Save.call(post, attributes: { fields: { source: "a = 3", note: "n", samples: [ { name: "s", listing: "b = 4" } ] } }).ok?
+    changes = Audit::Snapshot.field_changes_for(post)
+    assert_equal Digest::SHA256.hexdigest("a = 3"), changes.dig("metadata source", "digest_after")
+    assert_equal [ { "note" => "n", "samples" => [ { "name" => "s", "listing" => summary_of("b = 2") } ] }, { "note" => "n", "samples" => [ { "name" => "s", "listing" => summary_of("b = 4") } ] } ],
+      changes["metadata"]
+    assert_not_includes changes.to_json, "a = 3"
+    assert_not_includes changes.to_json, "b = 4"
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "a burst of saves folds into one event: the first digest and length before, the last after" do
+    block = code_block("language" => "ruby", "code" => "one")
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "language" => "ruby", "code" => "two!" } }).ok?
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "language" => "ruby", "code" => "three" } }).ok?
+    event = Audit::Event.where(action: "block.updated").order(:id).last
+
+    assert_equal 2, event.occurrences
+    assert_equal({
+      "digest_before" => Digest::SHA256.hexdigest("one"), "digest_after" => Digest::SHA256.hexdigest("three"),
+      "length_before" => 3, "length_after" => 5
+    }, event.field_changes["settings code"])
+  end
+
   test "the label is the title at the time" do
     assert_equal "Labelled", Audit::Snapshot.label_for(create_post(title: "Labelled"))
     assert_equal "two@example.com", Audit::Snapshot.label_for(users(:two))
