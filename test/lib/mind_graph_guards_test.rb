@@ -33,10 +33,8 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
   ALLOWED = {
     "PAGE_COLUMNS = %i[id title parent_id position published_at unpublished_changes_at].freeze" =>
       "site.rb: the columns loaded of a page; `Publishing::State` is handed the record and reads them",
-    "@post_rows = @readable_posts.pluck(:id, :content_type, :published_at, :updated_at)" =>
-      "site.rb: the time is loaded for the order of a page's posts (below), nothing else",
-    "@recency = post_rows.to_h { |id, _type, published_at, updated_at| [ id, (published_at || updated_at).to_f ] }" =>
-      "listings.rb: RECENCY, not state: a page's posts newest first, a draft by when it was last changed",
+    "posts.pluck(:id, :content_type, :published_at, :updated_at).map { |id, type, published_at, updated_at| [ id, type, (published_at || updated_at).to_f, updated_at ] }" =>
+      "site.rb: RECENCY, not state: the time is loaded and turned into a number on this one line, so no row carries it on (a page's posts newest first, a draft by when it was last changed)",
     "COLUMNS = %i[id title content_type published_at unpublished_changes_at].freeze" =>
       "builder.rb: the columns loaded of a post; `Publishing::State` is handed the record and reads them",
     "status: state.status," =>
@@ -68,6 +66,29 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
     present = lines(RUBY + SCRIPTS).map(&:last).to_set
 
     assert_empty ALLOWED.keys.reject { |line| present.include?(line) }
+  end
+
+  # WHAT A NAME CANNOT SEE, AND HOW IT IS HELD INSTEAD (Task 3's review, m2).
+  # (1) A row that carries the time as a place in an array is compared under
+  # whatever name a block parameter gives it. So no row carries it: `Site`
+  # turns it into a recency on the line that loads it (allowed above), and
+  # `test/queries/post_graph/site_test.rb` holds that a row's places are an
+  # id, a type, a number and `updated_at`. (2) A script could decide a look
+  # by comparing a scheduled change's time with the clock (a corner dot that
+  # goes when the time has passed while the page is open): that is a state
+  # decided without `Publishing::State`, and it names no column. So no
+  # script of the graph names the time the data carries (`change_at`; the
+  # card says the day in the server's words, `change_on`) and none reads a
+  # clock for a date: a look is the `status` and `changes` the server
+  # answered, until the data is read again.
+  CLOCK = /\bDate\s*\.\s*(?:now|parse)\b|\bnew\s+Date\b|\bchange_?at\b|\bTemporal\b/i
+  PAGE_SCRIPTS = (SCRIPTS + Dir[Rails.root.join("app/javascript/controllers/admin/mind_graph/**/*.js")]).freeze
+
+  test "no script of the mind graph reads the clock for a date or names a scheduled change's time: a look is what the server answered" do
+    assert_operator PAGE_SCRIPTS.size, :>, SCRIPTS.size
+    assert_empty offences(PAGE_SCRIPTS, CLOCK)
+    [ "if (Date.now() > Date.parse(node.change_at)) return LOOKS.live", "const due = new Date(node.changeAt)", "node.change_at", "Temporal.Now.instant()" ].each { |line| assert_match CLOCK, line }
+    [ "const started = performance.now()", "const date = node.change_on ?? \"\"", "state.updated = true" ].each { |line| assert_no_match CLOCK, line }
   end
 
   # Each form a query or a script would really be written in.

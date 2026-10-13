@@ -31,6 +31,21 @@
 # Two statements: the blocks (with the sections that place them), and the
 # tags their settings name. (With no
 # name to look up the second is not made: `Tag.named_any` answers `none`.)
+#
+# THE WORK IN RUBY IS BOUNDED TOO, and by counts a test holds, since no
+# statement shows it (measured on 2026-10-13 at 200 pages and 2,000 posts,
+# the spec's "As built"; every read of the graph loads the site, so this
+# runs on each of them):
+# - The posts are put in order ONCE (`@ordered`, newest first), so a list
+#   made by one pass over them is in order already and nothing sorts 2,000
+#   posts per page. As first built each page's posts were sorted for that
+#   page by a two-part key: 200 pages listing everything took 0.58 s.
+# - `matches?` is asked once per distinct filter and distinct KIND of post
+#   (`@kinds`: a stored type with the named tags it carries), not once per
+#   post: it answers from those two alone, so posts of one kind share the
+#   answer. 200 pages each with a filter of its own were 400,000 calls
+#   (0.89 s).
+# - Pages whose blocks say the same share one list (`listed_by`), frozen.
 module PostGraph
   class Listings
     # The list blocks of these pages, page by page, each page's IN THE ORDER
@@ -54,13 +69,13 @@ module PostGraph
 
     def self.key(settings) = [ settings.content_type.presence&.to_s, settings.tag.to_s.strip.downcase.presence ]
 
-    # `post_rows`: `[[id, content_type, published_at, updated_at], …]`;
-    # `tag_links`: `[[tag_id, post_id], …]`.
+    # `post_rows`: `[[id, content_type, recency, updated_at], …]`, as
+    # `Site.rows_of` answers them (recency a number: the newest is the
+    # highest); `tag_links`: `[[tag_id, post_id], …]`.
     def initialize(page_ids:, post_rows:, tag_links:)
       @post_rows = post_rows
-      @recency = post_rows.to_h { |id, _type, published_at, updated_at| [ id, (published_at || updated_at).to_f ] }
-      @tags_of = {}
-      tag_links.each { |tag_id, post_id| (@tags_of[post_id] ||= []) << tag_id }
+      tags_of = {}
+      tag_links.each { |tag_id, post_id| (tags_of[post_id] ||= []) << tag_id }
       @settings = {}
       self.class.blocks(page_ids).each do |block|
         settings = block.settings_object or next
@@ -73,6 +88,19 @@ module PostGraph
       @tag_name = named.to_h { |id, name| [ id, name.downcase ] }
       @tag_label = named.to_h
       @tag_id = named.reverse.to_h { |id, name| [ name.downcase, id ] }
+      # Newest first, once: by recency, then the higher id. `@rank` is a
+      # post's place in that order, for a list put together from several.
+      newest = post_rows.sort_by { |id, _type, recency, _stamp| [ -recency, -id ] }
+      @rank = newest.each_with_index.to_h { |row, index| [ row.first, index ] }
+      # A post's KIND: its stored type and the names of the tags it carries
+      # that some block names (no other tag can decide anything), which is
+      # all the criteria read. `@ordered` is `[[id, kind's index], …]`.
+      kinds = {}
+      @ordered = newest.map do |id, content_type, *|
+        names = tags_of.fetch(id, []).filter_map { |tag_id| @tag_name[tag_id] }.sort
+        [ id, kinds[[ content_type, names ]] ||= kinds.size ]
+      end
+      @kinds = kinds.keys
     end
 
     def edges
@@ -86,8 +114,10 @@ module PostGraph
       @tag_ids ||= @settings.values.flatten.filter_map { |settings| @tag_id[self.class.key(settings).last] }.to_set
     end
 
+    # The posts a page's blocks list, newest first, each once. FROZEN: pages
+    # whose blocks say the same are handed the same list.
     def posts_of(page_id)
-      (@posts_of ||= {})[page_id] ||= newest_first(@settings.fetch(page_id, []).flat_map { |settings| matching(settings) }.uniq)
+      (@posts_of ||= {})[page_id] ||= listed_by(@settings.fetch(page_id, []).uniq { |settings| self.class.key(settings) })
     end
 
     def target_of(page_id, post_id)
@@ -100,7 +130,7 @@ module PostGraph
 
     def listed_count(page_id) = posts_of(page_id).size
     def listed?(post_id) = listed.include?(post_id)
-    def unlisted = newest_first(@post_rows.map(&:first).reject { |id| listed?(id) })
+    def unlisted = @ordered.filter_map { |id, _kind| id unless listed?(id) }
 
     # What each target of the page brings in beyond the `shown` newest posts
     # the local view draws (design answer H1: one "+N more" pill per target,
@@ -145,12 +175,26 @@ module PostGraph
       end
     end
 
-    def listed = @listed ||= @settings.keys.flat_map { |page_id| posts_of(page_id) }.to_set
+    # Every post some page lists: the union over the DISTINCT filters, not
+    # over the pages (200 pages listing everything are one filter).
+    def listed
+      @listed ||= @settings.values.flatten.uniq { |settings| self.class.key(settings) }.each_with_object(Set.new) { |settings, all| all.merge(matching(settings)) }
+    end
 
+    # One list for every page whose blocks hold these filters, in whatever
+    # order: a single filter's posts are in order as they come, several
+    # filters' are put together by their place in the one order.
+    def listed_by(all)
+      keys = all.map { |settings| self.class.key(settings) }.sort_by(&:to_s)
+      (@listed_by ||= {})[keys] ||= (all.one? ? matching(all.first) : all.flat_map { |settings| matching(settings) }.uniq.sort_by { |id| @rank.fetch(id) }).freeze
+    end
+
+    # The posts one filter lists, newest first. The criteria are the
+    # listing's own, asked once per kind of post (see the header).
     def matching(settings)
-      (@matching ||= {})[self.class.key(settings)] ||= @post_rows.filter_map do |id, content_type, *|
-        names = @tags_of.fetch(id, []).filter_map { |tag_id| @tag_name[tag_id] }
-        id if BlockTypes::PostList.matches?(settings, content_type: content_type, tag_names: names)
+      (@matching ||= {})[self.class.key(settings)] ||= begin
+        listed = @kinds.map { |content_type, names| BlockTypes::PostList.matches?(settings, content_type: content_type, tag_names: names) }
+        @ordered.filter_map { |id, kind| id if listed[kind] }.freeze
       end
     end
 
@@ -158,7 +202,5 @@ module PostGraph
     def matched?(settings, post_id)
       ((@matched ||= {})[self.class.key(settings)] ||= matching(settings).to_set).include?(post_id)
     end
-
-    def newest_first(ids) = ids.sort_by { |id| [ -@recency.fetch(id), -id ] }
   end
 end

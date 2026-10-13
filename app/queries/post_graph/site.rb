@@ -16,6 +16,14 @@
 # Five statements whatever the size: the readable posts (four columns, never
 # a body), their tag links, the readable pages (`PAGE_COLUMNS`), and
 # `Listings`' two.
+#
+# A POST'S ROW IS `[id, content_type, recency, updated_at]`, and `recency`
+# is a NUMBER: when it was published, a draft when it was last changed, for
+# the order "newest first" and nothing else. The publication time itself
+# never leaves `rows_of`: a row that carried it as a place in an array could
+# be compared with the clock under any name a block parameter gave it, and
+# `test/lib/mind_graph_guards_test.rb`, which refuses every line that NAMES
+# the column, would not see it. A node's state is `Publishing::State`'s.
 module PostGraph
   class Site
     PAGE_COLUMNS = %i[id title parent_id position published_at unpublished_changes_at].freeze
@@ -24,9 +32,14 @@ module PostGraph
 
     def self.load(actor:) = new(actor)
 
+    # The rows of these posts (see the header), in one statement.
+    def self.rows_of(posts)
+      posts.pluck(:id, :content_type, :published_at, :updated_at).map { |id, type, published_at, updated_at| [ id, type, (published_at || updated_at).to_f, updated_at ] }
+    end
+
     def initialize(actor)
       @readable_posts = AccessControl.scope(actor, "posts.read", Post.all)
-      @post_rows = @readable_posts.pluck(:id, :content_type, :published_at, :updated_at)
+      @post_rows = self.class.rows_of(@readable_posts)
       @tag_links = PostTag.where(post_id: @readable_posts.select(:id)).order(:tag_id, :post_id).pluck(:tag_id, :post_id)
       @tag_counts = @tag_links.group_by(&:first).transform_values(&:size)
       pages = AccessControl.scope(actor, "pages.read", Page.all).select(*PAGE_COLUMNS).to_a
@@ -38,6 +51,6 @@ module PostGraph
 
     def page(id) = @by_id[id]
     def home = @by_id[@tree.home_id]
-    def stamps = @stamps ||= @post_rows.to_h { |id, _type, _time, updated_at| [ id, updated_at ] }
+    def stamps = @stamps ||= @post_rows.to_h { |id, _type, _recency, updated_at| [ id, updated_at ] }
   end
 end

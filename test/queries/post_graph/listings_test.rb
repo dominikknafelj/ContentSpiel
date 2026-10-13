@@ -15,7 +15,7 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
   end
 
   def listings(pages = Page.all)
-    posts = Post.kept.pluck(:id, :content_type, :published_at, :updated_at)
+    posts = PostGraph::Site.rows_of(Post.kept)
     links = PostTag.where(post_id: Post.kept.select(:id)).order(:tag_id, :post_id).pluck(:tag_id, :post_id)
     PostGraph::Listings.new(page_ids: pages.map(&:id), post_rows: posts, tag_links: links)
   end
@@ -273,6 +273,58 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     assert_equal [ 3, 1, 4 ], [ result.type_count("blog"), result.type_count("resume_entry"), result.post_count ]
   end
 
+  # THE WORK IN RUBY, HELD BY COUNTS (the measurement of 2026-10-13, at 200
+  # pages and 2,000 posts: the spec's "As built"). As first built the
+  # criteria were asked once per distinct filter AND POST, and every page's
+  # posts were sorted for that page: 200 pages each listing everything were
+  # 200 sorts of 2,000 posts (0.58 s for the graph's data, of every read
+  # that loads the site), and 200 pages each with a filter of its own were
+  # 400,000 calls of `matches?` (0.89 s). Neither is a statement, so no
+  # `capture_sql` test saw it. Now: the criteria are asked once per distinct
+  # filter and distinct KIND of post (its type and which of the named tags
+  # it carries), and pages whose blocks say the same share one list.
+  test "the criteria are asked once for each distinct filter and each distinct kind of post, however many posts and pages there are" do
+    pages = 12.times.map { |index| create_page(title: "Lister #{index}") }
+    pages.each_with_index { |page, index| list_block(page, **[ { tag: "ruby" }, { content_type: "blog" }, {} ][index % 3]) }
+    count = ->(posts) do
+      posts.times { |index| create_post(title: "Counted #{posts}-#{index}", tags: index.even? ? [ "ruby" ] : []) }
+      asked = 0
+      original = BlockTypes::PostList.method(:matches?)
+      with_singleton_override(BlockTypes::PostList, :matches?, ->(*arguments, **options) { asked += 1; original.call(*arguments, **options) }) do
+        result = listings
+        Page.pluck(:id).each { |id| result.posts_of(id) }
+        result.unlisted
+      end
+      asked
+    end
+
+    few = count.call(4)
+    many = count.call(40)
+
+    assert_equal few, many, "the calls grew with the posts"
+    kinds = Post.kept.includes(:tags).map { |post| [ post.content_type, post.tags.map(&:name).include?("ruby") ] }.uniq.size
+    assert_equal 3 * kinds, many, "three distinct filters, each asked once per kind of post"
+  end
+
+  test "pages whose list blocks say the same share one list of posts, the same object, and it is the list each would have had alone" do
+    twins = 3.times.map { |index| create_page(title: "Twin #{index}") }
+    twins.each { |page| list_block(page, tag: "RUBY "); list_block(page, content_type: "resume_entry") }
+    other = create_page(title: "Other order")
+    list_block(other, content_type: "resume_entry")
+    list_block(other, tag: "ruby")
+    @ruby.update_columns(published_at: 3.days.ago)   # version: none (a test sets a time) # changes: none (a test sets a time)
+    @entry.update_columns(published_at: 1.day.ago)   # version: none (a test sets a time) # changes: none (a test sets a time)
+
+    result = listings
+
+    assert_equal [ @entry.id, @ruby.id ], result.posts_of(twins[0].id)
+    assert twins.all? { |page| result.posts_of(page.id).equal?(result.posts_of(twins[0].id)) }, "a list was made again for a page that lists the same"
+    assert_equal result.posts_of(twins[0].id), result.posts_of(other.id), "the same posts whatever the blocks' order"
+    assert_predicate result.posts_of(twins[0].id), :frozen?, "a shared list that a caller could change"
+    assert_equal [ "tag-#{Tag.find_by!(name: 'ruby').id}", "type-resume_entry" ], result.targets(twins[0].id), "the page's own blocks still say its targets, in its order"
+    assert_equal [ "type-resume_entry", "tag-#{Tag.find_by!(name: 'ruby').id}" ], result.targets(other.id)
+  end
+
   # Two sizes far apart, so a statement per page, per block or per post
   # cannot hide: 3 pages with a block each and 5 posts, then 30 and 60.
   test "it costs two statements whatever the number of pages, blocks and posts" do
@@ -280,7 +332,7 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     list_block(create_page(title: "Small"), content_type: "blog")
     create_post(title: "Small post", tags: [ "ruby" ])
     ask = -> do
-      posts = Post.kept.pluck(:id, :content_type, :published_at, :updated_at)
+      posts = PostGraph::Site.rows_of(Post.kept)
       links = PostTag.pluck(:tag_id, :post_id)
       page_ids = Page.pluck(:id)
       statements = capture_sql do

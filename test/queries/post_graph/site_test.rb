@@ -30,6 +30,22 @@ class PostGraph::SiteTest < ActiveSupport::TestCase
     assert_nil site.page(0)
   end
 
+  # Task 3's review, m2: the guard on `published_at` reads names, and a row
+  # that carried the time as its third place could be compared with the
+  # clock under any name a block parameter gave it. So the time never leaves
+  # the one line that loads it: a row carries a NUMBER to order by.
+  test "a post's publication time never leaves the site: a row carries its recency as a number, a draft's by when it was last changed" do
+    live = create_post(title: "Live", published: true)
+    draft = create_post(title: "Draft", published: false)
+    live.update_columns(published_at: 3.days.ago) # version: none (a test sets a time) # changes: none (a test sets a time)
+
+    rows = PostGraph::Site.load(actor: nil).post_rows.index_by(&:first)
+
+    assert_equal [ live.reload.published_at.to_f, draft.reload.updated_at.to_f ], [ rows[live.id][2], rows[draft.id][2] ]
+    assert_equal [ [ Integer, String, Float, ActiveSupport::TimeWithZone ] ], rows.values.map { |row| row.map(&:class) }.uniq
+    assert_equal rows.values.sort_by(&:first), PostGraph::Site.rows_of(Post.where(id: [ live.id, draft.id ])).sort_by(&:first)
+  end
+
   test "a trashed page, a trashed post and what is outside the viewer's scope are not in it" do
     kept = create_page(title: "Kept")
     hidden = create_page(title: "Hidden")
