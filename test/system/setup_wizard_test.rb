@@ -65,7 +65,16 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_text "claude-desktop (created)"
     press "Finish setup"
 
-    assert_current_path %r{\A/cs-studio}
+    # The press's own answer is short (`StarterContents::EnsureHome` and
+    # `Setup.complete!`, 11 statements, since the home page is there by
+    # now), but it redirects to CS Studio's dashboard, which this server
+    # draws here for the first time: its queries, every component of the
+    # shell and the admin scripts, all cold. A tenth of a second on an idle
+    # laptop and nobody has measured it on a two-core runner, where the run
+    # that failed stopped one press earlier. The same wait as above, so the
+    # next run does not find out. The wizard's other presses answer with 9
+    # to 25 statements and a page of the wizard, and keep the default.
+    assert_current_path %r{\A/cs-studio}, wait: 10
     visit "/"
     assert_text "Welcome to your new site"
   end
