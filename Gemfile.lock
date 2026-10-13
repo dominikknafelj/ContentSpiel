@@ -699,6 +699,7 @@ DEPENDENCIES
   puma (>= 5.0)
   rack-attack (~> 6.8)
   rails (~> 8.1.4)
+  rouge (~> 5.1)
   rubocop-rails-omakase
   ruby-vips (~> 2.2)
   simplecov
