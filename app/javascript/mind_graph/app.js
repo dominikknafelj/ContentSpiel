@@ -107,7 +107,7 @@ import { placeCard } from "mind_graph/card_placement"
 import { readTheme, watchTheme } from "mind_graph/theme"
 import { draw, radiusFor, labelFont } from "mind_graph/renderer"
 import { collisionRadius, boxOf, moreWidth } from "mind_graph/marks"
-import { nodesOf, anchorOf, visible, counts } from "mind_graph/graph_data"
+import { nodesOf, anchorOf, visible, counts, NODE_TOGGLES, LINE_TOGGLES } from "mind_graph/graph_data"
 import { summaryOf } from "mind_graph/summary"
 import { attachInput } from "mind_graph/input"
 import { createCard } from "mind_graph/card"
@@ -422,7 +422,11 @@ export function mount(element) {
   // its nodes and their lines; a kind of line that is off takes its lines
   // and nothing else.
   function applyFilter() {
-    const shownNow = visible({ nodes: state.nodes, edges: state.edges, on: { nodes: new Set(switched("mind_graph_nodes", true)), lines: new Set(switched("mind_graph_lines", true)) } })
+    // A kind is hidden only by a toggle that is switched OFF: one the viewer
+    // has no toggle for (the legend gives none for a kind they cannot read,
+    // and the data then holds none of it) is never hidden by its absence.
+    const on = (all, name) => new Set(all.filter((kind) => !switched(name, false).includes(kind)))
+    const shownNow = visible({ nodes: state.nodes, edges: state.edges, on: { nodes: on(NODE_TOGGLES, "mind_graph_nodes"), lines: on(LINE_TOGGLES, "mind_graph_lines") } })
     state.visibleNodes = shownNow.visibleNodes
     state.visibleEdges = shownNow.visibleEdges
     state.order = shownNow.order

@@ -644,6 +644,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_equal [ "6", "6" ], [ graph["data-nodes"], graph["data-edges"] ], "two posts, the tag, the page, the type and the pill; every line the data holds"
+    # The legend has no toggle for pages here (the viewer reads none, and the
+    # data is a stub's): a kind is hidden by a toggle switched off, never by
+    # a toggle that is not there.
+    assert_no_selector "#{GRAPH} label[data-legend-toggle=page], #{GRAPH} label[data-legend-toggle=type]"
     # A selected label is semibold, and its box is measured in that font: the
     # hit target and the hover's backing are as wide as the words drawn.
     click_node("post-12")
@@ -1824,7 +1828,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_nil screen_position(alone)
 
-    fill_in "Find a post or tag", with: "hidden"
+    fill_in "Find a page, post or tag", with: "hidden"
     click_frame_link { within("[data-mind-graph-results]") { click_link "Hidden gem" } }
 
     assert_selector "[data-mind-graph-focus]", text: "Around “Hidden gem”"
@@ -1837,7 +1841,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    fill_in "Find a post or tag", with: "rub"
+    fill_in "Find a page, post or tag", with: "rub"
     within("[data-mind-graph-results]") do
       assert_link "ruby"
       assert_text "Tag"
@@ -1845,11 +1849,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_selector "[data-mind-graph-status]", text: "1 result", visible: :all
 
-    fill_in "Find a post or tag", with: "zzzz"
+    fill_in "Find a page, post or tag", with: "zzzz"
     assert_selector "[data-mind-graph-results]", text: "No post or tag matches."
     assert_selector "[data-mind-graph-status]", text: "No post or tag matches.", visible: :all
 
-    find_field("Find a post or tag").send_keys(:escape)
+    find_field("Find a page, post or tag").send_keys(:escape)
     assert_no_selector "[data-mind-graph-results]", visible: :visible
   end
 
@@ -1858,7 +1862,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    field = find_field("Find a post or tag")
+    field = find_field("Find a page, post or tag")
     field.fill_in with: "hidden"
     assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
     click_frame_link { field.send_keys(:tab, :enter) }
@@ -1875,7 +1879,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       window.fetch = (url, options) => String(url).includes("/mind_graph/search") ? Promise.reject(new TypeError("Failed to fetch")) : original(url, options)
     JS
 
-    fill_in "Find a post or tag", with: "hidden"
+    fill_in "Find a page, post or tag", with: "hidden"
 
     assert_selector "[data-mind-graph-results]", text: "Search failed — check your connection."
     assert_selector "[data-mind-graph-status][role=status]", text: "Search failed — check your connection.", visible: :all
@@ -1887,7 +1891,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Zebra")
     visit admin_mind_graph_path
     await_graph
-    field = find_field("Find a post or tag")
+    field = find_field("Find a page, post or tag")
     field.fill_in with: "hidden"
     assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
     # Hold the next answer back, so what is on screen meanwhile is the point.
@@ -1902,7 +1906,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Hidden gem")
     visit admin_mind_graph_path
     await_graph
-    field = find_field("Find a post or tag")
+    field = find_field("Find a page, post or tag")
     field.fill_in with: "hidden"
     assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
 
@@ -1917,7 +1921,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    fill_in "Find a post or tag", with: "gem"
+    fill_in "Find a page, post or tag", with: "gem"
 
     assert_selector "[data-mind-graph-results] a", text: "<img src=x onerror=alert(1)> gem"
     assert_no_selector "[data-mind-graph-results] img", visible: :all
@@ -1927,7 +1931,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Hidden gem")
     visit admin_mind_graph_path
     await_graph
-    fill_in "Find a post or tag", with: "hidden"
+    fill_in "Find a page, post or tag", with: "hidden"
     click_frame_link { within("[data-mind-graph-results]") { click_link "Hidden gem" } }
     assert_selector "[data-mind-graph-focus]"
 
@@ -1935,7 +1939,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_no_selector "[data-mind-graph-results]", visible: :visible
-    assert_equal "", find_field("Find a post or tag").value
+    assert_equal "", find_field("Find a page, post or tag").value
   end
 
   test "leaving the screen aborts a search request still in flight" do
@@ -1952,7 +1956,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         return new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))))
       }
     JS
-    fill_in "Find a post or tag", with: "hid"
+    fill_in "Find a page, post or tag", with: "hid"
     assert_eventually(wait: 3, message: "the search request was never sent") { page.evaluate_script("window.searchSignals.length") == 1 }
 
     # Left through a real link (the sidebar's Posts), a Turbo visit: the window,
@@ -2571,7 +2575,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     within(LIST) { assert_selector "button span.truncate", exact_text: nasty }
-    fill_in "Find a post or tag", with: "onerror"
+    fill_in "Find a page, post or tag", with: "onerror"
     within("[data-mind-graph-results]") { assert_link nasty }
 
     assert_no_selector "#{LIST} img, [data-mind-graph-results] img", visible: :all
