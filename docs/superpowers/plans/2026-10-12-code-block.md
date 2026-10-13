@@ -1559,6 +1559,8 @@ end
 
 - [ ] **Step 3: implement,** `app/javascript/controllers/code_copy_controller.js`:
 
+  > **Superseded (2026-10-12, as built).** The controller below was not shipped as written: its `disconnect` reads `this.buttonTarget`, and a controller taken off its element finds no target any more, so it raised "Missing target element" in this plan's own tests. The built file keeps the button, the strip and the status line as fields at `connect`, takes its words back at `turbo:before-cache` as well, has a `label` value and a `strip` target, and says nothing after a late answer. Read `app/javascript/controllers/code_copy_controller.js` and `docs/reference/content-blocks-and-types.md` ("The copy script"), not this listing; the spec's "As built" lists every departure.
+
 ```js
 import { Controller } from "@hotwired/stimulus"
 

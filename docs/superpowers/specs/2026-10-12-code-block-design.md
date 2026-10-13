@@ -1,6 +1,6 @@
 # The Code block
 
-Date: 2026-10-12. Status: approved by the owner on 2026-10-12 ("Sounds everything good"); the plan is `docs/superpowers/plans/2026-10-12-code-block.md`. Built after theming is merged, as its own pull request, and relies on the theming contract (`docs/superpowers/specs/2026-10-12-theming-design.md` on the `theming` branch).
+Date: 2026-10-12. Status: built (plan `docs/superpowers/plans/2026-10-12-code-block.md`); approved by the owner on 2026-10-12 ("Sounds everything good"). Built as its own pull request on top of theming and relies on the theming contract (`docs/superpowers/specs/2026-10-12-theming-design.md`). **The text below is the design as approved and is not rewritten: the last section, "As built", lists where the code left it, and the documents that describe the code are `docs/reference/content-blocks-and-types.md` ("The Code block") and `docs/reference/theming.md` ("The Code block").**
 
 ## Why
 
@@ -154,3 +154,50 @@ Built and tested the way the Image and Rich text blocks are.
 ## Documentation
 
 Guide, in `contentspiel-docs` (no guide text here). **New, integrators: "How to add a block type"** (the owner, 2026-10-12: "a great topic to document"): a walk-through that follows this block as it was really built, step by step (the declaration, its fields and where they are stored, the component and its template, the editor card, what is translated, the published copy, the tokens, the tests), written from the finished pull request so it cannot describe steps nobody took. Editors: `pages/build-a-page-with-blocks` (a fifth block type, its fields, the limit, what is translated), `pages/arrange-blocks-in-sections` (one sentence: it works in a column), `pages/the-rich-text-editor` (when to use which code), `translating` (the code is shared, the caption is not). Integrators: `theming/the-token-contract` (seven tokens), `theming/rendering-blocks-and-pages` and the block and template reference (the component's entry, the `code-copy` markup). In this repository: `docs/reference/content-blocks-and-types.md` (the type, the `:code` field), `docs/reference/theming.md` (the two entries), `docs/reference/i18n.md` (the public file), `CLAUDE.md` (the block-type list in "What This Repo Is" stays general; nothing to add unless a rule appears while building).
+
+## As built
+
+Where the code left the text above, and which document now describes it. "The reference" is `docs/reference/content-blocks-and-types.md`, "The Code block"; "theming's reference" is `docs/reference/theming.md`, "The Code block". The designer's answers (C1 to C8, 2026-10-12, asked in the design system's project while the block was being built) arrived after Tasks 2 to 5 and were built as one extra task.
+
+**The order of the build.** The type, the field, the public render, the Copy button and the editor were built on `main` before theming was merged, as the plan allowed; the branch was then rebased onto theming and the contract's entries were added last. Nothing of the design depended on the order.
+
+**§1, the type and its fields.**
+
+- **Two new field options, where the spec has none.** `blank:` names a select's empty choice ("Plain text": the select's own blank option had no words). `label:` names a field where its name humanised reads wrong: the type says `label: "File name"` (design answer C5; the plan had built "Filename" and left it as a wording question). Everything that names a field to a person asks `ContentModel::Definition::Field#label`, the public page's group rows and the validation messages included. The reference, "Three things the schema learned for it".
+- **The limit's message is a key of its own**, `errors.messages.code_too_long` in `config/locales/en.yml` (the limit grouped, "20,000"); the error is still `:too_long`.
+- Unchanged: no migration, no column, no service; the published copy's column test did not move, and a test reads the code from the copy.
+
+**§2, colouring.**
+
+- **`CodeHighlight.lines(code, language, block_id: nil)`**: a third, optional argument, because the log line of a lexer that raised names the block and the id has to come from the caller. Roles are Strings, not Symbols, so the cached value is the same whatever the cache store's serializer does.
+- **A failure is never cached** (`skip_nil: true`); the spec's `Rails.cache.fetch` cached whatever the block answered, so one failed lex was plain text under the code's own key until the code changed. In consequence the failure is logged at each call that fails, not "once".
+- **Two more inputs are plain text**: bytes that are not text are scrubbed to U+FFFD before anything else, and code over `MAX_CHARACTERS` is neither lexed nor cached. Neither is reachable through the services.
+- Rouge's tag for a Dockerfile is `docker`; the label is "Dockerfile".
+
+**§3, the editor.**
+
+- **The counter is a controller of its own**, `admin--editor--code-limit` (the controller's ruling: reuse only without a special case; `admin--ui--char-count` is always shown and is a hint about a soft length). Its words carry the unit and, over the limit and in the danger ink, by how much: "18,412 of 20,000 characters", "20,412 of 20,000 characters · 412 over". It is announced twice at most and is the field's description only while it shows (C4).
+- **The field grows with the code**, six to twenty-four lines by `field-sizing: content`, and does not wrap (`white-space: pre`); the spec's twelve rows are the fallback of a browser without `field-sizing` (C3).
+- **A translation tab** keeps the code's frame and puts one line above it, "Code isn't translated. Edit it on the English tab.", the language's name a link to the default tab (C6).
+- **The tile's line** is the file name; else the language's label, " · " and the first line of code in the monospace face; and "Empty" for a block with neither (C7). The spec had "the file name, else the language's label, else the first line, else 'No code yet'". **The collapsed card's line of C7 is not built**: a collapsed card shows its type's label and no content, for every type (roadmap).
+- **The strings are in three files**, not in `editor_screen.en.yml` and `ui.en.yml` alone: the counter's in `config/locales/admin/fields.en.yml` (one locale file per component folder), the tile's "Empty" and the translation tab's line in `editor_screen.en.yml`.
+- The integration tests are in `test/integration/admin/content_blocks_test.rb` (`test/integration/blocks_test.rb` does not exist).
+
+**§4, the public render.**
+
+- **The head strip is conditional** (C1), where the spec draws it always: with no file name and no language it is `hidden` in the markup and the copy script's `strip` target, shown with the button where there is a clipboard, so a page without the script shows no empty box.
+- **The markup has three values and four targets**: `data-code-copy-label-value` (the button's word at rest, which the script writes back and never reads from the page) beside `copied` and `failed`, and the `strip` target beside `button`, `source` and `status`. The status line's class is `code-status`, hidden by the block's own stylesheet, not Tailwind's `sr-only`, which would depend on a theme's scan.
+- **The copy script** keeps the elements it needs as fields and takes its words back at `turbo:before-cache` as well as at `disconnect`, leaving `hidden` to `connect` and `disconnect`; the status line is emptied when the word goes back, and "Not copied" is in the same colour as "Copy" (C2). **The plan's Task 4, Step 3 holds a controller that is superseded**: its `disconnect` read a target, which Stimulus no longer finds once the controller is taken off its element. The file is `app/javascript/controllers/code_copy_controller.js`, and its comment and the reference ("The copy script") say why.
+- **The figure has no `min-width: 0`**: it is never a flex or grid item in the default theme, and what keeps a block in a column narrow is `sections.css`.
+- **`string` answers the four keys only**: any other raises where a theme is written and is an empty string elsewhere.
+- Added from C8: a 1px rule under the strip, the selection as the accent pair, and in a strong band `--th-on-accent` re-valued and the block told the opposite `color-scheme`.
+
+**§5, the contract.**
+
+- **The component's line is nine names**, the spec's eight and `string`, which the default template calls for its words. For one review the line also held `head_attributes` and `file_id`; both came off the contract and out of the component, because they were the default template's layout and a theme whose bar also holds the caption would have hidden the caption with them. The default template writes both out itself. `string` is a generic name to have promised to themes: the owner's call, listed in the pull request.
+- **Contrast is held for 42 pairs on three grounds**, not 28 on two: the strong band's ground is computed too, and each token is measured as the band values it. The lowest is the comment on the dark sunken ground, 5.5 to 1.
+- **The fixture is a third theme, `test/fixtures/themes/code`**, written from theming's reference alone; `plain` does not replace the Code template, so every test of it is also a test of the default block.
+- **A theme's `--th-syn-*` do not reach code in a strong band**, since the band's declaration is nearer the code; theming's reference says how a theme sets them there.
+- The copy script's markup in theming's reference names three values, not two, and the optional `strip` and `restore`.
+
+**Not this repository, unchanged:** the documentation theme's three changes (`--th-syn-attr` to `--th-syn-attribute`, `lines` in place of its helper, `code-copy` in place of `docs--copy`) and the guide's pages.
