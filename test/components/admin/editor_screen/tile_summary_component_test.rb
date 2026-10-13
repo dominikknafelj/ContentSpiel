@@ -108,4 +108,23 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_selector ".admin-block-tile__summary", text: "All posts · tag rails · Needs fixing"
     assert_selector attention
   end
+
+  test "a code block is its file name, else its language, else its first line, else says there is no code, and needs no attention" do
+    render_summary block("code", settings: { "language" => "yaml", "filename" => "config/deploy.yml", "code" => "service: site" })
+    assert_equal "config/deploy.yml", page.find(line).text
+
+    render_summary block("code", settings: { "language" => "yaml", "code" => "service: site" })
+    assert_equal "YAML", page.find(line).text
+
+    render_summary block("code", settings: { "code" => "    first line\nsecond line" })
+    assert_equal "first line", page.find(line).text
+
+    render_summary block("code", settings: { "code" => "x" * 200 })
+    assert_equal 80, page.find(line).text.length
+
+    render_summary block("code")
+    assert_equal "No code yet", page.find(line).text
+    assert_no_selector attention
+    assert_no_selector "img"
+  end
 end

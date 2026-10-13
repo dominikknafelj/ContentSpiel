@@ -165,7 +165,7 @@
             <%= render Admin::Columns::PlainColumnComponent.new(
                   name: "caption", id: field_id("caption"), html_name: field_html_name("caption"),
                   value: column_value("caption"), original: column_original("caption"), errors: column_errors("caption"), locale: locale,
-                  placeholder: column_placeholder("caption"), override: "caption", **translation("caption")
+                  **caption_options, **translation("caption")
                 ) %>
           <% when "alt" %>
             <%= render Admin::Columns::PlainColumnComponent.new(

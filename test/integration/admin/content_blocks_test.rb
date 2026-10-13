@@ -1355,4 +1355,113 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       assert_equal [ 1, { "Page-#{page.id}" => 1 } ], JSON.parse(nodes.first["data-counts"]).values_at("total", "subjects")
     end
   end
+
+  # --- the Code block (code block spec §1, §3) ---
+
+  def code_block(**attributes) = @page.content_blocks.create!(block_type: "code", position: 0, **attributes)
+
+  def save_code(block, settings, base: block.reload.updated_at.iso8601(6), tab: nil, **more)
+    patch "#{blocks_path}/#{block.id}", params: { block: { settings: settings, **more }, base_updated_at: base }, as: :turbo_stream,
+      headers: { "X-Notes-Tab" => tab }.compact
+  end
+
+  test "adding a Code block streams its card with the code field, and its code is saved as typed" do
+    post blocks_path, params: { block: { block_type: "code" } }, as: :turbo_stream
+    assert_response :success
+    block = @page.content_blocks.last
+    assert_equal "code", block.block_type
+    assert_select "turbo-stream template textarea[name='block[settings][code]']"
+
+    save_code(block, { language: "ruby", filename: "a.rb", code: "\r\n    def a\r\n\tb\r\n    end\r\n\r\n" }, caption: "A sample")
+
+    assert_response :success
+    assert_equal({ "language" => "ruby", "filename" => "a.rb", "code" => "    def a\n\tb\n    end" }, block.reload.settings)
+    assert_equal "A sample", block.caption
+  end
+
+  test "a Code block over the limit is refused with the message in its slot, nothing is written, and the answer does not touch the field" do
+    block = code_block(settings: { "code" => "kept = 1" })
+    stamp = block.reload.updated_at
+
+    save_code(block, { code: "x" * 20_001 })
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{block.id}-code-errors'] template", text: /Code is too long \(maximum is 20000 characters\)/
+    assert_no_match(/<textarea/, response.body, "the field, and the text in it, is the browser's to keep")
+    assert_equal "kept = 1", block.reload.settings["code"]
+    assert_equal stamp, block.updated_at
+
+    save_code(block, { code: "x" * 20_000 })
+    assert_response :success
+    assert_equal 20_000, block.reload.settings["code"].length
+  end
+
+  test "a Code block's language is one of the list or none, and a save of the code alone leaves it" do
+    block = code_block(settings: { "language" => "ruby", "code" => "a = 1" })
+
+    save_code(block, { language: "cobol" })
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{block.id}-language-errors'] template", text: /Language is not included in the list/
+    assert_equal "ruby", block.reload.settings["language"]
+
+    save_code(block, { code: "a = 2" })
+    assert_response :success
+    assert_equal({ "language" => "ruby", "code" => "a = 2" }, block.reload.settings)
+
+    save_code(block, { language: "" })
+    assert_response :success
+    assert_equal({ "code" => "a = 2" }, block.reload.settings)
+  end
+
+  test "a Code block in a column says its file name on its tile, is duplicated with its code and caption, and is deleted" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "code", section: section, section_column: 1, position: 0)
+
+    save_code(inside, { filename: "config/deploy.yml", code: "service: site" })
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='block-#{inside.id}-tile-summary'] template", text: %r{config/deploy\.yml}
+
+    top = @page.content_blocks.create!(block_type: "code", position: 1, caption: "Cap", settings: { "language" => "yaml", "code" => "  a: 1\n  b: 2" })
+    post "#{blocks_path}/#{top.id}/duplicate", as: :turbo_stream
+    assert_response :success
+    copy = (@page.content_blocks.reload.to_a - [ section, inside, top ]).sole
+    assert_equal "code", copy.block_type
+    assert_equal top.settings, copy.settings
+    assert_equal "Cap", copy.caption
+
+    delete "#{blocks_path}/#{copy.id}", as: :turbo_stream
+    assert_response :success
+    assert_not ContentBlock.exists?(copy.id)
+  end
+
+  test "a Code block's save is refused when it is stale and when another tab holds it, like any block's" do
+    block = code_block(settings: { "code" => "zero" })
+    base = block.updated_at.iso8601(6)
+
+    save_code(block, { code: "one" }, base: base, tab: "tab-aaaaaaaa")
+    assert_response :success
+    travel 1.minute do
+      save_code(block, { code: "two" }, base: base, tab: "tab-aaaaaaaa")
+    end
+    assert_response :conflict
+    assert_equal "one", block.reload.settings["code"]
+
+    sign_in_as users(:two)
+    save_code(block, { code: "theirs" }, tab: "tab-bbbbbbbb")
+    assert_response :conflict
+    assert_equal "one", block.reload.settings["code"]
+  end
+
+  test "the editor draws a Code block's card on the default tab and its shared fields on a translation tab" do
+    block = code_block(settings: { "language" => "ruby", "code" => "a = 1" })
+
+    get "/cs-studio/pages/#{@page.id}"
+    assert_response :success
+    assert_select "##{ActionView::RecordIdentifier.dom_id(block)} textarea#block-#{block.id}-code", text: /a = 1/
+
+    get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+    assert_response :success
+    assert_select "##{ActionView::RecordIdentifier.dom_id(block)} textarea", count: 0
+    assert_select "##{ActionView::RecordIdentifier.dom_id(block)} details[data-shared-fields] dd pre", text: /a = 1/
+  end
 end

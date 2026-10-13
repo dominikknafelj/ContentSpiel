@@ -528,4 +528,77 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
     assert_empty statements
   end
+
+  def code_block(page, **settings)
+    page.content_blocks.create!(block_type: "code", position: 0, caption: "A sample",
+      settings: { "language" => "ruby", "filename" => "a.rb", "code" => "    a = 1" }.merge(settings.stringify_keys))
+  end
+
+  test "a code block's card: language, file name and code stacked in that order, then a caption that overrides nothing" do
+    page = create_page(title: "Code card")
+    block = code_block(page)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
+
+    render_card(block, page: page)
+
+    assert_text "Code"
+    assert_equal %w[language filename code caption], Capybara.string(rendered_content).all("form .admin-field, form .admin-column").map { |node| node["data-field-name"] }
+    assert_selector "select##{prefix}-language[name='block[settings][language]'] option[value='ruby'][selected]", text: "Ruby"
+    assert_selector "select##{prefix}-language option[value='']", text: "Plain text"
+    assert_selector "select##{prefix}-language option", count: 21
+    assert_selector "input##{prefix}-filename[name='block[settings][filename]'][value='a.rb']"
+    assert_selector "textarea##{prefix}-code[name='block[settings][code]']"
+    assert_equal "    a = 1", Nokogiri::HTML5.fragment(rendered_content).at_css("textarea##{prefix}-code").text
+    assert_selector "##{prefix}-code-errors", visible: :all
+    assert_no_selector ".admin-block-settings-row"
+
+    assert_selector "input##{prefix}-caption[name='block[caption]'][value='A sample']"
+    assert_no_selector "input##{prefix}-caption[placeholder]"
+    assert_no_selector "[data-controller='admin--ui--override-field']"
+    assert_no_text "from Media"
+    assert_no_text "Reset"
+  end
+
+  test "an image block's card is as it was: its caption and alt are overrides of the library's text, with an image and without one" do
+    page = create_page(title: "Image pin")
+    asset = create_media_asset
+    asset.update!(alt: "A dog", caption: "Our dog")
+    with_image = page.content_blocks.create!(block_type: "image", position: 0, media_asset: asset, caption: "Mine")
+    without_image = page.content_blocks.create!(block_type: "image", position: 1)
+
+    [ with_image, without_image ].each do |block|
+      prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
+      render_card(block, page: page)
+
+      assert_selector "[data-controller='admin--ui--override-field']", count: 2
+      assert_selector "[data-admin--ui--override-field-input-id-value='#{prefix}-caption']"
+      assert_selector "[data-admin--ui--override-field-input-id-value='#{prefix}-alt']"
+      assert_text "Empty uses the caption from Media"
+      assert_text "Empty uses the alt text from Media"
+    end
+
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(with_image)
+    render_card(with_image, page: page)
+    assert_selector "input##{prefix}-caption[name='block[caption]'][placeholder='Our dog'][value='Mine']"
+    assert_selector "input##{prefix}-alt[name='block[alt]'][placeholder='A dog']"
+    assert_selector "[data-admin--ui--override-field-input-id-value='#{prefix}-caption'] button", text: "Reset"
+  end
+
+  test "on a translation tab a code block's three settings are shared fields, read-only, and only the caption is edited" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "Code tab")
+      block = code_block(page)
+
+      render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
+
+      assert_selector "details[data-shared-fields] summary", text: "Shared fields (3)"
+      assert_equal %w[Language Filename Code], Capybara.string(rendered_content).all("details[data-shared-fields] dt", visible: :all).map { |node| node.text(:all) }
+      assert_selector "details[data-shared-fields] dd", text: "Ruby", visible: :all
+      assert_selector "details[data-shared-fields] dd", text: "a.rb", visible: :all
+      assert_equal "    a = 1", Nokogiri::HTML5.fragment(rendered_content).at_css("details[data-shared-fields] dd pre").text
+      assert_no_selector "[name='block[settings][code]'], [name='block[settings][language]'], [name='block[settings][filename]']", visible: :all
+      assert_selector "input[name='block[caption]']"
+      assert_no_selector "[data-controller='admin--ui--override-field']"
+    end
+  end
 end

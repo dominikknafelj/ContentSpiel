@@ -25,6 +25,7 @@ en:
           unavailable: "Unavailable type — %{type}"
           no_image: "No image chosen"
           empty_text: "Empty text"
+          no_code: "No code yet"
           any_type: "All posts"
           tag: "tag %{name}"
           needs_fixing: "Needs fixing"

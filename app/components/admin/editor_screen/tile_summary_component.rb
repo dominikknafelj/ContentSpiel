@@ -1,8 +1,8 @@
 module Admin
   module EditorScreen
     # One line of a block's content on its tile (sections spec §4.2): the
-    # start of a text, an image's file name with a small thumbnail, a post
-    # list's filter. A block in a section's column is a tile until it is
+    # start of a text, an image's file name with a small thumbnail, a code
+    # block's file name, a post list's filter. A block in a section's column is a tile until it is
     # opened, so this line is all that says which block it is -- and what
     # marks the ones that need attention, as a card would: an image block
     # without an image, a type that is no longer registered, a save that was
@@ -12,7 +12,7 @@ module Admin
     # the columns it uses (`uses_columns`) and its capabilities, so a type a
     # plugin registers gets a sensible tile without being known here. A type
     # that uses an image AND a body is summarised by its image, the first rule
-    # that matches. A type with neither and no listing has no line at all;
+    # that matches. A type with neither, no code and no listing has no line at all;
     # its tile is its label.
     #
     # It is its own component with its own id because it is the one part of
@@ -60,6 +60,7 @@ module Admin
         if definition.nil? then t(".unavailable", type: block.block_type)
         elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
         elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
+        elsif definition.capability?(:code) then code_line
         elsif definition.capability?(:lists_posts) then listing
         end
       end
@@ -73,6 +74,17 @@ module Admin
         tag = settings&.tag.presence
 
         [ type ? (::ContentTypes.find(type)&.label || type) : t(".any_type"), (t(".tag", name: tag) if tag) ].compact.join(" · ")
+      end
+
+      # What tells one code block from another at a glance: its file name,
+      # else its language as an editor reads it, else the start of its first
+      # line. An empty one says so and is not marked: an empty block is the
+      # state the picker leaves it in.
+      def code_line
+        settings = block.settings_object(locale: locale)
+
+        settings&.filename.presence || ::CodeHighlight.label(settings&.language) ||
+          settings&.code.to_s.lines.first.to_s.strip.truncate(LENGTH).presence || t(".no_code")
       end
     end
   end

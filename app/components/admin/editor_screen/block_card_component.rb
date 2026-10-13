@@ -377,6 +377,14 @@ module Admin
         end
       end
 
+      # A caption is a per-use override of a library text only where the type
+      # also uses an image: then the library image's caption is the input's
+      # placeholder and the field gets the help line, Reset and the library's
+      # text (`admin/shared/_override_field`). A type with a caption and no
+      # image (the Code block) has no library text behind it, so its caption
+      # is a plain translated field.
+      def caption_options = uses_columns.include?("image") ? { placeholder: column_placeholder("caption"), override: "caption" } : {}
+
       # The image column itself -- a class method so `Admin
       # ::ContentBlocksController` re-renders a refused choice from exactly
       # what this card renders (`asset` passed in: after a refusal that's the
