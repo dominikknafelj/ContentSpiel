@@ -458,7 +458,7 @@ The first block type that joined the contract after it was written (code block s
 | `data-code-copy-target="source"` | the element whose text is the code. Its `textContent` is what is copied: no markup, and every character between its tags. Required at a press: without it the press is an error in the console and the visitor is told nothing |
 | `data-code-copy-target="status"` | optional: an element with `role="status"`, empty. The answer is written into it too, for a screen reader (the button's accessible name does not change), and taken out when the word goes back. The default hides it from sight by a rule of its own class |
 | `data-code-copy-target="strip"` | optional: an element that holds nothing a visitor reads but the button, **rendered `hidden`**. The script shows and hides it with the button, so nobody sees an empty bar. The default's head strip is this target when the block has no file name and no language, and is not when it has one |
-| `data-code-copy-label-value` | the button's word at rest (`string(:copy)`). Left out, the script keeps the word the template wrote into the button |
+| `data-code-copy-label-value` | the button's word at rest (`string(:copy)`). Left out or empty, the script keeps the word the template wrote into the button |
 | `data-code-copy-copied-value` | what the button says after a press that worked (`string(:copied)`) |
 | `data-code-copy-failed-value` | what it says when the browser refused (`string(:failed)`) |
 | `data-code-copy-restore-value` | optional: how long the answer stays, in milliseconds. 2000 without it |

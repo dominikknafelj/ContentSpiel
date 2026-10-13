@@ -46,9 +46,15 @@ import { Controller } from "@hotwired/stimulus"
 // two anchors): a strip hidden there, even for a moment, moves everything
 // below it and can leave the visitor off the anchor they asked for.
 //
-// WHAT A COPY THEREFORE HOLDS: the server's words always; the button and
-// the strip hidden when the script was disconnected before the copy was
-// made, shown when the copy was made of the page as it stood. Either is
+// WHAT A COPY THEREFORE HOLDS: the server's words, with one exception; the
+// button and the strip hidden when the script was disconnected before the
+// copy was made, shown when the copy was made of the page as it stood. The
+// exception is a page that is NOT left (the anchor cases above), where the
+// script stays connected: a clipboard's answer that lands after
+// `turbo:before-cache` and before Turbo clones the page is written, as it
+// should be for the visitor who is still there, and the copy holds "Copied"
+// and the status line. That copy is harmless for the same reason as the
+// rest: `connect` writes the word and empties the status line. Either is
 // right, because nobody is shown a copy without this script running on it:
 // a page restored from a copy, and a copy shown as a preview while the
 // fresh page loads, are put into the document, where `connect` runs before
@@ -68,8 +74,11 @@ export default class extends Controller {
     this.button = this.buttonTarget
     this.status = this.hasStatusTarget ? this.statusTarget : null
     this.strip = this.hasStripTarget ? this.stripTarget : null
-    // A template that hands no `label` keeps the word it wrote on the button.
-    this.word = this.hasLabelValue ? this.labelValue : this.button.textContent
+    // A template that hands no `label`, or an empty one (a theme's mistyped
+    // key is "" outside development), keeps the word it wrote on the button:
+    // an attribute that is there and empty must not leave a button with no
+    // word after the first answer.
+    this.word = this.labelValue || this.button.textContent
     this.reset()
     this.show(this.able)
 

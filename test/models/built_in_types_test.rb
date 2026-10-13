@@ -42,6 +42,31 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
+  # The editor's tile asks a `:code` type's settings for three fields by name
+  # (`TileSummaryComponent#code_line`), without a guard.
+  test "a type with the code capability and without its three fields is refused, and the message names what is missing" do
+    saved = BlockTypes.all.dup
+
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.field :code, :code; t.capability :code } }
+    assert_equal "a code block type needs language and filename field(s)", error.message
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.capability :code } }
+    assert_equal "a code block type needs language and filename and code field(s)", error.message
+    assert_nil BlockTypes.find(:test_listing), "a refused type is not registered"
+
+    BlockTypes.register(:test_listing) do |t|
+      t.label "Listing"
+      t.field :language, :string
+      t.field :filename, :string
+      t.field :code, :code
+      t.capability :code
+      t.component Blocks::CodeComponent
+    end
+    assert BlockTypes.find(:test_listing).capability?(:code)
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
   test "post_list settings are typed" do
     block = root_page.content_blocks.build(block_type: "post_list", position: 0)
     block.assign_settings({ "content_type" => "nope", "limit" => "0" }, locale: "en")

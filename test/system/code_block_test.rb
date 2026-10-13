@@ -239,12 +239,23 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
   # script connects to new elements. The strips above the anchor are the
   # script's to reveal, and the page must still end at the anchor: they are
   # revealed before Turbo scrolls, not after.
+  #
+  # Scroll anchoring is switched off for the test: Chrome keeps what is in
+  # view where it is when something above it grows, so with it a strip
+  # revealed AFTER the scroll leaves the page at the anchor all the same and
+  # this test could not fail (Task 5b's re-review, N3). Without it the order
+  # is seen: this was red, 292 pixels off, with the reveal put off by fifty
+  # milliseconds. It is switched off for EVERY element, by a stylesheet the
+  # document adopts (which a Turbo visit keeps): `overflow-anchor: none` on
+  # the root alone left Chrome compensating. Safari has no scroll anchoring,
+  # which is who the order is for.
   test "a link to an anchor in the page, which Turbo draws again, ends at the anchor with every strip and button shown" do
     8.times { add_code(CODE, settings: { "code" => CODE }) }
     target = add_code(CODE, settings: { "filename" => "greet.rb", "code" => CODE })
     8.times { add_code(CODE, settings: { "code" => CODE }) }
     open_page
     assert_selector "#{FIGURE} .code-head button", exact_text: "Copy", count: 17
+    page.execute_script("const sheet = new CSSStyleSheet(); sheet.replaceSync('* { overflow-anchor: none !important }'); document.adoptedStyleSheets = [sheet]")
     page.execute_script(%(document.querySelector("main").insertAdjacentHTML("afterbegin", '<a id="to-file" href="#code-#{target.id}-file">To the file</a>')))
 
     find("#to-file").click
@@ -256,6 +267,30 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
 
     assert_selector "#{FIGURE} .code-head button", exact_text: "Copy", count: 17
     assert_in_delta 0, page.evaluate_script("document.getElementById('code-#{target.id}-file').getBoundingClientRect().top"), 2, "the page ends at the anchor, with the strips above it already there"
+    assert_equal "none", page.evaluate_script("getComputedStyle(document.getElementById('code-#{target.id}-file')).overflowAnchor"), "and the browser did not hold it there: anchoring was still off after the visit"
+  ensure
+    page.execute_script("document.adoptedStyleSheets = []")
+  end
+
+  # Final review M7. A theme's mistyped key is "" outside development, and
+  # an attribute that is there and empty is still a value: the word the
+  # template wrote on the button is what it goes back to, not nothing.
+  test "an empty label keeps the word the template wrote on the button: after an answer the button says it again" do
+    add_code(CODE, settings: { "code" => CODE })
+    open_page
+    clipboard(RECORDING)
+    disconnect
+    page.execute_script("#{figure_js}.setAttribute('data-code-copy-label-value', ''); #{figure_js}.querySelector('button').textContent = 'Take it'; #{figure_js}.setAttribute('data-controller', 'code-copy')")
+    await_connected
+    assert_selector "#{FIGURE} button", exact_text: "Take it"
+
+    restore_after(60_000)
+    find("#{FIGURE} button").click
+    assert_selector "#{FIGURE} button", exact_text: "Copied"
+    restore_after(50)
+    find("#{FIGURE} button").click
+    assert_selector "#{FIGURE} button", exact_text: "Take it"
+    assert_equal "", status_text
   end
 
   test "a page left by a link comes back on Back with the button at rest, and a press there says Copy first and copies" do
@@ -418,8 +453,12 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
   end
 
   # A phone's width, where a sideways scroll is likeliest, and the second
-  # block in a column of a section. What keeps the line in is the `pre`,
-  # which scrolls it: a scrolling box asks for no width for what is in it.
+  # block in a column of a section. The `pre` scrolls the line. At full width
+  # the figure is a block and as wide as what holds it; in a column what
+  # holds it is a grid item, which would by itself be as wide as its longest
+  # line, a scrolling `pre` included, and what keeps it narrow there is the
+  # tracks' `minmax(0, …)` and the column's `min-width: 0` in `sections.css`
+  # (`code.css`, "A LONG LINE").
   test "a long line scrolls inside the block and the page never scrolls sideways, at full width and in a column, on a wide window and on a phone's" do
     long = %(x = "#{"a" * 300}")
     add_code(long)

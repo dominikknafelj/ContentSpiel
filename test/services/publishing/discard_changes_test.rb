@@ -60,6 +60,24 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal @first.id, @page.content_blocks.reorder(:position, :id).first.id, "a block that stayed keeps its id"
   end
 
+  # Final review M6. A Code block's three values are keys of `settings`,
+  # which a discard writes back whole, through the save service and its cast.
+  test "a Code block goes back to the published code, white space included, and a file name added since is gone" do
+    white = "    indented first  \n\n\tsecond\n  third"
+    code = add(nil, block_type: "code", settings: { "language" => "ruby", "code" => white })
+    publish_changes(@page)
+    published = shape
+    caption = ContentBlocks::Save.call(code, attributes: { settings: { "language" => "python", "filename" => "a.py", "code" => "changed = 1" } }, translations: { "en" => { caption: "Typed" } })
+    assert caption.ok?, caption.errors.to_sentence
+    assert_equal :changed, Publishing::Changes.of(@page.reload).blocks.sole.kind
+
+    discard
+
+    assert_equal published, shape
+    assert_equal({ "language" => "ruby", "code" => white }, code.reload.settings, "the same block, with no file name")
+    assert_nil code.caption
+  end
+
   test "a block added since is deleted, and a block deleted since comes back as a new block in its place" do
     add("Added")
     assert ContentBlocks::Destroy.call(@first).ok?

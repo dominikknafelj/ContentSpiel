@@ -90,6 +90,8 @@
   padding: 0;
   border: 0;
   overflow: hidden;
+  /* `clip` for a browser that does not know `clip-path`; one that knows both uses both. */
+  clip: rect(0 0 0 0);
   clip-path: inset(50%);
   white-space: nowrap;
 }

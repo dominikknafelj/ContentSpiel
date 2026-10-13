@@ -274,18 +274,52 @@ class CodeHighlightTest < ActiveSupport::TestCase
     end
   end
 
-  test "code over the limit is plain text and is not cached or lexed" do
-    was = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    code = "def" + " " * CodeHighlight::MAX_CHARACTERS
+  # A lexer that would be seen if it were asked: the earlier form of this
+  # test used one that raises, which is rescued to the same plain text, so it
+  # passed without the cap, and its "limit itself" was eight characters.
+  test "code over the limit is plain text and is not cached or lexed, and code of exactly the limit is lexed" do
+    asked = []
+    seen = Class.new { define_singleton_method(:lex) { |code| asked << code.length; Rouge::Lexers::Ruby.lex(code) } }
+    at = "def" + " " * (CodeHighlight::MAX_CHARACTERS - 3)
+    over = "#{at} "
+    assert_equal [ CodeHighlight::MAX_CHARACTERS, CodeHighlight::MAX_CHARACTERS + 1 ], [ at.length, over.length ]
 
-    with_singleton_override(Rouge::Lexer, :find, ->(_tag) { RAISING }) do
-      assert_equal [ [ [ nil, code ] ] ], CodeHighlight.lines(code, "ruby")
+    with_memory_cache do
+      with_singleton_override(Rouge::Lexer, :find, ->(_tag) { seen }) do
+        assert_equal [ [ [ "keyword", "def" ], [ nil, " " * (CodeHighlight::MAX_CHARACTERS - 3) ] ] ], CodeHighlight.lines(at, "ruby")
+        assert_equal [ CodeHighlight::MAX_CHARACTERS ], asked, "the limit itself is lexed"
+
+        assert_equal [ [ [ nil, over ] ] ], CodeHighlight.lines(over, "ruby")
+        assert_equal [ CodeHighlight::MAX_CHARACTERS ], asked, "one character more is not handed to the lexer"
+      end
+
+      assert Rails.cache.read(CodeHighlight.cache_key(at, "ruby"))
+      assert_nil Rails.cache.read(CodeHighlight.cache_key(over, "ruby"))
+      assert_nil Rails.cache.read(CodeHighlight.failure_key(over, "ruby")), "and it is no failure either"
     end
-    assert_nil Rails.cache.read(CodeHighlight.cache_key(code, "ruby"))
-    assert_equal [ [ [ "keyword", "def" ], [ nil, " " * 5 ] ] ], CodeHighlight.lines("def     ", "ruby"), "the limit itself is allowed"
-  ensure
-    Rails.cache = was
+  end
+
+  # Task 1's re-review, N1: `scrub` alone raises Encoding::CompatibilityError
+  # for a string in another encoding that holds bytes its encoding does not.
+  test "a string in another encoding never raises, with bad bytes or without: US-ASCII, Shift_JIS, UTF-16LE and one Ruby cannot convert" do
+    assert_equal [ [ [ nil, "a\uFFFDb" ] ] ], CodeHighlight.lines("a\xffb".dup.force_encoding(Encoding::US_ASCII), nil)
+    assert_equal [ [ [ "keyword", "def" ], [ nil, " \uFFFD" ] ] ], CodeHighlight.lines("def \xff".dup.force_encoding(Encoding::US_ASCII), "ruby")
+
+    japanese = "日本".encode(Encoding::Shift_JIS)
+    assert_equal [ [ [ nil, "日本" ] ] ], CodeHighlight.lines(japanese, nil), "a valid string is transcoded, not mangled"
+    assert_equal [ [ [ nil, "日本\uFFFD" ] ] ], CodeHighlight.lines((japanese.b + "\x81".b).force_encoding(Encoding::Shift_JIS), "ruby")
+
+    wide = "def a".encode(Encoding::UTF_16LE)
+    assert_equal [ [ [ "keyword", "def" ], [ nil, " a" ] ] ], CodeHighlight.lines(wide, "ruby")
+    assert_equal [ [ [ nil, "def a\uFFFD" ] ] ], CodeHighlight.lines((wide.b + "\x00".b).force_encoding(Encoding::UTF_16LE), nil), "half a character at the end"
+    assert_equal [ [ [ nil, "a" ] ], [ [ nil, "b" ] ] ], CodeHighlight.lines("a\r\nb".encode(Encoding::UTF_16LE), nil), "line breaks are read after the transcoding"
+
+    assert_nothing_raised { CodeHighlight.lines("ab".dup.force_encoding(Encoding::UTF_7), "ruby") }
+    [ Encoding::US_ASCII, Encoding::Shift_JIS, Encoding::UTF_16LE, Encoding::UTF_7 ].each do |encoding|
+      answered = CodeHighlight.lines("a\xff\xfe\x81".dup.force_encoding(encoding), "ruby").flatten(1).map(&:last).join
+      assert_equal Encoding::UTF_8, answered.encoding
+      assert_predicate answered, :valid_encoding?
+    end
   end
 
   test "a very long single line and a leading line break are kept as they are" do

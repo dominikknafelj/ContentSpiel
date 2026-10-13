@@ -141,9 +141,9 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes Rails.root.join("app/assets/tailwind/themes/default/theme.css").read, %(@import "./code.css";)
     refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, css)
     CodeHighlight::ROLES.each { |role| assert_match(/\.syn-#{role}\s*\{\s*color:\s*var\(--th-syn-#{role}\);/, css) }
-    assert_no_match(/\.content-block--code\s*\{[^}]*min-width/, css, "the figure is a block wherever it is drawn; the scrolling pre is what keeps the line in")
+    assert_no_match(/\.content-block--code\s*\{[^}]*min-width/, css, "the figure is a block wherever it is drawn and needs no min-width of its own; in a column the tracks' minmax(0, …) keep the line in")
     assert_match(/\.content-block--code pre\s*\{[^}]*overflow-x:\s*auto;[^}]*white-space:\s*pre;/m, css)
-    assert_match(/\.content-block--code \.code-status\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;[^}]*overflow:\s*hidden;[^}]*clip-path:\s*inset\(50%\);/m, css,
+    assert_match(/\.content-block--code \.code-status\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;[^}]*overflow:\s*hidden;[^}]*clip:\s*rect\(0 0 0 0\);[^}]*clip-path:\s*inset\(50%\);/m, css,
       "the status line is hidden from sight by the block's own rule, so a theme's template needs no scanned utility")
     assert_match(/\.content-block--code \.code-head\s*\{[^}]*color:\s*var\(--th-dim\);/m, css, "meta on the sunken ground is 4.3:1 in the light theme; the head reads as dim")
   end
