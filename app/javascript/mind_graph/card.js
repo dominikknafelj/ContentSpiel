@@ -45,6 +45,7 @@
 // The status chip is `Admin::Ui::StatusChipComponent`'s, class for class: a dot in
 // the status's token colour AND the word, so the colour is never the only cue.
 import { cardNotes } from "mind_graph/card_notes"
+import { recordId } from "mind_graph/ids"
 
 const STATUS_DOTS = { draft: "bg-meta", scheduled: "bg-warn", live: "bg-ok" }
 // A URL template filled with one value: a function as the replacement, because
@@ -147,10 +148,10 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       heading(mark(dotClass(dotClasses, node)), kind, ...(Object.hasOwn(STATUS_DOTS, node.status) ? [ statusChip(node.status) ] : [])),
       title(node),
       counts,
-      cardNotes(node, { text, url: fill(urls.postNotes, "__ID__", node.id), postUrl: node.url, onChange }),
+      cardNotes(node, { text, url: fill(urls.postNotes, "__ID__", recordId(node.id)), postUrl: node.url, onChange }),
       actions(
         openLink(node),
-        link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.postFocus, "__ID__", node.id))
+        link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.postFocus, "__ID__", recordId(node.id)))
       )
     ]
   }
@@ -164,7 +165,7 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       counts,
       actions(
         link(buttonClasses.primary, text.t("mind_graph.script.card.show_tagged"), fill(urls.tagPosts, "__NAME__", node.title)),
-        link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.tagFocus, "__ID__", String(node.id).replace("tag-", "")))
+        link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.tagFocus, "__ID__", recordId(node.id)))
       )
     ]
   }

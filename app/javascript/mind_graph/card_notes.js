@@ -53,6 +53,7 @@
 // the word "new" for a screen reader, so it is never colour alone -- and the
 // link to the rest is `a[data-note-more]`.
 import { draftKey } from "controllers/admin/notes/composer_controller"
+import { recordId } from "mind_graph/ids"
 
 const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
 // Three rows, then "+N more" (handoff, "Node card thread list").
@@ -79,7 +80,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   section.dataset.mindGraphCardNotes = ""
   section.setAttribute("data-admin--notes--live-target", "record")
   section.dataset.notesType = "post"
-  section.dataset.notesId = node.id
+  section.dataset.notesId = recordId(node.id)
   const heading = element("h3", LABEL)
   const list = element("ul", "m-0 flex list-none flex-col gap-2 p-0")
   const status = element("p", "m-0 text-[12px] text-danger-ink")
@@ -98,7 +99,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   submit.type = "submit"
   form.append(field, submit)
 
-  const key = draftKey(document.body.getAttribute("data-admin--notes--inbox-person-value") || "", `graph-Post-${node.id}`)
+  const key = draftKey(document.body.getAttribute("data-admin--notes--inbox-person-value") || "", `graph-Post-${recordId(node.id)}`)
   const draft = {
     read() {
       try {

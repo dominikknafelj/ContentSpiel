@@ -681,6 +681,11 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ 1, 2 ], labelled
   end
 
+  test "ids: a node's id is its kind and its record's id, and only the first dash separates them" do
+    assert_equal [ "post-12", "12", "blog", "owner/a-b", "posts" ],
+      js_module("mind_graph/ids", '[m.nodeId("post", 12), m.recordId("post-12"), m.recordId("type-blog"), m.recordId("type-owner/a-b"), m.recordId("all-posts")]')
+  end
+
   private
 
   # Zoomed in, most of the graph is outside the canvas, and a path of long

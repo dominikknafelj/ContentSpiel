@@ -6,9 +6,9 @@
 # - `PostGraph::Search`: readable posts and tags by name.
 # - `PostGraph::Builder`: the `{ nodes, tags, edges }` the first two share.
 #
-# Shape: `{ nodes: [{ id, title, type, colour_index, status, url, degree }],
-# tags: [{ id: "tag-<id>", name, count, degree }], edges: [{ source, target,
-# kind }], total, shown }`, plus `isolated` (global) or `focus` (local). There
+# Shape: `{ nodes: [{ id: "post-<id>", title, type, colour_index, status, url,
+# degree }], tags: [{ id: "tag-<id>", name, count, degree }], edges: [{ source,
+# target, kind }] (both ends a node's id), total, shown }`, plus `isolated` (global) or `focus` (local). There
 # is deliberately NO colour here: a node carries its content type's
 # `colour_index` (nil for a type that isn't registered any more) and the page
 # draws it from the `--cs-cat-<n>` tokens, so a type looks the same in the
@@ -26,4 +26,10 @@ module PostGraph
   # best-connected, and a local view the nearest. Set from the measurements in
   # the spec's §7.
   CAP = 2_000
+
+  # A node's id in the graph's data and everywhere the page writes one (pages
+  # spec, decision 4): its kind and its database id, "post-12", "tag-3",
+  # "page-7"; a post type's is its stored name, "type-blog". One rule, so no
+  # script asks what type an id has.
+  def self.node_id(kind, id) = "#{kind}-#{id}"
 end

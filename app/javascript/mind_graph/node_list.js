@@ -29,8 +29,8 @@ const byDegree = (a, b) => b.degree - a.degree || String(a.title).localeCompare(
 const ROW = "flex w-full cursor-pointer items-center gap-2 px-3 py-1 text-left text-sm text-ink hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current]:bg-accent-tint aria-[current]:font-semibold"
 
 export function createList(container, { text, dotClasses, onSelect, onHover }) {
-  // The rows by node id, as a string: a `data-` attribute is one, and a
-  // post's id is a number.
+  // The rows by node id, as a string: a `data-` attribute is one, and so is
+  // every node's id now ("post-12", "tag-3": `String` of one is itself).
   let rows = new Map()
   let ids = new Map()
   let marked = null

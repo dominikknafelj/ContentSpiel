@@ -23,8 +23,8 @@ module PostGraph
       tags = Tag.name_containing(@text).where(id: PostTag.where(post_id: readable.select(:id)).select(:tag_id))
                 .name_starting_first(@text).by_name.limit(@limit).pluck(:id, :name)
 
-      posts.map { |post| { kind: "post", id: post.id, label: Locales.read(post, :title, locale: @locale) } } +
-        tags.map { |id, name| { kind: "tag", id: id, label: name } }
+      posts.map { |post| { kind: "post", id: PostGraph.node_id(:post, post.id), record_id: post.id, label: Locales.read(post, :title, locale: @locale) } } +
+        tags.map { |id, name| { kind: "tag", id: PostGraph.node_id(:tag, id), record_id: id, label: name } }
     end
   end
 end

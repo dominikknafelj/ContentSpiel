@@ -11,7 +11,7 @@ class PostGraph::FocusTest < ActiveSupport::TestCase
 
     focus = PostGraph::Focus.find(actor: nil, post: post.id.to_s)
 
-    assert_equal [ "post", post.id, "Alpha", post.id ], [ focus.kind, focus.id, focus.title, focus.node_id ]
+    assert_equal [ "post", post.id, "Alpha", "post-#{post.id}" ], [ focus.kind, focus.id, focus.title, focus.node_id ]
   end
 
   test "a tag a readable post carries is a focus with its name" do

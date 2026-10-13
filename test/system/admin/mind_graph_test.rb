@@ -184,7 +184,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: corner[0] + 60, y: corner[1] + 40)
     mouse.up
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id}); return Math.abs(p.x - #{moved_from["x"] + 60}) < 2 && Math.abs(p.y - #{moved_from["y"] + 40}) < 2 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(first_id).to_json}); return Math.abs(p.x - #{moved_from["x"] + 60}) < 2 && Math.abs(p.y - #{moved_from["y"] + 40}) < 2 })()")
   end
 
   # Mind graph canvas spec §4.4: with the canvas focused, + and - zoom around
@@ -206,9 +206,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     from = screen_position(first_id)
     canvas.send_keys(:right)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"]}) < 1 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(first_id).to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"]}) < 1 })()")
     canvas.send_keys(:down)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(first_id).to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
   end
 
   test "the filter hands the layout only what is shown" do
@@ -777,7 +777,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     click_node(a.id)
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     within("[data-mind-graph-card]") do
       assert_text "Alpha"
       assert_text ContentTypes.fetch("resume_entry").label
@@ -916,9 +916,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # The neighbours are said directly; a neighbour's LABEL may give way to
     # another's where the two would overlap (no overlap wins), the selected
     # node's never does: it places first.
-    assert_equal [ hub.id, spokes[28].id ].map(&:to_s).sort, graph["data-neighbours"].split(",").sort
-    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{last.id}')")
-    assert_equal last.id.to_s, graph["data-labelled"].split(",").first, "the selected node's label is placed first"
+    assert_equal [ hub, spokes[28] ].map { |post| nid(post) }.sort, graph["data-neighbours"].split(",").sort
+    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{nid(last)}')")
+    assert_equal nid(last), graph["data-labelled"].split(",").first, "the selected node's label is placed first"
   end
 
   # What dims is everything but the selection and its neighbours: read from the
@@ -952,17 +952,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "", graph["data-neighbours"].to_s
 
     click_node(a.id)
-    assert_equal [ c.id.to_s, tag_id ].sort, neighbours.call
+    assert_equal [ nid(c), tag_id ].sort, neighbours.call
 
     find("label", text: "Related").click
     await_graph
-    assert_equal a.id.to_s, graph["data-selected"], "a selection the filter still shows stays"
+    assert_equal nid(a), graph["data-selected"], "a selection the filter still shows stays"
     assert_selector "[data-mind-graph-card]", text: "P0"
-    assert_equal [ c.id.to_s ], neighbours.call, "the tag is no neighbour while its edges are not shown"
+    assert_equal [ nid(c) ], neighbours.call, "the tag is no neighbour while its edges are not shown"
 
     find("label", text: "All").click
     await_graph
-    assert_equal [ c.id.to_s, tag_id ].sort, neighbours.call, "back under All the tag is a neighbour again"
+    assert_equal [ nid(c), tag_id ].sort, neighbours.call, "back under All the tag is a neighbour again"
 
     escape_on_canvas
     assert_equal "", graph["data-neighbours"]
@@ -1012,7 +1012,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: from["x"] + 40, y: from["y"] + 30)
     mouse.move(x: from["x"] + 80, y: from["y"] + 60)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{a.id}); return Math.abs(p.x - #{from["x"] + 80}) < 6 && Math.abs(p.y - #{from["y"] + 60}) < 6 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(a).to_json}); return Math.abs(p.x - #{from["x"] + 80}) < 6 && Math.abs(p.y - #{from["y"] + 60}) < 6 })()")
     # Not a pan, which would move the node on screen just the same: the layout
     # was told to hold the node, and is running again.
     assert_no_selector "#{GRAPH}[data-settled]"
@@ -1108,7 +1108,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.click(x: point["x"], y: point["y"], count: 2)
     assert_button "Release 1 pinned"
     assert_equal "1", graph["data-pinned"]
-    assert_equal c.id.to_s, graph["data-selected"], "the double click's clicks select the node, as any click does"
+    assert_equal nid(c), graph["data-selected"], "the double click's clicks select the node, as any click does"
     await_graph
     press "Release 1 pinned"
     assert_equal "0", graph["data-pinned"]
@@ -1129,7 +1129,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.click(x: point["x"], y: point["y"], count: 2)
     await_frames
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert_equal [], worker_messages
     assert_equal "0", graph["data-pinned"]
   end
@@ -1217,7 +1217,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.zoom !== #{zoom.to_json}")
     await_frames
     assert_card_beside(a.id)
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
   end
 
   # Near the canvas's right edge there is no room on the right: the card
@@ -1261,7 +1261,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # out of the way before the pointer gets there.
     drag_node(a.id, by: [ 60, 90 ], release: false, steps: 12)
     assert_no_selector "[data-mind-graph-card]", visible: :visible
-    assert_equal a.id.to_s, graph["data-selected"], "the drag cleared the selection"
+    assert_equal nid(a), graph["data-selected"], "the drag cleared the selection"
     page.driver.browser.mouse.up
 
     assert_selector "[data-mind-graph-card]", visible: :visible
@@ -1278,8 +1278,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{a.id}')")
-    label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{a.id})")
+    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{nid(a)}')")
+    label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{nid(a).to_json})")
     node = screen_position(a.id)
     point = [ label["left"] + 12, (label["top"] + label["bottom"]) / 2 ]
     assert_operator point[0] - node["x"], :>, 13, "the point is inside the dot's own target"
@@ -1292,11 +1292,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_not_equal "pointer", page.evaluate_script("getComputedStyle(document.querySelector(#{CANVAS.to_json})).cursor")
 
     mouse.move(x: point[0], y: point[1])
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(a)}'")
     assert_equal "pointer", page.evaluate_script("getComputedStyle(document.querySelector(#{CANVAS.to_json})).cursor")
     mouse.click(x: point[0], y: point[1])
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert_selector "[data-mind-graph-card] h2", text: "A title long enough to press"
   end
 
@@ -1315,7 +1315,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     others = [ c, d ].to_h { |post| [ post, pixels_of(post).first ] }
 
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(a)}'")
 
     assert_not_equal ring_before, pixel_at(point["x"] - 9.5, point["y"]), "no ring round the hovered node"
     others.each { |post, pixel| assert_equal pixel, pixels_of(post).first, "#{post.title} changed while another node was hovered" }
@@ -1337,13 +1337,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     4.times { press "Zoom out" }
     await_frames
     labelled = graph["data-labelled"].split(",")
-    hidden = posts.find { |post| labelled.exclude?(post.id.to_s) }
+    hidden = posts.find { |post| labelled.exclude?(nid(post)) }
     assert hidden, "every post is labelled: nothing to show"
 
     point = screen_position(hidden.id)
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{hidden.id}'")
-    hovered = hidden.id
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(hidden)}'")
+    hovered = nid(hidden)
     await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{hovered}')")
 
     box = canvas_box
@@ -1495,7 +1495,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_equal "2", graph["data-nodes"]
     # `data-settled` is written before the frame that writes `data-labelled`.
-    assert await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{a.id}')"), "the focus is always labelled"
+    assert await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{nid(a)}')"), "the focus is always labelled"
 
     click_frame_link { within("[data-mind-graph-focus]") { click_link "2" } }
     await_graph
@@ -1927,7 +1927,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_node(a.id)
     await_frames
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert_selector "[data-mind-graph-card-notes][data-same='yes']"
     assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
     assert_equal 0, page.evaluate_script("window.notesFetches"), "the card's notes were fetched again"
@@ -1959,8 +1959,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # the counts are the point.
   CAPPED_GRAPH = <<~JS.freeze
     ({
-      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
-      tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 6000, shown: 2000, isolated: 1214
+      nodes: [ { id: "post-1", title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: "post-2", title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
+      tags: [], edges: [ { source: "post-1", target: "post-2", kind: "related" } ], total: 6000, shown: 2000, isolated: 1214
     })
   JS
 
@@ -1968,9 +1968,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # more posts than the cap keeps.
   CAPPED_LOCAL_GRAPH = <<~JS.freeze
     ({
-      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
-      tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 2695, shown: 2000,
-      focus: { kind: "post", id: 1, node_id: 1, title: "One", depth: 2 }
+      nodes: [ { id: "post-1", title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: "post-2", title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
+      tags: [], edges: [ { source: "post-1", target: "post-2", kind: "related" } ], total: 2695, shown: 2000,
+      focus: { kind: "post", id: 1, node_id: "post-1", title: "One", depth: 2 }
     })
   JS
 
@@ -1978,11 +1978,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # each also on one of 30 tags. A JavaScript expression, made in the page.
   BIG_GRAPH = <<~JS.freeze
     (() => {
-      const nodes = Array.from({ length: 1500 }, (_, index) => ({ id: index + 1, title: `Post ${index + 1}`, type: "blog", colour_index: 1, status: "live", url: "/post", degree: 3, related_count: 2, tag_count: 1 }))
+      const nodes = Array.from({ length: 1500 }, (_, index) => ({ id: `post-${index + 1}`, title: `Post ${index + 1}`, type: "blog", colour_index: 1, status: "live", url: "/post", degree: 3, related_count: 2, tag_count: 1 }))
       const tags = Array.from({ length: 30 }, (_, index) => ({ id: `tag-${index + 1}`, name: `tag ${index + 1}`, count: 50, degree: 50 }))
       const edges = [
-        ...nodes.slice(1).map((node) => ({ source: node.id - 1, target: node.id, kind: "related" })),
-        ...nodes.map((node) => ({ source: node.id, target: `tag-${(node.id % 30) + 1}`, kind: "tag" }))
+        ...nodes.slice(1).map((node, index) => ({ source: `post-${index + 1}`, target: node.id, kind: "related" })),
+        ...nodes.map((node, index) => ({ source: node.id, target: `tag-${((index + 1) % 30) + 1}`, kind: "tag" }))
       ]
       return { nodes, tags, edges, total: 1500, shown: 1500, isolated: 0 }
     })()
@@ -2082,8 +2082,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     within(LIST) { find("button", text: "Alpha").click }
 
-    assert_equal a.id.to_s, graph["data-selected"]
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{a.id}); return Math.abs(p.x - #{centre[0]}) < 2 && Math.abs(p.y - #{centre[1]}) < 2 })()")
+    assert_equal nid(a), graph["data-selected"]
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(a).to_json}); return Math.abs(p.x - #{centre[0]}) < 2 && Math.abs(p.y - #{centre[1]}) < 2 })()")
     assert_equal zoom, graph["data-zoom"], "centring changed the zoom"
     assert_selector "#{LIST} button[aria-current='true']", text: "Alpha", count: 1
     assert_selector "[data-mind-graph-card] h2", text: "Alpha"
@@ -2107,13 +2107,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     # The last row: one of the chain's two ends, which have one connection.
     last = posts.last
-    row_in_view = "(() => { const list = document.querySelector(#{LIST.to_json}).getBoundingClientRect(); const row = document.querySelector(#{LIST.to_json} + ' button[data-node-id=\"#{last.id}\"]').getBoundingClientRect(); return row.top >= list.top - 1 && row.bottom <= list.bottom + 1 })()"
+    row_in_view = "(() => { const list = document.querySelector(#{LIST.to_json}).getBoundingClientRect(); const row = document.querySelector(#{LIST.to_json} + ' button[data-node-id=\"#{nid(last)}\"]').getBoundingClientRect(); return row.top >= list.top - 1 && row.bottom <= list.bottom + 1 })()"
     assert_not page.evaluate_script(row_in_view), "the row is in view before anything is selected: the list is not long enough for this test"
     scrolled = page.evaluate_script("window.scrollY")
 
     click_node(last.id)
 
-    assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{last.id}']"
+    assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(last)}']"
     await_js(row_in_view)
     assert_equal scrolled, page.evaluate_script("window.scrollY"), "the page scrolled, not the list"
   end
@@ -2129,7 +2129,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     find("#{LIST} button", text: "Alpha").hover
 
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(a)}'")
     assert_not_equal ring_before, pixel_at(point["x"] - 9.5, point["y"]), "no ring round the node whose row is hovered"
     assert_equal "", graph["data-selected"].to_s
 
@@ -2154,7 +2154,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     find("#{LIST} button", text: "Alpha").execute_script("this.focus()")
     page.driver.browser.keyboard.type(:Enter)
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the focus did not move to the card"
     assert_equal "mind-graph-card-title", find("[data-mind-graph-card]")["aria-labelledby"], "the card is not named by its title"
     # Tab meets the card in its reading order: the notes' field, then the actions.
@@ -2290,7 +2290,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: from["x"] + (by[0] / 2), y: from["y"] + (by[1] / 2), steps: steps)
     mouse.move(x: to["x"], y: to["y"], steps: steps)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{id.to_json}); return Math.abs(p.x - #{to["x"]}) < 2 && Math.abs(p.y - #{to["y"]}) < 2 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(id).to_json}); return Math.abs(p.x - #{to["x"]}) < 2 && Math.abs(p.y - #{to["y"]}) < 2 })()")
     mouse.up if release
     to
   end
@@ -2402,8 +2402,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script("if (window.RealWorker) { window.Worker = window.RealWorker; delete window.RealWorker }")
   end
 
+  # A node's id as the data and the page write it (pages spec, decision 4). A
+  # bare number in this file is always a post's id.
+  def nid(record)
+    case record
+    when Integer then "post-#{record}"
+    when String then record
+    when Tag then "tag-#{record.id}"
+    else "#{record.class.name.underscore}-#{record.id}"
+    end
+  end
+
   def screen_position(id)
-    page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{id.to_json})")
+    page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(id).to_json})")
   end
 
   # The canvas's box in client coordinates: left, top, right, bottom.

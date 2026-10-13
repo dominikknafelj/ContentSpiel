@@ -6,15 +6,16 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
   def graph(actor: nil, cap: PostGraph::CAP) = PostGraph::Global.call(actor: actor, cap: cap, url_for: ->(post) { "/cs-studio/posts/#{post.id}" })
 
   def relate(a, b) = PostRelation.create!(post: a, related_post: b)
+  def pid(post) = "post-#{post.id}"
 
   test "a connected post is a node with its title, type, colour index, status, url and degree" do
     a = create_post(title: "Alpha", content_type: "resume_entry")
     b = create_post(title: "Beta")
     relate(a, b)
 
-    node = graph[:nodes].find { |n| n[:id] == a.id }
+    node = graph[:nodes].find { |n| n[:id] == pid(a) }
 
-    assert_equal({ id: a.id, title: "Alpha", type: "resume_entry", colour_index: ContentTypes.fetch("resume_entry").colour_index,
+    assert_equal({ id: pid(a), title: "Alpha", type: "resume_entry", colour_index: ContentTypes.fetch("resume_entry").colour_index,
                    status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1, related_count: 1, tag_count: 0,
                    open_notes: 0 }, node)
   end
@@ -31,8 +32,8 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
 
     nodes = graph[:nodes].index_by { |n| n[:id] }
 
-    assert_equal [ 1, 2, 3 ], nodes[a.id].values_at(:related_count, :tag_count, :degree)
-    assert_equal [ 2, 0, 2 ], nodes[c.id].values_at(:related_count, :tag_count, :degree)
+    assert_equal [ 1, 2, 3 ], nodes[pid(a)].values_at(:related_count, :tag_count, :degree)
+    assert_equal [ 2, 0, 2 ], nodes[pid(c)].values_at(:related_count, :tag_count, :degree)
     nodes.each_value { |node| assert_equal node[:degree], node[:related_count] + node[:tag_count] }
   end
 
@@ -42,8 +43,22 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
 
     result = PostGraph::Global.call(actor: nil, url_for: ->(record) { "/edit/#{record.id}" })
 
-    assert_equal "/edit/#{a.id}", result[:nodes].find { |n| n[:id] == a.id }[:url]
+    assert_equal "/edit/#{a.id}", result[:nodes].find { |n| n[:id] == pid(a) }[:url]
     assert result[:nodes].none? { |n| n.key?(:color) || n.key?(:colour) }, "no colour value: the page draws from the --cs-cat tokens"
+  end
+
+  test "every id in the data is its kind and its database id: nodes, tags and both ends of every edge" do
+    a = create_post(title: "A", tags: [ "shared" ])
+    b = create_post(title: "B", tags: [ "shared" ])
+    relate(a, b)
+
+    result = graph
+    ids = result[:nodes].map { |n| n[:id] } + result[:tags].map { |t| t[:id] }
+
+    assert ids.all? { |id| id.match?(/\A(post|tag)-\d+\z/) }, ids.inspect
+    assert_equal ids.sort, result[:edges].flat_map { |e| [ e[:source], e[:target] ] }.uniq.sort
+    assert_equal "post-12", PostGraph.node_id("post", 12)
+    assert_equal "type-blog", PostGraph.node_id(:type, "blog")
   end
 
   test "each PostRelation row is exactly one edge" do
@@ -51,7 +66,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     b = create_post(title: "B")
     relate(a, b)
 
-    assert_equal [ { source: a.id, target: b.id, kind: "related" } ], graph[:edges]
+    assert_equal [ { source: pid(a), target: pid(b), kind: "related" } ], graph[:edges]
   end
 
   test "a type that isn't registered any more has no colour index" do
@@ -59,7 +74,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     relate(a, create_post(title: "B"))
     a.update_column(:content_type, "gone/thing")
 
-    node = graph[:nodes].find { |n| n[:id] == a.id }
+    node = graph[:nodes].find { |n| n[:id] == pid(a) }
 
     assert_equal [ "gone/thing", nil ], node.values_at(:type, :colour_index)
   end
@@ -70,7 +85,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     scheduled.update_column(:published_at, 2.days.from_now)
     live.update_column(:published_at, 1.day.ago)
 
-    assert_equal({ draft.id => "draft", scheduled.id => "scheduled", live.id => "live" }, graph[:nodes].to_h { |n| [ n[:id], n[:status] ] })
+    assert_equal({ pid(draft) => "draft", pid(scheduled) => "scheduled", pid(live) => "live" }, graph[:nodes].to_h { |n| [ n[:id], n[:status] ] })
   end
 
   test "a post with no connection is left out and counted as isolated" do
@@ -81,7 +96,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
 
     result = graph
 
-    assert_equal [ a.id, b.id ], result[:nodes].map { |n| n[:id] }
+    assert_equal [ pid(a), pid(b) ], result[:nodes].map { |n| n[:id] }
     assert_equal 2, result[:total]
     assert_equal 2, result[:shown]
     assert_equal 1, result[:isolated]
@@ -96,7 +111,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     result = graph
 
     assert_equal [ { id: "tag-#{tag.id}", name: "shared", count: 2, degree: 2 } ], result[:tags]
-    assert_equal [ { source: a.id, target: "tag-#{tag.id}", kind: "tag" }, { source: b.id, target: "tag-#{tag.id}", kind: "tag" } ], result[:edges]
+    assert_equal [ { source: pid(a), target: "tag-#{tag.id}", kind: "tag" }, { source: pid(b), target: "tag-#{tag.id}", kind: "tag" } ], result[:edges]
     assert_equal 1, result[:isolated], "a tag on one post connects nothing"
   end
 
@@ -108,7 +123,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
 
     result = graph(cap: 3)
 
-    assert_equal [ hub.id, spokes[0].id, spokes[1].id ].sort, result[:nodes].map { |n| n[:id] }.sort
+    assert_equal [ pid(hub), pid(spokes[0]), pid(spokes[1]) ].sort, result[:nodes].map { |n| n[:id] }.sort
     assert_equal 5, result[:total]
     assert_equal 3, result[:shown]
     assert result[:edges].all? { |edge| [ edge[:source], edge[:target] ].all? { |id| result[:nodes].any? { |n| n[:id] == id } } }, "an edge points at a post that was cut"
@@ -120,7 +135,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     relate(posts[2], posts[3])
     posts.each_with_index { |post, i| post.update_columns(updated_at: Time.zone.local(2026, 1, 1) + i.days) }
 
-    assert_equal [ posts[2].id, posts[3].id ], graph(cap: 2)[:nodes].map { |n| n[:id] }
+    assert_equal [ pid(posts[2]), pid(posts[3]) ], graph(cap: 2)[:nodes].map { |n| n[:id] }
     assert_equal graph(cap: 2), graph(cap: 2)
   end
 
@@ -144,9 +159,9 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
 
     result = as(users(:author)) { graph(actor: users(:author)) }
 
-    assert_equal own.map(&:id), result[:nodes].map { |n| n[:id] }
+    assert_equal own.map { |post| pid(post) }, result[:nodes].map { |n| n[:id] }
     assert_equal 2, result[:tags].first[:count]
-    assert result[:edges].none? { |edge| edge[:source] == other.id || edge[:target] == other.id }
+    assert result[:edges].none? { |edge| edge[:source] == pid(other) || edge[:target] == pid(other) }
     assert_equal 2, result[:total]
   end
 
@@ -199,7 +214,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     end
 
     nodes = graph[:nodes].index_by { |node| node[:id] }
-    assert_equal [ 2, 0 ], [ nodes[a.id][:open_notes], nodes[b.id][:open_notes] ]
+    assert_equal [ 2, 0 ], [ nodes[pid(a)][:open_notes], nodes[pid(b)][:open_notes] ]
 
     few = capture_sql { graph }.size
     as(users(:two)) { 7.times { Notes::Start.call(b, body: "More") } }

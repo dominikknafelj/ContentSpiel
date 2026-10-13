@@ -7,6 +7,7 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
   setup { site_settings(:default).update!(setup_completed_at: Time.current) }
 
   def data = response.parsed_body
+  def pid(post) = "post-#{post.id}"
 
   test "an unauthenticated request is redirected to sign-in" do
     get "/cs-studio/mind_graph/data"
@@ -26,7 +27,7 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal "application/json", response.media_type
-    assert_equal [ a.id, b.id ], data["nodes"].map { |n| n["id"] }
+    assert_equal [ pid(a), pid(b) ], data["nodes"].map { |n| n["id"] }
     assert_equal [ 2, 2, 1 ], data.values_at("total", "shown", "isolated")
     assert_equal "/cs-studio/posts/#{a.id}", data["nodes"].first["url"]
     assert_nil data["focus"]
@@ -42,10 +43,10 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
 
     get "/cs-studio/mind_graph/data"
-    assert_equal [ [ a.id, 1, false ], [ b.id, 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
+    assert_equal [ [ pid(a), 1, false ], [ pid(b), 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
 
     get "/cs-studio/mind_graph/data", params: { post: b.id }
-    assert_equal [ [ a.id, 1, false ], [ b.id, 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
+    assert_equal [ [ pid(a), 1, false ], [ pid(b), 0, false ] ], data["nodes"].map { |n| [ n["id"], n["open_notes"], n.key?("unread_notes") ] }
   end
 
   test "post= and depth= answer that post's neighbourhood" do
@@ -57,11 +58,11 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     PostRelation.create!(post: b, related_post: c)
 
     get "/cs-studio/mind_graph/data", params: { post: a.id }
-    assert_equal [ a.id, b.id ], data["nodes"].map { |n| n["id"] }
-    assert_equal({ "kind" => "post", "id" => a.id, "node_id" => a.id, "title" => "A", "depth" => 1 }, data["focus"])
+    assert_equal [ pid(a), pid(b) ], data["nodes"].map { |n| n["id"] }
+    assert_equal({ "kind" => "post", "id" => a.id, "node_id" => pid(a), "title" => "A", "depth" => 1 }, data["focus"])
 
     get "/cs-studio/mind_graph/data", params: { post: a.id, depth: 2 }
-    assert_equal [ a.id, b.id, c.id ], data["nodes"].map { |n| n["id"] }
+    assert_equal [ pid(a), pid(b), pid(c) ], data["nodes"].map { |n| n["id"] }
   end
 
   test "tag= answers that tag's neighbourhood" do
@@ -71,7 +72,7 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph/data", params: { tag: tag.id }
 
-    assert_equal [ a.id ], data["nodes"].map { |n| n["id"] }
+    assert_equal [ pid(a) ], data["nodes"].map { |n| n["id"] }
     assert_equal "tag-#{tag.id}", data["focus"]["node_id"]
   end
 
@@ -165,8 +166,8 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/search", params: { q: "rub" }
 
     assert_equal [
-      { "kind" => "post", "id" => post.id, "label" => "Ruby notes", "url" => "/cs-studio/mind_graph?post=#{post.id}" },
-      { "kind" => "tag", "id" => tag.id, "label" => "ruby", "url" => "/cs-studio/mind_graph?tag=#{tag.id}" }
+      { "kind" => "post", "id" => "post-#{post.id}", "record_id" => post.id, "label" => "Ruby notes", "url" => "/cs-studio/mind_graph?post=#{post.id}" },
+      { "kind" => "tag", "id" => "tag-#{tag.id}", "record_id" => tag.id, "label" => "ruby", "url" => "/cs-studio/mind_graph?tag=#{tag.id}" }
     ], data
 
     get "/cs-studio/mind_graph/search"

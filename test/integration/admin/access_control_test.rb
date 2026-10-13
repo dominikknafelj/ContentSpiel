@@ -294,8 +294,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/data"
 
     data = response.parsed_body
-    assert_equal [ @own_post.id, second_own.id ].sort, data["nodes"].map { |node| node["id"] }.sort
-    assert_equal [ { "source" => @own_post.id, "target" => second_own.id, "kind" => "related" } ], data["edges"]
+    assert_equal [ "post-#{@own_post.id}", "post-#{second_own.id}" ].sort, data["nodes"].map { |node| node["id"] }.sort
+    assert_equal [ { "source" => "post-#{@own_post.id}", "target" => "post-#{second_own.id}", "kind" => "related" } ], data["edges"]
   end
 
   test "the post editor names no related post the actor can't read" do

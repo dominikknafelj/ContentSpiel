@@ -52,10 +52,10 @@ module PostGraph
 
       {
         nodes: nodes(post_ids, related_count, tag_count),
-        tags: by_tag.map { |tag_id, rows| { id: "tag-#{tag_id}", name: names[tag_id], count: tag_counts.fetch(tag_id, rows.size), degree: rows.size } }
+        tags: by_tag.map { |tag_id, rows| { id: PostGraph.node_id(:tag, tag_id), name: names[tag_id], count: tag_counts.fetch(tag_id, rows.size), degree: rows.size } }
                     .sort_by { |tag| [ tag[:name].to_s.downcase, tag[:id] ] },
-        edges: related.map { |post_id, related_id| { source: post_id, target: related_id, kind: "related" } } +
-               by_tag.flat_map { |tag_id, rows| rows.map { |_tag_id, post_id| { source: post_id, target: "tag-#{tag_id}", kind: "tag" } } }
+        edges: related.map { |post_id, related_id| { source: PostGraph.node_id(:post, post_id), target: PostGraph.node_id(:post, related_id), kind: "related" } } +
+               by_tag.flat_map { |tag_id, rows| rows.map { |_tag_id, post_id| { source: PostGraph.node_id(:post, post_id), target: PostGraph.node_id(:tag, tag_id), kind: "tag" } } }
       }
     end
 
@@ -69,7 +69,7 @@ module PostGraph
       notes = Notes::Counts.by_container("Post", post_ids.to_a)
       Post.where(id: post_ids).select(*COLUMNS).order(:id).map do |post|
         {
-          id: post.id,
+          id: PostGraph.node_id(:post, post.id),
           title: Locales.read(post, :title, locale: @locale),
           type: post.content_type,
           colour_index: post.definition&.colour_index,

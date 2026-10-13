@@ -38,6 +38,6 @@ module PostGraph
     end
 
     # The id the node carries in the graph's data.
-    def node_id = kind == "tag" ? "tag-#{id}" : id
+    def node_id = PostGraph.node_id(kind, id)
   end
 end

@@ -8,7 +8,8 @@ class PostGraph::SearchTest < ActiveSupport::TestCase
     create_post(title: "Unrelated")
     tag = Tag.find_by!(name: "ruby")
 
-    assert_equal [ { kind: "post", id: post.id, label: "Ruby notes" }, { kind: "tag", id: tag.id, label: "ruby" } ], search("rub")
+    assert_equal [ { kind: "post", id: "post-#{post.id}", record_id: post.id, label: "Ruby notes" },
+                   { kind: "tag", id: "tag-#{tag.id}", record_id: tag.id, label: "ruby" } ], search("rub")
   end
 
   test "a typed % or _ is a character, not a wildcard" do

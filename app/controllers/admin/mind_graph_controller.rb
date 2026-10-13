@@ -49,7 +49,7 @@ module Admin
 
     def search
       rows = PostGraph::Search.call(actor: Current.actor, text: params[:q], locale: admin_locale)
-      render json: rows.map { |row| row.merge(url: admin_mind_graph_path(row[:kind] => row[:id], **admin_url_options)) }
+      render json: rows.map { |row| row.merge(url: admin_mind_graph_path(row[:kind] => row[:record_id], **admin_url_options)) }
     end
 
     private

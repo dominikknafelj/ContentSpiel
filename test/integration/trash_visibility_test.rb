@@ -593,8 +593,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
 
     get "/cs-studio/mind_graph/data"
-    assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, @gone_post.id
-    assert(response.parsed_body["nodes"].none? { |node| node["id"] == @gone_post.id })
+    assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, "post-#{@gone_post.id}"
+    assert(response.parsed_body["nodes"].none? { |node| node["id"] == "post-#{@gone_post.id}" })
     assert_empty response.parsed_body["edges"]
     get "/cs-studio/mind_graph/data", params: { post: @gone_post.id }
     assert_response :not_found
@@ -602,7 +602,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     assert_not_includes response.body, "A note"
     get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
-    assert_equal [ @kept_post.id ], response.parsed_body["nodes"].map { |n| n["id"] }
+    assert_equal [ "post-#{@kept_post.id}" ], response.parsed_body["nodes"].map { |n| n["id"] }
     # The kept post has no thread; the trashed one's are counted nowhere.
     assert_equal [ 0 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }
     # And a kept post's own note is counted, so the zero above is not the
@@ -628,7 +628,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/data"
     data = response.parsed_body
     assert_equal [ { "id" => "tag-#{tag.id}", "name" => "graph-shared", "count" => 2, "degree" => 2 } ], data["tags"]
-    assert_equal [ @kept_post.id, other.id ].sort, data["edges"].select { |e| e["kind"] == "tag" }.map { |e| e["source"] }.sort
+    assert_equal [ "post-#{@kept_post.id}", "post-#{other.id}" ].sort, data["edges"].select { |e| e["kind"] == "tag" }.map { |e| e["source"] }.sort
 
     other.update_column(:trashed_at, Time.current)
     get "/cs-studio/mind_graph/data"
