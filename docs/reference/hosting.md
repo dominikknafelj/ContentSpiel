@@ -244,6 +244,21 @@ While setup is not complete the boot logs `Setup::Token.log_line` (`config/initi
 
 **The plain-HTTP notice** (`Admin::Ui::InsecureNoticeComponent`): in production, on a request that is not `request.ssl?`, "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address." It can only show where the address is an http one or missing, since an https address redirects plain HTTP before it reaches the application. Three layouts draw it: `product` (sign-in and the password pages) and `setup` (every wizard page; the spec did not ask for the wizard, which takes the setup token and the first account's password) for everyone, and `admin` at the top of `<main>`, outside `#content`, for someone who holds `settings.manage` or `system_status.view`, each of which is enough alone (`Admin::BaseController::INSECURE_NOTICE_PERMISSIONS`; `test/integration/admin/insecure_notice_test.rb`: "in the shell settings.manage alone is enough to be told", "in the shell system_status.view alone is enough to be told", "in the shell someone who holds neither right is told nothing").
 
+## The first start's database
+
+`bin/docker-entrypoint` runs `bin/rails db:prepare` before the server. On an empty database that creates it, loads `db/schema.rb` (tables, indexes and keys; no rows) and then runs `db/seeds.rb`; on a database that exists it runs the pending migrations and no seed (`ActiveRecord::Tasks::DatabaseTasks.prepare_all`: the seed is loaded only when a database was initialized by this very run). No way of building a new database runs the migrations' data steps: `db:setup` and `db:schema:load` load the schema too, and since Rails 8 so does `db:migrate` on an empty database.
+
+What a schema load leaves out, and where it comes from instead:
+
+- **The audit log's append-only trigger**: reapplied after every schema load by `config/initializers/db_triggers.rb`.
+- **The four built-in groups** (Admin, Editor, Author, Read only) with their grants: made by `Groups::EnsureBuiltIns`, called at the top of `db/seeds.rb` in every environment and by the setup wizard before every step past the token (so a database built with `db:schema:load` alone, which runs no seed, gets them when the first account is made). Only a group that is missing by name is made; a group that exists is never changed. The two are independent, and the wizard's call is what production relies on when the seed never ran: the seed runs on the FIRST start only, in the run that creates the primary database, so a first start that stopped between loading the primary's schema and seeding (the role may not create the cache, queue or cable database, say) is not seeded by the next one, which finds the primary initialized. The wizard then makes the groups at its first step past the token.
+- **The settings row** and **the content version's row**: made by the application the first time they are needed (`SiteSetting.instance`, `PublicSite.bump_version!`).
+- Everything else a migration ever inserted was computed from content that existed (usage rows, translation states, first published copies), and a new site has none.
+
+Outside development the seed file does nothing else: no account, no content. The first account is the setup wizard's.
+
+**A site that was set up before the groups were made this way** (its Groups screen is empty, or a built-in group is missing): run `bin/rails db:seed` once on the server (with Kamal: `bin/kamal app exec "bin/rails db:seed"`). It makes the missing built-in groups and nothing else, and running it again writes nothing. `db:prepare` will not do it: the database exists, so it is not seeded.
+
 ## What a change can break silently
 
 - **A `..._url` helper or `request.base_url` in a public view** prints the host the client sent into a cacheable page. The guard refuses the line; it does not see an address handed in from a controller outside the scanned set or a `PublicSite::Urls` built with another host.

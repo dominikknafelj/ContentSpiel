@@ -537,8 +537,18 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     Publishing.clear_changes(live)
     block = ContentBlocks::Save.call(ContentBlock.new(owner: live), attributes: { block_type: "rich_text" }).record
     Publishing.clear_changes(live)
-    patch "/cs-studio/pages/#{live.id}/content_blocks/#{block.id}", params: { block: { caption: "Typed" }, base_updated_at: block.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    # A body, which a rich-text block has. This sent `caption`, a field the
+    # type does not use and the controller therefore drops: a save of nothing,
+    # which passed only while every block save marked its page, changed or not.
+    patch "/cs-studio/pages/#{live.id}/content_blocks/#{block.id}", params: { block: { body: rich_doc("Typed").to_json }, base_updated_at: block.reload.updated_at.iso8601(6) }, as: :turbo_stream
     assert_publishing_parts(present: true)
+
+    # And the same form sent again holds what is stored: the chip is answered
+    # without the mark, since nothing changed.
+    Publishing.clear_changes(live)
+    patch "/cs-studio/pages/#{live.id}/content_blocks/#{block.id}", params: { block: { body: rich_doc("Typed").to_json }, base_updated_at: block.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_publishing_parts(present: false)
 
     record = create_post(title: "Post")
     patch "/cs-studio/posts/#{record.id}", params: { post: { title: "Typed" }, base_updated_at: record.reload.updated_at.iso8601(6) }, as: :turbo_stream

@@ -1,4 +1,6 @@
 require "test_helper"
+require_relative "../support/schema_loaded_database"
+require_relative "../support/service_calls"
 
 class SeedsTest < ActiveSupport::TestCase
   # find_or_create_post!/find_or_create_page! (db/seeds.rb) exist specifically
@@ -46,6 +48,34 @@ class SeedsTest < ActiveSupport::TestCase
       assert_no_difference [ "User.count", "Page.count", "Post.count", "PostRelation.count" ] do
         TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end
+    ensure
+      Rails.singleton_class.remove_method :env
+      Rails.singleton_class.alias_method :env, :_original_env
+      Rails.singleton_class.remove_method :_original_env
+    end
+  end
+
+  # A first production start: `db:prepare` loads the schema, which holds no
+  # rows, and then this file. What every environment needs is above the line
+  # that ends it outside development (`Groups::EnsureBuiltIns`).
+  test "outside development the seed makes the built-in groups of a schema-loaded database, no account and no content, and nothing the second time" do
+    extend SchemaLoadedDatabase
+    empty_as_after_a_schema_load
+
+    begin
+      production_env = ActiveSupport::StringInquirer.new("production")
+      Rails.singleton_class.alias_method :_original_env, :env
+      Rails.singleton_class.define_method(:env) { production_env }
+
+      assert_no_difference [ "User.count", "Page.count", "Post.count", "SiteSetting.count" ] do
+        TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
+      end
+      assert_equal [ "Admin", "Author", "Editor", "Read only" ], AccessControl::Group.where(built_in: true).order(:name).pluck(:name)
+      assert_equal AccessControl::Permissions.keys.sort, AccessControl::Group.find_by!(name: "Admin").grants.pluck(:permission).sort
+
+      before = ServiceCalls.digests(except: [])
+      TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
+      assert_equal before, ServiceCalls.digests(except: []), "a second run of the seed wrote something"
     ensure
       Rails.singleton_class.remove_method :env
       Rails.singleton_class.alias_method :env, :_original_env

@@ -37,6 +37,34 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal 3, block.reload.settings_object.limit
   end
 
+  # The editor's autosave sends a form as it stands. One that holds what is
+  # stored (a flush on leaving, a field typed and typed back) is no edit:
+  # `ContentBlocks::Save` used to touch the page for it, which marked a live
+  # page as having unpublished changes with nothing to publish.
+  test "an autosave of a block form that holds what is stored is saved, marks the live page with nothing and moves no base" do
+    body = rich_doc("As it is")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "rich_text" }, translations: { "en" => { body: body } }).record
+    publish_changes(@page)
+    travel 1.minute
+    page_before = @page.reload.attributes.slice("updated_at", "settings_changed_at", "unpublished_changes_at")
+    base = block.reload.updated_at
+
+    assert_no_difference "Audit::Event.count" do
+      patch "#{blocks_path}/#{block.id}", params: { block: { body: body.to_json }, base_updated_at: base.iso8601(6) }, as: :turbo_stream
+    end
+
+    assert_response :success
+    assert_equal base, block.reload.updated_at
+    assert_equal page_before, @page.reload.attributes.slice("updated_at", "settings_changed_at", "unpublished_changes_at")
+    assert_nil @page.unpublished_changes_at
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: rich_doc("Changed").to_json }, base_updated_at: base.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_not_nil @page.reload.unpublished_changes_at, "a real edit still marks the live page"
+    assert_operator block.reload.updated_at, :>, base
+  end
+
   test "saving a block in a section streams its tile's summary, and a block outside one does not" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     inside = @page.content_blocks.create!(block_type: "post_list", section: section, section_column: 1, position: 0)
