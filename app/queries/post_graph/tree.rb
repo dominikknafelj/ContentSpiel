@@ -13,11 +13,11 @@
 #
 # Siblings are ordered by `position`, one without a position after those
 # with one, then by id: the order the Pages screen and the public menu show.
-# The key is `PublicSite::Branch#in_tree_order`'s, written out here as it is
-# in `Admin::PagesScreen::TreeNodeComponent#children` and
-# `Admin::EditorScreen::NewPageFormComponent#choices`, because those three
-# sort records and this sorts ids (`test/queries/post_graph/tree_test.rb`
-# holds the two against each other).
+# The key is `TreeOrder.key` (`app/values/tree_order.rb`), the one rule the
+# public branch, CS Studio's tree and the New page dialog sort records by;
+# this sorts ids from plain rows, so it takes the key and not the sort
+# (`test/queries/post_graph/tree_test.rb` holds it against `TreeOrder.sort`
+# over real pages).
 module PostGraph
   class Tree
     attr_reader :order, :home_id
@@ -31,7 +31,7 @@ module PostGraph
       end
       @children = {}
       @parent.each { |id, parent_id| (@children[parent_id] ||= []) << id if @parent.key?(parent_id) }
-      @children.each_value { |ids| ids.sort_by! { |id| [ position[id].nil? ? 1 : 0, position[id].to_i, id ] } }
+      @children.each_value { |ids| ids.sort_by! { |id| TreeOrder.key(position[id], id) } }
       @home_id = @parent.filter_map { |id, parent_id| id if parent_id.nil? }.min
       @order = []
       @depth = {}

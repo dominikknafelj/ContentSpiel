@@ -49,18 +49,24 @@ class PostGraph::TreeTest < ActiveSupport::TestCase
     assert_equal [ nil, [ 5, 9 ] ], [ PostGraph::Tree.new([ [ 9, 8, 0 ], [ 5, 2, 0 ] ]).home_id, PostGraph::Tree.new([ [ 9, 8, 0 ], [ 5, 2, 0 ] ]).order ]
   end
 
-  # The key is the one CS Studio's tree and the public branch sort by
-  # (`PublicSite::Branch#in_tree_order`): the graph's order is theirs.
+  # The rule is the one CS Studio's tree and the public branch sort by
+  # (`TreeOrder`, whose own test holds the rule): the graph's order is
+  # theirs, asked here of the public branch and of the Pages screen's tree
+  # themselves, over the same pages.
   test "siblings come in the order the Pages screen and the public menu give them" do
     home = root_page
     pages = 5.times.map { |index| create_page(title: "Sibling #{index}") }
     # Afterwards: creating a page renumbers its siblings.
     pages.zip([ 2, nil, 0, nil, 1 ]) { |page, position| page.update_columns(position: position) } # version: none (a test sets a position) # changes: none (a test sets a position)
-    expected = pages.sort_by { |page| [ page.position.nil? ? 1 : 0, page.position.to_i, page.id ] }.map(&:id)
+    pages.each { |page| page.update_columns(published_at: 1.day.ago) } # version: none (a test publishes a page for the public branch) # changes: none (a test publishes a page)
+    PublicSite::Paths.rebuild!
+    expected = [ pages[2], pages[4], pages[0], pages[1], pages[3] ].map(&:id)
 
     tree = PostGraph::Tree.new(Page.pluck(:id, :parent_id, :position))
 
-    assert_equal [ pages[2], pages[4], pages[0], pages[1], pages[3] ].map(&:id), expected
-    assert_equal expected, tree.children(home.id)
+    assert_equal expected, tree.children(home.id) & expected
+    assert_equal expected, TreeOrder.sort(pages.map(&:reload)).map(&:id)
+    assert_equal expected, PublicSite::Branch.new(urls: PublicSite::Urls.new, locale: "en").under(home).children.map(&:id) & expected, "the public branch"
+    assert_equal expected, Admin::PagesScreen::TreeNodeComponent.new(page: home, children_by_parent: Page.kept.to_a.group_by(&:parent_id), locale: "en").children.map(&:id) & expected, "the Pages screen"
   end
 end

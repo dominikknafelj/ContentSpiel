@@ -68,12 +68,12 @@ module Admin
       # The tree's own order, sorted here because the tree is loaded as one
       # list and not through the association: by position, a page without one
       # last (as Postgres sorts a NULL, which is what closure_tree's
-      # `order: "position"` gives the public menu), then by id, the same
-      # order `PublicSite::Branch#in_tree_order` gives a theme's sidebar. The
-      # bare `sort_by(&:position)` this was raised for a row without a
+      # `order: "position"` gives the public menu), then by id: the one rule
+      # of `TreeOrder`, which a theme's sidebar (`PublicSite::Branch`) asks
+      # too. Sorted by the bare column this raised for a row without a
       # position, which the column allows, and the Pages screen was a 500.
       def children
-        children_by_parent.fetch(page.id, []).sort_by { |child| [ child.position.nil? ? 1 : 0, child.position.to_i, child.id ] }
+        ::TreeOrder.sort(children_by_parent.fetch(page.id, []))
       end
 
       def child_count = children.size
