@@ -49,6 +49,12 @@ module Setup
     # site is published at and no secret.
     SITE_ADDRESS_COMMAND = "PUBLIC_HOST=https://www.example.org".freeze
 
+    # What the "Theme" warning offers to copy outside production: the build
+    # of both stylesheets, which reads THEME_PATH as the server does. A
+    # fixed string, like the two above. In production the build is the
+    # image's, which is no one command, and the warning carries none.
+    STYLESHEET_COMMAND = "bin/rails tailwindcss:build".freeze
+
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
     # uploading -- if the upload fails (the case this probe exists to catch),
@@ -87,13 +93,18 @@ module Setup
     # chooses between two true sentences and nothing else. Nobody having
     # said (the console) it is false, the wording of everywhere that is not
     # a developer's machine.
+    #
+    # `theme` is the theme that draws the site (`Theme.current`), handed in so
+    # a test can say it. `stylesheet_probe` answers whether the public
+    # stylesheet was built for that theme: by default, whether the build's
+    # stamp is the theme's fingerprint (`ThemeFolder.stamp`, one small file).
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       mail_delivery_method: ActionMailer::Base.delivery_method,
       mail_smtp_address: ActionMailer::Base.smtp_settings[:address],
       mail_host: ActionMailer::Base.default_url_options[:host],
       address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
-      reset_link_from_request: false)
+      reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -105,10 +116,23 @@ module Setup
       @request_ssl = request_ssl
       @production = production
       @reset_link_from_request = reset_link_from_request
+      @theme = theme
+      @stylesheet_probe = stylesheet_probe || self.class.stylesheet_probe(theme)
+    end
+
+    # Whether the public stylesheet was built for `theme`, in three answers:
+    # true (the build's stamp is the theme's fingerprint), false (it is
+    # another theme's, or an earlier state's of this one) and nil (there is
+    # no stamp: nothing was built in this checkout, or the last build
+    # failed, since a build takes the stamp away before it starts and writes
+    # it after it succeeded, `ThemeCss.build`). The row has a sentence for
+    # each of the two that are not true.
+    def self.stylesheet_probe(theme, root: Rails.root)
+      -> { ThemeFolder.stamp(root)&.then { |stamp| stamp == theme.fingerprint } }
     end
 
     def run
-      [ site_address, https, storage, image_processing, background_jobs, mail ].compact
+      [ site_address, https, theme, storage, image_processing, background_jobs, mail ].compact
     end
 
     private
@@ -165,6 +189,85 @@ module Setup
         else
           warning("HTTPS", "This page was reached over plain HTTP. Passwords and sessions can be read on the way. " \
             "Set PUBLIC_HOST to an https address.")
+        end
+      end
+
+      # Which theme draws the site (theming spec §1): the fact the boot line
+      # says, for someone who does not read the log. The folder's NAME and
+      # not its path, and of the fingerprint its first eight characters:
+      # this page is shown to anyone who may view it, and where a server
+      # keeps its files is nobody's business there.
+      #
+      # And whether the stylesheet is that theme's: the build stamps its
+      # output with the fingerprint of the theme it was built for
+      # (`ThemeCss.stamp!`), and a stamp that is another's, or none, means
+      # the right templates are drawn with the wrong styles. No stamp has a
+      # sentence of its own ("has not been built, or its last build
+      # failed"): a fresh checkout and a failed build were built for no
+      # other theme. For a stamp that is another's, two wordings, because
+      # what a person does about it differs:
+      # - in production the boot already refuses such a stylesheet
+      #   (config/application.rb), so the warning is seen only where that
+      #   check was passed over (a process started with
+      #   SECRET_KEY_BASE_DUMMY), and the remedy is the image's build;
+      # - everywhere else nothing refuses (a development server starts under
+      #   anything), so this row is the one place that says it: THEME_PATH
+      #   set or unset since the last build, a theme's file changed with no
+      #   `theme_css:watch` running to build and stamp again, or, the usual
+      #   cause, a test run: development and test share the built
+      #   stylesheet, and the tests build the default theme's, also under a
+      #   running watch (lib/theme_css.rb). So the sentence does not say
+      #   that bin/dev keeps it built. It names the command, a fixed string.
+      # It costs one small file read. A probe that raises or answers false
+      # is a stylesheet built for another theme (`probe` answers false for
+      # both), and its message is not shown; nil is no build at all.
+      #
+      # FIRST, a theme that was refused when it was last read (a development
+      # reload: `Theme.prepare`). Such a theme has no path, since it brings
+      # nothing, and without this branch the row said "The default theme
+      # draws the site (THEME_PATH is not set)", OK, while a theme was set
+      # and every public page raised. Neither the path nor the refusal's
+      # words are shown: the refusal names the server's path.
+      def theme
+        if @theme.refusal
+          return warning("Theme", "The theme folder was refused when it was last read, and the public site answers with the " \
+            "reason until the folder is corrected. bin/rails theme:check says what is wrong with it.")
+        end
+
+        described = @theme.configured? ? "The theme “#{@theme.name}”" : "The default theme"
+        with = @theme.configured? ? "with THEME_PATH set" : "without THEME_PATH"
+
+        built = probe(@stylesheet_probe)
+        if built
+          if @theme.configured?
+            ok("Theme", "#{described} draws the site (#{@theme.template_count} templates, fingerprint #{@theme.fingerprint[0, 8]}).")
+          else
+            ok("Theme", "#{described} draws the site (THEME_PATH is not set).")
+          end
+        elsif built.nil?
+          # No stamp at all: nothing here "was built for another theme".
+          missing = "#{described} is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+            "is drawn with an earlier build's styles or with none."
+          if @production
+            warning("Theme", "#{missing} Build the site's image again: assets:precompile #{with}.")
+          else
+            warning("Theme", "#{missing} Build it #{with}#{" as the server has it" if @theme.configured?}: run this command, " \
+              "or start bin/dev again. If the build fails, it says why where it runs.", command: STYLESHEET_COMMAND)
+          end
+        elsif @production
+          warning("Theme", "#{described} is set, but the stylesheet was built for another theme, so the site is drawn " \
+            "with the wrong styles. Build the site's image again: assets:precompile #{with}.")
+        else
+          remedy = "run this command, or start bin/dev again."
+          if @theme.configured?
+            warning("Theme", "#{described} is set, but the stylesheet was built for another theme or for an earlier state of " \
+              "this one, so the site is drawn with the wrong styles. A test run does that, also while bin/dev runs: it builds " \
+              "the default theme's stylesheet into the same place. Build the theme's again #{with} as the server has it: #{remedy}",
+              command: STYLESHEET_COMMAND)
+          else
+            warning("Theme", "#{described} is set, but the stylesheet was built for another theme, so the site is drawn with " \
+              "the wrong styles. Build it again #{with}: #{remedy}", command: STYLESHEET_COMMAND)
+          end
         end
       end
 

@@ -50,12 +50,31 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Starter content"
     press "Add starter content"
 
-    assert_selector "h1", text: "Review"
+    # The answer to this press is the slowest of the wizard: the POST is
+    # `StarterContents::Add`, the same service as CS Studio's "Create starter
+    # pages" (three pages, their posts and blocks and every derived row: 639
+    # statements, about a second cold on an idle laptop), and only then the
+    # redirect to this step. On a two-core runner that is more than
+    # Capybara's default 2 s, and nothing was wrong: the failed run still
+    # showed "Starter content" as the heading (the same failure comes from
+    # delaying the service by 2.5 s). So this one assertion waits longer,
+    # as the one after "Create starter pages" does
+    # (test/system/admin/tokens_related_posts_and_starter_pages_test.rb).
+    assert_selector "h1", text: "Review", wait: 10
     assert_text "Blog, Resume and Now pages"
     assert_text "claude-desktop (created)"
     press "Finish setup"
 
-    assert_current_path %r{\A/cs-studio}
+    # The press's own answer is short (`StarterContents::EnsureHome` and
+    # `Setup.complete!`, 11 statements, since the home page is there by
+    # now), but it redirects to CS Studio's dashboard, which this server
+    # draws here for the first time: its queries, every component of the
+    # shell and the admin scripts, all cold. A tenth of a second on an idle
+    # laptop and nobody has measured it on a two-core runner, where the run
+    # that failed stopped one press earlier. The same wait as above, so the
+    # next run does not find out. The wizard's other presses answer with 9
+    # to 25 statements and a page of the wizard, and keep the default.
+    assert_current_path %r{\A/cs-studio}, wait: 10
     visit "/"
     assert_text "Welcome to your new site"
   end

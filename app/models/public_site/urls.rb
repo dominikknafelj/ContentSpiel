@@ -55,7 +55,14 @@ module PublicSite
         @paths[key] = PublicSite::Paths.current_path(record, locale)
       end
       path ||= PublicSite::Paths.post_path(record, locale, PublicSite::Paths.current_path(listed_on, locale)) if @preview && listed_on
-      path && "#{prefix(locale)}#{path}"
+      path_from(path, locale)
+    end
+
+    # The address made of a path ALREADY READ from `public_paths` (several
+    # at once, `PublicSite::Paths.current_paths`): the same prefix, here and
+    # nowhere else. nil for no path.
+    def path_from(stored, locale = I18n.locale)
+      stored && "#{prefix(locale)}#{stored}"
     end
 
     def url_for(record, locale = I18n.locale)

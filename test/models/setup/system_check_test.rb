@@ -6,13 +6,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
   end
 
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "HTTPS", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -114,6 +114,138 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_nil result("HTTPS", run_check(production: false, request_ssl: true))
     # The default is the environment's, and the tests do not run in production.
     assert_nil result("HTTPS", Setup::SystemCheck.run(request_ssl: false))
+  end
+
+  test "without a theme folder the row says the default theme draws the site" do
+    check = result("Theme", run_check(theme: Theme.new))
+
+    assert check.ok?
+    assert_equal "The default theme draws the site (THEME_PATH is not set).", check.message
+    assert_nil check.command
+  end
+
+  test "with a theme folder the row names it, its templates and the start of its fingerprint, and not its path" do
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    check = result("Theme", run_check(theme: theme))
+
+    assert check.ok?
+    assert_equal "The theme “plain” draws the site (#{theme.template_count} templates, fingerprint #{theme.fingerprint[0, 8]}).", check.message
+    assert_not_includes check.message, ThemeTestHelper::PLAIN.dirname.to_s
+  end
+
+  test "in production a stylesheet built for another theme is a warning that says to build again" do
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    check = result("Theme", run_check(theme: theme, production: true, request_ssl: true, stylesheet_probe: -> { false }))
+
+    assert_equal :warning, check.status
+    assert_equal "The theme “plain” is set, but the stylesheet was built for another theme, so the site is drawn with the wrong styles. " \
+      "Build the site's image again: assets:precompile with THEME_PATH set.", check.message
+    assert_nil check.command
+  end
+
+  test "in production the default theme under a stylesheet built with a theme is the same warning, the other way round" do
+    check = result("Theme", run_check(theme: Theme.new, production: true, request_ssl: true, stylesheet_probe: -> { false }))
+
+    assert_equal :warning, check.status
+    assert_equal "The default theme is set, but the stylesheet was built for another theme, so the site is drawn with the wrong styles. " \
+      "Build the site's image again: assets:precompile without THEME_PATH.", check.message
+  end
+
+  # Outside production no boot refuses a stylesheet built for another theme
+  # (a development server starts under anything), so this row is the one
+  # place that says it, with the command that builds it.
+  test "outside production a stylesheet built for another theme is a warning with the command that builds it" do
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    check = result("Theme", run_check(theme: theme, production: false, stylesheet_probe: -> { false }))
+
+    assert_equal :warning, check.status
+    assert_equal "The theme “plain” is set, but the stylesheet was built for another theme or for an earlier state of this one, " \
+      "so the site is drawn with the wrong styles. A test run does that, also while bin/dev runs: it builds the default " \
+      "theme's stylesheet into the same place. Build the theme's again with THEME_PATH set as the server has it: " \
+      "run this command, or start bin/dev again.", check.message
+    assert_equal "bin/rails tailwindcss:build", check.command
+    assert Setup::SystemCheck::STYLESHEET_COMMAND.frozen?
+
+    default = result("Theme", run_check(theme: Theme.new, production: false, stylesheet_probe: -> { false }))
+    assert_equal :warning, default.status
+    assert_includes default.message, "The default theme is set, but the stylesheet was built for another theme"
+    assert_equal "The default theme is set, but the stylesheet was built for another theme, so the site is drawn with the wrong " \
+      "styles. Build it again without THEME_PATH: run this command, or start bin/dev again.", default.message
+    assert_no_match(/keeps it built/, check.message + default.message)
+  end
+
+  # R3 of the re-review. A build takes the stamp away before it starts and
+  # writes it after it succeeded (`ThemeCss.build`), and a fresh checkout
+  # has none: with no stamp nothing "was built for another theme". The probe
+  # answers nil for that, and the row says what is so, with the same command.
+  test "with no stamp at all the row says the stylesheet was not built or its build failed, for either theme, with the command" do
+    default = result("Theme", run_check(theme: Theme.new, production: false, stylesheet_probe: -> { nil }))
+
+    assert_equal :warning, default.status
+    assert_equal "The default theme is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+      "is drawn with an earlier build's styles or with none. Build it without THEME_PATH: run this command, or start bin/dev " \
+      "again. If the build fails, it says why where it runs.", default.message
+    assert_equal "bin/rails tailwindcss:build", default.command
+    assert_no_match(/another theme/, default.message)
+
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    themed = result("Theme", run_check(theme: theme, production: false, stylesheet_probe: -> { nil }))
+
+    assert_equal "The theme “plain” is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+      "is drawn with an earlier build's styles or with none. Build it with THEME_PATH set as the server has it: run this " \
+      "command, or start bin/dev again. If the build fails, it says why where it runs.", themed.message
+    assert_equal "bin/rails tailwindcss:build", themed.command
+
+    production = result("Theme", run_check(theme: theme, production: true, request_ssl: true, stylesheet_probe: -> { nil }))
+    assert_equal "The theme “plain” is set, but the public stylesheet has not been built, or its last build failed, so the site " \
+      "is drawn with an earlier build's styles or with none. Build the site's image again: assets:precompile with THEME_PATH set.",
+      production.message
+    assert_nil production.command
+  end
+
+  test "the row's own probe tells no stamp from another theme's" do
+    Dir.mktmpdir("root") do |root|
+      probe = Setup::SystemCheck.stylesheet_probe(Theme.new, root: root)
+      assert_nil probe.call, "no stamp"
+
+      ThemeCss.stamp!(ThemeFolder.new(nil), root: root)
+      assert_equal true, probe.call
+
+      ThemeCss.stamp!(ThemeFolder.new(ThemeTestHelper::PLAIN), root: root)
+      assert_equal false, probe.call, "another theme's"
+    end
+  end
+
+  test "a probe that raises is a stylesheet that was not built for the theme, and never a path" do
+    check = result("Theme", run_check(theme: Theme.new, stylesheet_probe: -> { raise Errno::EACCES, "/rails/app/assets/builds/theme.stamp" }))
+
+    assert_equal :warning, check.status
+    assert_not_includes check.message, "/rails"
+  end
+
+  # A theme refused on a development reload has no path (it brings nothing),
+  # so the row said "The default theme draws the site (THEME_PATH is not
+  # set)", OK, while a theme was set and every public page raised.
+  test "a theme that was refused when it was last read is a warning that says so, and never the folder's path or the reason's words" do
+    with_theme_copy do |dir|
+      dir.join("views/pages/shwo.html.erb").write("x")
+      refused = Theme.prepare(ThemeFolder.new(dir), reload: true)
+      check = result("Theme", run_check(theme: refused, production: false))
+
+      assert_equal :warning, check.status
+      assert_equal "The theme folder was refused when it was last read, and the public site answers with the reason until the " \
+        "folder is corrected. bin/rails theme:check says what is wrong with it.", check.message
+      assert_not_includes check.message, dir.to_s
+      assert_not_includes check.message, "shwo"
+    end
+  end
+
+  test "the row's own probe reads the build's stamp: this suite's stylesheet is the default theme's" do
+    assert_equal "default", ThemeFolder.stamp(Rails.root), "bin/rails tailwindcss:build stamps the stylesheet the tests read"
+    assert result("Theme", Setup::SystemCheck.run(theme: Theme.new)).ok?
+
+    theme = Theme.load(ThemeFolder.new(ThemeTestHelper::PLAIN))
+    assert_equal :warning, result("Theme", Setup::SystemCheck.run(theme: theme)).status
   end
 
   test "the real storage probe works against the test disk service" do
@@ -247,8 +379,10 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "only the site address and the mail warnings carry a command, each a fixed string" do
     results = run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
       storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
-      mail_host: "example.com")
+      mail_host: "example.com", stylesheet_probe: -> { false })
 
+    # Every row that can warn does. The theme's carries no command in
+    # production, where the build is the image's and no one command.
     assert results.none?(&:ok?)
     assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Outgoing mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
       results.select(&:command).to_h { |check| [ check.label, check.command ] })
@@ -267,7 +401,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       defaults = {
         storage_probe: -> { true }, image_probe: -> { true }, worker_alive_probe: -> { true },
         queue_adapter: "async", mail_delivery_method: :smtp, mail_smtp_address: "smtp.example.org",
-        mail_host: "cms.example.org", address: SiteAddress.parse("https://cms.example.org")
+        mail_host: "cms.example.org", address: SiteAddress.parse("https://cms.example.org"), stylesheet_probe: -> { true }
       }
       Setup::SystemCheck.run(**defaults.merge(overrides))
     end

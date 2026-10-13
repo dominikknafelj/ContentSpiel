@@ -1,0 +1,23 @@
+<article class="plain-page">
+  <%= render "theme/crumb" %>
+  <% if @post.nil? %>
+    <h1><%= translated(@page, :title) %></h1>
+  <% end %>
+  <% body = capture do %><% block_outline(@page).top_level.each do |block| %><%= render_block(block) %><% end %><% end %>
+  <% text, headings = with_heading_ids(body) %>
+  <% if headings.any? %>
+    <ol class="plain-contents">
+      <% headings.each do |heading| %>
+        <li><a href="#<%= heading.id %>"><%= heading.text %></a></li>
+      <% end %>
+    </ol>
+  <% end %>
+  <%= text %>
+  <% previous_page, next_page = neighbouring_pages(page_section(@page)) %>
+  <% if previous_page || next_page %>
+    <nav class="plain-neighbours" aria-label="Previous and next page">
+      <%= link_to previous_page.title, previous_page.path, rel: "prev" if previous_page %>
+      <%= link_to next_page.title, next_page.path, rel: "next" if next_page %>
+    </nav>
+  <% end %>
+</article>

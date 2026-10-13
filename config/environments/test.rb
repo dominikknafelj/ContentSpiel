@@ -57,4 +57,14 @@ Rails.application.configure do
   config.active_record.encryption.primary_key = "bucjIMC1e75jAXYLfrKbf3aIriMMYu2k"
   config.active_record.encryption.deterministic_key = "jlibvbSMI4KFeyeILzWPfJAWGFpJkVgZ"
   config.active_record.encryption.key_derivation_salt = "L0wR0q5UUCl1myUS0fbgkCkLKbvzcLaI"
+
+  # The second theme (`test/fixtures/themes/plain`). Propshaft's load path
+  # and the import map are both fixed when the application starts, and the
+  # suite swaps themes in-process (`Theme.with`), so that theme's images,
+  # fonts and controllers are there from the start, through the same two
+  # doors a real theme's go through at boot (config/initializers/theme.rb,
+  # config/importmap.rb).
+  second_theme = ThemeFolder.new(Rails.root.join("test/fixtures/themes/plain"))
+  second_theme.asset_paths.each { |directory| config.assets.paths << directory.to_s }
+  config.importmap.paths << Rails.root.join("test/fixtures/themes/importmap.rb")
 end

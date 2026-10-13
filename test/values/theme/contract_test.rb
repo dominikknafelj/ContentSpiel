@@ -1,0 +1,184 @@
+require "test_helper"
+
+# THE CONTRACT IS A PROMISE (theming spec §7 and "Risks"): every name in
+# Theme::Contract is one a theme outside this repository relies on, and the
+# CMS says in its release notes when one changes. These tests hold the list
+# to the code, both ways: a name on the list that the code no longer has
+# fails, and so does something a theme can reach that the list forgot.
+#
+# A BLOCK TYPE ADDED LATER joins by one entry per thing it brings
+# (decision 18): its component's line in COMPONENTS and its tokens' lines in
+# THEMED_TOKENS or FIXED_TOKENS. The first test below fails until the first
+# is there and the token test until the second is, each naming the missing
+# entry; the two tests after the first show that it can fail.
+class Theme::ContractTest < ActiveSupport::TestCase
+  include ComponentTestHelper
+
+  TOKENS_CSS = Rails.root.join("app/assets/tailwind/themes/default/tokens.css")
+  COLOUR = /#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/
+
+  # The built-in types' components, by the path the contract names them
+  # under. A name with a slash in it is a plugin's or a test's (`test/quote`,
+  # test/support/test_types.rb, which another test of this process may have
+  # registered): bare names are the built-ins'.
+  def registry_components
+    built_in = ->(definition) { !definition.name.to_s.include?("/") }
+    blocks = BlockTypes.all.select(&built_in).map(&:component)
+    posts = ContentTypes.all.select(&built_in).flat_map { |definition| [ definition.list_component, definition.detail_component ] }
+    (blocks + posts).compact.uniq.map { |component| component.name.underscore }.sort
+  end
+
+  # The one comparison of the registries with the list, as an assertion of
+  # its own so that the tests below can show it failing.
+  def assert_every_registered_component_is_listed
+    missing = registry_components - Theme::Contract::COMPONENTS.keys
+    assert_empty missing,
+      "Theme::Contract::COMPONENTS has no entry for #{missing.map(&:inspect).join(", ")}: a block or content type hands that " \
+      "component out, so its template is a theme's to replace. Add its line to COMPONENTS in app/values/theme/contract.rb, " \
+      "with the methods its template may call"
+  end
+
+  # A component nobody has written, under the name a type's own would have.
+  def unlisted_component(name)
+    Class.new(ApplicationComponent) { define_singleton_method(:name) { name } }
+  end
+
+  test "every component a type registry hands out is on the list, and the list holds nothing else" do
+    assert_every_registered_component_is_listed
+
+    left_over = Theme::Contract::COMPONENTS.keys - registry_components
+    assert_empty left_over, "Theme::Contract::COMPONENTS lists #{left_over.inspect}, which no block or content type hands out"
+  end
+
+  test "a block type registered with a component the list does not hold fails, and the message names the missing entry" do
+    component = unlisted_component("Blocks::CodeComponent")
+    BlockTypes.register("code") do |t|
+      t.label "Code"
+      t.component component
+    end
+
+    error = assert_raises(Minitest::Assertion) { assert_every_registered_component_is_listed }
+
+    assert_includes error.message, %(Theme::Contract::COMPONENTS has no entry for "blocks/code_component")
+    assert_includes error.message, "Add its line to COMPONENTS in app/values/theme/contract.rb"
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "a content type registered with a list component the list does not hold fails the same way" do
+    component = unlisted_component("Posts::GalleryListComponent")
+    ContentTypes.register("gallery") do |t|
+      t.label "Gallery"
+      t.list_component component
+      t.detail_component Posts::DetailComponent
+    end
+
+    error = assert_raises(Minitest::Assertion) { assert_every_registered_component_is_listed }
+
+    assert_includes error.message, %(Theme::Contract::COMPONENTS has no entry for "posts/gallery_list_component")
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "every listed component has its default template and every method its template may call" do
+    Theme::Contract::COMPONENTS.each do |path, methods|
+      assert Rails.root.join("app/components/#{path}.html.erb").file?, "#{path} has no default template"
+      component = path.camelize.constantize
+      methods.each do |name|
+        assert component.method_defined?(name) || component.private_method_defined?(name), "#{component} has no #{name}"
+      end
+    end
+    Theme::Contract::COMPONENT_HELPERS.each do |name|
+      assert ApplicationComponent.method_defined?(name), "a component's template cannot call #{name}"
+    end
+  end
+
+  test "every listed template has its default under app/views, and says what it is" do
+    Theme::Contract::TEMPLATES.each do |path, description|
+      assert Rails.root.join("app/views", path).file?, "#{path} has no default"
+      assert_operator description.length, :>, 15, "#{path} needs its description"
+    end
+  end
+
+  test "what the layout renders of the theme's is on the list, and what is the CMS's is not" do
+    %w[layouts/public/_frame layouts/public/_title layouts/public/_icons layouts/public/_head pages/show pages/not_found].each do |name|
+      assert Theme::Contract::TEMPLATES.key?("#{name}.html.erb"), "#{name} is not replaceable"
+    end
+    %w[layouts/application pages/_seo_meta shared/_theme_head layouts/public/_preview_banner].each do |name|
+      assert_not Theme::Contract::TEMPLATES.key?("#{name}.html.erb"), "#{name} is the CMS's and must not be replaceable"
+    end
+  end
+
+  test "every listed helper is one a template can call" do
+    available = ThemeHelper.public_instance_methods + PagesHelper.public_instance_methods
+
+    Theme::Contract::HELPERS.each { |name| assert_includes available, name.to_sym }
+  end
+
+  test "every token is defined, a themed one for light and for dark, and no other --th- name is" do
+    css = TOKENS_CSS.read
+    names = ->(block) { block.to_s.scan(/(--th-[\w-]+):/).flatten }
+    light = names.(css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1])
+    dark = names.(css[/^\[data-theme="dark"\]\s*\{(.*?)\}/m, 1])
+    fixed = names.(css[/^:root \{(.*?)\}/m, 1])
+    own = ->(list) { list.grep(Theme::Contract::OWN_TOKENS) }
+    prefixed = ->(list) { list.map { |name| "--th-#{name}" }.sort }
+    # Which names one side has and the other has not, so a token added to the
+    # stylesheet without its line (or the reverse) is named in the failure.
+    differ = lambda do |list, block, constant, where|
+      listed = prefixed.(list)
+      defined = (block - own.(block)).sort
+      assert_equal listed, defined,
+        "Theme::Contract::#{constant} and #{where} of tokens.css differ. Defined but not listed (add each to #{constant} in " \
+        "app/values/theme/contract.rb, without the --th- prefix): #{(defined - listed).inspect}. Listed but not defined: #{(listed - defined).inspect}"
+    end
+
+    assert_not_empty light
+    assert_not_empty dark
+    assert_not_empty fixed
+    differ.(Theme::Contract::THEMED_TOKENS, light, "THEMED_TOKENS", "the light block")
+    differ.(Theme::Contract::THEMED_TOKENS, dark, "THEMED_TOKENS", "the dark block")
+    differ.(Theme::Contract::FIXED_TOKENS, fixed, "FIXED_TOKENS", "the fixed block")
+    assert_equal Theme::Contract::TOKENS.sort, (prefixed.(Theme::Contract::THEMED_TOKENS) + prefixed.(Theme::Contract::FIXED_TOKENS)).sort
+    assert_equal %w[--th-ph-a --th-ph-b --th-preview-bg --th-preview-ink], own.(light + fixed).sort, "the CMS's own tokens"
+    assert_empty Theme::Contract::TOKENS.grep(Theme::Contract::OWN_TOKENS)
+    assert_equal names.(css).uniq.sort, (light + dark + fixed).uniq.sort, "a --th- token is defined outside the three blocks"
+  end
+
+  test "the default theme's styles and templates hold no colour literal: tokens.css is the one place" do
+    styles = %w[theme.css prose.css sections.css].map { |name| Rails.root.join("app/assets/tailwind/themes/default", name) }
+    styles.each { |path| assert_no_match COLOUR, path.read, "#{path.basename} holds a colour" }
+
+    templates = Theme::Contract::TEMPLATES.keys.map { |path| Rails.root.join("app/views", path) } +
+      Theme::Contract::COMPONENTS.keys.map { |path| Rails.root.join("app/components/#{path}.html.erb") }
+    templates.each do |path|
+      assert_no_match(/\[#\h{3,8}\]|\brgba?\(|\bhsla?\(|\boklch\(|style=/, path.read, "#{path} holds a colour or an inline style")
+    end
+  end
+
+  test "the default theme's tokens file imports nothing and names no block" do
+    css = TOKENS_CSS.read
+
+    assert_no_match(/@import/, css)
+    assert_no_match(/content-block|content-section|cs-prose/, css)
+  end
+
+  test "a rendered text is the elements the contract lists, under no class of its own" do
+    page = root_page
+    block = page.content_blocks.create!(block_type: :rich_text, position: 0,
+      body: rich_doc("## Two\n\n### Three\n\n#### Four\n\nA **bold** *slanted* ~~struck~~ `code` [link](https://example.org) line.\n\n" \
+                     "- one\n\n1. first\n\n> quoted\n\n```\nsource\n```\n\n---"))
+
+    render_inline(Blocks::RichTextComponent.new(block: block, page: page))
+    body = Nokogiri::HTML5.fragment(rendered_content).at_css(".cs-prose")
+
+    %w[h2 h3 h4 p ul ol li blockquote a strong em s code pre hr].each do |element|
+      assert_includes Theme::Contract::RICH_TEXT, element
+      assert body.at_css(element), "the text was rendered with no <#{element}>"
+    end
+    assert_includes Theme::Contract::RICH_TEXT, "pre code"
+    assert body.at_css("pre code")
+    assert_empty body.css("[class]").map { |node| node["class"] }, "a text's own elements carry no class: a theme styles them by element"
+    assert_empty body.css("*").map(&:name).uniq - Theme::Contract::RICH_TEXT, "an element a text renders is not in Theme::Contract::RICH_TEXT"
+  end
+end

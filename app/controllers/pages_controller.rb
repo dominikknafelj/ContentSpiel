@@ -70,6 +70,11 @@ class PagesController < PublicController
       #   only with published content, so without it a deploy that changed a
       #   component, the layout or the stylesheet's digest would keep being
       #   answered 304 until somebody published something;
+      # - the theme's fingerprint (`Theme.current.fingerprint`, theming spec
+      #   §6): a site's image rebuilt on the same CMS image with a changed
+      #   theme moves none of the revision's three sources in a way that is
+      #   promised, and a template the theme replaced is as much "what the
+      #   response is built from" as one of the CMS's;
       # - the year, which the footer prints: a 304 on 1 January would
       #   otherwise confirm last year's copyright line;
       # - with no site address configured, the request's origin
@@ -84,7 +89,7 @@ class PagesController < PublicController
       # is actually rendered.
       expires_in 0, public: true, must_revalidate: true
       keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) } # public: rows (the ETag names the copy's id, not content)
-      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year, *origin_etag_key ], public: true)
+      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Time.current.year, *origin_etag_key ], public: true)
         assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
         preload_page_images(@page)
         render :show

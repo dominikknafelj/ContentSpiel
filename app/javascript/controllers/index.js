@@ -2,11 +2,13 @@
 //
 // On its own (imported by the `application` entry point) this registers the
 // site's own controllers -- everything under `controllers/` except CS
-// Studio's `controllers/admin/*`. Those are registered by the separate
-// `admin` entry point (app/javascript/admin.js, final fix wave D), which
-// only CS Studio's layout imports, so a public page never imports -- or,
-// per config/importmap.rb's `preload: "admin"`, even modulepreloads -- an
-// admin controller, the editor, or anything they import.
+// Studio's `controllers/admin/*` and a theme's `controllers/theme/*`. CS
+// Studio's are registered by the separate `admin` entry point
+// (app/javascript/admin.js, final fix wave D), which only CS Studio's layout
+// imports, so a public page never imports -- or, per config/importmap.rb's
+// `preload: "admin"`, even modulepreloads -- an admin controller, the editor,
+// or anything they import. A theme's are registered by the `site` entry
+// point (app/javascript/site.js), which only the public layout imports.
 //
 // Eager: each controller is imported and registered as soon as the page
 // loads (a dynamic `import()` per controller, as stimulus-loading's own
@@ -30,4 +32,4 @@ export function registerControllers(include) {
     })
 }
 
-registerControllers((path) => !path.startsWith("controllers/admin/"))
+registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/"))

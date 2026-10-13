@@ -60,4 +60,17 @@ class Blocks::ImageComponentTest < ActiveSupport::TestCase
 
     assert_no_selector "figure"
   end
+
+  # A theme's template may call these without the default template's guard
+  # around them (theming spec §3): each answers nil for a block with no image.
+  test "alt, caption and asset answer nil for a block with no image, and sizes still answers" do
+    page = root_page
+    block = page.content_blocks.create!(block_type: :image, position: 0)
+    component = Blocks::ImageComponent.new(block: block, page: page)
+
+    assert_nil component.send(:asset)
+    assert_nil component.send(:alt)
+    assert_nil component.send(:caption)
+    assert_equal Blocks::ImageComponent::SIZES, component.send(:sizes)
+  end
 end

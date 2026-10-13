@@ -1,5 +1,7 @@
 require "test_helper"
 require "open3"
+require "tmpdir"
+require "fileutils"
 
 # Production is wired to `HostSettings`, and nothing else in the suite knows:
 # every other test of hosts, HTTPS and HSTS hands `HostSettings.apply` a
@@ -18,8 +20,12 @@ require "open3"
 # without a secret; the secret check has its tests in `host_settings_test.rb`
 # and is not booted for here.
 #
-# Each boot is about three seconds, so there are three and no more: an https
-# address, none, and a value that is no address.
+# Each boot is about three seconds, so there are seven and no more: an https
+# address, none, and a value that is no address; and for the theme, a
+# folder, a path that is none, a folder with a file the contract does
+# not name (`Theme::Check`, run by `Theme.load` in `to_prepare`: the one
+# proof that the contract is checked when the application starts), and a
+# folder the stylesheet was not built for.
 class ProductionBootTest < ActiveSupport::TestCase
   SCRIPT = <<~'RUBY'.freeze
     config = Rails.application.config
@@ -29,6 +35,7 @@ class ProductionBootTest < ActiveSupport::TestCase
     puts "hsts: #{config.ssl_options[:hsts].inspect}"
     puts "mailer: #{config.action_mailer.default_url_options.inspect}"
     puts "health check excluded: #{[ config.host_authorization[:exclude], config.ssl_options.dig(:redirect, :exclude) ].all? { |rule| rule.equal?(HostSettings::HEALTH_CHECK) }}"
+    puts "theme: #{Theme.current.name} #{Theme.current.fingerprint}"
   RUBY
 
   test "production with an https address answers that host alone, forces HTTPS, mails the address and says so at boot" do
@@ -59,6 +66,8 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_includes lines, "mailer: {}"
     assert_includes lines, "[ContentSpiel] PUBLIC_HOST is not set. Any host name is accepted and nothing is forced to HTTPS."
     assert_includes lines, HostSettings.log_level_warning({ "RAILS_LOG_LEVEL" => "debug" })
+    assert_includes lines, "[ContentSpiel] Theme: the default theme (THEME_PATH is not set)"
+    assert_includes lines, "theme: default default"
   end
 
   test "production with a PUBLIC_HOST that is no address does not start, and says which variable without repeating it" do
@@ -70,6 +79,66 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_no_match(/hunter2|docs\.example\.org|hosts:/, printed)
   end
 
+  # The theme is a COPY OUTSIDE THE APPLICATION, with an image, a font and a
+  # controller in it, because that is what every real site's theme is: a
+  # folder beside the application whose own asset folders the boot puts on
+  # the load path. Booted from the fixture inside the application, this test
+  # was green while no such site started (`Theme::Check.cms_asset_roots`
+  # took the theme's own folders for a gem's).
+  test "production under a theme folder outside the application says which at boot, and the application's theme is that folder" do
+    Dir.mktmpdir("site") do |site|
+      plain = Pathname(site).join("plain")
+      FileUtils.cp_r(Rails.root.join("test/fixtures/themes/plain"), plain)
+      plain.join("assets/fonts").mkpath
+      plain.join("assets/fonts/plain-sans.woff2").write("x")
+      assert_not plain.to_s.start_with?("#{Rails.root}/")
+      assert_equal 3, ThemeFolder.new(plain).asset_paths.size, "an image, a font and a controller"
+
+      printed, status = boot_production("THEME_PATH" => plain.to_s)
+      lines = printed.lines(chomp: true)
+
+      assert status.success?, printed
+      assert_includes lines, ThemeFolder.announcement(ThemeFolder.new(plain))
+      assert_includes lines, "theme: plain #{ThemeFolder.new(plain).fingerprint}"
+    end
+  end
+
+  test "production with a THEME_PATH that names no folder does not start, and says which variable and which path" do
+    printed, status = boot_production("THEME_PATH" => "/no/such/theme/anywhere")
+
+    assert_not status.success?, printed
+    assert_includes printed, "THEME_PATH names no directory: /no/such/theme/anywhere"
+    assert_includes printed, "ThemeFolder::Invalid"
+    assert_no_match(/^hosts:/, printed)
+  end
+
+  test "production with a theme folder that holds a file the contract does not name does not start, and names the file" do
+    Dir.mktmpdir("theme") do |dir|
+      FileUtils.mkdir_p(File.join(dir, "views/pages"))
+      File.write(File.join(dir, "views/pages/shwo.html.erb"), "x")
+
+      printed, status = boot_production("THEME_PATH" => dir)
+
+      assert_not status.success?, printed
+      assert_includes printed, "ThemeFolder::Invalid"
+      assert_includes printed, "views/pages/shwo.html.erb is not part of the theme contract"
+      assert_no_match(/^hosts:/, printed)
+    end
+  end
+
+  # The one boot here with a real secret: with SECRET_KEY_BASE_DUMMY the
+  # stylesheet's stamp is not asked, because that is how the image's own
+  # `assets:precompile` starts production before the stylesheet exists.
+  test "production under a theme whose stylesheet was not built for it does not start, and says how to build" do
+    plain = Rails.root.join("test/fixtures/themes/plain")
+    printed, status = boot_production("THEME_PATH" => plain.to_s, "SECRET_KEY_BASE_DUMMY" => nil, "SECRET_KEY_BASE" => "x" * 64)
+
+    assert_not status.success?, printed
+    assert_includes printed, "ThemeFolder::Invalid"
+    assert_includes printed, "the stylesheet was built for another theme: run assets:precompile with THEME_PATH set"
+    assert_no_match(/^hosts:/, printed)
+  end
+
   private
     BOOT_SECONDS = 90
 
@@ -79,7 +148,7 @@ class ProductionBootTest < ActiveSupport::TestCase
     def boot_production(variables)
       env = {
         "RAILS_ENV" => "production", "SECRET_KEY_BASE_DUMMY" => "1",
-        "PUBLIC_HOST" => nil, "SITEMAP_HOST" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
+        "PUBLIC_HOST" => nil, "SITEMAP_HOST" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
         "SECRET_KEY_BASE" => nil, "RAILS_MASTER_KEY" => nil, "DATABASE_URL" => nil, "ADMIN_PATH" => nil,
         "OTEL_EXPORTER_OTLP_ENDPOINT" => nil, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => nil, "OTEL_CONSOLE" => nil
       }.merge(variables)

@@ -150,6 +150,56 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select ".page-children", count: 0
   end
 
+  # Theming spec §7: the tree and previous/next a theme's template asks for
+  # (`PublicSite::Branch`), drawn here by the second theme. A page in the
+  # trash has no address, which alone would keep it out of a branch, so this
+  # one is put there around the callbacks: its address row is STILL STORED,
+  # and only the narrowing on the rows (`kept`) keeps it out.
+  test "a theme's page tree and previous and next leave out a trashed page whose address is still stored, publicly and in preview" do
+    guide = create_page(title: "Guide")
+    create_page(title: "First leaf", parent: guide)
+    gone = create_page(title: "Gone leaf", parent: guide)
+    create_page(title: "Last leaf", parent: guide)
+    gone.update_columns(trashed_at: Time.current) # version: none (a test puts a row in the trash around the callbacks, so that its address stays)
+    assert PublicPath.current.exists?(record_type: "Page", record_id: gone.id, locale: "en"), "the address is gone: this test would pass without the narrowing"
+
+    with_plain_theme { get "/guide/first-leaf" }
+
+    assert_response :success
+    assert_select "nav.plain-tree a", text: "First leaf"
+    assert_select "nav.plain-tree a", text: "Last leaf"
+    assert_select "nav.plain-neighbours a[rel=next]", text: "Last leaf"
+    assert_not_includes response.body, "Gone leaf"
+
+    sign_in_as users(:one)
+    with_plain_theme { get "/preview/guide/first-leaf" }
+
+    assert_response :success
+    assert_select "nav.plain-tree a", text: "Last leaf"
+    assert_not_includes response.body, "Gone leaf"
+  end
+
+  # The same for the pages above a page: a branch is trashed as a whole, so
+  # a kept page under a trashed one exists only around the callbacks.
+  test "a theme's crumbs leave out a trashed page above, publicly and in preview" do
+    guide = create_page(title: "Guide")
+    gone = create_page(title: "Gone part", parent: guide)
+    create_page(title: "Deep leaf", parent: gone)
+    gone.update_columns(trashed_at: Time.current) # version: none (a test puts a row in the trash around the callbacks, so that the page under it keeps its address)
+
+    with_plain_theme { get "/guide/gone-part/deep-leaf" }
+    assert_response :success
+    assert_select "p.plain-crumb a", text: "Guide"
+    assert_not_includes response.body, "Gone part"
+
+    sign_in_as users(:one)
+    with_plain_theme { get "/preview/guide/gone-part/deep-leaf" }
+
+    assert_response :success
+    assert_select "p.plain-crumb a", text: "Guide"
+    assert_not_includes response.body, "Gone part"
+  end
+
   test "a post list block never lists a trashed post, published or not" do
     block = @blog.content_blocks.listing.sole
     assert_includes block.listed_posts, @kept_post

@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# The two halves of "a site's image on top of the CMS's" that are the CMS's
+# own (theming spec §4 and §9), tried with the second theme, COPIED TO A
+# FOLDER OUTSIDE THE APPLICATION with an image, a font and a controller in
+# it. That is what every real site's theme is (`/rails/site-theme`, a
+# checkout beside this one), and a check that only ever saw the fixture
+# inside the application was green while no such site started:
+#
+#   1. the stylesheet builds with THEME_PATH set, and holds the default
+#      theme's styles, the theme's styles and the utilities of the theme's
+#      templates;
+#   2. production starts under that theme with that stylesheet (the stamp is
+#      the theme's), says which theme at boot, and has the theme's
+#      controller in its import map and its image on the asset path, and
+#      serves the stylesheet with the theme's image at its digested address;
+#   3. the theme passes the DEEP check (`Theme::Check`, `deep: true`): the
+#      boot reads names and sources, and only this compiles every template
+#      and reads it for the request, so a template with a syntax error fails
+#      here, at the build, and not at a visitor's request. The check is
+#      then shown to be awake: a copy of the theme with one broken template
+#      must be refused.
+#
+# Not in the test suite: it writes app/assets/builds, which every other test
+# reads, so it is never run while tests run. CI runs it after the unit
+# tests (.github/workflows/ci.yml). On the way out it builds the default
+# stylesheet again, so a laptop is left with the default theme's (under a
+# THEME_PATH of the shell's own, build again: bin/rails tailwindcss:build);
+# when that rebuild fails the script says so and ends non-zero, whatever
+# came before.
+#
+# The production commands are given no DATABASE_URL, as the production boots
+# of test/lib/production_boot_test.rb are not: nothing here asks a database,
+# and none that a runner happens to name is to be asked.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+scratch="$(mktemp -d)"
+theme="$scratch/plain"
+cp -R "$PWD/test/fixtures/themes/plain" "$theme"
+mkdir -p "$theme/assets/fonts"
+printf 'x' > "$theme/assets/fonts/plain-sans.woff2"
+case "$theme/" in "$PWD"/*) echo "theme-build-check: the copy of the theme is inside the application ($theme)" >&2; exit 1 ;; esac
+css="app/assets/builds/theme.css"
+secret="$(printf 'x%.0s' $(seq 1 64))"
+
+restore() {
+  status=$?
+  rm -rf "$scratch"
+  if ! env -u THEME_PATH bin/rails theme_css:build > /dev/null 2>&1; then
+    echo "theme-build-check: the default stylesheet could not be built again: run bin/rails tailwindcss:build" >&2
+    [ "$status" -ne 0 ] || status=1
+  fi
+  exit "$status"
+}
+trap restore EXIT
+
+need() {
+  if ! grep -q -- "$1" "$css"; then
+    echo "theme-build-check: the built stylesheet lacks $2 ($1)" >&2
+    exit 1
+  fi
+}
+
+env -u DATABASE_URL THEME_PATH="$theme" RAILS_ENV=production SECRET_KEY_BASE_DUMMY=1 bin/rails theme_css:build
+
+need '--th-paper' "the default theme's tokens"
+need 'max-w-3xl' "a utility of the default theme's templates"
+need 'cs-prose' "the default theme's rich-text rules"
+need '#123456' "the theme's accent"
+need 'plain-frame' "the theme's own rule"
+need 'mt-\\\[7px\\\]' "a utility used only in the theme's templates"
+need 'url(plain-mark.svg)' "the theme's image, named by its file name alone"
+
+# The assignment is the condition of an `if`: under `set -e` a bare
+# `printed="$(...)"` whose command fails ends the script on that line, with
+# what the boot printed never shown, and that output is the reason.
+if ! printed="$(env -u DATABASE_URL THEME_PATH="$theme" RAILS_ENV=production SECRET_KEY_BASE="$secret" bin/rails runner '
+  names = Struct.new(:nothing) { def path_to_asset(path) = path }.new
+  imports = JSON.parse(Rails.application.importmap.to_json(resolver: names, cache_key: :theme_build_check))["imports"]
+  puts "theme: #{Theme.current.name}"
+  puts "built: #{ThemeFolder.current.built?(Rails.root)}"
+  puts "pin: #{imports["controllers/theme/hello_controller"]}"
+  puts "script: #{Rails.application.assets.load_path.find("controllers/hello_controller.js") ? "found" : "missing"}"
+  puts "image: #{Rails.application.assets.load_path.find("plain-mark.svg") ? "found" : "missing"}"
+  puts "font: #{Rails.application.assets.load_path.find("plain-sans.woff2") ? "found" : "missing"}"
+  puts "outside: #{!ThemeFolder.current.path.to_s.start_with?("#{Rails.root}/")}"
+  assets = Rails.application.assets.load_path
+  digested = assets.find("plain-mark.svg")&.digested_path.to_s
+  served = assets.find("theme.css")&.compiled_content.to_s
+  puts "image in the served stylesheet: #{digested.match?(/\Aplain-mark-\h+\.svg\z/) && served.include?("/assets/#{digested}") ? "digested" : "not digested (#{digested.inspect})"}"
+  puts "stamp an asset: #{assets.assets.any? { |asset| asset.logical_path.to_s.include?("stamp") }}"
+  problems = Theme::Check.problems(ThemeFolder.current, deep: true)
+  puts "deep check: #{problems.empty? ? "sound" : problems.join(" | ")}"
+  require "tmpdir"
+  Dir.mktmpdir("theme") do |copy|
+    FileUtils.cp_r("#{ThemeFolder.current.path}/.", copy)
+    File.write(File.join(copy, "views/theme/_broken.html.erb"), "<% if true %>\n")
+    broken = Theme::Check.problems(ThemeFolder.new(copy), deep: true)
+    puts "deep check of a broken template: #{broken.grep(/_broken\.html\.erb does not compile/).size == 1 && broken.size == 1 ? "refused" : broken.inspect}"
+  end
+' 2>&1)"; then
+  echo "theme-build-check: production did not start under the theme, or the check in it raised:" >&2
+  echo "$printed" >&2
+  exit 1
+fi
+
+for line in "Theme: $theme (" "theme: plain" "built: true" "pin: controllers/hello_controller.js" "script: found" "image: found" "font: found" "outside: true" \
+            "image in the served stylesheet: digested" "stamp an asset: false" \
+            "deep check: sound" "deep check of a broken template: refused"; do
+  if ! grep -qF -- "$line" <<< "$printed"; then
+    echo "theme-build-check: production under the theme did not print \"$line\":" >&2
+    echo "$printed" >&2
+    exit 1
+  fi
+done
+
+echo "theme-build-check: ok"

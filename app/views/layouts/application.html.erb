@@ -1,11 +1,47 @@
 <!DOCTYPE html>
-<html lang="<%= I18n.locale %>"<%= " class=\"scroll-pt-9\"".html_safe if content_for?(:preview_banner) %>>
+<%# THE PUBLIC LAYOUT IS THE CMS'S AND NO THEME REPLACES IT (theming spec §2,
+    decision 10). What a site breaks without is written here; what is look or
+    voice is one of four partials a theme replaces, each with the default
+    theme's as the fallback:
+
+      layouts/public/_title   the pattern of the page title
+      layouts/public/_icons   the favicon and the touch icon
+      layouts/public/_head    the theme's own tags (fonts, theme-colour)
+      layouts/public/_frame   everything inside <body> but the preview bar
+
+    The CMS's tags, which a theme cannot remove: the <title> element, the
+    viewport, the CSP tag, the script that picks light or dark before the
+    first paint, the description and Open Graph tags (pages/_seo_meta), the
+    canonical and language links, the stylesheet link and the import map.
+    `test/integration/theme_pages_test.rb` ("every tag the CMS writes into
+    the head is there exactly once under both themes, ahead of the theme's
+    own") holds the list. A theme's `_head` can print more markup, a tag of
+    the same name included: the CMS's own are printed once and first, and
+    refusing such a `_head` is the folder check's. %>
+<html lang="<%= I18n.locale %>"<%= " class=\"scroll-pt-9\"".html_safe if @preview_record %>>
   <head>
-    <title><%= content_for(:title) || "ContentSpiel" %></title>
+    <%# Whether the response describes a record, for the title here and the
+        description and Open Graph tags below.
+
+        Not for a 404, and the response's status is what says so, not
+        `@page`: a 404 can have a record in hand (`assign_record` assigns
+        the page and the post before it finds that no block lists the post,
+        and the preview answers 404 for a post whose listing page the editor
+        may not read), and its title and description are not a 404's to
+        print. While pages/show rendered the tags, not rendering pages/show
+        was the guard
+        (`test/integration/theme_pages_test.rb`: "a 404 that had a record in
+        hand describes none"). %>
+    <% described = page_found? %>
+    <%# The title's text is asked for here and not read from a
+        `content_for(:title)` slot: `content_for` appends, so a theme's
+        template that wrote to the slot would have its text put in front of
+        the page's ("HijackAbout – Site"). The pattern is the theme's
+        (layouts/public/_title); the element and what goes into it are not
+        (`test/integration/theme_pages_test.rb`: "a theme's template that
+        writes to the title's slot changes no title"). %>
+    <title><%= described ? document_title(@page, post: @post) : themed_title(page_title: nil, site_title: Locales.read(Current.site, :title)) %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="ContentSpiel">
-    <meta name="mobile-web-app-capable" content="yes">
     <%# No csrf_meta_tags (spec §6.4): PublicController serves the same
         cookie-less response to every visitor, and Rails only reads/writes
         the session -- which would set a cookie on an otherwise anonymous,
@@ -13,17 +49,34 @@
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
 
-    <%= yield :head %>
+    <%# The description and the Open Graph tags, printed here by the layout
+        and not read from a `content_for(:head)` slot, for the reason the
+        title is not: the page is rendered before the layout, `content_for`
+        appends, and a theme's page or block template that wrote to the slot
+        would have its tags printed here, among the CMS's own and ahead of
+        the description. The theme's part of the head is
+        layouts/public/_head, below
+        (`test/integration/theme_pages_test.rb`: "a theme's template that
+        writes to the head's slot puts nothing into the head"; the folder
+        check refuses a template that writes to the slot, `Theme::Check`). %>
+    <%= render "pages/seo_meta", page: @page, post: @post if described %>
 
     <%# hreflang alternates (spec §6.5): every enabled language's URL for the
         page or post currently shown, plus x-default pointing search engines
-        at the site's own default language rather than making them guess. %>
-    <% if (alternate_record = @post || @page) %>
+        at the site's own default language rather than making them guess.
+
+        Not for a 404, by the response's status and not by the record, for
+        the reason above: a 404 can have a page and a post in hand, and a
+        canonical link or an alternate on it would name the missing page as
+        the record's own address in every language
+        (`test/integration/theme_pages_test.rb`: "a 404 that had a record in
+        hand names no canonical address and no other language's, in the
+        preview and in public"). %>
+    <% if page_found? && (alternate_record = @post || @page) %>
       <%# The one address of what is shown: the record's own in this language,
           on the site's configured address, with no query string -- so
           `/about?utm=1` and a request under any other `Host` name the same
-          page. Not in a preview (its addresses are not the public's), and
-          not for a 404, where there is no record. %>
+          page. Not in a preview (its addresses are not the public's). %>
       <% if !public_urls.preview? && (canonical_url = public_urls.url_for(alternate_record)) %>
         <link rel="canonical" href="<%= canonical_url %>">
       <% end %>
@@ -35,22 +88,23 @@
       <% end %>
     <% end %>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+    <%= render "layouts/public/icons" %>
+    <%= render "layouts/public/head" %>
 
-    <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# The public theme only (spec §9) -- never the product stylesheet. %>
-    <%= stylesheet_link_tag "theme-default", "data-turbo-track": "reload" %>
-    <%= javascript_importmap_tags %>
+    <%# The one public stylesheet (theming spec §4): the default theme's
+        styles and then the theme's, built together (`ThemeCss`) -- never the
+        product stylesheet. `site` is the public site's entry point:
+        `application` plus the theme's controllers (app/javascript/site.js). %>
+    <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags "site" %>
   </head>
 
   <%# In a preview the bar (layouts/public/_preview_banner) is fixed to the
       top of the window and out of the flow, so the body is pushed down by its
       height (`pt-9`, 36px) and anchor jumps keep clear of it (`scroll-pt-9` on
-      <html>). Neither exists on the public site proper.
+      <html>). Neither exists on the public site proper. The bar is product UI
+      on a public page: it is rendered here, by the CMS, and no theme
+      replaces it.
 
       `overflow-x-clip` is for a full-width section (sections spec §5.3,
       `themes/default/sections.css`): its band is `100vw` wide, and `100vw`
@@ -58,13 +112,13 @@
       with such a band would scroll sideways by those few pixels. On <body>
       the value is handed to the viewport, which stays the page's one
       scroller -- so a `position: sticky` element and a code block's own
-      sideways scroll (`.cs-prose pre`) behave as before. %>
-  <body class="min-h-screen overflow-x-clip bg-paper font-cs text-ink scheme-light dark:scheme-dark<%= " pt-9" if content_for?(:preview_banner) %>">
-    <%= yield :preview_banner %>
-    <div class="mx-auto max-w-3xl px-4">
-      <%= render "layouts/public/header" %>
-      <main class="py-12"><%= yield %></main>
-      <%= render "layouts/public/footer" %>
-    </div>
+      sideways scroll (`.cs-prose pre`) behave as before.
+
+      The classes on <body> are the default theme's and read tokens only: a
+      theme changes the page's ground and type by its tokens, or by a `body`
+      rule of its own, which comes later in the one stylesheet. %>
+  <body class="min-h-screen overflow-x-clip bg-paper font-cs text-ink scheme-light dark:scheme-dark<%= " pt-9" if @preview_record %>">
+    <%= render "layouts/public/preview_banner" if @preview_record %>
+    <%= render layout: "layouts/public/frame" do %><%= yield %><% end %>
   </body>
 </html>

@@ -81,7 +81,7 @@ A section is a block that holds blocks: it arranges ordinary blocks in columns a
 
 ### Sections on the public page
 
-**The markup.** `app/views/pages/show.html.erb` walks `block_outline(@page).top_level` through `ThemeHelper#render_block`, and `Blocks::SectionComponent` draws the blocks in its columns through the same helper (so the listing-to-detail swap of a post permalink happens in a column too, and each block is drawn once):
+**The markup.** `app/views/pages/show.html.erb` walks `block_outline(@page).top_level` through `ThemeHelper#render_block`, and `Blocks::SectionComponent` draws the blocks in its columns through the same helper (so the listing-to-detail swap of a post permalink happens in a column too, and each block is drawn once). The component is asked of `Theme.current.component_for(definition, role)`, and a theme may replace a component's TEMPLATE, not its class: for a component whose template the site's theme folder holds, `component_for` answers a generated subclass that carries the theme's file (`docs/reference/theming.md`, "The four seams"). A new block type adds its component's line to `Theme::Contract::COMPONENTS`, with the methods its template may call, and its tokens' lines to the token lists; `test/values/theme/contract_test.rb` ("every component a type registry hands out is on the list, and the list holds nothing else") fails until the first is there. The markup:
 
 ```
 section.content-section.content-section--<background>.content-section--<width>

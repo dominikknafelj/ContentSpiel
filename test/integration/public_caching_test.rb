@@ -231,6 +231,43 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     RichText.code_revision = original
   end
 
+  # The deployed revision does not move when a site's image is rebuilt on
+  # the same CMS image with another theme, so the theme's fingerprint is in
+  # the ETag itself (theming spec §6).
+  test "another theme, and the same theme with one byte changed, answer 200 where the same theme answers 304" do
+    get "/"
+    default_etag = response.headers["ETag"]
+    get "/", headers: { "If-None-Match" => default_etag }
+    assert_response :not_modified
+
+    with_theme_copy do |dir|
+      Theme.with(Theme.load(ThemeFolder.new(dir))) do
+        get "/", headers: { "If-None-Match" => default_etag }
+        assert_response :success
+        @themed_etag = response.headers["ETag"]
+        assert_not_equal default_etag, @themed_etag
+
+        get "/", headers: { "If-None-Match" => @themed_etag }
+        assert_response :not_modified
+      end
+
+      dir.join("views/theme/_crumb.html.erb").write(" ", mode: "a")
+      Theme.with(Theme.load(ThemeFolder.new(dir))) do
+        get "/", headers: { "If-None-Match" => @themed_etag }
+        assert_response :success
+        assert_not_equal @themed_etag, response.headers["ETag"]
+      end
+    end
+
+    # And back: what a browser kept from the theme is not confirmed by the
+    # default theme, which still confirms its own.
+    get "/", headers: { "If-None-Match" => @themed_etag }
+    assert_response :success
+    assert_equal default_etag, response.headers["ETag"]
+    get "/", headers: { "If-None-Match" => default_etag }
+    assert_response :not_modified
+  end
+
   # The settings row is in the ETag by itself, not only through the bump its
   # commit makes: written here around the callbacks, so no bump runs.
   test "a changed settings row answers 200 even without a bump" do

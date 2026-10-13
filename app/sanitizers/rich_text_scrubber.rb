@@ -26,12 +26,20 @@
 # Rails never had reason to allow them by default. All four are inert
 # outside an `img`/`source` element and carry no URL scheme of their own to
 # smuggle anything past the rest of this allow-list.
+#
+# `s` is the `strike` mark's element (`RichText::BuiltIns.register_marks`)
+# and is not on Rails' list, which has `del` and no `s`: until it was added
+# here a struck text reached the page as plain text, the editor showing it
+# struck and the site not. Found by the theme contract's test of what a
+# text is made of (`test/values/theme/contract_test.rb`: "a rendered text is
+# the elements the contract lists"). An `s` carries no attribute of its own
+# and nothing that runs.
 class RichTextScrubber < Rails::HTML::PermitScrubber
   YOUTUBE_NOCOOKIE_EMBED_SRC = %r{\Ahttps://www\.youtube-nocookie\.com/embed/[A-Za-z0-9_-]{11}\z}
 
   def initialize
     super
-    self.tags = Rails::HTML5::SafeListSanitizer.allowed_tags + %w[figure figcaption iframe]
+    self.tags = Rails::HTML5::SafeListSanitizer.allowed_tags + %w[figure figcaption iframe s]
     self.attributes = Rails::HTML5::SafeListSanitizer.allowed_attributes + %w[frameborder allow allowfullscreen referrerpolicy srcset sizes loading decoding]
   end
 

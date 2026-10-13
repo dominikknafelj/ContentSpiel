@@ -1,0 +1,10 @@
+<div class="plain-frame" data-controller="theme--hello">
+  <%= render "layouts/public/header" %>
+  <% if page_found? %><p class="plain-here"><%= translated(@page, :title) %></p><% end %>
+  <% tree = page_tree(page_section(@page)) %>
+  <% if tree %>
+    <nav class="plain-tree" aria-label="In this section"><%= render "theme/nodes", nodes: [ tree ] %></nav>
+  <% end %>
+  <main class="plain-main"><%= yield %></main>
+  <%= render "layouts/public/footer" %>
+</div>

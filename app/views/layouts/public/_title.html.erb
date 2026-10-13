@@ -1,0 +1,7 @@
+<%# The pattern of the page title (theming spec §2). `page_title` is the
+    page's or the post's own title, nil on the homepage and on a 404;
+    `site_title` is the site's. What this prints, with the white space
+    around and inside it squeezed to one line, is the text of <title>. A
+    meta title an editor typed for a page is taken as written and this
+    pattern is not asked (PagesHelper#document_title). %>
+<%= page_title.present? ? "#{page_title} – #{site_title}" : site_title %>

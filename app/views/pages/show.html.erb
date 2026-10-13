@@ -1,5 +1,7 @@
-<% content_for :preview_banner, render("layouts/public/preview_banner") if @preview_record %>
-<%= render "pages/seo_meta", page: @page, post: @post %>
+<%# What goes inside the frame's <main> for a page, and nothing else (theming
+    spec §2): the head tags that describe the page (pages/_seo_meta) and the
+    preview bar are rendered by the layout, so a theme that replaces this
+    file cannot lose either. %>
 <%# The page's own heading and, for a landing page, its hero fields -- skipped
     at a post's own detail view, since Posts::DetailComponent (which replaced
     the old content_blocks partial _post_list_detail) already renders that

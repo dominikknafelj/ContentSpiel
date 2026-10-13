@@ -1,0 +1,9 @@
+/* The second theme's one stylesheet: plain CSS, no utilities. The build
+   imports it after the default theme's styles, so a token declared again
+   here wins and nothing is copied. Its own custom properties take another
+   prefix than --th-, which is the CMS's. */
+:root, [data-theme="light"] { --th-accent: #123456; --plain-gap: 2rem; }
+[data-theme="dark"] { --th-accent: #abcdef; }
+.plain-frame { max-width: 60rem; margin-inline: auto; padding: var(--plain-gap); }
+.plain-text { line-height: 1.6; }
+.plain-crumb { background: url("plain-mark.svg") no-repeat left center; padding-left: 1.5rem; }

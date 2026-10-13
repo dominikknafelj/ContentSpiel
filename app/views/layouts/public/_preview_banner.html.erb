@@ -1,6 +1,6 @@
 <%# Signed-in preview bar (spec §6.4, round 3 handoff C40): PreviewController
     is the only place that sets @preview_record, so this only ever renders
-    there, via pages/show.html.erb's `content_for :preview_banner`, which the
-    layout yields at the very top of <body>, outside the content column. The
+    there: the layout renders it at the very top of <body>, outside the
+    theme's frame, and no theme replaces it. The
     bar itself is `Public::PreviewBarComponent`. %>
 <%= render Public::PreviewBarComponent.new(record: @preview_record, locale: I18n.locale) %>

@@ -40,16 +40,31 @@ module PagesHelper
     public_urls.path_for(post, locale, listed_on: listed_on)
   end
 
-  # "<page or post> – <site>" in the browser tab; the homepage is the site
-  # name alone, and an explicit meta title is taken as written. The site
+  # The text of <title>. An explicit meta title is taken as written: it is
+  # what an editor typed for search results, and no pattern is put around it.
+  # Everything else is the THEME'S PATTERN (`layouts/public/_title`, theming
+  # spec §2): the page's or the post's own title and the site's, where the
+  # homepage has no title of its own to put beside the site's. The site
   # title is translated (translation helpers spec §5) and read in the
   # request's language with the usual fallback, like the page's own.
   def document_title(page, post: nil)
-    site_title = Locales.read(Current.site, :title)
     meta_title = translated(page, :meta_title)
     return meta_title if post.nil? && meta_title.present?
-    return site_title if post.nil? && page.root?
 
-    "#{seo_title(page, post: post)} – #{site_title}"
+    page_title = seo_title(page, post: post) unless post.nil? && page.root?
+    themed_title(page_title: page_title, site_title: Locales.read(Current.site, :title))
+  end
+
+  # The theme's title pattern, as one line of text. The partial is a
+  # template, so what it prints carries the line breaks and the indentation
+  # it was written with: they are squeezed here, and a theme's author never
+  # has to write the pattern on one line to get a clean <title>.
+  #
+  # `html_safe` is right here and nowhere near: the partial's output is
+  # already escaped by ERB (a site title with an apostrophe arrives as
+  # `&#39;`), `squish` only removes white space and hands back a plain
+  # String, and escaping that again would print `&amp;#39;`.
+  def themed_title(page_title:, site_title:)
+    render("layouts/public/title", page_title: page_title, site_title: site_title).to_str.squish.html_safe
   end
 end

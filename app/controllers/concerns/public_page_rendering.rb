@@ -23,6 +23,29 @@ module PublicPageRendering
     # route's own `locale` constraint (one of the three configured locales) or
     # the site's default locale, itself validated against that same list.
     around_action :render_in_requested_locale
+
+    # The theme's page and layout templates are looked up before app/views
+    # (theming spec §2), for this request only: `prepend_view_path` on the
+    # instance changes this request's lookup and no other's, so
+    # `Theme.current` can differ between two requests of one process (a
+    # test's `Theme.with`). Only the two controllers that include this
+    # concern do it, `PagesController` and `PreviewController`: no CS Studio
+    # controller does, and no mailer, so a theme's template can never be
+    # found for an admin view, a password page or a mail
+    # (`test/integration/theme_pages_test.rb`, four tests: "nothing of a
+    # theme reaches sign-in…", "…CS Studio…", "…setup…", "…the password pages
+    # or a mail…").
+    #
+    # What the path lets a theme replace is not "any template": the folder
+    # is checked against `Theme::Contract` when the application starts
+    # (`Theme::Check`, run by `Theme.prepare` in the `to_prepare` of
+    # `config/initializers/theme.rb`, whose first run is the boot), and one
+    # that holds the layout, `pages/_seo_meta`, `shared/_theme_head` or the
+    # preview bar does not start (`test/lib/production_boot_test.rb`:
+    # "production with a theme folder that holds a file the contract does
+    # not name does not start, and names the file";
+    # `test/values/theme/check_test.rb` for each name).
+    before_action :look_in_the_theme_first
   end
 
   private
@@ -110,6 +133,20 @@ module PublicPageRendering
   def preload_page_images(page)
     ActiveRecord::Associations::Preloader.new(records: [ page ], associations: { hero_media_asset: Media::Asset::VARIANT_INCLUDES }).call
     ActiveRecord::Associations::Preloader.new(records: page.content_blocks.to_a, associations: { media_asset: Media::Asset::VARIANT_INCLUDES }).call
+  end
+
+  # A theme refused on a development reload (`Theme.prepare`) is said on
+  # every public page, with the check's own message, until the folder is
+  # sound again: the alternative is the default theme drawn in silence over
+  # the mistake the check found. At boot such a folder never gets this far.
+  # It is the same exception object each time, so the trace an error page
+  # shows is the reload's that refused the folder (`Theme.load`), not the
+  # request's: where the folder was refused is the useful place.
+  def look_in_the_theme_first
+    raise Theme.current.refusal if Theme.current.refusal
+
+    views = Theme.current.views_directory
+    prepend_view_path(views) if views
   end
 
   def render_in_requested_locale(&block)
