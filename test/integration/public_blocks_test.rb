@@ -458,6 +458,33 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "figure.content-block--code pre span", count: 0
   end
 
+  # Final re-review I1. A block drawn plain because the request's budget for
+  # lexing was spent is coloured by the next request, so the first answer
+  # must not be what a 304 confirms.
+  test "a page on which a code block was late carries no ETag that confirms it: the next request draws the block coloured" do
+    @root.content_blocks.create!(block_type: :code, position: 0, settings: { "language" => "ruby", "code" => "def top; end" })
+
+    get "/"
+    assert_select "figure.content-block--code pre span.syn-keyword", text: "def"
+    usual = response.headers["ETag"]
+    assert usual.present?
+    get "/", headers: { "If-None-Match" => usual }
+    assert_response :not_modified
+
+    with_singleton_override(CodeHighlight, :request_budget, -> { 0 }) { get "/" }
+    assert_response :success
+    assert_select "figure.content-block--code pre", text: "def top; end"
+    assert_select "figure.content-block--code pre span", count: 0
+    late = response.headers["ETag"]
+    assert_not_equal usual, late, "the content's ETag is not on a page drawn late"
+
+    get "/", headers: { "If-None-Match" => late.to_s }
+    assert_response :success
+    assert_select "figure.content-block--code pre span.syn-keyword", text: "def"
+    assert_equal usual, response.headers["ETag"]
+    assert_nil Current.lex_seconds_left, "the budget does not outlive its request"
+  end
+
   test "a code block on a live page is read from its published copy: a save shows nothing until it is published, and counts as a change" do
     page = create_page(title: "Docs")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "code", settings: { "language" => "ruby", "code" => "first = 1" } }).record

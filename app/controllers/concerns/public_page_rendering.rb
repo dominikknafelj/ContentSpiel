@@ -46,6 +46,26 @@ module PublicPageRendering
     # not name does not start, and names the file";
     # `test/values/theme/check_test.rb` for each name).
     before_action :look_in_the_theme_first
+
+    # A request's budget for colouring Code blocks that are in no cache
+    # (`CodeHighlight.start_request`: a page of blocks that each run to the
+    # lexer's deadline must not hold a thread for all of them), and what
+    # follows when it was spent.
+    before_action { CodeHighlight.start_request }
+    after_action :forget_late_code
+  end
+
+  # A page on which a Code block was drawn plain only because the request's
+  # budget was spent is not the page the next request draws: the block is
+  # coloured then. The ETag `PagesController` set names the content, the
+  # settings, the revision and the theme, none of which moves when that
+  # happens, so it would confirm the plain page with a 304 for as long as
+  # nothing is published. It is taken off, and the response is answered in
+  # full again next time. (A block that FAILED is plain for five minutes and
+  # keeps the ETag: taking it off there would make a page with one bad block
+  # a full render for every request.)
+  def forget_late_code
+    response.headers.delete("ETag") if CodeHighlight.late?
   end
 
   private

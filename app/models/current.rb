@@ -43,6 +43,14 @@ class Current < ActiveSupport::CurrentAttributes
   # set that one would put an origin on `Notes::Remove`'s signal, and the tab
   # that deleted a block would skip the refresh of its own notes drawer.
   attribute :editing_tab
+
+  # `CodeHighlight`'s budget for one request: the seconds this request may
+  # still spend colouring Code blocks that are in no cache, and whether a
+  # block was drawn plain because it was spent. `lex_seconds_left` is set by
+  # `CodeHighlight.start_request` (the two public controllers, through
+  # `PublicPageRendering`) and is nil outside a request, where there is no
+  # budget: a job, the console.
+  attribute :lex_seconds_left, :lex_late
   delegate :user, to: :session, allow_nil: true
 
   # The site's settings row, loaded at most once per request (spec §6.1) --

@@ -32,7 +32,11 @@ require "rouge"
 #   would never run in time.
 # So one lex costs at most `LEX_SECONDS` plus the step that was running when
 # the deadline passed: a step tries the rules of its state in turn, each
-# match under a second by the timeout above.
+# match under a second by the timeout above. And all the lexes of ONE
+# REQUEST together cost at most `REQUEST_SECONDS` plus one such lex
+# (`start_request`): a page of thirty blocks that each run to the deadline
+# was thirty deadlines in one request, and three such requests at once were
+# all of Puma's threads for most of a minute.
 #
 # The honest cost is far below it: 20,000 characters lex in 2 to 120 ms in
 # each of the twenty languages (measured on a laptop, 2026-10-12), so
@@ -112,6 +116,14 @@ module CodeHighlight
   LEX_SECONDS = 0.5
   FAILURE_TTL = 5.minutes
 
+  # What all the lexes of one request may cost together, in seconds: four
+  # deadlines. An honest page is far inside it (a block of a screen's length
+  # lexes in a few milliseconds, the longest allowed in 120 at most), so
+  # what it cuts is a page of blocks that fail; the worst honest page,
+  # thirty blocks of the full 20,000 characters each and none cached, is
+  # coloured over two requests.
+  REQUEST_SECONDS = 2.0
+
   # How many lexers may run one inside the other in one lex. An honest
   # sample nests three or four deep (Markdown, a fence of ERB, the HTML
   # around it, a script in that); a fence of Markdown in Markdown adds one
@@ -182,6 +194,26 @@ module CodeHighlight
     Module.instance_method(:prepend).bind_call(Rouge::RegexLexer, EachStep)
   end
 
+  # A request starts with `REQUEST_SECONDS` to spend on lexing
+  # (`PublicPageRendering` calls this before the action). Every lex of the
+  # request, one that worked and one that failed, is taken from it, and once
+  # it is spent a block that is in neither cache entry is LATE: drawn plain
+  # with no lex, no negative entry and no log line, because it did not fail
+  # and was not tried, so the next request colours it. A cached block costs
+  # nothing and is coloured whatever is left. `late?` says whether this
+  # request drew a block that way: its page must not be confirmed by a 304
+  # later (`PublicPageRendering#forget_late_code`). Outside a request
+  # nothing called this, `Current.lex_seconds_left` is nil and there is no
+  # budget.
+  def start_request
+    Current.lex_late = false
+    Current.lex_seconds_left = request_budget
+  end
+
+  def request_budget = REQUEST_SECONDS
+
+  def late? = Current.lex_late == true
+
   # `block_id` is only for the log line of a lex that failed. Code over
   # `MAX_CHARACTERS` (a row written around the services) is not lexed and
   # not cached. One read answers both keys: the lines of a lex that worked,
@@ -196,15 +228,34 @@ module CodeHighlight
     found = Rails.cache.read_multi(key, failed)
     return found[key] if found[key]
     return plain(code) if found[failed]
+    return plain(code) if spent?
 
-    begin
+    spending do
       lines = coloured(code, lexer)
     rescue StandardError, SystemStackError => error
       fail_for_a_while(failed, language, block_id, error)
-      return plain(code)
+      plain(code)
+    else
+      Rails.cache.write(key, lines)
+      lines
     end
-    Rails.cache.write(key, lines)
-    lines
+  end
+
+  # Whether the request has nothing left to lex with; it is then late.
+  def spent?
+    left = Current.lex_seconds_left
+    return false if left.nil? || left.positive?
+
+    Current.lex_late = true
+  end
+
+  # Takes what the block took from what the request has left.
+  def spending
+    started = now
+    yield
+  ensure
+    left = Current.lex_seconds_left
+    Current.lex_seconds_left = left - (now - started) if left
   end
 
   # Any string as UTF-8 text with Unix line breaks, and never an error:

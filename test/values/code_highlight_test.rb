@@ -290,6 +290,96 @@ class CodeHighlightTest < ActiveSupport::TestCase
     assert_nil Thread.current[CodeHighlight::CHECK]
   end
 
+  # Final re-review I1. Thirty failing blocks on one page were thirty
+  # deadlines in one request (up to 45 s), and every request in flight when
+  # their entries lapsed paid it: three of them held all of Puma's threads.
+  def endless_lexer(asked)
+    Class.new do
+      define_singleton_method(:lex) { |code| asked << code; Enumerator.new { |y| loop { y << [ Rouge::Token::Tokens::Keyword, "def" ] } } }
+    end
+  end
+
+  test "in a request the lexes of a page of slow blocks cost the request's budget and one deadline at most; the rest are plain, not lexed and not remembered" do
+    asked = []
+    blocks = Array.new(12) { |index| "def block_#{index}" }
+    at = 0.0
+
+    with_memory_cache do
+      log = capture_log do
+        with_singleton_override(CodeHighlight, :now, -> { at += 0.01 }) do
+          endless = endless_lexer(asked)
+          with_singleton_override(Rouge::Lexer, :find, ->(_tag) { endless }) do
+            CodeHighlight.start_request
+            started = at
+            blocks.each { |code| assert_equal [ [ [ nil, code ] ] ], CodeHighlight.lines(code, "ruby") }
+
+            assert_operator at - started, :<=, CodeHighlight::REQUEST_SECONDS + CodeHighlight::LEX_SECONDS + 0.1
+          end
+        end
+      end
+
+      assert_equal 2.0, CodeHighlight::REQUEST_SECONDS
+      assert_equal blocks.first(4), asked, "four deadlines spend the budget; the fifth block is not handed to a lexer"
+      assert_equal 4, log.scan("CodeHighlight: the").size, "a skipped block is not logged as a failure"
+      assert CodeHighlight.late?
+      blocks.first(4).each { |code| assert Rails.cache.read(CodeHighlight.failure_key(code, "ruby")) }
+      blocks.drop(4).each do |code|
+        assert_nil Rails.cache.read(CodeHighlight.failure_key(code, "ruby")), "late is not failed: nothing is remembered"
+        assert_nil Rails.cache.read(CodeHighlight.cache_key(code, "ruby")), "and plain lines are not cached as the answer"
+      end
+
+      # The next request: the four that failed are plain from their entries,
+      # at no cost, and the eight that were late are coloured.
+      CodeHighlight.start_request
+      assert_not CodeHighlight.late?
+      blocks.first(4).each { |code| assert_equal [ [ [ nil, code ] ] ], CodeHighlight.lines(code, "ruby") }
+      blocks.drop(4).each { |code| assert_equal "keyword", CodeHighlight.lines(code, "ruby").first.first.first }
+      assert_not CodeHighlight.late?
+    end
+  end
+
+  test "a block that is cached costs a spent request nothing and is still coloured, and a failed one is still plain from its entry" do
+    with_memory_cache do
+      coloured = CodeHighlight.lines("def a", "ruby")
+      with_singleton_override(Rouge::Lexer, :find, ->(_tag) { RAISING }) { CodeHighlight.lines("def b", "ruby") }
+
+      with_singleton_override(CodeHighlight, :request_budget, -> { 0 }) do
+        CodeHighlight.start_request
+        assert_equal coloured, CodeHighlight.lines("def a", "ruby")
+        assert_equal [ [ [ nil, "def b" ] ] ], CodeHighlight.lines("def b", "ruby")
+        assert_not CodeHighlight.late?, "neither was late: both were answered from the cache"
+        assert_equal [ [ [ nil, "def c" ] ] ], CodeHighlight.lines("def c", "ruby")
+        assert CodeHighlight.late?
+        assert_equal [ [ [ nil, "x" ] ] ], CodeHighlight.lines("x", nil), "no language is plain and is nobody's lateness"
+      end
+    end
+  end
+
+  test "outside a request there is no budget: a job or the console lexes every block, however long the others took" do
+    asked = []
+    blocks = Array.new(7) { |index| "def block_#{index}" }
+    assert_nil Current.lex_seconds_left
+
+    endless = endless_lexer(asked)
+    with_clock(step: 0.01) do
+      with_singleton_override(Rouge::Lexer, :find, ->(_tag) { endless }) { blocks.each { |code| CodeHighlight.lines(code, "ruby") } }
+    end
+
+    assert_equal blocks, asked
+    assert_not CodeHighlight.late?
+    assert_nil Current.lex_seconds_left
+  end
+
+  test "an honest lex is counted too: what it took is taken from what the request has left" do
+    with_clock(step: 0.25) do
+      CodeHighlight.start_request
+      CodeHighlight.lines("def a", "ruby")
+    end
+
+    assert_operator Current.lex_seconds_left, :<, CodeHighlight::REQUEST_SECONDS
+    assert_operator Current.lex_seconds_left, :>, 0
+  end
+
   test "one match past Regexp.timeout is a failure like any other: plain, remembered, and Rails sets that timeout" do
     assert_equal 1.0, Regexp.timeout, "load_defaults 8.1 sets it; the file's comment counts on it"
     slow = Class.new { def self.lex(_code) = raise(Regexp::TimeoutError, "regexp match timeout") }
