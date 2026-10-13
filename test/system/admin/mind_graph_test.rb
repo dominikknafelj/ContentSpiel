@@ -2055,6 +2055,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
     await_graph
     assert_kind_of Numeric, screen_position(alone)["x"], "the layout has no place for the added post"
+    # Its label is measured like every other node's (selected, so it is
+    # drawn, and in semibold): a label with no width could not be pressed.
+    label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{nid(alone).to_json})")
+    assert label && label["right"].is_a?(Numeric) && label["right"] - label["left"] > 20, "the added post's label was not measured: #{label.inspect}"
 
     # Closing the card gives the focus back to the row that opened it, which
     # is a new element since the rows were drawn again.

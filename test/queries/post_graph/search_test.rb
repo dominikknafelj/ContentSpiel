@@ -5,7 +5,7 @@ class PostGraph::SearchTest < ActiveSupport::TestCase
 
   test "posts by title and tags by name, posts first" do
     post = create_post(title: "Ruby notes", tags: [ "ruby" ])
-    create_post(title: "Unrelated")
+    create_post(title: "Unrelated", tags: [ "other" ])
     tag = Tag.find_by!(name: "ruby")
 
     assert_equal [ { kind: "post", id: "post-#{post.id}", record_id: post.id, label: "Ruby notes", colour_index: ContentTypes.fetch("blog").colour_index },
