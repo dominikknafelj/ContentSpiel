@@ -48,6 +48,9 @@
 // after the label (design answer G4, verbatim):
 //   "● Live · Unpublished changes"          no second dot
 //   "● Live · ● Change scheduled 14 Oct"    a warn dot: warn means "scheduled"
+// A chip of two states is as wide as the card, so it stands in a row of its
+// own under the first (a READING: the design drew the chip, not the card
+// around it).
 // Those two rows are for the eye, and hidden from a screen reader, which is
 // given the Status key's own words in one sentence (H6: one set of words):
 // "Live, unpublished changes", "Live, change scheduled 14 Oct". The state is
@@ -159,15 +162,35 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       return [ chip ]
     }
 
+    // The second part is one piece, its dot with its words, so that where
+    // the chip is too wide for the card it breaks before the piece and never
+    // between a dot and what the dot is of.
     const date = node.change_on ?? ""
-    const seen = element("span", "inline-flex items-center gap-1.5")
+    const seen = element("span", "inline-flex flex-wrap items-center gap-x-1 gap-y-0.5")
     seen.setAttribute("aria-hidden", "true")
     seen.dataset.chipSeen = ""
-    seen.append(text.t("mind_graph.script.card.status.live"), element("span", "text-meta", "·"))
-    if (node.changes === "scheduled") seen.append(mark(`${DOT} ${STATUS_DOTS.scheduled}`), text.t("mind_graph.script.card.status.change_scheduled", { date }))
-    else seen.append(text.t("mind_graph.script.card.status.unpublished_changes"))
+    const second = element("span", "inline-flex items-center gap-1.5")
+    if (node.changes === "scheduled") second.append(mark(`${DOT} ${STATUS_DOTS.scheduled}`), text.t("mind_graph.script.card.status.change_scheduled", { date }))
+    else second.append(text.t("mind_graph.script.card.status.unpublished_changes"))
+    seen.append(text.t("mind_graph.script.card.status.live"), element("span", "text-meta", "·"), second)
+    chip.classList.replace("shrink-0", "max-w-full")
     chip.append(seen, element("span", "sr-only", text.t(`mind_graph.script.card.status.${state}`, { date })))
     return [ chip ]
+  }
+
+  // Where the chip stands. One that says one state is beside what the node
+  // is, in the first row. One that says two is as wide as the card ("● Live
+  // · ● Change scheduled 14 Oct" beside a page's address and the Close
+  // button left the address no room, and ran under the button): it has the
+  // row under the first to itself.
+  const twoStates = (node) => Object.hasOwn(STATUS_DOTS, node.status) && stateOf(node) !== node.status
+  const chipBeside = (node) => (twoStates(node) ? [] : statusChip(node))
+  function chipBelow(node) {
+    if (!twoStates(node)) return []
+    const row = element("div", "flex")
+    row.dataset.chipRow = ""
+    row.append(...statusChip(node))
+    return [ row ]
   }
 
   // The first row: what the node is. It keeps clear of the Close button,
@@ -218,7 +241,8 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
     // have both.
     const known = node.related_count !== null && node.tag_count !== null
     return [
-      heading(mark(dotClass(dotClasses, node)), kind, ...statusChip(node)),
+      heading(mark(dotClass(dotClasses, node)), kind, ...chipBeside(node)),
+      ...chipBelow(node),
       title(node),
       ...(known ? [ pairOf(text.t("mind_graph.script.card.related", { count: node.related_count ?? 0 }), text.t("mind_graph.script.card.tags", { count: node.tag_count ?? 0 })) ] : []),
       cardNotes(node, { text, type: "post", url: fill(urls.postNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),
@@ -235,7 +259,8 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
   // address in the editing language or the default has none written.
   function page(node) {
     return [
-      heading(markCanvas(node), element("span", "min-w-0 truncate font-cs-mono text-label text-meta", node.path || ""), ...statusChip(node)),
+      heading(markCanvas(node), element("span", "min-w-0 truncate font-cs-mono text-label text-meta", node.path || ""), ...chipBeside(node)),
+      ...chipBelow(node),
       title(node),
       pairOf(text.t("mind_graph.script.card.child_pages", { count: node.child_count ?? 0 }), text.t("mind_graph.script.card.lists_posts", { count: node.listed_count ?? 0 })),
       cardNotes(node, { text, type: "page", url: fill(urls.pageNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),

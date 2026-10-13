@@ -97,8 +97,11 @@ export function cardNotes(node, { text, type = "post", url, recordUrl, onChange 
   field.rows = 2
   field.maxLength = 4000
   field.required = true
-  field.setAttribute("aria-label", text.t("mind_graph.script.card.notes.label"))
-  field.placeholder = text.t("mind_graph.script.card.notes.label")
+  // "Write a note on this post", or "on this page": the field says what the
+  // note is on.
+  const fieldLabel = type === "page" ? text.t("mind_graph.script.card.notes.label_page") : text.t("mind_graph.script.card.notes.label")
+  field.setAttribute("aria-label", fieldLabel)
+  field.placeholder = fieldLabel
   const submit = element("button", "cursor-pointer rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50", text.t("mind_graph.script.card.notes.add"))
   submit.type = "submit"
   form.append(field, submit)

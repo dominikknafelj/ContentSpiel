@@ -165,7 +165,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
                  messages.values_at(*%w[open_page status.unpublished_changes status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
     assert_equal [ { "one" => "%{count} child page", "other" => "%{count} child pages" }, { "one" => "lists %{count} post", "other" => "lists %{count} posts" } ],
                  messages.values_at("mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts")
-    assert_equal %w[all_posts capped capped_local card.child_pages card.close card.focus card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more
+    assert_equal %w[all_posts capped capped_local card.child_pages card.close card.focus card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.label_page card.notes.more
                     card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
                     card.status.change_scheduled card.status.draft card.status.live card.status.live_change_scheduled card.status.live_with_changes card.status.scheduled card.status.unpublished_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle

@@ -1673,7 +1673,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       const urls = { postFocus: "/g?post=__ID__", tagFocus: "/g?tag=__ID__", tagPosts: "/posts?tag=__NAME__", postNotes: "/notes/post/__ID__/threads", pageFocus: "/g?page=__ID__", pageNotes: "/notes/page/__ID__/threads" }
       const card = m.createCard(container, { text, urls, typeLabels: { blog: "Blog" }, dotClasses: Array(12).fill("dot"), buttonClasses: { primary: "primary", secondary: "secondary" }, onClose() {}, onPin() {}, onChange() {} })
       // The card top to bottom: each child as what it is and what it says.
-      const part = (child) => child.matches("[data-mind-graph-card-notes]") ? [ "notes", child.dataset.notesType, child.dataset.notesId ]
+      const part = (child) => child.matches("[data-mind-graph-card-notes]") ? [ "notes", child.dataset.notesType, child.dataset.notesId, child.querySelector("textarea").getAttribute("aria-label") ]
         : child.matches("[data-mind-graph-card-close]") ? [ "close" ]
         : child.tagName === "H2" ? [ "title", child.textContent ]
         : child.querySelector("a, button") ? [ "actions", ...Array.from(child.querySelectorAll("a, button"), (control) => [ control.tagName, control.textContent, control.getAttribute("href") ?? "-", control.className ]) ]
@@ -1684,8 +1684,8 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const found = container.querySelector(".admin-status-chip")
         if (!found) return "none"
         const seen = found.querySelector("span[aria-hidden='true'][data-chip-seen]")
-        return { status: found.dataset.status, dots: Array.from(found.querySelectorAll("span.rounded-full"), (dot) => [ dot.className.match(/bg-[a-z]+/)[0], dot.getAttribute("aria-hidden") ]),
-                 seen: seen ? Array.from(seen.childNodes, (item) => item.nodeType === 3 ? item.textContent : item.matches(".rounded-full") ? "(dot)" : item.textContent) : "-",
+        return { status: found.dataset.status, row: found.parentElement === container.firstElementChild ? "first" : found.parentElement.matches("[data-chip-row]") && found.parentElement.previousElementSibling === container.firstElementChild ? "own" : "?", dots: Array.from(found.querySelectorAll("span.rounded-full"), (dot) => [ dot.className.match(/bg-[a-z]+/)[0], dot.getAttribute("aria-hidden") ]),
+                 seen: seen ? Array.from(seen.childNodes).flatMap((item) => item.nodeType === 3 || item.childElementCount === 0 ? [ item.textContent ] : Array.from(item.childNodes, (piece) => piece.nodeType === 3 ? piece.textContent : "(dot)")) : "-",
                  heard: found.querySelector(".sr-only")?.textContent ?? "-", text: found.textContent }
       }
       return { container, card, read, chip }
@@ -1723,13 +1723,13 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ [ "heading", [ "mark", "page", "-", "true" ], [ "words", "/blog/<i>x</i>", "-" ], [ "chip", "live" ] ],
                    [ "title", "<b>Blog</b>" ],
                    [ "counts", [ "card.child_pages(4)", "-" ], [ "·", "true" ], [ "card.lists_posts(112)", "-" ] ],
-                   [ "notes", "page", "7" ],
+                   [ "notes", "page", "7", "card.notes.label_page()" ],
                    [ "actions", [ "A", "card.open_page()", "/cs-studio/pages/7?locale=de", "primary" ], [ "A", "card.focus()", "/g?page=7", "secondary" ], [ "BUTTON", "card.pin()", "-", "secondary" ] ],
                    [ "close" ] ], result["blog"]
     assert_equal [ "mind-graph-card-title", "mind-graph-card-title", false, 0 ], result["named"], "the card is named by its title, and a title and a path are text"
     assert_equal [ true ], result["marked"], "the page's mark is the renderer's drawing, painted once the card is in the document"
     assert_equal "/cs-studio/pages/7?locale=de", result["followed"], "Enter on a selected page presses Open page: the address is the one the server built"
-    assert_equal [ [ "words", "/", "-" ], [ "counts", [ "card.child_pages(1)", "-" ], [ "·", "true" ], [ "card.lists_posts(1)", "-" ] ], [ "notes", "page", "1" ] ],
+    assert_equal [ [ "words", "/", "-" ], [ "counts", [ "card.child_pages(1)", "-" ], [ "·", "true" ], [ "card.lists_posts(1)", "-" ] ], [ "notes", "page", "1", "card.notes.label_page()" ] ],
                  [ result["home"][0][2], result["home"][2], result["home"][3] ], "Home's card is a page's card"
     assert_equal [ "heading", [ "mark", "page", "-", "true" ], [ "words", "", "-" ] ], result["stray"][0], "a page with no address has none written, and a status the chip does not know has no chip"
     assert_equal [ "counts", [ "card.child_pages(0)", "-" ], [ "·", "true" ], [ "card.lists_posts(0)", "-" ] ], result["stray"][2]
@@ -1759,12 +1759,12 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     %w[page post].each do |kind|
       chips = result[kind]
-      assert_equal({ "status" => "draft", "dots" => [ [ "bg-meta", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.draft()" }, chips["draft"], kind)
-      assert_equal({ "status" => "scheduled", "dots" => [ [ "bg-warn", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.scheduled()" }, chips["scheduled"], kind)
-      assert_equal({ "status" => "live", "dots" => [ [ "bg-ok", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.live()" }, chips["live"], kind)
-      assert_equal({ "status" => "live_with_changes", "dots" => [ [ "bg-ok", "true" ] ], "seen" => [ "card.status.live()", "·", "card.status.unpublished_changes()" ], "heard" => "card.status.live_with_changes()",
+      assert_equal({ "status" => "draft", "row" => "first", "dots" => [ [ "bg-meta", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.draft()" }, chips["draft"], kind)
+      assert_equal({ "status" => "scheduled", "row" => "first", "dots" => [ [ "bg-warn", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.scheduled()" }, chips["scheduled"], kind)
+      assert_equal({ "status" => "live", "row" => "first", "dots" => [ [ "bg-ok", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.live()" }, chips["live"], kind)
+      assert_equal({ "status" => "live_with_changes", "row" => "own", "dots" => [ [ "bg-ok", "true" ] ], "seen" => [ "card.status.live()", "·", "card.status.unpublished_changes()" ], "heard" => "card.status.live_with_changes()",
                      "text" => "card.status.live()·card.status.unpublished_changes()card.status.live_with_changes()" }, chips["live_with_changes"], "#{kind}: no second dot")
-      assert_equal({ "status" => "live_change_scheduled", "dots" => [ [ "bg-ok", "true" ], [ "bg-warn", "true" ] ],
+      assert_equal({ "status" => "live_change_scheduled", "row" => "own", "dots" => [ [ "bg-ok", "true" ], [ "bg-warn", "true" ] ],
                      "seen" => [ "card.status.live()", "·", "(dot)", "card.status.change_scheduled(14 Oct)" ], "heard" => "card.status.live_change_scheduled(14 Oct)",
                      "text" => "card.status.live()·card.status.change_scheduled(14 Oct)card.status.live_change_scheduled(14 Oct)" }, chips["live_change_scheduled"], "#{kind}: a warn dot before the second part, and the server's day")
       assert_equal "draft", chips["draft_with_changes"]["status"], "#{kind}: only a live record has a second state"
@@ -1812,7 +1812,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     post, added, tag = result
     assert_equal [ [ "heading", [ "words", "", "true" ], [ "words", "Blog", "-" ], [ "chip", "live" ] ], [ "title", "Twelve" ],
-                   [ "counts", [ "card.related(3)", "-" ], [ "·", "true" ], [ "card.tags(2)", "-" ] ], [ "notes", "post", "12" ],
+                   [ "counts", [ "card.related(3)", "-" ], [ "·", "true" ], [ "card.tags(2)", "-" ] ], [ "notes", "post", "12", "card.notes.label()" ],
                    [ "actions", [ "A", "card.open_post()", "/cs-studio/posts/12", "primary" ], [ "A", "card.focus()", "/g?post=12", "secondary" ], [ "BUTTON", "card.pin()", "-", "secondary" ] ], [ "close" ] ], post
     assert_equal %w[heading title notes actions close], added.map(&:first), "a post added from the list says nothing of counts nobody counted"
     assert_equal [ [ "heading", [ "words", "", "true" ], [ "words", "card.tag()", "-" ] ], [ "title", "a b&c" ], [ "counts", [ "card.tag_posts(2)", "-" ] ],

@@ -2452,6 +2452,50 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert places.size == 4 && places.all? { |value| value.is_a?(Numeric) && value.finite? }, "an added post has no place: #{places.inspect}"
   end
 
+  # Ruling M5 on the review of Task 7: a `tick` the worker posted BEFORE it
+  # took an `add` is two numbers short of the page's nodes. Whether one is in
+  # flight is a matter of milliseconds, so the test plays it: the worker's
+  # wrapper hands the page the last positions it answered (which know
+  # nothing of the new post) in the same task as the `add`, and asks at once
+  # where the added post is. It is where the page put it; taken as it came,
+  # the short answer left it nowhere (NaN) until the worker's next.
+  test "a tick the worker posted before it took an added post leaves that post where the page put it" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      window.RealWorker = window.Worker
+      window.Worker = class extends window.RealWorker {
+        constructor(...args) {
+          super(...args)
+          this.addEventListener("message", ({ data }) => { if (data.type === "tick") this.lastTick = Float32Array.from(data.positions) })
+        }
+        postMessage(message, ...rest) {
+          super.postMessage(message, ...rest)
+          if (message.type !== "add" || !this.lastTick) return
+          this.dispatchEvent(new MessageEvent("message", { data: { type: "tick", positions: this.lastTick } }))
+          const at = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(message.node.id)
+          window.afterShortTick = { known: this.lastTick.length / 2, placed: Boolean(at) && Number.isFinite(at.x) && Number.isFinite(at.y) }
+        }
+      }
+    JS
+    begin
+      with_reduced_motion do
+        within("nav[aria-label='Modules']") { click_link "Mind graph" }
+        await_graph
+        find("#{LIST} label", text: "Not listed on any page").click
+        find("#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]").click
+        assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='3']"
+        assert_equal({ "known" => 2, "placed" => true }, page.evaluate_script("window.afterShortTick"), "the worker's answer knew two nodes, the page holds three: the third must keep its place")
+        await_graph
+        assert_kind_of Numeric, screen_position(alone)["x"]
+      end
+    ensure
+      page.execute_script("if (window.RealWorker) { window.Worker = window.RealWorker; delete window.RealWorker }")
+    end
+  end
+
   # Design answer H1: ONE PILL PER TARGET. A page with two list blocks has
   # two pills, each on its own hub or tag, each with its own posts, its own
   # row in the list and its own way to Posts.
@@ -2479,8 +2523,29 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         assert_row "5 more posts #{entry} lists, not in view. Activate to show them."
       end
 
+      # A pill's read that fails says so with a way back, and what clears a
+      # press on the canvas clears this too: Escape there, nothing selected.
+      # (The stub fails the one read and puts the real fetch back.)
+      page.execute_script(<<~JS)
+        const real = window.fetch
+        window.fetch = (url, options) => {
+          if (!String(url).includes("/mind_graph/listed")) return real(url, options)
+          window.fetch = real
+          return Promise.resolve(new Response("", { status: 500 }))
+        }
+      JS
+      click_node("more-type-resume_entry")
+      assert_selector "#{LIST} [role=alert] button[data-mind-graph-back]", text: "Back to the list"
+      toggle "Tree"
+      toggle "Tree"
+      assert_selector "#{LIST} [role=alert] p", text: "The list couldn't be loaded."
+      escape_on_canvas
+      assert_no_selector "#{LIST} [role=alert]"
+      assert_selector "#{LIST} button[data-more]", count: 2
+
       click_node("more-type-resume_entry")
       within(LIST) do
+        assert_selector "button[data-mind-graph-back]"
         assert_equal [ "MORE FROM #{entry.upcase} · 5" ], all("h2").map { |heading| heading.text.upcase }
         assert_equal entries.last(5).map(&:title), all("li button span.truncate").map(&:text)
         assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
@@ -2488,6 +2553,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
       click_node("more-#{tag}")
       within(LIST) do
+        assert_selector "h2", text: /more from pill/i
         assert_equal [ "MORE FROM PILL · 5" ], all("h2").map { |heading| heading.text.upcase }
         assert_equal pills.last(5).map(&:title), all("li button span.truncate").map(&:text), "the other pill's posts, and none of the first's"
         assert_equal({ "tag" => "pill" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
@@ -2653,6 +2719,30 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         await_graph
         around_home.call
         assert_selector "#{bar} button[aria-label='Show everything: all 4 connections']"
+
+        # Left while it says "around Home", and the data then fails: the page
+        # Turbo restores says nothing of a view that is not drawn (the
+        # controller's `reset` took the figure and the bar back). The stub
+        # fails the one request and puts the real fetch back.
+        click_frame_link { within("nav[aria-label='Modules']") { click_link "Tags" } }
+        assert_selector "h1", text: "Tags"
+        page.execute_script(<<~JS)
+          const real = window.fetch
+          window.fetch = (url, options) => {
+            if (!String(url).includes("/mind_graph/data")) return real(url, options)
+            window.fetch = real
+            return Promise.reject(new TypeError("Failed to fetch"))
+          }
+        JS
+        page.go_back
+        assert_selector "#{GRAPH}[data-state='failed']", wait: 10
+        assert_nil graph["data-opened-lines"]
+        assert_no_selector bar
+        assert_selector "#{bar}[hidden] [data-mind-graph-opened-line]:empty", visible: :all
+        assert_selector "#{bar} button:not([aria-label])", visible: :all
+        press "Retry"
+        await_graph
+        around_home.call
       end
     end
   end
