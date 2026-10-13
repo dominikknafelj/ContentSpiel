@@ -258,4 +258,184 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/search"
     assert_equal [], data
   end
+
+  # --- A page as the focus, and the list's two reads (pages in the mind
+  # graph, spec §3, §7) ---
+
+  def list_block(page, **settings)
+    ContentBlock.create!(owner: page, block_type: :post_list, position: page.content_blocks.count, settings: settings.stringify_keys)
+  end
+
+  test "page= and depth= answer that page's neighbourhood" do
+    sign_in_as(users(:one))
+    page = create_page(title: "Docs")
+    child = create_page(title: "Guide", parent: page)
+    list_block(page, content_type: "blog")
+    post = create_post(title: "Listed")
+
+    get "/cs-studio/mind_graph/data", params: { page: page.id, depth: 2 }
+
+    assert_response :success
+    assert_equal({ "kind" => "page", "id" => page.id, "node_id" => "page-#{page.id}", "title" => "Docs", "depth" => 2 }, data["focus"])
+    assert_equal [ root_page, page, child ].map { |record| "page-#{record.id}" }, data["pages"].map { |node| node["id"] }
+    assert_equal [ pid(post) ], data["nodes"].map { |node| node["id"] }
+    assert_includes data["edges"], { "source" => "type-blog", "target" => pid(post), "kind" => "brings" }
+    assert_equal "/cs-studio/pages/#{child.id}", data["pages"].last["url"]
+
+    get "/cs-studio/mind_graph/data", params: { page: page.id }
+    assert_equal 1, data["focus"]["depth"]
+    assert_empty data["nodes"]
+  end
+
+  test "page wins over post, and post over tag, in the address" do
+    sign_in_as(users(:one))
+    page = create_page(title: "Docs")
+    post = create_post(title: "A", tags: [ "t" ])
+    tag = Tag.find_by!(name: "t")
+
+    get "/cs-studio/mind_graph/data", params: { page: page.id, post: post.id, tag: tag.id }
+    assert_equal "page-#{page.id}", data["focus"]["node_id"]
+    get "/cs-studio/mind_graph/data", params: { post: post.id, tag: tag.id }
+    assert_equal pid(post), data["focus"]["node_id"]
+    # A page that is not found is not found, whatever else the address names.
+    get "/cs-studio/mind_graph/data", params: { page: "x", post: post.id }
+    assert_response :not_found
+  end
+
+  test "a page focus that is a list, hexadecimal, trashed or out of scope is 404, and 010 is page 10" do
+    page = 10.times.map { |index| create_page(title: "Page #{index}") }.last
+    assert_operator page.id, :>=, 10
+    hidden = create_page(title: "Hidden")
+    gone = create_page(title: "Gone")
+    gone.update_column(:trashed_at, Time.current)
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ page.id ] })
+    sign_in_as(users(:author))
+
+    [ "/cs-studio/mind_graph", "/cs-studio/mind_graph/data", "/cs-studio/mind_graph/listed" ].each do |path|
+      [ [ "1" ], "0x#{page.id.to_s(16)}", "about", "-#{page.id}", "0", gone.id, hidden.id, Page.maximum(:id) + 1 ].each do |value|
+        get path, params: { page: value }
+        assert_response :not_found, "#{path} page=#{value.inspect}"
+        assert_not_includes response.body, "Hidden"
+      end
+      get path, params: { page: "0#{page.id}" }
+      assert_response :success, path
+    end
+    get "/cs-studio/mind_graph/data", params: { page: "0#{page.id}" }
+    assert_equal page.id, data["focus"]["id"]
+  end
+
+  test "unlisted answers the posts no page lists, with the total" do
+    sign_in_as(users(:one))
+    blog = create_page(title: "Blog")
+    list_block(blog, tag: "news")
+    create_post(title: "Listed", tags: [ "news" ])
+    old = create_post(title: "Old")
+    old.update_columns(published_at: 2.days.ago) # version: none (a test sets a time) # changes: none (a test sets a time)
+    draft = create_post(title: "Draft", published: false)
+
+    get "/cs-studio/mind_graph/unlisted"
+
+    assert_response :success
+    assert_equal "application/json", response.media_type
+    assert_equal %w[rows total], data.keys.sort
+    assert_equal 2, data["total"]
+    assert_equal [ pid(draft), pid(old) ], data["rows"].map { |row| row["id"] }
+    assert_equal [ "draft", false, "/cs-studio/posts/#{draft.id}" ], data["rows"].first.values_at("status", "listed", "url")
+    assert(data["rows"].none? { |row| row.key?("via") })
+  end
+
+  test "listed answers the rows behind more and the Posts screen's address" do
+    sign_in_as(users(:one))
+    blog = create_page(title: "Blog")
+    list_block(blog, content_type: "blog", tag: "news")
+    22.times { |index| create_post(title: "News #{index}", tags: [ "news" ]) }
+    news = "tag-#{Tag.find_by!(name: "news").id}"
+
+    get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: news }
+
+    assert_response :success
+    assert_equal "application/json", response.media_type
+    assert_equal %w[posts_url rows total], data.keys.sort, "and no key filter"
+    assert_equal 2, data["total"]
+    assert_equal 2, data["rows"].size
+    assert_equal [ news ], data["rows"].map { |row| row["via"] }.uniq
+    assert_equal "/cs-studio/posts", URI(data["posts_url"]).path
+    assert_equal({ "tag" => "news", "type" => "blog" }, Rack::Utils.parse_query(URI(data["posts_url"]).query))
+  end
+
+  # The rows go through the controller's `with_dates`, as the graph's nodes do.
+  test "a row with a scheduled change carries its day, and the reads keep the editing language in their urls" do
+    sign_in_as(users(:one))
+    with_locales(%w[en de], default: "en")
+    post = create_post(title: "Changing")
+    at = 3.days.from_now
+    Publishing::Version.take!(post, live_at: at)
+    post.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+    blog = create_page(title: "Blog")
+    list_block(blog, content_type: "resume_entry")
+
+    get "/cs-studio/mind_graph/unlisted", params: { locale: "de" }
+
+    row = data["rows"].find { |candidate| candidate["id"] == pid(post) }
+    assert_equal [ "live", "scheduled", I18n.l(at, format: :"admin.short"), "/cs-studio/posts/#{post.id}?locale=de" ], row.values_at("status", "changes", "change_on", "url")
+
+    get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "type-resume_entry", locale: "de" }
+    assert_equal({ "type" => "resume_entry", "locale" => "de" }, Rack::Utils.parse_query(URI(data["posts_url"]).query))
+  end
+
+  test "listed without a page, and both reads without a session or a permission" do
+    blog = create_page(title: "Blog")
+    list_block(blog, content_type: "blog")
+    21.times { |index| create_post(title: "Many #{index}") }
+
+    get "/cs-studio/mind_graph/unlisted"
+    assert_redirected_to "/cs-studio/sign-in"
+    get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "type-blog" }
+    assert_redirected_to "/cs-studio/sign-in"
+
+    sign_in_as(users(:editor_branch))
+    get "/cs-studio/mind_graph/unlisted"
+    assert_response :forbidden
+    get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "type-blog" }
+    assert_response :forbidden
+
+    sign_in_as(users(:one))
+    get "/cs-studio/mind_graph/listed"
+    assert_response :not_found
+    get "/cs-studio/mind_graph/listed", params: { target: "type-blog" }
+    assert_response :not_found
+    get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "type-blog" }
+    assert_equal 1, data["total"], "so the empty answers below are the junk's doing"
+
+    [ {}, { target: [ "x" ] }, { target: { "a" => "b" } }, { target: "<script>alert(1)</script>" }, { target: "type-resume_entry" }, { target: "tag-0" } ].each do |junk|
+      get "/cs-studio/mind_graph/listed", params: { page: blog.id, **junk }
+      assert_response :success, junk.inspect
+      assert_equal [ 0, [] ], data.values_at("total", "rows"), junk.inspect
+      assert_equal "/cs-studio/posts", data["posts_url"], "a target the page does not list filters by nothing"
+      assert_no_match(/script|alert|resume_entry|tag-0/, response.body)
+    end
+  end
+
+  # Rights: the rows are the viewer's posts and the page's lists are a
+  # readable page's. A post outside the posts scope is in neither read and
+  # in no total.
+  test "the two reads hold no post outside the viewer's scope, in a row or in a total" do
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    blog = create_page(title: "Blog")
+    list_block(blog, tag: "news")
+    22.times { |index| create_post(title: "Theirs #{index}", tags: [ "news" ]) }
+    create_post(title: "Theirs alone")
+    own = create_post(title: "Own")
+    own.update_column(:author_id, users(:author).id)
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph/unlisted"
+    assert_equal [ 1, [ pid(own) ] ], [ data["total"], data["rows"].map { |row| row["id"] } ]
+    assert_not_includes response.body, "Theirs"
+
+    get "/cs-studio/mind_graph/listed", params: { page: blog.id, target: "tag-#{Tag.find_by!(name: "news").id}" }
+    assert_equal [ 0, [] ], data.values_at("total", "rows")
+    assert_not_includes response.body, "Theirs"
+  end
 end

@@ -14,14 +14,19 @@ module Admin
   # editor URL is built here (`editor_url`, called with a `Post` or a
   # `Page`): a query knows no routes.
   #
-  # `data` and `search` are the screen's JSON reads (mind graph canvas spec
-  # §3.1) with the screen's own permission and scope: `data` answers the
-  # global graph, or the neighbourhood of `post=` / `tag=`; `search` answers
-  # the search field's rows, each with the URL of its local view. A focus the
-  # viewer may not see (unknown, trashed, outside their read scope) is not
-  # found, from the page and from `data` alike: `PostGraph::Focus` raises
-  # `RecordNotFound`, which `Admin::BaseController` answers with the 404 page,
-  # or a bare 404 for a non-HTML request.
+  # `data`, `search`, `unlisted` and `listed` are the screen's JSON reads
+  # (mind graph canvas spec §3.1; pages spec §3) with the screen's own
+  # permission and scope: `data` answers the global graph, or the
+  # neighbourhood of `page=` / `post=` / `tag=` (a page wins over a post, a
+  # post over a tag); `search` answers the search field's rows, each with
+  # the URL of its local view; `unlisted` and `listed` answer the rows of the
+  # list's two filters (`PostGraph::Rows`): readable posts and no other, the
+  # trash left out, newest first, the first `PostGraph::ROW_LIMIT` with the
+  # whole total. A focus the viewer may not see (unknown, trashed, outside
+  # their read scope) is not found, from the page, from `data` and from
+  # `listed` alike: `PostGraph::Focus` raises `RecordNotFound`, which
+  # `Admin::BaseController` answers with the 404 page, or a bare 404 for a
+  # non-HTML request.
   class MindGraphController < BaseController
     # The screen opens for someone who may read a page or a post anywhere
     # (pages spec §2): a graph of pages alone is a graph. Each kind is then
@@ -37,7 +42,7 @@ module Admin
     # the selection card (a retired type has none; the card shows its stored
     # name, as `Admin::Ui::ContentTypeDotComponent` does).
     def show
-      @focus = PostGraph::Focus.find(actor: Current.actor, post: params[:post], tag: params[:tag], locale: admin_locale)
+      @focus = focus
       @depth = params[:depth].to_s == "2" ? 2 : 1
       @content_types = AccessControl.scope(Current.actor, "posts.read", Post.all).distinct.pluck(:content_type)
       @type_labels = @content_types.filter_map { |name| (definition = ContentTypes.find(name)) && [ name, definition.label ] }.to_h
@@ -45,7 +50,7 @@ module Admin
     end
 
     def data
-      focus = PostGraph::Focus.find(actor: Current.actor, post: params[:post], tag: params[:tag], locale: admin_locale)
+      focus = self.focus
       graph =
         if focus
           PostGraph::Local.call(actor: Current.actor, focus: focus, depth: params[:depth], locale: admin_locale, url_for: editor_url)
@@ -63,7 +68,30 @@ module Admin
       render json: rows.map { |row| row.merge(url: admin_mind_graph_path(row[:kind] => row[:record_id], **admin_url_options)) }
     end
 
+    # The posts no page lists (pages spec §3, decision 10): true for the
+    # viewer, by the pages THEY read.
+    def unlisted
+      render json: with_dates(list_rows.unlisted)
+    end
+
+    # The rows behind one of a page's "+N more" pills (`target=`: a pill per
+    # target, design answer H1), and where the Posts screen shows the same
+    # posts as far as its filters go: by the type and the tag of the block
+    # that points at the target. The page is found as a focus is, so one
+    # outside the scope, in the trash, unknown or not named at all is a 404.
+    # `target` is only ever compared with the page's own targets: a junk one,
+    # or one the page does not list, answers no rows and is echoed nowhere.
+    def listed
+      page = PostGraph::Focus.find(actor: Current.actor, page: params[:page], locale: admin_locale) or raise ActiveRecord::RecordNotFound
+      rows = list_rows.listed(page.id, params[:target].to_s)
+      render json: with_dates(rows.except(:filter)).merge(posts_url: admin_posts_path(**admin_url_options, **rows[:filter].compact))
+    end
+
     private
+
+    def focus = PostGraph::Focus.find(actor: Current.actor, page: params[:page], post: params[:post], tag: params[:tag], locale: admin_locale)
+
+    def list_rows = PostGraph::Rows.new(actor: Current.actor, locale: admin_locale, url_for: editor_url)
 
     def require_graph_access
       forbidden! unless can?("pages.read") || can?("posts.read")

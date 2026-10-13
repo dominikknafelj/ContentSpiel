@@ -179,6 +179,18 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     assert_equal [ @plain.id, @draft.id ].sort, result.left_out_of(@page.id, "type-blog", shown: 0).sort
   end
 
+  # "Open in Posts" filters the Posts screen, whose tag filter compares the
+  # name exactly: the filter names the tag as its row does.
+  test "the filter names a tag as its row names it, whatever the block's spelling, and a name no tag has as the block has it" do
+    list_block(@page, tag: "  RUBY ")
+    other = create_page(title: "Other")
+    list_block(other, tag: " Nobody ")
+
+    assert_equal({ type: nil, tag: "ruby" }, listings.filter_of(@page.id, tag("ruby")))
+    assert_equal({ type: nil, tag: "ruby" }, listings.filter_of(@page.id))
+    assert_equal({ type: nil, tag: "Nobody" }, listings.filter_of(other.id))
+  end
+
   test "of two blocks with one target, the filter is the upper one's, wherever it was made" do
     older = list_block(@page, tag: "ruby", content_type: "blog")
     newer = list_block(@page, tag: "ruby")

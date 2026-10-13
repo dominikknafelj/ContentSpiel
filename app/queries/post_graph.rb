@@ -3,7 +3,11 @@
 #
 # - `PostGraph::Global`: every readable page, and the best-connected readable
 #   posts up to `CAP`; or where to open instead, when that is too many lines.
-# - `PostGraph::Local`: one post's or tag's neighbourhood (`PostGraph::Focus`).
+# - `PostGraph::Local`: one page's, post's or tag's neighbourhood
+#   (`PostGraph::Focus`), to depth 1 or 2.
+# - `PostGraph::Rows`: the rows of the list's two filters, each a read of
+#   its own: the posts no page lists, and the posts one target of a page
+#   brings in beyond the ones its local view draws.
 # - `PostGraph::Search`: readable posts and tags by name.
 # - `PostGraph::Builder`: the nodes and lines the first two share, in two
 #   steps: `plan` (which lines; no statement) and `build`.
@@ -30,7 +34,12 @@
 #   more[]:  { id: "more-<target>", count, page, target }   one pill per
 #              target, a page's local view only; no key without one
 #
-# plus `total`, `shown` and `isolated` (global) or `focus` (local). The
+#   rows[]:  a post's node as in `nodes` with no line counted, and in
+#              `listed` its `via`, the target that brings it in: the list's
+#              two reads (`Rows`), `{ total, rows }`, newest first
+#
+# plus `total`, `shown` and `isolated` (global) or `focus` (local:
+# `{ kind: "page" | "post" | "tag", id, node_id, title, depth }`). The
 # global view answers `{ open: "page-<home id>", edges: N }` and nothing
 # else when the graph holds too many lines to read (`OPEN_AROUND_HOME_ABOVE`).
 #

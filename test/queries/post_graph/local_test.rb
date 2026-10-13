@@ -13,6 +13,18 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
   def ids(result) = result[:nodes].map { |n| n[:id] }.sort
   def tag_names(result) = result[:tags].map { |t| t[:name] }.sort
   def pid(post) = "post-#{post.id}"
+  def page_focus(page, actor: nil) = PostGraph::Focus.find(actor: actor, page: page.id)
+  def page_ids(result) = result[:pages].map { |page| page[:id] }
+
+  # As in `global_test.rb`: a block that names a type nobody registers any
+  # more is stored around the validation.
+  def list_block(page, **settings)
+    stored = settings.stringify_keys
+    retired = stored["content_type"].present? && ContentTypes.find(stored["content_type"]).nil?
+    block = ContentBlock.create!(owner: page, block_type: :post_list, position: page.content_blocks.count, settings: retired ? stored.except("content_type") : stored)
+    block.update_column(:settings, stored) if retired
+    block
+  end
 
   setup do
     #   centre -- near -- far -- beyond
@@ -110,5 +122,243 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     many = capture_sql { local(post_focus(@centre), depth: 2) }.size
 
     assert_equal few, many
+  end
+
+  # A PAGE AS THE FOCUS (pages in the mind graph, spec §7). Each test makes
+  # its own pages: the file's `setup` is about posts.
+  #
+  #   Home ── Docs ── Guide ── Intro
+  #        │       └─ Reference
+  #        └─ Blog
+  def tree
+    @docs = create_page(title: "Docs")
+    @guide = create_page(title: "Guide", parent: @docs)
+    @intro = create_page(title: "Intro", parent: @guide)
+    @reference = create_page(title: "Reference", parent: @docs)
+    @blog = create_page(title: "Blog")
+  end
+
+  test "depth 1 around a page: its parent, its children and what its blocks list, and no post" do
+    tree
+    list_block(@docs, tag: "shared")
+    list_block(@docs, content_type: "resume_entry")
+
+    result = local(page_focus(@docs))
+
+    assert_equal [ root_page, @docs, @guide, @reference ].map { |page| "page-#{page.id}" }, page_ids(result)
+    assert_equal [ "tag-#{Tag.find_by!(name: "shared").id}" ], result[:tags].map { |tag| tag[:id] }
+    assert_equal [ "type-resume_entry" ], result[:types].map { |type| type[:id] }
+    assert_empty result[:nodes]
+    assert_equal({ kind: "page", id: @docs.id, node_id: "page-#{@docs.id}", title: "Docs", depth: 1 }, result[:focus])
+    assert_equal 3, result[:edges].count { |edge| edge[:kind] == "tree" }
+    assert_equal 2, result[:edges].count { |edge| edge[:kind] == "lists" }
+    assert_nil result[:more]
+  end
+
+  test "depth 2 around a page adds the grandparent, the siblings and the grandchildren, each with its tree line" do
+    tree
+
+    result = local(page_focus(@guide), depth: 2)
+
+    assert_equal [ root_page, @docs, @guide, @intro, @reference ].map { |page| "page-#{page.id}" }, page_ids(result)
+    assert_not_includes page_ids(result), "page-#{@blog.id}", "the grandparent's other child is three steps away"
+    assert_equal 4, result[:edges].count { |edge| edge[:kind] == "tree" }
+  end
+
+  # Third design answers, "Local view lines": the hub that brings a post in
+  # draws the line to it, and more hangs off the hub. No lists line joins
+  # the page to a post.
+  test "depth 2 around a page draws the twenty newest posts it lists, each joined to the hub that brings it in, and counts the rest behind more" do
+    tree
+    list_block(@blog, content_type: "resume_entry")
+    posts = 23.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+
+    result = local(page_focus(@blog), depth: 2)
+
+    assert_equal posts.first(20).map { |post| "post-#{post.id}" }.sort, ids(result)
+    assert_equal [ { id: "more-type-resume_entry", count: 3, page: "page-#{@blog.id}", target: "type-resume_entry" } ], result[:more]
+    lists = result[:edges].select { |edge| edge[:kind] == "lists" }
+    brings = result[:edges].select { |edge| edge[:kind] == "brings" }
+    assert_equal [ { source: "page-#{@blog.id}", target: "type-resume_entry", kind: "lists" } ], lists, "the page's one lists line, and none to a post"
+    assert_equal 21, brings.size, "twenty posts and the pill"
+    assert brings.all? { |edge| edge[:source] == "type-resume_entry" }
+    assert_includes brings, { source: "type-resume_entry", target: "more-type-resume_entry", kind: "brings" }
+    assert_equal ids(result), (brings.map { |edge| edge[:target] } - [ "more-type-resume_entry" ]).sort
+    assert_equal [ 20, 20 ], result.values_at(:total, :shown)
+    assert_empty local(page_focus(@blog), depth: 1)[:nodes]
+    assert_empty local(page_focus(@blog), depth: 1)[:edges].select { |edge| edge[:kind] == "brings" }
+  end
+
+  test "a post the page lists through a tag is joined to the tag by its own line and by no other" do
+    tree
+    list_block(@blog, tag: "shared")
+
+    result = local(page_focus(@blog), depth: 2)
+    tag = "tag-#{Tag.find_by!(name: "shared").id}"
+
+    assert_equal [ @centre, @cousin ].map { |post| "post-#{post.id}" }.sort, ids(result)
+    assert_includes result[:edges], { source: "post-#{@centre.id}", target: tag, kind: "tag" }
+    assert_empty result[:edges].select { |edge| edge[:kind] == "brings" }, "the tag is the hub, and its own line is the line"
+    assert_empty result[:edges].select { |edge| edge[:kind] == "lists" && edge[:target].start_with?("post-") }
+    assert_nil result[:more]
+  end
+
+  # Design answer H1: ONE PILL PER TARGET, each counting only what its own
+  # target brings in. Not one pill on the first block's hub.
+  test "a page with two list blocks has a pill per target, each on its own hub or tag with its own count, and a target that brings in nothing more has none" do
+    tree
+    list_block(@docs, tag: "pill")
+    list_block(@docs, content_type: "resume_entry")
+    list_block(@docs, tag: "few")
+    pills = 15.times.map { |index| create_post(title: "Pill #{index}", tags: [ "pill" ]) }
+    entries = 15.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    create_post(title: "Few", tags: [ "few" ]).update_columns(published_at: 1.minute.ago)                  # version: none (a test sets a time) # changes: none (a test sets a time)
+    pills.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 1).hours.ago) }   # version: none (a test sets a time) # changes: none (a test sets a time)
+    entries.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 2).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    pill = "tag-#{Tag.find_by!(name: "pill").id}"
+
+    result = local(page_focus(@docs), depth: 2)
+
+    # The twenty newest: "Few", ten pills and nine entries. Left out: five
+    # pills and six entries.
+    assert_equal [ { id: "more-#{pill}", count: 5, page: "page-#{@docs.id}", target: pill },
+                   { id: "more-type-resume_entry", count: 6, page: "page-#{@docs.id}", target: "type-resume_entry" } ], result[:more], "in the order of the page's targets; the tag few has no pill"
+    to_pills = result[:edges].select { |edge| edge[:target].start_with?("more-") }
+    assert_equal [ { source: pill, target: "more-#{pill}", kind: "brings" }, { source: "type-resume_entry", target: "more-type-resume_entry", kind: "brings" } ], to_pills
+    assert_equal 9, result[:edges].count { |edge| edge[:kind] == "brings" && edge[:target].start_with?("post-") }, "the nine entries hang off the type; the tagged posts have their tag lines"
+  end
+
+  # A lists line is drawn between two nodes of the view: a neighbour page
+  # keeps its line to a target the focus reaches too, and what only the
+  # neighbour lists is no node here (it is one step further).
+  test "around a page a neighbour's lists line is drawn only to a target of the focus, and what only the neighbour lists is no node" do
+    tree
+    list_block(@docs, content_type: "resume_entry")
+    list_block(@guide, content_type: "resume_entry")
+    list_block(@guide, tag: "shared")
+    list_block(@reference)
+
+    result = local(page_focus(@docs), depth: 2)
+
+    assert_equal [ "type-resume_entry" ], result[:types].map { |type| type[:id] }
+    assert_empty result[:tags]
+    assert_equal [ [ "page-#{@docs.id}", "type-resume_entry" ], [ "page-#{@guide.id}", "type-resume_entry" ] ],
+                 result[:edges].select { |edge| edge[:kind] == "lists" }.map { |edge| edge.values_at(:source, :target) }
+    assert_empty result[:nodes], "the neighbours' posts are not the focus's"
+  end
+
+  test "a page that lists by nothing brings its posts in through All posts, pill included" do
+    tree
+    list_block(@blog)
+    21.times { |index| create_post(title: "Many #{index}") }
+
+    all = local(page_focus(@blog), depth: 2)
+    brings = all[:edges].select { |edge| edge[:kind] == "brings" }
+
+    assert brings.all? { |edge| edge[:source] == "all-posts" }
+    assert_equal ids(all), (brings.map { |edge| edge[:target] } - [ "more-all-posts" ]).sort
+    assert_equal [ "more-all-posts" ], all[:more].map { |more| more[:id] }
+    assert all[:more].first[:count].positive?
+  end
+
+  test "around a page nothing outside the viewer's scope is drawn: not the parent, not a child, not a post it lists" do
+    tree
+    list_block(@docs, content_type: "blog")
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ @guide.id ] })
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+
+    result = as(users(:author)) { local(page_focus(@guide, actor: users(:author)), depth: 2, actor: users(:author)) }
+
+    assert_equal [ @guide, @intro ].map { |page| "page-#{page.id}" }, page_ids(result)
+    assert_empty result[:nodes]
+    assert_no_match(/page-#{@docs.id}\b/, result.to_json)
+  end
+
+  test "from a tag the walk steps along a lists line: the pages that list it are depth 1" do
+    tree
+    list_block(@blog, tag: "shared")
+
+    result = local(tag_focus("shared"))
+
+    assert_equal [ "page-#{@blog.id}" ], page_ids(result)
+    assert_includes result[:edges], { source: "page-#{@blog.id}", target: "tag-#{Tag.find_by!(name: "shared").id}", kind: "lists" }
+  end
+
+  test "from a post, depth 2 reaches the pages that list one of its tags, and depth 1 does not" do
+    tree
+    list_block(@blog, tag: "shared")
+
+    assert_empty page_ids(local(post_focus(@centre)))
+    assert_equal [ "page-#{@blog.id}" ], page_ids(local(post_focus(@centre), depth: 2))
+  end
+
+  test "a page's local view costs the same with 3 listed posts and with 30: nine statements at depth 1, thirteen at depth 2" do
+    tree
+    list_block(@blog, tag: "many")
+    3.times { |index| create_post(title: "Few #{index}", tags: [ "many" ]) }
+    as(users(:two)) { Notes::Start.call(@blog, body: "A note") }
+    viewer = users(:one)
+    focus = page_focus(@blog, actor: viewer)
+    count = ->(depth) { capture_sql { local(focus, depth: depth, actor: viewer) }.size }
+
+    few = [ count.call(1), count.call(2) ]
+    27.times { |index| create_post(title: "Many #{index}", tags: [ "many" ]) }
+
+    # The walk around a page asks nothing. Depth 2: the site's five, the
+    # relations among the posts drawn and the builder's seven. Depth 1: no
+    # post is drawn, and a statement for no ids is not sent, so the relations
+    # and the posts' notes, pending copies and rows are not asked for: the
+    # site's five, the tags' names and the pages' three.
+    assert_equal [ 9, 13 ], few
+    assert_equal [ 9, 13 ], [ count.call(1), count.call(2) ]
+  end
+
+  # Payload note 4 of Task 3: a tag a readable page lists is a node whatever
+  # carries it, so it is a focus too, and its local view is the page.
+  test "a listed tag no readable post carries is a focus: its local view is the page that lists it, and the tag counts nothing" do
+    tree
+    Tag.create!(name: "empty")
+    list_block(@blog, tag: "empty")
+
+    result = local(tag_focus("empty"))
+
+    assert_equal [ "page-#{@blog.id}" ], page_ids(result)
+    assert_equal [ [ "empty", 0, 1 ] ], result[:tags].map { |tag| tag.values_at(:name, :count, :degree) }
+    assert_empty result[:nodes]
+  end
+
+  # A node's state is `Publishing::State`'s in a local view as in the whole
+  # graph (the builder's): the page's scheduled change with its time, a
+  # listed draft as a draft.
+  test "around a page every node carries Publishing::State's status and changes, and only a scheduled change its time" do
+    tree
+    list_block(@blog, content_type: "resume_entry")
+    draft = create_post(title: "Draft", content_type: "resume_entry", published: false)
+    live = create_post(title: "Live", content_type: "resume_entry")
+    at = 2.days.from_now
+    Publishing::Version.take!(@blog, live_at: at)
+    @blog.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+    live.update_columns(unpublished_changes_at: Time.current)  # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+
+    result = local(page_focus(@blog), depth: 2)
+    page = result[:pages].find { |node| node[:id] == "page-#{@blog.id}" }
+    posts = result[:nodes].index_by { |node| node[:id] }
+
+    assert_equal [ "live", "scheduled" ], page.values_at(:status, :changes)
+    assert_in_delta at.to_f, page[:change_at].to_f, 1
+    assert_equal [ "draft", nil, nil ], posts[pid(draft)].values_at(:status, :changes, :change_at)
+    assert_equal [ "live", "unpublished", nil ], posts[pid(live)].values_at(:status, :changes, :change_at)
+    [ [ @blog, page ], [ draft, posts[pid(draft)] ], [ live, posts[pid(live)] ] ].each do |record, node|
+      assert_equal Publishing::State.of(record.reload).status, node[:status]
+    end
+  end
+
+  test "a page trashed after it was found as the focus is not found, not an error" do
+    tree
+    focus = page_focus(@blog)
+    @blog.update_column(:trashed_at, Time.current)
+
+    assert_raises(ActiveRecord::RecordNotFound) { local(focus, depth: 2) }
   end
 end

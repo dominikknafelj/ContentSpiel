@@ -40,6 +40,7 @@ en:
         focus:
           around_post: "Around “%{title}”"
           around_tag: "Around the tag “%{title}”"
+          around_page: "Around the page “%{title}”"
           depth: "Depth"
           depth_n: "Depth %{depth}"
           whole: "Whole graph"

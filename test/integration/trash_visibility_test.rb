@@ -658,6 +658,58 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert(data["nodes"].none? { |node| node["listed"] })
   end
 
+  # A page as the mind graph's focus, and the list's two reads (pages in the
+  # mind graph, Task 4): a trashed page is no focus, from the page, from
+  # `data` and from `listed` alike; a trashed post is no row of either read
+  # and in no total; a trashed page lists nothing, so its posts are unlisted;
+  # and a kept page's local view names no trashed page and no trashed post.
+  test "a trashed page is no focus of the mind graph, and a trashed post is no row of its list's two reads" do
+    sign_in_as users(:one)
+
+    [ "/cs-studio/mind_graph", "/cs-studio/mind_graph/data", "/cs-studio/mind_graph/listed" ].each do |path|
+      get path, params: { page: @gone_page.id }
+      assert_response :not_found, path
+      assert_not_includes response.body, "Gone page"
+      get path, params: { page: @kept_page.id }
+      assert_response :success, path
+    end
+
+    # `@blog` lists the blog posts: the kept one is listed, so it is no row,
+    # and the trashed one is no row whatever lists it.
+    get "/cs-studio/mind_graph/unlisted"
+    assert_equal [ 0, [] ], response.parsed_body.values_at("total", "rows")
+
+    # Behind the pill: with twenty newer posts the oldest KEPT post is the
+    # one left out. The trashed post is older still and is not counted.
+    @kept_post.update_columns(published_at: 1.month.ago) # version: none (a test sets a time) # changes: none (a test sets a time)
+    @gone_post.update_columns(published_at: 1.year.ago)  # version: none (a test sets a time) # changes: none (a test sets a time)
+    20.times { |index| create_post(title: "Newer #{index}") }
+    get "/cs-studio/mind_graph/listed", params: { page: @blog.id, target: "type-blog" }
+    assert_equal [ 1, [ "post-#{@kept_post.id}" ] ], [ response.parsed_body["total"], response.parsed_body["rows"].map { |row| row["id"] } ]
+    assert_not_includes response.body, "Gone post"
+
+    # The local view around a kept page that lists them: the trashed post is
+    # no node and behind no pill's count, the trashed page (a sibling) no node.
+    get "/cs-studio/mind_graph/data", params: { page: @blog.id, depth: 2 }
+    data = response.parsed_body
+    assert_equal 20, data["nodes"].size
+    assert_equal [ 1 ], data["more"].map { |pill| pill["count"] }
+    assert_includes data["pages"].map { |page| page["id"] }, "page-#{@kept_page.id}", "a sibling, two steps along the tree"
+    assert_no_match(/Gone page|Gone post|page-#{@gone_page.id}\b|post-#{@gone_post.id}\b/, response.body)
+    get "/cs-studio/mind_graph/data", params: { page: @kept_page.id, depth: 2 }
+    assert_no_match(/Gone page|Gone post|page-#{@gone_page.id}\b|post-#{@gone_post.id}\b/, response.body)
+
+    # A trashed page lists nothing: its posts are unlisted, the kept ones.
+    @blog.update_column(:trashed_at, Time.current)
+    get "/cs-studio/mind_graph/unlisted"
+    assert_equal 21, response.parsed_body["total"]
+    assert_includes response.parsed_body["rows"].map { |row| row["id"] }, "post-#{@kept_post.id}"
+    assert_not_includes response.parsed_body["rows"].map { |row| row["id"] }, "post-#{@gone_post.id}"
+    assert_not_includes response.body, "Gone post"
+    get "/cs-studio/mind_graph/listed", params: { page: @blog.id, target: "type-blog" }
+    assert_response :not_found
+  end
+
   # What the mind graph loads of the site (pages in the mind graph, Task 2):
   # `PostGraph::Site` holds no trashed page and no trashed post, so no line
   # of a trashed page's list block, no count and no "listed" comes from one.

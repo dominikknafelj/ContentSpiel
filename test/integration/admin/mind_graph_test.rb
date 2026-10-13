@@ -323,12 +323,69 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal({ "tag" => tag.id.to_s, "depth" => "2" }, Rack::Utils.parse_query(URI(link["href"]).query))
   end
 
+  test "a page focus is named as a page, and its depth links keep the page" do
+    sign_in_as(users(:one))
+    page = create_page(title: "About")
+
+    get "/cs-studio/mind_graph", params: { page: page.id }
+
+    assert_response :success
+    assert_select "[data-mind-graph-focus]", text: /Around the page “About”/
+    link = css_select("[data-mind-graph-focus] a").find { |a| a.text == "2" }
+    assert_equal "/cs-studio/mind_graph", URI(link["href"]).path
+    assert_equal({ "page" => page.id.to_s, "depth" => "2" }, Rack::Utils.parse_query(URI(link["href"]).query))
+    url = css_select("[data-controller='admin--mind-graph--graph']").first["data-url"]
+    assert_equal "/cs-studio/mind_graph/data", URI(url).path
+    assert_equal({ "page" => page.id.to_s, "depth" => "1" }, Rack::Utils.parse_query(URI(url).query))
+
+    get "/cs-studio/mind_graph", params: { page: page.id, depth: 2 }
+    url = css_select("[data-controller='admin--mind-graph--graph']").first["data-url"]
+    assert_equal({ "page" => page.id.to_s, "depth" => "2" }, Rack::Utils.parse_query(URI(url).query))
+  end
+
+  # The bar names the focus the data will be drawn around: with a page AND a
+  # post in the address, the page.
+  test "with a page and a post in the address the bar names the page, and the data url carries both for the same answer" do
+    sign_in_as(users(:one))
+    page = create_page(title: "About")
+    post = create_post(title: "Alpha")
+
+    get "/cs-studio/mind_graph", params: { page: page.id, post: post.id }
+
+    assert_select "[data-mind-graph-focus]", text: /Around the page “About”/
+    url = css_select("[data-controller='admin--mind-graph--graph']").first["data-url"]
+    assert_equal page.id.to_s, Rack::Utils.parse_query(URI(url).query)["page"]
+  end
+
+  test "a page focus outside the viewer's scope, in the trash or unknown is 404" do
+    hidden = create_page(title: "Hidden")
+    seen = create_page(title: "Seen")
+    gone = create_page(title: "Gone")
+    gone.update_column(:trashed_at, Time.current)
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ seen.id ] })
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph", params: { page: seen.id }
+    assert_response :success
+    [ hidden.id, gone.id, 0, "x", [ seen.id ] ].each do |value|
+      get "/cs-studio/mind_graph", params: { page: value }
+      assert_response :not_found, "expected 404 for page=#{value.inspect}"
+      assert_not_includes response.body, "Hidden"
+    end
+  end
+
   test "a focus title with markup in it is escaped" do
     sign_in_as(users(:one))
     post = create_post(title: "<b>x</b>")
+    page = create_page(title: "<b>x</b>")
 
     get "/cs-studio/mind_graph", params: { post: post.id }
 
+    assert_select "[data-mind-graph-focus] b", count: 0
+
+    get "/cs-studio/mind_graph", params: { page: page.id }
+
+    assert_select "[data-mind-graph-focus]", text: /Around the page “<b>x<\/b>”/
     assert_select "[data-mind-graph-focus] b", count: 0
   end
 

@@ -57,7 +57,7 @@
       reads the literals to check that every key the script asks for is
       served. %>
   <div data-controller="admin--mind-graph--graph"
-       data-url="<%= data_admin_mind_graph_path(**admin_url_options, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
+       data-url="<%= data_admin_mind_graph_path(**admin_url_options, page: params[:page].presence, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
        data-d3-url="<%= asset_path("d3-force.js") %>"
        data-messages="<%= messages_data("mind_graph.script.loading", "mind_graph.script.load_failed", "mind_graph.script.retry", "mind_graph.script.worker_failed",

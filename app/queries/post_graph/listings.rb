@@ -71,6 +71,7 @@ module PostGraph
       # A tag's id => its name as the criteria compare it, for the tags a
       # block names and no other; a name => the tag its line goes to.
       @tag_name = named.to_h { |id, name| [ id, name.downcase ] }
+      @tag_label = named.to_h
       @tag_id = named.reverse.to_h { |id, name| [ name.downcase, id ] }
     end
 
@@ -113,11 +114,17 @@ module PostGraph
     end
 
     # The filter of the page's first list block, or of the first that points
-    # at `target`: what "Open in Posts" filters the Posts screen by.
+    # at `target`: what "Open in Posts" filters the Posts screen by. The tag
+    # is named AS ITS ROW NAMES IT, not as the block spells it: a block finds
+    # its tag whatever the case, and the Posts screen's filter does not, so
+    # a block that says "News" for the tag "news" would open an empty list.
+    # (A name no tag has stays as the block has it: it lists nothing here
+    # and there.)
     def filter_of(page_id, target = nil)
       all = @settings.fetch(page_id, [])
       settings = (target ? all.find { |candidate| target(candidate) == target } : all.first) or return {}
-      { type: settings.content_type.presence&.to_s, tag: settings.tag.to_s.strip.presence }
+      name = settings.tag.to_s.strip.presence
+      { type: settings.content_type.presence&.to_s, tag: name && @tag_label.fetch(@tag_id[name.downcase], name) }
     end
 
     def type_count(name) = (@type_counts ||= @post_rows.map { |_id, type, *| type }.tally).fetch(name.to_s, 0)
