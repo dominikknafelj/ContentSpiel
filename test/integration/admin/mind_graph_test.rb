@@ -80,10 +80,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "Posts · %{count}", messages["mind_graph.script.list.posts"]
     assert_equal "Showing the %{shown} nearest of %{total} posts around this one.", messages["mind_graph.script.capped_local"]
     assert_equal "Open notes · %{count}", messages["mind_graph.script.card.notes.title"]
-    assert_equal %w[capped capped_local card.close card.focus card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more card.notes.replies card.notes.sending
+    assert_equal [ "All posts", "+%{count} more", "%{name} (retired)" ], messages.values_at("mind_graph.script.all_posts", "mind_graph.script.more", "mind_graph.script.retired_type")
+    assert_equal %w[all_posts capped capped_local card.close card.focus card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more card.notes.replies card.notes.sending
                     card.notes.title card.notes.unread card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts card.tags card.unpin isolated isolated_only list.empty list.posts list.select_post list.select_tag list.tags load_failed loading no_connections
-                    release_pinned retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+                    card.tag card.tag_posts card.tags card.unpin isolated isolated_only list.empty list.posts list.select_post list.select_tag list.tags load_failed loading more no_connections
+                    release_pinned retired_type retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 

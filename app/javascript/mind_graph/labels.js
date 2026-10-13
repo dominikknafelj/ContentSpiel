@@ -1,4 +1,4 @@
-// Which labels the mind graph shows (mind graph canvas spec §5.2). Three rules:
+// Which labels the mind graph shows (mind graph canvas spec §5.2). Four rules:
 //
 // 1. HUBS FIRST, AMONG THE NODES ON THE CANVAS. `order` is the visible nodes,
 //    best-connected first, and the zoom decides how far down that list labels
@@ -19,6 +19,12 @@
 //    labelled whenever it is on the canvas, and a neighbour gives way to it
 //    however well connected it is. A member that is not in `order` (hidden by
 //    the filter) or not on the canvas gets no label, like any other node.
+// 4. `free` -- Home, the top-level pages and the post-type nodes (pages spec
+//    §4; `graph_data.js`, `freeOf`) -- is labelled at any zoom and does NOT
+//    count against the budget of rule 1. It places after `always` and before
+//    the ranked rest, in the order of `order`, and only a member that is in
+//    `order` (the filter shows it). Rule 2 still holds: no overlap wins over
+//    "always shown".
 //
 // A node outside the canvas gets no label. Answers `{ index, alpha, x, y }`,
 // `x`/`y` the label's left edge and vertical middle in screen pixels: a label
@@ -41,7 +47,7 @@ export function labelAt({ index, positions, radii, camera }) {
   return { index, alpha: 1, x: sx + radii[index] + GAP, y: sy }
 }
 
-export function chooseLabels({ order, positions, widths, radii, camera, width, height, always }) {
+export function chooseLabels({ order, positions, widths, radii, camera, width, height, always, free = new Set() }) {
   const reach = Math.max(1, Math.ceil(LABEL_BUDGET * camera.k * camera.k))
   const fadeFrom = reach * 0.75
   const placed = []
@@ -66,10 +72,12 @@ export function chooseLabels({ order, positions, widths, radii, camera, width, h
   const shown = new Set(order)
   for (const index of always) if (shown.has(index) && onCanvas(index)) place(index, 1)
 
+  for (const index of order) if (free.has(index) && !always.has(index) && onCanvas(index)) place(index, 1)
+
   let rank = 0
   for (const index of order) {
     if (rank >= reach) break
-    if (!onCanvas(index)) continue
+    if (free.has(index) || !onCanvas(index)) continue
     const alpha = rank < fadeFrom ? 1 : 1 - (rank - fadeFrom + 1) / (reach - fadeFrom + 1)
     rank += 1
     if (!always.has(index)) place(index, alpha)

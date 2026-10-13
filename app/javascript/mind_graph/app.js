@@ -15,8 +15,23 @@
 // `element.mindGraph.screenPosition(id)` answers where a visible node is, in
 // client coordinates (null for one the filter hides, and for every node until
 // the layout has placed them), `.labelBox(id)` the box of its label as the
-// last frame drew it (null when it drew none), and `.draws()` how many frames
-// have been drawn.
+// last frame drew it (null when it drew none), `.markBox(id)` the box of a
+// mark that is one (a page's card, the pill; null for any other),
+// `.graphPosition(id)` where the
+// layout has a node in GRAPH units, the camera not applied (null until the
+// layout has placed them), and `.draws()` how many frames have been drawn.
+//
+// WHAT IS DRAWN (pages in the mind graph, spec §4). Five kinds of node
+// (`graph_data.js` makes them from the payload; `marks.js` draws each): a
+// page, a post, a tag, a post type a page lists (with the one "All posts")
+// and, in a page's local view, a "+N more" pill per target. Five kinds of
+// line (`renderer.js`). Labels go to Home first, then the top-level pages
+// and the post types, which are named at any zoom, then the rest by their
+// links. HOME RESTS AT THE CENTRE of the layout: the worker holds it there
+// (`layout_worker.js`, the anchor). That is not a pin: `state.pinned` does
+// not hold it, nothing shows it as pinned, and nothing here can release it.
+// Dragged, it is pinned where it is dropped like any node, and released it
+// goes back to the centre.
 //
 // MOTION (spec §4.2). How fast the layout is shown is the worker's business
 // (`layout_worker.js`, PACING): this page draws every `tick` it is sent. All
@@ -69,6 +84,8 @@ import { chooseLabels, labelAt, LABEL_GAP, LABEL_HEIGHT } from "mind_graph/label
 import { placeCard } from "mind_graph/card_placement"
 import { readTheme, watchTheme } from "mind_graph/theme"
 import { draw, radiusFor } from "mind_graph/renderer"
+import { collisionRadius, boxOf, moreWidth } from "mind_graph/marks"
+import { nodesOf, orderOf, freeOf } from "mind_graph/graph_data"
 import { attachInput } from "mind_graph/input"
 import { createCard } from "mind_graph/card"
 import { attachSearch } from "mind_graph/search_box"
@@ -109,10 +126,13 @@ export function mount(element) {
   // `.target`, `visibleNodes`, `visibleEdges`, `selected`, `neighbours` and
   // `focusIndex`, `hovered` and the members of `pinned` are all INDEXES into
   // `nodes` (or `edges`); `positions` is the worker's x/y pairs, in the order
-  // of `nodes`. `order` is the visible nodes, best-connected first. `labels`
-  // is what the last frame drew, which is what the hit test may answer for.
+  // of `nodes`. `order` is the visible nodes that have a label, in the order
+  // labels go to them, and `free` those of them that are named at any zoom
+  // (`graph_data.js`). `boxes` is each node's box, for one that is a box
+  // (a page's card, the pill), else null. `labels` is what the last frame
+  // drew, which is what the hit test may answer for.
   const state = {
-    nodes: [], edges: [], positions: new Float32Array(0), radii: [], widths: [], order: [],
+    nodes: [], edges: [], positions: new Float32Array(0), radii: [], boxes: [], widths: [], order: [], free: new Set(),
     visibleNodes: [], visibleEdges: [], camera: identity(), selected: -1, neighbours: new Set(), focusIndex: -1,
     hovered: -1, pinned: new Set(), labels: [],
     theme: readTheme(canvas), width: 0, height: 0, ratio: 1, fitted: false, placed: false, data: null
@@ -263,13 +283,15 @@ export function mount(element) {
       // canvas's top-left corner -- so a frame drawn before then (the data has
       // just come, or the worker never started) is an empty one, not a pile.
       const labels = state.placed ? chooseLabels({ order: state.order, positions: state.positions, widths: state.widths, radii: state.radii,
-        camera: state.camera, width: state.width, height: state.height, always }) : []
+        camera: state.camera, width: state.width, height: state.height, always, free: state.free }) : []
       // With reduced motion a label switches on, it does not fade in (§5.2).
       if (reducedMotion.matches) labels.forEach((label) => { label.alpha = 1 })
       // The hovered node's label is drawn whatever the rule said of it: marked
       // where the rule placed it, added on top where it did not (a node
       // outside the canvas has none either way).
-      if (state.placed && state.hovered >= 0 && state.visibleNodes.includes(state.hovered)) {
+      // A node with no label (the pill: its words are inside it) has none
+      // when hovered either.
+      if (state.placed && state.hovered >= 0 && state.nodes[state.hovered].label && state.visibleNodes.includes(state.hovered)) {
         const ruled = labels.find((label) => label.index === state.hovered)
         const own = ruled || labelAt({ index: state.hovered, positions: state.positions, radii: state.radii, camera: state.camera })
         own.hover = true
@@ -358,7 +380,7 @@ export function mount(element) {
   // when the worker failed that is for good.
   function hit(x, y) {
     if (!state.placed) return -1
-    return nodeAt({ positions: state.positions, indexes: state.visibleNodes, radii: state.radii, camera: state.camera, sx: x, sy: y, labels: state.labels, widths: state.widths })
+    return nodeAt({ positions: state.positions, indexes: state.visibleNodes, radii: state.radii, boxes: state.boxes, camera: state.camera, sx: x, sy: y, labels: state.labels, widths: state.widths })
   }
 
   // What the filter shows: every edge of the chosen kind, and under "All"
@@ -368,7 +390,8 @@ export function mount(element) {
     state.visibleEdges = state.edges.flatMap((edge, index) => (chosen === "all" || edge.kind === chosen ? [ index ] : []))
     const touched = new Set(state.visibleEdges.flatMap((index) => [ state.edges[index].source, state.edges[index].target ]))
     state.visibleNodes = state.nodes.flatMap((_, index) => (chosen === "all" || touched.has(index) ? [ index ] : []))
-    state.order = state.visibleNodes.slice().sort((a, b) => state.nodes[b].degree - state.nodes[a].degree || a - b)
+    state.order = orderOf(state.nodes, state.visibleNodes)
+    state.free = freeOf(state.nodes, state.visibleNodes)
     // The selection goes with a node the filter hides; one that stays keeps
     // its place, but its neighbours are the ones the shown edges give it now,
     // so nothing stays lit (or dimmed) by an edge that is no longer drawn.
@@ -511,23 +534,38 @@ export function mount(element) {
 
   function show(data) {
     state.data = data
-    state.nodes = [ ...data.nodes.map((node) => ({ ...node, kind: "post" })), ...data.tags.map((tag) => ({ ...tag, title: tag.name, kind: "tag" })) ]
+    // A pill's figure is grouped as the messages' language groups it
+    // ("+1,980 more", design answer H4); `count` in that message is the
+    // figure as text, not a plural's number: the words have one form.
+    state.nodes = nodesOf(data, {
+      allPosts: text.t("mind_graph.script.all_posts"),
+      more: (count) => text.t("mind_graph.script.more", { count: number(count) }),
+      retired: (name) => text.t("mind_graph.script.retired_type", { name })
+    })
     indexOf = new Map(state.nodes.map((node, index) => [ node.id, index ]))
-    // A line to a node this script does not make yet (a page, a post type:
-    // pages plan, Task 5) is left out, so the graph of posts and tags is the
-    // one it was.
+    // Every end of a line is a node the server sent with it. One whose end
+    // is missing all the same is left out, not drawn to the canvas's corner.
     state.edges = data.edges.map((edge) => ({ kind: edge.kind, source: indexOf.get(edge.source), target: indexOf.get(edge.target) }))
       .filter((edge) => edge.source != null && edge.target != null)
     state.positions = new Float32Array(state.nodes.length * 2)
+    // A pill grows to fit its words: measured in the font they are drawn in,
+    // BEFORE the sizes are read, because a pill's size is its width.
+    context.font = state.theme.countFont
+    for (const node of state.nodes) if (node.kind === "more") node.width = moreWidth(context.measureText(node.title).width)
     state.radii = state.nodes.map(radiusFor)
-    context.font = state.theme.font
+    state.boxes = state.nodes.map(boxOf)
     state.nodes.forEach((node) => {
-      node.label = labelFor(node)
+      // The pill has no label: its words are inside it.
+      node.label = node.kind === "more" ? "" : labelFor(node)
       // Whether the label leaves some of the title out (a tag's count after
-      // its whole name does not).
-      node.cut = !node.label.startsWith(String(node.title))
+      // its whole name does not, and a node without a label has nothing cut).
+      node.cut = node.label !== "" && !node.label.startsWith(String(node.title))
     })
-    state.widths = state.nodes.map((node) => context.measureText(node.label).width)
+    // Each label is measured in the font it is drawn in: a tag's is mono.
+    state.widths = state.nodes.map((node) => {
+      context.font = node.kind === "tag" ? state.theme.monoFont : state.theme.font
+      return context.measureText(node.label).width
+    })
     state.focusIndex = data.focus ? indexOf.get(data.focus.node_id) ?? -1 : -1
     state.fitted = false
     state.placed = false
@@ -596,8 +634,10 @@ export function mount(element) {
     // follow `start` at once.
     // The worker can't ask about motion itself, so it is told (as the page
     // found it now; a change of the setting applies from the next load).
-    layout.start(state.nodes.map((node, index) => ({ id: node.id, radius: state.radii[index] })),
-      state.edges.map((edge) => ({ source: state.nodes[edge.source].id, target: state.nodes[edge.target].id })),
+    // What the layout keeps clear around a node is its mark's reach (a box's
+    // is half its diagonal). Home is the anchor: held at the centre.
+    layout.start(state.nodes.map((node) => ({ id: node.id, radius: collisionRadius(node), anchor: node.kind === "page" && Boolean(node.home) })),
+      state.edges.map((edge) => ({ source: state.nodes[edge.source].id, target: state.nodes[edge.target].id, kind: edge.kind })),
       { reducedMotion: reducedMotion.matches })
     if (mode() !== "all") sendFilter()
   }
@@ -738,6 +778,20 @@ export function mount(element) {
       if (!label) return null
       const box = canvas.getBoundingClientRect()
       return { left: box.left + label.x - LABEL_GAP, right: box.left + label.x + state.widths[label.index], top: box.top + label.y - LABEL_HEIGHT / 2, bottom: box.top + label.y + LABEL_HEIGHT / 2 }
+    },
+    // The box of a visible node whose mark is one (a page's card, the pill),
+    // in client coordinates; null for a mark that is a circle or a square.
+    markBox(id) {
+      const index = indexOf.get(id)
+      const at = this.screenPosition(id)
+      const size = index == null ? null : state.boxes[index]
+      return at && size ? { left: at.x - size.width / 2, right: at.x + size.width / 2, top: at.y - size.height / 2, bottom: at.y + size.height / 2 } : null
+    },
+    // Where the layout has a node, in GRAPH units (the camera not applied):
+    // Home's is 0, 0 while nobody holds it.
+    graphPosition(id) {
+      const index = indexOf.get(id)
+      return index == null || !state.placed ? null : { x: state.positions[index * 2], y: state.positions[index * 2 + 1] }
     },
     draws: () => draws
   }

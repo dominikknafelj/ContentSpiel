@@ -100,12 +100,18 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_operator sizes[0], :>, 0
   end
 
-  # Mind graph canvas spec §5.1, read from the pixels. Both posts have one
-  # connection, so both are drawn seven pixels in radius; four pixels left of the
-  # centre is inside a filled dot, and in a draft's ring it is the gap between
-  # the core (2.8 px) and the dashed outline (from 6 px). Left, because the
-  # label is on the right.
-  test "a live post is a filled dot, a draft a ring with a core: the status is a shape, not a colour" do
+  # One look read from the canvas's own pixels, so that "it draws at all" and
+  # "a draft is dashed" are seen on the real canvas, not only asked of a
+  # recording one (every look's detail is in the module tests): a live post is
+  # filled to its edge; a draft is empty inside, and its outline is there at
+  # some points round it and not at others.
+  #
+  # The ring is read 6.6px from the centre: inside the draft's surface disk
+  # (radius 7), so every sample has the surface under it, and inside the
+  # outline's band (6.25 to 7.75). A sample in a gap is the surface's own
+  # colour, one on a dash is mixed with the outline's. (At the disk's very
+  # edge a gap is half transparent, and nothing could be compared.)
+  test "a live post is filled and a draft is an empty, dashed outline" do
     live = create_post(title: "Live one")
     draft = create_post(title: "Draft one")
     draft.update_column(:published_at, nil)
@@ -116,12 +122,61 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     surface = pixel_at(*canvas_box.first(2).map { |edge| edge + 3 })
     live_centre, live_inside = pixels_of(live)
     draft_centre, draft_inside = pixels_of(draft)
+    round = ring_pixels(draft, radius: 6.6, samples: 96)
+    far = ->(pixel) { pixel.first(3).zip(draft_centre.first(3)).map { |a, b| (a - b).abs }.max }
 
     assert_operator surface[3], :<, 10, "the canvas's corner is not empty: #{surface}"
     assert_equal 255, live_centre[3], "nothing is drawn where the live post is"
     assert_equal live_centre, live_inside, "a live post is filled out to its edge"
-    assert_equal live_centre, draft_centre, "both are the same type: the draft's core has the type's hue"
-    assert_not_equal draft_centre, draft_inside, "a draft is a ring around a core, not a filled dot"
+    assert_equal 255, draft_centre[3], "a draft has no surface inside"
+    assert_not_equal live_centre, draft_centre, "a draft is empty inside: no core in its type's hue"
+    assert_equal draft_centre, draft_inside, "a draft is empty inside, out to its outline"
+    assert_operator round.count { |pixel| far.call(pixel) <= 8 }, :>, 12, "the outline has no gaps: it is not dashed"
+    assert_operator round.count { |pixel| far.call(pixel) > 24 }, :>, 12, "no outline is drawn round the draft"
+  end
+
+  # Pages spec §4, §5: pages, the post type a page lists and All posts are on
+  # the canvas; Home rests at the centre of the layout and is no pin; dragged,
+  # it is pinned where it is dropped, and released it goes back.
+  test "pages and what they list are drawn, and Home rests at the centre without being pinned" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: home, block_type: :post_list, position: 0, settings: {})
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+
+    visit admin_mind_graph_path
+    await_graph
+
+    assert_equal [ "6", "4" ], [ graph["data-nodes"], graph["data-edges"] ], "two pages, two posts, the type and All posts; a tree line, two lists lines and one related"
+    [ home, blog, a, "type-blog", "all-posts" ].each { |node| assert screen_position(nid(node)), "#{nid(node)} is not drawn" }
+    at = graph_position(home)
+    assert_in_delta 0, at["x"], 0.5
+    assert_in_delta 0, at["y"], 0.5
+    assert_equal "0", graph["data-pinned"]
+    assert_no_button "Release 1 pinned"
+    labelled = graph["data-labelled"].split(",")
+    assert_equal nid(home), labelled.first, "Home's label is placed first"
+    assert_empty [ nid(blog), "type-blog", "all-posts" ] - labelled, "a top-level page, a post type and All posts are named: #{labelled}"
+    # The marks on the real canvas: a page's card is ink out to its corner,
+    # where a dot of its width has nothing; and the hub has its ring.
+    home_at = screen_position(home)
+    assert_equal 255, pixel_at(home_at["x"] + 7, home_at["y"] + 4)[3], "Home is not a card: nothing is drawn in its corner"
+    assert_equal pixel_at(home_at["x"], home_at["y"]), pixel_at(home_at["x"] + 7, home_at["y"] + 4), "Home's card is not one colour out to its corner"
+    hub = screen_position("type-blog")
+    assert_not_equal pixel_at(hub["x"], hub["y"]), pixel_at(hub["x"] + 3.75, hub["y"]), "the hub has no ring inside it: it is one more post"
+
+    drag_node(nid(home), by: [ 90, 60 ])
+    assert_equal "1", graph["data-pinned"]
+    await_graph
+    assert_operator Math.hypot(graph_position(home)["x"], graph_position(home)["y"]), :>, 20, "a dragged Home is held where it was dropped"
+
+    press "Release 1 pinned"
+    await_graph
+    assert_in_delta 0, graph_position(home)["x"], 0.5, "a released Home did not go back to the centre"
+    assert_in_delta 0, graph_position(home)["y"], 0.5
+    assert_equal "0", graph["data-pinned"]
   end
 
   # Mind graph canvas spec §5.2: hubs are labelled first and the rest arrive
@@ -404,12 +459,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "2", graph["data-nodes"]
   end
 
-  # The data holds pages, post types and their lines from now on (pages plan,
-  # Task 3); the canvas draws them from Task 5. Until then a line whose end
-  # the script does not make is left out, and nothing throws. And one number
-  # is three nodes: the post and the tag of id 12 are each selected by their
-  # own id, with their own neighbours.
-  test "a post and a tag of one database id are two nodes, and a line to a page or a post type is left out" do
+  # One number is three nodes (pages spec, decision 4): the post, the tag
+  # and the page of id 12 are each drawn, each selected by its own id, with
+  # its own neighbours. A page's card and a pill's are their name and Pin
+  # until each has its own (pages plan, Task 8). The pill is as wide as its
+  # words, is pressed on its box and not on a circle as wide as it, and has
+  # no label beside it, hovered or not.
+  test "a post, a tag and a page of one database id are three nodes, and a page, a type and a pill are drawn and pressed" do
     create_post(title: "A")
     visit admin_tags_path
     await_admin_controllers
@@ -417,16 +473,41 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     await_graph
 
-    assert_equal [ "3", "3" ], [ graph["data-nodes"], graph["data-edges"] ], "two posts and the tag; the two lists lines are not drawn"
-    assert_nil screen_position("page-12")
-    assert_nil screen_position("type-blog")
+    assert_equal [ "6", "6" ], [ graph["data-nodes"], graph["data-edges"] ], "two posts, the tag, the page, the type and the pill; every line the data holds"
     click_node("post-12")
     assert_equal "post-12", graph["data-selected"]
     assert_equal %w[post-13 tag-12], graph["data-neighbours"].split(",").sort
     click_node("tag-12")
     assert_equal "tag-12", graph["data-selected"]
-    assert_equal %w[post-12 post-13], graph["data-neighbours"].split(",").sort
+    assert_equal %w[page-12 post-12 post-13], graph["data-neighbours"].split(",").sort
+    click_node("page-12")
+    assert_equal "page-12", graph["data-selected"]
+    assert_equal %w[tag-12 type-blog], graph["data-neighbours"].split(",").sort
+    within("[data-mind-graph-card]") do
+      assert_selector "h2", exact_text: "Page twelve"
+      assert_button "Pin"
+      assert_no_link "Open post"
+    end
     assert_raises(ArgumentError) { nid(12) }
+
+    # The pill: "+1,980 more" in the messages' language, wider than the least.
+    escape_on_canvas
+    pill = screen_position("more-type-blog")
+    box = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.markBox('more-type-blog')")
+    width = box["right"] - box["left"]
+    assert_equal [ 16, pill["x"] ], [ box["bottom"] - box["top"], (box["left"] + box["right"]) / 2 ]
+    assert_nil page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.markBox('type-blog')"), "a hub is a circle"
+    assert_operator width, :>, 60, "the pill did not grow with its words"
+    mouse = page.driver.browser.mouse
+    mouse.click(x: pill["x"], y: pill["y"] - 20)
+    assert_equal "", graph["data-selected"], "20px above the pill is not on it, though it is within a circle as wide as the pill"
+    mouse.move(x: pill["x"] + (width / 2) - 2, y: pill["y"] + 5)
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === 'more-type-blog'")
+    await_frames
+    assert_not_includes graph["data-labelled"].split(","), "more-type-blog", "a pill has no label beside it"
+    mouse.click(x: pill["x"] + (width / 2) - 2, y: pill["y"] + 5)
+    assert_equal "more-type-blog", graph["data-selected"]
+    assert_selector "[data-mind-graph-card] h2", exact_text: "+1,980 more"
   end
 
   # A notice line is a chip around its own words, not a bar as wide as the
@@ -1983,9 +2064,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # What the endpoint answers for a site over the cap, cut down to two nodes:
   # the counts are the point.
   # A post, a tag and a page of ONE database id (pages spec, decision 4: the
-  # three tables count on their own), with the lines the data holds from now
-  # on: a page's to a tag and to a post type. The page and the type are not
-  # drawn yet (pages plan, Task 5).
+  # three tables count on their own), with a page's lines to a tag and to a
+  # post type, and a pill hanging off the type by a `brings` line as in a
+  # page's local view.
   SHARED_ID_GRAPH = <<~JS.freeze
     ({
       nodes: [ { id: "post-12", title: "Twelve", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, listed: true, url: "/twelve", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 },
@@ -1994,7 +2075,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       pages: [ { id: "page-12", title: "Page twelve", path: "/twelve", depth: 0, home: true, parent: null, order: 0, status: "live", changes: null, change_at: null, url: "/pages/12", degree: 2, child_count: 0, listed_count: 2, open_notes: 0 } ],
       types: [ { id: "type-blog", name: "blog", label: "Blog post", colour_index: 1, count: 2, degree: 1 } ],
       edges: [ { source: "post-12", target: "post-13", kind: "related" }, { source: "post-12", target: "tag-12", kind: "tag" }, { source: "post-13", target: "tag-12", kind: "tag" },
-               { source: "page-12", target: "tag-12", kind: "lists" }, { source: "page-12", target: "type-blog", kind: "lists" } ],
+               { source: "page-12", target: "tag-12", kind: "lists" }, { source: "page-12", target: "type-blog", kind: "lists" },
+               { source: "type-blog", target: "more-type-blog", kind: "brings" } ],
+      more: [ { id: "more-type-blog", count: 1980, page: "page-12", target: "type-blog" } ],
       total: 2, shown: 2, isolated: 0
     })
   JS
@@ -2457,6 +2540,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # Where the layout has a node, in graph units (the camera not applied).
+  def graph_position(id) = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.graphPosition(#{nid(id).to_json})")
+
   def screen_position(id)
     page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(id).to_json})")
   end
@@ -2476,6 +2562,26 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         const box = canvas.getBoundingClientRect()
         const ratio = canvas.width / box.width
         return Array.from(canvas.getContext("2d").getImageData(Math.round((#{x} - box.left) * ratio), Math.round((#{y} - box.top) * ratio), 1, 1).data)
+      })()
+    JS
+  end
+
+  # The canvas's colours at `samples` points evenly round a node's centre,
+  # `radius` pixels from it: one read, after the frames `pixel_at` waits for.
+  def ring_pixels(node, radius:, samples:)
+    point = screen_position(node)
+    await_frames
+    page.evaluate_script(<<~JS)
+      (() => {
+        const canvas = document.querySelector(#{CANVAS.to_json})
+        const box = canvas.getBoundingClientRect()
+        const ratio = canvas.width / box.width
+        const context = canvas.getContext("2d")
+        return Array.from({ length: #{samples} }, (_, step) => {
+          const angle = step * 2 * Math.PI / #{samples}
+          const x = #{point["x"]} + #{radius} * Math.cos(angle), y = #{point["y"]} + #{radius} * Math.sin(angle)
+          return Array.from(context.getImageData(Math.round((x - box.left) * ratio), Math.round((y - box.top) * ratio), 1, 1).data)
+        })
       })()
     JS
   end

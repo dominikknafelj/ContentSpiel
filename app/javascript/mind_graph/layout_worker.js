@@ -7,7 +7,7 @@
 // hands over the vendored file's URL (`d3Url`) with `start`, and it is
 // imported once, dynamically. That file is one self-contained bundle.
 //
-// Messages in:  { type: "start", d3Url, nodes: [{ id, radius }], edges: [{ source, target }], reducedMotion }
+// Messages in:  { type: "start", d3Url, nodes: [{ id, radius, anchor }], edges: [{ source, target, kind }], reducedMotion }
 //               { type: "filter", nodeIds: [...], edgeIndexes: [...] }
 //               { type: "drag", id, x, y }   the node is held under the pointer
 //               { type: "drop", id }         the pointer let go: the node STAYS where it is
@@ -21,6 +21,17 @@
 // `drop`), and so does one pinned from its card; only `unpin` gives it back
 // to the forces. A `filter` lets go of every node it hides: a pin is for a
 // node on screen. Which nodes are pinned is the page's to know and to show.
+//
+// LINES AND THE ANCHOR (pages in the mind graph, spec §5). A line's `kind`
+// chooses its spring: a tree line is short and stiff (`LINKS.tree`), so a
+// subtree stays together; every other kind is as before. The node marked
+// `anchor` (Home) is HELD AT THE CENTRE while the layout runs: `fx` / `fy`
+// are 0. It is not a pin: the page shows none and counts none, so nothing
+// the page forgets or releases can let it go. Dragged or pinned it is held
+// where the person put it, like any node (`held`), and `unpin` gives it
+// back to the centre, not to the forces. A `filter` that hides it lets it
+// go like any node, and one that shows it again puts it back. No pinning by
+// depth and no rings by level: they would fight the post clusters.
 //
 // `after` is how many messages had been taken up when the layout cooled down.
 // The page counts what it sent and believes a `settled` only when the two
@@ -67,6 +78,12 @@ const FINAL_TICKS = Math.round(FINAL_STRETCH_MS / FRAME_MS)
 // How warm the layout is while a node is held, and what an unpin or (with
 // reduced motion) a drop warms it up to: d3's own drag uses the same figure.
 const HELD_ALPHA = 0.3
+// A line's spring by kind: its length at rest and how hard it pulls. A kind
+// that is not named here has d3's own (90, and a strength that falls with
+// the number of lines at its ends). The tree's are the spec's starting
+// values, tuned at the measurement (pages plan, Task 9).
+const DISTANCE = 90
+const LINKS = { tree: { distance: 40, strength: 0.9 } }
 
 let d3 = null
 let simulation = null
@@ -111,6 +128,7 @@ async function handle(message) {
     if (!node) return idle()
     node.fx = message.x
     node.fy = message.y
+    node.held = true
     if (reduced) {
       // The node moves alone: nothing ticks until the drop.
       node.x = message.x
@@ -135,16 +153,15 @@ async function handle(message) {
     if (node) {
       node.fx = node.x
       node.fy = node.y
+      node.held = true
     }
     // Nothing moves: the node is held where the forces had put it.
     idle()
   } else if (message.type === "unpin") {
     const freed = message.ids.map(find).filter(Boolean)
     if (!freed.length) return idle()
-    freed.forEach((node) => {
-      node.fx = null
-      node.fy = null
-    })
+    // The anchor goes back to the centre, every other node to the forces.
+    freed.forEach((node) => rest(node))
     simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), HELD_ALPHA))
     pace = "frame"
     run()
@@ -160,15 +177,21 @@ function idle() {
 }
 
 function start(givenNodes, givenEdges) {
-  nodes = givenNodes.map((node) => ({ id: node.id, radius: node.radius }))
-  edges = givenEdges.map((edge, index) => ({ source: edge.source, target: edge.target, index }))
+  nodes = givenNodes.map((node) => ({ id: node.id, radius: node.radius, anchor: Boolean(node.anchor), held: false }))
+  edges = givenEdges.map((edge, index) => ({ source: edge.source, target: edge.target, kind: edge.kind, index }))
+  nodes.forEach((node) => rest(node))
   shown = null
+  const link = d3.forceLink(edges.slice()).id((node) => node.id).distance((edge) => LINKS[edge.kind]?.distance ?? DISTANCE)
+  // d3's own strength, kept for every kind that names none: it reads the
+  // force's own count of lines per node, which `links()` refreshes.
+  const ordinary = link.strength()
+  link.strength((edge, index, all) => LINKS[edge.kind]?.strength ?? ordinary(edge, index, all))
   simulation = d3.forceSimulation(nodes)
     // `distanceMax` bounds each node's repulsion to its surroundings: without
     // it every node pushes every other, which is what makes a large graph slow
     // and flings its outer nodes away.
     .force("charge", d3.forceManyBody().strength(-250).distanceMax(600))
-    .force("link", d3.forceLink(edges.slice()).id((node) => node.id).distance(90))
+    .force("link", link)
     .force("x", d3.forceX(0).strength(0.04))
     .force("y", d3.forceY(0).strength(0.04))
     .force("collide", d3.forceCollide((node) => node.radius + 10))
@@ -177,9 +200,23 @@ function start(givenNodes, givenEdges) {
   run()
 }
 
+// Where a node that nobody holds is kept: the anchor at the centre, every
+// other node nowhere.
+function rest(node) {
+  node.held = false
+  node.fx = node.anchor ? 0 : null
+  node.fy = node.anchor ? 0 : null
+}
+
 function filter(nodeIds, edgeIndexes) {
   nodes.forEach((node) => {
-    if (nodeIds.has(node.id)) return
+    // A shown anchor that nobody holds is at the centre (again: a filter
+    // that hid it had let it go).
+    if (nodeIds.has(node.id)) {
+      if (node.anchor && !node.held) rest(node)
+      return
+    }
+    node.held = false
     node.fx = null
     node.fy = null
   })

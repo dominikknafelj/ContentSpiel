@@ -6,7 +6,10 @@
 // at every zoom -- so the camera moves the centres only. A small dot would be
 // hard to hit, so its target is its radius plus `slack`, and never less than
 // MIN_TARGET pixels across, at any zoom. Where two overlap, the nearer centre
-// wins.
+// wins. A BOX (a page's card, the "+N more" pill: `boxes`, from `marks.js`'s
+// `boxOf`) is pressed on the box itself, grown by the same slack and never
+// less than MIN_TARGET either way: the pill is 60 wide and 16 high, and a
+// circle as wide as it would take every press 25 pixels above and below it.
 //
 // The label. `labels` is what the last frame DREW (`labels.js`'s answer, plus
 // the hovered node's): a label counts only while it is drawn, so nothing
@@ -21,14 +24,20 @@ import { LABEL_GAP, LABEL_HEIGHT } from "mind_graph/labels"
 
 export const MIN_TARGET = 24
 
-export function nodeAt({ positions, indexes, radii, camera, sx, sy, slack = 4, labels = [], widths = [] }) {
+// `boxes[index]` is `{ width, height }` for a node that is a box, and
+// nothing (null, or no entry at all) for one that is a circle.
+export function nodeAt({ positions, indexes, radii, camera, sx, sy, slack = 4, labels = [], widths = [], boxes = [] }) {
   let best = -1
   let bestDistance = Infinity
   for (const index of indexes) {
     const dx = positions[index * 2] * camera.k + camera.tx - sx
     const dy = positions[index * 2 + 1] * camera.k + camera.ty - sy
     const distance = Math.hypot(dx, dy)
-    if (distance <= Math.max(radii[index] + slack, MIN_TARGET / 2) && distance < bestDistance) {
+    const box = boxes[index]
+    const hit = box
+      ? Math.abs(dx) <= Math.max(box.width / 2 + slack, MIN_TARGET / 2) && Math.abs(dy) <= Math.max(box.height / 2 + slack, MIN_TARGET / 2)
+      : distance <= Math.max(radii[index] + slack, MIN_TARGET / 2)
+    if (hit && distance < bestDistance) {
       best = index
       bestDistance = distance
     }

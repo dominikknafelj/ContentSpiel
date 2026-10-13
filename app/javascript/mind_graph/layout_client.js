@@ -30,7 +30,10 @@ export function createLayout({ workerUrl, d3Url, onTick, onSettled, onError }) {
   }
 
   return {
-    // `reducedMotion`: the worker has no `matchMedia`, so the page says it.
+    // A node may carry `anchor` (Home: held at the centre) and an edge
+    // carries its `kind` (which chooses its spring); both are passed on as
+    // given. `reducedMotion`: the worker has no `matchMedia`, so the page
+    // says it.
     start(nodes, edges, { reducedMotion = false } = {}) { send({ type: "start", d3Url, nodes, edges, reducedMotion }) },
     filter(nodeIds, edgeIndexes) { send({ type: "filter", nodeIds, edgeIndexes }) },
     drag(id, x, y) { send({ type: "drag", id, x, y }) },

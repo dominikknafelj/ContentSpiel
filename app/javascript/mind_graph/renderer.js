@@ -2,17 +2,8 @@
 // Order: edges, nodes (each with its pin mark and its notes badge), labels, rings. Everything is in SCREEN pixels: the
 // camera moves a node's centre, and a node is the same size at every zoom.
 //
-// A node's mark carries two cues that never share a shape, exactly as
-// `Admin::Ui::ContentTypeDotComponent` and the legend draw them:
-// - the TYPE is the fill: colour slots 1-6 are filled with the hue, 7-12 are a
-//   ring of the same six hues (13+ cycle);
-// - the STATUS is the outline: a live post's is solid, a draft's or a
-//   scheduled post's dashed -- with a small filled core for slots 1-6, so the
-//   hue is still there;
-// - a post whose type is no longer registered (no `colour_index`) is a ring in
-//   the `meta` grey WITH A STROKE THROUGH IT, so it differs from a 7-12 ring
-//   by shape, not by colour alone.
-// A tag is a square. A related edge is solid, a shared tag's dashed.
+// The marks and the five looks of a record's state are `marks.js`'s
+// (`drawMark`); the lines are the five styles of `LINE_STYLES` below.
 //
 // WHAT IS OUTSIDE THE CANVAS IS NOT DRAWN. A node whose mark lies wholly
 // outside is skipped, and so is an edge that can't cross the canvas: both its
@@ -27,12 +18,13 @@
 // - HOVERED (`hovered`, by the pointer or by its row in the list): a 1px ink
 //   ring round the mark, and its label in full ink on a backing, drawn even
 //   where the label rule hides it. Hovering dims nothing.
-// - SELECTED: a 2px accent ring with a gap, a semibold label, its edges
-//   brightened, and every node and edge not connected to it at DIM.
+// - SELECTED: a 2px accent ring with a gap, a semibold label in full ink, its
+//   edges brightened in ink (each keeps its kind's dash and cap; the accent
+//   stays the ring's), and every node and edge not connected to it at DIM.
 // - PINNED (`pinned`, a Set of indexes): a small ink dot with a surface ring
 //   at the mark's top-right. It is drawn with the node, at the node's
 //   strength, whatever else the node is.
-// - WITH OPEN NOTES (`open_notes` above zero, a post only; notes spec §4.4):
+// - WITH OPEN NOTES (`open_notes` above zero, a post's and a page's; notes spec §4.4):
 //   the count in a small mono badge on the mark's top-LEFT corner, opposite
 //   the pin, so a node can carry both: the badge keeps its right edge where
 //   it is and grows to the LEFT with its text, away from the pin. Not a ring:
@@ -40,15 +32,49 @@
 //   node's strength, and the same size at every zoom. Always neutral: what
 //   is unread for the viewer is said on the rows of the node's card.
 // - The focus of a local view: a dotted accent ring.
-// A tag's rings are squares, like its mark.
+// A ring follows its mark: a tag's is a square, a page's card's and the
+// pill's a box, every other a circle. So does what hangs on a corner: on a
+// box the pin and the notes badge are at the box's own corners
+// (`marks.js`, `topCorner`), not where a circle as wide as it would have them.
+//
+// A LABEL (pages spec §4; design answer F6): a page's and a post type's in
+// ink, a tag's in mono `meta`, a post's in `dim`; the selected node's is
+// semibold and the hovered node's on its backing, both in full ink. A node
+// with no label (the "+N more" pill: its words are inside it) has none.
 //
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`), and
 // what dims is dimmed by `globalAlpha`.
-// Up to this many connections: a post's radius, a tag's half side. The
-// posts' are the sizes of the design review's mock (2026-10-08), which draws
-// its dots a step larger than the first build did (6, 8, 11, 14).
-const STEPS = [ [ 2, 7, 4.5 ], [ 5, 10, 6 ], [ 12, 13, 8.25 ], [ Infinity, 16, 10.5 ] ]
+import { drawMark, boxOf, radiusFor, topCorner } from "mind_graph/marks"
+
+// The app and the module tests ask for a node's size here.
+export { radiusFor }
+
 const DIM = 0.28
+// One path per style (pages spec §4): Shares a tag dashed `meta`, Related
+// solid ink, a hub's line to what it brings in faint, Lists dotted `dim`,
+// Tree solid in the strong line colour. Drawn in this order, so a tree line
+// is on top of a tag's. A value of `colour` is a theme key.
+//
+// LISTS (design answer G3): 1.5px with ROUND caps and a dash of 0.1 / 3.5.
+// A dash that short is its two caps, so each is a round dot 1.5px across,
+// 3.6px from the next; with a butt cap it would be a hairline.
+// BRINGS (the third answers' "Local view lines", G2, H1): a page's local
+// view only, the hub's line to each post it brings in and to "+N more".
+export const LINE_STYLES = {
+  tag: { colour: "meta", width: 1, dash: [ 4, 3 ], alpha: 0.8, cap: "butt" },
+  related: { colour: "ink", width: 1.5, dash: [], alpha: 0.35, cap: "butt" },
+  brings: { colour: "faint", width: 1, dash: [], alpha: 1, cap: "butt" },
+  lists: { colour: "dim", width: 1.5, dash: [ 0.1, 3.5 ], alpha: 1, cap: "round" },
+  tree: { colour: "line", width: 1, dash: [], alpha: 1, cap: "butt" }
+}
+// Below this zoom the lines of shared tags are not drawn (design answer,
+// part one §6): zoomed out they are most of the ink and say the least. A
+// DRAWING rule only: the filter, its counts and a selection's neighbours do
+// not change with it.
+export const HIDE_TAG_LINES_BELOW = 0.4
+// A label's colour by kind, as a theme key (pages spec §4): a page's and a
+// type's read first, a post's is `dim` until it is hovered or selected.
+const LABEL_COLOURS = { page: "ink", type: "ink", tag: "meta", post: "dim", more: "dim" }
 // The width of the surface-coloured outline under a label, which keeps a title
 // readable where it crosses an edge.
 const LABEL_HALO = 3
@@ -57,15 +83,15 @@ const BACKING_X = 4
 const BACKING_HEIGHT = 18
 // How far outside the canvas an edge's end or a node's edge may be and still
 // count as on it: half the widest stroke, rounded up, and a node's rings and
-// its notes badge (which reaches furthest on the smallest mark: "99+" on a
-// 7px dot ends 20.5px left of its edge).
+// its notes badge (which reaches furthest on a page's card: "99+" there ends
+// 22.5px left of the card's edge, and 20.5px left of a 7px dot's).
 const EDGE_MARGIN = 2
-const NODE_MARGIN = 21
+const NODE_MARGIN = 23
 // A ring's distance from the mark's edge.
 const HOVER_RING = 2.5
 const SELECTED_RING = 4
 const FOCUS_RING = 5
-// A post with open notes (notes spec §4.4, handoff "Mind graph node badge"):
+// A post or a page with open notes (notes spec §4.4, handoff "Mind graph node badge"):
 // the count in a small pill on the mark's top-left corner. Half its height
 // (the handoff's 14px line), half a character's advance at 10px mono, the
 // room beside the text (`px-1`), and how far the pill reaches over the
@@ -74,13 +100,6 @@ const NOTES_BADGE = 7
 const NOTES_CHARACTER = 3
 const NOTES_BADGE_PAD = 4
 const NOTES_OVERLAP = 4
-
-// Four sizes by degree: small differences in size can't be read, so a hub is
-// one of four steps, not a point on a scale. A tag's is its half side.
-export function radiusFor(node) {
-  const [ , post, tag ] = STEPS.find(([ upTo ]) => node.degree <= upTo)
-  return node.kind === "tag" ? tag : post
-}
 
 // `edges[i].source` / `.target` are node INDEXES (`app.js` converts the ids
 // once), `visibleNodes` / `visibleEdges` indexes too. `width` and `height` are
@@ -98,10 +117,11 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   const beyond = (sx, sy, margin) =>
     (sx < -margin ? 1 : sx > width + margin ? 2 : 0) | (sy < -margin ? 4 : sy > height + margin ? 8 : 0)
 
-  // One path per kind and strength, so a few thousand edges are four strokes.
-  // With a selection, the edges that touch it are the bright pass and the
-  // rest the faded one; with none, every edge is the plain pass.
-  for (const kind of [ "tag", "related" ]) {
+  // One path per style and strength, so a few thousand edges are a handful
+  // of strokes. With a selection, the edges that touch it are the bright pass
+  // and the rest the faded one; with none, every edge is the plain pass.
+  for (const [ kind, style ] of Object.entries(LINE_STYLES)) {
+    if (kind === "tag" && camera.k < HIDE_TAG_LINES_BELOW) continue
     for (const pass of selected < 0 ? [ "plain" ] : [ "faded", "bright" ]) {
       context.beginPath()
       for (const edgeIndex of visibleEdges) {
@@ -115,29 +135,38 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
         context.lineTo(toX, toY)
       }
       const bright = pass === "bright"
-      context.globalAlpha = bright ? 0.9 : (kind === "tag" ? 0.8 : 0.35) * (pass === "faded" ? DIM : 1)
-      context.strokeStyle = kind === "tag" && !bright ? theme.meta : theme.ink
-      context.lineWidth = (kind === "tag" ? 1 : 1.5) + (bright ? 0.5 : 0)
-      context.setLineDash(kind === "tag" ? [ 4, 3 ] : [])
+      context.globalAlpha = bright ? 0.9 : style.alpha * (pass === "faded" ? DIM : 1)
+      context.strokeStyle = bright ? theme.ink : theme[style.colour]
+      context.lineWidth = style.width + (bright ? 0.5 : 0)
+      context.lineCap = style.cap
+      context.setLineDash(style.dash)
       context.stroke()
     }
   }
+  // The marks, the pin and the rings are drawn with the cap they expect.
+  context.lineCap = "butt"
   context.setLineDash([])
 
   for (const index of visibleNodes) {
     if (beyond(x(index), y(index), radii[index] + NODE_MARGIN)) continue
     context.globalAlpha = dimmed(index) ? DIM : 1
-    if (nodes[index].kind === "tag") drawTag(context, theme, x(index), y(index), radii[index])
-    else drawPost(context, theme, nodes[index], x(index), y(index), radii[index])
-    if (pinned.has(index)) drawPin(context, theme, x(index), y(index), radii[index])
-    if (nodes[index].kind !== "tag" && (nodes[index].open_notes ?? 0) > 0) drawNotes(context, theme, nodes[index], x(index), y(index), radii[index])
+    const node = nodes[index]
+    drawMark(context, theme, node, x(index), y(index), radii[index])
+    if (pinned.has(index)) drawPin(context, theme, x(index), y(index), topCorner(node, radii[index]))
+    // A record's notes: a tag, a post type and the pill have none.
+    if ((node.open_notes ?? 0) > 0 && (node.kind === "post" || node.kind === "page")) drawNotes(context, theme, node, x(index), y(index), topCorner(node, radii[index]))
   }
 
   context.textBaseline = "middle"
   context.lineJoin = "round"
   for (const label of labels) {
     const node = nodes[label.index]
-    context.font = label.index === selected ? theme.strongFont : theme.font
+    // The pill's words are inside it: no label, and no empty backing beside
+    // it when it is hovered.
+    if (!node.label) continue
+    const chosen = label.index === selected
+    // A tag's label is mono, like a tag everywhere else in CS Studio.
+    context.font = chosen ? theme.strongFont : node.kind === "tag" ? theme.monoFont : theme.font
     if (label.hover) {
       // Full ink on a backing, at full strength whatever the selection dims.
       context.globalAlpha = 1
@@ -150,7 +179,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
     context.globalAlpha = label.alpha * (dimmed(label.index) ? DIM : 1)
     context.lineWidth = LABEL_HALO
     context.strokeStyle = theme.surface
-    context.fillStyle = node.kind === "tag" ? theme.meta : theme.ink
+    context.fillStyle = chosen ? theme.ink : theme[LABEL_COLOURS[node.kind]]
     context.strokeText(node.label, label.x, label.y)
     context.fillText(node.label, label.x, label.y)
   }
@@ -161,9 +190,11 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   context.globalAlpha = 1
   const shown = (index) => index != null && index >= 0 && visibleNodes.includes(index)
   const ring = (index, distance) => {
+    const box = boxOf(nodes[index])
     const reach = radii[index] + distance
     context.beginPath()
     if (nodes[index].kind === "tag") context.rect(x(index) - reach, y(index) - reach, reach * 2, reach * 2)
+    else if (box) context.rect(x(index) - box.width / 2 - distance, y(index) - box.height / 2 - distance, box.width + distance * 2, box.height + distance * 2)
     else context.arc(x(index), y(index), reach, 0, Math.PI * 2)
     context.stroke()
   }
@@ -186,12 +217,12 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   }
 }
 
-// A small ink dot with a surface ring, at the mark's top-right: "this node
-// stays where it was put". The legend's "Pinned" swatch is the same mark.
-function drawPin(context, theme, x, y, radius) {
-  const offset = radius * 0.72
+// A small ink dot with a surface ring, at the mark's top-right (`corner`,
+// from `topCorner`): "this node stays where it was put". The legend's
+// "Pinned" swatch is the same mark.
+function drawPin(context, theme, x, y, corner) {
   context.beginPath()
-  context.arc(x + offset, y - offset, 3, 0, Math.PI * 2)
+  context.arc(x + corner.x, y - corner.y, 3, 0, Math.PI * 2)
   context.setLineDash([])
   context.fillStyle = theme.ink
   context.fill()
@@ -210,11 +241,10 @@ function drawPin(context, theme, x, y, radius) {
 // the corner covered half of it at two digits and all of it at "99+" on a
 // small mark. `save` and `restore` keep the node's own strength
 // (`globalAlpha`) and leave the text settings as the labels expect them.
-function drawNotes(context, theme, node, x, y, radius) {
+function drawNotes(context, theme, node, x, y, corner) {
   const label = node.open_notes > 99 ? "99+" : String(node.open_notes)
-  const offset = radius * 0.72
   const half = Math.max(NOTES_BADGE, NOTES_CHARACTER * label.length + NOTES_BADGE_PAD)
-  const right = x - offset + NOTES_OVERLAP
+  const right = x - corner.x + NOTES_OVERLAP
   context.save()
   context.setLineDash([])
   context.beginPath()
@@ -222,8 +252,8 @@ function drawNotes(context, theme, node, x, y, radius) {
   // (`roundRect` is newer than the rest of what is drawn here): a missing
   // method would throw inside the draw and take the whole canvas with it,
   // for every graph that has a note on any post.
-  if (typeof context.roundRect === "function") context.roundRect(right - half * 2, y - offset - NOTES_BADGE, half * 2, NOTES_BADGE * 2, NOTES_BADGE)
-  else context.rect(right - half * 2, y - offset - NOTES_BADGE, half * 2, NOTES_BADGE * 2)
+  if (typeof context.roundRect === "function") context.roundRect(right - half * 2, y - corner.y - NOTES_BADGE, half * 2, NOTES_BADGE * 2, NOTES_BADGE)
+  else context.rect(right - half * 2, y - corner.y - NOTES_BADGE, half * 2, NOTES_BADGE * 2)
   context.fillStyle = theme.surface
   context.fill()
   context.strokeStyle = theme.line
@@ -233,48 +263,6 @@ function drawNotes(context, theme, node, x, y, radius) {
   context.textAlign = "center"
   context.textBaseline = "middle"
   context.fillStyle = theme.ink
-  context.fillText(label, right - half, y - offset + 0.5)
+  context.fillText(label, right - half, y - corner.y + 0.5)
   context.restore()
-}
-
-function drawTag(context, theme, x, y, half) {
-  context.fillStyle = theme.surface
-  context.strokeStyle = theme.meta
-  context.lineWidth = 1.5
-  context.setLineDash([])
-  context.fillRect(x - half, y - half, half * 2, half * 2)
-  context.strokeRect(x - half, y - half, half * 2, half * 2)
-}
-
-function drawPost(context, theme, node, x, y, radius) {
-  const retired = node.colour_index == null
-  const slot = retired ? null : (node.colour_index - 1) % 12
-  const hue = retired ? theme.meta : theme.categories[slot % 6]
-  const ring = retired || slot >= 6
-  const hollow = node.status !== "live"
-
-  context.beginPath()
-  context.arc(x, y, radius, 0, Math.PI * 2)
-  context.fillStyle = ring || hollow ? theme.surface : hue
-  context.fill()
-  context.strokeStyle = hue
-  context.lineWidth = ring ? 2.5 : hollow ? 2 : 1.5
-  context.setLineDash(hollow ? [ 3, 2.5 ] : [])
-  context.stroke()
-  context.setLineDash([])
-
-  if (hollow && !ring) {
-    context.beginPath()
-    context.arc(x, y, radius * 0.4, 0, Math.PI * 2)
-    context.fillStyle = hue
-    context.fill()
-  }
-  if (retired) {
-    const reach = radius * 0.72
-    context.beginPath()
-    context.moveTo(x - reach, y + reach)
-    context.lineTo(x + reach, y - reach)
-    context.lineWidth = 1.5
-    context.stroke()
-  }
 }

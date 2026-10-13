@@ -170,6 +170,10 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
     ]
   }
 
+  // A page, a post type and "+N more" until each has its card (pages plan,
+  // Task 8): its name, and Pin.
+  const plain = (node) => [ heading(), title(node), actions() ]
+
   function setPinned(pinned) {
     if (!pin) return
     pin.textContent = text.t(pinned ? "mind_graph.script.card.unpin" : "mind_graph.script.card.pin")
@@ -177,7 +181,7 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
 
   return {
     show(node, { pinned = false, pinnable = true } = {}) {
-      container.replaceChildren(...(node.kind === "tag" ? tag(node) : post(node)), closeButton())
+      container.replaceChildren(...({ tag, post }[node.kind] || plain)(node), closeButton())
       setPinned(pinned)
       pin.hidden = !pinnable
       // Named by its title while it has one (the view's own name is the
