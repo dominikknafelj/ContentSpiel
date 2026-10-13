@@ -26,4 +26,18 @@ class Admin::Fields::SelectFieldTest < ViewComponent::TestCase
 
     assert_selector "select.cs-select[name='post[fields][size]']"
   end
+
+  test "a select that is not required names its empty choice when the field says how, and leaves it unnamed otherwise" do
+    named = Field.new(name: "language", type: :select, options: { options: { "ruby" => "Ruby" }, blank: "Plain text" })
+    render_inline Admin::Fields::SelectField.new(field: named, form_name: "block[settings]", value: nil, locale: "en")
+    assert_selector "option[value='']", text: "Plain text"
+
+    unnamed = Field.new(name: "size", type: :select, options: { options: %w[small] })
+    render_inline Admin::Fields::SelectField.new(field: unnamed, form_name: "block[settings]", value: nil, locale: "en")
+    assert_equal "", page.find("option[value='']").text
+
+    required = Field.new(name: "size", type: :select, options: { options: %w[small], required: true })
+    render_inline Admin::Fields::SelectField.new(field: required, form_name: "block[settings]", value: "small", locale: "en")
+    assert_no_selector "option[value='']"
+  end
 end

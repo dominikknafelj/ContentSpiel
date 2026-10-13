@@ -10,9 +10,17 @@
 # via `dsl_attribute`.
 module ContentModel
   class Definition
-    SCALAR_TYPES = %i[string text integer boolean date url select content_type tag].freeze
+    # `:code` is source code: stored as typed (`FieldSet#cast_code`), never
+    # stripped like `:text`, and never translated -- the code is the same in
+    # every language, and a translated field is what is offered to an AI
+    # provider (`Admin::Ui::FieldComponent::TRANSLATABLE_TYPES` does not list
+    # it either).
+    SCALAR_TYPES = %i[string text code integer boolean date url select content_type tag].freeze
     GROUP_TYPES = %i[group groups].freeze
-    OPTIONS = %i[required default min max translated options of].freeze
+    # `blank:` is the label of a select's empty choice ("Plain text"); without
+    # it the choice has no label. `max:` counts characters for a `:code` field
+    # and is a number's upper bound for an `:integer`.
+    OPTIONS = %i[required default min max translated options of blank].freeze
 
     # One field in the schema: `options` carries everything but name/type
     # (`required:`, `default:`, `min:`/`max:`, `translated:`, `options:` for
@@ -56,6 +64,8 @@ module ContentModel
       raise ArgumentError, "#{type} fields need `of:` naming a field group" if GROUP_TYPES.include?(type) && options[:of].blank?
       raise ArgumentError, "#{type} fields can't have a default (there's no one canonical default for a nested value)" if GROUP_TYPES.include?(type) && options.key?(:default)
       raise ArgumentError, "select fields need `options:`" if type == :select && options[:options].blank?
+      raise ArgumentError, "code fields can't be translated (the code is the same in every language)" if type == :code && options[:translated]
+      raise ArgumentError, "`blank:` names the empty choice of a select that isn't required" if options.key?(:blank) && (type != :select || options[:required])
 
       @fields << Field.new(name: name.to_s, type: type, options: options)
     end

@@ -180,8 +180,23 @@ module ContentModel
         when :integer then Integer(value.to_s, exception: false)
         when :boolean then ActiveModel::Type::Boolean.new.cast(value)
         when :date then parse_date(value)
+        when :code then cast_code(value)
         else value.to_s.strip.presence
         end
+      end
+
+      # Source code (`:code`, code block spec §1) is kept as typed: the first
+      # line's indentation, tabs, inner blank lines and trailing spaces. Two
+      # things are not content: which line ending the browser sent (a form
+      # submits CRLF) and lines of only white space before the first line and
+      # after the last, which a paste brings along. Lines, not a regular
+      # expression: a run of blank lines in the middle of 20,000 characters
+      # must not be walked once per line.
+      def cast_code(value)
+        lines = value.to_s.gsub(/\r\n?/, "\n").split("\n", -1)
+        lines.shift while lines.any? && lines.first.strip.empty?
+        lines.pop while lines.any? && lines.last.strip.empty?
+        lines.join("\n").presence
       end
 
       # Strictly `yyyy-mm-dd`: `Date.iso8601` alone also takes "20240101" and
@@ -237,6 +252,7 @@ module ContentModel
 
           errors.add(field.name, :inclusion) if field.type == :select && !select_options(field).include?(value)
           errors.add(field.name, :inclusion) if field.type == :content_type && ContentTypes.find(value).nil?
+          errors.add(field.name, :too_long, count: field.options[:max]) if field.type == :code && field.options[:max] && value.length > field.options[:max]
           errors.add(field.name, :invalid) if field.type == :url && !url?(value)
           errors.add(field.name, :greater_than_or_equal_to, count: field.options[:min]) if field.options[:min] && value.is_a?(Integer) && value < field.options[:min]
           errors.add(field.name, :less_than_or_equal_to, count: field.options[:max]) if field.options[:max] && value.is_a?(Integer) && value > field.options[:max]

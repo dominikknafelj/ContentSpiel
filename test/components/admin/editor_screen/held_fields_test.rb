@@ -113,7 +113,8 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     "input->admin--editor--slug-preview#update",
     "focusout->admin--rich-text--editor#containFocus",
     "click->admin--ui--menu#select",
-    "click->admin--ui--menu#close"
+    "click->admin--ui--menu#close",
+    "input->admin--editor--code-limit#update"
   ].freeze
 
   def assert_survives(html)
@@ -134,6 +135,17 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true)
 
     assert_survives(rendered_content)
+  end
+
+  test "Admin::Fields::CodeField, rewritten: the code is read-only with its indentation and its counter's action is the one left" do
+    field = ContentModel::Definition::Field.new(name: "code", type: :code, options: { max: 20_000 })
+    render_inline Admin::Ui::FieldComponent.new(field: field, form_name: "block[settings]", value: "    indented\n\tb", locale: "en", id_prefix: "block-1")
+
+    assert_survives(rendered_content)
+    rewritten = Nokogiri::HTML5.fragment(held(rendered_content))
+    assert rewritten.at_css("textarea[name='block[settings][code]'][readonly]")
+    assert_equal "    indented\n\tb", rewritten.at_css("textarea").text
+    assert_equal [ "input->admin--editor--code-limit#update" ], rewritten.css("[data-action]").map { |node| node["data-action"] }
   end
 
   test "Admin::Ui::ChipInputComponent and RelatedPostsComponent (a post's tags, a block's tag), rewritten" do

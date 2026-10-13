@@ -50,6 +50,7 @@ module Admin
         admin--rich-text--editor#containFocus
         admin--ui--menu#select
         admin--ui--menu#close
+        admin--editor--code-limit#update
       ].freeze
       # The rules as data, for the browser's counterpart (`editing/freeze`),
       # which turns ONE form read-only in place: the region renders this into

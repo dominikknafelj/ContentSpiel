@@ -7,7 +7,13 @@
     <% fields.each do |label, value| %>
       <div>
         <dt class="<%= setup_label_class %>"><%= label %></dt>
-        <dd class="text-ink"><%= value.presence || "—" %></dd>
+        <dd class="text-ink">
+          <% if value.is_a?(Admin::EditorScreen::SharedFieldsComponent::Code) %>
+            <%= tag.pre value.text, tabindex: 0, class: "max-h-[12lh] overflow-auto rounded-cs border border-line bg-sunken p-2 font-cs-mono text-sm [tab-size:2]" %>
+          <% else %>
+            <%= value.presence || "—" %>
+          <% end %>
+        </dd>
       </div>
     <% end %>
   </dl>
