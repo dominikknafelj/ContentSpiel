@@ -248,7 +248,8 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     page.execute_script(%(document.querySelector("main").insertAdjacentHTML("afterbegin", '<a id="to-file" href="#code-#{target.id}-file">To the file</a>')))
 
     find("#to-file").click
-    assert_no_selector "#to-file"
+    # wait: the link goes when Turbo has fetched and drawn the page again, seventeen blocks of it.
+    assert_no_selector "#to-file", wait: 8
     await_connected
     await_js("location.hash === '#code-#{target.id}-file'")
     await_frames
@@ -266,7 +267,8 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     find("#{FIGURE} button", text: "Copy").click
     assert_selector "#{FIGURE} button", exact_text: "Copied"
     find("header a", match: :first).click
-    assert_no_selector FIGURE
+    # wait: the figure goes when Turbo has fetched and drawn the page the link leads to.
+    assert_no_selector FIGURE, wait: 8
 
     kept = nil
     assert_eventually(message: "Turbo kept no snapshot of the page that was left") { (kept = turbo_snapshots.grep(/content-block--code/)).any? }

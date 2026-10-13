@@ -64,7 +64,8 @@ class Admin::CodeBlockSystemTest < ApplicationSystemTestCase
     open_editor
     # Scoped to the picker: the rich-text toolbar has a "Code block" button, and a label is matched as a part.
     within("#block-picker-end") { press "Code" }
-    assert_selector ".admin-block-card textarea[name='block[settings][code]']"
+    # wait: the card is the answer to the request that creates the block, on a runner with two slow cores.
+    assert_selector ".admin-block-card textarea[name='block[settings][code]']", wait: 8
     block = @page.content_blocks.sole
     await_admin_controllers
 
@@ -94,7 +95,9 @@ class Admin::CodeBlockSystemTest < ApplicationSystemTestCase
     assert_equal 18_412, block.reload.settings["code"].length
 
     paste(block, 20_001)
-    assert_selector "##{code_id(block)}-errors", text: "Code is too long (maximum is 20,000 characters)"
+    # wait: the message is the answer to a save that starts a second after the paste (the autosave's debounce),
+    # carries 20,001 characters and re-renders the card; the default two seconds leave it one.
+    assert_selector "##{code_id(block)}-errors", text: "Code is too long (maximum is 20,000 characters)", wait: 8
     assert_selector "##{code_id(block)}-count.text-danger-ink", exact_text: "20,001 of 20,000 characters · 1 over"
     assert_equal 20_001, page.evaluate_script("document.getElementById('#{code_id(block)}').value.length"), "the refused text is still in the field"
     assert_equal 18_412, block.reload.settings["code"].length, "and nothing was written"
@@ -258,7 +261,8 @@ class Admin::CodeBlockSystemTest < ApplicationSystemTestCase
     paste(block, 20_500)
     assert_selector "##{code_id(block)}-count", exact_text: "20,500 of 20,000 characters · 500 over"
     assert_equal "20,412 of 20,000 characters · 412 over", announced(block), "further over is not announced again"
-    assert_selector "##{code_id(block)}-errors", text: "Code is too long (maximum is 20,000 characters)"
+    # wait: as above, the refusal of a save that starts a second after the last paste and carries 20,500 characters.
+    assert_selector "##{code_id(block)}-errors", text: "Code is too long (maximum is 20,000 characters)", wait: 8
 
     # Down again says nothing and empties the region, so the next time up is said.
     paste(block, 19_000)
