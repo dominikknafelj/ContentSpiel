@@ -81,7 +81,10 @@ const lineToggleOf = (edge) => (edge.kind === "brings" ? "lists" : edge.kind)
 
 // A pill that stands for no post any more (every one of its posts was added
 // from the list, `countAdded`) is not shown, and its faint line goes with it.
-const spent = (node) => node.kind === "more" && node.count <= 0
+// What is not shown takes no press, has no label, no row in the list and no
+// place in any count, since each of those reads `visible`'s answer; and the
+// app lets a pin on it go (`app.js`, `addPost`).
+export const spent = (node) => node.kind === "more" && node.count <= 0
 
 export function visible({ nodes, edges, on }) {
   const visibleNodes = nodes.flatMap((node, index) => (on.nodes.has(toggleOf(node)) && !spent(node) ? [ index ] : []))
@@ -109,12 +112,13 @@ export function counts(nodes, edges) {
 //   (`row.via`): the pill on that target stands for one post fewer. The
 //   answer is that pill's index, for the caller to write its words and its
 //   width again; at none the pill is no longer shown (`visible`).
-// - A row of "Not listed on any page" names none. In the WHOLE graph, when
-//   nothing was cut at the cap, a readable post that was not drawn is one of
-//   the unconnected ones the notice counts (`data.isolated`): one fewer
-//   isn't shown. AT THE CAP THE PAGE CANNOT KNOW whether the post was cut or
-//   unconnected (its row was read with no line counted), and claims
-//   nothing; a local view counts no such posts at all.
+// - A row of "Not listed on any page" names none, and says whether its post
+//   has no connection at all (`row.unconnected`, `PostGraph::Rows`). In the
+//   WHOLE graph such a post is one the notice counts (`data.isolated`): one
+//   fewer isn't shown. The row says it because the page cannot work it out:
+//   at the posts' cap a post that is not drawn may as well be a connected
+//   one the cut left out, which the notice never counted. A local view
+//   counts no such posts at all.
 //
 // Answers the index of the pill it counted down, or -1.
 export function countAdded(nodes, data, row) {
@@ -123,7 +127,7 @@ export function countAdded(nodes, data, row) {
     if (pill >= 0) nodes[pill].count -= 1
     return pill
   }
-  if (!data.focus && data.shown >= data.total && data.isolated > 0) data.isolated -= 1
+  if (row.unconnected === true && !data.focus && data.isolated > 0) data.isolated -= 1
   return -1
 }
 

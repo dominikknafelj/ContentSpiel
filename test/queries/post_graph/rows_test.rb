@@ -23,7 +23,43 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     assert_equal 2, result[:total]
     assert_equal [ "post-#{@new.id}", "post-#{@old.id}" ], result[:rows].map { |row| row[:id] }
     assert_equal({ id: "post-#{@new.id}", title: "New", type: "blog", colour_index: ContentTypes.fetch("blog").colour_index, status: "draft", changes: nil,
-                   change_at: nil, listed: false, url: "/cs-studio/posts/#{@new.id}", degree: 0, related_count: 0, tag_count: 0, open_notes: 0 }, result[:rows].first)
+                   change_at: nil, listed: false, url: "/cs-studio/posts/#{@new.id}", degree: 0, related_count: 0, tag_count: 0, open_notes: 0, unconnected: true }, result[:rows].first)
+  end
+
+  # The whole graph's notice counts the posts with no connection as not
+  # shown; a row that adds such a post takes it out of that count, so the
+  # row says which it is, by the rule `Global` ranks with. Held against
+  # `Global` itself: the posts it counts as connected are exactly the rows
+  # that are not unconnected, at a cap that cuts every one of them too.
+  test "an unlisted row says whether its post has no connection at all, by the rule the whole graph counts with, also for a post the cap cut" do
+    related = create_post(title: "Related", content_type: "resume_entry")
+    other = create_post(title: "Other end", content_type: "resume_entry")
+    PostRelation.create!(post: other, related_post: related)
+    twins = 2.times.map { |index| create_post(title: "Twin #{index}", content_type: "resume_entry", tags: [ "pair" ]) }
+    single = create_post(title: "Single tag", content_type: "resume_entry", tags: [ "lonely" ])
+    # A tag a page lists (for blog posts) that this one post alone carries: it
+    # is no blog post, so no page lists it, and the listed tag is a node, so
+    # it has a line.
+    list_block(@blog, content_type: "blog", tag: "solo")
+    create_post(title: "Carries a listed tag", content_type: "resume_entry", tags: [ "solo" ])
+    hidden = create_post(title: "Trashed end", content_type: "resume_entry")
+    PostRelation.create!(post: single, related_post: hidden)
+    hidden.update_column(:trashed_at, Time.current)
+
+    flags = rows.unlisted[:rows].to_h { |row| [ row[:title], row[:unconnected] ] }
+
+    assert_equal({ "Related" => false, "Other end" => false, "Twin 0" => false, "Twin 1" => false, "Carries a listed tag" => false,
+                   "Single tag" => true, "Old" => true, "New" => true }, flags,
+      "a relation either way, a tag two readable posts carry and a tag a page lists are connections; a tag one post carries and a relation to a trashed post are none")
+    assert rows.listed(@blog.id, "tag-#{Tag.find_by!(name: "news").id}")[:rows].none? { |row| row.key?(:unconnected) }, "a pill's rows say nothing of it: they are counted by their pill"
+
+    whole = PostGraph::Global.call(actor: nil, url_for: ->(_record) { "" }, everything: true)
+    cut = PostGraph::Global.call(actor: nil, url_for: ->(_record) { "" }, everything: true, cap: 1)
+    unlisted = rows.unlisted[:rows]
+    drawn = whole[:nodes].map { |node| node[:id] }
+    assert_equal unlisted.reject { |row| row[:unconnected] }.map { |row| row[:id] }.sort, (unlisted.map { |row| row[:id] } & drawn).sort, "the rows that are connected are the ones the whole graph draws"
+    assert_equal [ whole[:isolated], 1 ], [ cut[:isolated], cut[:shown] ], "the cap cuts connected posts and leaves the unconnected count as it is"
+    assert_equal whole[:isolated], unlisted.count { |row| row[:unconnected] }, "every unconnected post here is unlisted, and each row says so"
   end
 
   test "the first rows up to the limit, with the whole total" do
@@ -66,11 +102,13 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     assert_equal({ total: 0, rows: [], filter: {} }, rows.listed(root_page.id, "all-posts"))
   end
 
-  # EIGHT IS A CEILING (the site's five and the nodes' three). The two sizes
+  # EACH FIGURE IS A CEILING (the site's five and the nodes' three; the
+  # unlisted read asks one more, the relations that touch its rows, for
+  # what each row says of its post's connections). The two sizes
   # differ in the pages (and their children), the list blocks on a page, a
   # section, the tags blocks name, the posts and their notes: a statement
   # per page, per block or per row would show.
-  test "each read costs eight statements, on a small site and on one with thirty more pages, their blocks and sections, and thirty more posts" do
+  test "the unlisted read costs nine statements and a pill's eight, on a small site and on one with thirty more pages, their blocks and sections, and thirty more posts" do
     viewer = users(:one)
     22.times { |index| create_post(title: "News #{index}", tags: [ "news" ]) } # so that `listed` has rows: a read with none asks for no notes
     news = "tag-#{Tag.find_by!(name: "news").id}" # looked up out here: inside the block it would be counted
@@ -88,8 +126,8 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     posts = 30.times.map { |index| create_post(title: "More #{index}", tags: index.even? ? [ "news" ] : (index % 3 == 0 ? [ "topic #{index % 6}" ] : [])) }
     as(users(:two)) { posts.last(4).each { |post| Notes::Start.call(post, body: "A note") } }
 
-    assert_equal [ 8, 8 ], few
-    assert_equal [ 8, 8 ], count.call
+    assert_equal [ 9, 8 ], few
+    assert_equal [ 9, 8 ], count.call
     assert_equal [ 12, 18 ], [ @unlisted[:total], @behind[:total] ]
   end
 
@@ -118,8 +156,8 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
 
   # A viewer who is not an owner costs one more in a request, constant:
   # their grants, read once. Here they are read before the counting (the
-  # first read of the test), so each read is its eight.
-  test "for a viewer with a scope each read costs the same eight statements at both sizes, after their grants, and holds no post outside it" do
+  # first read of the test), so each read is its nine or its eight.
+  test "for a viewer with a scope the reads cost the same nine and eight statements at both sizes, after their grants, and hold no post outside it" do
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
     access_control_grants(:author_posts_create).update!(scope: { "own" => true })
     author = users(:author)
@@ -127,15 +165,15 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     22.times { |index| mine.call("Mine #{index}", tags: [ "news" ]) }
     mine.call("Mine alone")
     news = "tag-#{Tag.find_by!(name: "news").id}"
-    assert_equal 9, capture_sql { as(author) { rows(actor: author).unlisted } }.size, "the grants, once"
+    assert_equal 10, capture_sql { as(author) { rows(actor: author).unlisted } }.size, "the grants, once"
     read = -> { as(author) { [ capture_sql { @unlisted = rows(actor: author).unlisted }.size, capture_sql { @behind = rows(actor: author).listed(@blog.id, news) }.size ] } }
 
     few = read.call
     assert_equal [ 1, 2 ], [ @unlisted[:total], @behind[:total] ], "of the twenty-two they read, two are behind the pill; the three posts of others are in neither read"
     30.times { |index| mine.call("More #{index}", tags: ([ "news" ] if index.even?).to_a) }
 
-    assert_equal [ 8, 8 ], few
-    assert_equal [ 8, 8 ], read.call
+    assert_equal [ 9, 8 ], few
+    assert_equal [ 9, 8 ], read.call
     assert_equal [ 16, 17 ], [ @unlisted[:total], @behind[:total] ]
     assert_no_match(/Listed|Old|New\b/, [ @unlisted, @behind ].to_json)
     assert_no_match(/#{[ @listed, @old, @new ].map { |post| "post-#{post.id}\\b" }.join("|")}/, [ @unlisted, @behind ].to_json, "nor their ids")

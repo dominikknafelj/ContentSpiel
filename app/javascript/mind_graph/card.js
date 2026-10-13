@@ -73,10 +73,12 @@
 // `Admin::Ui::ContentTypeDotComponent`'s, both handed over by the view
 // (`buttonClasses`, `dotClasses`), so neither is copied here.
 //
-// `createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses,
+// `createCard(container, { text, number, urls, typeLabels, dotClasses, buttonClasses,
 // onClose, onPin, onChange })` answers `{ show(node, { pinned, pinnable }),
 // setPinned(pinned), open(), hide() }` (`pinnable: false` leaves the Pin button out:
-// with no layout there is nothing to hold). `text` is `messages(element)`,
+// with no layout there is nothing to hold; `show` answers whether the node's
+// kind has a card, and does nothing for one that has none). `text` is
+// `messages(element)`, `number` groups a figure as the messages' language does,
 // `urls` the six templates (`postFocus`, `tagFocus`, `tagPosts`, `pageFocus`,
 // and `postNotes` and `pageNotes`, a record's notes as JSON), `typeLabels` a
 // content type's human name by its stored name, `onClose` what the Close
@@ -108,7 +110,7 @@ export const dotClass = (dotClasses, node) =>
   `h-[7px] w-[7px] shrink-0 rounded-full ${node.colour_index == null ? "border border-meta" : dotClasses[(node.colour_index - 1) % dotClasses.length]}`
 export const TAG_MARK = "h-2 w-2 shrink-0 border border-meta bg-surface"
 
-export function createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange }) {
+export function createCard(container, { text, number = String, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange }) {
   let pin = null
 
   const element = (tag, className, content) => {
@@ -131,6 +133,9 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
     return anchor
   }
   const label = (content) => element("span", "font-cs-mono text-label uppercase tracking-mono text-meta", content)
+  // A count in its sentence: the figure grouped as the messages' language
+  // groups it ("lists 2,040 posts"); the number only chooses the form.
+  const counted = (key, count) => text.t(key, { count, figure: number(count) })
   // "Open post" or "Open page", marked so that Enter on the selected node
   // can press it. The address is the node's own, which the server built.
   const openLink = (node, key) => {
@@ -244,7 +249,7 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       heading(mark(dotClass(dotClasses, node)), kind, ...chipBeside(node)),
       ...chipBelow(node),
       title(node),
-      ...(known ? [ pairOf(text.t("mind_graph.script.card.related", { count: node.related_count ?? 0 }), text.t("mind_graph.script.card.tags", { count: node.tag_count ?? 0 })) ] : []),
+      ...(known ? [ pairOf(counted("mind_graph.script.card.related", node.related_count ?? 0), counted("mind_graph.script.card.tags", node.tag_count ?? 0)) ] : []),
       cardNotes(node, { text, type: "post", url: fill(urls.postNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),
       actions(
         openLink(node, "mind_graph.script.card.open_post"),
@@ -262,7 +267,7 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       heading(markCanvas(node), element("span", "min-w-0 truncate font-cs-mono text-label text-meta", node.path || ""), ...chipBeside(node)),
       ...chipBelow(node),
       title(node),
-      pairOf(text.t("mind_graph.script.card.child_pages", { count: node.child_count ?? 0 }), text.t("mind_graph.script.card.lists_posts", { count: node.listed_count ?? 0 })),
+      pairOf(counted("mind_graph.script.card.child_pages", node.child_count ?? 0), counted("mind_graph.script.card.lists_posts", node.listed_count ?? 0)),
       cardNotes(node, { text, type: "page", url: fill(urls.pageNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),
       actions(
         openLink(node, "mind_graph.script.card.open_page"),
@@ -273,7 +278,7 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
 
   function tag(node) {
     const counts = element("p", "m-0 flex")
-    counts.append(label(text.t("mind_graph.script.card.tag_posts", { count: node.count })))
+    counts.append(label(counted("mind_graph.script.card.tag_posts", node.count)))
     return [
       heading(mark(TAG_MARK), element("span", "text-sm text-dim", text.t("mind_graph.script.card.tag"))),
       title(node),
@@ -290,7 +295,7 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
   // nowhere: the pages that list it are its neighbours on the canvas.
   function type(node) {
     const counts = element("p", "m-0 flex")
-    counts.append(label(text.t("mind_graph.script.card.tag_posts", { count: node.count ?? 0 })))
+    counts.append(label(counted("mind_graph.script.card.tag_posts", node.count ?? 0)))
     return [ heading(markCanvas(node), element("span", "text-sm text-dim", text.t("mind_graph.script.card.post_type"))), title(node), counts, actions() ]
   }
 
@@ -303,7 +308,11 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
 
   return {
     show(node, { pinned = false, pinnable = true } = {}) {
-      // (A "+N more" pill never comes here: it is not selected.)
+      // A kind with no card (a "+N more" pill, which is not selected, or a
+      // kind a later build draws before it has one) is answered false:
+      // nothing is shown, the card that is open stays, and nothing throws.
+      // `hasOwn`, because a kind is data and `CARDS.constructor` is no card.
+      if (!Object.hasOwn(CARDS, node.kind)) return false
       container.replaceChildren(...CARDS[node.kind](node), closeButton())
       // A canvas has colours only once it is in the document.
       paintMarks(container)
@@ -313,6 +322,7 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       // general "Selected in the graph").
       container.setAttribute("aria-labelledby", "mind-graph-card-title")
       container.hidden = false
+      return true
     },
     setPinned,
     // Enter on the selected node: the record's own "Open post" or "Open

@@ -56,9 +56,11 @@
 #   more[]:  { id: "more-<target>", count, page, target }   one pill per
 #              target, a page's local view only; no key without one
 #
-#   rows[]:  a post's node as in `nodes` with no line counted, and in
-#              `listed` its `via`, the target that brings it in: the list's
-#              two reads (`Rows`), `{ total, rows }`, newest first
+#   rows[]:  a post's node as in `nodes` with no line counted; in `listed`
+#              its `via`, the target that brings it in, and in `unlisted`
+#              `unconnected`, whether the post has no connection at all (it
+#              is then one of the global view's `isolated`): the list's two
+#              reads (`Rows`), `{ total, rows }`, newest first
 #
 # plus `total`, `shown` and `isolated` (global) or `focus` (local:
 # `{ kind: "page" | "post" | "tag", id, node_id, title, depth }`). The

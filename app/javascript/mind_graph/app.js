@@ -271,6 +271,7 @@ export function mount(element) {
   const buttonClasses = JSON.parse(element.dataset.buttonClasses)
   const card = createCard(cardElement, {
     text,
+    number,
     urls: {
       postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl, postNotes: element.dataset.postNotesUrl,
       pageFocus: element.dataset.pageFocusUrl, pageNotes: element.dataset.pageNotesUrl
@@ -348,6 +349,9 @@ export function mount(element) {
   // line, and nothing draws the groups over it.
   let rowsShown = null
   let failed = null
+  // The graph that is being read was asked for by "Show everything": its
+  // summary is announced when it is drawn, as the opened view's was.
+  let announceNext = false
   let asked = 0
   // The bar of the view a large site opens in, its sentence and its button
   // (absent from a focused view's page: such a view is never opened by rule).
@@ -556,8 +560,12 @@ export function mount(element) {
     if (rowsShown) {
       const shown = new Set(state.visibleNodes)
       const drawn = (id) => shown.has(indexOf.get(id))
+      // A pill's rows are headed by what the pill counts NOW ("More from Blog
+      // · 4" beside "+4 more"), not by what the read answered: one figure
+      // for "more" on the screen. The checkbox's rows keep the read's total.
+      const pill = rowsShown.pill == null ? null : state.nodes[indexOf.get(rowsShown.pill)]
       list.showRows({
-        heading: rowsShown.heading, link: rowsShown.link, inView: drawn, rows: rowsShown.rows.map((row) => (drawn(row.id) ? state.nodes[indexOf.get(row.id)] : row)),
+        heading: pill ? text.t("mind_graph.script.list.more_heading", { target: pill.of, count: number(pill.count) }) : rowsShown.heading, link: rowsShown.link, inView: drawn, rows: rowsShown.rows.map((row) => (drawn(row.id) ? state.nodes[indexOf.get(row.id)] : row)),
         back: rowsShown.pill ? wayBack() : null
       })
     } else {
@@ -607,7 +615,9 @@ export function mount(element) {
   // old one had, and when it brings the rows the list itself puts the focus
   // on the first of them (`node_list.js`: the focus was in the rows' region).
   // The heading's figure is the read's whole `total`, which can be more
-  // than its rows (the server answers the first `PostGraph::ROW_LIMIT`).
+  // than its rows (the server answers the first `PostGraph::ROW_LIMIT`);
+  // over a pill's rows it is the pill's own count, which falls as its
+  // posts are added.
   // "Open in Posts →" stands under a pill's rows (`pill`), where there are
   // any: the server names the address also when it found none.
   async function showRowsFrom(url, { pill = null, again = false } = {}) {
@@ -621,12 +631,12 @@ export function mount(element) {
       if (destroyed || mine !== asked) return
       list.setBusy(false)
       failed = null
-      // A pill's rows are named by what the pill hangs off, and have a way
-      // back; the checkbox's are "Posts", and the checkbox is their way back.
-      const hub = pill == null ? null : state.nodes[indexOf.get(pill)]
+      // A pill's rows are named by what the pill hangs off and counted by
+      // the pill (`drawList`), and have a way back; the checkbox's are
+      // "Posts", and the checkbox is their way back.
       rowsShown = {
         pill,
-        heading: hub ? text.t("mind_graph.script.list.more_heading", { target: hub.of, count: number(answer.total) }) : text.t("mind_graph.script.list.posts", { count: number(answer.total) }),
+        heading: text.t("mind_graph.script.list.posts", { count: number(answer.total) }),
         rows: answer.rows,
         link: pill && answer.posts_url && answer.rows.length > 0 ? { href: answer.posts_url, label: text.t("mind_graph.script.list.open_in_posts") } : null
       }
@@ -711,9 +721,15 @@ export function mount(element) {
     const pill = countAdded(state.nodes, state.data, row)
     if (pill >= 0) {
       sizePill(pill)
-      if (state.nodes[pill].count <= 0 && rowsShown?.pill === state.nodes[pill].id) {
-        letGo()
-        rowsShown = null
+      if (state.nodes[pill].count <= 0) {
+        // A SPENT PILL is not shown again (`graph_data.js`, `spent`), so a
+        // pin on it is let go: "Release 1 pinned" would name something
+        // nobody can see.
+        unpin([ pill ])
+        if (rowsShown?.pill === state.nodes[pill].id) {
+          letGo()
+          rowsShown = null
+        }
       }
     }
 
@@ -1023,7 +1039,9 @@ export function mount(element) {
     // The view a large site opened in is not what was asked for: where it
     // is, and what the site holds, is announced (the canvas's name, into
     // the notice's live region, hidden from the eye: the bar says it there).
-    if (opened()) summarise({ announce: true })
+    // So is the whole graph that "Show everything" put in its place.
+    if (opened() || announceNext) summarise({ announce: true })
+    announceNext = false
     setState("ready")
 
     // Nothing to lay out: settled as it stands, and no worker is started.
@@ -1118,6 +1136,7 @@ export function mount(element) {
     clear()
     showOpened()
     if (focused) canvas.focus()
+    announceNext = true
     load(element.dataset.everythingUrl)
   }
 

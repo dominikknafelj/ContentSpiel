@@ -17,10 +17,15 @@
 # Newest first, the first `limit` with the whole `total`. A row is a post's
 # node exactly as the graph's data has it (`Builder#post_nodes`), with no
 # line counted: the page adds a row that is not drawn to the canvas without
-# another request. A row of `listed` also says which hub brings its post in
+# another request. A row of `unlisted` also says whether its post has no
+# connection at all (`unconnected`): such a post is one the whole graph's
+# notice counts as not shown (`isolated`), and the page takes it out of that
+# count when the row adds it, at the posts' cap too, where a post that is
+# not drawn may as well be one the cut left out. A row of `listed` also says which hub brings its post in
 # (`via`, `Listings#target_of`): added to the canvas it gets that hub's line
-# (third design answers). AT MOST eight statements each, a ceiling: the
-# site's five and the nodes' three. A read with no row does not ask for the
+# (third design answers). AT MOST eight statements for `listed`, a ceiling:
+# the site's five and the nodes' three; `unlisted` asks one more, the
+# relations that touch its rows (nine). A read with no row does not ask for the
 # nodes (five), and a site where no list block names a tag does not ask for
 # the tags blocks name.
 #
@@ -39,7 +44,7 @@ module PostGraph
 
     def unlisted
       site = Site.load(actor: @actor)
-      answer(site, site.listings.unlisted)
+      answer(site, site.listings.unlisted, unconnected: true)
     end
 
     def listed(page_id, target)
@@ -53,14 +58,34 @@ module PostGraph
 
     private
 
-    def answer(site, ids, via: nil)
+    def answer(site, ids, via: nil, unconnected: false)
       shown = ids.first(@limit)
       nodes = Builder.new(site: site, locale: @locale, url_for: @url_for).post_nodes(shown).index_by { |node| node[:id] }
+      connected = unconnected ? connected(site, shown) : nil
       rows = shown.filter_map do |id|
         node = nodes[PostGraph.node_id(:post, id)] or next
+        node = node.merge(unconnected: !connected.include?(id)) if connected
         via ? node.merge(via: via.call(id)) : node
       end
       { total: ids.size, rows: rows }
+    end
+
+    # Which of these posts have a connection as `Global` counts one (its
+    # `weight`): a relation to a readable post, either way, a tag at least
+    # `MIN_TAGGED_POSTS` readable posts carry, or a tag a readable page
+    # lists. The rule is written there and here, and
+    # `test/queries/post_graph/rows_test.rb` holds the two to one answer.
+    # One statement, the relations that touch these posts; asked only when
+    # there is a row.
+    def connected(site, ids)
+      return Set.new if ids.empty?
+
+      readable = site.readable_posts.select(:id)
+      among = PostRelation.where(post_id: readable, related_post_id: readable)
+      related = among.where(post_id: ids).or(among.where(related_post_id: ids)).pluck(:post_id, :related_post_id).flatten
+      listed_tags = site.listings.tag_ids
+      tagged = site.tag_links.filter_map { |tag_id, post_id| post_id if site.tag_counts[tag_id] >= MIN_TAGGED_POSTS || listed_tags.include?(tag_id) }
+      related.to_set.merge(tagged)
     end
   end
 end

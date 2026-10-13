@@ -30,8 +30,8 @@
 // can be pressed by a keyboard). Each pill in view has a row UNDER THE ROW
 // OF WHAT IT HANGS OFF -- the post type's, "All posts"' or the tag's --
 // indented one step, in the pill's own words ("+92 more"), and named whole
-// for a screen reader ("92 more posts Blog lists, not in view. Activate to
-// show them."). It is counted in no heading: it is no post type and no tag.
+// for a screen reader, beginning with those words ("+92 more: 92 more posts
+// Blog lists, not in view. Activate to show them."). It is counted in no heading: it is no post type and no tag.
 // A pill whose hub has no row (its kind is switched off) stands at the end
 // of the posts, and with no post drawn either, after the groups: a pill in
 // view is never without a row. Activating it asks the app for the pill's
@@ -238,7 +238,9 @@ export function createList(container, { text, number = String, dotClasses, typeL
     button.type = "button"
     button.dataset.nodeId = pill.id
     button.dataset.more = ""
-    button.setAttribute("aria-label", text.t("mind_graph.script.list.more_row", { count: pill.count, figure: number(pill.count), target: pill.of ?? "" }))
+    // The name begins with the words the row shows, so someone who says
+    // what they see names it (WCAG 2.5.3, label in name).
+    button.setAttribute("aria-label", text.t("mind_graph.script.list.more_row", { count: pill.count, figure: number(pill.count), target: pill.of ?? "", words: pill.title }))
     button.style.paddingInlineStart = `${ROW_PADDING + PILL_INDENT}px`
     button.append(element("span", "min-w-0 flex-1 truncate font-cs-mono text-label text-dim", pill.title))
     item.append(button)

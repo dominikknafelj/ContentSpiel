@@ -60,7 +60,9 @@
 # screen reader is given it, the Status key's own words with the day added
 # (H6: one set of words). `card.child_pages` and `card.lists_posts` are the
 # two halves of a page's line of counts ("4 child pages · lists 112 posts");
-# a post type's card says its posts with `card.tag_posts`.
+# a post type's card says its posts with `card.tag_posts`. In every count of
+# the card `%{figure}` is the count as the messages' language groups it
+# ("lists 2,040 posts"), and `count` only chooses the form.
 #
 # `script.opened.*` is the view the 3,000-line rule opened: `line` the bar's
 # sentence and `everything_name` the whole accessible name of "Show
@@ -69,7 +71,9 @@
 #
 # `script.list.more_row` is the whole name of a "+N more" pill's row in the
 # list (its visible words are the pill's own, `script.more`): `%{target}` is
-# the post type or tag the pill hangs off, `%{figure}` the grouped count.
+# the post type or tag the pill hangs off, `%{figure}` the grouped count and
+# `%{words}` the pill's own words as the row shows them, FIRST in the name:
+# a name that holds the visible words is one voice control can press.
 # `more_heading` heads the rows a pill opened, and `back` is the button
 # beside it (and beside "Try again" when a pill's read failed).
 #
@@ -176,23 +180,23 @@ en:
         retired_type: "%{name} (retired)"
         card:
           related:
-            one: "%{count} related"
-            other: "%{count} related"
+            one: "%{figure} related"
+            other: "%{figure} related"
           tags:
-            one: "%{count} tag"
-            other: "%{count} tags"
+            one: "%{figure} tag"
+            other: "%{figure} tags"
           tag_posts:
-            one: "%{count} post"
-            other: "%{count} posts"
+            one: "%{figure} post"
+            other: "%{figure} posts"
           open_post: "Open post"
           open_page: "Open page"
           post_type: "Post type"
           child_pages:
-            one: "%{count} child page"
-            other: "%{count} child pages"
+            one: "%{figure} child page"
+            other: "%{figure} child pages"
           lists_posts:
-            one: "lists %{count} post"
-            other: "lists %{count} posts"
+            one: "lists %{figure} post"
+            other: "lists %{figure} posts"
           focus: "Focus"
           pin: "Pin"
           unpin: "Unpin"
@@ -221,8 +225,8 @@ en:
           back: "Back to the list"
           more_heading: "More from %{target} · %{count}"
           more_row:
-            one: "%{figure} more post %{target} lists, not in view. Activate to show it."
-            other: "%{figure} more posts %{target} lists, not in view. Activate to show them."
+            one: "%{words}: %{figure} more post %{target} lists, not in view. Activate to show it."
+            other: "%{words}: %{figure} more posts %{target} lists, not in view. Activate to show them."
           select_page:
             one: "%{title}: page, %{count} connection. Shows it in the graph."
             other: "%{title}: page, %{count} connections. Shows it in the graph."

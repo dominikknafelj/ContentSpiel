@@ -1671,7 +1671,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       document.body.append(container)
       const text = { t: (key, values = {}) => `${key.split(".").slice(2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
       const urls = { postFocus: "/g?post=__ID__", tagFocus: "/g?tag=__ID__", tagPosts: "/posts?tag=__NAME__", postNotes: "/notes/post/__ID__/threads", pageFocus: "/g?page=__ID__", pageNotes: "/notes/page/__ID__/threads" }
-      const card = m.createCard(container, { text, urls, typeLabels: { blog: "Blog" }, dotClasses: Array(12).fill("dot"), buttonClasses: { primary: "primary", secondary: "secondary" }, onClose() {}, onPin() {}, onChange() {} })
+      const card = m.createCard(container, { text, number: (value) => new Intl.NumberFormat("en").format(value), urls, typeLabels: { blog: "Blog" }, dotClasses: Array(12).fill("dot"), buttonClasses: { primary: "primary", secondary: "secondary" }, onClose() {}, onPin() {}, onChange() {} })
       // The card top to bottom: each child as what it is and what it says.
       const part = (child) => child.matches("[data-mind-graph-card-notes]") ? [ "notes", child.dataset.notesType, child.dataset.notesId, child.querySelector("textarea").getAttribute("aria-label") ]
         : child.matches("[data-mind-graph-card-close]") ? [ "close" ]
@@ -1715,25 +1715,32 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const pin = [ container.querySelector("[data-mind-graph-card-pin]").textContent, container.querySelector("[data-mind-graph-card-pin]").hidden ]
         card.hide()
         const hidden = [ container.hidden, container.childElementCount ]
+        // A kind with no card (a pill, or one a later build adds): nothing is shown and nothing throws.
+        const cardless = [ "more", "constructor", undefined ].map((kind) => { try { return [ card.show({ id: "x-1", kind, title: "X" }), container.hidden, container.childElementCount ] } catch (error) { return String(error) } })
+        card.show(page)
+        const over = [ card.show({ id: "more-type-a", kind: "more", title: "+2 more" }), container.querySelector("h2").textContent, container.hidden ]
+        card.hide()
         container.remove()
-        return { blog, named, marked, followed, home, stray, pin, hidden }
+        return { blog, named, marked, followed, home, stray, pin, hidden, cardless, over }
       })()
     JS
 
     assert_equal [ [ "heading", [ "mark", "page", "-", "true" ], [ "words", "/blog/<i>x</i>", "-" ], [ "chip", "live" ] ],
                    [ "title", "<b>Blog</b>" ],
-                   [ "counts", [ "card.child_pages(4)", "-" ], [ "·", "true" ], [ "card.lists_posts(112)", "-" ] ],
+                   [ "counts", [ "card.child_pages(4,4)", "-" ], [ "·", "true" ], [ "card.lists_posts(112,112)", "-" ] ],
                    [ "notes", "page", "7", "card.notes.label_page()" ],
                    [ "actions", [ "A", "card.open_page()", "/cs-studio/pages/7?locale=de", "primary" ], [ "A", "card.focus()", "/g?page=7", "secondary" ], [ "BUTTON", "card.pin()", "-", "secondary" ] ],
                    [ "close" ] ], result["blog"]
     assert_equal [ "mind-graph-card-title", "mind-graph-card-title", false, 0 ], result["named"], "the card is named by its title, and a title and a path are text"
     assert_equal [ true ], result["marked"], "the page's mark is the renderer's drawing, painted once the card is in the document"
     assert_equal "/cs-studio/pages/7?locale=de", result["followed"], "Enter on a selected page presses Open page: the address is the one the server built"
-    assert_equal [ [ "words", "/", "-" ], [ "counts", [ "card.child_pages(1)", "-" ], [ "·", "true" ], [ "card.lists_posts(1)", "-" ] ], [ "notes", "page", "1", "card.notes.label_page()" ] ],
+    assert_equal [ [ "words", "/", "-" ], [ "counts", [ "card.child_pages(1,1)", "-" ], [ "·", "true" ], [ "card.lists_posts(1,1)", "-" ] ], [ "notes", "page", "1", "card.notes.label_page()" ] ],
                  [ result["home"][0][2], result["home"][2], result["home"][3] ], "Home's card is a page's card"
     assert_equal [ "heading", [ "mark", "page", "-", "true" ], [ "words", "", "-" ] ], result["stray"][0], "a page with no address has none written, and a status the chip does not know has no chip"
-    assert_equal [ "counts", [ "card.child_pages(0)", "-" ], [ "·", "true" ], [ "card.lists_posts(0)", "-" ] ], result["stray"][2]
+    assert_equal [ "counts", [ "card.child_pages(0,0)", "-" ], [ "·", "true" ], [ "card.lists_posts(0,0)", "-" ] ], result["stray"][2]
     assert_equal [ [ "card.unpin()", true ], [ true, 0 ] ], result.values_at("pin", "hidden")
+    assert_equal [ [ false, true, 0 ] ] * 3, result["cardless"], "a kind without a card is answered false: no card, no error, also for a name every object has"
+    assert_equal [ false, "<b>Blog</b>", false ], result["over"], "and the card that is open stays as it is"
   end
 
   # Design answers G4 and H6: the chip keeps its three dots and says a live
@@ -1790,11 +1797,12 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     JS
 
     blog, retired, all, countless = result
-    assert_equal [ [ "heading", [ "mark", "type", "3", "true" ], [ "words", "card.post_type()", "-" ] ], [ "title", "Blog" ], [ "counts", [ "card.tag_posts(112)", "-" ] ],
+    assert_equal [ [ "heading", [ "mark", "type", "3", "true" ], [ "words", "card.post_type()", "-" ] ], [ "title", "Blog" ], [ "counts", [ "card.tag_posts(112,112)", "-" ] ],
                    [ "actions", [ "BUTTON", "card.pin()", "-", "secondary" ] ], [ "close" ] ], blog
-    assert_equal [ [ "heading", [ "mark", "type", "retired", "true" ], [ "words", "card.post_type()", "-" ] ], [ "title", "talk (retired)" ], [ "counts", [ "card.tag_posts(1)", "-" ] ] ], retired.first(3)
-    assert_equal [ [ "heading", [ "mark", "type", "all-posts", "true" ], [ "words", "card.post_type()", "-" ] ], [ "title", "All posts" ], [ "counts", [ "card.tag_posts(2040)", "-" ] ] ], all.first(3)
-    assert_equal [ "counts", [ "card.tag_posts(0)", "-" ] ], countless[2]
+    assert_equal [ [ "heading", [ "mark", "type", "retired", "true" ], [ "words", "card.post_type()", "-" ] ], [ "title", "talk (retired)" ], [ "counts", [ "card.tag_posts(1,1)", "-" ] ] ], retired.first(3)
+    assert_equal [ [ "heading", [ "mark", "type", "all-posts", "true" ], [ "words", "card.post_type()", "-" ] ], [ "title", "All posts" ], [ "counts", [ "card.tag_posts(2040,2,040)", "-" ] ] ], all.first(3)
+    assert_equal [ "counts", [ "card.tag_posts(0,0)", "-" ] ], countless[2]
+    assert_includes all[2].flatten, "card.tag_posts(2040,2,040)", "a figure is grouped as the messages' language groups it; the number itself only chooses the plural"
   end
 
   # What the card showed before pages is what it shows now: a post's and a
@@ -1812,10 +1820,10 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     post, added, tag = result
     assert_equal [ [ "heading", [ "words", "", "true" ], [ "words", "Blog", "-" ], [ "chip", "live" ] ], [ "title", "Twelve" ],
-                   [ "counts", [ "card.related(3)", "-" ], [ "·", "true" ], [ "card.tags(2)", "-" ] ], [ "notes", "post", "12", "card.notes.label()" ],
+                   [ "counts", [ "card.related(3,3)", "-" ], [ "·", "true" ], [ "card.tags(2,2)", "-" ] ], [ "notes", "post", "12", "card.notes.label()" ],
                    [ "actions", [ "A", "card.open_post()", "/cs-studio/posts/12", "primary" ], [ "A", "card.focus()", "/g?post=12", "secondary" ], [ "BUTTON", "card.pin()", "-", "secondary" ] ], [ "close" ] ], post
     assert_equal %w[heading title notes actions close], added.map(&:first), "a post added from the list says nothing of counts nobody counted"
-    assert_equal [ [ "heading", [ "words", "", "true" ], [ "words", "card.tag()", "-" ] ], [ "title", "a b&c" ], [ "counts", [ "card.tag_posts(2)", "-" ] ],
+    assert_equal [ [ "heading", [ "words", "", "true" ], [ "words", "card.tag()", "-" ] ], [ "title", "a b&c" ], [ "counts", [ "card.tag_posts(2,2)", "-" ] ],
                    [ "actions", [ "A", "card.show_tagged()", "/posts?tag=a%20b%26c", "primary" ], [ "A", "card.focus()", "/g?tag=3", "secondary" ], [ "BUTTON", "card.pin()", "-", "secondary" ] ], [ "close" ] ], tag
   end
 
@@ -1854,7 +1862,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ "list.pages(4)", [ "Home", "1", "12px", "list.select_page(Home,1)" ], [ "Docs", "2", "24px", "list.select_page(Docs,2)" ],
                    [ "Child", "9", "36px", "list.select_page(Child,9)" ], [ "Stray", "0", "24px", "list.select_page(Stray,0)" ],
                    "list.posts(1)", [ "Post", "1", "", "list.select_post(Post,1)" ], "list.tags(1)", [ "tag", "2", "", "list.select_tag(tag,2)" ],
-                   "list.types(4)", [ "Blog", "112", "", "list.select_type(Blog,112)" ], [ "+3 more", "+3 more", "28px", "list.more_row(3,3,Blog)" ], [ "Talk", "1", "", "list.select_type(Talk,1)" ],
+                   "list.types(4)", [ "Blog", "112", "", "list.select_type(Blog,112)" ], [ "+3 more", "+3 more", "28px", "list.more_row(3,3,Blog,+3 more)" ], [ "Talk", "1", "", "list.select_type(Talk,1)" ],
                    [ "gone (retired)", "0", "", "list.select_type(gone (retired),0)" ], [ "All posts", "2040", "", "list.select_type(All posts,2040)" ] ], rows["rows"],
       "a page whose parent is not in the data is listed after the tree, indented once; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill's row stands under the row of what it hangs off and is no post type: the group still counts four"
     assert_equal [ "top", "page-1", "page-2", "top" ], rows["under"], "the tree is the document's: a page's row is in a list inside its parent's item, and one with no parent here at the top"
@@ -2004,7 +2012,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     assert_equal [ "list.pages(1)", "page-1", "list.posts(1)", "post-1", "list.tags(2)", "tag-6", "tag-5", "more-tag-5", "list.types(2)", "type-blog", "more-type-blog", "all-posts" ], result["all"],
       "a pill's row follows the row of the hub or the tag it hangs off, and is counted in no heading"
-    assert_equal [ "BUTTON", "button", "+1,980 more", "list.more_row(1980,n1980,Blog post)", true, false, 0, "list.more_row(1,n1,<b>pill</b>)", 0 ], result["row"],
+    assert_equal [ "BUTTON", "button", "+1,980 more", "list.more_row(1980,n1980,Blog post,+1,980 more)", true, false, 0, "list.more_row(1,n1,<b>pill</b>,+1 more)", 0 ], result["row"],
       "its visible words are the pill's own, its name says how many posts of what, and a tag's name in it is text"
     assert_equal [ [ "hover", "more-type-blog" ], [ "more", "more-type-blog" ], [ "select", "type-blog" ] ], result["calls"], "hovering it lights the pill, pressing it asks for its rows and selects nothing"
     assert_equal [ "list.pages(1)", "page-1", "list.posts(1)", "post-1", "more-type-blog", "list.tags(2)", "tag-6", "tag-5", "more-tag-5" ], result["hubless"], "a pill whose hub has no row stands at the end of the posts"
@@ -2098,11 +2106,15 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         pills.push(data.countAdded(nodes, local, { id: "post-23", via: "type-a" }), data.countAdded(nodes, local, { id: "post-24", via: "type-zzz" }), data.countAdded(nodes, local, { id: "post-25" }))
 
         // "N other posts have no connections yet and aren't shown." (the whole graph).
+        // "N other posts have no connections yet and aren't shown." (the whole graph). A row of
+        // "Not listed on any page" says whether its post is one of them (`unconnected`).
+        const lone = (id) => ({ id, unconnected: true })
         const whole = { shown: 5, total: 5, isolated: 2 }
         const capped = { shown: 2000, total: 2040, isolated: 3 }
         const around = { focus, shown: 5, total: 5 }
-        const isolated = [ data.countAdded([], whole, { id: "post-1" }), whole.isolated, data.countAdded([], whole, { id: "post-2" }), whole.isolated, data.countAdded([], whole, { id: "post-3" }), whole.isolated,
-                           data.countAdded([], capped, { id: "post-4" }), capped.isolated, data.countAdded([], around, { id: "post-5" }), around.isolated ?? "none" ]
+        const isolated = [ data.countAdded([], whole, lone("post-1")), whole.isolated, data.countAdded([], whole, lone("post-2")), whole.isolated, data.countAdded([], whole, lone("post-3")), whole.isolated,
+                           data.countAdded([], capped, { id: "post-4", unconnected: false }), capped.isolated, data.countAdded([], capped, { id: "post-5" }), capped.isolated,
+                           data.countAdded([], capped, lone("post-6")), capped.isolated, data.countAdded([], around, lone("post-7")), around.isolated ?? "none" ]
         done({ seen, pills, isolated })
       }).catch((error) => done({ error: String(error) }))
     JS
@@ -2116,8 +2128,8 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ "posts_of(20 20 23)", "posts_of(21 21 23)", "posts_of(22 22 23)", "posts(23 23 0)" ], result["seen"].map { |_counts, _pills, summary| summary[/posts(?:_of)?\([\d ]+\)/] },
       "N of M: N is the posts drawn, M what the page lists; with every pill gone the page lists no more than is drawn and the plain count is said"
     assert_equal [ 23, 23, 24, -1, -1, -1 ], result["pills"], "which pill was counted down (its index), and none for a row with no pill to count"
-    assert_equal [ -1, 1, -1, 0, -1, 0, -1, 3, -1, "none" ], result["isolated"],
-      "in the whole graph, not cut, a post that was not drawn was one of the unconnected: one fewer isn't shown, never below none; at the cap the page cannot know which it was and claims nothing; a local view counts none"
+    assert_equal [ -1, 1, -1, 0, -1, 0, -1, 3, -1, 3, -1, 2, -1, "none" ], result["isolated"],
+      "a row that says its post has no connection takes one from those that aren't shown, never below none; one the cap cut, and one that says nothing, take none; at the cap an unconnected one still does; a local view counts none"
   end
 
   # Ruling M5: a tick the worker posted before it took `add` is two numbers

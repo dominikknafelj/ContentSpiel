@@ -85,7 +85,13 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     element = css_select("[data-controller='admin--mind-graph--graph']").first
     assert_equal "/cs-studio/mind_graph/data", element["data-url"]
     assert_nil element["data-opened-lines"]
-    assert_not_includes response.body, "3412"
+    # Searched where a figure or the choice could be written: the addresses
+    # the script reads and the bar. (Not the whole page: an asset's digest
+    # may hold any digits.)
+    addresses = %w[data-url data-open-url data-everything-url data-page-focus-url data-listed-url].to_h { |name| [ name, element[name] ] }
+    assert_empty addresses.select { |_name, value| value.match?(/3412|lines/) }
+    assert_equal %w[data-everything-url], addresses.select { |_name, value| value.include?("everything") }.keys, "only the address Show everything reads asks for everything"
+    assert_no_match(/3412/, css_select("[data-mind-graph-opened]").first.to_s)
   end
 
   # The bar of the view the 3,000-line rule opened: in the page from the
@@ -132,7 +138,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "The graph could not be loaded.", messages["mind_graph.script.load_failed"]
     assert_equal({ "one" => "%{figure} other post has no connections yet and isn't shown.", "other" => "%{figure} other posts have no connections yet and aren't shown." }, messages["mind_graph.script.isolated"])
     assert_equal({ "one" => "%{figure} post has no connections yet.", "other" => "%{figure} posts have no connections yet." }, messages["mind_graph.script.isolated_only"])
-    assert_equal({ "one" => "%{count} tag", "other" => "%{count} tags" }, messages["mind_graph.script.card.tags"])
+    assert_equal({ "one" => "%{figure} tag", "other" => "%{figure} tags" }, messages["mind_graph.script.card.tags"])
     assert_equal({ "one" => "Release %{count} pinned", "other" => "Release %{count} pinned" }, messages["mind_graph.script.release_pinned"])
     assert_equal "%{title}: post, %{count} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
     assert_equal "Posts · %{count}", messages["mind_graph.script.list.posts"]
@@ -163,8 +169,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     # chip's second part (G4) and the whole chip for a screen reader (H6).
     assert_equal [ "Open page", "Unpublished changes", "Change scheduled %{date}", "Live, unpublished changes", "Live, change scheduled %{date}" ],
                  messages.values_at(*%w[open_page status.unpublished_changes status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
-    assert_equal [ { "one" => "%{count} child page", "other" => "%{count} child pages" }, { "one" => "lists %{count} post", "other" => "lists %{count} posts" } ],
+    assert_equal [ { "one" => "%{figure} child page", "other" => "%{figure} child pages" }, { "one" => "lists %{figure} post", "other" => "lists %{figure} posts" } ],
                  messages.values_at("mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts")
+    # A pill's row is named with its visible words first ("+92 more: …"), so
+    # that someone who says what they see names it (WCAG 2.5.3).
+    assert_equal [ true, true ], messages["mind_graph.script.list.more_row"].values_at("one", "other").map { |name| name.start_with?("%{words}: ") }
     assert_equal %w[all_posts capped capped_local card.child_pages card.close card.focus card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.label_page card.notes.more
                     card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
                     card.status.change_scheduled card.status.draft card.status.live card.status.live_change_scheduled card.status.live_with_changes card.status.scheduled card.status.unpublished_changes

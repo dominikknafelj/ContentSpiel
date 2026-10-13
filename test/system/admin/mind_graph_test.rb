@@ -2434,6 +2434,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     within(LIST) { assert_row "Entry 21: post, 1 connection. Shows it in the graph." }
     # The figures are true of what is drawn now: one more post, one fewer behind the pill.
     assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 21 of 22 posts. 1 more is in the list.']"
+    # The heading over the rows counts what the pill counts: one figure for "more" on the screen.
+    within(LIST) do
+      assert_selector "h2", text: /· 1\z/
+      assert_equal [ "MORE FROM #{entry.upcase} · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_selector "li button[data-node-id^='post-']", count: 2
+    end
     await_graph
     assert_kind_of Numeric, screen_position(posts.last)["x"], "the layout has no place for the added post"
 
@@ -2453,7 +2459,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_no_selector "a[data-mind-graph-posts-link]"
       # The pill's row says what the pill says: one post is still behind it.
       assert_selector "button[data-node-id='more-type-resume_entry'][data-more]", exact_text: "+1 more"
-      assert_row "1 more post #{entry} lists, not in view. Activate to show it."
+      assert_row "+1 more: 1 more post #{entry} lists, not in view. Activate to show it."
     end
 
     await_graph
@@ -2488,7 +2494,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_selector pill, exact_text: "+2 more"
     within(LIST) do
-      assert_row "2 more posts #{entry} lists, not in view. Activate to show them."
+      assert_row "+2 more: 2 more posts #{entry} lists, not in view. Activate to show them."
       assert_equal %w[type-resume_entry more-type-resume_entry], all("section:last-of-type button").map { |button| button["data-node-id"] }, "the pill's row stands under its hub's"
       assert_equal [ "PAGES · 2", "POSTS · 20", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }, "and is counted in no heading"
     end
@@ -2546,10 +2552,22 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_selector "#{GRAPH} [role=status] p[data-mind-graph-announced]", text: "21 of 22 posts. 1 more is in the list.", visible: :all
     assert_selector "#{LIST} button[data-not-in-view]", count: 1
 
+    # The pill is dragged, which pins it where it is dropped, and hovered.
+    escape_on_canvas
+    dropped = drag_node("more-type-resume_entry", by: [ 24, 18 ])
+    assert_selector "#{GRAPH}[data-pinned='1']"
+    assert_selector "#{GRAPH} [data-mind-graph-release]", text: "Release 1 pinned"
+    page.driver.browser.mouse.move(x: dropped["x"], y: dropped["y"])
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === 'more-type-resume_entry'")
+
     # The last one: nothing is behind the pill, so the pill, its row and its
-    # rows go, and the list is the groups again.
+    # rows go, and the list is the groups again. A SPENT PILL IS NOTHING: no
+    # pin (nothing is left to release), and where it stood no hover, no
+    # press, no label and no row; no count holds it.
     find("#{LIST} button[data-node-id='#{nid(posts[21])}']").click
-    assert_selector "#{GRAPH}[data-selected='#{nid(posts[21])}'][data-edges='24']"
+    assert_selector "#{GRAPH}[data-selected='#{nid(posts[21])}'][data-edges='24'][data-pinned='0']"
+    assert_no_selector "#{GRAPH} [data-mind-graph-release]", wait: 0
+    assert_equal "25", graph["data-nodes"], "two pages, the hub and twenty-two posts: the pill is not among what is drawn"
     assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 22 posts.']"
     within(LIST) do
       assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
@@ -2559,6 +2577,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     end
     await_graph
     assert_nil screen_position("more-type-resume_entry"), "a pill that stands for nothing is not drawn"
+    assert_nil page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.markBox('more-type-resume_entry')")
+    assert_not_includes graph["data-labelled"].split(","), "more-type-resume_entry"
+    mouse = page.driver.browser.mouse
+    mouse.move(x: dropped["x"] + 1, y: dropped["y"] + 1)
+    await_frames
+    assert_not_equal "more-type-resume_entry", graph["data-hovered"], "where the pill was dropped nothing of it is hovered"
+    lines = graph["data-edges"]
+    mouse.click(x: dropped["x"], y: dropped["y"])
+    await_frames
+    assert_not_equal "more-type-resume_entry", graph["data-selected"]
+    within(LIST) { assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }, "a press where it stood opens no rows" }
+    assert_equal lines, graph["data-edges"]
+    assert_equal "Posts 22", legend_counts[1]
     places = page.evaluate_script("#{posts.last(2).map { |post| nid(post) }.to_json}.map((id) => document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(id)).flatMap((at) => [ at.x, at.y ])")
     assert places.size == 4 && places.all? { |value| value.is_a?(Numeric) && value.finite? }, "an added post has no place: #{places.inspect}"
   end
@@ -2630,8 +2661,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 20 of 30 posts and 1 tag. 10 more are in the list.']"
       within(LIST) do
         assert_equal [ [ "more-#{tag}", "+5 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("button[data-more]").map { |button| [ button["data-node-id"], button.text ] }
-        assert_row "5 more posts pill lists, not in view. Activate to show them."
-        assert_row "5 more posts #{entry} lists, not in view. Activate to show them."
+        assert_row "+5 more: 5 more posts pill lists, not in view. Activate to show them."
+        assert_row "+5 more: 5 more posts #{entry} lists, not in view. Activate to show them."
       end
 
       # A pill's read that fails says so with a way back, and what clears a
@@ -2676,6 +2707,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_equal [ tag ], graph["data-neighbours"].split(","), "a post a tag brings in gets its own line to that tag"
       # Each pill counts its own: the tag's stands for one fewer, the type's for as many as before.
       assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 21 of 30 posts and 1 tag. 9 more are in the list.']"
+      within(LIST) do
+        assert_selector "h2", text: /· 4\z/
+        assert_equal [ "MORE FROM PILL · 4" ], all("h2").map { |heading| heading.text.upcase }, "the heading follows its own pill, and the other pill's count is untouched"
+      end
       within(LIST) { press "Back to the list" }
       within(LIST) do
         assert_equal [ [ "more-#{tag}", "+4 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("button[data-more]").map { |button| [ button["data-node-id"], button.text ] }
@@ -2811,6 +2846,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         assert_equal "", graph["data-selected"], "the selection was of the view that went"
         assert_no_selector "[data-mind-graph-card]", visible: :visible
         assert_selector "#{CANVAS}[aria-label='Mind graph: 5 pages, 4 connections. Showing everything.']"
+        # The press is answered for a screen reader too: the whole graph's summary, in the notice's live region.
+        assert_selector "#{GRAPH} [role=status] p.sr-only[data-mind-graph-announced]", text: /\AMind graph: 5 pages, 4 connections\. Showing everything\.\z/, visible: :all
         within(LIST) { assert_equal [ "PAGES · 5" ], all("h2").map { |heading| heading.text.upcase } }
         assert screen_position("page-#{Page.find_by!(parent: first).id}")
         assert_current_path admin_mind_graph_path, ignore_query: false
