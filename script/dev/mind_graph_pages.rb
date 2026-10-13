@@ -16,7 +16,8 @@
 # first sixty. Every third page has a post-list block: by one of the
 # measurement's tags ("graph-tag-N", the posts script's), by the "blog"
 # type, or by nothing, in turn. Deterministic and safe to run again: a page
-# is found by its title.
+# is found by its title, and one that is there without its block (a run that
+# stopped half way) is given it.
 #
 # The measurement itself (2026-10-13) is in the spec's "As built":
 # `docs/superpowers/specs/2026-10-12-pages-in-the-mind-graph-design.md`.
@@ -24,7 +25,12 @@ abort "development only" unless Rails.env.development?
 
 count = Integer(ARGV.fetch(0, "200"))
 locale = Locales.default.to_s
-home = Page.find_by(parent_id: nil) || Pages::Save.call(attributes: { published: true }, translations: { locale => { title: "Home", slug: "" } }).record
+home = Page.find_by(parent_id: nil)
+unless home
+  made = Pages::Save.call(attributes: { published: true }, translations: { locale => { title: "Home", slug: "" } })
+  abort "Home: #{made.errors.to_sentence}" unless made.ok?
+  home = made.record
+end
 pages = [ home ]
 
 (1...count).each do |number|
@@ -35,11 +41,14 @@ pages = [ home ]
     result = Pages::Save.call(attributes: { parent: parent, published: number % 9 != 0 }, translations: { locale => { title: title } })
     abort "#{title}: #{result.errors.to_sentence}" unless result.ok?
     page = result.record
-    if (number % 3).zero?
-      settings = [ { "tag" => "graph-tag-#{number % 60}" }, { "content_type" => "blog" }, {} ][(number / 3) % 3]
-      saved = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: settings })
-      abort "#{title}: #{saved.errors.to_sentence}" unless saved.ok?
-    end
+  end
+  # Asked of a page that was there already too: a run that stopped between a
+  # page's save and its block's would otherwise leave that page without its
+  # block for good, and the site would silently not be the measured shape.
+  if (number % 3).zero? && page.content_blocks.none? { |block| block.block_type == "post_list" }
+    settings = [ { "tag" => "graph-tag-#{number % 60}" }, { "content_type" => "blog" }, {} ][(number / 3) % 3]
+    saved = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: settings })
+    abort "#{title}: #{saved.errors.to_sentence}" unless saved.ok?
   end
   pages << page
   puts "#{number + 1} / #{count}" if ((number + 1) % 50).zero?

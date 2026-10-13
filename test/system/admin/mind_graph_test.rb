@@ -41,10 +41,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   test "every stub of fetch in this file remembers the real one, so the teardown can put it back" do
     source = File.read(__FILE__)
-    stubs = source.lines.each_with_index.select { |line, _| line.match?(/window\.fetch = \(/) }.map { |_, index| index }
+    # Any assignment but one that puts a real fetch back (`= real`, `= window.realFetch`).
+    stubs = source.lines.each_with_index.select { |line, _| line.match?(/window\.fetch = (?!real\b|window\.realFetch)/) }.map { |_, index| index }
 
     assert_operator stubs.size, :>, 12
-    forgetful = stubs.reject { |index| source.lines[[ index - 12, 0 ].max..index].join.match?(/window\.realFetch (?:\?\?=|=) /) }
+    # Looked for in the lines above the stub, up to the script's own start (a
+    # here-document or a one-line script), not within a fixed distance.
+    forgetful = stubs.reject do |index|
+      start = index.downto(0).find { |line| source.lines[line].match?(/execute_script|evaluate_(?:async_)?script/) } || 0
+      source.lines[start..index].join.match?(/window\.realFetch (?:\?\?=|=) /)
+    end
     assert_empty forgetful.map { |index| "line #{index + 1}" }
   end
 
@@ -2308,6 +2314,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       const timeout = AbortSignal.timeout.bind(AbortSignal)
       window.listMode = "hang"
       window.askedFor = []
+      // (For the whole window while the mode is "hang": anything else that asked for a timeout then would get 50 ms. Nothing else on this screen asks.)
       AbortSignal.timeout = (milliseconds) => { window.askedFor.push(milliseconds); return timeout(window.listMode === "hang" ? 50 : milliseconds) }
       window.fetch = (url, options) => {
         if (window.listMode === "real" || !String(url).includes("/mind_graph/unlisted")) return original(url, options)

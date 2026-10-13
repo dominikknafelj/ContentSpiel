@@ -97,8 +97,8 @@ module PostGraph
       # all the criteria read. `@ordered` is `[[id, kind's index], …]`.
       kinds = {}
       @ordered = newest.map do |id, content_type, *|
-        names = tags_of.fetch(id, []).filter_map { |tag_id| @tag_name[tag_id] }.sort
-        [ id, kinds[[ content_type, names ]] ||= kinds.size ]
+        carried = tags_of.fetch(id, []).filter_map { |tag_id| @tag_name[tag_id] }.sort
+        [ id, kinds[[ content_type, carried ]] ||= kinds.size ]
       end
       @kinds = kinds.keys
     end
@@ -193,8 +193,8 @@ module PostGraph
     # listing's own, asked once per kind of post (see the header).
     def matching(settings)
       (@matching ||= {})[self.class.key(settings)] ||= begin
-        listed = @kinds.map { |content_type, names| BlockTypes::PostList.matches?(settings, content_type: content_type, tag_names: names) }
-        @ordered.filter_map { |id, kind| id if listed[kind] }.freeze
+        answers = @kinds.map { |content_type, carried| BlockTypes::PostList.matches?(settings, content_type: content_type, tag_names: carried) }
+        @ordered.filter_map { |id, kind| id if answers[kind] }.freeze
       end
     end
 

@@ -303,7 +303,42 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
 
     assert_equal few, many, "the calls grew with the posts"
     kinds = Post.kept.includes(:tags).map { |post| [ post.content_type, post.tags.map(&:name).include?("ruby") ] }.uniq.size
+    # (`kinds` here, "its type and whether it carries ruby", is the code's
+    # kinds only while the blocks name ONE tag, as these do: a kind is a
+    # type with the NAMED tags a post carries.)
     assert_equal 3 * kinds, many, "three distinct filters, each asked once per kind of post"
+  end
+
+  # "Ordered once" by a count too (the review of the last task: the two
+  # tests around this one hold the criteria's calls and a shared list, and
+  # neither failed if a single filter's list were sorted again, or the
+  # unlisted posts). Every sort of a list as long as the site's posts is
+  # counted, by Ruby's own trace of the C method: one while the listings
+  # are made, and none afterwards for pages with one filter each, however
+  # many pages there are, nor for the unlisted posts. (A page with SEVERAL
+  # filters does sort what they list together, once per distinct set of
+  # filters: the next test holds that such pages share the result.)
+  test "a page's posts are put in order without sorting them page by page: the one order is made once, and a page with one filter sorts nothing" do
+    12.times { |index| create_post(title: "Sorted #{index}", tags: index.even? ? [ "ruby" ] : []) }
+    posts = Post.kept.count
+    sorts = ->(&work) do
+      count = 0
+      trace = TracePoint.new(:c_call) { |point| count += 1 if %i[sort sort! sort_by sort_by!].include?(point.method_id) && point.self.is_a?(Array) && point.self.size >= posts }
+      trace.enable(&work)
+      count
+    end
+    ask = ->(pages) do
+      pages.times { |index| list_block(create_page(title: "Sorter #{Page.count}"), **[ {}, { content_type: "blog" }, {} ][index % 3]) }
+      result = nil
+      made = sorts.call { result = listings }
+      asked = sorts.call do
+        Page.pluck(:id).each { |id| result.posts_of(id); result.listed_count(id) }
+        result.unlisted
+      end
+      [ made, asked ]
+    end
+
+    assert_equal [ [ 1, 0 ], [ 1, 0 ] ], [ ask.call(3), ask.call(18) ]
   end
 
   test "pages whose list blocks say the same share one list of posts, the same object, and it is the list each would have had alone" do

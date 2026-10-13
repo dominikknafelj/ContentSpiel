@@ -116,8 +116,9 @@ let easing = null
 
 // Messages are handled strictly in order, each after the previous one has
 // finished. `start` awaits the d3 import, and a `drag`, `unpin` or `add`
-// sent right behind it would otherwise run before the simulation exists: an
-// add would throw and report a spurious error, a drag would be dropped.
+// sent right behind it would otherwise run before the simulation exists: a
+// drag would find no node and be dropped, and an add would throw on the
+// simulation that is not there.
 // An error in one message is posted and the chain goes on with the next.
 let queue = Promise.resolve()
 let taken = 0

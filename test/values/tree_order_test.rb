@@ -49,6 +49,13 @@ class TreeOrderTest < ActiveSupport::TestCase
   # of them is changed. So the idiom of the key (a nil test of a position
   # turned into 1 or 0, or a position made a number with `to_i` inside a
   # sort) is refused everywhere in `app` and `lib` but in the value's file.
+  # A SOURCE GREP FOR THE THREE FORMS THE KEY WAS WRITTEN IN, and no more: a
+  # rewriting of the rule in another form (`position || Float::INFINITY`, a
+  # `min_by`, a block over two lines) is not seen. The third form, a sort by
+  # the bare `position`, is refused for anything, not for pages alone: it
+  # raises for a row without a position whatever it sorts, and a list that
+  # is rightly sorted so (blocks, whose position is never NULL) says so by
+  # sorting with a block.
   IDIOM = /position\S*\.nil\?\s*\?\s*1\s*:\s*0|sort(?:_by)?!?\s*(?:\{|do)[^\n]*position\S*\.to_i|sort_by!?\(&:position\)/
   HOME = "app/values/tree_order.rb".freeze
 

@@ -24,6 +24,15 @@
 # order, and that the key is written in this file and nowhere else in `app`
 # or `lib`.
 #
+# TWO LIMITS, both older than this file. (1) Pages of ONE position are
+# ordered by id here; closure_tree's own lists (`order: "position"`: the
+# public menu, `page.children`) name no tie-break, so for two siblings with
+# one position their order is the database's choice and can differ from
+# this. Positions are unique among siblings wherever the services wrote
+# them. (2) This is the one writing of the order in RUBY. SQL says the same
+# order as `order(:position, :id)` in `Page::TreeRanking`,
+# `Admin::TreeController` and `Admin::GroupsScreen::BranchTree`.
+#
 # NOT THE ORDER OF THE WHOLE TREE: this orders siblings. Depth first over
 # them is each caller's own walk.
 module TreeOrder
