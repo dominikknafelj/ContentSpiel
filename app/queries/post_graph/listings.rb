@@ -43,8 +43,7 @@ module PostGraph
     # not reach (its section's type holds no blocks any more, so the section
     # is not among the rows) comes last, by id: no line is lost to an order.
     def self.blocks(page_ids)
-      places = BlockTypes.with_capability(:container).map { |definition| definition.name.to_s }
-      rows = ContentBlock.where(owner_type: "Page", owner_id: page_ids).merge(ContentBlock.listing.or(ContentBlock.where(block_type: places)))
+      rows = ContentBlock.where(owner_type: "Page", owner_id: page_ids).merge(ContentBlock.listing.or(ContentBlock.containers))
                          .select(:id, :owner_id, :owner_type, :block_type, :settings, :translated_settings, :position, :section_id, :section_column)
                          .order(:owner_id, :id).to_a
       rows.group_by(&:owner_id).flat_map do |_page_id, blocks|

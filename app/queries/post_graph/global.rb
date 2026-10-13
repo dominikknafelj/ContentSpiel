@@ -33,7 +33,10 @@
 # outside the scope -- or a trashed one, which `AccessControl.scope` already
 # leaves out.
 #
-# Cost: thirteen statements whatever the size -- the site's five (the
+# Cost: AT MOST thirteen statements whatever the size (a ceiling: a site
+# where no list block names a tag does not ask for the tags blocks name, and
+# one with no page, or no post drawn, does not ask for that kind's notes) --
+# the site's five (the
 # readable posts, their tag links, the readable pages, the list blocks, the
 # tags those name), the relations, and the builder's seven (the tags' names;
 # the pages' addresses, open notes and pending copies; the posts' open

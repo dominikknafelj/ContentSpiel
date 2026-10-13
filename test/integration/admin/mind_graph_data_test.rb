@@ -225,6 +225,24 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Not theirs"
   end
 
+  # With `pages.read` alone the search is answered (the screen opens for
+  # either right) and answers nothing: `PostGraph::Search` narrows posts, and
+  # the tags they carry, by `posts.read`.
+  test "search answers nothing for a viewer with pages.read alone: no post and no tag a post carries" do
+    create_post(title: "Not theirs", tags: [ "nottheirs" ])
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.read", scope: {})
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/mind_graph/search", params: { q: "not" }
+
+    assert_response :success
+    assert_equal [], data
+
+    sign_in_as(users(:one))
+    get "/cs-studio/mind_graph/search", params: { q: "not" }
+    assert_equal %w[post tag], data.map { |row| row["kind"] }, "to someone who reads the post both are rows"
+  end
+
   test "search answers rows with the url of each row's local view" do
     sign_in_as(users(:one))
     post = create_post(title: "Ruby notes", tags: [ "ruby" ])

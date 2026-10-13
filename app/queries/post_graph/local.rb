@@ -19,10 +19,12 @@
 # farther ones, and among equals the better connected.
 #
 # Cost: three queries per depth level (the relations touching the frontier,
-# the frontier posts' tags, the frontier tags' posts) plus nine whatever the
-# size -- the site's five, the relations among the posts reached, the tags'
-# names and the posts' open notes, pending copies and rows -- never one per
-# node. The tag links and the readable counts are the site's, narrowed here
+# the frontier posts' tags, the frontier tags' posts) plus AT MOST ten
+# whatever the size -- the site's five, the relations among the posts
+# reached, the tags' names and the posts' open notes, pending copies and
+# rows -- never one per node. (At most: a site where no list block names a
+# tag does not ask for the tags blocks name, and one with no post drawn
+# does not ask for notes.) The tag links and the readable counts are the site's, narrowed here
 # in Ruby. (No page is drawn in a local view yet, so the builder reads
 # nothing of pages: the walk gains them in the pages plan's Task 4.)
 module PostGraph

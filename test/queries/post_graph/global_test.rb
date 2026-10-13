@@ -415,13 +415,21 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     list_block(hidden, tag: "secret")
     list_block(hidden, content_type: "resume_entry")
     Tag.create!(name: "secret")
+    # Two posts of the type the hidden page lists, related so that they are
+    # drawn: a post only an UNREADABLE page lists is not listed, to this
+    # viewer.
+    entry = create_post(title: "Entry", content_type: "resume_entry")
+    relate(entry, create_post(title: "Other"))
     access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ seen.id ] })
 
     result = as(users(:author)) { graph(actor: users(:author)) }
 
     assert_empty result[:tags]
     assert_empty result[:types]
-    assert_empty result[:edges]
+    assert_equal [ "related" ], result[:edges].map { |edge| edge[:kind] }
+    assert_equal false, result[:nodes].find { |node| node[:id] == pid(entry) }.fetch(:listed)
+    assert_equal true, graph[:nodes].find { |node| node[:id] == pid(entry) }.fetch(:listed), "to someone who reads the page it is listed"
+    assert_no_match(/Hidden|secret|page-#{hidden.id}\b/, result.to_json, "nothing of the hidden page anywhere in the answer: not its title, its id or the tag it names")
   end
 
   test "a trashed page is no node, its lines are gone, and its child is drawn without a line to it" do
@@ -544,8 +552,14 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
   # a tag at once on any site. Each is its own node with its own lines.
   test "a post, a tag and a page of one database id are three nodes, each with its own lines" do
     home = root_page
-    id = [ Page, Post, Tag ].map { |model| model.maximum(:id).to_i }.max + 1
-    %w[pages posts tags].each { |table| Page.connection.set_pk_sequence!(table, id - 1) }
+    # From the SEQUENCES, never from the rows' highest id: in a worker's
+    # database the sequences are far ahead of the rows (every rolled-back
+    # test moved them on), and `setval` is taken back by no transaction, so
+    # an id from the rows would set two of the three back for good. Each
+    # only ever moves forward here.
+    connection = Page.connection
+    id = %w[pages posts tags].map { |table| connection.select_value("SELECT nextval(#{connection.quote(connection.default_sequence_name(table, "id"))})").to_i }.max + 1
+    %w[pages posts tags].each { |table| connection.set_pk_sequence!(table, id - 1) }
     page = create_page(title: "Same")
     tag = Tag.create!(name: "same")
     post = create_post(title: "Same post", tags: [ "same" ])
