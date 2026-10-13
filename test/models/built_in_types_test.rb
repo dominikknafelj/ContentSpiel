@@ -2,10 +2,24 @@ require "test_helper"
 
 class BuiltInTypesTest < ActiveSupport::TestCase
   test "built-ins are registered" do
-    assert_equal %w[rich_text image post_list section], BlockTypes.names
+    assert_equal %w[rich_text image code post_list section], BlockTypes.names
     assert_equal %w[blog resume_entry now_update], ContentTypes.names
     assert BlockTypes.fetch(:post_list).capability?(:lists_posts)
     assert_equal %w[image caption alt], BlockTypes.fetch(:image).uses_columns
+  end
+
+  test "code is a block of three settings and a caption, none of them required, the code never translated" do
+    code = BlockTypes.fetch(:code)
+
+    assert_equal "Code", code.label
+    assert_equal [ %w[language select], %w[filename string], %w[code code] ], code.fields.map { |field| [ field.name, field.type.to_s ] }
+    assert_equal %w[caption], code.uses_columns
+    assert code.capability?(:code)
+    assert_equal Blocks::CodeComponent, code.component
+    assert code.fields.none? { |field| field.required? || field.translated? }
+    assert_equal CodeHighlight::LANGUAGES, code.fields.first.options[:options]
+    assert_equal "Plain text", code.fields.first.options[:blank]
+    assert_equal 20_000, code.fields.last.options[:max]
   end
 
   test "section is the one container type, and its columns follow its layout" do

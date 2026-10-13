@@ -421,4 +421,47 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
 
     assert_select "body.overflow-x-clip"
   end
+
+  test "a code block is drawn with its head and its code coloured, at the top level and in a column of a section" do
+    section = @root.content_blocks.create!(block_type: :section, position: 0, settings: { "layout" => "two" })
+    @root.content_blocks.create!(block_type: :code, position: 1, settings: { "language" => "ruby", "filename" => "a.rb", "code" => "def top; end" })
+    @root.content_blocks.create!(block_type: :code, position: 0, section: section, section_column: 2, settings: { "language" => "yaml", "code" => "inside: column" })
+
+    get "/"
+
+    assert_response :success
+    assert_select "main figure.content-block--code", count: 2
+    assert_select "figure.content-block--code .code-file", text: "a.rb"
+    assert_select "figure.content-block--code pre span.syn-keyword", text: "def"
+    assert_select ".content-section__column figure.content-block--code pre", text: "inside: column"
+    assert_select ".content-section__column figure.content-block--code .code-language", text: "YAML"
+  end
+
+  test "a code block on a live page is read from its published copy: a save shows nothing until it is published, and counts as a change" do
+    page = create_page(title: "Docs")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "code", settings: { "language" => "ruby", "code" => "first = 1" } }).record
+    publish_changes(page)
+    path = PublicSite::Urls.new.path_for(page, "en")
+
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "code" => "second = 2" } }).ok?
+    get path
+
+    assert_select "figure.content-block--code pre", text: "first = 1"
+    assert page.reload.unpublished_changes_at.present?, "a save on a live page marks it"
+    assert_equal [ :changed ], Publishing::Changes.of(page).blocks.map(&:kind)
+    assert_equal "ruby", block.reload.settings["language"], "a save of the code alone leaves the other settings"
+
+    publish_changes(page)
+    get path
+    assert_select "figure.content-block--code pre", text: "second = 2"
+  end
+
+  test "an empty code block draws nothing on the page" do
+    @root.content_blocks.create!(block_type: :code, position: 0)
+
+    get "/"
+
+    assert_response :success
+    assert_select "figure.content-block--code", count: 0
+  end
 end

@@ -7,7 +7,7 @@
 # spec §3). Which columns matter depends on the type: `body` (per-locale JSON
 # documents, see `HasRichTextBody`) for rich_text,
 # `media_asset` + `caption`/`alt` for image, `settings`/`translated_settings` for
-# post_list.
+# post_list, `settings` + `caption` for code.
 class ContentBlock < ApplicationRecord
   extend Mobility
 

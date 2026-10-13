@@ -1,0 +1,19 @@
+<%# The copy script's markup (the identifier, its three targets, its action and its two
+    values) is what a theme's own template has to write to keep the button working. %>
+<figure class="content-block content-block--code" data-controller="code-copy" data-code-copy-copied-value="<%= string(:copied) %>" data-code-copy-failed-value="<%= string(:failed) %>">
+  <div class="code-head">
+    <% if filename.present? %>
+      <span class="code-file" id="<%= file_id %>"><%= filename %></span>
+    <% end %>
+    <% if language_label %>
+      <span class="code-language"><%= language_label %></span>
+    <% end %>
+    <%= tag.button string(:copy), type: "button", hidden: true, aria: { label: string(:copy_code), describedby: (file_id if filename.present?) },
+          data: { code_copy_target: "button", action: "code-copy#copy" } %>
+    <span class="sr-only" role="status" data-code-copy-target="status"></span>
+  </div>
+  <pre tabindex="0" data-code-copy-target="source"><code><% lines.each_with_index do |line, index| %><%= "\n" if index.positive? %><% line.each do |role, text| %><% if role %><%= tag.span(text, class: "syn-#{role}") %><% else %><%= text %><% end %><% end %><% end %></code></pre>
+  <% if caption.present? %>
+    <figcaption><%= caption %></figcaption>
+  <% end %>
+</figure>

@@ -26,7 +26,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "block_type is a string checked against the BlockTypes registry" do
-    assert_equal %w[rich_text image post_list section], BlockTypes.names
+    assert_equal %w[rich_text image code post_list section], BlockTypes.names
   end
 
   test "a block belongs to an owner" do

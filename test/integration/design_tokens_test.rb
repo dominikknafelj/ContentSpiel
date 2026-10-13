@@ -133,6 +133,19 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     refute_match(/color-scheme\s*:/, css.gsub(%r{/\*.*?\*/}m, ""), "color-scheme stays per layout, never global")
   end
 
+  # Code block spec §4: plain rules on tokens, because the span classes are
+  # built from role names and no utility scan would find them.
+  test "the code block's stylesheet is imported by the theme, holds no colour of its own, colours each role by its token and keeps a long line inside" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/code.css").read
+
+    assert_includes Rails.root.join("app/assets/tailwind/themes/default/theme.css").read, %(@import "./code.css";)
+    refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, css)
+    CodeHighlight::ROLES.each { |role| assert_match(/\.syn-#{role}\s*\{\s*color:\s*var\(--th-syn-#{role}\);/, css) }
+    assert_match(/\.content-block--code\s*\{[^}]*min-width:\s*0;/, css)
+    assert_match(/\.content-block--code pre\s*\{[^}]*overflow-x:\s*auto;[^}]*white-space:\s*pre;/m, css)
+    assert_match(/\.content-block--code \.code-head\s*\{[^}]*color:\s*var\(--th-dim\);/m, css, "meta on the sunken ground is 4.3:1 in the light theme; the head reads as dim")
+  end
+
   private
     def helpers = ActionController::Base.helpers
 
