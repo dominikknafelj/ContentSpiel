@@ -26,6 +26,11 @@ module AccessControl
     has_many :api_tokens, foreign_key: :group_id, inverse_of: :group
 
     validates :name, presence: true, uniqueness: { case_sensitive: false }
+
+    # The group of this name, whatever its case: names are unique without
+    # case (the index on lower(name)), so a lookup by a built-in name finds
+    # what `Groups::EnsureBuiltIns` counts as there.
+    scope :named, ->(name) { where(arel_table[:name].lower.eq(name.to_s.downcase)) }
     validate :built_in_name_unchanged, on: :update
 
     # `prepend: true`, same reasoning as `User#ensure_not_last_owner`: the

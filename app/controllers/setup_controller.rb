@@ -261,13 +261,18 @@ class SetupController < ApplicationController
       # The first account is an owner, so its token gets the Admin group
       # (it can be narrowed to another group in CS Studio later).
       #
-      # `find_by`, not `find_by!`: a missing group is this installation's
+      # `first`, not `find_by!`: a missing group is this installation's
       # state, not a wrong address, and `RecordNotFound` is answered as a 404
       # with nothing a person can act on (how a schema-loaded database showed
       # up before `#ensure_built_in_groups`). It can still be absent when
       # whoever is signed in may not make groups; then the step says what is
       # missing and what puts it back, and can be skipped as before.
-      admin = AccessControl::Group.find_by(name: AccessControl::Seeds::ADMIN_NAME)
+      #
+      # Looked up without case, as names are unique and as the service
+      # counts a group as there: a group somebody made by hand as "admin" is
+      # the Admin group of this site, and the message below, whose advice
+      # would do nothing for it, is not shown.
+      admin = AccessControl::Group.named(AccessControl::Seeds::ADMIN_NAME).first
       name = params[:token_name].to_s
       return missing_admin_group(name) unless admin
 

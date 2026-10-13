@@ -63,6 +63,27 @@ class SetupFreshDatabaseTest < ActionDispatch::IntegrationTest
     assert_equal User.find_by!(email_address: "owner@example.com").id, Audit::Event.where(action: "group.created").order(:id).last.user_id
   end
 
+  # Names are unique without case, and the service counts a hand-made
+  # "admin" as there. The step finds it the same way, so it is never told to
+  # run a seed that would make nothing.
+  test "a group made by hand under the Admin name in another case is the one the token gets, and no message is shown" do
+    verify_setup_token
+    create_setup_admin
+    ApiToken.delete_all
+    AccessControl::Grant.delete_all
+    AccessControl::Group.delete_all
+    theirs = AccessControl::Group.create!(name: "admin")
+
+    assert_difference "ApiToken.count", 1 do
+      patch setup_step_path("mcp_token"), params: { token_name: "claude-desktop" }
+    end
+
+    assert_response :success
+    assert_equal theirs, ApiToken.authenticate(css_select("#mcp-token").first.text.strip).group
+    assert_no_match(/db:seed/, response.body)
+    assert_equal [ "Author", "Editor", "Read only" ], AccessControl::Group.where(built_in: true).order(:name).pluck(:name)
+  end
+
   # The one way the group can still be absent: whoever is signed in may not
   # make groups. A person who is no owner, on a site whose setup was never
   # finished.

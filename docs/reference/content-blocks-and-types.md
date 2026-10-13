@@ -162,7 +162,7 @@ The `<section>` has no accessible name and no heading, so it is a grouping eleme
 
 **Types that are gone.** A block of an unregistered type in a column is skipped with a log line, as at the top level. A section whose own type is gone draws the blocks it holds once each, in reading order, stacked at the content width where the section was, with no band and no grid (`render_block`'s last branch): they are registered blocks, and rendering nothing would take a page's texts and pictures off the site because their wrapper's plugin was removed. Their images ask for the content-width `sizes`.
 
-**Caching and preview** are unchanged: every block write touches the page (its `updated_at`, not the settings form's `settings_changed_at`), a live page's `after_commit` moves the public content version, and `/preview` renders a section as the public page does (`test/integration/preview_test.rb`).
+**Caching and preview** are unchanged: a block write that changes something touches the page (its `updated_at`, not the settings form's `settings_changed_at`): a delete, a duplicate and a changed order always, a save when the block itself changed or a section's column was folded, and a save that wrote nothing not at all (`test/services/no_change_save_test.rb`), a live page's `after_commit` moves the public content version, and `/preview` renders a section as the public page does (`test/integration/preview_test.rb`).
 
 ## Adding a block type: what the Code block touched
 

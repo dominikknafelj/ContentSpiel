@@ -121,8 +121,11 @@ module Publishable
     Publishing.note_change(self) if (saved_changes.keys & Publishing.content_columns(self)).any?
   end
 
-  # A touch is how a write beside the record says it changed: every block
-  # write touches its page, and a post is touched for its tags. `touch` runs
+  # A touch is how a write beside the record says it changed: a block save
+  # touches its page when the block changed or a section's column was folded
+  # (a save that wrote nothing touches nothing, `ContentBlocks::Save`), a
+  # delete, a duplicate and a changed order always, and a post is touched for
+  # its tags. `touch` runs
   # no save callback, so the mark is written here. A touch that is no
   # change to a copy (`touch_without_mark`: a post's related posts, which no
   # copy holds) says so.
