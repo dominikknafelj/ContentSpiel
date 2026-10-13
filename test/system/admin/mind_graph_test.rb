@@ -13,7 +13,8 @@ require "application_system_test_case"
 # (`pixel_at`): a canvas can pass every other test and still draw nothing.
 class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   GRAPH = "[data-controller~='admin--mind-graph--graph']".freeze
-  CANVAS = "#{GRAPH} canvas".freeze
+  # The graph's own canvas: the legend's swatches are canvases too.
+  CANVAS = "#{GRAPH} canvas[data-admin--mind-graph--graph-target='canvas']".freeze
   LIST = "#{GRAPH} [data-mind-graph-list]".freeze
 
   setup do
@@ -30,7 +31,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_equal "7", graph["data-nodes"], "six posts and the tag they share"
     assert_equal "7", graph["data-edges"], "one related and six tag edges"
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 7 posts and tags, 7 connections.']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 6 posts and 1 tag, 7 connections. Showing everything.']"
+    assert_equal [ "Posts 6", "Tags 1", "Related 1", "Shares a tag 6" ], legend_counts, "no page is read here, so no toggle of pages"
     box = canvas_box
     (posts + [ Tag.find_by!(name: "shared") ]).map { |record| nid(record) }.each do |id|
       point = screen_position(id)
@@ -278,29 +280,163 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
   end
 
-  test "the filter hands the layout only what is shown" do
+  # Pages spec §6: each toggle hides its kind and only its kind, the counts
+  # stay what the graph holds, and the list follows. What a toggle shows is
+  # written by the change itself, before the layout moves, so nothing here
+  # waits for a layout but the first load and the last look.
+  test "each toggle of the legend hides its kind and only its kind, and the counts stay" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     a, b, c = 3.times.map { |i| create_post(title: "P#{i}") }
     PostRelation.create!(post: a, related_post: b)
     [ b, c ].each { |post| PostTag.create!(post: post, tag: Tag.find_or_create_by!(name: "t")) }
+    tag = Tag.find_by!(name: "t")
     visit admin_mind_graph_path
     await_graph
-    assert_equal [ "4", "3" ], [ graph["data-nodes"], graph["data-edges"] ]
+    counts = [ "Pages 2", "Posts 3", "Tags 1", "Post types 1", "Tree 1", "Lists 1", "Related 1", "Shares a tag 2" ]
+    shows = lambda do |nodes, edges|
+      assert_selector "#{GRAPH}[data-nodes='#{nodes}'][data-edges='#{edges}']"
+      assert_equal counts, legend_counts
+    end
 
-    find("label", text: "Related").click
-    await_graph
-    assert_equal [ "2", "1" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert_nil screen_position(c), "a hidden node has no place on screen"
-    assert_nil screen_position("tag-#{Tag.find_by!(name: "t").id}"), "a hidden tag has no place on screen"
+    shows.call(7, 5)
+    assert_selector "#{GRAPH} input[name=mind_graph_nodes][value=page][aria-label='Pages, 2']", visible: :all
+    assert_selector "#{GRAPH} input[name=mind_graph_lines][value=tag][aria-label='Shares a tag, 2']", visible: :all
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 pages, 1 post type, 3 posts and 1 tag, 5 connections. Showing everything.']"
+    assert_no_selector "#{GRAPH} [role=status] [data-mind-graph-announced]", visible: :all
 
-    find("label", text: "Tags").click
+    toggle "Related"
+    shows.call(7, 4)
+    assert screen_position(a), "a line switched off hid a node"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 pages, 1 post type, 3 posts and 1 tag, 4 connections. Showing everything. Related lines hidden.']"
+    toggle "Related"
+
+    toggle "Tags"
+    shows.call(6, 3)
+    assert_nil screen_position(tag)
+    within(LIST) { assert_no_selector "h2", text: /tags/i }
+    toggle "Tags"
+
+    toggle "Post types"
+    shows.call(6, 4)
+    assert_nil screen_position("type-blog")
+    toggle "Post types"
+
+    toggle "Lists"
+    shows.call(7, 4)
+    assert screen_position("type-blog"), "the type stays, without its line"
+    toggle "Tree"
+    shows.call(7, 3)
+    toggle "Lists"
+    toggle "Tree"
+
+    toggle "Pages"
+    shows.call(5, 3)
+    assert_nil screen_position(home)
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 1 post type, 3 posts and 1 tag, 3 connections. Showing everything. Pages hidden.']"
+    # A change of the legend is announced: the same words in the notice's
+    # live region, once, hidden from the eye.
+    assert_selector "#{GRAPH} [role=status] p.sr-only[data-mind-graph-announced]", count: 1, visible: :all,
+      text: "Mind graph: 1 post type, 3 posts and 1 tag, 3 connections. Showing everything. Pages hidden."
+    toggle "Pages"
+
+    shows.call(7, 5)
     await_graph
-    assert_equal [ "3", "2" ], [ graph["data-nodes"], graph["data-edges"] ]
+    assert screen_position(home)
+  end
+
+  # The legend by the keyboard: a toggle is a checkbox, a Tab stop that Space
+  # switches, and the graph follows it as it follows a click.
+  test "Space on a focused toggle switches it" do
+    create_post(title: "Alpha", tags: [ "t" ])
+    create_post(title: "Beta", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+    assert_selector "#{GRAPH}[data-nodes='3'][data-edges='2']"
+
+    find("#{GRAPH} input[name=mind_graph_nodes][value=tag]").execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Space)
+
+    assert_selector "#{GRAPH}[data-nodes='2'][data-edges='0']"
+    assert_no_selector "#{GRAPH} input[name=mind_graph_nodes][value=tag]:checked", visible: :all
+    page.driver.browser.keyboard.type(:Space)
+    assert_selector "#{GRAPH}[data-nodes='3'][data-edges='2']"
+    await_graph
+  end
+
+  # Third design answers and H6: status is not a filter. The key is a dialog
+  # named "Status key" behind the legend's "Status" link, in the chip's words.
+  test "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" do
+    create_post(title: "Alpha", tags: [ "t" ])
+    create_post(title: "Beta", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+    key = "dialog#mind-graph-status-key"
+    assert_no_selector "#{key}[open]", visible: :all
+    before = [ graph["data-nodes"], graph["data-edges"] ]
+
+    button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status")
+    button.execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Enter)
+
+    assert_selector "#{key}[open] h2", text: "Status key"
+    assert_equal [ "Live", "Draft", "Scheduled", "Live, unpublished changes", "Live, change scheduled" ], all("#{key} li[data-legend-state]").map { |item| item.text.squish }
+    await_js("document.querySelector('#mind-graph-status-key').contains(document.activeElement)")
+    assert_no_selector "#{key} .admin-dialog__body input, #{key} .admin-dialog__body button, #{key} .admin-dialog__body a"
+    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "the key filters nothing"
+    # Its five swatches are drawn (by the graph's own renderer), each its own.
+    await_js("Array.from(document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]')).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))")
+    drawings = page.evaluate_script("Array.from(document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]'), (canvas) => canvas.toDataURL())")
+    assert_equal 5, drawings.uniq.size, "two looks of the key are one drawing"
+
+    page.driver.browser.keyboard.type(:Escape)
+
+    assert_no_selector "#{key}[open]", visible: :all
+    await_js("document.activeElement?.textContent.trim() === 'Status'")
+    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "Escape closed the key and nothing of the graph"
+  end
+
+  test "a kind switched off takes the selection, the pins and the hover of its nodes with it, and switched on again brings the node back unpinned" do
+    blog = create_page(title: "Blog")
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    drag_node(nid(blog), by: [ 60, 40 ])
+    await_graph
+    click_node(nid(blog))
+    assert_equal [ nid(blog), "1" ], [ graph["data-selected"], graph["data-pinned"] ]
+
+    toggle "Pages"
+
+    assert_selector "#{GRAPH}[data-selected=''][data-pinned='0'][data-hovered='']"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_no_button "Release 1 pinned"
+
+    toggle "Pages"
+    await_graph
+    assert screen_position(nid(blog)), "the page did not come back"
+    assert_equal "0", graph["data-pinned"], "a pin came back with the node"
+  end
+
+  test "with every kind off nothing is drawn and the list says so" do
+    create_page(title: "Blog")
+    a = create_post(title: "Alpha", tags: [ "t" ])
+    create_post(title: "Beta", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+
+    [ "Pages", "Posts", "Tags", "Post types" ].each { |name| toggle name }
+
+    assert_selector "#{GRAPH}[data-nodes='0'][data-edges='0']"
+    assert_selector "#{LIST} p", text: "Nothing is drawn yet."
+    assert_selector "#{CANVAS}[aria-label='Mind graph: nothing to show. All types are hidden.']"
     assert_nil screen_position(a)
-
-    find("label", text: "All").click
+    toggle "Posts"
+    assert_selector "#{GRAPH}[data-nodes='2']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts, 0 connections. Showing everything. Pages hidden. Tags hidden. Post types hidden.']"
     await_graph
-    assert_equal [ "4", "3" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert screen_position(a)
   end
 
   test "posts with no connection are counted, not drawn" do
@@ -330,10 +466,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "0", graph["data-nodes"]
   end
 
-  test "no readable post: 'No posts yet.' and no canvas" do
+  test "no readable page or post: 'No pages or posts yet.' and no canvas" do
     visit admin_mind_graph_path
 
-    assert_text "No posts yet."
+    assert_text "No pages or posts yet."
     assert_no_selector "canvas"
   end
 
@@ -702,7 +838,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # With no layout the list is all there is, so it has to follow the filter:
-  # the control saying "Related" over a list that still holds the tag would be
+  # the legend saying "Tags" is off over a list that still holds the tag would be
   # the screen contradicting itself.
   test "the worker can't start: the filter still narrows the list and the counts" do
     a = create_post(title: "Alpha", tags: [ "shared" ])
@@ -717,14 +853,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     end
     assert_selector "#{LIST} li", count: 4
 
-    find("label", text: "Related").click
+    toggle "Tags"
 
-    assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='2'][data-edges='1']"
+    assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='3'][data-edges='1']"
     within(LIST) do
-      assert_selector "li", count: 2
+      assert_selector "li", count: 3
       assert_selector "button", text: "Alpha"
+      assert_selector "button", text: "Beta"
       assert_selector "button", text: "Gamma"
-      assert_no_selector "button", text: "Beta"
       assert_no_selector "button", text: "shared"
     end
     assert_no_selector "#{GRAPH}[data-settled]"
@@ -806,7 +942,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       window.leftGraph = document.querySelector(#{GRAPH.to_json})
       window.leftDraws = window.leftGraph.mindGraph.draws
       window.drawnAfter = null
-      const context = window.leftGraph.querySelector("canvas").getContext("2d")
+      const context = document.querySelector(#{CANVAS.to_json}).getContext("2d")
       const clear = context.clearRect.bind(context)
       context.clearRect = (...args) => { if (window.drawnAfter !== null) window.drawnAfter += 1; clear(...args) }
       // The moment of leaving: Stimulus disconnects the controller when the
@@ -834,15 +970,18 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # "ready"`, `data-settled`, the counts -- before anything is fetched, so the
   # controller takes those back on connect; `data-url` is fetched once more
   # and the graph drawn from it.
-  test "Back to the graph draws it once, with the filter the control shows" do
+  test "Back to the graph draws it once, with what the legend shows: its counts gone until the data is back, its checkboxes kept" do
     a, b = 2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     PostRelation.create!(post: a, related_post: b)
     visit admin_mind_graph_path
     await_graph
-    find("label", text: "Related").click
+    assert_equal "3", graph["data-nodes"]
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts and 1 tag, 3 connections. Showing everything.']"
+    toggle "Tags"
     await_graph
-    assert_equal "2", graph["data-nodes"]
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 3 posts and tags, 3 connections.']"
+    assert_equal [ "2", "1" ], [ graph["data-nodes"], graph["data-edges"] ]
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts, 1 connection. Showing everything. Tags hidden.']"
+    assert_selector "#{GRAPH} [data-mind-graph-announced]", visible: :all
 
     within("nav[aria-label='Modules']") { click_link "Tags" }
     assert_selector "h1", text: "Tags"
@@ -860,18 +999,29 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.go_back
     assert_selector "h1", text: "Mind graph"
     await_js("window.graphFetches === 1")
-    # The snapshot's canvas was named with the counts of the visit that was
+    # The snapshot's canvas was named with the summary of the visit that was
     # left; until this visit's data has come, it has the server's name again.
+    # So with the legend: its counts and the names made of them are gone,
+    # and the announcement with the notice; the checkboxes are the person's
+    # choice and are kept, so "Tags" is still off.
     assert_selector "#{GRAPH}[data-state='loading']"
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph']"
+    assert_equal [ "Posts", "Tags", "Related", "Shares a tag" ], legend_counts, "a count of the visit that was left is still beside its toggle"
+    assert_no_selector "#{GRAPH} [data-mind-graph-legend] input[aria-label]", visible: :all
+    assert_no_selector "#{GRAPH} [data-mind-graph-announced]", visible: :all
+    assert_no_selector "#{GRAPH} input[name=mind_graph_nodes][value=tag]:checked", visible: :all
+    assert_selector "#{GRAPH} input[name=mind_graph_nodes][value=post]:checked", visible: :all
     page.execute_script("window.releaseGraph()")
     await_graph
-    # (The name counts what was loaded, not what the filter shows.)
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 3 posts and tags, 3 connections.']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts, 1 connection. Showing everything. Tags hidden.']"
+    assert_equal [ "Posts 2", "Tags 1", "Related 1", "Shares a tag 2" ], legend_counts, "the counts are what was loaded, not what the legend shows"
 
-    assert_equal "2", graph["data-nodes"], "the Related filter is still chosen, so the tag is not drawn"
+    assert_equal "2", graph["data-nodes"], "Tags is still switched off, so the tag is not drawn"
     assert_equal "1", graph["data-edges"]
-    assert_selector "#{GRAPH} canvas", count: 1
+    assert_selector CANVAS, count: 1
+    # The swatches are drawn again in the restored page: a snapshot keeps a
+    # canvas and none of its pixels.
+    await_js("Array.from(document.querySelectorAll(#{"#{GRAPH} canvas[data-swatch]".to_json})).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))")
     assert_equal 1, page.evaluate_script("window.graphFetches")
     box = canvas_box
     [ a, b ].each do |post|
@@ -1108,15 +1258,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_node(a)
     assert_equal [ nid(c), tag_id ].sort, neighbours.call
 
-    find("label", text: "Related").click
+    toggle "Shares a tag"
     await_graph
     assert_equal nid(a), graph["data-selected"], "a selection the filter still shows stays"
     assert_selector "[data-mind-graph-card]", text: "P0"
-    assert_equal [ nid(c) ], neighbours.call, "the tag is no neighbour while its edges are not shown"
+    assert_equal [ nid(c) ], neighbours.call, "the tag is no neighbour while its lines are not shown"
+    assert screen_position(tag_id), "a line switched off hides no node"
 
-    find("label", text: "All").click
+    toggle "Shares a tag"
     await_graph
-    assert_equal [ nid(c), tag_id ].sort, neighbours.call, "back under All the tag is a neighbour again"
+    assert_equal [ nid(c), tag_id ].sort, neighbours.call, "with its lines back the tag is a neighbour again"
 
     escape_on_canvas
     assert_equal "", graph["data-neighbours"]
@@ -1132,7 +1283,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_node("tag-#{tag.id}")
     assert_selector "[data-mind-graph-card]", text: /2 posts/i
 
-    find("label", text: "Related").click
+    toggle "Tags"
     await_graph
     assert_equal "", graph["data-selected"]
     assert_no_selector "[data-mind-graph-card]", visible: :visible
@@ -1304,7 +1455,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "2", graph["data-pinned"]
     await_graph
 
-    find("label", text: "Related").click
+    toggle "Tags"
     assert_equal "1", graph["data-pinned"], "the hidden tag's pin was kept"
     assert_button "Release 1 pinned"
     await_graph
@@ -1312,7 +1463,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_in_delta dropped["x"], at["x"], 2, "a pinned node that the filter still shows moved"
     assert_in_delta dropped["y"], at["y"], 2
 
-    find("label", text: "All").click
+    toggle "Tags"
     await_graph
     assert_equal "1", graph["data-pinned"], "a pin came back with the node"
   end
@@ -2217,11 +2368,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_no_selector "a", visible: :all
     end
 
-    find("label", text: "Related").click
+    toggle "Tags"
     await_graph
     within(LIST) do
-      assert_equal [ "POSTS · 2" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal %w[Alpha Gamma], all("li button span.truncate").map(&:text)
+      assert_equal [ "POSTS · 3" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal %w[Alpha Beta Gamma], all("li button span.truncate").map(&:text)
     end
   end
 
@@ -2396,7 +2547,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         .map((element) => {
           if (element.id === "mind-graph-search") return "search"
           if (element.closest("[data-mind-graph-focus]")) return "focus bar"
-          if (element.name === "mind_graph_filter") return "filter"
+          if (element.closest("[data-mind-graph-legend]")) return "legend"
           if (element.dataset.action?.includes("admin--mind-graph--graph#")) return "zoom"
           if (element.tagName === "CANVAS") return "canvas"
           if (element.closest("[data-mind-graph-card]")) return "card"
@@ -2405,7 +2556,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         })
     JS
 
-    assert_equal [ "search", "focus bar", "filter", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
+    assert_equal [ "search", "focus bar", "legend", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
+    # The toggles, then "Status", and every one of them a stop the Tab key
+    # makes: none is taken out of the order.
+    legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
+    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status", 0 ] ], legend
   end
 
   test "a title with markup in it is text in the list and in the search results" do
@@ -2553,6 +2708,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   def worker_messages = page.evaluate_script("window.workerMessages")
 
   def graph = find(GRAPH)
+
+  # A toggle of the legend, by the name on it. No `await_graph` is needed to
+  # read what it shows: `data-nodes`, `data-edges`, the list and the canvas's
+  # name are written by the change itself, before the layout moves.
+  def toggle(name) = find("#{GRAPH} [data-mind-graph-legend] label", text: name).click
+
+  # Each toggle as a person reads it: its name, and its count once written.
+  def legend_counts = all("#{GRAPH} label[data-legend-toggle]").map { |label| label.text.squish }
 
   # The graph is loaded and its layout has cooled down -- and the frame that
   # was asked for when it did has been drawn. `data-settled` is written BEFORE

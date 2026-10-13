@@ -1369,6 +1369,188 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ 1, 1, 1, 1 ], hovered["nodeAlphas"]
   end
 
+  # ---- The legend is the filter (pages spec §6; design answers G6, H5, H6) ----
+
+  GRAPH_DATA = <<~JS.freeze
+    (() => {
+      const nodes = [ { kind: "page", home: true, depth: 0, degree: 2 }, { kind: "page", depth: 1, degree: 2 }, { kind: "post", degree: 2 }, { kind: "post", degree: 2 },
+                      { kind: "tag", degree: 2 }, { kind: "type", degree: 1 }, { kind: "more", degree: 1 } ]
+      const edges = [ { kind: "tree", source: 1, target: 0 }, { kind: "lists", source: 1, target: 5 }, { kind: "brings", source: 5, target: 6 },
+                      { kind: "related", source: 2, target: 3 }, { kind: "tag", source: 2, target: 4 }, { kind: "tag", source: 3, target: 4 }, { kind: "brings", source: 5, target: 2 } ]
+      const all = { nodes: [ "page", "post", "tag", "type" ], lines: [ "tree", "lists", "related", "tag" ] }
+      const shown = (off) => {
+        const on = { nodes: new Set(all.nodes.filter((name) => !off.includes(name))), lines: new Set(all.lines.filter((name) => !off.includes(`line-${name}`))) }
+        const result = m.visible({ nodes, edges, on })
+        return [ result.visibleNodes, result.visibleEdges ]
+      }
+      const labelled = m.visible({ nodes, edges, on: { nodes: new Set([ "page", "post", "type" ]), lines: new Set(all.lines) } })
+      return { everything: shown([]), noRelated: shown([ "line-related" ]), noTagLines: shown([ "line-tag" ]), noLists: shown([ "line-lists" ]), noTree: shown([ "line-tree" ]), noTags: shown([ "tag" ]),
+               noTypes: shown([ "type" ]), noPages: shown([ "page" ]), noPosts: shown([ "post" ]), nothing: shown(all.nodes), noLines: shown(all.lines.map((name) => `line-${name}`)),
+               order: labelled.order, free: Array.from(labelled.free), counts: m.counts(nodes, edges), toggles: [ m.NODE_TOGGLES, m.LINE_TOGGLES ] }
+    })()
+  JS
+
+  test "graph data: a line switched off hides only the lines, and a kind switched off hides its nodes and every line that touches one" do
+    shown = js_module("mind_graph/graph_data", GRAPH_DATA)
+
+    assert_equal [ (0..6).to_a, (0..6).to_a ], shown["everything"]
+    assert_equal [ (0..6).to_a, [ 0, 1, 2, 4, 5, 6 ] ], shown["noRelated"], "every node stays"
+    assert_equal [ (0..6).to_a, [ 0, 1, 2, 3, 6 ] ], shown["noTagLines"], "the tag stays, without its lines"
+    assert_equal [ (0..6).to_a, [ 0, 3, 4, 5 ] ], shown["noLists"], "a hub's faint lines to its posts and to the pill go with Lists: they have no toggle of their own"
+    assert_equal [ (0..6).to_a, [ 1, 2, 3, 4, 5, 6 ] ], shown["noTree"], "Home stays, without its line"
+    assert_equal [ [ 0, 1, 2, 3, 5, 6 ], [ 0, 1, 2, 3, 6 ] ], shown["noTags"]
+    assert_equal [ [ 0, 1, 2, 3, 4, 6 ], [ 0, 3, 4, 5 ] ], shown["noTypes"], "the type, the lists line that points at it and its faint lines; the pill stays, loose"
+    assert_equal [ [ 2, 3, 4, 5, 6 ], [ 2, 3, 4, 5, 6 ] ], shown["noPages"]
+    assert_equal [ [ 0, 1, 4, 5 ], [ 0, 1 ] ], shown["noPosts"], "more goes with the posts"
+    assert_equal [ [], [] ], shown["nothing"]
+    assert_equal [ (0..6).to_a, [] ], shown["noLines"], "with every line off every node is still there"
+  end
+
+  test "graph data: what is shown comes with the order of its labels and the free set, and the pill has no label" do
+    shown = js_module("mind_graph/graph_data", GRAPH_DATA)
+
+    assert_equal [ 0, 1, 5, 2, 3 ], shown["order"], "Home, the top-level page and the type, then the posts; no tag (it is off) and no pill"
+    assert_equal [ 0, 1, 5 ], shown["free"].sort
+  end
+
+  test "graph data: the counts are what the response holds, whatever is switched off, and a hub's faint lines are no Lists lines" do
+    data = js_module("mind_graph/graph_data", GRAPH_DATA)
+
+    assert_equal({ "nodes" => { "page" => 2, "post" => 2, "tag" => 1, "type" => 1 }, "lines" => { "tree" => 1, "lists" => 1, "related" => 1, "tag" => 2 } }, data["counts"])
+    assert_equal [ Admin::MindGraphScreen::LegendComponent::NODES.map(&:to_s), Admin::MindGraphScreen::LegendComponent::LINES.map(&:to_s) ], data["toggles"],
+      "the script's toggles are the legend's, in its order"
+  end
+
+  # The canvas's name (design answers G6 and H5), in the page's own words:
+  # the messages are the locale file's, handed to the module as the view
+  # hands them, so each sentence is read here as a screen reader says it.
+  def node_set(pages: 0, types: 0, posts: 0, tags: 0, more: [], focus: nil)
+    nodes = Array.new(pages) { |index| { kind: "page", id: "page-#{index + 1}" } } + Array.new(posts) { { kind: "post" } } + Array.new(tags) { { kind: "tag" } } +
+            Array.new(types) { { kind: "type" } } + more.map { |count| { kind: "more", count: count } }
+    nodes.first.merge!(focus) if focus
+    nodes
+  end
+
+  WHOLE = { shown: 13, total: 13 }.freeze
+  ALL_ON = { nodes: [], lines: [] }.freeze
+
+  test "summary: the whole graph says its counts by type, its connections and Showing everything, in the designer's words" do
+    whole, small, pair, capped = summaries(
+      { nodes: node_set(pages: 9, types: 3, posts: 13, tags: 4), lines: 27, data: WHOLE },
+      { nodes: node_set(pages: 1, types: 1, posts: 1, tags: 1), lines: 1, data: WHOLE },
+      { nodes: node_set(posts: 2040, tags: 2), lines: 0, data: { shown: 2040, total: 2040 } },
+      { nodes: node_set(pages: 212, posts: 2000, tags: 64), lines: 3000, data: { shown: 2000, total: 2040 } }
+    )
+
+    assert_equal "Mind graph: 9 pages, 3 post types, 13 posts and 4 tags, 27 connections. Showing everything.", whole
+    assert_equal "Mind graph: 1 page, 1 post type, 1 post and 1 tag, 1 connection. Showing everything.", small, "each count in its singular"
+    assert_equal "Mind graph: 2,040 posts and 2 tags, 0 connections. Showing everything.", pair, "a kind with nothing in view is left out, and a figure is grouped"
+    assert_equal "Mind graph: 212 pages, 2,000 posts and 64 tags, 3,000 connections. Showing the 2,000 best-connected of 2,040 posts.", capped
+    assert_not_includes capped, "Showing everything", "never at the cap (H5)"
+  end
+
+  test "summary: a local view names its focus and depth, a page that lists more says N of M posts and how many more are in the list" do
+    focus = { focus: { kind: "page", node_id: "page-1", title: "Blog", depth: 2 }, shown: 20, total: 20 }
+    blog, pills, one, alone, post = summaries(
+      { nodes: node_set(pages: 7, types: 1, posts: 20, more: [ 92 ], focus: { listed_count: 112 }), lines: 30, data: focus },
+      { nodes: node_set(pages: 7, types: 1, posts: 20, tags: 1, more: [ 60, 32 ], focus: { listed_count: 112 }), lines: 30, data: focus },
+      { nodes: node_set(pages: 1, types: 1, posts: 20, more: [ 1 ], focus: { listed_count: 21 }), lines: 30, data: focus },
+      { nodes: node_set(pages: 1, focus: { listed_count: 0 }), lines: 0, data: { focus: { kind: "page", node_id: "page-1", title: "About", depth: 1 }, shown: 0, total: 0 } },
+      { nodes: node_set(posts: 3, tags: 1), lines: 3, data: { focus: { kind: "post", node_id: "post-9", title: "Small sites", depth: 1 }, shown: 3, total: 3 } }
+    )
+
+    assert_equal "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts. 92 more are in the list.", blog
+    assert_equal "Mind graph around Blog, depth 2: 7 pages, 1 post type, 20 of 112 posts and 1 tag. 92 more are in the list.", pills, "every pill in view counts together"
+    assert_equal "Mind graph around Blog, depth 2: 1 page, 1 post type and 20 of 21 posts. 1 more is in the list.", one
+    assert_equal "Mind graph around About, depth 1: 1 page.", alone, "depth 1 around a page draws no post, and is not nothing"
+    assert_equal "Mind graph around Small sites, depth 1: 3 posts and 1 tag.", post
+    [ blog, pills, one, alone, post ].each { |summary| assert_no_match(/Showing|nearest/, summary, "a local view names no cap and never says everything") }
+  end
+
+  test "summary: what is switched off is named after the scope, kinds then lines, and with nothing in view it says why" do
+    nodes = node_set(pages: 2, types: 1, posts: 3, tags: 1)
+    without = ->(kinds) { nodes.each_index.reject { |index| kinds.include?(nodes[index][:kind]) } }
+    tags, lines, both, all, none, pills = summaries(
+      { nodes: nodes, visible: without.call(%w[tag]), lines: 3, data: WHOLE, off: { nodes: %w[tag], lines: [] } },
+      { nodes: nodes, lines: 3, data: WHOLE, off: { nodes: [], lines: %w[tag] } },
+      { nodes: nodes, visible: without.call(%w[page type]), lines: 1, data: WHOLE, off: { nodes: %w[page type], lines: %w[tree lists related] } },
+      { nodes: nodes, visible: [], lines: 0, data: WHOLE, off: { nodes: %w[page post tag type], lines: %w[tag] } },
+      { nodes: [], lines: 0, data: { shown: 0, total: 0 }, off: { nodes: %w[tag], lines: [] } },
+      { nodes: node_set(pages: 2, types: 1, posts: 20, more: [ 92 ], focus: { listed_count: 112 }), visible: [ 0, 1, 22 ], lines: 2, off: { nodes: %w[post], lines: [] },
+        data: { focus: { kind: "page", node_id: "page-1", title: "Blog", depth: 2 }, shown: 20, total: 20 } }
+    )
+
+    assert_equal "Mind graph: 2 pages, 1 post type and 3 posts, 3 connections. Showing everything. Tags hidden.", tags, "both, in that order: everything means no cap, not no filters"
+    assert_equal "Mind graph: 2 pages, 1 post type, 3 posts and 1 tag, 3 connections. Showing everything. Shares-a-tag lines hidden.", lines
+    assert_equal "Mind graph: 3 posts and 1 tag, 1 connection. Showing everything. Pages hidden. Post types hidden. Tree lines hidden. Lists lines hidden. Related lines hidden.", both
+    assert_equal "Mind graph: nothing to show. All types are hidden.", all, "every kind is off: that is said once, and no line is named"
+    assert_equal "Mind graph: nothing to show. No pages, posts or tags yet.", none, "nothing to draw: no toggle is named"
+    assert_equal "Mind graph around Blog, depth 2: 2 pages and 1 post type. Posts hidden.", pills, "the pill goes with the posts: neither N of M nor more is said"
+  end
+
+  test "summary: the view the 3,000-line rule opened says where it is and what the site holds, and no other view does" do
+    home = { focus: { kind: "page", node_id: "page-1", title: "Home", depth: 1 }, shown: 0, total: 0, site: { pages: 212, posts: 2040, tags: 64 } }
+    opened, plain, bare, tagless = summaries(
+      { nodes: node_set(pages: 6, types: 2), lines: 7, data: home, around_home: true },
+      { nodes: node_set(pages: 6, types: 2), lines: 7, data: home },
+      { nodes: node_set(pages: 6, types: 2), lines: 7, data: home.except(:site), around_home: true },
+      { nodes: node_set(pages: 6, types: 2), lines: 7, data: home.merge(site: { pages: 1, posts: 2040, tags: 0 }), around_home: true, off: { nodes: %w[tag], lines: [] } }
+    )
+
+    assert_equal "Mind graph around Home, depth 1: 6 pages and 2 post types. Showing the area around Home. The site has 212 pages, 2,040 posts and 64 tags.", opened
+    assert_equal "Mind graph around Home, depth 1: 6 pages and 2 post types.", plain
+    assert_equal plain, bare, "without the site's counts nothing is said of the site"
+    assert_equal "Mind graph around Home, depth 1: 6 pages and 2 post types. Showing the area around Home. The site has 1 page and 2,040 posts. Tags hidden.", tagless
+  end
+
+  # The swatches of the legend and of the Status key are the RENDERER'S OWN
+  # drawings: each is compared with what the canvas draws for the same node
+  # or line, part for part, so a look that changes in `marks.js` changes
+  # here too and no key can show one the canvas does not have.
+  SWATCH_STATES = { "state-live" => {}, "state-draft" => { status: "draft" }, "state-scheduled" => { status: "scheduled" },
+                    "state-live-with-changes" => { changes: "unpublished" }, "state-live-change-scheduled" => { changes: "scheduled" } }.freeze
+
+  def in_hue(drawn, hue) = drawn.map { |part| part.map { |value| value == "cat-1" ? hue : value } }
+  def swatch_parts(name) = swatch_drawn(name).map { |_x, _y, *rest| rest }
+
+  test "swatches: the Status key's five looks are the canvas's own drawing of a post in each state, in ink" do
+    on_canvas = marks_drawn(SWATCH_STATES.values)
+
+    SWATCH_STATES.each_key.with_index { |name, index| assert_equal in_hue(on_canvas[index], "ink"), swatch_parts(name), name }
+    assert_equal 5, SWATCH_STATES.keys.map { |name| swatch_parts(name) }.uniq.size, "no two looks are one drawing"
+    assert_equal Admin::MindGraphScreen::StatusKeyComponent::STATES.map { |state| "state-#{state.to_s.dasherize}" }, SWATCH_STATES.keys, "the key's states, by Publishing::State's names"
+  end
+
+  test "swatches: a toggle's mark, the retired type, the pin and the notes badge are the canvas's own drawings, and a toggle's line its kind's style" do
+    page_mark, post, tag, type, retired, noted = marks_drawn([ { kind: "page" }, {}, { kind: "tag" }, { kind: "type", id: "all-posts", colour_index: nil }, { colour_index: nil }, { open_notes: 1 } ])
+    pinned = marks_drawn([ {} ], pinned: [ 0 ]).first
+
+    assert_equal page_mark, swatch_parts("page")
+    assert_equal in_hue(post, "dim"), swatch_parts("post"), "a post that names no type: in dim, as All posts is"
+    assert_equal tag, swatch_parts("tag")
+    assert_equal type, swatch_parts("type"), "the hub of All posts"
+    assert_equal retired, swatch_parts("retired")
+    assert_equal in_hue(pinned, "dim"), swatch_parts("pinned")
+    assert_equal in_hue(noted, "dim"), swatch_parts("notes")
+    LINES.except("brings").each do |kind, (colour, width, dash)|
+      assert_equal [ [ 0, 4, "stroke", "line", colour, width, dash ] ], swatch_drawn("line-#{kind}"), "#{kind}: one line across the swatch, from its left edge at half its height"
+    end
+  end
+
+  test "swatches: every swatch the page can ask for has a scene, and none is cut by its canvas" do
+    sizes = Admin::MindGraphScreen::SwatchComponent::SIZES
+    assert_equal sizes.keys.map(&:to_s).sort, js_module("mind_graph/swatches", "Object.keys(m.SCENES)").sort
+
+    sizes.each do |name, (width, height)|
+      swatch_drawn(name.to_s).each do |x, y, _done, shape, *rest|
+        reach = shape == "circle" ? [ rest[0], rest[0] ] : shape == "box" ? [ rest[0] / 2.0, rest[1] / 2.0 ] : [ 0, 0 ]
+        assert x - reach[0] >= 0 && x + reach[0] <= width && y - reach[1] >= 0 && y + reach[1] <= height, "#{name}: a #{shape} at #{x}, #{y} reaching #{reach.inspect} leaves its #{width} by #{height} canvas"
+      end
+    end
+    error = js_module("mind_graph/swatches", '(() => { try { m.drawSwatch({}, {}, "no-such", { width: 1, height: 1 }); return null } catch (error) { return error.message } })()')
+    assert_equal 'mind graph: no swatch "no-such"', error, "an unknown swatch is loud, not blank"
+  end
+
   # Runs `script` against a layout and answers what happened, in order:
   # "raw:<after>" for each `settled` the WORKER posted and "called" for each
   # `onSettled` the client made of them (for one message the client's handler
@@ -1539,6 +1721,40 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     drawn
   end
 
+  # A canvas context that records (`marks_drawn`, `swatch_drawn`): `log`
+  # holds what was filled, stroked and written, each with where it is.
+  RECORDING_CONTEXT = <<~'JS'.freeze
+    const round = (value) => Math.round(value * 100) / 100
+    const log = []
+    const set = { dash: [] }
+    let shape = null
+    const box = (x, y, width, height, ...radius) => [ round(x + width / 2), round(y + height / 2), "box", width, height, ...radius ]
+    // A stroked shape by its outer edge: half the line's width more, each way.
+    const outer = ([ cx, cy, kind, ...sizes ]) => {
+      const half = set.lineWidth / 2
+      if (kind === "circle") return [ cx, cy, kind, round(sizes[0] + half) ]
+      if (kind === "box") return [ cx, cy, kind, round(sizes[0] + half * 2), round(sizes[1] + half * 2), ...sizes.slice(2).map((radius) => round(radius + half)) ]
+      return [ cx, cy, kind ]
+    }
+    const context = new Proxy({}, {
+      get: (_, name) => {
+        if (name === "beginPath") return () => { shape = null }
+        if (name === "arc") return (x, y, radius) => { shape = [round(x), round(y), "circle", round(radius)] }
+        if (name === "rect") return (x, y, width, height) => { shape = box(x, y, width, height) }
+        if (name === "roundRect") return (x, y, width, height, radius) => { shape = box(x, y, width, height, radius) }
+        if (name === "moveTo") return (x, y) => { shape = [round(x), round(y), "line"] }
+        if (name === "setLineDash") return (dash) => { set.dash = dash }
+        if (name === "fillRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = box(x, y, width, height); log.push([cx, cy, "fill", ...rest, set.fillStyle]) }
+        if (name === "strokeRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = outer(box(x, y, width, height)); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) }
+        if (name === "fillText") return (words, x, y) => { log.push([round(x), round(y), "text", words, set.font, set.fillStyle]) }
+        if (name === "fill") return () => { if (shape) log.push([shape[0], shape[1], "fill", ...shape.slice(2), set.fillStyle]) }
+        if (name === "stroke") return () => { if (shape) { const [ cx, cy, ...rest ] = outer(shape); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) } }
+        return () => {}
+      },
+      set: (_, name, value) => { set[name] = value; return true }
+    })
+  JS
+
   # Draws the given nodes 100 pixels apart (the first at 50, 50) against a
   # context that records, with a theme whose values are their own names, and
   # answers per node what was filled, stroked and written, in order:
@@ -1557,35 +1773,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     drawn = page.evaluate_async_script(<<~JS, nodes, labels, selected, hovered, pinned)
       const [given, labelled, selected, hovered, pinned, done] = arguments
       import("mind_graph/renderer").then(({ draw, radiusFor }) => {
-        const round = (value) => Math.round(value * 100) / 100
-        const log = []
-        const set = { dash: [] }
-        let shape = null
-        const box = (x, y, width, height, ...radius) => [ round(x + width / 2), round(y + height / 2), "box", width, height, ...radius ]
-        // A stroked shape by its outer edge: half the line's width more, each way.
-        const outer = ([ cx, cy, kind, ...sizes ]) => {
-          const half = set.lineWidth / 2
-          if (kind === "circle") return [ cx, cy, kind, round(sizes[0] + half) ]
-          if (kind === "box") return [ cx, cy, kind, round(sizes[0] + half * 2), round(sizes[1] + half * 2), ...sizes.slice(2).map((radius) => round(radius + half)) ]
-          return [ cx, cy, kind ]
-        }
-        const context = new Proxy({}, {
-          get: (_, name) => {
-            if (name === "beginPath") return () => { shape = null }
-            if (name === "arc") return (x, y, radius) => { shape = [round(x), round(y), "circle", round(radius)] }
-            if (name === "rect") return (x, y, width, height) => { shape = box(x, y, width, height) }
-            if (name === "roundRect") return (x, y, width, height, radius) => { shape = box(x, y, width, height, radius) }
-            if (name === "moveTo") return (x, y) => { shape = [round(x), round(y), "line"] }
-            if (name === "setLineDash") return (dash) => { set.dash = dash }
-            if (name === "fillRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = box(x, y, width, height); log.push([cx, cy, "fill", ...rest, set.fillStyle]) }
-            if (name === "strokeRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = outer(box(x, y, width, height)); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) }
-            if (name === "fillText") return (words, x, y) => { log.push([round(x), round(y), "text", words, set.font, set.fillStyle]) }
-            if (name === "fill") return () => { if (shape) log.push([shape[0], shape[1], "fill", ...shape.slice(2), set.fillStyle]) }
-            if (name === "stroke") return () => { if (shape) { const [ cx, cy, ...rest ] = outer(shape); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) } }
-            return () => {}
-          },
-          set: (_, name, value) => { set[name] = value; return true }
-        })
+        #{RECORDING_CONTEXT}
         const nodes = given.map((node, index) => ({ id: `n-${index}`, kind: "post", degree: 1, colour_index: 1, status: "live", label: "", ...node }))
         const positions = Float32Array.from(nodes.flatMap((_, index) => [ 50 + index * 100, 50 ]))
         const radii = nodes.map(radiusFor)
@@ -1655,6 +1843,46 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     JS
     flunk "renderer: #{drawn["error"]}" if drawn.is_a?(Hash)
     drawn
+  end
+
+  # What the swatch called `name` draws, at its size in the page
+  # (`SwatchComponent::SIZES`), against the recording context and the theme
+  # of `marks_drawn`: each part as `[ x, y, "fill" | "stroke" | "text", … ]`.
+  def swatch_drawn(name)
+    width, height = Admin::MindGraphScreen::SwatchComponent::SIZES.fetch(name.to_sym)
+    drawn = page.evaluate_async_script(<<~JS, name, width, height)
+      const [name, width, height, done] = arguments
+      import("mind_graph/swatches").then(({ drawSwatch }) => {
+        #{RECORDING_CONTEXT}
+        drawSwatch(context, { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", radius: 4,
+                              categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count" },
+          name, { width, height })
+        done(log)
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "swatches: #{drawn["error"]}" if drawn.is_a?(Hash)
+    drawn
+  end
+
+  # The canvas's name for each given case, in the locale file's words. A
+  # case: `nodes`, `visible` (indexes; every node unless given), `lines`,
+  # `data`, `off` (nothing unless given), `around_home`. The viewer has all
+  # four toggles.
+  def summaries(*cases)
+    keys = I18n.t("admin.mind_graph.script.summary").flat_map { |key, value| value.is_a?(Hash) && !value.key?(:other) ? value.keys.map { |inner| "#{key}.#{inner}" } : [ key ] }
+    messages = Class.new { include Admin::MessagesHelper }.new.messages_data("mind_graph.script.capped", *keys.map { |key| "mind_graph.script.summary.#{key}" })
+    given = cases.map { |one| { visible: one[:nodes].each_index.to_a, off: ALL_ON, around_home: false }.merge(one) }
+    result = page.evaluate_async_script(<<~JS, messages, given)
+      const [json, cases, done] = arguments
+      Promise.all([ import("mind_graph/summary"), import("i18n/messages") ]).then(([ { summaryOf }, { messages } ]) => {
+        const holder = document.createElement("div")
+        holder.setAttribute("data-messages", json)
+        const tools = { text: messages(holder), number: (value) => new Intl.NumberFormat("en").format(value) }
+        done(cases.map((one) => summaryOf({ nodes: one.nodes, visibleNodes: one.visible, lines: one.lines, data: one.data, off: one.off, toggles: 4, aroundHome: one.around_home }, tools)))
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "summary: #{result["error"]}" if result.is_a?(Hash)
+    result
   end
 
   # Imports a module of the page's import map and answers `expression`, in
