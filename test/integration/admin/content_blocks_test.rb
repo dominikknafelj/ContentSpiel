@@ -1379,17 +1379,36 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "A sample", block.caption
   end
 
-  test "a Code block over the limit is refused with the message in its slot, nothing is written, and the answer does not touch the field" do
+  # "Nothing is written" is the row, the audit log and the content version.
+  # An edit reservation is no content and follows the save rule (CLAUDE.md,
+  # "A save is a claim"): a request that names no tab claims nothing, and a
+  # claim a request took is KEPT on a 422, since the person is still typing
+  # in the form that was refused.
+  test "a Code block over the limit is refused with the message in its slot, nothing is written or audited, and the answer does not touch the field" do
     block = code_block(settings: { "code" => "kept = 1" })
     stamp = block.reload.updated_at
+    version = PublicSite.content_version
 
-    save_code(block, { code: "x" * 20_001 })
+    assert_no_difference [ -> { Audit::Event.count }, -> { Editing::Reservation.count } ] do
+      save_code(block, { code: "x" * 20_001 })
+    end
 
     assert_response :unprocessable_entity
-    assert_select "turbo-stream[target='block-#{block.id}-code-errors'] template", text: /Code is too long \(maximum is 20000 characters\)/
+    assert_select "turbo-stream[target='block-#{block.id}-code-errors'] template", text: /Code is too long \(maximum is 20,000 characters\)/
+    assert_no_match(/20000/, response.body, "the limit is said grouped, as the counter says it")
     assert_no_match(/<textarea/, response.body, "the field, and the text in it, is the browser's to keep")
     assert_equal "kept = 1", block.reload.settings["code"]
     assert_equal stamp, block.updated_at
+
+    assert_no_difference -> { Audit::Event.count } do
+      save_code(block, { code: "x" * 20_001 }, tab: "tab-aaaaaaaa")
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal "kept = 1", block.reload.settings["code"]
+    assert_equal stamp, block.updated_at
+    assert_equal version, PublicSite.content_version
+    assert_equal [ "ContentBlock", block.id, users(:one).id, "tab-aaaaaaaa" ], Editing::Reservation.sole.values_at(:subject_type, :subject_id, :user_id, :tab), "the claim this request took is kept on a 422"
 
     save_code(block, { code: "x" * 20_000 })
     assert_response :success

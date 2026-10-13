@@ -233,6 +233,6 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     assert_selector "fieldset.admin-held input[name='block[settings][filename]'][readonly]"
     assert_no_selector "[data-controller~='admin--saving--autosave']"
     left = Nokogiri::HTML5.fragment(rendered_content).css("fieldset.admin-held [data-action]").flat_map { |node| node["data-action"].split }
-    assert_empty left - [ "input->admin--editor--code-limit#update" ], "only the counter, which reads, is left in a held code card"
+    assert_equal [ "input->admin--editor--code-limit#update" ], left, "the counter, which reads, is left in a held code card, and nothing else is"
   end
 end

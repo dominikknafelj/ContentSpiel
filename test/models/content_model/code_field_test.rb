@@ -42,6 +42,16 @@ class ContentModel::CodeFieldTest < ActiveSupport::TestCase
     assert fields("code" => "é" * 10).valid?, "characters, not bytes"
   end
 
+  # The counter under the field says "20,000"; the refusal says it the same way.
+  test "the message says the limit grouped, and the error is still Rails' too_long with its count" do
+    definition = ContentModel::BlockTypeDefinition.new("sample").tap { |t| t.field :code, :code, max: 20_000 }
+    over = ContentModel::FieldSet.for(definition).new({}).assign("code" => "x" * 20_001)
+
+    assert_not over.valid?
+    assert_equal [ "is too long (maximum is 20,000 characters)" ], over.errors[:code]
+    assert_equal [ :too_long, 20_000 ], [ over.errors.first.type, over.errors.first.options[:count] ]
+  end
+
   test "a code field is never translated" do
     error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").field(:code, :code, translated: true) }
 

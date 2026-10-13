@@ -252,12 +252,19 @@ module ContentModel
 
           errors.add(field.name, :inclusion) if field.type == :select && !select_options(field).include?(value)
           errors.add(field.name, :inclusion) if field.type == :content_type && ContentTypes.find(value).nil?
-          errors.add(field.name, :too_long, count: field.options[:max]) if field.type == :code && field.options[:max] && value.length > field.options[:max]
+          errors.add(field.name, :too_long, **code_limit(field.options[:max])) if field.type == :code && field.options[:max] && value.length > field.options[:max]
           errors.add(field.name, :invalid) if field.type == :url && !url?(value)
           errors.add(field.name, :greater_than_or_equal_to, count: field.options[:min]) if field.options[:min] && value.is_a?(Integer) && value < field.options[:min]
           errors.add(field.name, :less_than_or_equal_to, count: field.options[:max]) if field.options[:max] && value.is_a?(Integer) && value > field.options[:max]
         end
       end
+
+      # A code field's limit as its message says it: the error is Rails' own
+      # `:too_long` with its `count`, and its words are
+      # `errors.messages.code_too_long` (config/locales/en.yml), which takes
+      # the limit grouped ("20,000"), as the counter under the field writes
+      # it. Rails' own message would print the bare digits.
+      def code_limit(max) = { count: max, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(max) }
 
       def select_options(field)
         options = field.options[:options]

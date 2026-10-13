@@ -48,6 +48,14 @@ en:
         short_datetime: "%-d %b, %H:%M"
         datetime: "%-d %b %Y, %H:%M"
 
+  # A `:code` field over its limit (`ContentModel::FieldSet#code_limit`):
+  # Rails' own "is too long" sentence with the limit grouped for reading
+  # ("20,000"), as the counter under the field says it. `%{limit}` arrives
+  # formatted.
+  errors:
+    messages:
+      code_too_long: "is too long (maximum is %{limit} characters)"
+
   # How these columns are named in validation messages ("AI provider isn't
   # an available provider", not Rails' default "Ai provider ...").
   activerecord:
