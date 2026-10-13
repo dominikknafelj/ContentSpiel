@@ -23,7 +23,28 @@
 // (H2): its mark a small copy of the hub, its number the POSTS of that type
 // the viewer can read (a tag's row has its connections there), in the order
 // the data has them -- colour-slot order, then retired types, then "All
-// posts" last. "+N more" has no row: pressed on the canvas, it IS the list.
+// posts" last.
+//
+// "+N MORE" HAS A ROW TOO (the ruling on the review of the pages plan's Task
+// 7: a pill pressed on the canvas opens the list, and nothing on a canvas
+// can be pressed by a keyboard). Each pill in view has a row UNDER THE ROW
+// OF WHAT IT HANGS OFF -- the post type's, "All posts"' or the tag's --
+// indented one step, in the pill's own words ("+92 more"), and named whole
+// for a screen reader ("92 more posts Blog lists, not in view. Activate to
+// show them."). It is counted in no heading: it is no post type and no tag.
+// A pill whose hub has no row (its kind is switched off) stands at the end
+// of the posts, and with no post drawn either, after the groups: a pill in
+// view is never without a row. Activating it asks the app for the pill's
+// rows (`onMore(id)`), as a press on the pill does, and the focus goes to
+// the first of them (the rule under "THE FOCUS IS NOT LOST").
+//
+// A PILL'S ROWS (`showRows` with `back`) stand under a heading that names
+// them ("More from Blog · 92") with "Back to the list" beside it, a button,
+// before the rows in the document; ESCAPE pressed anywhere in the rows is
+// the same way back (`back.onBack`), and so it is on the error line of a
+// pill's read that failed, which offers the button beside "Try again". The
+// rows of "Not listed on any page" have neither: their checkbox is the way
+// back, and Escape there is nobody's.
 //
 // THE PAGES' TREE IS A TREE FOR A SCREEN READER TOO, not an indent alone: a
 // page's row stands in a list INSIDE its parent's item (by the data's
@@ -55,7 +76,9 @@
 //
 // A READ THAT FAILED (G5) is said IN THE LIST, not in a toast: the line and
 // a small "Try again" button under it (`fail`), in a `role="alert"` so it
-// is announced. The checkbox above stays, so the filter can be let go.
+// is announced. The checkbox above stays, so the filter can be let go. When
+// the focus was in the rows it is put on "Try again": the row or the button
+// that was pressed is gone, and the keyboard is not left on nothing.
 //
 // THE FOCUS IS NOT LOST when the rows are drawn again (a post was added, a
 // kind was switched, "Try again" brought the rows): `render` and `showRows`
@@ -64,15 +87,19 @@
 // first row, else on the checkbox.
 //
 // Text goes in with `textContent`; no path is written here but the one the
-// app hands in (`link`). `createList(container, { text, dotClasses,
-// typeLabels, retryClass, unlisted, onSelect, onHover, onAdd, onUnlisted })`
-// answers `{ render(nodes), showRows({ heading, rows, inView, link }),
-// fail(line, { label, onRetry, focus }), setUnlisted(on), mark(id),
-// row(id), destroy() }`: `render` replaces the rows with the four groups
-// (the app calls it once per load and once per filter change), `mark` moves
-// the mark to the row of `id` (null for none). `onSelect(id)` and
-// `onHover(id | null)` get a node's id as the data has it. The listeners
-// are on the rows' region, one of each, however many rows there are.
+// app hands in (`link`). `createList(container, { text, number, dotClasses,
+// typeLabels, retryClass, unlisted, onSelect, onHover, onAdd, onMore,
+// onUnlisted })` answers `{ render(nodes), showRows({ heading, rows, inView,
+// link, back }), fail(line, { label, onRetry, focus, back }), clear(),
+// setUnlisted(on), mark(id), row(id), destroy() }`: `render` replaces the
+// rows with the four groups (the app calls it once per load and once per
+// filter change), `clear` empties the rows while another graph is loaded,
+// `mark` moves the mark to the row of `id` (null for none). `back` is
+// `{ label, onBack }`. `onSelect(id)`, `onMore(id)` and `onHover(id | null)`
+// get a node's id as the data has it; `number` groups a figure as the
+// messages' language does. A pill's node carries `of`, the name of what it
+// hangs off. The listeners are on the rows' region, one of each, however
+// many rows there are.
 import { dotClass, TAG_MARK } from "mind_graph/card"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
 
@@ -88,12 +115,19 @@ const NAMES = { page: "mind_graph.script.list.select_page", post: "mind_graph.sc
 // (a READING: the design answer says "with indents" and no figure).
 const INDENT = 12
 const ROW_PADDING = 12
+// A pill's row stands one step in from the row it hangs off, beyond that
+// row's mark (a READING: nobody drew it).
+const PILL_INDENT = 16
+const LINK = "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
 
-export function createList(container, { text, dotClasses, typeLabels = {}, retryClass = "", unlisted: filterable = true, onSelect, onHover, onAdd, onUnlisted }) {
+export function createList(container, { text, number = String, dotClasses, typeLabels = {}, retryClass = "", unlisted: filterable = true, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
   let rows = new Map()
   let absent = new Map()
   let marked = null
   let headings = 0
+  // The way back from what is shown, while there is one (a pill's rows, or
+  // the error line of a pill's read): what Escape in the rows' region does.
+  let goBack = null
 
   const element = (tag, className, content) => {
     const created = document.createElement(tag)
@@ -124,13 +158,29 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
   const changed = () => onUnlisted(unlisted.checked)
   unlisted.addEventListener("change", changed)
 
-  // A group: its heading, and its rows in a list the heading names.
-  const section = (title, list) => {
+  // "Back to the list": a button that reads as a link, as the legend's
+  // "Status" does. It changes what the list shows and leads nowhere.
+  const backButton = ({ label, onBack }) => {
+    const button = element("button", `shrink-0 ${LINK}`, label)
+    button.type = "button"
+    button.dataset.mindGraphBack = ""
+    button.addEventListener("click", onBack)
+    return button
+  }
+  // A group: its heading, and its rows in a list the heading names. With
+  // `back`, the way back stands beside the heading, before the rows.
+  const section = (title, list, { back = null } = {}) => {
     const wrapper = document.createElement("section")
-    const heading = element("h2", "m-0 px-3 pb-1 pt-3 font-cs-mono text-label uppercase tracking-mono text-meta", title)
+    const heading = element("h2", "m-0 min-w-0 px-3 pb-1 pt-3 font-cs-mono text-label uppercase tracking-mono text-meta", title)
     heading.id = `mind-graph-list-${(headings += 1)}`
     list.setAttribute("aria-labelledby", heading.id)
-    wrapper.append(heading, list)
+    if (back) {
+      const head = element("div", "flex items-baseline justify-between gap-2 pr-3")
+      head.append(heading, backButton(back))
+      wrapper.append(head, list)
+    } else {
+      wrapper.append(heading, list)
+    }
     return wrapper
   }
   // A post's type as a row that is not in view names it (design answers G5,
@@ -169,6 +219,22 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
     }
     return item
   }
+  // A pill's row: the pill's own words, in the small mono style they have
+  // on the canvas, and its whole name. No mark: the row above is what it
+  // hangs off.
+  const pillRow = (pill) => {
+    const item = document.createElement("li")
+    const button = element("button", ROW)
+    button.type = "button"
+    button.dataset.nodeId = pill.id
+    button.dataset.more = ""
+    button.setAttribute("aria-label", text.t("mind_graph.script.list.more_row", { count: pill.count, figure: number(pill.count), target: pill.of ?? "" }))
+    button.style.paddingInlineStart = `${ROW_PADDING + PILL_INDENT}px`
+    button.append(element("span", "min-w-0 flex-1 truncate font-cs-mono text-label text-dim", pill.title))
+    item.append(button)
+    rows.set(pill.id, button)
+    return item
+  }
   // The pages as the tree they are: a page's item holds the list of its
   // children. The pages come in tree order, so a parent is met before its
   // children; one whose parent has no row here stands at the top level.
@@ -188,6 +254,7 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
     rows = new Map()
     absent = new Map()
     marked = null
+    goBack = null
   }
   // Replaces the rows, and keeps the focus where it was: on the row of the
   // same node, else on the first row, else on the checkbox. Only when the
@@ -206,8 +273,17 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
   const click = (event) => {
     const button = rowOf(event)
     if (!button) return
-    if (absent.has(button.dataset.nodeId)) onAdd(absent.get(button.dataset.nodeId))
+    if (button.dataset.more != null) onMore(button.dataset.nodeId)
+    else if (absent.has(button.dataset.nodeId)) onAdd(absent.get(button.dataset.nodeId))
     else onSelect(button.dataset.nodeId)
+  }
+  // Escape in the rows' region goes back where there is a way back, and is
+  // nobody's otherwise (it is not taken, so whatever else listens hears it).
+  const keydown = (event) => {
+    if (event.key !== "Escape" || !goBack || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+    event.preventDefault()
+    event.stopPropagation()
+    goBack()
   }
   const over = (event) => {
     const button = rowOf(event)
@@ -216,7 +292,7 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
   const out = (event) => {
     if (rowOf(event)) onHover(null)
   }
-  const listeners = { click, pointerover: over, pointerout: out, focusin: over, focusout: out }
+  const listeners = { click, keydown, pointerover: over, pointerout: out, focusin: over, focusout: out }
   Object.entries(listeners).forEach(([ name, handler ]) => body.addEventListener(name, handler))
 
   function mark(id) {
@@ -239,15 +315,34 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
       forget()
       const of = (kind, order) => nodes.filter((node) => node.kind === kind).sort(order)
       const groups = [ [ "pages", of("page", byTree) ], [ "posts", of("post", byDegree) ], [ "tags", of("tag", byDegree) ], [ "types", of("type", asGiven) ] ].filter(([ , found ]) => found.length)
-      if (!groups.length) return put(line(text.t("mind_graph.script.list.empty")))
+      const pills = of("more", asGiven)
+      if (!groups.length && !pills.length) return put(line(text.t("mind_graph.script.list.empty")))
 
-      put(...groups.map(([ name, found ]) => section(text.t(`mind_graph.script.list.${name}`, { count: found.length }), name === "pages" ? tree(found) : listOf(found.map((node) => row(node))))))
+      const lists = new Map()
+      const parts = groups.map(([ name, found ]) => {
+        const list = name === "pages" ? tree(found) : listOf(found.map((node) => row(node)))
+        lists.set(name, list)
+        return section(text.t(`mind_graph.script.list.${name}`, { count: found.length }), list)
+      })
+      // Each pill under the row of what it hangs off; one with no such row
+      // at the end of the posts, or after the groups when no post is drawn.
+      const loose = []
+      for (const pill of pills) {
+        const hub = rows.get(pill.target)?.closest("li")
+        if (hub) hub.after(pillRow(pill))
+        else loose.push(pillRow(pill))
+      }
+      if (loose.length && lists.has("posts")) lists.get("posts").append(...loose)
+      else if (loose.length) parts.push(listOf(loose))
+      put(...parts)
     },
     // A filter's rows in place of the groups. `inView(id)`: whether the
-    // canvas draws that post now.
-    showRows({ heading, rows: given, inView, link = null }) {
+    // canvas draws that post now. `back`: the rows are a pill's, and this
+    // is the way back to the groups.
+    showRows({ heading, rows: given, inView, link = null, back = null }) {
       forget()
-      const parts = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id) })))) ]
+      goBack = back?.onBack ?? null
+      const parts = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id) }))), { back }) ]
       if (link) {
         const anchor = element("a", "mx-3 mt-2 inline-block text-sm text-accent underline", link.label)
         anchor.href = link.href
@@ -260,17 +355,28 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
     // that asks again, in the list. `focus`: the press that asked was the
     // button's own, which this call has just removed, so the new one takes
     // the focus and the keyboard is not left on nothing.
-    fail(content, { label, onRetry, focus = false }) {
+    // `back`: the read was a pill's, and the error line keeps the way back
+    // to the groups beside "Try again" (and Escape goes back).
+    fail(content, { label, onRetry, focus = false, back = null }) {
+      const held = body.contains(document.activeElement)
       forget()
+      goBack = back?.onBack ?? null
       const said = element("div", "flex flex-col items-start gap-2 px-3 py-3")
       said.setAttribute("role", "alert")
       const again = element("button", retryClass, label)
       again.type = "button"
       again.dataset.mindGraphRetry = ""
       again.addEventListener("click", onRetry)
-      said.append(element("p", "m-0 text-sm text-meta", content), again)
+      const controls = element("div", "flex flex-wrap items-center gap-3")
+      controls.append(again, ...(back ? [ backButton(back) ] : []))
+      said.append(element("p", "m-0 text-sm text-meta", content), controls)
       body.replaceChildren(said)
-      if (focus) again.focus()
+      if (focus || held) again.focus()
+    },
+    // The rows of a graph that is being replaced: nothing, until `render`.
+    clear() {
+      forget()
+      body.replaceChildren()
     },
     setUnlisted(on) { unlisted.checked = on },
     mark,

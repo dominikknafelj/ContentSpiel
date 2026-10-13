@@ -73,14 +73,39 @@
 // listed on any page" is on (`data-unlisted-url`), and the posts behind a
 // "+N more" after a press on it (`data-listed-url`, the pill's page and
 // target), with "Open in Posts →" under them. A pill is NOT SELECTED: a
-// press on it opens the list (design answer F4), and Escape on the canvas
-// or a click on empty space, with nothing selected, gives the groups back
-// (`dismiss`). A row of such a read whose post the
-// canvas does not draw is "not in view", and a press ADDS the post
-// (`addPost`): the row is the post's node as the data has it, so nothing is
-// fetched; it joins the hub that brings it in (`via`) by that hub's line,
-// the layout is told (the worker's `add`) and the post is selected. A read that
-// fails says so in the list, with "Try again" (G5).
+// press on it opens the list (design answer F4), and so does its ROW in the
+// list, which is the keyboard's and a screen reader's way to the same rows
+// (`openMore`). THE WAY BACK to the groups is on screen, "Back to the list"
+// over a pill's rows, and Escape pressed in them (`backToList`: the focus
+// returns to the pill's row); Escape on the canvas or a click on empty
+// space, with nothing selected, gives the groups back too (`dismiss`). A row
+// of such a read whose post the canvas does not draw is "not in view", and
+// a press ADDS the post (`addPost`): the row is the post's node as the data
+// has it, so nothing is fetched; it joins the hub that brings it in (`via`)
+// by that hub's line, the layout is told (the worker's `add`) and the post
+// is selected. WITH "POSTS" SWITCHED OFF the press switches it back on
+// first: the row says "Activate to add it to the graph", and that is true
+// only of a post that is then drawn. AFTER A ROW IS ADDED EVERY FIGURE IS
+// TRUE: the pill stands for one post fewer (its words, its width, and at
+// none the pill itself and its rows go), the canvas's name counts the pills
+// as they now are, and the notice no longer counts the post among those
+// that aren't shown -- all three read what the page holds
+// (`graph_data.js`, `countAdded`). A read that fails says so in the list,
+// with "Try again" (G5) and, for a pill's, the way back; the error line
+// stays through a toggle of the legend, until the read is asked again or
+// let go (`failed`).
+//
+// A SITE WITH TOO MANY LINES FOR ONE PICTURE (pages spec, decision 6; design
+// answer, part one §6) opens around Home. The data's answer says where
+// (`open`, and how many lines the site has); this page then reads that
+// page's local view (`data-open-url`), writes the figure on the element
+// (`data-opened-lines`, which the canvas's name reads: "Showing the area
+// around Home. The site has ...", H5) and shows the bar that says why, with
+// "Show everything". That is a BUTTON: it reads the whole graph
+// (`data-everything-url`) into this page and navigates nowhere, so the
+// choice is in no address and a reload opens around Home again (the third
+// design answers: not remembered). Whatever of this is written into the
+// page, the controller's `reset` takes back.
 //
 // A LABEL'S WIDTH is measured in the font the label is drawn in
 // (`renderer.js`, `labelFont`): a tag's in mono, and the selected node's in
@@ -140,7 +165,7 @@ import { placeCard } from "mind_graph/card_placement"
 import { readTheme, watchTheme } from "mind_graph/theme"
 import { draw, radiusFor, labelFont } from "mind_graph/renderer"
 import { collisionRadius, boxOf, moreWidth } from "mind_graph/marks"
-import { nodesOf, anchorOf, visible, counts, NODE_TOGGLES, LINE_TOGGLES } from "mind_graph/graph_data"
+import { nodesOf, anchorOf, visible, counts, countAdded, placedFor, NODE_TOGGLES, LINE_TOGGLES } from "mind_graph/graph_data"
 import { summaryOf } from "mind_graph/summary"
 import { attachInput } from "mind_graph/input"
 import { createCard, fill } from "mind_graph/card"
@@ -202,6 +227,10 @@ export function mount(element) {
   }
   let destroyed = false
   let layout = null
+  // The address the graph was last asked from: the page's own (`data-url`),
+  // the local view a large site opens in, or the whole graph after "Show
+  // everything". Retry asks the same one again.
+  let source = element.dataset.url
   let frame = null
   let draws = 0
   let labelled = null
@@ -242,7 +271,10 @@ export function mount(element) {
   const buttonClasses = JSON.parse(element.dataset.buttonClasses)
   const card = createCard(cardElement, {
     text,
-    urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl, postNotes: element.dataset.postNotesUrl },
+    urls: {
+      postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl, postNotes: element.dataset.postNotesUrl,
+      pageFocus: element.dataset.pageFocusUrl, pageNotes: element.dataset.pageNotesUrl
+    },
     typeLabels,
     dotClasses,
     buttonClasses,
@@ -264,7 +296,7 @@ export function mount(element) {
   })
   // Escape closes the card from inside it too, not only from the canvas
   // (`input.js` hears the canvas's keys alone).
-  // Enter opens the selected post while the focus is on the card ITSELF,
+  // Enter opens the selected post or page while the focus is on the card ITSELF,
   // where the list hands it: on a control inside the card Enter is that
   // control's own (a link, a button, a line break in the note's field).
   const cardKeydown = (event) => {
@@ -287,7 +319,7 @@ export function mount(element) {
   // of the list's reads, never per frame. "Not listed on any page" is there
   // only for a viewer the server gave its address (one who reads a page).
   const list = createList(element.querySelector("[data-mind-graph-list]"), {
-    text, dotClasses, typeLabels, retryClass: buttonClasses.secondary, unlisted: Boolean(element.dataset.unlistedUrl),
+    text, number, dotClasses, typeLabels, retryClass: buttonClasses.secondary, unlisted: Boolean(element.dataset.unlistedUrl),
     onSelect: (id) => {
       const index = indexOf.get(id)
       if (index != null) reveal(index)
@@ -297,6 +329,11 @@ export function mount(element) {
       syncHover()
     },
     onAdd: addPost,
+    // A pill's row: what a press on the pill does.
+    onMore: (id) => {
+      const index = indexOf.get(id)
+      if (index != null) openMore(state.nodes[index])
+    },
     onUnlisted: (on) => {
       if (on) showRowsFrom(element.dataset.unlistedUrl)
       else showGroups()
@@ -306,9 +343,15 @@ export function mount(element) {
   // read's answer (`heading`, `rows`, `link`) and, for a pill's, the pill
   // (`pill`, its node's id). `asked` counts the reads, so that an answer
   // that comes after a later ask, or after the groups were asked back, is
-  // not drawn.
+  // not drawn. `failed` is the read that failed and has not been asked
+  // again or let go (`{ pill }`): while it is set the list shows its error
+  // line, and nothing draws the groups over it.
   let rowsShown = null
+  let failed = null
   let asked = 0
+  // The bar of the view a large site opens in, its sentence and its button
+  // (absent from a focused view's page: such a view is never opened by rule).
+  const openedBar = element.querySelector("[data-mind-graph-opened]")
   const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text, status: search.querySelector("[data-mind-graph-status]"), dotClasses })
 
   // The legend's toggles (pages spec §6): the state is the checkboxes' own,
@@ -503,11 +546,20 @@ export function mount(element) {
   // drawn again whenever what is in view changes (a post was added, a kind
   // switched). A row whose post IS drawn is the drawn node, with the
   // connections it has on the canvas; one that is not is the read's row.
+  //
+  // A READ THAT FAILED keeps its error line: it is not drawn over by the
+  // groups when a kind is switched (under a checkbox that is still ticked,
+  // that would be a list that is not what the checkbox says), until the
+  // read is asked again or let go.
   function drawList() {
+    if (failed) return
     if (rowsShown) {
       const shown = new Set(state.visibleNodes)
       const drawn = (id) => shown.has(indexOf.get(id))
-      list.showRows({ heading: rowsShown.heading, link: rowsShown.link, inView: drawn, rows: rowsShown.rows.map((row) => (drawn(row.id) ? state.nodes[indexOf.get(row.id)] : row)) })
+      list.showRows({
+        heading: rowsShown.heading, link: rowsShown.link, inView: drawn, rows: rowsShown.rows.map((row) => (drawn(row.id) ? state.nodes[indexOf.get(row.id)] : row)),
+        back: rowsShown.pill ? wayBack() : null
+      })
     } else {
       list.render(state.visibleNodes.map((index) => state.nodes[index]))
     }
@@ -517,8 +569,21 @@ export function mount(element) {
   function showGroups() {
     asked += 1
     rowsShown = null
+    failed = null
     list.setUnlisted(false)
     drawList()
+  }
+
+  // "Back to the list", over a pill's rows and beside "Try again" when a
+  // pill's read failed; Escape in the list does the same (`node_list.js`).
+  // Both are pressed IN the list, so the focus goes back to where the rows
+  // were asked from: the pill's row (the list itself puts it on the first
+  // row when the pill has gone).
+  const wayBack = () => ({ label: text.t("mind_graph.script.list.back"), onBack: backToList })
+  function backToList() {
+    const pill = rowsShown?.pill ?? failed?.pill
+    showGroups()
+    if (pill) list.row(pill)?.focus()
   }
 
   // One of the list's reads (`unlisted`, or a pill's `listed`). A plain
@@ -539,9 +604,13 @@ export function mount(element) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const answer = await response.json()
       if (destroyed || mine !== asked) return
+      failed = null
+      // A pill's rows are named by what the pill hangs off, and have a way
+      // back; the checkbox's are "Posts", and the checkbox is their way back.
+      const hub = pill == null ? null : state.nodes[indexOf.get(pill)]
       rowsShown = {
         pill,
-        heading: text.t("mind_graph.script.list.posts", { count: number(answer.total) }),
+        heading: hub ? text.t("mind_graph.script.list.more_heading", { target: hub.of, count: number(answer.total) }) : text.t("mind_graph.script.list.posts", { count: number(answer.total) }),
         rows: answer.rows,
         link: pill && answer.posts_url && answer.rows.length > 0 ? { href: answer.posts_url, label: text.t("mind_graph.script.list.open_in_posts") } : null
       }
@@ -549,15 +618,21 @@ export function mount(element) {
     } catch (error) {
       if (destroyed || error.name === "AbortError" || mine !== asked) return
       rowsShown = null
-      list.fail(text.t("mind_graph.script.list.failed"), { label: text.t("mind_graph.script.list.try_again"), focus: again, onRetry: () => showRowsFrom(url, { pill, again: true }) })
+      failed = { pill }
+      list.fail(text.t("mind_graph.script.list.failed"), {
+        label: text.t("mind_graph.script.list.try_again"), focus: again, onRetry: () => showRowsFrom(url, { pill, again: true }), back: pill ? wayBack() : null
+      })
     }
   }
 
-  // "+N more" pressed (design answer F4; H1: a pill per target): the list
-  // shows the posts THIS pill stands for, read for its page and its target.
-  // Pressed again it reads them again. THE WAY BACK to the groups is the
-  // one that already clears what a press on the canvas brought (`dismiss`):
-  // Escape on the canvas or a click on empty space, once nothing is selected.
+  // "+N more" pressed, on the canvas or as its row in the list (design
+  // answer F4; H1: a pill per target): the list shows the posts THIS pill
+  // stands for, read for its page and its target. Pressed again it reads
+  // them again. When the press was the row's, the focus is in the list and
+  // the list puts it on the first of the rows it then draws. THE WAY BACK
+  // to the groups: "Back to the list" and Escape in the rows
+  // (`backToList`), or what already clears what a press on the canvas
+  // brought (`dismiss`).
   function openMore(pill) {
     list.setUnlisted(false)
     showRowsFrom(fill(fill(element.dataset.listedUrl, "__ID__", recordId(pill.page)), "__TARGET__", pill.target), { pill: pill.id })
@@ -575,9 +650,19 @@ export function mount(element) {
   // line counted, so the post's related posts and tags are not known here.
   // Its `degree` is the lines it was given, and its two counts are null,
   // which the card leaves out (`card.js`) instead of saying "0 related".
+  //
+  // "POSTS" SWITCHED OFF is switched back on by the press (the ruling on the
+  // review of Task 7): the row's name says "Activate to add it to the
+  // graph", and with posts hidden the press would add a node nobody sees,
+  // or do nothing at all. The checkbox is the state, so it follows; the
+  // change is announced as a toggle's is.
   function addPost(row) {
+    const switchedOn = showPosts()
     const known = indexOf.get(row.id)
-    if (known != null) return state.visibleNodes.includes(known) ? reveal(known) : undefined
+    if (known != null) {
+      if (switchedOn) refilter()
+      return state.visibleNodes.includes(known) ? reveal(known) : undefined
+    }
 
     const hub = row.via == null ? -1 : indexOf.get(row.via) ?? -1
     const index = state.nodes.length
@@ -603,8 +688,24 @@ export function mount(element) {
     state.positions = positions
     state.edges.push(...lines)
 
+    // What the page holds now says the post is drawn: its pill stands for
+    // one fewer (and is written and measured again), and at none its rows
+    // go with it; an unconnected post is no longer one that isn't shown.
+    const pill = countAdded(state.nodes, state.data, row)
+    if (pill >= 0) {
+      sizePill(pill)
+      if (state.nodes[pill].count <= 0 && rowsShown?.pill === state.nodes[pill].id) {
+        asked += 1
+        rowsShown = null
+      }
+    }
+
     applyFilter()
     writeCounts()
+    // (Only over a graph that is drawn: the notice of a worker that failed
+    // says so, and stays.)
+    if (element.dataset.state === "ready") notify()
+    if (switchedOn) summarise({ announce: true })
     if (layout) {
       element.removeAttribute("data-settled")
       // The layout holds every node, whatever the legend hides, so the
@@ -618,12 +719,37 @@ export function mount(element) {
     if (state.visibleNodes.includes(index)) reveal(index)
   }
 
+  // The "Posts" toggle, switched on if it was off: whether it was. A viewer
+  // with no such toggle has no posts hidden.
+  function showPosts() {
+    const toggle = toggles("mind_graph_nodes").find((input) => input.value === "post")
+    if (!toggle || toggle.checked) return false
+    toggle.checked = true
+    return true
+  }
+
+  // A pill's words for its count, and its size for its words: when the data
+  // arrives, and again whenever one of its posts is added. A pill grows to
+  // fit ("+1,980 more", design answer H4): its figure is grouped as the
+  // messages' language groups it, and `count` in that message is the figure
+  // as text, not a plural's number, because the words have one form.
+  const pillWords = (count) => text.t("mind_graph.script.more", { count: number(count) })
+  function sizePill(index) {
+    const node = state.nodes[index]
+    node.title = pillWords(node.count)
+    context.font = state.theme.countFont
+    node.width = moreWidth(context.measureText(node.title).width)
+    state.radii[index] = radiusFor(node)
+    state.boxes[index] = boxOf(node)
+  }
+
   // Escape on the canvas and a click on empty space take back what the last
   // press on the canvas brought: the selection, and with nothing selected
-  // the rows of a "+N more" (the list shows its groups again). The rows of
-  // "Not listed on any page" are not a press's: its checkbox lets them go.
+  // the rows of a "+N more", or the error line of a pill's read that failed
+  // (the list shows its groups again). The rows of "Not listed on any page"
+  // are not a press's: its checkbox lets them go.
   function dismiss() {
-    if (state.selected < 0 && rowsShown?.pill) showGroups()
+    if (state.selected < 0 && (rowsShown?.pill || failed?.pill)) showGroups()
     else select(-1)
   }
 
@@ -645,7 +771,7 @@ export function mount(element) {
       nodes: state.nodes, visibleNodes: state.visibleNodes, lines: state.visibleEdges.length, data: state.data,
       off: { nodes: switched("mind_graph_nodes", false), lines: switched("mind_graph_lines", false) }, toggles: toggles("mind_graph_nodes").length,
       // The view the 3,000-line rule opened (the server says so on the element).
-      aroundHome: Boolean(element.dataset.openedLines)
+      aroundHome: opened()
     }, { text, number })
     canvas.setAttribute("aria-label", summary)
     if (!announce) return
@@ -803,16 +929,34 @@ export function mount(element) {
   }
 
   function show(data) {
+    // TOO MANY LINES FOR ONE PICTURE (pages spec, decision 6): the server
+    // says where to open instead, and this page reads that page's local
+    // view in the whole graph's place. Nothing navigates: the address stays
+    // the screen's own, so a reload asks the server again. The figure is
+    // written for the bar and for the canvas's name, and is a whole number
+    // or the answer is no answer. Only the page's OWN address may be
+    // answered so: a local view or "everything" that said "open" would be
+    // asked for ever.
+    if (data.open) {
+      if (source !== element.dataset.url || !Number.isSafeInteger(data.edges) || data.edges < 0) throw new Error("mind graph: an answer that says where to open, where none can")
+      element.dataset.openedLines = data.edges
+      return load(fill(element.dataset.openUrl, "__ID__", recordId(data.open)))
+    }
+
+    // (A graph was drawn before this one, after "Show everything": its
+    // layout ends here, if `clear` has not ended it.)
+    layout?.stop()
+    layout = null
     state.data = data
-    // A pill's figure is grouped as the messages' language groups it
-    // ("+1,980 more", design answer H4); `count` in that message is the
-    // figure as text, not a plural's number: the words have one form.
     state.nodes = nodesOf(data, {
       allPosts: text.t("mind_graph.script.all_posts"),
-      more: (count) => text.t("mind_graph.script.more", { count: number(count) }),
+      more: pillWords,
       retired: (name) => text.t("mind_graph.script.retired_type", { name })
     })
     indexOf = new Map(state.nodes.map((node, index) => [ node.id, index ]))
+    // What a pill hangs off, by name: its row in the list and the heading
+    // of its rows say it.
+    for (const node of state.nodes) if (node.kind === "more") node.of = state.nodes[indexOf.get(node.target)]?.title ?? ""
     // Every end of a line is a node the server sent with it. One whose end
     // is missing all the same is left out, not drawn to the canvas's corner.
     state.edges = data.edges.map((edge) => ({ kind: edge.kind, source: indexOf.get(edge.source), target: indexOf.get(edge.target) }))
@@ -853,23 +997,16 @@ export function mount(element) {
     // A new load shows the groups: a read's rows were the load's before.
     asked += 1
     rowsShown = null
+    failed = null
     list.setUnlisted(false)
+    showOpened()
     applyFilter()
     writeCounts()
-
-    // The two views cut differently (`PostGraph::Global` keeps the best
-    // connected, `PostGraph::Local` the nearest to the focus), so each has its
-    // own sentence. A figure in a sentence is grouped (`number`); `count`
-    // only chooses the plural form.
-    const cut = { shown: number(data.shown), total: number(data.total) }
-    const capped = data.focus ? text.t("mind_graph.script.capped_local", cut) : text.t("mind_graph.script.capped", cut)
-    say(
-      state.edges.length === 0 ? text.t("mind_graph.script.no_connections") : null,
-      data.shown < data.total ? capped : null,
-      // "Other" posts, beside the ones drawn; with nothing drawn there are no
-      // others, and the sentence is the plain one.
-      data.isolated > 0 ? text.t(state.nodes.length > 0 ? "mind_graph.script.isolated" : "mind_graph.script.isolated_only", { count: data.isolated, figure: number(data.isolated) }) : null
-    )
+    notify()
+    // The view a large site opened in is not what was asked for: where it
+    // is, and what the site holds, is announced (the canvas's name, into
+    // the notice's live region, hidden from the eye: the bar says it there).
+    if (opened()) summarise({ announce: true })
     setState("ready")
 
     // Nothing to lay out: settled as it stands, and no worker is started.
@@ -880,17 +1017,106 @@ export function mount(element) {
     startLayout()
   }
 
+  // The notice's sentences about what is NOT drawn, from what the page holds
+  // now: said when the data arrives, and again when a post was added from
+  // the list (`data.isolated` is then one fewer, `graph_data.js`).
+  //
+  // The two views cut differently (`PostGraph::Global` keeps the best
+  // connected, `PostGraph::Local` the nearest to the focus), so each has its
+  // own sentence. A figure in a sentence is grouped (`number`); `count`
+  // only chooses the plural form.
+  function notify() {
+    const data = state.data
+    const cut = { shown: number(data.shown), total: number(data.total) }
+    const capped = data.focus ? text.t("mind_graph.script.capped_local", cut) : text.t("mind_graph.script.capped", cut)
+    say(
+      state.edges.length === 0 ? text.t("mind_graph.script.no_connections") : null,
+      data.shown < data.total ? capped : null,
+      // "Other" posts, beside the ones drawn; with nothing drawn there are no
+      // others, and the sentence is the plain one.
+      data.isolated > 0 ? text.t(state.nodes.length > 0 ? "mind_graph.script.isolated" : "mind_graph.script.isolated_only", { count: data.isolated, figure: number(data.isolated) }) : null
+    )
+  }
+
+  // Whether what is drawn is the view a large site opened in: the server
+  // said where to open (`data-opened-lines`), and this is that local view.
+  const opened = () => Boolean(element.dataset.openedLines) && Boolean(state.data?.focus)
+
+  // The bar of that view: why the whole graph is not what is drawn, and
+  // "Show everything", whose whole name says how many lines that is. Shown
+  // while the view is drawn, hidden and emptied otherwise.
+  function showOpened() {
+    if (!openedBar) return
+    const lines = Number(element.dataset.openedLines)
+    const button = openedBar.querySelector("[data-mind-graph-everything]")
+    openedBar.hidden = !opened()
+    openedBar.querySelector("[data-mind-graph-opened-line]").textContent = opened() ? text.t("mind_graph.script.opened.line", { count: lines, figure: number(lines) }) : ""
+    if (opened()) button.setAttribute("aria-label", text.t("mind_graph.script.opened.everything_name", { count: lines, figure: number(lines) }))
+    else button.removeAttribute("aria-label")
+  }
+
+  // The graph that is drawn goes, before another is read in its place: its
+  // layout, its selection and its card, its rows and its name. What `show`
+  // writes when the data arrives is written again then.
+  function clear() {
+    layout?.stop()
+    layout = null
+    select(-1)
+    asked += 1
+    rowsShown = null
+    failed = null
+    state.data = null
+    state.nodes = []
+    state.edges = []
+    state.visibleNodes = []
+    state.visibleEdges = []
+    state.order = []
+    state.labels = []
+    state.placed = false
+    state.pinned = new Set()
+    state.focusIndex = -1
+    state.hovered = pointerHover = rowHover = -1
+    indexOf = new Map()
+    element.dataset.hovered = ""
+    element.dataset.nodes = 0
+    element.dataset.edges = 0
+    pinsChanged()
+    hideTooltip()
+    list.setUnlisted(false)
+    list.clear()
+    canvas.setAttribute("aria-label", canvas.dataset.label)
+    requestDraw()
+  }
+
+  // "Show everything" (pages spec, decision 6): the whole graph is read into
+  // this page. The figure and the bar go first, so nothing says "around
+  // Home" of what is then drawn; the focus, which was on the button the bar
+  // hides, goes to the canvas. NOT REMEMBERED: nothing is stored and the
+  // address is not touched, so a reload, and Back to this page, open around
+  // Home again.
+  function showEverything() {
+    if (destroyed || !openedBar || !opened()) return
+    const focused = openedBar.contains(document.activeElement)
+    element.removeAttribute("data-opened-lines")
+    clear()
+    showOpened()
+    if (focused) canvas.focus()
+    load(element.dataset.everythingUrl)
+  }
+
   function startLayout() {
     try {
       layout = createLayout({
         workerUrl: element.dataset.workerUrl,
         d3Url: element.dataset.d3Url,
         onTick: (positions) => {
-          state.positions = positions
+          // Whole, also when the worker answered before it took a node this
+          // page has added since (`graph_data.js`, `placedFor`).
+          state.positions = placedFor(positions, state.positions, state.nodes.length)
           state.placed = true
           // The first view fits everything as soon as there is a shape to fit;
           // after that the camera moves only when the user moves it.
-          if (!state.fitted) state.camera = fit(bounds(positions, state.visibleNodes), state.width, state.height)
+          if (!state.fitted) state.camera = fit(bounds(state.positions, state.visibleNodes), state.width, state.height)
           // The first positions: a card opened from the list before there was
           // a layout now has a node to stand beside.
           cardPlace = null
@@ -936,7 +1162,11 @@ export function mount(element) {
     say(text.t("mind_graph.script.worker_failed"))
   }
 
-  async function load() {
+  // Reads the graph from `url`: the address it was last read from, unless
+  // another is named (the local view a large site opens in, the whole graph
+  // after "Show everything"). Retry asks `source` again.
+  async function load(url = source) {
+    source = url
     setState("loading")
     element.removeAttribute("data-settled")
     say(text.t("mind_graph.script.loading"))
@@ -945,7 +1175,7 @@ export function mount(element) {
       // (`aborter`, an AbortError, silent) and no answer in time (a
       // TimeoutError, which is a failure like any other and gets Retry).
       const signal = AbortSignal.any([ aborter.signal, AbortSignal.timeout(LOAD_TIMEOUT_MS) ])
-      const response = await fetch(element.dataset.url, { headers: { Accept: "application/json" }, signal })
+      const response = await fetch(source, { headers: { Accept: "application/json" }, signal })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       if (!destroyed) show(data)
@@ -956,7 +1186,7 @@ export function mount(element) {
       retry.type = "button"
       retry.className = "pointer-events-auto cursor-pointer font-semibold text-ink underline"
       retry.textContent = text.t("mind_graph.script.retry")
-      retry.addEventListener("click", load, { once: true })
+      retry.addEventListener("click", () => load(), { once: true })
       say(text.t("mind_graph.script.load_failed"), retry)
     }
   }
@@ -1031,7 +1261,8 @@ export function mount(element) {
       if (index >= 0) unpin([ index ])
     },
     onEscape: dismiss,
-    // Enter with a post selected opens it (the card's own "Open post").
+    // Enter with a post or a page selected opens it (the card's own "Open
+    // post" or "Open page").
     onEnter: () => card.open(),
     onHover: hover,
     onPan: (dx, dy) => moveCamera(panBy(state.camera, dx, dy)),
@@ -1048,6 +1279,16 @@ export function mount(element) {
   observer.observe(canvas)
   resize()
   load()
+
+  // A toggle of the legend changed (or was switched back on by a row that
+  // adds a post): what is drawn changes, and nothing else.
+  function refilter() {
+    if (!state.data) return
+    applyFilter()
+    summarise({ announce: true })
+    rehover()
+    requestDraw()
+  }
 
   const zoomBy = (factor) => moveCamera(zoomAt(state.camera, state.width / 2, state.height / 2, factor))
 
@@ -1092,13 +1333,8 @@ export function mount(element) {
     // the legend whenever there is data, a layout or not: when the worker
     // could not start, the list is all there is, and it must show what the
     // legend says.
-    filter() {
-      if (!state.data) return
-      applyFilter()
-      summarise({ announce: true })
-      rehover()
-      requestDraw()
-    },
+    filter: refilter,
+    showEverything,
     destroy() {
       destroyed = true
       aborter.abort()

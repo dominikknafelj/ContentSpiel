@@ -65,6 +65,9 @@ export const freeOf = (nodes, indexes) => new Set(indexes.filter((index) => labe
 // part of how a page lists: it has no toggle of its own and follows
 // "Lists" (design answer H1: "they follow the Lists toggle").
 //
+// A pill whose posts have all been added from the list stands for nothing
+// and is not shown, whatever is switched on.
+//
 // Nothing here knows the layout, and THE LAYOUT KNOWS NOTHING OF THIS: it
 // is computed once over every node and line, and a toggle is a filter on
 // what is drawn (`app.js`). So a hidden node keeps its place and comes back
@@ -76,8 +79,12 @@ export const LINE_TOGGLES = [ "tree", "lists", "related", "tag" ]
 const toggleOf = (node) => (node.kind === "more" ? "post" : node.kind)
 const lineToggleOf = (edge) => (edge.kind === "brings" ? "lists" : edge.kind)
 
+// A pill that stands for no post any more (every one of its posts was added
+// from the list, `countAdded`) is not shown, and its faint line goes with it.
+const spent = (node) => node.kind === "more" && node.count <= 0
+
 export function visible({ nodes, edges, on }) {
-  const visibleNodes = nodes.flatMap((node, index) => (on.nodes.has(toggleOf(node)) ? [ index ] : []))
+  const visibleNodes = nodes.flatMap((node, index) => (on.nodes.has(toggleOf(node)) && !spent(node) ? [ index ] : []))
   const shown = new Set(visibleNodes)
   const visibleEdges = edges.flatMap((edge, index) => (on.lines.has(lineToggleOf(edge)) && shown.has(edge.source) && shown.has(edge.target) ? [ index ] : []))
   return { visibleNodes, visibleEdges, order: orderOf(nodes, visibleNodes), free: freeOf(nodes, visibleNodes) }
@@ -90,4 +97,49 @@ export function visible({ nodes, edges, on }) {
 export function counts(nodes, edges) {
   const tally = (names, items) => Object.fromEntries(names.map((name) => [ name, items.filter((item) => item.kind === name).length ]))
   return { nodes: tally(NODE_TOGGLES, nodes), lines: tally(LINE_TOGGLES, edges) }
+}
+
+// A POST WAS ADDED FROM THE LIST (`app.js`, `addPost`): what the page holds
+// says so, and every figure a person reads is read from there -- the pill's
+// words, the canvas's name (`summary.js` adds up the pills in view) and the
+// notice's "N other posts ... aren't shown". ONE SOURCE, so the three cannot
+// disagree (the ruling on the review of the pages plan's Task 7).
+//
+// - A row of a page's "+N more" names the target that brings its post in
+//   (`row.via`): the pill on that target stands for one post fewer. The
+//   answer is that pill's index, for the caller to write its words and its
+//   width again; at none the pill is no longer shown (`visible`).
+// - A row of "Not listed on any page" names none. In the WHOLE graph, when
+//   nothing was cut at the cap, a readable post that was not drawn is one of
+//   the unconnected ones the notice counts (`data.isolated`): one fewer
+//   isn't shown. AT THE CAP THE PAGE CANNOT KNOW whether the post was cut or
+//   unconnected (its row was read with no line counted), and claims
+//   nothing; a local view counts no such posts at all.
+//
+// Answers the index of the pill it counted down, or -1.
+export function countAdded(nodes, data, row) {
+  if (row.via != null) {
+    const pill = nodes.findIndex((node) => node.kind === "more" && node.target === row.via && node.count > 0)
+    if (pill >= 0) nodes[pill].count -= 1
+    return pill
+  }
+  if (!data.focus && data.shown >= data.total && data.isolated > 0) data.isolated -= 1
+  return -1
+}
+
+// THE POSITIONS OF EVERY NODE THE PAGE HOLDS. A `tick` the worker posted
+// before it took an `add` is two numbers short of the page's nodes, and
+// taken as it came the added node would have no place for a frame: NaN into
+// the renderer, into its card's place and, while the first view is still
+// being fitted, into the camera. So a short answer is completed with the
+// places the page holds for the rest (where it put the added node), and
+// with the centre where it holds none. A whole answer is taken as it is,
+// the worker's own array.
+export function placedFor(positions, held, count) {
+  if (positions.length >= count * 2) return positions
+
+  const whole = new Float32Array(count * 2)
+  whole.set(held.subarray(0, Math.min(held.length, count * 2)))
+  whole.set(positions)
+  return whole
 }

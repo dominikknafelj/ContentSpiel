@@ -32,8 +32,8 @@
 //   node's strength, and the same size at every zoom. Always neutral: what
 //   is unread for the viewer is said on the rows of the node's card.
 // - The focus of a local view: a dotted accent ring.
-// A ring follows its mark: a tag's is a square, a page's card's and the
-// pill's a box, every other a circle. So does what hangs on a corner: on a
+// A ring follows its mark: a tag's is a square, a page's card's a box, the
+// pill's a pill (rounded as the pill is), every other a circle. So does what hangs on a corner: on a
 // box the pin and the notes badge are at the box's own corners
 // (`marks.js`, `topCorner`), not where a circle as wide as it would have them.
 //
@@ -200,6 +200,10 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
     const reach = radii[index] + distance
     context.beginPath()
     if (nodes[index].kind === "tag") context.rect(x(index) - reach, y(index) - reach, reach * 2, reach * 2)
+    // The pill's ring is a pill: its ends are half circles, and a square box
+    // round it read as a second border. A plain box where the canvas cannot
+    // draw a rounded one (`drawNotes` says why that is asked first).
+    else if (nodes[index].kind === "more" && typeof context.roundRect === "function") context.roundRect(x(index) - box.width / 2 - distance, y(index) - box.height / 2 - distance, box.width + distance * 2, box.height + distance * 2, box.height / 2 + distance)
     else if (box) context.rect(x(index) - box.width / 2 - distance, y(index) - box.height / 2 - distance, box.width + distance * 2, box.height + distance * 2)
     else context.arc(x(index), y(index), reach, 0, Math.PI * 2)
     context.stroke()

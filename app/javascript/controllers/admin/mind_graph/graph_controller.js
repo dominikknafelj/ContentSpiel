@@ -15,8 +15,11 @@ import { Controller } from "@hotwired/stimulus"
 // page as it stood when it was left -- `data-state="ready"`, `data-settled`,
 // the counts, the canvas's name with its summary of them, the notice's lines,
 // an open selection card and where it stood, the search's text and results,
-// the list's rows, the zoom's figure, the number of pinned nodes and the
-// button that releases them -- and Back restores exactly that, before
+// the list's rows (a post added from the list among them, and a pill's rows
+// in the groups' place), the zoom's figure, the number of pinned nodes and
+// the button that releases them, and on a large site the bar of the view it
+// opened in with its figure, or the whole graph after "Show everything" --
+// and Back restores exactly that, before
 // anything has been fetched or laid out. All of it says what the screen
 // SHOWS, so it is reset here, synchronously, and the app writes it again as it
 // becomes true. Pins are among it on purpose: they live in the page that made
@@ -49,6 +52,7 @@ export default class extends Controller {
   }
 
   filter() { this.app?.filter() }
+  showEverything() { this.app?.showEverything() }
   zoomIn() { this.app?.zoomIn() }
   zoomOut() { this.app?.zoomOut() }
   fit() { this.app?.fit() }
@@ -56,7 +60,18 @@ export default class extends Controller {
 
   reset() {
     this.element.dataset.state = "loading"
-    for (const name of ["data-settled", "data-nodes", "data-edges", "data-zoom", "data-labelled", "data-selected", "data-neighbours", "data-hovered", "data-pinned"]) this.element.removeAttribute(name)
+    for (const name of ["data-settled", "data-nodes", "data-edges", "data-zoom", "data-labelled", "data-selected", "data-neighbours", "data-hovered", "data-pinned", "data-opened-lines"]) this.element.removeAttribute(name)
+    // The view a large site opened in: how many lines the site has
+    // (`data-opened-lines` above), the bar that says so and the name of its
+    // button are the script's, written when the data said where to open.
+    // "Show everything" is taken back with them: nothing remembers it, so
+    // Back to this page opens around Home again, as a reload does.
+    const opened = this.element.querySelector("[data-mind-graph-opened]")
+    if (opened) {
+      opened.hidden = true
+      opened.querySelector("[data-mind-graph-opened-line]")?.replaceChildren()
+      opened.querySelector("[data-mind-graph-everything]")?.removeAttribute("aria-label")
+    }
     if (this.hasNoticeTarget) this.noticeTarget.replaceChildren()
     // The canvas's name: the app writes the counts into it once the data has
     // come, and the snapshot holds the counts of the visit that was left --
