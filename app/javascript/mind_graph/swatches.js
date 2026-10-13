@@ -20,6 +20,25 @@
 //
 // A swatch's mark is the SMALLEST the canvas draws (`radiusFor` of a node
 // with no connections), in the same pixels.
+//
+// A ROW'S MARK (pages spec §7; design answer H2) is the same thing for a
+// node of the data: `markCanvas(node)` answers a small canvas for a PAGE or
+// a POST TYPE, where a row of the list, a search result or a card shows what
+// the node is, and `paintMarks(root)` draws every one inside `root` with the
+// renderer -- so a post type's row shows its hub as the canvas has it (a
+// ring type's a ring round a centre, a retired type's dashed, "All posts"
+// filled in dim) and not a copy of it in CSS. SMALLER THAN ON THE CANVAS,
+// by a scale and nothing else (`ROW_MARKS`): the whole drawing is scaled,
+// its rings and outlines with it, so nothing is redrawn at another size by
+// another rule. What a canvas shows is said on it (`data-mark`, and for a
+// post type `data-mark-of`: its colour slot, "retired" or "all-posts"),
+// which is all `paintMarks` needs to draw it again when the theme changes.
+// A row's mark shows the KIND, not the record's state: a page's is the
+// live look whatever the page's state is (the canvas and the card say that).
+// A post's dot and a tag's square in a row are older than this and are not
+// canvases: they are CS Studio's own type dot
+// (`Admin::Ui::ContentTypeDotComponent`'s classes, handed over by the view)
+// and the tag's square, as everywhere in CS Studio.
 import { draw, radiusFor } from "mind_graph/renderer"
 import { readTheme } from "mind_graph/theme"
 
@@ -84,5 +103,72 @@ export function paintSwatches(root) {
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
     drawSwatch(canvas.getContext("2d"), readTheme(canvas), canvas.dataset.swatch, { width, height, ratio })
+  }
+}
+
+// A row's marks: the size of each one's canvas in the page, and the scale
+// its drawing has there. A post type's hub is 10px across where the canvas
+// draws it at 12 (design answer H2: "a smaller copy of the hub as drawn,
+// 10px with the inner ring"). A page's card is 10 wide where the canvas
+// draws it 14 by 10: a READING (the pages plan, Task 7: "a 10 by 7 ink
+// card"), by the same rule as the hub; its canvas is 8 high so that the
+// card's 7.14 pixels are not cut.
+export const ROW_MARKS = {
+  page: { width: 10, height: 8, scale: 10 / 14 },
+  type: { width: 10, height: 10, scale: 10 / 12 }
+}
+
+// The node a row's mark is drawn from: its kind, and for a post type what
+// tells its hub (`marks.js`, `drawType`). Nothing of the record itself.
+const markOf = (node) => (node.id === "all-posts" ? "all-posts" : node.colour_index == null ? "retired" : String(node.colour_index))
+const markNode = (kind, of) =>
+  kind === "page" ? { kind, status: "live" } : { kind, id: of === "all-posts" ? "all-posts" : "type", colour_index: /^\d+$/.test(of) ? Number(of) : null }
+
+// An empty canvas for the mark of `node` (a page or a post type), sized for
+// the page; `paintMarks` draws it once it is in the document (a canvas
+// outside it has no colours to read). Decoration: the row's name says what
+// the node is.
+export function markCanvas(node) {
+  const { width, height } = ROW_MARKS[node.kind]
+  const canvas = document.createElement("canvas")
+  canvas.className = "mg-swatch"
+  canvas.width = width
+  canvas.height = height
+  canvas.dataset.mark = node.kind
+  if (node.kind === "type") canvas.dataset.markOf = markOf(node)
+  canvas.setAttribute("aria-hidden", "true")
+  return canvas
+}
+
+// Draws the mark a canvas of `markCanvas` says it shows (`kind`, `of`), at
+// its scale, in the middle of its box.
+export function drawRowMark(context, theme, { kind, of }, { ratio = 1 } = {}) {
+  const { width, height, scale } = ROW_MARKS[kind]
+  const nodes = [ { id: "mark", degree: 0, label: "", ...markNode(kind, of) } ]
+  draw(context, {
+    // The renderer's own transform takes the scale up: the mark is drawn in
+    // the canvas's pixels, on a page `scale` times as large.
+    width: width / scale, height: height / scale, ratio: ratio * scale, camera: { k: 1, tx: 0, ty: 0 }, theme, nodes, edges: [],
+    positions: Float32Array.from([ width / scale / 2, height / scale / 2 ]), radii: nodes.map(radiusFor), widths: [ 0 ],
+    visibleNodes: [ 0 ], visibleEdges: [], labels: [], selected: -1, neighbours: new Set(), focusIndex: -1, hovered: -1, pinned: new Set()
+  })
+}
+
+// Every `canvas[data-mark]` inside `root`, in the colours the page has now:
+// read ONCE for all of them (a list may hold some hundreds of pages), from
+// `root`, which must be in the document.
+export function paintMarks(root) {
+  const canvases = root.querySelectorAll("canvas[data-mark]")
+  if (canvases.length === 0) return
+
+  const theme = readTheme(root)
+  const ratio = window.devicePixelRatio || 1
+  for (const canvas of canvases) {
+    const { width, height } = ROW_MARKS[canvas.dataset.mark]
+    canvas.width = Math.round(width * ratio)
+    canvas.height = Math.round(height * ratio)
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+    drawRowMark(canvas.getContext("2d"), theme, { kind: canvas.dataset.mark, of: canvas.dataset.markOf }, { ratio })
   }
 }

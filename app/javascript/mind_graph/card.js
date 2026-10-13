@@ -144,10 +144,15 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       label(text.t("mind_graph.script.card.related", { count: node.related_count ?? 0 })), separator,
       label(text.t("mind_graph.script.card.tags", { count: node.tag_count ?? 0 }))
     )
+    // A post added to the canvas from the list (`app.js`, `addPost`) was
+    // read with no line counted: its two counts are null, and the card says
+    // nothing of them rather than "0 related · 0 tags" of a post that may
+    // have both.
+    const known = node.related_count !== null && node.tag_count !== null
     return [
       heading(mark(dotClass(dotClasses, node)), kind, ...(Object.hasOwn(STATUS_DOTS, node.status) ? [ statusChip(node.status) ] : [])),
       title(node),
-      counts,
+      ...(known ? [ counts ] : []),
       cardNotes(node, { text, url: fill(urls.postNotes, "__ID__", recordId(node.id)), postUrl: node.url, onChange }),
       actions(
         openLink(node),

@@ -13,6 +13,8 @@
 //               { type: "drop", id }         the pointer let go: the node STAYS where it is
 //               { type: "pin", id }          hold the node where it is now
 //               { type: "unpin", ids: [...] } let these nodes go
+//               { type: "add", node: { id, radius, x, y }, edges: [{ source, target, kind }] }
+//                                            one more node, placed where the page says, with its lines
 // Messages out: { type: "tick", positions: Float32Array }   (transferred, not copied)
 //               { type: "settled", after }
 //               { type: "error", message }
@@ -48,8 +50,10 @@
 // page has already asked to change (`layout_client.js`).
 //
 // `positions` always covers EVERY node given to `start`, in that order, two
-// numbers each: a node the filter hides keeps its last place, so it comes
-// back where it was.
+// numbers each, and after them every node an `add` brought, in the order
+// they were added: a node the filter hides keeps its last place, so it comes
+// back where it was. An added line's index (what a `filter` names) follows
+// the last line's, as the page counts its own.
 //
 // Messages are handled strictly in order (see `queue` below): the first
 // `start` awaits the d3 import, and what follows it must wait for it.
@@ -179,6 +183,8 @@ async function handle(message) {
     simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), HELD_ALPHA))
     pace = "frame"
     run()
+  } else if (message.type === "add") {
+    add(message.node, message.edges)
   }
 }
 
@@ -212,6 +218,30 @@ function start(givenNodes, givenEdges) {
     .force("collide", d3.forceCollide((node) => node.radius + 10))
     .stop()
   pace = nodes.length <= SMALL_GRAPH ? "frame" : "fast"
+  run()
+}
+
+// One more node after the layout began (a post added from the list): it
+// starts where the page put it, its lines (to the hub that brings it in,
+// when it has one) join the others, and the layout warms up enough to make
+// room. `positions` covers it from the next `tick`. A node that is there
+// already is not added twice. A line one of whose ends the filter hides is
+// kept (`edges`, so a later `filter` can show it) and not handed to the
+// forces now: d3 looks a line's ends up among the nodes it lays out, and
+// throws for one it does not find.
+function add(node, givenEdges) {
+  if (find(node.id)) return idle()
+  const added = { id: node.id, radius: node.radius, anchor: false, held: false, x: node.x, y: node.y }
+  nodes.push(added)
+  const lines = givenEdges.map((edge, index) => ({ source: edge.source, target: edge.target, kind: edge.kind, index: edges.length + index }))
+  edges.push(...lines)
+  shown = null
+  const laidOut = [ ...simulation.nodes(), added ]
+  const ids = new Set(laidOut.map((candidate) => candidate.id))
+  simulation.nodes(laidOut)
+  simulation.force("link").links([ ...simulation.force("link").links(), ...lines.filter((line) => ids.has(line.source) && ids.has(line.target)) ])
+  simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), HELD_ALPHA))
+  pace = "frame"
   run()
 }
 

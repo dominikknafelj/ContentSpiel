@@ -1551,6 +1551,252 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal 'mind graph: no swatch "no-such"', error, "an unknown swatch is loud, not blank"
   end
 
+  # A ROW'S MARK (pages spec §7; design answer H2) is the renderer's own
+  # drawing of that kind of node, scaled as a whole: compared part for part
+  # with what the canvas draws, so a hub's row cannot show a look the canvas
+  # does not have, and a look that changes in `marks.js` changes here too.
+  test "row marks: a page's and a post type's are the canvas's own drawings scaled to 10 pixels, each hub its own, in the middle of its canvas" do
+    on_canvas = marks_drawn([ { kind: "page" }, { kind: "type", id: "type-a", colour_index: 1 }, { kind: "type", id: "type-b", colour_index: 8 },
+                              { kind: "type", id: "type-c", colour_index: nil }, { kind: "type", id: "all-posts", colour_index: nil } ])
+    rows = [ [ "page", nil ], [ "type", "1" ], [ "type", "8" ], [ "type", "retired" ], [ "type", "all-posts" ] ].map { |kind, of| row_mark_drawn(kind, of) }
+
+    rows.each_with_index { |row, index| assert_equal on_canvas[index], row["parts"].map { |_x, _y, *rest| rest }, "row #{index}" }
+    assert_equal 5, rows.map { |row| row["parts"].map { |_x, _y, *rest| rest } }.uniq.size, "a filled hub, a ring type's, a retired type's and All posts are four drawings, and a page's a fifth"
+    assert_equal [ (10 / 14.0).round(4) ] + [ (10 / 12.0).round(4) ] * 4, rows.map { |row| row["scale"].round(4) }, "a page's card is 10 wide where the canvas has 14, a hub 10 across where it has 12"
+    rows.each do |row|
+      width, height = row.values_at("width", "height")
+      x, y = row["parts"].first.first(2)
+      assert_in_delta width / 2.0, x * row["scale"], 0.01, "the mark is in the middle of its canvas"
+      assert_in_delta height / 2.0, y * row["scale"], 0.01
+    end
+    assert_equal [ [ 10, 8 ], [ 10, 10 ] ], [ rows.first, rows.last ].map { |row| row.values_at("width", "height") }, "a page's canvas is high enough for 10 * 10 / 14 pixels"
+  end
+
+  test "row marks: a mark's canvas says what it shows, is decoration, and is drawn only once it is asked" do
+    marks = js_module("mind_graph/swatches", <<~JS)
+      [ { kind: "page", id: "page-1", status: "draft", home: true }, { kind: "type", id: "type-blog", colour_index: 3 }, { kind: "type", id: "type-old", colour_index: null },
+        { kind: "type", id: "all-posts", colour_index: null }, { kind: "type", id: "type-x", colour_index: 14 } ]
+        .map((node) => m.markCanvas(node)).map((canvas) => [ canvas.tagName, canvas.dataset.mark, canvas.dataset.markOf ?? "-", canvas.getAttribute("aria-hidden"), canvas.width, canvas.height ])
+    JS
+
+    assert_equal [ [ "CANVAS", "page", "-", "true", 10, 8 ], [ "CANVAS", "type", "3", "true", 10, 10 ], [ "CANVAS", "type", "retired", "true", 10, 10 ],
+                   [ "CANVAS", "type", "all-posts", "true", 10, 10 ], [ "CANVAS", "type", "14", "true", 10, 10 ] ], marks,
+      "a page's mark says nothing of the page (its state and Home are the canvas's and the card's to show)"
+  end
+
+  LIST_SCRIPT = <<~JS.freeze
+    (() => {
+      const container = document.createElement("div")
+      const calls = []
+      const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
+      const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", onSelect: (id) => calls.push([ "select", id ]), onHover: () => {},
+                                             onAdd: (row) => calls.push([ "add", row.id ]), onUnlisted: (on) => calls.push([ "unlisted", on ]) })
+      const read = () => Array.from(container.querySelectorAll("h2, button")).map((item) => item.tagName === "H2" ? item.textContent : [ item.querySelector(".truncate").textContent, item.lastChild.textContent, item.style.paddingInlineStart, item.getAttribute("aria-label") ])
+      return { container, calls, list, read }
+    })()
+  JS
+
+  test "list: four groups: Pages first, in tree order and indented by depth, then posts and tags by their connections, then the post types as the data has them" do
+    rows = js_module("mind_graph/node_list", <<~JS)
+      (() => {
+        const { container, list, read } = #{LIST_SCRIPT}
+        list.render([ { id: "post-1", kind: "post", title: "Post", degree: 1, colour_index: 1 }, { id: "tag-1", kind: "tag", title: "tag", degree: 2 },
+                      { id: "page-3", kind: "page", title: "Child", degree: 9, depth: 2, order: 2, parent: "page-2" }, { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0, parent: null },
+                      { id: "page-2", kind: "page", title: "Docs", degree: 2, depth: 1, order: 1, parent: "page-1" }, { id: "page-9", kind: "page", title: "Stray", degree: 0, depth: 1, order: 3, parent: null },
+                      { id: "type-blog", kind: "type", title: "Blog", degree: 4, count: 112, colour_index: 1 }, { id: "type-talk", kind: "type", title: "Talk", degree: 9, count: 1, colour_index: 8 },
+                      { id: "type-gone", kind: "type", title: "gone (retired)", degree: 1, count: 0, colour_index: null }, { id: "all-posts", kind: "type", title: "All posts", degree: 1, count: 2040, colour_index: null },
+                      { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1 } ])
+        const markOf = (button) => { const mark = button.firstElementChild; return [ mark.tagName, mark.dataset.mark ?? mark.className.split(" ").pop(), mark.dataset.markOf ?? "-", mark.getAttribute("aria-hidden") ] }
+        // Where a page's row stands in the document: the row of the item its list is in, or "top". (No null: the driver drops one from an array.)
+        const under = (id) => list.row(id).closest("ul").parentElement.closest("li")?.querySelector("button").dataset.nodeId ?? "top"
+        return { rows: read(), marks: Array.from(container.querySelectorAll("button"), markOf),
+                 under: [ "page-1", "page-2", "page-3", "page-9" ].map(under),
+                 lists: Array.from(container.querySelectorAll("section"), (section) => [ section.querySelector("h2").textContent, section.querySelector("ul").getAttribute("aria-labelledby") === section.querySelector("h2").id, section.querySelector("ul").getAttribute("role") ]),
+                 checkbox: [ container.firstElementChild.tagName, container.querySelector("label input").type, container.querySelector("label").textContent ] }
+      })()
+    JS
+
+    assert_equal [ "list.pages(4)", [ "Home", "1", "12px", "list.select_page(Home,1)" ], [ "Docs", "2", "24px", "list.select_page(Docs,2)" ],
+                   [ "Child", "9", "36px", "list.select_page(Child,9)" ], [ "Stray", "0", "24px", "list.select_page(Stray,0)" ],
+                   "list.posts(1)", [ "Post", "1", "", "list.select_post(Post,1)" ], "list.tags(1)", [ "tag", "2", "", "list.select_tag(tag,2)" ],
+                   "list.types(4)", [ "Blog", "112", "", "list.select_type(Blog,112)" ], [ "Talk", "1", "", "list.select_type(Talk,1)" ],
+                   [ "gone (retired)", "0", "", "list.select_type(gone (retired),0)" ], [ "All posts", "2040", "", "list.select_type(All posts,2040)" ] ], rows["rows"],
+      "a page whose parent is not in the data is listed after the tree, indented once; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill has no row"
+    assert_equal [ "top", "page-1", "page-2", "top" ], rows["under"], "the tree is the document's: a page's row is in a list inside its parent's item, and one with no parent here at the top"
+    assert_equal [ [ "CANVAS", "page", "-", "true" ] ] * 4 + [ [ "SPAN", "dot", "-", "true" ], [ "SPAN", "bg-surface", "-", "true" ] ] +
+                 [ [ "CANVAS", "type", "1", "true" ], [ "CANVAS", "type", "8", "true" ], [ "CANVAS", "type", "retired", "true" ], [ "CANVAS", "type", "all-posts", "true" ] ], rows["marks"],
+      "a page's and a post type's mark are the renderer's canvases, each hub saying which it is; a post's dot and a tag's square are CS Studio's own"
+    assert_equal [ [ "list.pages(4)", true, "list" ], [ "list.posts(1)", true, "list" ], [ "list.tags(1)", true, "list" ], [ "list.types(4)", true, "list" ] ], rows["lists"], "each group is a list named by its heading"
+    assert_equal [ "LABEL", "checkbox", "list.unlisted()" ], rows["checkbox"]
+  end
+
+  test "list: a row that is not in view is named with its type and asks to be added, one in view selects, and the checkbox reports its change" do
+    result = js_module("mind_graph/node_list", <<~JS)
+      (() => {
+        const { container, calls, list, read } = #{LIST_SCRIPT}
+        document.body.append(container) // a checkbox outside the document changes without saying so
+        list.showRows({ heading: "Posts · 3", rows: [ { id: "post-1", title: "Drawn", degree: 3, colour_index: 1, type: "blog" }, { id: "post-2", title: "<b>Absent</b>", degree: 0, colour_index: 1, type: "blog" },
+                                                      { id: "post-3", title: "Old", degree: 0, colour_index: null, type: "<i>Gone</i>" } ],
+                        inView: (id) => id === "post-1", link: { href: "/posts?type=blog", label: "Open in Posts" } })
+        const rows = read()
+        const absent = Array.from(container.querySelectorAll("button[data-not-in-view]"), (button) => button.dataset.nodeId)
+        container.querySelectorAll("button").forEach((button) => button.click())
+        const box = container.querySelector("input[type=checkbox]")
+        box.click()
+        const link = container.querySelector("a[data-mind-graph-posts-link]")
+        const result = { rows, calls, absent, link: [ link.getAttribute("href"), link.textContent ], markup: container.querySelectorAll("b, i").length, checked: box.checked, label: box.closest("label").textContent }
+        container.remove()
+        return result
+      })()
+    JS
+
+    assert_equal [ "Posts · 3", [ "Drawn", "3", "", "list.select_post(Drawn,3)" ], [ "<b>Absent</b>", "list.not_in_view()", "", "list.add_post(<b>Absent</b>,blog)" ],
+                   [ "Old", "list.not_in_view()", "", "list.add_retired_post(Old,<i>gone</i>)" ] ], result["rows"],
+      "the type's label in lower case, and for a retired type its stored name in lower case in its own sentence: never a bare 'post'"
+    assert_equal %w[post-2 post-3], result["absent"]
+    assert_equal [ [ "select", "post-1" ], [ "add", "post-2" ], [ "add", "post-3" ], [ "unlisted", true ] ], result["calls"]
+    assert_equal [ [ "/posts?type=blog", "Open in Posts" ], 0, true, "list.unlisted()" ], result.values_at("link", "markup", "checked", "label")
+  end
+
+  # Design answer G5: the error line is in the list, with a small button.
+  test "list: a failed read says so in the list with Try again, and pressing it asks again" do
+    result = js_module("mind_graph/node_list", <<~JS)
+      (() => {
+        const { container, list } = #{LIST_SCRIPT}
+        document.body.append(container)
+        let asked = 0
+        list.fail("The list couldn't be loaded.", { label: "Try again", onRetry: () => { asked += 1 }, focus: true })
+        const button = container.querySelector("[role=alert] button[data-mind-graph-retry]")
+        const said = [ container.querySelector("[role=alert] p").textContent, button.textContent, button.type, button.className, document.activeElement === button, container.querySelectorAll("button[data-node-id]").length ]
+        button.click()
+        button.click()
+        const checkbox = Boolean(container.querySelector("input[type=checkbox]"))
+        list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
+        list.focus()
+        const focused = document.activeElement?.dataset.nodeId
+        container.remove()
+        return { said, asked, checkbox, focused }
+      })()
+    JS
+
+    assert_equal [ "The list couldn't be loaded.", "Try again", "button", "retry", true, 0 ], result["said"]
+    assert_equal [ 2, true, "tag-1" ], result.values_at("asked", "checkbox", "focused"), "the checkbox above the rows is still there, and the focus goes to the first row once there is one"
+  end
+
+  # The keyboard is never left on nothing: the rows are replaced whenever
+  # what is in view changes, and a person may be on one of them.
+  test "list: rows drawn again keep the focus on the row of the same node, else on the first row, else on the checkbox, and take none from elsewhere" do
+    result = js_module("mind_graph/node_list", <<~JS)
+      (() => {
+        const { container, list } = #{LIST_SCRIPT}
+        document.body.append(container)
+        const posts = [ { id: "post-1", title: "One", degree: 0, type: "blog" }, { id: "post-2", title: "Two", degree: 0, type: "blog" } ]
+        const focused = () => document.activeElement === document.body ? "body" : document.activeElement.dataset.nodeId ?? document.activeElement.type
+        const seen = []
+        list.showRows({ heading: "Posts", rows: posts, inView: () => false })
+        seen.push(focused())                                   // nobody was in the list: nothing takes the focus
+        list.row("post-2").focus()
+        const before = list.row("post-2")
+        list.showRows({ heading: "Posts", rows: posts, inView: () => true })
+        seen.push([ focused(), list.row("post-2") !== before ]) // the same node's NEW row
+        list.showRows({ heading: "Posts", rows: posts.slice(0, 1), inView: () => true })
+        seen.push(focused())                                   // its row is gone: the first row
+        list.showRows({ heading: "Posts", rows: [], inView: () => true })
+        seen.push(focused())                                   // no row at all: the checkbox
+        list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
+        seen.push(focused())                                   // the checkbox is not part of the rows: it keeps the focus
+        container.remove()
+        return seen
+      })()
+    JS
+
+    assert_equal [ "body", [ "post-2", true ], "post-1", "checkbox", "checkbox" ], result
+  end
+
+  # A viewer who reads no page is told every post is unlisted (the server
+  # counts by the pages THEY read), so the filter is not offered to them.
+  test "list: without the unlisted read there is no checkbox, and the rows are all there is" do
+    result = js_module("mind_graph/node_list", <<~JS)
+      (() => {
+        const container = document.createElement("div")
+        const text = { t: (key) => key, locale: () => "en" }
+        const list = m.createList(container, { text, dotClasses: [], unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
+        list.setUnlisted(true)
+        list.focus()
+        return [ container.querySelectorAll("input, label").length, container.querySelectorAll("button[data-node-id]").length ]
+      })()
+    JS
+
+    assert_equal [ 0, 1 ], result
+  end
+
+  test "the layout takes one more node with its line after it has come to rest, places it where it is told, and settles again" do
+    result = using_wait_time(40) do
+      page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
+        const [workerUrl, d3Url, done] = arguments
+        import("mind_graph/layout_client").then(({ createLayout }) => {
+          let last = null
+          let first = null
+          let afterAdd = null
+          const layout = createLayout({
+            workerUrl, d3Url,
+            onTick: (positions) => { last = Array.from(positions); if (first && !afterAdd && last.length === 6) afterAdd = last },
+            onSettled: () => {
+              if (!first) { first = last; layout.add({ id: "post-9", radius: 7, x: last[2] + 30, y: last[3] + 30 }, [ { source: "type-blog", target: "post-9", kind: "brings" } ]); layout.add({ id: "post-9", radius: 7, x: 0, y: 0 }, []) }
+              else { layout.stop(); done({ first, last, afterAdd }) }
+            },
+            onError: (message) => done({ error: message })
+          })
+          layout.start([ { id: "page-1", radius: 9, anchor: true }, { id: "type-blog", radius: 6 } ], [ { source: "page-1", target: "type-blog", kind: "lists" } ], { reducedMotion: true })
+        })
+      JS
+    end
+
+    assert_nil result["error"]
+    assert_equal [ 4, 6 ], [ result["first"].size, result["last"].size ], "the second add of the same node added nothing"
+    assert_equal [ 0, 0 ], result["last"].first(2)
+    assert_operator Math.hypot(result["last"][4] - result["last"][2], result["last"][5] - result["last"][3]), :<, 200, "the added node is joined to the hub that brings it in"
+  end
+
+  # A line to a hub the filter hides (Post types switched off, then a row
+  # added): d3 throws for a line whose end it does not lay out, and the
+  # worker's error would take the whole graph down.
+  test "the layout takes a node whose hub the filter hides without an error, and shows the line once the filter shows the hub" do
+    result = using_wait_time(40) do
+      page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
+        const [workerUrl, d3Url, done] = arguments
+        import("mind_graph/layout_client").then(({ createLayout }) => {
+          let last = null
+          let step = 0
+          const far = () => Math.hypot(last[4] - last[2], last[5] - last[3])
+          const layout = createLayout({
+            workerUrl, d3Url,
+            onTick: (positions) => { last = Array.from(positions) },
+            onSettled: () => {
+              step += 1
+              if (step === 1) {
+                layout.filter([ "page-1" ], [])
+                layout.add({ id: "post-9", radius: 7, x: 400, y: 400 }, [ { source: "type-blog", target: "post-9", kind: "brings" } ])
+                layout.filter([ "page-1", "post-9" ], [])
+              } else if (step === 2) {
+                layout.filter([ "page-1", "type-blog", "post-9" ], [ 0, 1 ])
+              } else { layout.stop(); done({ far: far(), size: last.length }) }
+            },
+            onError: (message) => done({ error: message })
+          })
+          // A short, stiff spring for the added line, so that its pull is told from none: the two marks end as near as they may be.
+          layout.start([ { id: "page-1", radius: 9, anchor: true }, { id: "type-blog", radius: 6 } ], [ { source: "page-1", target: "type-blog", kind: "lists" } ],
+                       { reducedMotion: true, springs: { brings: { distance: 10, strength: 1 } } })
+        })
+      JS
+    end
+
+    assert_nil result["error"]
+    assert_equal 6, result["size"]
+    assert_operator result["far"], :<, 45, "with its hub shown again the added line (index 1, after the one the layout began with) holds the post beside it"
+  end
+
   # Runs `script` against a layout and answers what happened, in order:
   # "raw:<after>" for each `settled` the WORKER posted and "called" for each
   # `onSettled` the client made of them (for one message the client's handler
@@ -1744,6 +1990,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         if (name === "roundRect") return (x, y, width, height, radius) => { shape = box(x, y, width, height, radius) }
         if (name === "moveTo") return (x, y) => { shape = [round(x), round(y), "line"] }
         if (name === "setLineDash") return (dash) => { set.dash = dash }
+        if (name === "setTransform") return (scale) => { set.scale = scale }
         if (name === "fillRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = box(x, y, width, height); log.push([cx, cy, "fill", ...rest, set.fillStyle]) }
         if (name === "strokeRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = outer(box(x, y, width, height)); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) }
         if (name === "fillText") return (words, x, y) => { log.push([round(x), round(y), "text", words, set.font, set.fillStyle]) }
@@ -1861,6 +2108,25 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       }).catch((error) => done({ error: String(error) }))
     JS
     flunk "swatches: #{drawn["error"]}" if drawn.is_a?(Hash)
+    drawn
+  end
+
+  # What a row's mark draws (`swatches.js`, `drawRowMark`) against the
+  # recording context and the theme of `marks_drawn`: its parts as
+  # `swatch_drawn` answers them, the scale the drawing has, and its canvas's
+  # size in the page.
+  def row_mark_drawn(kind, of)
+    drawn = page.evaluate_async_script(<<~JS, kind, of)
+      const [kind, of, done] = arguments
+      import("mind_graph/swatches").then(({ drawRowMark, ROW_MARKS }) => {
+        #{RECORDING_CONTEXT}
+        drawRowMark(context, { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", radius: 4,
+                               categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count" },
+          { kind, of })
+        done({ parts: log, scale: set.scale, width: ROW_MARKS[kind].width, height: ROW_MARKS[kind].height })
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "swatches: #{drawn["error"]}" if drawn["error"]
     drawn
   end
 

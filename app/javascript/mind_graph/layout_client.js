@@ -44,6 +44,8 @@ export function createLayout({ workerUrl, d3Url, onTick, onSettled, onError }) {
     drop(id) { send({ type: "drop", id }) },
     pin(id) { send({ type: "pin", id }) },
     unpin(ids) { send({ type: "unpin", ids }) },
+    // One more node (`{ id, radius, x, y }`) with its lines, after `start`.
+    add(node, edges) { send({ type: "add", node, edges }) },
     stop() {
       stopped = true
       worker.terminate()

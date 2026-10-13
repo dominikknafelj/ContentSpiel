@@ -56,7 +56,16 @@
       id 0 and that one segment swapped. The message
       keys are written out one by one: `test/lib/script_messages_test.rb`
       reads the literals to check that every key the script asks for is
-      served. %>
+      served.
+
+      THE LIST'S TWO READS (pages spec §3, §7): `data-unlisted-url` is where
+      "Not listed on any page" reads its rows, and it is there ONLY FOR A
+      VIEWER WHO READS A PAGE: to someone who reads none, every post they
+      read is one no page (they read) lists, so the filter would say nothing,
+      and the script draws its checkbox only when it has the address.
+      `data-listed-url` is the rows behind one of a page's "+N more" pills,
+      a template with `__ID__` (the page's id) and `__TARGET__` (the pill's
+      target, URL-encoded). %>
   <div data-controller="admin--mind-graph--graph"
        data-url="<%= data_admin_mind_graph_path(**admin_url_options, page: params[:page].presence, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
@@ -69,8 +78,12 @@
                                      "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
                                      "mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.sending", "mind_graph.script.card.notes.replies",
                                      "mind_graph.script.card.notes.more", "mind_graph.script.card.notes.deleted_user", "mind_graph.script.card.notes.unread", "mind_graph.script.card.notes.failed",
-                                     "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag",
-                                     "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.empty", "mind_graph.script.list.select_post", "mind_graph.script.list.select_tag",
+                                     "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed",
+                                     "mind_graph.script.search.groups.page", "mind_graph.script.search.groups.post", "mind_graph.script.search.groups.tag",
+                                     "mind_graph.script.list.pages", "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.types", "mind_graph.script.list.empty",
+                                     "mind_graph.script.list.unlisted", "mind_graph.script.list.not_in_view", "mind_graph.script.list.open_in_posts", "mind_graph.script.list.failed", "mind_graph.script.list.try_again",
+                                     "mind_graph.script.list.select_page", "mind_graph.script.list.select_post", "mind_graph.script.list.select_tag", "mind_graph.script.list.select_type",
+                                     "mind_graph.script.list.add_post", "mind_graph.script.list.add_retired_post",
                                      "mind_graph.script.legend.toggle",
                                      "mind_graph.script.summary.whole", "mind_graph.script.summary.local", "mind_graph.script.summary.everything", "mind_graph.script.summary.nothing",
                                      "mind_graph.script.summary.all_hidden", "mind_graph.script.summary.none_yet", "mind_graph.script.summary.around_home", "mind_graph.script.summary.site",
@@ -83,17 +96,19 @@
        data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
        data-post-notes-url="<%= admin_record_note_threads_data_path("post", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
+       <% if @pages %>data-unlisted-url="<%= unlisted_admin_mind_graph_path(**admin_url_options) %>"<% end %>
+       data-listed-url="<%= listed_admin_mind_graph_path(**admin_url_options, page: "__ID__", target: "__TARGET__") %>"
        data-type-labels="<%= @type_labels.to_json %>"
        data-button-classes="<%= { primary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
        data-dot-classes="<%= (Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS).to_json %>"
        data-state="loading"
        class="grid min-h-0 flex-1 overflow-hidden rounded-cs border border-line bg-surface min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
-    <%# The search field: how a post or tag the graph doesn't draw is reached.
+    <%# The search field: how a page, post or tag the graph doesn't draw is reached.
         Its rows are links to that row's local view, filled in by
         `mind_graph/search_box.js` with text and `href` only. The results are
         ordinary links after the field in the document, so Tab reaches them.
         The status line is the live region the results' wording goes through
-        (a count, "No post or tag matches.", the failure): it stays in the DOM,
+        (a count, "No page, post or tag matches.", the failure): it stays in the DOM,
         so the list itself can stay a plain list of links. %>
     <div class="border-t border-line p-2.5 min-[1100px]:col-start-2 min-[1100px]:row-start-1 min-[1100px]:border-l min-[1100px]:border-t-0">
       <div class="relative" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
@@ -176,9 +191,11 @@
         <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs border border-line bg-surface px-2 py-1 text-sm text-ink shadow-menu"></div>
       </div>
     </div>
-    <%# The list (mind graph canvas spec §5.7): every node the graph draws, as
-        a row, filled by `mind_graph/node_list.js` from the same data and
-        following the filter. A canvas's nodes can't take focus, so this is
+    <%# The list (mind graph canvas spec §5.7; pages spec §7): every node the
+        graph draws, as a row, in four groups (Pages, Posts, Tags, Post
+        types), filled by `mind_graph/node_list.js` from the same data and
+        following the filter; or, while "Not listed on any page" is on or
+        after a press on "+N more", the rows of that read in their place. A canvas's nodes can't take focus, so this is
         the keyboard and screen-reader path to them: a row is a button that
         selects its node, and the card it opens holds the links. It comes last
         in the document and scrolls on its own beside the canvas. Under the

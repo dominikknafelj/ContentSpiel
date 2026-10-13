@@ -38,6 +38,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
   test "the card's URL templates and the type labels ride on the element" do
     sign_in_as(users(:one))
     create_post(title: "A", content_type: "resume_entry")
+    root_page
 
     get "/cs-studio/mind_graph"
 
@@ -45,6 +46,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     # A post's notes for its card (notes spec §4.4): the route takes digits
     # only, so the template is built for id 0 and the segment swapped.
     assert_select "[data-controller='admin--mind-graph--graph'][data-post-notes-url='/cs-studio/notes/post/__ID__/threads']"
+    # The list's two reads (pages spec §3, §7): the posts no page lists, and
+    # the posts behind one of a page's "+N more" pills, by its page and target.
+    element = css_select("[data-controller='admin--mind-graph--graph']").first
+    assert_equal "/cs-studio/mind_graph/unlisted", element["data-unlisted-url"]
+    assert_equal "/cs-studio/mind_graph/listed?page=__ID__&target=__TARGET__", element["data-listed-url"]
     labels = JSON.parse(css_select("[data-controller='admin--mind-graph--graph']").first["data-type-labels"])
     assert_equal({ "resume_entry" => ContentTypes.fetch("resume_entry").label }, labels)
     assert_select "[data-mind-graph-card][hidden]:empty"
@@ -78,6 +84,19 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal({ "one" => "Release %{count} pinned", "other" => "Release %{count} pinned" }, messages["mind_graph.script.release_pinned"])
     assert_equal "%{title}: post, %{count} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
     assert_equal "Posts · %{count}", messages["mind_graph.script.list.posts"]
+    # The design answer's words, verbatim (F4, G5, H7).
+    assert_equal [ "Not listed on any page", "not in view", "Open in Posts →", "The list couldn't be loaded.", "Try again" ],
+                 messages.values_at(*%w[unlisted not_in_view open_in_posts failed try_again].map { |key| "mind_graph.script.list.#{key}" })
+    assert_equal "%{title}, %{type} post, not in view. Activate to add it to the graph.", messages["mind_graph.script.list.add_post"]
+    assert_equal "%{title}, %{type}, retired type, not in view. Activate to add it to the graph.", messages["mind_graph.script.list.add_retired_post"]
+    assert_equal [ "Pages · %{count}", "Tags · %{count}", "Post types · %{count}" ], messages.values_at("mind_graph.script.list.pages", "mind_graph.script.list.tags", "mind_graph.script.list.types")
+    assert_equal({ "one" => "%{title}: post type, %{count} post. Shows it in the graph.", "other" => "%{title}: post type, %{count} posts. Shows it in the graph." }, messages["mind_graph.script.list.select_type"])
+    assert_equal [ "Pages", "Posts", "Tags", "No page, post or tag matches." ], messages.values_at(*%w[groups.page groups.post groups.tag none].map { |key| "mind_graph.script.search.#{key}" })
+    # Every string of the list and of the search the locale file holds is served.
+    %w[list search].each do |part|
+      held = I18n.t("admin.mind_graph.script.#{part}").flat_map { |key, value| value.is_a?(Hash) && !value.key?(:other) ? value.keys.map { |inner| "#{key}.#{inner}" } : [ key.to_s ] }
+      assert_empty held.map { |key| "mind_graph.script.#{part}.#{key}" } - messages.keys
+    end
     assert_equal "Showing the %{shown} nearest of %{total} posts around this one.", messages["mind_graph.script.capped_local"]
     assert_equal "Open notes · %{count}", messages["mind_graph.script.card.notes.title"]
     assert_equal [ "All posts", "+%{count} more", "%{name} (retired)" ], messages.values_at("mind_graph.script.all_posts", "mind_graph.script.more", "mind_graph.script.retired_type")
@@ -90,8 +109,10 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_empty held.map { |key| "mind_graph.script.summary.#{key}" } - messages.keys
     assert_equal %w[all_posts capped capped_local card.close card.focus card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.more card.notes.replies card.notes.sending
                     card.notes.title card.notes.unread card.open_post card.pin card.related card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle list.empty list.posts list.select_post list.select_tag list.tags load_failed loading more no_connections
-                    release_pinned retired_type retry search.count search.failed search.none search.post search.tag
+                    card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
+                    list.add_post list.add_retired_post list.empty list.failed list.not_in_view list.open_in_posts list.pages list.posts list.select_page list.select_post list.select_tag list.select_type
+                    list.tags list.try_again list.types list.unlisted load_failed loading more no_connections
+                    release_pinned retired_type retry search.count search.failed search.groups.page search.groups.post search.groups.tag search.none
                     summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type
                     summary.hidden_lines.lists summary.hidden_lines.related summary.hidden_lines.tag summary.hidden_lines.tree summary.local summary.more summary.none_yet summary.nothing
                     summary.pages summary.pair summary.posts summary.posts_of summary.series summary.site summary.tags summary.types summary.whole worker_failed].map { |key| "mind_graph.script.#{key}" },
@@ -310,6 +331,24 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     assert_equal %w[post tag related tag], css_select("label[data-legend-toggle]").map { |label| label["data-legend-toggle"] }
     assert_not_includes response.body, "Hidden from them"
+  end
+
+  # To someone who reads no page every post is one no page (they read)
+  # lists, so "Not listed on any page" would say nothing: the script draws
+  # its checkbox only when the element carries the read's address.
+  test "the address of the unlisted read is there for a viewer who reads a page, and for no other" do
+    create_post(title: "Theirs to read")
+    root_page
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph"
+    assert_select "[data-controller='admin--mind-graph--graph'][data-unlisted-url]"
+
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ 0 ] })
+    get "/cs-studio/mind_graph"
+    assert_select "[data-controller='admin--mind-graph--graph']"
+    assert_select "[data-controller='admin--mind-graph--graph'][data-unlisted-url]", count: 0
+    assert_not_includes response.body, "mind_graph/unlisted"
   end
 
   # Third design answers and H6: status is not a filter; its key is a dialog

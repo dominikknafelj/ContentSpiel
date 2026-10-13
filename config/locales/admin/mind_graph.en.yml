@@ -23,10 +23,23 @@
 # `script.legend.toggle` is a toggle's whole accessible name once its count
 # is known ("Pages, 200").
 #
-# `script.list.select_post` and `select_tag` are a row's whole accessible name,
-# so the script never joins two strings with punctuation of its own: what it
-# is, how connected, and what pressing it does.
-# `script.list.posts` and `tags` are a group's heading with how many it holds.
+# `script.list.select_page`, `select_post`, `select_tag` and `select_type` are
+# a row's WHOLE accessible name, so the script never joins two strings with
+# punctuation of its own: what it is, how connected (a post type: how many
+# posts it has, the number its row shows), and what pressing it does.
+# `script.list.add_post` is the whole name of a row whose post the canvas
+# does not draw, the design answer's sentence (G5): `%{type}` is the post
+# TYPE's label in lower case, so the row says "blog post" and never a bare
+# "post"; `add_retired_post` is its form for a post of a type that is no
+# longer registered (H7: "talk, retired type"), where `%{type}` is the
+# stored name in lower case. `not_in_view` stands where such a row's count
+# would. `script.list.pages`, `posts`, `tags` and `types` are a group's
+# heading with how many it holds; `posts` is also the heading of the rows a
+# filter shows ("Not listed on any page", a "+N more" pill), where the
+# figure is the read's whole total. `failed` and `try_again` are the design
+# answer's too (G5): a read of the list's that failed, said in the list.
+#
+# `script.search.groups.*` head the three groups of the search's results.
 #
 # `show.zoom_out`, `zoom_in` and `fit` are the zoom buttons' whole names (their
 # `aria-label` and tooltip); what is drawn on them is a glyph, or `fit_short`.
@@ -151,20 +164,37 @@ en:
             scheduled: "Scheduled"
             live: "Live"
         list:
+          pages: "Pages · %{count}"
           posts: "Posts · %{count}"
           tags: "Tags · %{count}"
+          types: "Post types · %{count}"
           empty: "Nothing is drawn yet."
+          unlisted: "Not listed on any page"
+          not_in_view: "not in view"
+          open_in_posts: "Open in Posts →"
+          failed: "The list couldn't be loaded."
+          try_again: "Try again"
+          select_page:
+            one: "%{title}: page, %{count} connection. Shows it in the graph."
+            other: "%{title}: page, %{count} connections. Shows it in the graph."
           select_post:
             one: "%{title}: post, %{count} connection. Shows it in the graph."
             other: "%{title}: post, %{count} connections. Shows it in the graph."
           select_tag:
             one: "%{title}: tag, %{count} connection. Shows it in the graph."
             other: "%{title}: tag, %{count} connections. Shows it in the graph."
+          select_type:
+            one: "%{title}: post type, %{count} post. Shows it in the graph."
+            other: "%{title}: post type, %{count} posts. Shows it in the graph."
+          add_post: "%{title}, %{type} post, not in view. Activate to add it to the graph."
+          add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
         search:
           count:
             one: "%{count} result"
             other: "%{count} results"
-          none: "No post or tag matches."
+          none: "No page, post or tag matches."
           failed: "Search failed — check your connection."
-          post: "Post"
-          tag: "Tag"
+          groups:
+            page: "Pages"
+            post: "Posts"
+            tag: "Tags"
