@@ -57,19 +57,28 @@ module CodeHighlight
 
   def label(language) = LANGUAGES[language.to_s]
 
-  # `block_id` is only for the log line of a lexer that raised.
+  # `block_id` is only for the log line of a lexer that raised. Bytes that are
+  # not text (invalid UTF-8, a binary-encoded string) are scrubbed to U+FFFD
+  # first, so a visitor sees a replacement character where they were and
+  # nothing raises. Code over `MAX_CHARACTERS` (a row written around the
+  # services) is not lexed and not cached. A failed lex is plain text for this
+  # call only: `skip_nil` keeps the failure (nil) out of the cache, so the
+  # next call tries again.
   def lines(code, language, block_id: nil)
-    code = code.to_s.gsub(/\r\n?/, "\n")
-    lexer = lexer_for(language)
+    code = code.to_s
+    code = code.dup.force_encoding(Encoding::UTF_8) if code.encoding == Encoding::BINARY
+    code = code.scrub("\uFFFD").gsub(/\r\n?/, "\n")
+    lexer = code.length > MAX_CHARACTERS ? nil : lexer_for(language)
     return plain(code) if lexer.nil?
 
-    Rails.cache.fetch(cache_key(code, language)) { coloured(code, lexer, language, block_id) }
+    Rails.cache.fetch(cache_key(code, language), skip_nil: true) { coloured(code, lexer, language, block_id) } || plain(code)
   end
 
   def cache_key(code, language) = [ "code", Digest::SHA256.hexdigest(code), language.to_s, Rouge.version, REVISION ]
 
   def lexer_for(language) = LANGUAGES.key?(language.to_s) ? Rouge::Lexer.find(language.to_s) : nil
 
+  # Answers nil for a failure (the caller draws plain text and does not cache it).
   # `map` runs the lexer here, inside the rescue: `lex` alone answers a lazy
   # enumerator. The log line names the block and never the code or the
   # error's message, which can quote it.
@@ -77,7 +86,7 @@ module CodeHighlight
     split_lines(lexer.lex(code).map { |token, text| [ role_of(token), text ] })
   rescue StandardError => error
     Rails.logger.warn("CodeHighlight: the #{language} lexer raised #{error.class} for block #{block_id.inspect}; drawn as plain text")
-    plain(code)
+    nil
   end
 
   def plain(code) = split_lines([ [ nil, code ] ])

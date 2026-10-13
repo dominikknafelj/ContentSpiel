@@ -7,6 +7,9 @@ require "test_helper"
 class CodeHighlightTest < ActiveSupport::TestCase
   include LogCapture
 
+  # Rouge is required by CodeHighlight alone; touch it so a test that names Rouge first finds it.
+  setup { CodeHighlight }
+
   RAISING = Class.new { def self.lex(_code) = raise("boom SECRET-CODE") }
 
   test "the twenty languages are the listed ones, each with a Rouge lexer, and a label is read by tag" do
@@ -98,5 +101,69 @@ class CodeHighlightTest < ActiveSupport::TestCase
     assert_equal [ "code", Digest::SHA256.hexdigest("x"), "ruby", Rouge.version, CodeHighlight::REVISION ], CodeHighlight.cache_key("x", "ruby")
   ensure
     Rails.cache = was
+  end
+
+  test "bytes that are not text never raise: invalid UTF-8 and a binary string are scrubbed, with or without a language" do
+    bad = "a\xffb\nc"
+    expected = [ [ [ nil, "a\uFFFDb" ] ], [ [ nil, "c" ] ] ]
+
+    assert_equal expected, CodeHighlight.lines(bad, nil)
+    assert_equal expected, CodeHighlight.lines(bad, "ruby")
+    assert_equal [ [ [ nil, "ab" ] ] ], CodeHighlight.lines("ab".b, "xojo")
+    assert_equal [ [ [ "keyword", "def" ] ] ], CodeHighlight.lines("def".b, "ruby")
+    assert_equal [ [ [ nil, "a\uFFFD" ] ] ], CodeHighlight.lines("a\xff".b, "ruby")
+  end
+
+  test "a failed lex is not cached: plain this time, logged, and the next call tries again" do
+    was = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    calls = 0
+    flaky = Class.new do
+      define_singleton_method(:lex) { |code| (calls += 1) == 1 ? raise("boom") : Rouge::Lexers::Ruby.lex(code) }
+    end
+
+    log = capture_log do
+      with_singleton_override(Rouge::Lexer, :find, ->(_tag) { flaky }) do
+        assert_equal [ [ [ nil, "def a" ] ] ], CodeHighlight.lines("def a", "ruby", block_id: 7)
+        assert_equal [ [ [ "keyword", "def" ], [ nil, " a" ] ] ], CodeHighlight.lines("def a", "ruby", block_id: 7)
+      end
+    end
+    assert_equal 2, calls
+    assert_equal 1, log.scan("CodeHighlight:").size
+  ensure
+    Rails.cache = was
+  end
+
+  test "a lexer that fails partway through gives plain text for all of it, not the part it had lexed" do
+    partway = Class.new do
+      def self.lex(_code) = Enumerator.new { |y| y << [ Rouge::Token::Tokens::Keyword, "def" ]; raise "boom" }
+    end
+
+    with_singleton_override(Rouge::Lexer, :find, ->(_tag) { partway }) do
+      assert_equal [ [ [ nil, "def a" ] ] ], CodeHighlight.lines("def a", "ruby")
+    end
+  end
+
+  test "code over the limit is plain text and is not cached or lexed" do
+    was = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    code = "def" + " " * CodeHighlight::MAX_CHARACTERS
+
+    with_singleton_override(Rouge::Lexer, :find, ->(_tag) { RAISING }) do
+      assert_equal [ [ [ nil, code ] ] ], CodeHighlight.lines(code, "ruby")
+    end
+    assert_nil Rails.cache.read(CodeHighlight.cache_key(code, "ruby"))
+    assert_equal [ [ [ "keyword", "def" ], [ nil, " " * 5 ] ] ], CodeHighlight.lines("def     ", "ruby"), "the limit itself is allowed"
+  ensure
+    Rails.cache = was
+  end
+
+  test "a very long single line and a leading line break are kept as they are" do
+    long = "x" * 5_000
+    assert_equal [ [ [ nil, long ] ] ], CodeHighlight.lines(long, nil)
+    assert_equal [ [], [ [ nil, "a" ] ] ], CodeHighlight.lines("\na", nil)
+    assert_equal [ [] ], CodeHighlight.lines("\n", nil)
+    assert_equal [ [ [ "keyword", "def" ] ] ], CodeHighlight.lines("def", "ruby")
+    assert_equal [ [], [ [ "keyword", "def" ] ] ], CodeHighlight.lines("\ndef", "ruby")
   end
 end
