@@ -115,16 +115,31 @@ module ContentBlocks
         # save callbacks -- so not `Page#sync_public_paths` or closure_tree's
         # hierarchy rebuild, which a block edit can't affect -- only
         # `after_touch`/commit callbacks: a live owner's `after_commit`
-        # moves the public content version (`Publishable`).
-        @block.owner.touch
-        # The touch comes BEFORE the state refresh: it takes the owner's row
-        # lock, so a second editor's block save on the same page waits here
-        # and its refresh then reads this transaction's committed rows,
-        # instead of both computing the owner's state from their own snapshot
-        # and the later upsert winning with a value that ignores the other's
-        # change (final review A, M2). `ContentBlocks::Destroy` does the same.
+        # moves the public content version (`Publishable`), and its
+        # `after_touch` sets the mark that it has unpublished changes.
+        #
+        # ONLY WHEN THIS SAVE WROTE SOMETHING. The touch used to be
+        # unconditional, and a save that changed nothing -- the same content
+        # sent again by a loader, an import or an autosave whose form holds
+        # what is stored -- left its live page marked "has unpublished
+        # changes" with nothing to publish, and moved its `updated_at`, with
+        # no audit event to say why (a docs loader's second run marked 56
+        # live pages that way). "Wrote something" is the model's own dirty
+        # tracking after the save: `saved_changes?` is true for a new block
+        # and for any column the UPDATE carried -- a jsonb settings key, one
+        # language of a translated column, a body `assign_body` normalised
+        # to something other than what was stored -- and false when no
+        # UPDATE was issued at all. A fold writes other blocks' rows around
+        # the callbacks, so it counts on its own. A save that wrote nothing
+        # still took the page's lock above and still answers ok.
+        @block.owner.touch if @block.saved_changes? || folded.any?
         # A block's fields roll up into its owner's stored translation state
-        # (`translation_states`), so this refreshes the page or post.
+        # (`translation_states`), so this refreshes the page or post. Two
+        # editors' saves on one page compute it one after the other, each
+        # from the other's committed rows, because both hold the owner's row
+        # lock from `lock_owner` on (final review A, M2: it used to be the
+        # touch that took it, which is why the touch stands before this
+        # line). `ContentBlocks::Destroy` does the same.
         Translations::StateIndex.refresh(@block)
 
         created = @block.previously_new_record?

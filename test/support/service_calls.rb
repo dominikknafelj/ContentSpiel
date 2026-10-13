@@ -247,6 +247,14 @@ module ServiceCalls
       { call: -> { Groups::Destroy.call(group) }, permission: "groups.manage", on: group }
     },
 
+    # With nothing missing it asks for no right and writes nothing, so one
+    # built-in group is taken away first (no fixture token points at it; its
+    # grants and memberships go with it, by the foreign keys).
+    "Groups::EnsureBuiltIns" => lambda {
+      access_control_groups(:read_only).delete
+      { call: -> { Groups::EnsureBuiltIns.call }, permission: "groups.manage", on: AccessControl::Group }
+    },
+
     "Groups::Save" => lambda {
       group = AccessControl::Group.create!(name: "Editors of things")
       AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})

@@ -2,6 +2,20 @@
 # development, test). The code here should be idempotent so that it can be executed at any point in every environment.
 # The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
 
+# WHAT EVERY ENVIRONMENT NEEDS comes first, above the line that ends this
+# file outside development: the rows the application cannot run without and
+# that `db/schema.rb` cannot carry. Today that is the built-in groups. A
+# first production start gets them from here: `bin/docker-entrypoint` runs
+# `db:prepare`, which loads the schema into an empty database and then this
+# file (only then: a database that already exists is not seeded again, so a
+# site set up before this was here runs `bin/rails db:seed` once by hand).
+# Only what is missing is made, so running it again writes nothing. A row a
+# later change needs on every site is added to this block, and to the table
+# in `test/lib/built_in_data_test.rb`, which fails for a migration that
+# inserts rows and is not named there.
+built_ins = Groups::EnsureBuiltIns.call
+raise "seeds: #{built_ins.errors.to_sentence}" unless built_ins.ok?
+
 return unless Rails.env.development?
 
 # `title`/`slug` are Mobility-backed jsonb columns (mobility.rb): `where(title:
@@ -55,13 +69,8 @@ def find_or_create_block!(page:, block_type:, position:, settings: nil, body: ni
   result.record
 end
 
-# Idempotent by name (design spec §6), so this is safe to call even though
-# `db:migrate`'s own data migration (`SeedAccessControlGroups`) already
-# seeded these groups in any database that's been migrated -- a dev
-# database rebuilt via `db:schema:load` skips migrations entirely and
-# would otherwise have no groups at all for `author@example.com` below to
-# join.
-groups = AccessControl::Seeds.ensure_built_in_groups!
+# The built-in groups are there by now (the top of this file).
+author_group = AccessControl::Group.find_by!(name: AccessControl::Seeds::AUTHOR_NAME)
 
 # The dev admin account is this app's stand-in for the setup wizard's own
 # account, which is always an owner (design spec §6) -- without `owner:
@@ -78,7 +87,7 @@ end
 author = User.find_or_create_by!(email_address: "author@example.com") do |user|
   user.password = "password12345"
 end
-AccessControl::Membership.find_or_create_by!(user: author, group: groups.fetch(AccessControl::Seeds::AUTHOR_NAME))
+AccessControl::Membership.find_or_create_by!(user: author, group: author_group)
 
 puts "Seeded dev accounts:"
 puts "  admin@example.com / password12345 (owner)"

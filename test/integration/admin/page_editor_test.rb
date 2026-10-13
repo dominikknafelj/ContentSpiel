@@ -180,6 +180,24 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(value="#{page.settings_changed_at.iso8601(6)}")
   end
 
+  test "a settings autosave that holds what is stored marks the live page with nothing and moves neither base" do
+    sign_in_as users(:one)
+    page = create_page(title: "Pricing")
+    assert Pages::Save.call(page, translations: { Locales.default => { subtitle: "As it is" } }).ok?
+    publish_changes(page)
+    assert_nil page.reload.unpublished_changes_at
+    travel 1.minute
+    before = page.reload.attributes.slice("updated_at", "settings_changed_at", "unpublished_changes_at")
+
+    assert_no_difference "Audit::Event.count" do
+      patch admin_page_path(page), params: { base_updated_at: page.settings_changed_at.iso8601(6), page: { subtitle: "As it is" } }, as: :turbo_stream
+    end
+
+    assert_response :ok
+    assert_equal before, page.reload.attributes.slice("updated_at", "settings_changed_at", "unpublished_changes_at")
+    assert_nil page.unpublished_changes_at
+  end
+
   test "the settings form is refused when the settings themselves were saved since" do
     sign_in_as users(:one)
     page = create_page(title: "Pricing")
