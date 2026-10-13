@@ -470,7 +470,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   end
 
   # The Code block's template is a theme's to replace (code block spec §5):
-  # the third theme's is written from the eleven names the contract gives it,
+  # the third theme's is written from the nine names the contract gives it,
   # each of which is drawn here, and the markup the copy script asks for.
   # The second theme holds no Code template, so under it the block is the
   # default's.
@@ -513,7 +513,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_equal %w[assets/stylesheets/theme.css components/blocks/code_component.html.erb], folder.files
     template = folder.read("components/blocks/code_component.html.erb")
     Theme::Contract::COMPONENTS.fetch("blocks/code_component").each { |name| assert_match(/\b#{name}\b/, template, "the template calls #{name}") }
-    assert_no_match(/bare\?|settings|html_safe|raw\b|safe_join|<%==/, template, "nothing the contract does not name, and no string marked safe")
+    assert_no_match(/head_attributes|bare\?|settings|html_safe|raw\b|safe_join|<%==/, template, "nothing the contract does not name, and no string marked safe")
     css = folder.read("assets/stylesheets/theme.css")
     [ /:root, \[data-theme="light"\]\s*\{(.*?)\}/m, /^\[data-theme="dark"\]\s*\{(.*?)\}/m ].each do |block|
       assert_equal CodeHighlight::ROLES.map { |role| "--th-syn-#{role}" }, css[block, 1].to_s.scan(/(--th-[\w-]+):/).flatten

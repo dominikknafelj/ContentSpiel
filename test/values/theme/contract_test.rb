@@ -99,25 +99,32 @@ class Theme::ContractTest < ActiveSupport::TestCase
 
   # THE CODE BLOCK, the first block to join (decision 18, code block spec
   # §5): its component's line and its seven tokens. Beside the spec's
-  # eight names the line holds the three the default template calls since
-  # the designer's answers were built: `string` (a theme has no Ruby of its
-  # own, and the copy script takes its words from the template), `file_id`
-  # and `head_attributes`. What `theme:new` copies calls nothing of the
-  # component that is not on its line (the test below holds that for every
-  # component). `bare?` and `settings` are behind those and not on it.
+  # eight names the line holds `string`: a theme has no Ruby of its own,
+  # and the copy script takes its words from the template. NOT on it, and
+  # not methods of the component at all: `head_attributes`, `file_id` and
+  # `bare?`. They were the default template's layout (when its head strip
+  # is the script's to show, what its file name's id is), which is the
+  # thing a replaced template changes; the default template writes both
+  # out from promised names, so `theme:new`'s copy shows an author how.
   test "the Code block is in the contract: its template is replaceable with the methods it may call, and its seven syntax tokens are themed tokens in the highlighter's order" do
-    assert_equal %w[block page lines code language language_label filename caption string file_id head_attributes], Theme::Contract::COMPONENTS.fetch("blocks/code_component")
+    assert_equal %w[block page lines code language language_label filename caption string], Theme::Contract::COMPONENTS.fetch("blocks/code_component")
     assert_equal CodeHighlight::ROLES.map { |role| "syn-#{role}" }, Theme::Contract::THEMED_TOKENS.grep(/\Asyn-/)
     CodeHighlight::ROLES.each { |role| assert_includes Theme::Contract::TOKENS, "--th-syn-#{role}" }
     assert_empty Theme::Contract::FIXED_TOKENS.grep(/\Asyn-/), "a syntax colour has a light and a dark value"
-    assert_empty Theme::Contract::COMPONENTS.fetch("blocks/code_component") & %w[bare? settings]
+    assert_empty Theme::Contract::COMPONENTS.fetch("blocks/code_component") & %w[head_attributes file_id bare? settings]
+    %i[head_attributes file_id bare?].each do |name|
+      assert_not Blocks::CodeComponent.method_defined?(name) || Blocks::CodeComponent.private_method_defined?(name), "#{name} is the default template's own layout, written out in the template"
+    end
   end
 
   # The copy `theme:new` writes is the contract's example: a method of the
   # component that a default template calls and its line does not name
   # would put every scaffolded theme on a name the CMS may rename. Read
   # from each template's ERB tags, the words of their strings left out: a
-  # word there that is a method the component's own class defines.
+  # word there that is a method the component's own class defines. Not
+  # seen: a call inside a string's interpolation (the Code block's
+  # `"code-#{block.id}-file"`), one written `self.name`, and a method a
+  # component inherits from a base of its own.
   def component_methods_called(path)
     component = path.camelize.constantize
     own = (component.instance_methods(false) + component.private_instance_methods(false)).map(&:to_s) - %w[initialize render? call]
@@ -129,7 +136,7 @@ class Theme::ContractTest < ActiveSupport::TestCase
     Theme::Contract::COMPONENTS.each do |path, methods|
       assert_empty component_methods_called(path) - methods, "#{path}.html.erb calls a method of its component that Theme::Contract::COMPONENTS does not list for it"
     end
-    assert_equal %w[caption file_id filename head_attributes language_label lines string], component_methods_called("blocks/code_component").sort,
+    assert_equal %w[caption filename language_label lines string], component_methods_called("blocks/code_component").sort,
       "the reading sees what the Code block's template calls (and so could fail)"
   end
 
@@ -143,8 +150,6 @@ class Theme::ContractTest < ActiveSupport::TestCase
 
     assert_equal [], component.send(:lines)
     %i[code language language_label filename caption].each { |name| assert_nil component.send(name), name.to_s }
-    assert_equal({ hidden: true, data: { code_copy_target: "strip" } }, component.send(:head_attributes))
-    assert_equal "code--file", component.send(:file_id), "an unsaved block has no id; a drawn one is saved"
     assert_equal false, component.render?, "and the component draws nothing without code, so a template never meets one"
     I18n.with_locale(:de) do
       assert_equal [ "Copy", "Copy code", "Copied", "Not copied" ], %i[copy copy_code copied failed].map { |key| component.send(:string, key) }

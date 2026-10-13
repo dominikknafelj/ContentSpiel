@@ -1,12 +1,16 @@
 <%# A theme's own Code block, written from what `Theme::Contract` gives the template
     (`block`, `page`, `lines`, `code`, `language`, `language_label`, `filename`, `caption`,
-    `string`, `file_id`, `head_attributes`) and from the markup the CMS's copy script asks of any template
+    `string`) and from the markup the CMS's copy script asks of any template
     (docs/reference/theming.md, "The Code block"): the identifier, the `button`, `source`
     and `status` targets, the action and the three values. Each token's text is printed
     through ERB's own escaping and nothing is marked safe. The `pre` is on one line: what
-    is between its tags is what is copied. %>
+    is between its tags is what is copied. This theme's bar holds the file name, the
+    language and the button, so it has nothing to read without the first two: it is then
+    `hidden` and the script's `strip` target, which the template says for its own bar. %>
+<% bare = filename.blank? && language_label.nil? %>
+<% file_id = "code-#{block.id}-file" %>
 <div class="plain-code" data-controller="code-copy" data-code-copy-label-value="<%= string(:copy) %>" data-code-copy-copied-value="<%= string(:copied) %>" data-code-copy-failed-value="<%= string(:failed) %>" data-language="<%= language %>" data-characters="<%= code.length %>" data-block="<%= block.id %>" data-page="<%= page.id %>">
-  <%= tag.div class: "plain-code__bar", **head_attributes do %>
+  <%= tag.div class: "plain-code__bar", hidden: bare, data: { code_copy_target: ("strip" if bare) } do %>
     <% if filename.present? %>
       <p class="plain-code__file" id="<%= file_id %>"><%= filename %></p>
     <% end %>

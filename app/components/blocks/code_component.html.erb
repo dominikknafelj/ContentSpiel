@@ -1,11 +1,15 @@
 <%# The copy script's markup is what a theme's own template has to write to keep the button
     working: the identifier, its `button`, `source` and `status` targets, its action and its
     three values (`label` is the button's word at rest, which the script writes back and never
-    reads from the page). A head that holds nothing but the button is `hidden` and is the
-    `strip` target, which the script shows with the button; a head with a file name or a
-    language is neither. %>
+    reads from the page). A head that holds nothing but the button (`bare`: no file name and
+    no language) is `hidden` and is the `strip` target, which the script shows with the
+    button; a head with a file name or a language is neither. The condition and the file
+    name's id are written out here, from what the theming contract hands every template of
+    this block (docs/reference/theming.md, "The Code block"). %>
+<% bare = filename.blank? && language_label.nil? %>
+<% file_id = "code-#{block.id}-file" %>
 <figure class="content-block content-block--code" data-controller="code-copy" data-code-copy-label-value="<%= string(:copy) %>" data-code-copy-copied-value="<%= string(:copied) %>" data-code-copy-failed-value="<%= string(:failed) %>">
-  <%= tag.div class: "code-head", **head_attributes do %>
+  <%= tag.div class: "code-head", hidden: bare, data: { code_copy_target: ("strip" if bare) } do %>
     <% if filename.present? %>
       <span class="code-file" id="<%= file_id %>"><%= filename %></span>
     <% end %>

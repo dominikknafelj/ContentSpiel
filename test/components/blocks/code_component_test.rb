@@ -157,6 +157,50 @@ class Blocks::CodeComponentTest < ActiveSupport::TestCase
     end
   end
 
+  # `string` is on the theming contract, so a theme's template calls it
+  # with a key its author typed. A key that is not one of the four never
+  # becomes I18n's "Translation missing: …" as a button's word on a public
+  # page: where a theme is written it raises and names the four, and in
+  # production it is no word at all and one line in the log.
+  test "string answers the four words and nothing else: another key raises with the four where a theme is written, and in production is empty and logged once" do
+    component = Blocks::CodeComponent.new(block: code_block, page: root_page)
+
+    assert_equal %i[copy copy_code copied failed], Blocks::CodeComponent::STRINGS
+    assert_equal Blocks::CodeComponent::STRINGS.map(&:to_s), YAML.load_file(Rails.root.join("config/locales/public.en.yml")).dig("en", "public", "blocks", "code").keys
+    assert_equal [ "Copy", "Copy code", "Copied", "Not copied" ], Blocks::CodeComponent::STRINGS.map { |key| component.send(:string, key) }
+    assert_equal "Copy", component.send(:string, "copy"), "a key written as a String is the same key"
+
+    error = assert_raises(ArgumentError) { component.send(:string, :copy_all) }
+    assert_equal "Blocks::CodeComponent#string has no :copy_all: the Code block's words are :copy, :copy_code, :copied, :failed", error.message
+
+    Blocks::CodeComponent.instance_variable_set(:@unknown_strings, nil)
+    with_singleton_override(Rails, :env, -> { ActiveSupport::EnvironmentInquirer.new("production") }) do
+      log = capture_log do
+        assert_equal [ "", "", "" ], [ component.send(:string, :copy_all), component.send(:string, :copy_all), component.send(:string, "copy_all") ]
+        assert_equal "Copy", component.send(:string, :copy)
+      end
+      assert_equal 1, log.scan("Blocks::CodeComponent#string has no :copy_all").size, "said once, not once per visitor"
+      assert_no_match(/ranslation missing/, log)
+    end
+  ensure
+    Blocks::CodeComponent.instance_variable_set(:@unknown_strings, nil)
+  end
+
+  # `lines` is on the contract too, and a theme's template may ask twice (a
+  # gutter's count, then the lines).
+  test "lines is read once however often a template asks" do
+    component = Blocks::CodeComponent.new(block: code_block, page: root_page)
+    calls = 0
+    real = CodeHighlight.method(:lines)
+
+    with_singleton_override(CodeHighlight, :lines, ->(*arguments, **options) { calls += 1; real.call(*arguments, **options) }) do
+      first = component.send(:lines)
+      assert_same first, component.send(:lines)
+      assert_equal 3, first.size
+    end
+    assert_equal 1, calls
+  end
+
   test "nothing in the component, its template or the highlighter marks a string as safe, and only the highlighter names Rouge" do
     %w[app/components/blocks/code_component.rb app/components/blocks/code_component.html.erb app/values/code_highlight.rb].each do |path|
       assert_no_match(/html_safe|\braw\b|safe_join|Formatters|<%==|SafeBuffer|escape:\s*false/, Rails.root.join(path).read, path)
