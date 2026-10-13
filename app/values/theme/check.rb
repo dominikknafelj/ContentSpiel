@@ -81,9 +81,9 @@ class Theme
     # Where the CMS's own assets are inside the application, each a root of
     # Propshaft's load path: a file of the theme's that would be served
     # under the same name as one of these shadows it or is shadowed by it,
-    # by an order nobody chose. The roots outside the application (the gems'
-    # scripts: Turbo, Stimulus, Action Cable) are asked too, from the
-    # configured load path (`cms_asset_roots`).
+    # by an order nobody chose. The gems' roots (their scripts: Turbo,
+    # Stimulus, Action Cable) are asked too, from the configured load path,
+    # wherever Bundler installed them (`cms_asset_roots`).
     #
     # `app/assets/builds` is on the load path and not on this list, on
     # purpose: what is in it depends on whether a build has run, and a check
@@ -282,7 +282,8 @@ class Theme
 
     module_function
 
-    def problems(folder, deep: false, root: Rails.root, paths: Rails.application.config.assets.paths, started: ThemeFolder.current)
+    def problems(folder, deep: false, root: Rails.root, paths: Rails.application.config.assets.paths, started: ThemeFolder.current,
+                 gems: gem_folders)
       return [] unless folder.configured?
 
       # WHAT IS AT THE FOLDER'S TOP AND IS NO PART OF A THEME, FIRST, each
@@ -306,7 +307,7 @@ class Theme
       out_of_place, placed = files.partition { |file| misplaced(file) }
       found += out_of_place.map { |file| misplaced(file) }
       found += folder.hidden_templates.reject { |file| strangers.include?(file.split("/", 2).first) }.map { |file| hidden(file) }
-      found += shadowing(placed, cms_asset_roots(Pathname(root), paths: paths, folder: folder, started: started))
+      found += shadowing(placed, cms_asset_roots(Pathname(root), paths: paths, folder: folder, started: started, gems: gems))
       # A template in another encoding (Latin-1 from an old editor) cannot be
       # asked anything: every pattern raises on its bytes, and Rails would
       # raise drawing it. It is one problem, and nothing else is said of it.
@@ -355,11 +356,26 @@ class Theme
 
     # Every root the CMS's own assets are served from, as [what to call it,
     # where it is]: the application's (`CMS_ASSET_ROOTS`, under `root`) and
-    # those of the load path that are outside the application, which are the
-    # gems'. `paths` is the configured load path; a root of it inside the
-    # application is not taken from there but from the list, so the answer
-    # does not depend on what the environment added (the test environment
-    # puts the second theme's folders on the path).
+    # the gems' (Turbo, Stimulus, Action Cable), which are the roots of the
+    # configured load path (`paths`) that are outside the application OR
+    # inside an installed gem's folder (`gems`). Any other root of the load
+    # path inside the application is not taken from there but from the
+    # list, so the answer does not depend on what the environment added
+    # (the test environment puts the second theme's folders on the path).
+    #
+    # A GEM'S FOLDER IS TOLD BY BEING A GEM'S, NOT BY BEING OUTSIDE THE
+    # APPLICATION. Bundler installs to wherever it is told: beside the
+    # application (the image: /usr/local/bundle), in the user's home (a
+    # laptop), or INSIDE the application (`bundle config set path
+    # vendor/bundle`, `bundle install --deployment`, and every GitHub
+    # Actions runner with `bundler-cache`). "Outside the application" alone
+    # dropped every gem's root in the third layout, so a theme's file named
+    # like one of Turbo's or Stimulus's was let through there, and the
+    # check said one thing on a laptop and another on the runner (which is
+    # how it was found: the first CI run of the branch). So a root inside
+    # the application is asked whether it is under the folder of a gem
+    # Bundler has activated, by the path as written and as it really is
+    # (Rails makes an engine's root real, RubyGems does not).
     #
     # THE THEME'S OWN FOLDERS ARE NEVER AMONG THEM. The initializer puts
     # `folder.asset_paths` on the load path before this check runs
@@ -374,14 +390,21 @@ class Theme
     # whatever folder is checked: `theme:check` of a second copy of the
     # running theme would otherwise find each of the copy's assets in the
     # running theme's folders.
-    def cms_asset_roots(root, paths: Rails.application.config.assets.paths, folder: nil, started: ThemeFolder.current)
+    def cms_asset_roots(root, paths: Rails.application.config.assets.paths, folder: nil, started: ThemeFolder.current, gems: gem_folders)
       inside = CMS_ASSET_ROOTS.map { |relative| [ relative, root.join(relative) ] }
       own = [ folder, started ].compact.flat_map(&:asset_paths).flat_map { |path| [ path.to_s, real(path.to_s) ] }
-      outside = paths.map { |path| Pathname(path.to_s) }.reject do |path|
-        path.to_s.start_with?("#{Rails.root}/") || own.include?(path.to_s) || own.include?(real(path.to_s))
+      installed = gems.flat_map { |gem| [ gem.to_s, real(gem.to_s) ] }.uniq
+      a_gems = ->(path) { [ path, real(path) ].any? { |place| installed.any? { |gem| place.start_with?("#{gem}/") } } }
+      others = paths.map(&:to_s).select do |path|
+        next false if own.include?(path) || own.include?(real(path))
+
+        !path.start_with?("#{Rails.root}/") || a_gems.(path)
       end
-      inside + outside.map { |path| [ path.to_s, path ] }
+      inside + others.map { |path| [ path, Pathname(path) ] }
     end
+
+    # Where every gem of the bundle is installed, one folder each.
+    def gem_folders = Gem.loaded_specs.values.map(&:full_gem_path)
 
     def real(path)
       File.realpath(path)

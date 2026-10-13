@@ -179,8 +179,11 @@ class Theme::CheckTest < ActiveSupport::TestCase
     )
   end
 
+  # "A gem's" is asked of the root's name in the answer, not of where the
+  # root is: on a laptop the gems are outside the application, on a CI
+  # runner (and wherever Bundler's path is vendor/bundle) inside it.
   test "an asset named like one of a gem's scripts or like a file of the CMS's stylesheets folder is refused" do
-    gems = Theme::Check.cms_asset_roots(Rails.root).map(&:last).reject { |path| path.to_s.start_with?("#{Rails.root}/") }
+    gems = Theme::Check.cms_asset_roots(Rails.root).reject { |name, _| Theme::Check::CMS_ASSET_ROOTS.include?(name) }.map(&:last)
     assert_operator gems.size, :>=, 3, "the gems' asset folders are asked"
     assert gems.any? { |path| path.join("turbo.min.js").file? }, "Turbo's script is in one of them"
 
@@ -193,6 +196,49 @@ class Theme::CheckTest < ActiveSupport::TestCase
       roots = Theme::Check.cms_asset_roots(Rails.root, paths: [ gem, Rails.root.join("test/fixtures/themes/plain/javascript").to_s ])
 
       assert_equal Theme::Check::CMS_ASSET_ROOTS + [ gem ], roots.map(&:first), "a root inside the application is the list's, not the load path's"
+    end
+  end
+
+  # THE THIRD LAYOUT: Bundler's path inside the application (vendor/bundle:
+  # `bundle install --deployment`, and every CI runner with a cached
+  # bundle). A gem's asset folder is then under the application's root, and
+  # a check that knew a gem's folder by its being OUTSIDE dropped it: a
+  # theme's file named like one of a gem's scripts was let through there,
+  # and the two tests around this one failed on the runner and nowhere
+  # else. The layout is built here, in the application's own tmp folder, so
+  # it is shown on any machine.
+  test "a gem installed inside the application (vendor/bundle) is still a gem: its asset folder is asked, by its real path too" do
+    Rails.root.join("tmp").mkpath
+    Dir.mktmpdir("bundle", Rails.root.join("tmp")) do |bundle|
+      gem = File.join(bundle, "ruby/3.4.0/gems/hello-rails-1.0.0")
+      scripts = File.join(gem, "app/assets/javascripts")
+      FileUtils.mkdir_p(File.join(scripts, "controllers"))
+      File.write(File.join(scripts, "controllers/hello_controller.js"), "x")
+      assert scripts.start_with?("#{Rails.root}/"), "the gem is inside the application"
+      beside = Rails.root.join("test/fixtures/themes/plain/javascript").to_s
+      names = ->(**options) { Theme::Check.cms_asset_roots(Rails.root, paths: [ scripts, beside ], **options).map(&:first) }
+
+      assert_equal Theme::Check::CMS_ASSET_ROOTS + [ scripts ], names.(gems: [ gem ])
+      assert_equal Theme::Check::CMS_ASSET_ROOTS, names.(gems: []), "a root inside the application that is no gem's is the list's"
+      assert_equal Theme::Check::CMS_ASSET_ROOTS, names.(gems: [ "#{gem}-beta" ]), "a gem whose name only starts the same is another gem"
+
+      # Rails hands an engine's root as it really is and RubyGems a gem's
+      # folder as it was configured: one of the two through a link is still
+      # the same folder.
+      link = File.join(bundle, "linked")
+      File.symlink(gem, link)
+      assert_equal Theme::Check::CMS_ASSET_ROOTS + [ scripts ], names.(gems: [ link ])
+
+      # And the refusal itself, of a theme with a controller of that name.
+      with_theme_copy do |dir|
+        dir.join("javascript/controllers/hello_controller.js").write("x")
+        problems = Theme::Check.problems(ThemeFolder.new(dir), paths: [ scripts ], gems: [ gem ])
+
+        assert_equal [ "javascript/controllers/hello_controller.js is named like an asset of the CMS's own " \
+                       "(#{scripts}/controllers/hello_controller.js): a theme adds assets, it does not replace one. " \
+                       "Give it a name of its own." ], problems
+        assert_empty Theme::Check.problems(ThemeFolder.new(dir), paths: [ scripts ], gems: [])
+      end
     end
   end
 
