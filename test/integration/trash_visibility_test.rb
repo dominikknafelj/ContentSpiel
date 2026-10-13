@@ -637,6 +637,32 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_empty data["edges"]
   end
 
+  # What the mind graph loads of the site (pages in the mind graph, Task 2):
+  # `PostGraph::Site` holds no trashed page and no trashed post, so no line
+  # of a trashed page's list block, no count and no "listed" comes from one.
+  test "what the mind graph loads of the site holds no trashed page, no trashed post and no line of a trashed page's list block" do
+    tag = Tag.create!(name: "graph-site")
+    [ @kept_post, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: @gone_page), attributes: { block_type: "post_list", settings: { "tag" => "graph-site" } }).ok?
+
+    site = as_owner { PostGraph::Site.load(actor: users(:one)) }
+
+    assert_includes site.pages.map(&:id), @kept_page.id
+    assert_not_includes site.pages.map(&:id), @gone_page.id
+    assert_nil site.page(@gone_page.id)
+    assert_not_includes site.tree.order, @gone_page.id
+    assert_equal [ @kept_post.id ], site.post_rows.map(&:first)
+    assert_equal [ [ tag.id, @kept_post.id ] ], site.tag_links
+    assert_equal({ tag.id => 1 }, site.tag_counts)
+    assert_equal [ [ @blog.id, "type-blog" ] ], site.listings.edges, "the trashed page's block makes no line"
+    assert_empty site.listings.pages_of("tag-#{tag.id}")
+    assert_equal [ @kept_post.id ], site.listings.posts_of(@blog.id)
+    assert_equal [ 1, 1 ], [ site.listings.type_count("blog"), site.listings.post_count ]
+    assert_empty site.listings.unlisted
+    assert_not site.listings.listed?(@gone_post.id)
+    assert_equal [ @blog.id, @kept_page.id ].sort, PostGraph.paths(Page.pluck(:id), locale: :en).keys.sort - [ root_page.id ], "a trashed page has no current address to hand up"
+  end
+
   # The Tags list (round 3, Task 13): its "Posts" column counts the KEPT posts the
   # viewer may read, and links to the posts list for the tag, which shows the same
   # ones. The dialogs' number is the one place a trashed post is counted on

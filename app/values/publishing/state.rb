@@ -71,11 +71,21 @@ module Publishing
     STATES = %i[draft scheduled live live_with_changes live_change_scheduled].freeze
     ACTIONS = %i[publish schedule publish_changes cancel_scheduled_change discard_changes unpublish].freeze
 
-    def self.of(record, now: Time.current) = new(record, now: now)
+    # `pending_at:` hands over the answer to the one question that costs a
+    # statement (fact 2 above), for a caller that has read the pending copies
+    # of many records at once: the mind graph draws the fifth state on every
+    # node, and asks once for all of them. Given (a time, or nil for "none"),
+    # `pending_at` and `state` ask the database nothing. Not given, they read
+    # it the first time, as before. A draft's is ignored either way.
+    NOT_READ = Object.new.freeze
+    private_constant :NOT_READ
 
-    def initialize(record, now: Time.current)
+    def self.of(record, now: Time.current, pending_at: NOT_READ) = new(record, now: now, pending_at: pending_at)
+
+    def initialize(record, now: Time.current, pending_at: NOT_READ)
       @record = record
       @now = now
+      @pending_at = pending_at unless pending_at.equal?(NOT_READ)
     end
 
     # "draft", "scheduled" or "live": the cheap answer lists and chips use,

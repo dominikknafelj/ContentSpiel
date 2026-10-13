@@ -5,6 +5,10 @@
 # - `PostGraph::Local`: one post's or tag's neighbourhood (`PostGraph::Focus`).
 # - `PostGraph::Search`: readable posts and tags by name.
 # - `PostGraph::Builder`: the `{ nodes, tags, edges }` the first two share.
+# - `PostGraph::Site`: the readable posts and pages, loaded once (pages in
+#   the mind graph, spec §1), with `PostGraph::Tree` (the page tree as far as
+#   the viewer reads it) and `PostGraph::Listings` (which page lists what).
+#   No view asks them yet.
 #
 # Shape: `{ nodes: [{ id: "post-<id>", title, type, colour_index, status, url,
 # degree }], tags: [{ id: "tag-<id>", name, count, degree }], edges: [{ source,
@@ -32,4 +36,32 @@ module PostGraph
   # "page-7"; a post type's is its stored name, "type-blog". One rule, so no
   # script asks what type an id has.
   def self.node_id(kind, id) = "#{kind}-#{id}"
+
+  # Above this many lines the screen opens in the local view around Home,
+  # with "Show everything" (pages spec, decision 6; the design answer's
+  # "about 3,000 visible edges").
+  OPEN_AROUND_HOME_ABOVE = 3_000
+
+  # How many of the posts a page lists its local view draws; the rest are
+  # behind "+N more" (design answer F4, F5).
+  LISTED_IN_VIEW = 20
+
+  # The most rows one of the list's reads answers (`unlisted`, `listed`).
+  ROW_LIMIT = 200
+
+  # The one node a list block with no filter points at: no record, so no
+  # database id to add. And the kind of a "+N more" pill of a page's local
+  # view, ONE PER TARGET (design answer H1): its id is the kind and the
+  # target it hangs off, `node_id(MORE, "type-blog")` => "more-type-blog".
+  ALL_POSTS = "all-posts"
+  MORE = "more"
+
+  # Each page's current address in `locale`, else in the default language:
+  # `{ page_id => "/about" }`; a page with an address in neither is not in
+  # it. One statement, `PublicSite::Paths.current_paths`' (the stored rows'
+  # one read for several records), so the read is written once.
+  def self.paths(page_ids, locale:)
+    PublicSite::Paths.current_paths("Page", page_ids.to_a)
+                     .transform_values { |paths| paths[locale.to_s] || paths[Locales.default.to_s] }.compact
+  end
 end
