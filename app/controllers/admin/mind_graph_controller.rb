@@ -18,8 +18,9 @@ module Admin
   # (mind graph canvas spec §3.1; pages spec §3) with the screen's own
   # permission and scope: `data` answers the global graph, or the
   # neighbourhood of `page=` / `post=` / `tag=` (a page wins over a post, a
-  # post over a tag); `search` answers the search field's rows, each with
-  # the URL of its local view; `unlisted` and `listed` answer the rows of the
+  # post over a tag); `search` answers the search field's rows (readable
+  # pages, posts and tags, `PostGraph::Search`), each with the URL of its
+  # local view, built from the row's `kind` and `record_id`; `unlisted` and `listed` answer the rows of the
   # list's two filters (`PostGraph::Rows`): readable posts and no other, the
   # trash left out, newest first, the first `PostGraph::ROW_LIMIT` with the
   # whole total. A focus the viewer may not see (unknown, trashed, outside

@@ -128,7 +128,12 @@ module PostGraph
     end
 
     def type_count(name) = (@type_counts ||= @post_rows.map { |_id, type, *| type }.tally).fetch(name.to_s, 0)
-    def post_count = @post_count ||= @post_rows.count { |_id, type, *| ContentTypes.find(type) }
+    # What "All posts" says beside its name (design answer H2: "the site
+    # total"): EVERY post the viewer reads, one of a type that is no longer
+    # registered included. Not what a block with no filter lists (it lists
+    # no post of a retired type, `posts_of`): the number is the site's, as a
+    # type hub's is the type's, and neither is a pill's arithmetic.
+    def post_count = @post_rows.size
 
     private
 

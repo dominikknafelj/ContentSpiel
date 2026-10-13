@@ -226,34 +226,47 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
   end
 
   # With `pages.read` alone the search is answered (the screen opens for
-  # either right) and answers nothing: `PostGraph::Search` narrows posts, and
-  # the tags they carry, by `posts.read`.
-  test "search answers nothing for a viewer with pages.read alone: no post and no tag a post carries" do
+  # either right) with the pages they read and nothing of a post:
+  # `PostGraph::Search` narrows posts, and the tags they carry, by
+  # `posts.read`, and pages by `pages.read`.
+  test "search answers pages and nothing of a post for a viewer with pages.read alone, and no page for one with posts.read alone" do
     create_post(title: "Not theirs", tags: [ "nottheirs" ])
+    page = create_page(title: "Not a post")
     AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.read", scope: {})
     sign_in_as(users(:editor_branch))
 
     get "/cs-studio/mind_graph/search", params: { q: "not" }
 
     assert_response :success
-    assert_equal [], data
+    assert_equal [ "page-#{page.id}" ], data.map { |row| row["id"] }
+    assert_not_includes response.body.downcase, "theirs"
 
     sign_in_as(users(:one))
     get "/cs-studio/mind_graph/search", params: { q: "not" }
-    assert_equal %w[post tag], data.map { |row| row["kind"] }, "to someone who reads the post both are rows"
+    assert_equal %w[page post tag], data.map { |row| row["kind"] }, "to someone who reads the post all three are rows"
+
+    AccessControl::Grant.where(group: access_control_groups(:branch_editors), permission: "pages.read").delete_all
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
+    sign_in_as(users(:editor_branch))
+    get "/cs-studio/mind_graph/search", params: { q: "not" }
+    assert_equal %w[post tag], data.map { |row| row["kind"] }, "a page they cannot read is no row"
+    assert_not_includes response.body, "Not a post"
   end
 
   test "search answers rows with the url of each row's local view" do
     sign_in_as(users(:one))
+    page = create_page(title: "Ruby docs")
     post = create_post(title: "Ruby notes", tags: [ "ruby" ])
     tag = Tag.find_by!(name: "ruby")
 
     get "/cs-studio/mind_graph/search", params: { q: "rub" }
 
     assert_equal [
-      { "kind" => "post", "id" => "post-#{post.id}", "record_id" => post.id, "label" => "Ruby notes", "url" => "/cs-studio/mind_graph?post=#{post.id}" },
+      { "kind" => "page", "id" => "page-#{page.id}", "record_id" => page.id, "label" => "Ruby docs", "path" => PublicPath.current.where(record: page).pick(:path), "url" => "/cs-studio/mind_graph?page=#{page.id}" },
+      { "kind" => "post", "id" => "post-#{post.id}", "record_id" => post.id, "label" => "Ruby notes", "colour_index" => ContentTypes.fetch("blog").colour_index, "url" => "/cs-studio/mind_graph?post=#{post.id}" },
       { "kind" => "tag", "id" => "tag-#{tag.id}", "record_id" => tag.id, "label" => "ruby", "url" => "/cs-studio/mind_graph?tag=#{tag.id}" }
     ], data
+    assert_equal "/ruby-docs", data.first["path"]
 
     get "/cs-studio/mind_graph/search"
     assert_equal [], data

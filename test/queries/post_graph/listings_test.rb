@@ -101,7 +101,7 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     assert_equal [ "type-gone/thing" ], result.targets(@page.id)
     assert_empty result.posts_of(@page.id)
     assert_equal 1, result.type_count("gone/thing")
-    assert_equal 3, result.post_count, "a post of a retired type is one no block with no filter lists"
+    assert_equal 4, result.post_count, "All posts counts every post, one of a retired type included (design answer H2: the site total)"
   end
 
   test "a block of another type and a page that is not asked for make no line" do

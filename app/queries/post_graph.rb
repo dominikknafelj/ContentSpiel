@@ -8,7 +8,7 @@
 # - `PostGraph::Rows`: the rows of the list's two filters, each a read of
 #   its own: the posts no page lists, and the posts one target of a page
 #   brings in beyond the ones its local view draws.
-# - `PostGraph::Search`: readable posts and tags by name.
+# - `PostGraph::Search`: readable pages, posts and tags by name.
 # - `PostGraph::Builder`: the nodes and lines the first two share, in two
 #   steps: `plan` (which lines; no statement) and `build`.
 # - `PostGraph::Site`: the readable posts and pages, loaded once (pages in
@@ -27,7 +27,12 @@
 #              listed_count, open_notes }                    in tree order
 #   types[]: { id: "type-<name>" | "all-posts", name, label, colour_index,
 #              count, degree }     by colour slot, then the retired types by
-#                                  name, then "all-posts" last
+#                                  name, then "all-posts" last. `count` is
+#                                  the readable posts of that type, and for
+#                                  "all-posts" EVERY readable post, those of
+#                                  a retired type included: the site's total
+#                                  as this viewer reads it (design answer
+#                                  H2), not what a block with no filter lists
 #   edges[]: { source, target, kind: "related" | "tag" | "tree" | "lists" |
 #              "brings" }   tree: child -> parent; lists: page -> tag, type
 #                           or all-posts; brings: a page's local view only,

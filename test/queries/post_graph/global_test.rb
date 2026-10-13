@@ -266,6 +266,25 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     assert_equal [ true, nil, 0, 1 ], pages[0].values_at(:home, :parent, :depth, :child_count)
   end
 
+  # Design answer H2: "All posts" shows the site total. Every post the
+  # viewer reads, one of a type that is no longer registered included (which
+  # a block with no filter does not list), and no post they cannot read.
+  test "All posts counts every readable post, a retired type's included, and a type's hub its own" do
+    list_block(root_page)
+    list_block(root_page, content_type: "resume_entry")
+    create_post(title: "Blog one")
+    create_post(title: "Entry", content_type: "resume_entry")
+    create_post(title: "Old talk").update_column(:content_type, "talk")
+    create_post(title: "A draft", published: false)
+
+    assert_equal [ [ "type-resume_entry", 1 ], [ "all-posts", 4 ] ], graph[:types].map { |type| type.values_at(:id, :count) }
+    assert_equal 3, graph[:pages].first[:listed_count], "what the page lists is not the site's total: no block lists the post of a retired type"
+
+    %i[author_posts_read author_posts_create author_posts_edit].each { |grant| access_control_grants(grant).update!(scope: { "content_types" => [ "resume_entry" ] }) }
+    assert_equal [ [ "type-resume_entry", 1 ], [ "all-posts", 1 ] ], as(users(:author)) { graph(actor: users(:author)) }[:types].map { |type| type.values_at(:id, :count) },
+      "for a narrowed viewer, the posts THEY read"
+  end
+
   test "a tree line joins a page to its parent, and a lists line a page to its tag, its type or All posts" do
     home = root_page
     by_tag = create_page(title: "By tag")

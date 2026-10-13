@@ -34,7 +34,9 @@
 #   lists line needs its end; the caller handed only readable pages), and
 #   `keep_tag`, a local view's focused tag;
 # - a post type's `count` and "All posts"' are counted over the site's
-#   readable posts.
+#   readable posts: a type's is the readable posts of that stored type,
+#   "All posts"' EVERY readable post, a retired type's included (design
+#   answer H2: "the site total").
 #
 # A `brings` line (a hub to a post it brings in, a hub or tag to its "+N
 # more") is a page's local view's alone: the whole graph has none, and there

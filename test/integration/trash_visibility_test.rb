@@ -617,8 +617,18 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ 1 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }
     get "/cs-studio/notes/post/#{@kept_post.id}/threads"
     assert_equal [ 1, 1 ], [ response.parsed_body["open"], response.parsed_body["threads"].size ]
+    # The search (pages in the mind graph, Task 7) finds pages too, and a tag
+    # a page's list block names: neither the trashed page ("Gone page") nor
+    # the trashed post, nor a tag only a trashed page lists, is a row.
+    listed = Tag.create!(name: "gone-listed")
+    ContentBlock.create!(owner: @gone_page, block_type: :post_list, position: 2, settings: { "tag" => "gone-listed" })
     get "/cs-studio/mind_graph/search", params: { q: "gone" }
     assert_empty response.parsed_body
+    # And the same block on a kept page makes the tag a row, so the empty
+    # answer above is the trash's doing.
+    ContentBlock.create!(owner: @kept_page, block_type: :post_list, position: 2, settings: { "tag" => "gone-listed" })
+    get "/cs-studio/mind_graph/search", params: { q: "gone" }
+    assert_equal [ "tag-#{listed.id}" ], response.parsed_body.map { |row| row["id"] }
   end
 
   # The mind graph's tag nodes (round 3, Task 17): a tag counts only the KEPT
