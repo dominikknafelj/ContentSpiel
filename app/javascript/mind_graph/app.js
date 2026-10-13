@@ -508,7 +508,9 @@ export function mount(element) {
   // `fetch`, ended with everything else when the screen is left. A read
   // that fails says so in the list with "Try again" (design answer G5),
   // which asks for the same read; `again` says the ask came from that
-  // button, which is gone by then, so the focus is put where the answer is.
+  // button: if the read fails once more, the new button takes the focus the
+  // old one had, and when it brings the rows the list itself puts the focus
+  // on the first of them (`node_list.js`: the focus was in the rows' region).
   // The heading's figure is the read's whole `total`, which can be more
   // than its rows (the server answers the first `PostGraph::ROW_LIMIT`).
   // "Open in Posts →" stands under a pill's rows (`pill`), where there are
@@ -527,7 +529,6 @@ export function mount(element) {
         link: pill && answer.posts_url && answer.rows.length > 0 ? { href: answer.posts_url, label: text.t("mind_graph.script.list.open_in_posts") } : null
       }
       drawList()
-      if (again) list.focus()
     } catch (error) {
       if (destroyed || error.name === "AbortError" || mine !== asked) return
       rowsShown = null

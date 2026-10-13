@@ -58,15 +58,16 @@
 // is announced. The checkbox above stays, so the filter can be let go.
 //
 // THE FOCUS IS NOT LOST when the rows are drawn again (a post was added, a
-// kind was switched): `render` and `showRows` replace the rows' own region
-// and never the checkbox, and when the focus was on a row it is put on the
-// row of the same node, else on the first row, else on the checkbox.
+// kind was switched, "Try again" brought the rows): `render` and `showRows`
+// replace the rows' own region and never the checkbox, and when the focus
+// was in that region it is put on the row of the same node, else on the
+// first row, else on the checkbox.
 //
 // Text goes in with `textContent`; no path is written here but the one the
 // app hands in (`link`). `createList(container, { text, dotClasses,
 // typeLabels, retryClass, unlisted, onSelect, onHover, onAdd, onUnlisted })`
 // answers `{ render(nodes), showRows({ heading, rows, inView, link }),
-// fail(line, { label, onRetry, focus }), focus(), setUnlisted(on), mark(id),
+// fail(line, { label, onRetry, focus }), setUnlisted(on), mark(id),
 // row(id), destroy() }`: `render` replaces the rows with the four groups
 // (the app calls it once per load and once per filter change), `mark` moves
 // the mark to the row of `id` (null for none). `onSelect(id)` and
@@ -271,9 +272,6 @@ export function createList(container, { text, dotClasses, typeLabels = {}, retry
       body.replaceChildren(said)
       if (focus) again.focus()
     },
-    // The first row, or the checkbox when there is none: where the focus
-    // goes when "Try again" has brought the rows.
-    focus() { (body.querySelector("button[data-node-id]") || (filterable ? unlisted : null))?.focus() },
     setUnlisted(on) { unlisted.checked = on },
     mark,
     row: (id) => rows.get(id) || null,

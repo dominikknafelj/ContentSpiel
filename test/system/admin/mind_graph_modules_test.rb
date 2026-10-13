@@ -1671,8 +1671,8 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         button.click()
         button.click()
         const checkbox = Boolean(container.querySelector("input[type=checkbox]"))
-        list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
-        list.focus()
+        // The rows the retry brought: the button that had the focus is gone, and the first row takes it.
+        list.showRows({ heading: "Posts", rows: [ { id: "post-1", title: "One", degree: 0, type: "blog" } ], inView: () => false })
         const focused = document.activeElement?.dataset.nodeId
         container.remove()
         return { said, asked, checkbox, focused }
@@ -1680,7 +1680,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     JS
 
     assert_equal [ "The list couldn't be loaded.", "Try again", "button", "retry", true, 0 ], result["said"]
-    assert_equal [ 2, true, "tag-1" ], result.values_at("asked", "checkbox", "focused"), "the checkbox above the rows is still there, and the focus goes to the first row once there is one"
+    assert_equal [ 2, true, "post-1" ], result.values_at("asked", "checkbox", "focused"), "the checkbox above the rows is still there, and the focus goes to the first row once there is one"
   end
 
   # The keyboard is never left on nothing: the rows are replaced whenever
@@ -1723,7 +1723,6 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const list = m.createList(container, { text, dotClasses: [], unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
         list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
         list.setUnlisted(true)
-        list.focus()
         return [ container.querySelectorAll("input, label").length, container.querySelectorAll("button[data-node-id]").length ]
       })()
     JS

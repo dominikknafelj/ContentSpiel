@@ -2054,7 +2054,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_selector "[data-mind-graph-card]:focus", wait: 2
     assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
     await_graph
-    assert screen_position(alone)
+    assert_kind_of Numeric, screen_position(alone)["x"], "the layout has no place for the added post"
 
     # Closing the card gives the focus back to the row that opened it, which
     # is a new element since the rows were drawn again.
@@ -2093,15 +2093,33 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     alone = create_post(title: "Alone")
     visit admin_mind_graph_path
     await_graph
+    # The first request for the unlisted posts is held until the test lets
+    # it go, the second fails, and the third and every other request go to
+    # the real fetch.
     page.execute_script(<<~JS)
       const original = window.fetch
-      window.unlistedFailures = 1
+      window.unlistedAsked = 0
       window.fetch = (url, options) => {
-        if (!String(url).includes("/mind_graph/unlisted") || window.unlistedFailures <= 0) return original(url, options)
-        window.unlistedFailures -= 1
-        return Promise.resolve(new Response("", { status: 500 }))
+        if (!String(url).includes("/mind_graph/unlisted")) return original(url, options)
+        window.unlistedAsked += 1
+        if (window.unlistedAsked === 1) return new Promise((resolve) => { window.releaseUnlisted = () => original(url, options).then((response) => { resolve(response); window.unlistedReleased = true }) })
+        if (window.unlistedAsked === 2) return Promise.resolve(new Response("", { status: 500 }))
+        return original(url, options)
       }
     JS
+
+    # An answer that comes after the filter was let go again is not drawn.
+    filter = find("#{LIST} label", text: "Not listed on any page")
+    filter.click
+    await_js("window.unlistedAsked === 1")
+    filter.click
+    page.execute_script("window.releaseUnlisted()")
+    await_js("window.unlistedReleased === true")
+    await_frames
+    within(LIST) do
+      assert_equal [ "PAGES · 2" ], all("h2").map { |heading| heading.text.upcase }, "the late answer replaced the groups"
+      assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+    end
 
     find("#{LIST} label", text: "Not listed on any page").click
 
@@ -2154,6 +2172,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     JS
     assert_equal %w[canvas checkbox row row row], stops
 
+    # A canvas holds colours, not tokens: a row's mark is drawn again when
+    # the theme changes, like the graph.
+    mark = "document.querySelector(#{"#{LIST} canvas[data-mark=page]".to_json}).toDataURL()"
+    before = page.evaluate_script(mark)
+    theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
+    begin
+      page.execute_script("document.documentElement.setAttribute('data-theme', #{(theme == "dark" ? "light" : "dark").to_json})")
+      await_js("#{mark} !== #{before.to_json}")
+    ensure
+      page.execute_script("document.documentElement.setAttribute('data-theme', #{theme.to_json})")
+    end
+    await_js("#{mark} === #{before.to_json}")
+
     click_node(nid(docs))
     assert_selector "[data-mind-graph-card] h2", text: "<b>Docs</b>"
     assert_no_selector "[data-mind-graph-card] b"
@@ -2198,7 +2229,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal [ "type-resume_entry" ], graph["data-neighbours"].split(","), "the added post is joined to the hub that brings it in, and not to the page"
     within(LIST) { assert_row "Entry 21: post, 1 connection. Shows it in the graph." }
     await_graph
-    assert screen_position(posts.last)
+    assert_kind_of Numeric, screen_position(posts.last)["x"], "the layout has no place for the added post"
 
     # The added line is the hub's, and follows "Lists" as the others do.
     toggle "Lists"
