@@ -264,6 +264,25 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
       code.fetch("app/javascript/admin.js").lstrip, "CS Studio's entry point registers controllers/admin/ and nothing else")
   end
 
+  # Code block spec §4: the copy button is a controller of the site's own,
+  # at the top level of `controllers/` like `theme`, so a public page loads
+  # it and still nothing of CS Studio.
+  test "a public page with a Code block carries the copy controller and no admin script" do
+    page = create_page(title: "Docs")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "code", settings: { "code" => "a = 1" } }).ok?
+    publish_changes(page)
+
+    get PublicSite::Urls.new.path_for(page, "en")
+
+    assert_response :success
+    assert_select "figure[data-controller='code-copy'] button[hidden][data-action='code-copy#copy']"
+    assert modulepreloads.any? { |href| href.include?("controllers/code_copy_controller") }, "the copy controller is preloaded with the site's own"
+    ADMIN_ONLY.each do |name|
+      assert modulepreloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a page with a Code block"
+    end
+    assert_select "[data-controller*='admin--']", count: 0
+  end
+
   private
 
   def modulepreloads = css_select("link[rel=modulepreload]").map { |link| link["href"] }
