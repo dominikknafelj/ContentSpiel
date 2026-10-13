@@ -116,7 +116,9 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_not_equal rest.last(4), dropped.last(4), "the drop did not lay the neighbours out again"
   end
 
-  test "a filter sent in the same tick as start waits for the d3 import instead of failing" do
+  # Messages are taken strictly in order: `start` awaits the d3 import, and an
+  # `add` handled before it had finished would find no simulation and throw.
+  test "an add sent in the same tick as start waits for the d3 import instead of failing" do
     result = page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
       const [workerUrl, d3Url, done] = arguments
       import("mind_graph/layout_client").then(({ createLayout }) => {
@@ -128,12 +130,12 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
           onError: (message) => done({ error: message })
         })
         layout.start([{ id: 1, radius: 8 }, { id: 2, radius: 8 }, { id: 3, radius: 6 }], [{ source: 1, target: 2 }, { source: 2, target: 3 }], { reducedMotion: true })
-        layout.filter([1, 2], [0])
+        layout.add({ id: 4, radius: 7, x: 30, y: 0 }, [{ source: 1, target: 4 }])
       })
     JS
 
     assert_nil result["error"]
-    assert_equal 6, result["last"].size
+    assert_equal 8, result["last"].size, "the layout the page heard of as settled holds the added node"
   end
 
   # Pinning (spec §4.4): a dragged node is held under the pointer, STAYS where
@@ -196,8 +198,8 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
           window.Worker = Real
           const answer = (after) => { log.push(`raw:${after}`); worker.onmessage({ data: { type: "settled", after } }) }
           layout.start([{ id: 1, radius: 8 }], [])
-          layout.filter([1], [])
-          answer(1) // the first layout cooled down before the filter was taken up
+          layout.pin(1)
+          answer(1) // the first layout cooled down before the pin was taken up
           answer(2)
           layout.drag(1, 10, 10)
           answer(2) // late, and stale again
@@ -212,35 +214,36 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     end
 
     assert_nil log["error"]
-    assert_equal %w[start filter drag drop], log["sent"]
+    assert_equal %w[start pin drag drop], log["sent"]
     assert_equal %w[raw:1 raw:2 called raw:2 raw:3 raw:4 called raw:4], log["log"]
   end
 
   # THE WORKER'S HALF, with the real one: `after` counts the messages taken
-  # up. A `filter` is sent right behind `start`, and whichever way that race
-  # goes on this machine the page hears of ONE settled layout, the filter's.
+  # up. An `unpin` (which warms the layout up again) is sent right behind
+  # `start`, and whichever way that race
+  # goes on this machine the page hears of ONE settled layout, the unpin's.
   # With reduced motion three nodes usually cool down inside the first 12 ms
-  # slice, before the filter is handled, and the worker then posts `settled`
-  # twice (`raw:1`, `raw:2`); on a slower machine the filter is taken up while
+  # slice, before the unpin is handled, and the worker then posts `settled`
+  # twice (`raw:1`, `raw:2`); on a slower machine the unpin is taken up while
   # the first layout is still running and there is only `raw:2`. (That it is
   # machine speed that decides was found in CI: this test used to insist on
   # `raw:1`. The stale case itself is the test above.) The end of the watch is
   # a message that changes nothing (a drag of a node that isn't there), which
   # the idle worker answers at once: every `settled` before it has arrived by
   # then, so "exactly once" is not a wait.
-  test "a filter sent right behind start is settled once, and only when the filter's layout has cooled down" do
+  test "an unpin sent right behind start is settled once, and only when the layout it warmed up has cooled down" do
     log = settled_log(<<~JS)
       layout.start([{ id: 1, radius: 8 }, { id: 2, radius: 8 }, { id: 3, radius: 6 }], [{ source: 1, target: 2 }, { source: 2, target: 3 }], { reducedMotion: true })
-      layout.filter([1, 2], [0])
+      layout.unpin([1])
       onCall = (count) => { if (count === 1) layout.drag("no such node", 0, 0); else finish() }
     JS
 
-    assert_equal 2, log.count("called"), "one for the filter's layout, one for the drag that ended the watch: #{log}"
+    assert_equal 2, log.count("called"), "one for the unpin's layout, one for the drag that ended the watch: #{log}"
     first = log.index("called")
-    assert_equal "raw:2", log[first + 1], "the page was told of a settled that did not answer the filter: #{log}"
+    assert_equal "raw:2", log[first + 1], "the page was told of a settled that did not answer the unpin: #{log}"
     assert_equal %w[called raw:3], log.last(2), log.inspect
     assert_not_includes log[0...first], "raw:2"
-    assert_includes [ [], [ "raw:1" ] ], log[0...first], "something other than the first layout's own settled came before the filter's: #{log}"
+    assert_includes [ [], [ "raw:1" ] ], log[0...first], "something other than the first layout's own settled came before the unpin's: #{log}"
   end
 
   # Every message is answered, whatever it changes: a drag and its drop
@@ -1045,24 +1048,21 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ 0, 0 ], released.first(2), "a released anchor did not go back to the centre"
   end
 
-  # The anchor is Home's place at rest and nothing more: a filter that hides
-  # it lets it go like any node, one that shows it again puts it back at the
-  # centre, and an anchor a person holds stays where they put it through a
-  # filter that keeps it. A pin (from a card) holds it where it is, which is
-  # the centre.
-  test "the layout puts a shown anchor nobody holds back at the centre after a filter, and leaves a held one where it was put" do
+  # The anchor is Home's place at rest and nothing more: an anchor a person
+  # holds stays where they put it while the layout is warmed up around it (a
+  # post added from the list does that), released it goes back to the
+  # centre, and a pin (from a card) holds it where it is, which is the
+  # centre.
+  test "the layout leaves a held anchor where it was put while a node is added, and puts a released one back at the centre" do
     result = using_wait_time(40) do
       page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
         const [workerUrl, d3Url, done] = arguments
         import("mind_graph/layout_client").then(({ createLayout }) => {
           let last = null
           const seen = []
-          const all = [ "page-1", "page-2", "post-1" ]
           const steps = [
-            () => layout.filter([ "page-2", "post-1" ], []),
-            () => layout.filter(all, [ 0, 1 ]),
             () => { layout.drag("page-1", 150, 50); layout.drop("page-1") },
-            () => layout.filter(all, [ 0 ]),
+            () => layout.add({ id: "post-2", radius: 7, x: 60, y: 60 }, [ { source: "page-1", target: "post-2", kind: "lists" } ]),
             () => layout.unpin([ "page-1" ]),
             () => layout.pin("page-1")
           ]
@@ -1084,10 +1084,10 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     end
 
     assert_nil result["error"]
-    start, _hidden, shown, dragged, kept, released, pinned = result["seen"]
-    assert_equal [ [ 0, 0 ], [ 0, 0 ] ], [ start, shown ], "at the start, and shown again by a filter: the centre"
+    start, dragged, kept, released, pinned = result["seen"]
+    assert_equal [ 0, 0 ], start, "at the start: the centre"
     assert_in_delta 150, dragged[0], 0.01
-    assert_equal dragged, kept, "a filter moved an anchor a person holds"
+    assert_equal dragged, kept, "an added node moved an anchor a person holds"
     assert_equal [ [ 0, 0 ], [ 0, 0 ] ], [ released, pinned ], "released it is back at the centre, and pinned from its card it is held there"
   end
 
@@ -2168,29 +2168,25 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_operator Math.hypot(result["last"][4] - result["last"][2], result["last"][5] - result["last"][3]), :<, 200, "the added node is joined to the hub that brings it in"
   end
 
-  # A line to a hub the filter hides (Post types switched off, then a row
-  # added): d3 throws for a line whose end it does not lay out, and the
-  # worker's error would take the whole graph down.
-  test "the layout takes a node whose hub the filter hides without an error, and shows the line once the filter shows the hub" do
+  # d3 throws for a line whose end it does not lay out, and the worker's
+  # error would take the whole graph down. The app never sends one (the
+  # layout holds every node of the data, whatever the legend hides, so a
+  # post's hub is always there); the worker does not rely on that.
+  test "the layout takes an added node one of whose lines ends at a node it does not hold, without an error, and keeps its other line" do
     result = using_wait_time(40) do
       page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
         const [workerUrl, d3Url, done] = arguments
         import("mind_graph/layout_client").then(({ createLayout }) => {
           let last = null
           let step = 0
-          const far = () => Math.hypot(last[4] - last[2], last[5] - last[3])
           const layout = createLayout({
             workerUrl, d3Url,
             onTick: (positions) => { last = Array.from(positions) },
             onSettled: () => {
               step += 1
               if (step === 1) {
-                layout.filter([ "page-1" ], [])
-                layout.add({ id: "post-9", radius: 7, x: 400, y: 400 }, [ { source: "type-blog", target: "post-9", kind: "brings" } ])
-                layout.filter([ "page-1", "post-9" ], [])
-              } else if (step === 2) {
-                layout.filter([ "page-1", "type-blog", "post-9" ], [ 0, 1 ])
-              } else { layout.stop(); done({ far: far(), size: last.length }) }
+                layout.add({ id: "post-9", radius: 7, x: 400, y: 400 }, [ { source: "type-gone", target: "post-9", kind: "brings" }, { source: "type-blog", target: "post-9", kind: "brings" } ])
+              } else { layout.stop(); done({ far: Math.hypot(last[4] - last[2], last[5] - last[3]), size: last.length }) }
             },
             onError: (message) => done({ error: message })
           })
@@ -2203,7 +2199,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     assert_nil result["error"]
     assert_equal 6, result["size"]
-    assert_operator result["far"], :<, 45, "with its hub shown again the added line (index 1, after the one the layout began with) holds the post beside it"
+    assert_operator result["far"], :<, 45, "the line to the hub the layout holds keeps the post beside it"
   end
 
   # Runs `script` against a layout and answers what happened, in order:

@@ -39,7 +39,6 @@ export function createLayout({ workerUrl, d3Url, onTick, onSettled, onError }) {
     // unless a caller names others: the app never does, a test of the worker
     // does, to see a spring or an ease at work without waiting out the real one.
     start(nodes, edges, { reducedMotion = false, springs = SPRINGS, ease = EASE } = {}) { send({ type: "start", d3Url, nodes, edges, reducedMotion, springs, ease }) },
-    filter(nodeIds, edgeIndexes) { send({ type: "filter", nodeIds, edgeIndexes }) },
     drag(id, x, y) { send({ type: "drag", id, x, y }) },
     drop(id) { send({ type: "drop", id }) },
     pin(id) { send({ type: "pin", id }) },

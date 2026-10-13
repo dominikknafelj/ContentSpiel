@@ -8,7 +8,6 @@
 // imported once, dynamically. That file is one self-contained bundle.
 //
 // Messages in:  { type: "start", d3Url, nodes: [{ id, radius, anchor }], edges: [{ source, target, kind }], reducedMotion, springs, ease }
-//               { type: "filter", nodeIds: [...], edgeIndexes: [...] }
 //               { type: "drag", id, x, y }   the node is held under the pointer
 //               { type: "drop", id }         the pointer let go: the node STAYS where it is
 //               { type: "pin", id }          hold the node where it is now
@@ -21,8 +20,16 @@
 //
 // PINNING. A node that was dragged keeps its place (`fx` / `fy` stay set after
 // `drop`), and so does one pinned from its card; only `unpin` gives it back
-// to the forces. A `filter` lets go of every node it hides: a pin is for a
-// node on screen. Which nodes are pinned is the page's to know and to show.
+// to the forces. Which nodes are pinned is the page's to know and to show.
+//
+// THERE IS NO `filter` MESSAGE. The legend's toggles are a filter on what the
+// PAGE draws (pages in the mind graph, "As built": the ruling on its Task 6):
+// the layout is computed once over every node and line of the data, a toggle
+// sends this worker nothing, and a node the legend hides keeps its place, its
+// pin and its part in the forces. The message this worker had for the old
+// radios (which laid the shown nodes out again, at alpha 0.8, so that nodes a
+// toggle did not touch moved and could leave the view) is gone with its code;
+// `test/lib/mind_graph_guards_test.rb` holds that no script knows it.
 //
 // LINES AND THE ANCHOR (pages in the mind graph, spec §5). A line's `kind`
 // chooses its spring from `springs` (`{ kind: { distance, strength } }`,
@@ -33,8 +40,7 @@
 // are 0. It is not a pin: the page shows none and counts none, so nothing
 // the page forgets or releases can let it go. Dragged or pinned it is held
 // where the person put it, like any node (`held`), and `unpin` gives it
-// back to the centre, not to the forces. A `filter` that hides it lets it
-// go like any node, and one that shows it again puts it back. BACK TO THE
+// back to the centre, not to the forces. BACK TO THE
 // CENTRE IS EASED: the anchor is held a little nearer with every tick
 // (`ease`, `{ keep, within }`, handed over with `start`), so it travels
 // like every other released node and its subtree
@@ -45,15 +51,13 @@
 //
 // `after` is how many messages had been taken up when the layout cooled down.
 // The page counts what it sent and believes a `settled` only when the two
-// agree: a `filter` sent right behind `start` may be handled after the first
-// layout has cooled down, and that first `settled` describes a layout the
-// page has already asked to change (`layout_client.js`).
+// agree: an `unpin` or an `add` sent right behind `start` may be handled
+// after the first layout has cooled down, and that first `settled` describes
+// a layout the page has already asked to change (`layout_client.js`).
 //
 // `positions` always covers EVERY node given to `start`, in that order, two
 // numbers each, and after them every node an `add` brought, in the order
-// they were added: a node the filter hides keeps its last place, so it comes
-// back where it was. An added line's index (what a `filter` names) follows
-// the last line's, as the page counts its own.
+// they were added.
 //
 // Messages are handled strictly in order (see `queue` below): the first
 // `start` awaits the d3 import, and what follows it must wait for it.
@@ -63,7 +67,7 @@
 // - FRAME: one simulation tick, one `tick` message, then FRAME_MS until the
 //   next -- so the page shows every step and the graph visibly eases to rest.
 //   This is the pace of a small graph's first layout (up to SMALL_GRAPH
-//   nodes), of a drag, and of the settle after a drop, a filter or an unpin.
+//   nodes), of a drag, and of the settle after a drop, an add or an unpin.
 // - FAST: as many ticks as fit into SLICE_MS, one message, then a zero timeout
 //   so a message that arrived meanwhile is handled before the next slice. A
 //   larger graph's first layout runs like this until about FINAL_STRETCH_MS
@@ -96,7 +100,6 @@ const DISTANCE = 90
 let d3 = null
 let simulation = null
 let nodes = []
-let edges = []
 let running = false
 let reduced = false
 // "frame" or "fast"; see PACING.
@@ -112,9 +115,9 @@ let ease = { keep: 0, within: 0 }
 let easing = null
 
 // Messages are handled strictly in order, each after the previous one has
-// finished. `start` awaits the d3 import, and a `filter`, `drag` or `unpin`
-// sent right behind it would otherwise run before the simulation exists: the
-// filter would throw and report a spurious error, a drag would be dropped.
+// finished. `start` awaits the d3 import, and a `drag`, `unpin` or `add`
+// sent right behind it would otherwise run before the simulation exists: an
+// add would throw and report a spurious error, a drag would be dropped.
 // An error in one message is posted and the chain goes on with the next.
 let queue = Promise.resolve()
 let taken = 0
@@ -137,8 +140,6 @@ async function handle(message) {
     springs = message.springs
     ease = message.ease
     start(message.nodes, message.edges)
-  } else if (message.type === "filter") {
-    filter(new Set(message.nodeIds), new Set(message.edgeIndexes))
   } else if (message.type === "drag") {
     const node = find(message.id)
     if (!node) return idle()
@@ -198,11 +199,11 @@ function idle() {
 
 function start(givenNodes, givenEdges) {
   nodes = givenNodes.map((node) => ({ id: node.id, radius: node.radius, anchor: Boolean(node.anchor), held: false }))
-  edges = givenEdges.map((edge, index) => ({ source: edge.source, target: edge.target, kind: edge.kind, index }))
+  const edges = givenEdges.map((edge) => ({ source: edge.source, target: edge.target, kind: edge.kind }))
   easing = null
   nodes.forEach((node) => rest(node))
   shown = null
-  const link = d3.forceLink(edges.slice()).id((node) => node.id).distance((edge) => springs[edge.kind]?.distance ?? DISTANCE)
+  const link = d3.forceLink(edges).id((node) => node.id).distance((edge) => springs[edge.kind]?.distance ?? DISTANCE)
   // d3's own strength, kept for every kind that names none: it reads the
   // force's own count of lines per node, which `links()` refreshes.
   const ordinary = link.strength()
@@ -225,21 +226,21 @@ function start(givenNodes, givenEdges) {
 // starts where the page put it, its lines (to the hub that brings it in,
 // when it has one) join the others, and the layout warms up enough to make
 // room. `positions` covers it from the next `tick`. A node that is there
-// already is not added twice. A line one of whose ends the filter hides is
-// kept (`edges`, so a later `filter` can show it) and not handed to the
-// forces now: d3 looks a line's ends up among the nodes it lays out, and
-// throws for one it does not find.
+// already is not added twice. A line one of whose ends the layout does not
+// hold is not handed to the forces: d3 looks a line's ends up among the
+// nodes it lays out and throws for one it does not find, and the worker's
+// error would take the whole graph down for one line.
 function add(node, givenEdges) {
   if (find(node.id)) return idle()
   const added = { id: node.id, radius: node.radius, anchor: false, held: false, x: node.x, y: node.y }
   nodes.push(added)
-  const lines = givenEdges.map((edge, index) => ({ source: edge.source, target: edge.target, kind: edge.kind, index: edges.length + index }))
-  edges.push(...lines)
+  const ids = new Set(nodes.map((candidate) => candidate.id))
+  const lines = givenEdges
+    .filter((edge) => ids.has(edge.source) && ids.has(edge.target))
+    .map((edge) => ({ source: edge.source, target: edge.target, kind: edge.kind }))
   shown = null
-  const laidOut = [ ...simulation.nodes(), added ]
-  const ids = new Set(laidOut.map((candidate) => candidate.id))
-  simulation.nodes(laidOut)
-  simulation.force("link").links([ ...simulation.force("link").links(), ...lines.filter((line) => ids.has(line.source) && ids.has(line.target)) ])
+  simulation.nodes(nodes)
+  simulation.force("link").links([ ...simulation.force("link").links(), ...lines ])
   simulation.alphaTarget(0).alpha(Math.max(simulation.alpha(), HELD_ALPHA))
   pace = "frame"
   run()
@@ -247,8 +248,8 @@ function add(node, givenEdges) {
 
 // Where a node that nobody holds is kept: the anchor at the centre, every
 // other node nowhere.
-// `eased`: the anchor is somewhere else (it was dragged, or let go while a
-// filter hid it) and travels back -- from where it is HELD, if it is: a
+// `eased`: the anchor is somewhere else (it was dragged) and travels back
+// -- from where it is HELD, if it is: a
 // node dropped and released before the next tick is not yet where it was
 // put (`x` follows `fx` only with a tick), and would be taken for a node
 // that never left.
@@ -283,26 +284,6 @@ function tick() {
     }
   }
   simulation.tick()
-}
-
-function filter(nodeIds, edgeIndexes) {
-  nodes.forEach((node) => {
-    // A shown anchor that nobody holds is at the centre (again: a filter
-    // that hid it had let it go).
-    if (nodeIds.has(node.id)) {
-      if (node.anchor && !node.held && easing !== node) rest(node, { eased: true })
-      return
-    }
-    node.held = false
-    if (easing === node) easing = null
-    node.fx = null
-    node.fy = null
-  })
-  simulation.nodes(nodes.filter((node) => nodeIds.has(node.id)))
-  simulation.force("link").links(edges.filter((edge) => edgeIndexes.has(edge.index)))
-  simulation.alpha(0.8)
-  pace = "frame"
-  run()
 }
 
 function run() {

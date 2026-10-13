@@ -94,18 +94,31 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
   end
   # A TOGGLE OF THE LEGEND IS A FILTER ON WHAT IS DRAWN, NOT A NEW LAYOUT (the
   # ruling on the pages plan's Task 6): the layout is computed once over
-  # everything the data holds, so no script of the page hands the worker a
-  # `filter`. (The worker and its client still know the message; the browser
-  # test "a toggle moves nothing" holds what this cannot see.)
-  FILTER_SENT = /\blayout\??\.filter\(|type: "filter"/
+  # everything the data holds, so the worker has no `filter` message and
+  # nothing sends one. Until the build's last task the worker and its client
+  # still knew the message the old radios had used, and this guard had an
+  # exception for them; the message is gone, so the guard now holds its
+  # ABSENCE, from the client and the worker too: whoever brings a second
+  # layout back for a toggle has to take this test away first, and read why
+  # (`layout_worker.js`, "THERE IS NO `filter` MESSAGE"). What this cannot
+  # see, that a toggle moves nothing, is the browser test "a toggle moves
+  # nothing: after each of the eight, off and on again, every node is where
+  # it was and the layout was told nothing".
+  FILTER_SENT = /\blayout\??\.filter\(|type:? ===? "filter"|type: "filter"|^\s*filter\(nodeIds/
 
-  test "no script of the mind graph but the layout's own client sends the worker a filter" do
-    senders = Dir[Rails.root.join("app/javascript/mind_graph/*.js"), Rails.root.join("app/javascript/controllers/admin/mind_graph/*.js")]
-      .reject { |path| %w[layout_client.js layout_worker.js].include?(File.basename(path)) }
-      .select { |path| File.read(path).lines.reject { |line| line.strip.start_with?("//") }.join.match?(FILTER_SENT) }
+  test "no script of the mind graph knows a filter message for the layout: not the page, not the client, not the worker" do
+    knowing = Dir[Rails.root.join("app/javascript/mind_graph/*.js"), Rails.root.join("app/javascript/controllers/admin/mind_graph/*.js")]
+      .select { |path| File.read(path).lines.reject { |line| line.strip.start_with?("//") }.any? { |line| line.match?(FILTER_SENT) } }
 
-    assert_empty senders.map { |path| File.basename(path) }
-    assert_match FILTER_SENT, "    layout?.filter(state.visibleNodes.map((index) => state.nodes[index].id), state.visibleEdges)"
-    assert_match FILTER_SENT, File.read(Rails.root.join("app/javascript/mind_graph/layout_client.js")), "the client no longer knows the message: this guard and its exception can go"
+    assert_empty knowing.map { |path| File.basename(path) }
+  end
+
+  test "the filter guard can fail: each line the message was written in is one it reads" do
+    [
+      "    layout?.filter(state.visibleNodes.map((index) => state.nodes[index].id), state.visibleEdges)",
+      "    filter(nodeIds, edgeIndexes) { send({ type: \"filter\", nodeIds, edgeIndexes }) },",
+      "  } else if (message.type === \"filter\") {"
+    ].each { |line| assert_match FILTER_SENT, line }
+    [ "    const freed = message.ids.map(find).filter(Boolean)", "    filter: refilter," ].each { |line| assert_no_match FILTER_SENT, line }
   end
 end
