@@ -25,6 +25,15 @@
 // every mark, so no state rests on colour alone. The corners are then:
 // notes top-left, pin top-right (`renderer.js`), changes bottom-right.
 //
+// A MARK'S SIZE IS ITS OUTER SIZE (the ruling on this task's review): an
+// outline is drawn INSIDE the mark's edge, so an outlined mark is exactly as
+// large as a filled one -- a draft page is 14 by 10, a ring type's hub and a
+// retired hub 12px across, a ring post's ring ends at its radius, the pill
+// is 60 by 16 with its border in it. `inside` below traces the path such a
+// stroke is centred on. Two marks are older than that rule and are left as
+// they were: a live filled post's own outline in its hue and a tag's
+// square are centred on the edge.
+//
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`),
 // and a value of the table is a theme KEY.
 
@@ -56,6 +65,8 @@ const CORNER_INSET = 1
 const CORNER_RING = 1.5
 // Every outline here: a draft's, a scheduled record's, a ring type's ring.
 const OUTLINE = 1.5
+// The pill's border (G2).
+const MORE_BORDER = 1
 // A READING of "dashed": the dash a draft has had since the first build.
 const DRAFT_DASH = [ 3, 2.5 ]
 // How far along its radius a circle's top corners are, for what hangs on
@@ -150,8 +161,24 @@ export function drawMark(context, theme, node, x, y, radius) {
   dot(context, theme[look.corner], cornerX, cornerY, CORNER_DOT)
 }
 
+// A mark's shape, centred on x, y: `{ radius }` for a circle, `{ width,
+// height, corner }` for a box. `trace` opens its path, `inset` pixels inside
+// its edge all round; a stroke of width w on `trace(…, w / 2)` lies wholly
+// inside the shape.
+function trace(context, shape, x, y, inset = 0) {
+  context.beginPath()
+  if (shape.radius != null) return context.arc(x, y, Math.max(0, shape.radius - inset), 0, Math.PI * 2)
+
+  const width = shape.width - inset * 2, height = shape.height - inset * 2
+  // A rounded box where the canvas can round one; a plain rectangle where
+  // it can't (`roundRect` is newer than the rest of what is drawn here, and
+  // a missing method would throw inside the draw and take the canvas with it).
+  if (typeof context.roundRect === "function") context.roundRect(x - width / 2, y - height / 2, width, height, Math.max(0, (shape.corner ?? 0) - inset))
+  else context.rect(x - width / 2, y - height / 2, width, height)
+}
+
 // Strokes the path that is open, and leaves no dash behind.
-function outline(context, colour, { dashed = false, width = OUTLINE } = {}) {
+function stroke(context, colour, { dashed = false, width = OUTLINE } = {}) {
   context.strokeStyle = colour
   context.lineWidth = width
   context.setLineDash(dashed ? DRAFT_DASH : [])
@@ -159,11 +186,10 @@ function outline(context, colour, { dashed = false, width = OUTLINE } = {}) {
   context.setLineDash([])
 }
 
-function dot(context, colour, x, y, radius) {
-  context.beginPath()
-  context.arc(x, y, radius, 0, Math.PI * 2)
-  context.fillStyle = colour
-  context.fill()
+// An outline of the shape, INSIDE its edge.
+function outline(context, colour, shape, x, y, options = {}) {
+  trace(context, shape, x, y, (options.width ?? OUTLINE) / 2)
+  stroke(context, colour, options)
 }
 
 function fill(context, colour) {
@@ -171,50 +197,43 @@ function fill(context, colour) {
   context.fill()
 }
 
-// A row of `LOOKS` on the mark whose path is open, centred on x, y: the
-// fill, the outline and the centre dot. (The corner dot is the whole
-// mark's, `drawMark`'s.) `own` is the mark's own colour. A filled mark's
-// path stays open, for a caller that outlines it.
-function state(context, theme, look, own, x, y) {
+function dot(context, colour, x, y, radius) {
+  trace(context, { radius }, x, y)
+  fill(context, colour)
+}
+
+// A row of `LOOKS` on a shape centred on x, y: the fill, the outline inside
+// its edge and the centre dot. (The corner dot is the whole mark's,
+// `drawMark`'s.) `own` is the mark's own colour, and `edged` a filled
+// post's own outline in its hue, centred on its edge as it has always been
+// (drawn on the path the fill left open).
+function state(context, theme, look, own, shape, x, y, { edged = false } = {}) {
+  trace(context, shape, x, y)
   fill(context, look.fill === "own" ? own : theme[look.fill])
-  if (look.outline) outline(context, theme[look.outline], { dashed: look.dashed })
+  if (edged && look.fill === "own") stroke(context, own)
+  if (look.outline) outline(context, theme[look.outline], shape, x, y, { dashed: look.dashed })
   if (look.centre) dot(context, theme[look.centre], x, y, CENTRE_DOT)
 }
 
-// A box where the canvas can round one; a plain rectangle where it can't
-// (`roundRect` is newer than the rest of what is drawn here, and a missing
-// method would throw inside the draw and take the canvas with it).
-function boxPath(context, x, y, { width, height }, corner) {
-  context.beginPath()
-  if (typeof context.roundRect === "function") context.roundRect(x - width / 2, y - height / 2, width, height, corner)
-  else context.rect(x - width / 2, y - height / 2, width, height)
-}
-
 function drawPage(context, theme, node, look, x, y) {
-  boxPath(context, x, y, boxOf(node), theme.radius ?? 0)
-  state(context, theme, look, theme.ink, x, y)
+  state(context, theme, look, theme.ink, { ...boxOf(node), corner: theme.radius ?? 0 }, x, y)
 }
 
 function drawPost(context, theme, node, look, x, y, radius) {
   const retired = node.colour_index == null
   const slot = retired ? null : (node.colour_index - 1) % 12
   const hue = retired ? theme.meta : theme.categories[slot % 6]
-  const ring = retired || slot >= 6
 
-  context.beginPath()
-  context.arc(x, y, radius, 0, Math.PI * 2)
-  if (ring) {
+  if (retired || slot >= 6) {
     // A ring type (third design answers; H3): the ring, thin and ALWAYS
-    // solid, and inside it the type's mark in whichever of the five looks.
+    // solid, ending at the mark's radius, and inside it the type's mark in
+    // whichever of the five looks.
+    trace(context, { radius }, x, y)
     fill(context, theme.surface)
-    outline(context, hue)
-    context.beginPath()
-    context.arc(x, y, innerRadius(radius), 0, Math.PI * 2)
-    state(context, theme, look, hue, x, y)
+    outline(context, hue, { radius }, x, y)
+    state(context, theme, look, hue, { radius: innerRadius(radius) }, x, y)
   } else {
-    state(context, theme, look, hue, x, y)
-    // A filled post's own outline in its hue, as it has always had.
-    if (look.fill === "own") outline(context, hue)
+    state(context, theme, look, hue, { radius }, x, y, { edged: true })
   }
   if (!retired) return
 
@@ -222,42 +241,44 @@ function drawPost(context, theme, node, look, x, y, radius) {
   context.beginPath()
   context.moveTo(x - reach, y + reach)
   context.lineTo(x + reach, y - reach)
-  outline(context, hue)
+  stroke(context, hue)
 }
 
 function drawType(context, theme, node, x, y) {
   const retired = node.id !== "all-posts" && node.colour_index == null
   const slot = node.colour_index == null ? null : (node.colour_index - 1) % 12
+  const hub = { radius: TYPE_RADIUS }
   // A RING TYPE's hub (slots 7-12; design answer H3) is not filled: a ring
   // in the hue round a filled centre. A RETIRED type's (G1, H3) is the same
   // shape in `dim` with a DASHED ring and a smaller centre, so the two
   // differ by more than colour; and "All posts" is FILLED in `dim`, so it
-  // differs from a retired hub by fill, not by shade.
+  // differs from a retired hub by fill, not by shade. Either ring is inside
+  // the hub's 12px, like every outline.
   if (retired || slot >= 6) {
     const hue = retired ? theme.dim : theme.categories[slot % 6]
-    context.beginPath()
-    context.arc(x, y, TYPE_RADIUS, 0, Math.PI * 2)
+    trace(context, hub, x, y)
     fill(context, theme.surface)
-    outline(context, hue, { dashed: retired })
+    outline(context, hue, hub, x, y, { dashed: retired })
     return dot(context, hue, x, y, retired ? CENTRE_DOT : RING_HUB_CENTRE)
   }
 
   dot(context, node.id === "all-posts" ? theme.dim : theme.categories[slot], x, y, TYPE_RADIUS)
-  context.beginPath()
-  context.arc(x, y, TYPE_RING.radius, 0, Math.PI * 2)
-  outline(context, theme.surface, { width: TYPE_RING.width })
+  // The inner ring is given by its edges (3 to 4.5), not by a shape's.
+  trace(context, { radius: TYPE_RING.radius }, x, y)
+  stroke(context, theme.surface, { width: TYPE_RING.width })
 }
 
 // "+N more" (design answers G2, H4): a pill on surface with a strong line
-// round it and its words inside, in the small mono style the notes badge
-// has. `save` and `restore` leave the text settings as the labels expect
-// them.
+// round it (inside its 16px) and its words inside, in the small mono style
+// the notes badge has. `save` and `restore` leave the text settings as the
+// labels expect them.
 function drawMore(context, theme, node, x, y) {
   const box = boxOf(node)
+  const pill = { ...box, corner: box.height / 2 }
   context.save()
-  boxPath(context, x, y, box, box.height / 2)
+  trace(context, pill, x, y)
   fill(context, theme.surface)
-  outline(context, theme.line, { width: 1 })
+  outline(context, theme.line, pill, x, y, { width: MORE_BORDER })
   context.font = theme.countFont
   context.textAlign = "center"
   context.textBaseline = "middle"

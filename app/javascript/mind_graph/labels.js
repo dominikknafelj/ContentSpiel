@@ -47,7 +47,11 @@ export function labelAt({ index, positions, radii, camera }) {
   return { index, alpha: 1, x: sx + radii[index] + GAP, y: sy }
 }
 
-export function chooseLabels({ order, positions, widths, radii, camera, width, height, always, free = new Set() }) {
+//
+// `free` HAS NO DEFAULT, on purpose: a caller that forgot it would name Home
+// and the post types only while the budget lasts, and nothing would look
+// wrong on a small graph. Without it this throws.
+export function chooseLabels({ order, positions, widths, radii, camera, width, height, always, free }) {
   const reach = Math.max(1, Math.ceil(LABEL_BUDGET * camera.k * camera.k))
   const fadeFrom = reach * 0.75
   const placed = []

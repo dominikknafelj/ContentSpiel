@@ -31,6 +31,13 @@ export function nodesOf(data, { allPosts, more, retired }) {
   ]
 }
 
+// The node the layout holds at the centre, by its id, or null (pages spec
+// §5 with the ruling on Task 5's review): Home in the WHOLE graph, the focus
+// in a local view -- a person who asks for the graph around something
+// expects it in the middle -- where Home, if it is drawn, is a page like any
+// other.
+export const anchorOf = (data) => (data.focus ? data.focus.node_id : (data.pages || []).find((page) => page.home)?.id ?? null)
+
 // Whose label comes first (design answer, part one §6 and F1): Home, then
 // the top-level pages and the type nodes, then everything else by its links.
 export const rank = (node) => (node.kind === "page" && node.home ? 0 : (node.kind === "page" && node.depth === 1) || node.kind === "type" ? 1 : 2)

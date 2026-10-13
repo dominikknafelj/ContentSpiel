@@ -39,7 +39,8 @@
 //
 // A LABEL (pages spec §4; design answer F6): a page's and a post type's in
 // ink, a tag's in mono `meta`, a post's in `dim`; the selected node's is
-// semibold and the hovered node's on its backing, both in full ink. A node
+// semibold (a tag's still mono) and the hovered node's on its backing, both
+// in full ink. A node
 // with no label (the "+N more" pill: its words are inside it) has none.
 //
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`), and
@@ -72,6 +73,12 @@ export const LINE_STYLES = {
 // DRAWING rule only: the filter, its counts and a selection's neighbours do
 // not change with it.
 export const HIDE_TAG_LINES_BELOW = 0.4
+// The font a node's label is drawn in, and so the font its width is measured
+// in (`app.js`): a tag's is mono, like a tag everywhere else in CS Studio,
+// and the selected node's is semibold in its own face.
+export const labelFont = (theme, node, selected) =>
+  node.kind === "tag" ? (selected ? theme.strongMonoFont : theme.monoFont) : selected ? theme.strongFont : theme.font
+
 // A label's colour by kind, as a theme key (pages spec §4): a page's and a
 // type's read first, a post's is `dim` until it is hovered or selected.
 const LABEL_COLOURS = { page: "ink", type: "ink", tag: "meta", post: "dim", more: "dim" }
@@ -165,8 +172,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
     // it when it is hovered.
     if (!node.label) continue
     const chosen = label.index === selected
-    // A tag's label is mono, like a tag everywhere else in CS Studio.
-    context.font = chosen ? theme.strongFont : node.kind === "tag" ? theme.monoFont : theme.font
+    context.font = labelFont(theme, node, chosen)
     if (label.hover) {
       // Full ink on a backing, at full strength whatever the selection dims.
       context.globalAlpha = 1

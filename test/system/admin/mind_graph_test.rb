@@ -106,11 +106,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # filled to its edge; a draft is empty inside, and its outline is there at
   # some points round it and not at others.
   #
-  # The ring is read 6.6px from the centre: inside the draft's surface disk
-  # (radius 7), so every sample has the surface under it, and inside the
-  # outline's band (6.25 to 7.75). A sample in a gap is the surface's own
-  # colour, one on a dash is mixed with the outline's. (At the disk's very
-  # edge a gap is half transparent, and nothing could be compared.)
+  # The ring is read 6.25px from the centre: the middle of the outline's
+  # band, which is INSIDE the mark's edge (5.5 to 7, on a surface disk of
+  # radius 7), so every sample has the surface under it. A sample in a gap is
+  # the surface's own colour, one on a dash is mixed with the outline's. And
+  # nothing is drawn a pixel beyond the mark's own radius: a draft is as
+  # large as a live post's fill, not half a stroke larger.
   test "a live post is filled and a draft is an empty, dashed outline" do
     live = create_post(title: "Live one")
     draft = create_post(title: "Draft one")
@@ -122,7 +123,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     surface = pixel_at(*canvas_box.first(2).map { |edge| edge + 3 })
     live_centre, live_inside = pixels_of(live)
     draft_centre, draft_inside = pixels_of(draft)
-    round = ring_pixels(draft, radius: 6.6, samples: 96)
+    round = ring_pixels(draft, radius: 6.25, samples: 96)
+    beyond = ring_pixels(draft, radius: 8, samples: 24, quadrant: :left)
     far = ->(pixel) { pixel.first(3).zip(draft_centre.first(3)).map { |a, b| (a - b).abs }.max }
 
     assert_operator surface[3], :<, 10, "the canvas's corner is not empty: #{surface}"
@@ -133,6 +135,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal draft_centre, draft_inside, "a draft is empty inside, out to its outline"
     assert_operator round.count { |pixel| far.call(pixel) <= 8 }, :>, 12, "the outline has no gaps: it is not dashed"
     assert_operator round.count { |pixel| far.call(pixel) > 24 }, :>, 12, "no outline is drawn round the draft"
+    assert_operator beyond.count { |pixel| pixel[3] > 40 }, :<, 8, "an outline is drawn beyond the draft's radius: it is not inside the mark's edge (a line to a neighbour may cross a few of the samples)"
   end
 
   # Pages spec §4, §5: pages, the post type a page lists and All posts are on
@@ -159,11 +162,20 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     labelled = graph["data-labelled"].split(",")
     assert_equal nid(home), labelled.first, "Home's label is placed first"
     assert_empty [ nid(blog), "type-blog", "all-posts" ] - labelled, "a top-level page, a post type and All posts are named: #{labelled}"
-    # The marks on the real canvas: a page's card is ink out to its corner,
-    # where a dot of its width has nothing; and the hub has its ring.
+    # The marks on the real canvas. Home is a card 18 wide and 13 high, not a
+    # dot. Ink 7.5px right of its centre and in its corner (7.5 right, 5
+    # down: 9px from the centre), where a dot as high as it has nothing; and
+    # nothing 8px above and below its centre, where a dot as wide as it is
+    # filled (the lower of the two readings, since a line may cross one). No
+    # one pixel tells a card's corner from a dot of radius 9: the two differ
+    # there by less than the pixel the mark may be off the grid, so it is the
+    # height that says "not a dot as wide".
     home_at = screen_position(home)
-    assert_equal 255, pixel_at(home_at["x"] + 7, home_at["y"] + 4)[3], "Home is not a card: nothing is drawn in its corner"
-    assert_equal pixel_at(home_at["x"], home_at["y"]), pixel_at(home_at["x"] + 7, home_at["y"] + 4), "Home's card is not one colour out to its corner"
+    centre = pixel_at(home_at["x"], home_at["y"])
+    assert_equal 255, centre[3]
+    assert_equal centre, pixel_at(home_at["x"] + 7.5, home_at["y"]), "Home is not 18 wide: nothing 7.5px right of its centre"
+    assert_operator pixel_at(home_at["x"] + 7.5, home_at["y"] + 5)[3], :>, 200, "Home's card has no corner"
+    assert_operator [ pixel_at(home_at["x"], home_at["y"] + 8)[3], pixel_at(home_at["x"], home_at["y"] - 8)[3] ].min, :<, 100, "Home is as high as it is wide: a dot, not a card"
     hub = screen_position("type-blog")
     assert_not_equal pixel_at(hub["x"], hub["y"]), pixel_at(hub["x"] + 3.75, hub["y"]), "the hub has no ring inside it: it is one more post"
 
@@ -459,6 +471,28 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "2", graph["data-nodes"]
   end
 
+  # The ruling on Task 5's review: Home is held at the centre in the whole
+  # graph only. In a local view it is the FOCUS that rests at the centre --
+  # a person who asks for the graph around a page expects that page in the
+  # middle -- and Home, when it is drawn, is a page like any other. Neither
+  # is a pin.
+  test "in a local view the focus rests at the centre and Home does not" do
+    home = root_page
+    journal = create_page(title: "Journal")
+    create_page(title: "Archive", parent: journal)
+
+    visit admin_mind_graph_path(page: journal.id)
+    await_graph
+
+    assert_equal "3", graph["data-nodes"]
+    at = graph_position(journal)
+    assert_in_delta 0, at["x"], 0.5, "the focus is not at the centre"
+    assert_in_delta 0, at["y"], 0.5
+    assert_operator Math.hypot(graph_position(home)["x"], graph_position(home)["y"]), :>, 20, "Home is held at the centre of a view that is not its own"
+    assert_equal "0", graph["data-pinned"]
+    assert_no_button "Release 1 pinned"
+  end
+
   # One number is three nodes (pages spec, decision 4): the post, the tag
   # and the page of id 12 are each drawn, each selected by its own id, with
   # its own neighbours. A page's card and a pill's are their name and Pin
@@ -474,9 +508,23 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_equal [ "6", "6" ], [ graph["data-nodes"], graph["data-edges"] ], "two posts, the tag, the page, the type and the pill; every line the data holds"
+    # A selected label is semibold, and its box is measured in that font: the
+    # hit target and the hover's backing are as wide as the words drawn.
     click_node("post-12")
     assert_equal "post-12", graph["data-selected"]
     assert_equal %w[post-13 tag-12], graph["data-neighbours"].split(",").sort
+    await_frames
+    widths = page.evaluate_script(<<~JS)
+      (() => {
+        const canvas = document.querySelector(#{CANVAS.to_json})
+        const box = canvas.parentElement.closest(#{GRAPH.to_json}).mindGraph.labelBox("post-12")
+        const context = document.createElement("canvas").getContext("2d")
+        const measured = (weight) => { context.font = `${weight}12px ${getComputedStyle(canvas).fontFamily}`; return context.measureText("Twelve").width }
+        return { box: box.right - box.left - 4, regular: measured(""), semibold: measured("600 ") }
+      })()
+    JS
+    assert_operator widths["semibold"], :>, widths["regular"] + 0.5, "the two fonts are as wide as each other here: the test shows nothing"
+    assert_in_delta widths["semibold"], widths["box"], 0.01, "the selected label's box is not as wide as the semibold words drawn"
     click_node("tag-12")
     assert_equal "tag-12", graph["data-selected"]
     assert_equal %w[page-12 post-12 post-13], graph["data-neighbours"].split(",").sort
@@ -2568,7 +2616,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   # The canvas's colours at `samples` points evenly round a node's centre,
   # `radius` pixels from it: one read, after the frames `pixel_at` waits for.
-  def ring_pixels(node, radius:, samples:)
+  # `quadrant: :left` reads the quarter on the node's left only, where there
+  # is no label.
+  def ring_pixels(node, radius:, samples:, quadrant: nil)
     point = screen_position(node)
     await_frames
     page.evaluate_script(<<~JS)
@@ -2578,7 +2628,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         const ratio = canvas.width / box.width
         const context = canvas.getContext("2d")
         return Array.from({ length: #{samples} }, (_, step) => {
-          const angle = step * 2 * Math.PI / #{samples}
+          const angle = #{quadrant == :left ? "Math.PI * 0.75 + step * Math.PI / 2 / #{samples}" : "step * 2 * Math.PI / #{samples}"}
           const x = #{point["x"]} + #{radius} * Math.cos(angle), y = #{point["y"]} + #{radius} * Math.sin(angle)
           return Array.from(context.getImageData(Math.round((x - box.left) * ratio), Math.round((y - box.top) * ratio), 1, 1).data)
         })

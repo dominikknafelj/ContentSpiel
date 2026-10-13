@@ -27,11 +27,19 @@
 // and, in a page's local view, a "+N more" pill per target. Five kinds of
 // line (`renderer.js`). Labels go to Home first, then the top-level pages
 // and the post types, which are named at any zoom, then the rest by their
-// links. HOME RESTS AT THE CENTRE of the layout: the worker holds it there
+// links. ONE NODE RESTS AT THE CENTRE of the layout (`graph_data.js`,
+// `anchorOf`): Home in the whole graph, the focus in a local view, where
+// Home is a page like any other. The worker holds it there
 // (`layout_worker.js`, the anchor). That is not a pin: `state.pinned` does
 // not hold it, nothing shows it as pinned, and nothing here can release it.
 // Dragged, it is pinned where it is dropped like any node, and released it
-// goes back to the centre.
+// eases back to the centre.
+//
+// A LABEL'S WIDTH is measured in the font the label is drawn in
+// (`renderer.js`, `labelFont`): a tag's in mono, and the selected node's in
+// semibold, so `state.widths` holds the selected node's semibold width while
+// it is selected. The label rule, the hit test and the hover's backing all
+// read that one array.
 //
 // MOTION (spec §4.2). How fast the layout is shown is the worker's business
 // (`layout_worker.js`, PACING): this page draws every `tick` it is sent. All
@@ -83,9 +91,9 @@ import { nodeAt } from "mind_graph/hit_test"
 import { chooseLabels, labelAt, LABEL_GAP, LABEL_HEIGHT } from "mind_graph/labels"
 import { placeCard } from "mind_graph/card_placement"
 import { readTheme, watchTheme } from "mind_graph/theme"
-import { draw, radiusFor } from "mind_graph/renderer"
+import { draw, radiusFor, labelFont } from "mind_graph/renderer"
 import { collisionRadius, boxOf, moreWidth } from "mind_graph/marks"
-import { nodesOf, orderOf, freeOf } from "mind_graph/graph_data"
+import { nodesOf, orderOf, freeOf, anchorOf } from "mind_graph/graph_data"
 import { attachInput } from "mind_graph/input"
 import { createCard } from "mind_graph/card"
 import { attachSearch } from "mind_graph/search_box"
@@ -144,6 +152,11 @@ export function mount(element) {
   let labelled = null
   let zoom = null
   let indexOf = new Map()
+  // Each label's width in its regular font and in the selected node's
+  // (semibold): `state.widths` is the first, with the selected node's entry
+  // from the second.
+  let plainWidths = []
+  let strongWidths = []
   // The node a press is on (an index, -1 for none), where on it the press
   // took hold (in graph units from its centre) and whether it has become a
   // drag: a press becomes one only once it has moved, and a plain click must
@@ -417,6 +430,9 @@ export function mount(element) {
     // change that keeps it, must not build the card again -- that would
     // throw away a note half typed in it and fetch its notes once more.
     const shown = index >= 0 && index === state.selected && cardElement.childElementCount > 0
+    // The selected label is semibold, and as wide as that.
+    if (state.selected >= 0) state.widths[state.selected] = plainWidths[state.selected]
+    if (index >= 0) state.widths[index] = strongWidths[index]
     state.selected = index
     state.neighbours = new Set()
     if (index >= 0) {
@@ -561,11 +577,17 @@ export function mount(element) {
       // its whole name does not, and a node without a label has nothing cut).
       node.cut = node.label !== "" && !node.label.startsWith(String(node.title))
     })
-    // Each label is measured in the font it is drawn in: a tag's is mono.
-    state.widths = state.nodes.map((node) => {
-      context.font = node.kind === "tag" ? state.theme.monoFont : state.theme.font
+    // Each label is measured in the font it is drawn in: a tag's is mono,
+    // the selected node's semibold. Both once, here, never in a frame.
+    const measured = (selected) => state.nodes.map((node) => {
+      context.font = labelFont(state.theme, node, selected)
       return context.measureText(node.label).width
     })
+    plainWidths = measured(false)
+    strongWidths = measured(true)
+    state.widths = plainWidths.slice()
+    // The selection of the data before this is not one of these nodes.
+    state.selected = -1
     state.focusIndex = data.focus ? indexOf.get(data.focus.node_id) ?? -1 : -1
     state.fitted = false
     state.placed = false
@@ -635,8 +657,10 @@ export function mount(element) {
     // The worker can't ask about motion itself, so it is told (as the page
     // found it now; a change of the setting applies from the next load).
     // What the layout keeps clear around a node is its mark's reach (a box's
-    // is half its diagonal). Home is the anchor: held at the centre.
-    layout.start(state.nodes.map((node) => ({ id: node.id, radius: collisionRadius(node), anchor: node.kind === "page" && Boolean(node.home) })),
+    // is half its diagonal). One node is the anchor, held at the centre:
+    // Home in the whole graph, the focus in a local view.
+    const anchor = anchorOf(state.data)
+    layout.start(state.nodes.map((node) => ({ id: node.id, radius: collisionRadius(node), anchor: node.id === anchor })),
       state.edges.map((edge) => ({ source: state.nodes[edge.source].id, target: state.nodes[edge.target].id, kind: edge.kind })),
       { reducedMotion: reducedMotion.matches })
     if (mode() !== "all") sendFilter()
@@ -788,7 +812,7 @@ export function mount(element) {
       return at && size ? { left: at.x - size.width / 2, right: at.x + size.width / 2, top: at.y - size.height / 2, bottom: at.y + size.height / 2 } : null
     },
     // Where the layout has a node, in GRAPH units (the camera not applied):
-    // Home's is 0, 0 while nobody holds it.
+    // the anchor's is 0, 0 while nobody holds it.
     graphPosition(id) {
       const index = indexOf.get(id)
       return index == null || !state.placed ? null : { x: state.positions[index * 2], y: state.positions[index * 2 + 1] }

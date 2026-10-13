@@ -542,7 +542,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
           const positions = new Float32Array(n * 2)
           for (let i = 0; i < n; i++) { positions[i * 2] = (i % 20) * 400; positions[i * 2 + 1] = Math.floor(i / 20) * 400 }
           const order = Array.from({ length: n }, (_, i) => i)
-          return m.chooseLabels({ order, positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
+          return m.chooseLabels({ free: new Set(), order, positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
             camera: { k: #{k}, tx: 0, ty: 0 }, width: 100000, height: 100000, always: new Set() }).map((label) => label.index)
         })()
       JS
@@ -558,7 +558,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   test "labels: a label that would overlap a better-connected node's is left out" do
     labelled = js_module("mind_graph/labels", <<~JS)
-      m.chooseLabels({ order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+      m.chooseLabels({ free: new Set(), order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
         camera: { k: 1, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set() }).map((label) => label.index)
     JS
 
@@ -567,7 +567,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   test "labels: the always set is labelled at any zoom, at full strength, and first" do
     labels = js_module("mind_graph/labels", <<~JS)
-      m.chooseLabels({ order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+      m.chooseLabels({ free: new Set(), order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
         camera: { k: 0.05, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set([1]) })
     JS
 
@@ -581,7 +581,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   # place (`app.js` puts the selected node in first).
   test "labels: of two overlapping members of the always set the first in the set wins, whatever the order says" do
     labelled = js_module("mind_graph/labels", <<~JS)
-      m.chooseLabels({ order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+      m.chooseLabels({ free: new Set(), order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
         camera: { k: 1, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set([1, 0]) }).map((label) => label.index)
     JS
 
@@ -590,7 +590,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   test "labels: a member of the always set the filter hides (not in the order) gets no label" do
     labelled = js_module("mind_graph/labels", <<~JS)
-      m.chooseLabels({ order: [0, 2], positions: new Float32Array([0, 0, 300, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+      m.chooseLabels({ free: new Set(), order: [0, 2], positions: new Float32Array([0, 0, 300, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
         camera: { k: 1, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set([1]) }).map((label) => label.index)
     JS
 
@@ -599,7 +599,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   test "labels: a node outside the canvas gets no label, and a label sits right of its node" do
     labels = js_module("mind_graph/labels", <<~JS)
-      m.chooseLabels({ order: [0, 1], positions: new Float32Array([50, 50, 5000, 50]), widths: [80, 80], radii: [8, 8],
+      m.chooseLabels({ free: new Set(), order: [0, 1], positions: new Float32Array([50, 50, 5000, 50]), widths: [80, 80], radii: [8, 8],
         camera: { k: 1, tx: 0, ty: 0 }, width: 300, height: 300, always: new Set([1]) })
     JS
 
@@ -645,7 +645,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const positions = new Float32Array(n * 2)
         for (let i = 0; i < 100; i++) { positions[i * 2] = -5000 - i * 100; positions[i * 2 + 1] = 50 }
         for (let i = 100; i < n; i++) { positions[i * 2] = 50 + (i - 100) * 150; positions[i * 2 + 1] = 100 }
-        return m.chooseLabels({ order: Array.from({ length: n }, (_, i) => i), positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
+        return m.chooseLabels({ free: new Set(), order: Array.from({ length: n }, (_, i) => i), positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
           camera: { k: 1, tx: 0, ty: 0 }, width: 1000, height: 1000, always: new Set() }).map((label) => label.index)
       })()
     JS
@@ -659,7 +659,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const n = 100
         const positions = new Float32Array(n * 2)
         for (let i = 0; i < n; i++) { positions[i * 2] = (i % 10) * 200; positions[i * 2 + 1] = Math.floor(i / 10) * 200 }
-        return m.chooseLabels({ order: Array.from({ length: n }, (_, i) => i), positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
+        return m.chooseLabels({ free: new Set(), order: Array.from({ length: n }, (_, i) => i), positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
           camera: { k: 1, tx: 0, ty: 0 }, width: 5000, height: 5000, always: new Set() })
       })()
     JS
@@ -674,7 +674,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   test "labels: rank order decides which of two overlapping labels wins" do
     labelled = js_module("mind_graph/labels", <<~JS)
-      m.chooseLabels({ order: [1, 0, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+      m.chooseLabels({ free: new Set(), order: [1, 0, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
         camera: { k: 1, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set() }).map((label) => label.index)
     JS
 
@@ -689,6 +689,11 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   # ---- Pages in the mind graph (spec §4; design answers, all four parts) ----
 
   SOLID = [].freeze
+  # Where the tree line of the test below rests, and where d3's own strength
+  # would rest it (one half for that line, where the tree's is 0.9): measured on
+  # this layout, which is deterministic.
+  TREE_REST = 47.7
+  TREE_REST_DEFAULT = 51.8
   DASHED = [ 3, 2.5 ].freeze
 
   # Pages spec §4, the status table: one rule for a page and a post, and warn
@@ -716,7 +721,9 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       {}, { status: "draft" }, { status: "scheduled" }, { changes: "unpublished" }, { changes: "scheduled" }
     ])
 
-    assert_equal [ [ "fill", "circle", 7, "cat-1" ], [ "stroke", "circle", 7, "cat-1", 1.5, SOLID ] ], live
+    # A live post's own outline is centred on its edge, as before pages came
+    # (left for the designer): its outer edge is at 7.75.
+    assert_equal [ [ "fill", "circle", 7, "cat-1" ], [ "stroke", "circle", 7.75, "cat-1", 1.5, SOLID ] ], live
     assert_equal [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "meta", 1.5, DASHED ] ], draft
     assert_equal [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "dim", 1.5, SOLID ], [ "fill", "circle", 2, "warn" ] ], scheduled
     assert_equal live + CORNER.call("dim"), changed
@@ -759,11 +766,13 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     "change_scheduled" => { node: { status: "live", changes: "scheduled" }, fill: :own, corner: "warn" }
   }.freeze
   # `shape` is the mark that carries the state; `ring` what a ring type draws
-  # round it first; `edged` the outline a filled post has in its own hue.
+  # round it first; `edged` the outline a filled post has in its own hue, by
+  # its outer edge. Every other outline is INSIDE its mark: an outlined mark
+  # is as large as a filled one (the ruling on Task 5's review).
   STATED_MARKS = {
     "page" => { node: { kind: "page" }, shape: [ "box", 14, 10, 4 ], own: "ink" },
     "Home" => { node: { kind: "page", home: true }, shape: [ "box", 18, 13, 4 ], own: "ink" },
-    "filled post" => { node: { colour_index: 3 }, shape: [ "circle", 7 ], own: "cat-3", edged: true },
+    "filled post" => { node: { colour_index: 3 }, shape: [ "circle", 7 ], own: "cat-3", edged: [ "circle", 7.75 ] },
     "ring post" => { node: { colour_index: 9 }, shape: [ "circle", 4 ], own: "cat-3", ring: [ "circle", 7 ] },
     "retired post" => { node: { colour_index: nil }, shape: [ "circle", 4 ], own: "meta", ring: [ "circle", 7 ], struck: true }
   }.freeze
@@ -780,7 +789,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       shape, own = mark[:shape], mark[:own]
       expected = mark[:ring] ? [ [ "fill", *mark[:ring], "surface" ], [ "stroke", *mark[:ring], own, 1.5, SOLID ] ] : []
       expected << [ "fill", *shape, state[:fill] == :own ? own : state[:fill] ]
-      expected << [ "stroke", *shape, own, 1.5, SOLID ] if mark[:edged] && state[:fill] == :own
+      expected << [ "stroke", *mark[:edged], own, 1.5, SOLID ] if mark[:edged] && state[:fill] == :own
       expected << [ "stroke", *shape, state[:outline][0], 1.5, state[:outline][1] ] if state[:outline]
       expected << [ "fill", "circle", 2, state[:centre] ] if state[:centre]
       expected << [ "stroke", "line", own, 1.5, SOLID ] if mark[:struck]
@@ -823,11 +832,13 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       { kind: "type", id: "type-gone", colour_index: nil }, { kind: "tag" }, { kind: "more", title: "+92 more" }, { kind: "more", title: "+1,980 more", width: 82 }
     ])
 
-    assert_equal [ [ "fill", "circle", 6, "cat-1" ], [ "stroke", "circle", 3.75, "surface", 1.5, SOLID ] ], type
+    # The inner ring's outer edge is 1.5px inside the hub's radius: at 4.5.
+    assert_equal [ [ "fill", "circle", 6, "cat-1" ], [ "stroke", "circle", 4.5, "surface", 1.5, SOLID ] ], type
     assert_equal [ [ "fill", "circle", 6, "surface" ], [ "stroke", "circle", 6, "cat-2", 1.5, SOLID ], [ "fill", "circle", 3, "cat-2" ] ], ring_type
-    assert_equal [ [ "fill", "circle", 6, "dim" ], [ "stroke", "circle", 3.75, "surface", 1.5, SOLID ] ], all
+    assert_equal [ [ "fill", "circle", 6, "dim" ], [ "stroke", "circle", 4.5, "surface", 1.5, SOLID ] ], all
     assert_equal [ [ "fill", "circle", 6, "surface" ], [ "stroke", "circle", 6, "dim", 1.5, DASHED ], [ "fill", "circle", 2, "dim" ] ], retired
-    assert_equal [ [ "fill", "box", 9, 9, "surface" ], [ "stroke", "box", 9, 9, "meta", 1.5, SOLID ] ], tag
+    # A tag's square is as it was before pages came: its outline on its edge.
+    assert_equal [ [ "fill", "box", 9, 9, "surface" ], [ "stroke", "box", 10.5, 10.5, "meta", 1.5, SOLID ] ], tag
     assert_equal [ [ "fill", "box", 60, 16, 8, "surface" ], [ "stroke", "box", 60, 16, 8, "line", 1, SOLID ], [ "text", "+92 more", "count", "dim" ] ], more
     assert_equal [ [ "fill", "box", 82, 16, 8, "surface" ], [ "stroke", "box", 82, 16, 8, "line", 1, SOLID ], [ "text", "+1,980 more", "count", "dim" ] ], long
     # A hub has no state: whatever the data says of one, it is drawn the same.
@@ -915,11 +926,11 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_includes page, [ "circle", 7, -5, 3 ], "the pin on the card's top-right corner"
     assert_includes page, [ "box", -10, -5, 14, 14, 7 ], "the badge's box, its right edge 4px over the top-left corner"
     assert_includes more, [ "circle", 30, -8, 3 ], "the pill's pin on its corner, not 21px above it"
-    assert_includes type, [ "circle", 0, 0, 8.5 ], "a hovered hub's ring"
-    assert_equal type.reject { |shape| shape == [ "circle", 0, 0, 8.5 ] }, noted_type, "a post type carries no notes badge, whatever the data says"
+    assert_includes type, [ "circle", 0, 0, 9 ], "a hovered hub's ring: a 1px line 2.5px out, so its outer edge is 3px out"
+    assert_equal type.reject { |shape| shape == [ "circle", 0, 0, 9 ] }, noted_type, "a post type carries no notes badge, whatever the data says"
     selected = shapes_drawn([ { kind: "page" }, { kind: "more", title: "+92 more" } ], selected: 0, hovered: 1)
-    assert_includes selected[0], [ "box", 0, 0, 22, 18 ], "a selected card's ring, 4px out all round"
-    assert_includes selected[1], [ "box", 0, 0, 65, 21 ], "a hovered pill's ring, 2.5px out all round"
+    assert_includes selected[0], [ "box", 0, 0, 24, 20 ], "a selected card's ring: a 2px line 4px out all round, so its outer edge is 5px out"
+    assert_includes selected[1], [ "box", 0, 0, 66, 22 ], "a hovered pill's ring: a 1px line 2.5px out all round"
   end
 
   # Design answer, part one §3 and F6: a page's and a type's label in ink, a
@@ -933,7 +944,8 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     assert_equal [ [ [ "Page", "sans", "ink" ] ], [ [ "Type", "sans", "ink" ] ], [ [ "Post", "sans", "dim" ] ], [ [ "Tag", "mono", "meta" ] ], [] ], labels.call
     assert_equal [ [ "Post", "strong", "ink" ] ], labels.call(selected: 2)[2]
-    assert_equal [ [ "Tag", "strong", "ink" ] ], labels.call(selected: 3)[3]
+    assert_equal [ [ "Tag", "strongMono", "ink" ] ], labels.call(selected: 3)[3], "a selected tag's label is semibold and still mono"
+    assert_equal [ [ "Tag", "strongMono", "ink" ] ], labels.call(selected: 3, hovered: 3)[3]
     assert_equal [ [ "Post", "sans", "ink" ] ], labels.call(hovered: 2)[2]
     assert_equal [ [ "Tag", "mono", "ink" ] ], labels.call(hovered: 3)[3]
     assert_equal [], labels.call(hovered: 4)[4], "a hovered pill draws no label and no backing"
@@ -978,8 +990,11 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         for (let i = 0; i < n; i++) { positions[i * 2] = (i % 10) * 400; positions[i * 2 + 1] = Math.floor(i / 10) * 400 }
         positions[198] = positions[196] + 2; positions[199] = positions[197]
         const order = Array.from({ length: n }, (_, i) => i)
-        const args = { order, positions, widths: new Array(n).fill(20), radii: new Array(n).fill(8), camera: { k: 0.1, tx: 0, ty: 0 }, width: 100000, height: 100000, always: new Set() }
-        return { plain: m.chooseLabels(args).map((label) => label.index), free: m.chooseLabels({ ...args, free: new Set([ 97, 98, 99 ]) }).map((label) => [ label.index, label.alpha ]),
+        const args = { order, positions, widths: new Array(n).fill(20), radii: new Array(n).fill(8), camera: { k: 0.1, tx: 0, ty: 0 }, width: 100000, height: 100000, always: new Set(), free: new Set() }
+        const { free: _free, ...unnamed } = args
+        let refused = null
+        try { m.chooseLabels(unnamed) } catch (error) { refused = error.constructor.name }
+        return { refused, plain: m.chooseLabels(args).map((label) => label.index), free: m.chooseLabels({ ...args, free: new Set([ 97, 98, 99 ]) }).map((label) => [ label.index, label.alpha ]),
                  both: m.chooseLabels({ ...args, free: new Set([ 97, 98 ]), always: new Set([ 99, 97 ]) }).map((label) => label.index),
                  hidden: m.chooseLabels({ ...args, order: order.slice(0, 97), free: new Set([ 97, 98 ]) }).map((label) => label.index),
                  first: m.chooseLabels({ ...args, free: new Set([ 0 ]) }).map((label) => label.index) }
@@ -987,6 +1002,11 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     JS
 
     assert_equal [ 0 ], labelled["plain"], "at this zoom the budget is one label"
+    # The free set is free only when a graph has more of it than the zoom's
+    # budget, and there its labels overlap away on any small graph: a caller
+    # that lost the argument would show nothing wrong in a browser test. So
+    # the rule has no default for it, and such a caller throws in every frame.
+    assert_equal "TypeError", labelled["refused"], "the free set has a default: a caller that forgets it is not told"
     assert_equal [ [ 97, 1 ], [ 98, 1 ], [ 0, 1 ] ], labelled["free"], "97 and 98 are free; 99 would lie on 98's and gives way; the budget's one label is still placed"
     assert_equal [ 99, 97, 0 ], labelled["both"], "the always set places first: the selection's neighbour 99 keeps the place and the free 98 gives way; a free node that is also always is placed once"
     assert_equal [ 0 ], labelled["hidden"], "a free node the filter hides (not in the order) gets no label"
@@ -1070,6 +1090,145 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_in_delta 150, dragged[0], 0.01
     assert_equal dragged, kept, "a filter moved an anchor a person holds"
     assert_equal [ [ 0, 0 ], [ 0, 0 ] ], [ released, pinned ], "released it is back at the centre, and pinned from its card it is held there"
+  end
+
+  # Every other test here draws with a theme whose values are their own
+  # names, so it holds "the pill's border is the key `line`" and not "`line`
+  # is `--cs-line-strong`". This one holds the map: each token is given a
+  # value of its own on an element, and the whole theme read from it is
+  # compared. "Warn means scheduled" rests on `warn` being `--cs-warn`.
+  test "theme: every key reads the token the design names, the type hues, the fonts and the card's radius included" do
+    theme = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("mind_graph/theme").then(({ readTheme }) => {
+        const element = document.createElement("div")
+        const tokens = [ "ink", "meta", "dim", "warn", "surface", "sunken", "accent", "line", "line-strong", "cat-1", "cat-2", "cat-3", "cat-4", "cat-5", "cat-6" ]
+        tokens.forEach((token) => element.style.setProperty(`--cs-${token}`, `the-${token}`))
+        element.style.setProperty("--cs-mono", "MonoFace")
+        element.style.setProperty("--cs-radius", "7px")
+        element.style.fontFamily = "SansFace"
+        document.body.append(element)
+        const theme = readTheme(element)
+        element.remove()
+        done(theme)
+      }).catch((error) => done({ error: String(error) }))
+    JS
+
+    assert_equal({
+      "ink" => "the-ink", "meta" => "the-meta", "dim" => "the-dim", "warn" => "the-warn", "surface" => "the-surface", "sunken" => "the-sunken", "accent" => "the-accent",
+      "line" => "the-line-strong", "faint" => "the-line", "categories" => (1..6).map { |slot| "the-cat-#{slot}" },
+      "font" => "12px SansFace", "strongFont" => "600 12px SansFace", "countFont" => "10px MonoFace", "monoFont" => "12px MonoFace", "strongMonoFont" => "600 12px MonoFace",
+      "radius" => 7
+    }, theme)
+  end
+
+  # A press INSIDE a drawn shape is a press on that shape, whatever else has
+  # it within its slack: a pill is 60 or more wide, so its drawn end is 30
+  # pixels from its centre, and a post beside it would win by its nearer
+  # centre a press that is on the pill and not on the post. Only among the
+  # shapes that hold the point, or where none does among the targets that
+  # reach it, does the nearer centre decide.
+  test "hit test: a press inside a drawn shape selects it though a neighbour's centre is nearer, and outside every shape the nearer centre still wins" do
+    hits = js_module("mind_graph/hit_test", <<~JS)
+      (() => {
+        // A pill at 100 (its right end at 130), a post of radius 7 at 139 (its edge at 132), a card at 300 and a dot of radius 10 on its corner.
+        const at = (sx, sy) => m.nodeAt({ positions: Float32Array.from([ 100, 100, 139, 100, 300, 100, 308, 106 ]), indexes: [ 0, 1, 2, 3 ], radii: [ 30, 7, 7, 10 ],
+                                          boxes: [ { width: 60, height: 16 }, null, { width: 14, height: 10 }, null ], camera: { k: 1, tx: 0, ty: 0 }, sx, sy })
+        return { pill: at(129, 100), gap: at(131, 100), post: at(133, 100), both: [ at(305, 103), at(302, 101) ], beside: at(297, 110) }
+      })()
+    JS
+
+    assert_equal 0, hits["pill"], "on the pill's last pixel, 29 from its centre and 10 from the post's: the pill"
+    assert_equal 1, hits["gap"], "between the two, on neither: the nearer centre, as before"
+    assert_equal 1, hits["post"], "on the post"
+    assert_equal [ 3, 2 ], hits["both"], "on the card and on the dot at once: the nearer centre of the two"
+    assert_equal 2, hits["beside"], "in the card's slack and in the dot's, on neither: the nearer centre"
+  end
+
+  # Which node the layout holds at the centre: Home in the whole graph, the
+  # focus in a local view (the ruling on Task 5's review), where Home, if it
+  # is drawn, is a page like any other.
+  test "graph data: the anchor is Home in the whole graph and the focus in a local view, of whatever kind" do
+    anchors = js_module("mind_graph/graph_data", <<~JS)
+      (() => {
+        const pages = [ { id: "page-2", home: false }, { id: "page-1", home: true } ]
+        const whole = { nodes: [], tags: [], pages }
+        return [ m.anchorOf(whole), m.anchorOf({ nodes: [], tags: [], pages: [ pages[0] ] }), m.anchorOf({ nodes: [], tags: [] }),
+                 m.anchorOf({ ...whole, focus: { node_id: "page-2" } }), m.anchorOf({ ...whole, focus: { node_id: "post-9" } }), m.anchorOf({ ...whole, focus: { node_id: "tag-3" } }),
+                 m.anchorOf({ ...whole, focus: { node_id: "page-1" } }) ].map((id) => id ?? "none")
+      })()
+    JS
+
+    assert_equal %w[page-1 none none page-2 post-9 tag-3 page-1], anchors
+  end
+
+  # A released anchor EASES back to the centre like every other released
+  # node, a little nearer with each tick, where it used to be there in the
+  # next frame with its subtree yanked after it. (With reduced motion it is
+  # simply there: the test above.)
+  test "a released anchor eases back to the centre tick by tick" do
+    result = using_wait_time(40) do
+      page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
+        const [workerUrl, d3Url, done] = arguments
+        import("mind_graph/layout_client").then(({ createLayout }) => {
+          let settled = 0
+          const back = []
+          const layout = createLayout({
+            workerUrl, d3Url,
+            onTick: (positions) => { if (settled === 1) back.push(Math.hypot(positions[0], positions[1])) },
+            // Dragged 500 away, dropped and released at once: every tick from
+            // then on is the anchor where it was dropped, or on its way back.
+            onSettled: () => {
+              settled += 1
+              if (settled === 1) { layout.drag("page-1", 300, -400); layout.drop("page-1"); layout.unpin([ "page-1" ]) }
+              else { layout.stop(); done({ back }) }
+            },
+            onError: (message) => done({ error: message })
+          })
+          // More than three hundred nodes, so the first layout is computed in
+          // slices and not shown tick by tick: the test is about the release.
+          const posts = Array.from({ length: 300 }, (_, index) => ({ id: `post-${index}`, radius: 7 }))
+          layout.start([ { id: "page-1", radius: 11, anchor: true }, { id: "page-2", radius: 9 }, ...posts ],
+                       [ { source: "page-2", target: "page-1", kind: "tree" }, ...posts.slice(1).map((post, index) => ({ source: posts[index].id, target: post.id, kind: "related" })) ])
+        })
+      JS
+    end
+
+    assert_nil result["error"]
+    back = result["back"]
+    assert_operator back.first, :>, 350, "the released anchor was at the centre in the next frame: it jumped"
+    assert_operator back.count { |distance| distance > 1 }, :>=, 15, "the anchor was back in fewer than fifteen frames"
+    assert_equal back, back.sort.reverse, "the anchor did not come nearer with every tick"
+    assert_equal 0, back.last, "the anchor did not end at the centre"
+  end
+
+  # The tree's spring is STIFF as well as short. Home with two children, one
+  # of which has two of its own: d3's own strength for the line from that
+  # child to Home is one half (it falls with the lines at a line's ends), the
+  # tree's is 0.9, and against the same repulsion the stiffer spring holds
+  # the child nearer its rest length of 40. The figures are this layout's,
+  # which is deterministic.
+  test "the layout's tree line is stiff: a page with children of its own is held nearer its parent than d3's own strength would hold it" do
+    result = using_wait_time(40) do
+      page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
+        const [workerUrl, d3Url, done] = arguments
+        import("mind_graph/layout_client").then(({ createLayout }) => {
+          let last = null
+          const layout = createLayout({
+            workerUrl, d3Url,
+            onTick: (positions) => { last = Array.from(positions) },
+            onSettled: () => { layout.stop(); done({ distance: Math.hypot(last[2], last[3]) }) },
+            onError: (message) => done({ error: message })
+          })
+          const tree = (source, target) => ({ source, target, kind: "tree" })
+          layout.start([ "page-1", "page-2", "page-3", "page-4", "page-5" ].map((id, index) => ({ id, radius: 9, anchor: index === 0 })),
+                       [ tree("page-2", "page-1"), tree("page-3", "page-1"), tree("page-4", "page-2"), tree("page-5", "page-2") ], { reducedMotion: true })
+        })
+      JS
+    end
+
+    assert_nil result["error"]
+    assert_in_delta TREE_REST, result["distance"], 1.5, "the tree line from a branching page to Home rests elsewhere: its strength changed (d3's own would rest it at about #{TREE_REST_DEFAULT})"
   end
 
   private
@@ -1359,7 +1518,11 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   # `[ "fill", shape, sizes…, colour ]`, `[ "stroke", shape, sizes…, colour,
   # width, dash ]` and `[ "text", words, font, colour ]`, where a circle's
   # size is its radius, a box's its width, height and (rounded) its corner
-  # radius, and a line has none. `places: true` puts where the part is in
+  # radius, and a line has none. A STROKE'S SIZE IS ITS OUTER SIZE, the
+  # path's plus half the line's width each way: what a person sees of it,
+  # and what the design gives ("14 by 10", "radius 7"). So an outline drawn
+  # inside its mark's edge reads as the mark's own size, and one centred on
+  # the edge as three quarters of a pixel more. `places: true` puts where the part is in
   # front of each -- its centre from the node's centre, x then y (a line's:
   # where it starts). `labels: true` draws every node's label; `selected`,
   # `hovered` and `pinned` are indexes.
@@ -1372,6 +1535,13 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const set = { dash: [] }
         let shape = null
         const box = (x, y, width, height, ...radius) => [ round(x + width / 2), round(y + height / 2), "box", width, height, ...radius ]
+        // A stroked shape by its outer edge: half the line's width more, each way.
+        const outer = ([ cx, cy, kind, ...sizes ]) => {
+          const half = set.lineWidth / 2
+          if (kind === "circle") return [ cx, cy, kind, round(sizes[0] + half) ]
+          if (kind === "box") return [ cx, cy, kind, round(sizes[0] + half * 2), round(sizes[1] + half * 2), ...sizes.slice(2).map((radius) => round(radius + half)) ]
+          return [ cx, cy, kind ]
+        }
         const context = new Proxy({}, {
           get: (_, name) => {
             if (name === "beginPath") return () => { shape = null }
@@ -1381,10 +1551,10 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
             if (name === "moveTo") return (x, y) => { shape = [round(x), round(y), "line"] }
             if (name === "setLineDash") return (dash) => { set.dash = dash }
             if (name === "fillRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = box(x, y, width, height); log.push([cx, cy, "fill", ...rest, set.fillStyle]) }
-            if (name === "strokeRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = box(x, y, width, height); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) }
+            if (name === "strokeRect") return (x, y, width, height) => { const [ cx, cy, ...rest ] = outer(box(x, y, width, height)); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) }
             if (name === "fillText") return (words, x, y) => { log.push([round(x), round(y), "text", words, set.font, set.fillStyle]) }
             if (name === "fill") return () => { if (shape) log.push([shape[0], shape[1], "fill", ...shape.slice(2), set.fillStyle]) }
-            if (name === "stroke") return () => { if (shape) log.push([shape[0], shape[1], "stroke", ...shape.slice(2), set.strokeStyle, set.lineWidth, set.dash]) }
+            if (name === "stroke") return () => { if (shape) { const [ cx, cy, ...rest ] = outer(shape); log.push([cx, cy, "stroke", ...rest, set.strokeStyle, set.lineWidth, set.dash]) } }
             return () => {}
           },
           set: (_, name, value) => { set[name] = value; return true }
@@ -1395,7 +1565,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         draw(context, {
           width: 100 * nodes.length, height: 100, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
           theme: { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", radius: 4,
-                   categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", countFont: "count" },
+                   categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count" },
           nodes, edges: [], positions,
           radii, widths: nodes.map(() => 0), visibleNodes: nodes.map((_, index) => index), visibleEdges: [],
           // A label 20px right of its mark's centre, on the node's own line.

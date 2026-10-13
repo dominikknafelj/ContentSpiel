@@ -25,8 +25,10 @@ export function readTheme(element) {
   // The notes count on a node: the small mono label style, read from the
   // mono token so the canvas and the page agree.
   theme.countFont = `10px ${read("--cs-mono") || style.fontFamily}`
-  // A tag's label: mono, like a tag everywhere else in CS Studio.
+  // A tag's label: mono, like a tag everywhere else in CS Studio, and still
+  // mono when its node is selected.
   theme.monoFont = `12px ${read("--cs-mono") || style.fontFamily}`
+  theme.strongMonoFont = `600 12px ${read("--cs-mono") || style.fontFamily}`
   // The card's corner radius (`rounded-cs`), for a page's mark. The token is
   // a length in pixels and is read as one: `parseFloat` takes the number in
   // front of "px" and knows no other unit, so a token given in `rem` would
