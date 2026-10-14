@@ -109,7 +109,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     open_editor
     fail_writes_with "Promise.reject(new TypeError('Failed to fetch'))"
 
-    find("button[aria-label='Move Alpha']").send_keys(:space, :down, :space)
+    handle("Alpha").send_keys(:space, :down, :space)
 
     assert_selector "#toasts .admin-toast[role=alert]", text: FAILED, wait: 10
     assert_order_eventually(%w[Alpha Beta Gamma]) { tree_order }
@@ -121,7 +121,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     open_editor
     fail_writes_with "new Response('Bad gateway', { status: 502, headers: { 'Content-Type': 'text/plain' } })"
 
-    find("button[aria-label='Move Beta']").send_keys(:space, :right, :space)
+    handle("Beta").send_keys(:space, :right, :space)
 
     assert_selector "#toasts .admin-toast[role=alert]", text: FAILED, wait: 10
     assert_order_eventually(%w[Alpha Beta Gamma]) { tree_order }
@@ -193,8 +193,13 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # A row's drag handle. It stands in the row's gutter and is shown only on
+  # hover or focus (`Admin::PagesScreen::TreeNodeComponent`); a test never
+  # waits for what only a hover reveals, so it is found whatever it shows.
+  def handle(title) = find("button[aria-label='Move #{title}']", visible: :all)
+
   def tree_order
-    page.all("#tree .admin-tree-node__handle").map { |handle| handle["aria-label"].delete_prefix("Move ") }
+    page.all("#tree .admin-tree-node__handle", visible: :all).map { |handle| handle["aria-label"].delete_prefix("Move ") }
   end
 
   def children_titles = root_page.reload.children.order(:position).map(&:title)

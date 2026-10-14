@@ -6,7 +6,8 @@
       <span class="flex-1 truncate text-meta" title="You can’t open this page"><%= title %></span>
     </div>
   <% else %>
-    <div class="group/node flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken">
+    <%# `relative`: the handle is placed against the row, outside its box. %>
+    <div class="group/node relative flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken">
       <%# The homepage can't be moved (Pages::Move) -- no handle, nothing to
           grab; nor can a page the actor may not move. Every other node's
           handle is the only part of the row that starts a drag (admin--pages--tree's
@@ -15,8 +16,25 @@
       <% if movable? %>
         <%# A real button, so the keyboard reaches it: Space picks the row up,
             the arrows move it, Space drops it (`admin--pages--tree#key`). The mouse
-            drag still starts from it (SortableJS `handle:`). %>
-        <button type="button" class="admin-tree-node__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+            drag still starts from it (SortableJS `handle:`).
+
+            IN THE GUTTER, NOT IN THE ROW (Claude Design, 2026-10-13, T2): it
+            stands in the 16px of indent to the row's left (`-left-4 w-4`,
+            exactly the children list's `ml-2` + line + `pl-[7px]` below), so
+            the title has the room it took. Every movable row has that gutter:
+            only the homepage is not in a children list, and it has no handle.
+            It is shown the way the hover control in a block card's header
+            is (a control that is nothing at rest): by `opacity`,
+            on hover of its row and while it has the focus, and always for a
+            coarse pointer, which cannot hover. `focus:` and not `focus-visible:`, because a row
+            picked up with Space after a click on its handle must show what
+            holds it. Not shown by `opacity` it is still there: in the Tab
+            order, which is the keyboard's way to it, and under the pointer,
+            so a press where it is starts the drag. Being a child of the row
+            it keeps the row hovered while the pointer is on it, and it
+            abuts the row, so the pointer crosses no gap on its way. Its
+            chrome ground covers the guide line it stands on while it shows. %>
+        <button type="button" class="admin-tree-node__handle absolute inset-y-0 -left-4 w-4 cursor-grab select-none rounded-cs bg-chrome text-center text-meta opacity-0 hover:text-ink focus:opacity-100 focus-visible:outline-2 focus-visible:outline-accent group-hover/node:opacity-100 pointer-coarse:opacity-100"
                 aria-label="Move <%= title %>" aria-describedby="tree-drag-help"
                 data-action="keydown->admin--pages--tree#key focusout->admin--pages--tree#blur">⠿</button>
       <% end %>
@@ -55,9 +73,20 @@
       <%= render Admin::Ui::SlotComponent.new(name: "tree.row.markers", record: page, viewer: Current.actor, loaded: loaded, locale: locale, url_options: url_options) %>
 
       <% if child_count.positive? %>
-        <%# `role="img"` and a label, like the translation markers: a bare "3" says nothing. %>
+        <%# `role="img"` and a label, like the translation markers: a bare "3" says nothing.
+
+            ON HOVER AND FOCUS ONLY (T2): the design shows the count on a
+            collapsed row, where it says what is hidden, and on hover. The
+            tree has no collapsing, so every row's children are in view below
+            it and the count takes room from the title for nothing; it shows
+            while the pointer is on the row or the focus is in it, and always
+            for a coarse pointer. `sr-only` and not `hidden`, so a screen
+            reader still reads "3 subpages" on a row at rest and the count
+            takes no room there. When the tree learns to collapse, a
+            collapsed row shows it at rest. %>
         <%= tag.span child_count, data: { child_count: true }, role: "img", aria: { label: pluralize(child_count, "subpage") },
-              title: pluralize(child_count, "subpage"), class: "shrink-0 font-cs-mono text-label text-meta" %>
+              title: pluralize(child_count, "subpage"),
+              class: "sr-only shrink-0 font-cs-mono text-label text-meta group-hover/node:not-sr-only group-focus-within/node:not-sr-only pointer-coarse:not-sr-only" %>
       <% end %>
 
       <% if can_add_child? %>
@@ -72,7 +101,9 @@
       a real SortableJS drop target (`data-admin--pages--tree-target="list"`), so a
       currently-childless page can still receive a dropped page. Except under
       a context-only page (see the component's comment). %>
-  <ul <%= tag.attributes("data-admin--pages--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
+  <%# 16px of indent a level (T2; it was 25): 8px to the guide line, the 1px
+      line, 7px to the row. A row's handle stands in exactly that gutter. %>
+  <ul <%= tag.attributes("data-admin--pages--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-2 flex flex-col gap-0.5 border-l border-line pl-[7px]">
     <% children.each do |child| %>
       <%= render Admin::PagesScreen::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, selected: selected, locale: locale, url_options: url_options) %>
     <% end %>
