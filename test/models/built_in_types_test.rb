@@ -1,8 +1,16 @@
 require "test_helper"
 
 class BuiltInTypesTest < ActiveSupport::TestCase
+  # The built-ins are what config/initializers/types.rb calls, in the order
+  # of its lines (`BuiltInBlockTypes`, read from its source), and that order
+  # is the picker's: no list of names is written here, so a new built-in
+  # (the generator's line) touches no list but the contract's ledger.
   test "built-ins are registered" do
-    assert_equal %w[rich_text image code post_list section], BlockTypes.names
+    built_ins = BuiltInBlockTypes.names
+    files = Dir.children(Rails.root.join("app/models/block_types")).grep(/\.rb\z/).map { |file| File.basename(file, ".rb") }
+    assert_equal files.sort, built_ins.sort, "every module of app/models/block_types is registered by one line of the initializer"
+    assert_equal built_ins, BlockTypes.built_in_names, "the built-ins are registered in the order of the initializer's lines"
+    assert_equal built_ins, BlockTypes.names, "the CMS registers its built-ins and nothing else"
     assert_equal %w[blog resume_entry now_update], ContentTypes.names
     assert BlockTypes.fetch(:post_list).capability?(:lists_posts)
     assert_equal %w[image caption alt], BlockTypes.fetch(:image).uses_columns
@@ -37,6 +45,18 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_equal 3, BlockTypes.fetch(:section).columns.call("layout" => "three")
     assert_equal [ 1, 2 ], BlockTypes::Section.weights("one_two")
     assert_equal [ 1, 1 ], BlockTypes::Section.weights("no such layout")
+  end
+
+  test "a type with an owner, and a bare name a test registers with no module of its own, are no built-in" do
+    saved = BlockTypes.all.dup
+    BlockTypes.register("gallery/band") { |t| TestTypes.declare(t); t.label "Band" }
+    BlockTypes.register(:test_band) { |t| TestTypes.declare(t); t.label "Band" }
+
+    assert_equal BuiltInBlockTypes.names + %w[gallery/band test_band], BlockTypes.names
+    assert_equal BuiltInBlockTypes.names, BlockTypes.built_in_names
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
   # `ContentBlock#column_count` calls the type's `columns` without a guard, so

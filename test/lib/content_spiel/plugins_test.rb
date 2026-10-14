@@ -8,7 +8,10 @@ require "test_helper"
 class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
   include GalleryAlbum
 
-  BUILT_INS = %w[rich_text image code post_list section].freeze
+  # The built-ins as the initializer's lines name them, read from its source
+  # and not from the registry, so "the built-ins are registered" after a
+  # reload compares the registry with something it cannot change.
+  BUILT_INS = BuiltInBlockTypes.names.freeze
 
   # The error a kept hook raises when it is replayed. Not through
   # `prepare!`: in the tests the boot is over (`ThemeFolder.booted?`), and a
@@ -27,6 +30,7 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
       assert_equal BUILT_INS + %w[gallery/album], BlockTypes.names
       Rails.application.reloader.prepare!
       assert_equal BUILT_INS + %w[gallery/album], BlockTypes.names, "a reload resets the registry and replays the hook"
+      assert_equal BUILT_INS, BlockTypes.built_in_names, "an outside type is no built-in"
       assert_equal %w[block page title], Theme::Contract.components.fetch("gallery/album_component")
       assert_includes Theme::Contract.tokens, "--th-gallery-frame"
 

@@ -8,6 +8,21 @@ module BlockTypes
   def self.definition_class = ContentModel::BlockTypeDefinition
   def self.kind_label = "block type"
 
+  # The built-in block types, in the order they were registered (the
+  # picker's): each registered type that a module of its own under
+  # `BlockTypes` registers (`code` by `BlockTypes::Code`, in
+  # app/models/block_types/), which is what a call in
+  # config/initializers/types.rb is and what the generator writes. Derived
+  # from the registry and the modules rather than written as a list, so a new
+  # built-in touches no list but the theme contract's ledger; not a record
+  # taken while the initializer runs, because the tests reset the registry
+  # and put its definitions back (`registry_put`), which a record would not
+  # survive. An outside type (`gallery/album`) has an owner, and a bare name
+  # a test registers (`quote`, `test_band`) has no module, so neither is one.
+  def self.built_in_names
+    names.select { |name| !name.include?("/") && const_defined?(name.camelize, false) }
+  end
+
   # One component, one line of the theme contract (`Theme::Contract.components`
   # is keyed by the component's path): an outside type (`gallery/album`)
   # that handed out a built-in's component would replace the built-in's
