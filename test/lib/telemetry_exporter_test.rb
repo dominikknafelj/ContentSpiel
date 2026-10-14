@@ -70,7 +70,9 @@ class TelemetryExporterTest < ActiveSupport::TestCase
   # making one span and then printing a marker line. With neither variable
   # the SDK is never configured: the API's own no-op provider is still in
   # place and the span is printed nowhere. With OTEL_CONSOLE=1 the SDK's
-  # provider is there and the span is in the terminal.
+  # provider is there and the request's span is in the terminal, and a span
+  # that begins outside any request or job, as a poll's does, is not
+  # (`Telemetry::WorkSampler` is the sampler of every configured case).
   #
   # The boot is a whole one, so it is not free of the development database:
   # `config/initializers/setup_token.rb` asks `Setup.required?` once the
@@ -78,16 +80,19 @@ class TelemetryExporterTest < ActiveSupport::TestCase
   # database). Nothing is written to it, and the test database is not
   # touched. A boot that does not finish is killed and fails the test.
   test "a development boot with neither variable configures no SDK and prints no span, and OTEL_CONSOLE=1 prints it" do
-    script = 'OpenTelemetry.tracer_provider.tracer("probe").in_span("probe-span") { }; puts "provider: #{OpenTelemetry.tracer_provider.class.name}"'
+    script = 'tracer = OpenTelemetry.tracer_provider.tracer("probe"); ' \
+      'tracer.in_span("probe-span", kind: :server) { }; tracer.in_span("probe-poll") { }; ' \
+      'puts "provider: #{OpenTelemetry.tracer_provider.class.name}"'
 
     quiet = boot_development(script, {})
     assert_includes quiet.lines(chomp: true), "provider: OpenTelemetry::Internal::ProxyTracerProvider", quiet
-    assert_no_match(/SpanData|probe-span/, quiet)
+    assert_no_match(/SpanData|probe-span|probe-poll/, quiet)
 
     asked = boot_development(script, CONSOLE)
     assert_includes asked.lines(chomp: true), "provider: OpenTelemetry::SDK::Trace::TracerProvider", asked
     assert_match(/SpanData/, asked)
     assert_match(/name="probe-span"/, asked)
+    assert_no_match(/probe-poll/, asked)
   end
 
   private

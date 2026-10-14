@@ -31,11 +31,12 @@ require_relative "../lib/site_address"
 require_relative "../lib/host_settings"
 require_relative "../lib/theme_folder"
 
-# And these two for another reason: config/initializers/opentelemetry.rb
+# And these three for another reason: config/initializers/opentelemetry.rb
 # hands their objects to the OpenTelemetry SDK for the life of the process
 # (lib/telemetry.rb says the rest).
 require_relative "../lib/telemetry"
 require_relative "../lib/telemetry/path_scrubber"
+require_relative "../lib/telemetry/work_sampler"
 
 module ContentSpiel
   class Application < Rails::Application

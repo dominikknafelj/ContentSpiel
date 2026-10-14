@@ -27,6 +27,9 @@
 # them the path of every request, a password-reset token included. Hence the
 # two rules of this file: nothing is printed unless asked, and whatever is
 # exported, printed or sent, goes through `Telemetry::PathScrubber` first.
+# And a third, since the first day spans went to a backend: what is recorded
+# is the work a request or a job caused, never the background's polling
+# (`Telemetry::WorkSampler`, assigned at the end of this file).
 require "opentelemetry/sdk"
 require "opentelemetry/exporter/otlp"
 require "opentelemetry/instrumentation/all"
@@ -85,6 +88,17 @@ unless kind == :none
       "OpenTelemetry::Instrumentation::PG" => { enabled: false }
     )
   end
+
+  # Only a trace that begins with a request or with a job being performed is
+  # recorded; one that begins in Solid Cable's or Solid Queue's polling, or
+  # in their heartbeats, is dropped whole, before any processor sees it
+  # (lib/telemetry/work_sampler.rb says why it is a sampler and why by kind).
+  # That was about 820,000 spans a day on an idle site. `configure` takes no
+  # sampler, so it is assigned to the provider `configure` made, before any
+  # span can start (Puma, Solid Queue and Solid Cable start their threads
+  # after the initializers). For all three exporters alike, so that what a
+  # test records and what the console prints are what a backend is sent.
+  OpenTelemetry.tracer_provider.sampler = Telemetry::WorkSampler.sampler
 end
 
 # So a test can retrieve the very exporter the SDK is actually using (the

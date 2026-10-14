@@ -1,10 +1,11 @@
 # What `config/initializers/opentelemetry.rb` decides with, kept apart from
 # it so the decision can be tested as a table without booting four times.
 #
-# `config/application.rb` requires this file and `telemetry/path_scrubber`
-# itself although `lib/` is autoloaded (`config.autoload_lib`): an
-# initializer hands the scrubber's objects to the OpenTelemetry SDK, which
-# keeps them for the life of the process, so they are loaded once, before
+# `config/application.rb` requires this file, `telemetry/path_scrubber` and
+# `telemetry/work_sampler` itself although `lib/` is autoloaded
+# (`config.autoload_lib`): an initializer hands the scrubber's and the
+# sampler's objects to the OpenTelemetry SDK, which keeps them for the life
+# of the process, so they are loaded once, before
 # the autoloader is set up, and are not among what a development reload
 # takes away and defines again.
 module Telemetry
