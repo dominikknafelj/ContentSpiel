@@ -310,12 +310,14 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # A RELOAD THAT REFUSES THE THEME LEAVES THE APPLICATION WHOLE. In
   # development a changed file of the theme reloads the application, and
   # the check runs again in `to_prepare`. Raising there (as the boot does,
-  # and should) would stop the chain of prepare blocks half way: the type
-  # registries, which are filled by a block that runs after the theme's,
-  # would stay empty, the reloader would count the reload as done, and the
-  # next request would be drawn by the default theme with no block types,
-  # right after the mistake the check is there to explain. So on a reload
-  # the refusal is kept on the Theme and every public page raises it.
+  # and should) would stop the chain of prepare blocks where it is raised,
+  # and the reloader would count the reload as done. The theme is prepared
+  # last in the types' block (config/initializers/types.rb), after the types
+  # it is checked against; when it had a block of its own before the
+  # types', a raise left the registries empty and the next request was
+  # drawn with no block types, right after the mistake the check is there
+  # to explain. So on a reload the refusal is kept on the Theme and every
+  # public page raises it, and the registries are still asserted here.
   test "a theme refused on a reload leaves the registries prepared and CS Studio working, and every public page says why until it is corrected" do
     with_theme_copy do |dir|
       dir.join("views/pages/shwo.html.erb").write("x")
@@ -325,8 +327,10 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
         # The registries are emptied first, as a code reload leaves them
         # (their classes are loaded anew): `prepare!` alone clears nothing,
         # so without this the three assertions below would hold whether or
-        # not the blocks after the theme's ran. The theme's block is before
-        # the registries' (config/initializers/theme.rb, types.rb).
+        # not the prepare ran. The theme is prepared last in the types'
+        # block (config/initializers/types.rb), after the registries it is
+        # checked against.
+        names = BlockTypes.names
         [ BlockTypes, ContentTypes ].each(&:reset!)
         AccessControl::Permissions.reset!
         assert_empty BlockTypes.all
@@ -334,7 +338,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
         Rails.application.reloader.prepare!
 
         assert_includes Theme.current.refusal.message, "views/pages/shwo.html.erb is not part of the theme contract"
-        assert_equal %w[code image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
+        assert_equal names, BlockTypes.names
         assert_not_empty ContentTypes.all
         assert AccessControl::Permissions.all.any?
 
@@ -371,6 +375,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       dir.join("javascript").write("not a folder")
 
       with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        names = BlockTypes.names
         [ BlockTypes, ContentTypes ].each(&:reset!)
         AccessControl::Permissions.reset!
 
@@ -378,7 +383,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
 
         assert_includes Theme.current.refusal.message, "  - notes.txt is not part of a theme."
         assert_includes Theme.current.refusal.message, "  - javascript is not part of a theme."
-        assert_equal %w[code image post_list rich_text section], BlockTypes.all.map { |definition| definition.name.to_s }.sort
+        assert_equal names, BlockTypes.names
         assert_not_empty ContentTypes.all
         assert_includes assert_raises(ThemeFolder::Invalid) { get "/about" }.message, "notes.txt is not part of a theme"
         sign_in_as users(:one)
@@ -512,7 +517,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_empty Theme::Check.problems(folder, deep: true)
     assert_equal %w[assets/stylesheets/theme.css components/blocks/code_component.html.erb], folder.files
     template = folder.read("components/blocks/code_component.html.erb")
-    Theme::Contract::COMPONENTS.fetch("blocks/code_component").each { |name| assert_match(/\b#{name}\b/, template, "the template calls #{name}") }
+    Theme::Contract.components.fetch("blocks/code_component").each { |name| assert_match(/\b#{name}\b/, template, "the template calls #{name}") }
     assert_no_match(/head_attributes|bare\?|settings|html_safe|raw\b|safe_join|<%==/, template, "nothing the contract does not name, and no string marked safe")
     css = folder.read("assets/stylesheets/theme.css")
     [ /:root, \[data-theme="light"\]\s*\{(.*?)\}/m, /^\[data-theme="dark"\]\s*\{(.*?)\}/m ].each do |block|

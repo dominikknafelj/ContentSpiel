@@ -42,4 +42,13 @@ Rails.application.config.to_prepare do
   # (`AI::DuplicateProvider` otherwise, after a development reload).
   AI::Providers.reset!
   AI::Providers.register("anthropic", AI::Providers::Anthropic)
+
+  # The site's theme, LAST (block types spec, decision 6): its check reads
+  # `Theme::Contract`, whose block lines are the types registered above. The
+  # first run raises and every later one does not (`Theme.prepare`);
+  # `bin/rails theme:check` is the one boot that does not raise either
+  # (`ThemeFolder.checking`).
+  Theme.current = Theme.prepare(ThemeFolder.current, reload: Rails.application.config.x.theme_booted || ThemeFolder.checking?)
+  # Not under `theme:check`, which says the list itself, once and whole.
+  Rails.logger.error("[ContentSpiel] #{Theme.current.refusal.message}") if Theme.current.refusal && !ThemeFolder.checking?
 end

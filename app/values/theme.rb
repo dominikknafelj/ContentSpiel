@@ -92,17 +92,21 @@ class Theme
     end
 
     # `load` for the application's own theme, with the two ways a refusal is
-    # answered (`config/initializers/theme.rb`).
+    # answered (called last in the `to_prepare` of
+    # `config/initializers/types.rb`, after the types it is checked against).
     #
     # AT BOOT IT RAISES, and the application does not start.
     #
     # ON A RELOAD IT DOES NOT. In development a changed file of the theme
     # reloads the application and the check runs again in `to_prepare`. An
-    # exception there stops the chain of prepare blocks where it is raised:
-    # the type registries, filled by a block that runs after the theme's
-    # (`config/initializers/types.rb`), stay empty, the reloader counts the
-    # reload as done, and the request after the error page is drawn by the
-    # default theme with no block types. So the refusal is kept: the answer
+    # exception there stops the chain of prepare blocks where it is raised
+    # and the reloader counts the reload as done: `Theme.current` stays the
+    # Theme built before the reload, whose component subclasses are of the
+    # classes the reload threw away, and a block after the theme's does not
+    # run. (While the theme was prepared in a block of its own, before the
+    # types', the type registries were such a block: they stayed empty, and
+    # the request after the error page was drawn with no block types.) So
+    # the refusal is kept: the answer
     # is a theme that brings nothing and remembers why, and every public
     # request raises it (`PublicPageRendering#look_in_the_theme_first`)
     # until a reload finds the folder sound. CS Studio is untouched, as it

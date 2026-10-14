@@ -72,7 +72,7 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       Theme::Contract::TEMPLATES.each_key do |path|
         assert_equal Rails.root.join("app/views", path).read, target.join("views", path).read, path
       end
-      Theme::Contract::COMPONENTS.each_key do |path|
+      Theme::Contract.components.each_key do |path|
         assert_equal Rails.root.join("app/components/#{path}.html.erb").read, target.join("components/#{path}.html.erb").read, path
       end
       assert target.join("assets/stylesheets/theme.css").file?
@@ -80,14 +80,14 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       assert target.join("README.md").file?
 
       assert_equal ThemeFolder.new(target).files.sort, (written - [ "README.md" ]).sort, "it says what it wrote, and wrote nothing the folder does not count"
-      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract::COMPONENTS.size + 1, ThemeFolder.new(target).files.size
+      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size + 1, ThemeFolder.new(target).files.size
     end
   end
 
   test "the folder it writes has no problem, checked deeply, and loads" do
     scaffolded do |target, _written|
       assert_empty Theme::Check.problems(ThemeFolder.new(target), deep: true)
-      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract::COMPONENTS.size, Theme.load(ThemeFolder.new(target)).template_count
+      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size, Theme.load(ThemeFolder.new(target)).template_count
     end
   end
 
@@ -107,7 +107,7 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       css = target.join("assets/stylesheets/theme.css").read
 
       assert_empty css.gsub(%r{/\*.*?\*/}m, "").strip, "the stylesheet is a comment and nothing else: the site looks as before"
-      Theme::Contract::TOKENS.each { |token| assert_includes css, token }
+      Theme::Contract.tokens.each { |token| assert_includes css, token }
     end
   end
 
@@ -129,7 +129,7 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       definitions = BlockTypes.all.map { |definition| [ definition, :component ] } +
         ContentTypes.all.flat_map { |definition| [ [ definition, :list_component ], [ definition, :detail_component ] ] }
       own = definitions.map { |definition, role| theme.component_for(definition, role) }.select { |component| component.sidecar_files([ "erb" ]).first.to_s.start_with?(target.to_s) }
-      assert_equal Theme::Contract::COMPONENTS.keys.sort, own.map { |component| component.name.underscore }.uniq.sort, "every component is drawn by the copy's template"
+      assert_equal Theme::Contract.components.keys.sort, own.map { |component| component.name.underscore }.uniq.sort, "every component is drawn by the copy's template"
 
       Theme.with(theme) do
         paths.each { |path| assert_equal default.fetch(path), body_of(path), "#{path} differs under the copied theme" }

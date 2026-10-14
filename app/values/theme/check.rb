@@ -102,7 +102,7 @@ class Theme
 
     MAY_HOLD = {
       "views" => "views holds the templates Theme::Contract::TEMPLATES names and the theme's own partials under views/theme/",
-      "components" => "components holds <component path>.html.erb for the components Theme::Contract::COMPONENTS names",
+      "components" => "components holds <component path>.html.erb for the components Theme::Contract.components names",
       "assets" => "assets holds stylesheets/theme.css, images/ (#{ASSET_EXTENSIONS.fetch("images/").join(", ")}) " \
                   "and fonts/ (#{ASSET_EXTENSIONS.fetch("fonts/").join(", ")})",
       "javascript" => "javascript holds controllers/**/*_controller.js"
@@ -332,11 +332,20 @@ class Theme
       allowed =
         case area
         when "views" then Contract::TEMPLATES.key?(rest) || (rest.start_with?(Contract::OWN_PARTIALS) && rest.end_with?(".html.erb"))
-        when "components" then rest.end_with?(".html.erb") && Contract::COMPONENTS.key?(rest.delete_suffix(".html.erb"))
+        when "components" then rest.end_with?(".html.erb") && Contract.components.key?(rest.delete_suffix(".html.erb"))
         when "assets" then rest == "stylesheets/theme.css" || asset?(rest)
         when "javascript" then rest.start_with?("controllers/") && rest.end_with?("_controller.js")
         end
       return if allowed
+
+      # The owner's answer 3 (block types spec): a template of a component no
+      # registered type hands out is a gem's that the site no longer has, or
+      # a name misspelt; either way it is nobody's, and the check says so by
+      # name rather than leave the template unused.
+      if area == "components" && rest.end_with?(".html.erb")
+        return "#{file} replaces the template of #{rest.delete_suffix(".html.erb")}, which no registered block or content type " \
+               "hands out: the type it belongs to is not installed. Remove the template from the theme, or install the type."
+      end
 
       # `area` is one of the four: `problems` took everything else out.
       "#{file} is not part of the theme contract (#{MAY_HOLD.fetch(area)}). Rename it to a name the contract has, or take it out of the folder."

@@ -5,12 +5,13 @@ require "test_helper"
 class ThemeGuardsTest < ActiveSupport::TestCase
   ROOTS = %w[app lib config].freeze
 
-  # The one place outside `Theme` that may set the theme: the initializer's
-  # `to_prepare`, by the exact line it is allowed, so a second assignment in
+  # The one place outside `Theme` that may set the theme: the last lines of
+  # the types' `to_prepare` (the theme is prepared after the types it is
+  # checked against, block types spec decision 6), by the exact line it is allowed, so a second assignment in
   # the same file is still found. (`Theme` itself sets `@current`, which is
   # none of the spellings below, so it needs no entry here.)
   ALLOWED = {
-    "config/initializers/theme.rb" => /\A\s*Theme\.current = Theme\.prepare\(ThemeFolder\.current, reload: booted \|\| ThemeFolder\.checking\?\)\z/
+    "config/initializers/types.rb" => /\A\s*Theme\.current = Theme\.prepare\(ThemeFolder\.current, reload: Rails\.application\.config\.x\.theme_booted \|\| ThemeFolder\.checking\?\)\z/
   }.freeze
 
   # Every way to swap the process's theme: `Theme.with`, an assignment to
@@ -82,7 +83,7 @@ class ThemeGuardsTest < ActiveSupport::TestCase
       "app/views/pages/show.html.erb" => "<%# Theme.current = x %>\n<% Theme.current = Theme.new %>\n",
       "app/jobs/x_job.rb" => "Theme.send(:with, theme) { }\nTheme.current == theme\nTheme.current ||= theme\nTheme\n  .with(theme) { }\n",
       "app/models/x.rb" => "Theme.instance_variable_set(:@current, theme)\nTheme.current =\n  theme\nx = { Theme.current => 1 }\n",
-      "config/initializers/theme.rb" => "  Theme.current = Theme.prepare(ThemeFolder.current, reload: booted || ThemeFolder.checking?)\nTheme.current = Theme.new\n",
+      "config/initializers/types.rb" => "  Theme.current = Theme.prepare(ThemeFolder.current, reload: Rails.application.config.x.theme_booted || ThemeFolder.checking?)\nTheme.current = Theme.new\n",
       "app/values/theme.rb" => "    def with(theme)\n      @current = theme\n"
     )
 
@@ -94,7 +95,7 @@ class ThemeGuardsTest < ActiveSupport::TestCase
       "app/jobs/x_job.rb:4: Theme",
       "app/models/x.rb:1: Theme.instance_variable_set(:@current, theme)",
       "app/models/x.rb:2: Theme.current =",
-      "config/initializers/theme.rb:2: Theme.current = Theme.new"
+      "config/initializers/types.rb:2: Theme.current = Theme.new"
     ], found
   end
 
@@ -111,14 +112,14 @@ class ThemeGuardsTest < ActiveSupport::TestCase
   test "that guard can fail too: Theme.new in a controller or an initializer is named, and Theme's own and a comment are not" do
     found = unchecked_in(
       "app/controllers/pages_controller.rb" => "# Theme.new(path: x) in a comment\ntheme = Theme.new(path: params[:theme])\n",
-      "config/initializers/theme.rb" => "Theme.current = Theme\n  .new(path: ENV[\"THEME_PATH\"])\n",
+      "config/initializers/types.rb" => "Theme.current = Theme\n  .new(path: ENV[\"THEME_PATH\"])\n",
       "app/values/theme.rb" => "Theme.new\n",
       "app/models/x.rb" => "ThemeFolder.new(x)\nOtherTheme.new\n"
     )
 
     assert_equal [
       "app/controllers/pages_controller.rb:2: theme = Theme.new(path: params[:theme])",
-      "config/initializers/theme.rb:1: Theme.current = Theme"
+      "config/initializers/types.rb:1: Theme.current = Theme"
     ], found
   end
 end

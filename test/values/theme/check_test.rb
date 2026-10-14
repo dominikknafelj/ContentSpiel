@@ -38,7 +38,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
   test "a folder of every default template the contract names has no problem, checked deeply too" do
     Dir.mktmpdir("theme") do |dir|
       copies = Theme::Contract::TEMPLATES.keys.map { |path| [ "app/views/#{path}", "views/#{path}" ] } +
-        Theme::Contract::COMPONENTS.keys.map { |path| [ "app/components/#{path}.html.erb", "components/#{path}.html.erb" ] }
+        Theme::Contract.components.keys.map { |path| [ "app/components/#{path}.html.erb", "components/#{path}.html.erb" ] }
       copies.each do |from, to|
         FileUtils.mkdir_p(File.dirname(File.join(dir, to)))
         FileUtils.cp(Rails.root.join(from), File.join(dir, to))
@@ -58,8 +58,6 @@ class Theme::CheckTest < ActiveSupport::TestCase
       "views/layouts/public/_preview_banner.html.erb" => "the preview bar",
       "views/layouts/admin.html.erb" => "CS Studio's layout",
       "views/admin/dashboard/show.html.erb" => "a CS Studio view",
-      "components/media/picture_component.html.erb" => "a component that is called, not replaced",
-      "components/rich_text/image_component.html.erb" => "rich text's own component",
       "components/blocks/image_component.rb" => "Ruby",
       "components/blocks/image_component.html.haml" => "another template language",
       "assets/stylesheets/other.css" => "a second stylesheet",
@@ -73,6 +71,37 @@ class Theme::CheckTest < ActiveSupport::TestCase
       assert_includes problems.first, file
       assert_includes problems.first, "not part of the theme contract"
       assert_includes problems.first, "Rename it to a name the contract has, or take it out of the folder."
+    end
+
+    # A component template the contract does not name is "a component nobody
+    # hands out" (the owner's answer 3), whether it is misspelt, the CMS's own
+    # and not replaceable, or a removed gem's.
+    {
+      "components/media/picture_component.html.erb" => "a component that is called, not replaced",
+      "components/rich_text/image_component.html.erb" => "rich text's own component"
+    }.each do |file, what|
+      problems = problems_with(file => "x")
+
+      assert_equal 1, problems.size, "#{what} (#{file}): #{problems.inspect}"
+      assert_equal "#{file} replaces the template of #{file.delete_prefix("components/").delete_suffix(".html.erb")}, which no registered " \
+                   "block or content type hands out: the type it belongs to is not installed. Remove the template from the theme, or install the type.",
+                   problems.first
+    end
+  end
+
+  # The owner's answer 3 (block types spec): a gem removed from a site leaves
+  # its theme's template of the gem's block behind, and the check refuses it
+  # by name, at the image's build, and says what to do.
+  test "a template of a component no registered type hands out is refused by name, and the message says to remove it or install the type" do
+    with_theme_copy do |dir|
+      dir.join("components/blocks").mkpath
+      dir.join("components/blocks/marquee_component.html.erb").write("<p>marquee</p>")
+
+      problems = Theme::Check.problems(ThemeFolder.new(dir))
+
+      assert_includes problems, "components/blocks/marquee_component.html.erb replaces the template of blocks/marquee_component, " \
+                                "which no registered block or content type hands out: the type it belongs to is not installed. " \
+                                "Remove the template from the theme, or install the type."
     end
   end
 

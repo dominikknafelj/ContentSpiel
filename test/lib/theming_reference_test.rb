@@ -4,7 +4,11 @@ require "test_helper"
 # Theme::Contract is what the code reads: this test keeps the two from
 # drifting (theming spec, "Risks": the contract is a promise). A name added
 # to the contract fails here until the reference file says it, and a name
-# the file promises that the contract does not hold fails too.
+# the file promises that the contract does not hold fails too. The tokens
+# and components tables are held to the ledger (test/support/contract_ledger.rb),
+# the built-in types' part of the contract written out, which
+# test/values/theme/contract_ledger_test.rb holds to the derived contract:
+# an outside type's names are its gem's to document.
 #
 # What it reads is the first cell of each row of a Markdown table under a
 # `###` heading of `## The contract`, as its backticked name. It does not
@@ -28,7 +32,7 @@ class ThemingReferenceTest < ActiveSupport::TestCase
   def section(title) = self.class.section(title) || flunk("no section \"### #{title}\" in #{DOC.basename}")
 
   test "the tokens table names exactly the contract's tokens" do
-    assert_equal Theme::Contract::TOKENS.sort, rows("Tokens").keys.sort
+    assert_equal (ContractLedger::THEMED_TOKENS + ContractLedger::FIXED_TOKENS).map { "--th-#{_1}" }.sort, rows("Tokens").keys.sort
   end
 
   test "the templates table names exactly the contract's templates" do
@@ -37,9 +41,9 @@ class ThemingReferenceTest < ActiveSupport::TestCase
 
   test "the components table names exactly the contract's components, each with the methods its template may call" do
     table = rows("Components")
-    assert_equal Theme::Contract::COMPONENTS.keys.sort, table.keys.sort
+    assert_equal ContractLedger::COMPONENTS.keys.sort, table.keys.sort
 
-    Theme::Contract::COMPONENTS.each do |path, methods|
+    ContractLedger::COMPONENTS.each do |path, methods|
       assert_equal methods.sort, table.fetch(path).scan(/`([a-z_?]+)`/).flatten.sort, "the methods of #{path}"
     end
   end
@@ -76,7 +80,7 @@ class ThemingReferenceTest < ActiveSupport::TestCase
 
     assert_equal %w[button source status strip], targets.sort, "the script's targets, as this test reads them"
     assert_equal %w[copied failed label restore], values.sort, "the script's values, as this test reads them"
-    methods = Theme::Contract::COMPONENTS.fetch("blocks/code_component").map { |name| name == "string" ? "string(key)" : name }
+    methods = ContractLedger::COMPONENTS.fetch("blocks/code_component").map { |name| name == "string" ? "string(key)" : name }
     markup = [ %(data-controller="code-copy"), %(data-action="code-copy#copy") ] +
       targets.map { |name| %(data-code-copy-target="#{name}") } + values.map { |name| "data-code-copy-#{name}-value" }
 
