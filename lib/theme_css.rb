@@ -95,9 +95,13 @@ module ThemeCss
   module_function
 
   def entry(folder, root:, blocks: [])
-    from = Pathname(root).join(ENTRY).dirname
+    # The root by its real path too: every other path here is a real one,
+    # and a checkout reached through a link would otherwise write the
+    # default theme's own files the long way round, out of the link and in.
+    root = real(root)
+    from = root.join(ENTRY).dirname
     relative = ->(path) { Pathname(path).relative_path_from(from).to_s }
-    default = Pathname(root).join(DEFAULT)
+    default = root.join(DEFAULT)
 
     imports = [ default ]
     sources = [ default.dirname ]

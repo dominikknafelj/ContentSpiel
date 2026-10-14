@@ -65,6 +65,19 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     assert_equal BUILT_INS, BlockTypes.names, "a refused hook is gone and the registries are prepared again"
   end
 
+  # Task 6 review M6: hooks are replayed in the order they were called (the
+  # Gemfile's), after the built-ins, never sorted.
+  test "two hooks register in the order they were called, after the built-ins" do
+    slides = ContentSpiel::Plugins.block_types { |types| types.register("slides/deck") { |t| TestTypes.declare(t) } }
+    gallery = ContentSpiel::Plugins.block_types { |types| types.register("gallery/album") { |t| TestTypes.declare(t) } }
+    Rails.application.reloader.prepare!
+    assert_equal BUILT_INS + %w[slides/deck gallery/album], BlockTypes.names
+  ensure
+    ContentSpiel::Plugins.remove(slides) if slides
+    ContentSpiel::Plugins.remove(gallery) if gallery
+    Rails.application.reloader.prepare!
+  end
+
   test "a hook without a block is refused where it is called" do
     error = assert_raises(ArgumentError) { ContentSpiel::Plugins.block_types }
     assert_includes error.message, "takes a block"
@@ -81,6 +94,11 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
       assert Theme.current.refusal, "the reload is refused"
       assert_includes Theme.current.refusal.message, "#{__FILE__}:#{line}"
       assert_includes Theme.current.refusal.message, "owner/name"
+      assert_includes Theme.current.refusal.message, "restart the server", "a gem's files are not reloaded: saving one does nothing"
+      assert_equal BUILT_INS, BlockTypes.names, "the built-in block types are registered"
+      assert_includes ContentTypes.names, "blog", "the hooks are replayed last: every registry of the CMS is filled"
+      assert_not_empty AccessControl::Permissions.all
+      assert_not_empty AI::Providers.names
     ensure
       ContentSpiel::Plugins.remove(bare)
       Rails.application.reloader.prepare!

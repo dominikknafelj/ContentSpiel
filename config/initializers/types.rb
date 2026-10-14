@@ -26,11 +26,6 @@ Rails.application.config.to_prepare do
     BlockTypes::PostList.register
     BlockTypes::Section.register
 
-    # Block types from outside the CMS, after every built-in, in the order
-    # their hooks were called (lib/content_spiel/plugins.rb). That is the
-    # picker's order too.
-    ContentSpiel::Plugins.register_block_types(BlockTypes)
-
     # Registration order matters: it defines `names` order and
     # `ContentTypes.default` (the first one registered -- `blog`).
     ContentTypes::Blog.register
@@ -60,6 +55,13 @@ Rails.application.config.to_prepare do
     # (`AI::DuplicateProvider` otherwise, after a development reload).
     AI::Providers.reset!
     AI::Providers.register("anthropic", AI::Providers::Anthropic)
+
+    # Block types from outside the CMS, after every built-in, in the order
+    # their hooks were called (lib/content_spiel/plugins.rb). That is the
+    # picker's order too. LAST of the block: a gem whose hook raises on a
+    # development reload then leaves every registry of the CMS filled, and
+    # only its own block types (and those of the hooks after it) missing.
+    ContentSpiel::Plugins.register_block_types(BlockTypes)
   rescue StandardError => error
     raise unless ThemeFolder.booted?
 

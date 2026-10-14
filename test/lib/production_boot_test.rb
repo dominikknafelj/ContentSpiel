@@ -20,12 +20,14 @@ require "fileutils"
 # without a secret; the secret check has its tests in `host_settings_test.rb`
 # and is not booted for here.
 #
-# Each boot is about three seconds, so there are seven and no more: an https
+# Each boot is about three seconds, so there are eight and no more: an https
 # address, none, and a value that is no address; and for the theme, a
 # folder, a path that is none, a folder with a file the contract does
 # not name (`Theme::Check`, run by `Theme.load` in `to_prepare`: the one
 # proof that the contract is checked when the application starts), and a
-# folder the stylesheet was not built for.
+# folder the stylesheet was not built for; and a gem's block type hook that
+# raises (the one proof that a registration raises at boot and names its
+# place, block types spec, decision 11).
 class ProductionBootTest < ActiveSupport::TestCase
   SCRIPT = <<~'RUBY'.freeze
     config = Rails.application.config
@@ -136,6 +138,19 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_not status.success?, printed
     assert_includes printed, "ThemeFolder::Invalid"
     assert_includes printed, "the stylesheet was built for another theme: run assets:precompile with THEME_PATH set"
+    assert_no_match(/^hosts:/, printed)
+  end
+
+  # The fixture stands for a gem: it is loaded ahead of everything, as
+  # `Bundler.require` would load a gem, and calls the hook with a bare name.
+  test "production with a gem's hook that registers a bare name does not start, and names the hook's file and line" do
+    fixture = Rails.root.join("test/fixtures/block_types/bad_hook.rb")
+    line = fixture.readlines.index { |each| each.include?("ContentSpiel::Plugins.block_types") } + 1
+    printed, status = boot_production("RUBYOPT" => "-r#{fixture}")
+
+    assert_not status.success?, printed
+    assert_includes printed, "#{fixture}:#{line}"
+    assert_includes printed, "owner/name"
     assert_no_match(/^hosts:/, printed)
   end
 

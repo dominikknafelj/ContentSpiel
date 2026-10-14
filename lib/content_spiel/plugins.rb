@@ -43,6 +43,10 @@ module ContentSpiel
       end
     end
 
+    # The words a hook's error is given (`register_block_types`), which the
+    # theme's refusal on a reload looks for (`Theme.not_registered`).
+    REPLAYED = "ContentSpiel::Plugins.block_types, called at".freeze
+
     @hooks = []
 
     class << self
@@ -60,7 +64,7 @@ module ContentSpiel
         @hooks.each do |hook|
           hook.block.call(Registrar.new(registry, hook.location))
         rescue StandardError => error
-          raise error.exception("#{error.message} (ContentSpiel::Plugins.block_types, called at #{hook.location})")
+          raise error.exception("#{error.message} (#{REPLAYED} #{hook.location})")
         end
       end
 

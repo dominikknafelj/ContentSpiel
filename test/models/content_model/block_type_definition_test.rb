@@ -149,6 +149,48 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
+  # Task 6 review I2: a colour is a value's, never a selector's, a
+  # comment's or a string's, and every kind of literal is one.
+  test "the colour guard reads declaration values: every kind of literal is refused, a selector, a comment and a string are not" do
+    rule = ->(declaration) { ".content-block--gallery-album { #{declaration}; }" }
+    refused = [ "border: 1px solid red", "color: White", "color: lab(50% 40 59)", "color: oklab(0.5 0.1 0.1)", "color: hwb(0 0% 0%)",
+                "color: color(display-p3 1 0 0)", "color: color-mix(in oklab, red 40%, var(--th-ink))", "color: #ff0000",
+                "color: rgb(0 0 0)", "color: rgba(0,0,0,1)", "color: hsl(0 0% 0%)", "color: hsla(0,0%,0%,1)", "color: oklch(0.5 0 0)",
+                "color: lch(50% 0 0)", "--th-gallery-frame: tomato" ]
+    refused.each { |css| assert ContentModel::BlockTypeDefinition.colour_literal?(rule.(css)), "#{css} was let through" }
+
+    passed = [ "#fade { color: var(--th-ink); }", "li:has(#bead) { color: var(--th-ink); }", "/* not #fff, nor red */ .a { color: var(--th-ink); }",
+               ".a { color: var(--th-red); }", ".a { animation-name: red-pulse; }", %(.a::before { content: "#bad red"; }),
+               ".a { background: url(red.png); }", ".a { color: color-mix(in oklab, var(--th-ink) 60%, var(--th-page)); }",
+               ".a { color: currentcolor; border-color: transparent; }", ".red { color: var(--th-ink); }" ]
+    passed.each { |css| assert_not ContentModel::BlockTypeDefinition.colour_literal?(css), "#{css} was refused" }
+  end
+
+  test "an outside type's stylesheet is one file: an @import is refused" do
+    saved = BlockTypes.all.dup
+    Dir.mktmpdir do |dir|
+      sheet = Pathname(dir).join("album.css")
+      sheet.write(%(@import "./colours.css";\n.a { color: var(--th-ink); }))
+      error = assert_raises(ArgumentError) { BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.stylesheet sheet } }
+      assert_includes error.message, "@import"
+    end
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # Task 6 review M2: a token name has no underscore, so an owner with one
+  # names its tokens with a dash.
+  test "an owner with an underscore names its tokens with a dash" do
+    saved = BlockTypes.all.dup
+    assert BlockTypes.register("photo_gallery/album") { |t| TestTypes.declare(t); t.tokens themed: %w[photo-gallery-frame] }
+    error = assert_raises(ArgumentError) { BlockTypes.register("photo_gallery/strip") { |t| TestTypes.declare(t); t.tokens themed: %w[gallery-frame] } }
+    assert_includes error.message, "photo-gallery-"
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
   # Task 3 review M4: a gem's missing stylesheet stops the boot as that
   # type's, not as a bare Errno::ENOENT.
   test "an outside type's stylesheet that is not there is refused with the type's name" do

@@ -32,11 +32,41 @@ module ContentModel
     TOKEN_NAME = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
     ACTION = /\A[a-z0-9]+(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)*#[a-zA-Z]\w*\z/
 
-    # A colour written as a value in an outside type's stylesheet (decision
-    # 3): a hex colour, or one of the functions that take numbers. Not
-    # `color-mix()`, which an outside type mixes its colours with, from the
-    # theme's base tokens.
-    COLOUR_LITERAL = /#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/
+    # CSS Color 4's named colours (not `transparent`, not `currentcolor`,
+    # which name no colour of their own).
+    NAMED_COLOURS = %w[
+      aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood
+      cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray
+      darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen
+      darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue
+      firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew
+      hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan
+      lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray
+      lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue
+      mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred
+      midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid
+      palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple
+      rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue
+      slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white
+      whitesmoke yellow yellowgreen
+    ].freeze
+
+    # An outside type's stylesheet holds no colour literal (decision 3). A
+    # colour is looked for in a declaration's VALUE only, so a selector
+    # (`#fade`, `li:has(#bead)`, `.red`) is never one: a declaration starts
+    # after an opening brace or a semicolon. Comments are taken out of the
+    # whole file first, and strings, `url()`s and custom property names
+    # (`var(--th-red)`) out of each value. A word is bounded by anything but
+    # a word character or a dash, so `red-pulse` holds no `red`. Refused: a
+    # hex colour, a colour function (`color(` is not `color-mix(`, which is
+    # allowed, though a literal inside it is not), and a named colour.
+    DECLARATION = /[{;]\s*(?:--[\w-]+|-?[a-z][a-z-]*)\s*:\s*([^;{}]*)/i
+    NOT_A_COLOUR = %r{"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|url\([^)]*\)|--[\w-]+}im
+    COLOUR_LITERAL = /#\h{3,8}(?![\w-])|(?<![\w-])(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(|(?<![\w-])(?:#{NAMED_COLOURS.join("|")})(?![\w-])/i
+
+    def self.colour_literal?(css)
+      css.gsub(%r{/\*.*?\*/}m, " ").scan(DECLARATION).any? { |(value)| value.gsub(NOT_A_COLOUR, " ").match?(COLOUR_LITERAL) }
+    end
 
     # One filled block of the type (decision 14): `settings` (string keys),
     # `translations` (locale => values: translated schema fields and the
@@ -248,8 +278,11 @@ module ContentModel
       %i[container lists_posts].each do |capability|
         refuse "a block type from outside may not claim :#{capability} (it has no seam for one yet)" if capability?(capability)
       end
-      foreign = (themed_tokens + fixed_tokens).reject { |token| token.start_with?("#{owner}-") }
-      refuse "its tokens are named after its owner (#{owner}-…): #{foreign.inspect}" if foreign.any?
+      # A token name has no underscore (`TOKEN_NAME`), so `photo_gallery`'s
+      # tokens start with `photo-gallery-`.
+      prefix = "#{owner.tr("_", "-")}-"
+      foreign = (themed_tokens + fixed_tokens).reject { |token| token.start_with?(prefix) }
+      refuse "its tokens are named after its owner (#{prefix}…): #{foreign.inspect}" if foreign.any?
       return if stylesheet.nil?
 
       path = Pathname(stylesheet)
@@ -259,7 +292,10 @@ module ContentModel
       rescue SystemCallError => error
         refuse "its stylesheet #{path} cannot be read (#{error.class})"
       end
-      return unless source.match?(COLOUR_LITERAL)
+      # An import is resolved by the build and never read here, so its
+      # colours would pass unseen: an outside type brings one file.
+      refuse "its stylesheet imports another (@import); an outside type's styles are one file, read at registration" if source.gsub(%r{/\*.*?\*/}m, " ").match?(/@import\b/i)
+      return unless self.class.colour_literal?(source)
 
       refuse "its stylesheet holds a colour literal; an outside type's colours are defined from the theme's " \
              "base tokens, as var() or color-mix() of them, so a theme that re-colours its base re-colours the block"

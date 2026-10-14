@@ -79,6 +79,19 @@ class ThemeCssTest < ActiveSupport::TestCase
     end
   end
 
+  # Task 6 review M8: the type stylesheets are written by their real paths,
+  # so the root is read by its real path too, or a checkout reached through
+  # a link wrote the default theme's files out of the link and back in.
+  test "an application reached through a link writes the same entry as one that is not" do
+    Dir.mktmpdir("link") do |dir|
+      linked = Pathname(dir).join("app")
+      File.symlink(ROOT, linked)
+      blocks = BlockTypes.theme_css_blocks
+
+      assert_equal ThemeCss.entry(ThemeFolder.new(PLAIN), root: ROOT, blocks: blocks), ThemeCss.entry(ThemeFolder.new(PLAIN), root: linked, blocks: blocks)
+    end
+  end
+
   # Task 3 review M4: a gem's stylesheet that is gone (an engine being
   # edited, a gem uninstalled under a running watch) is that type's, not
   # "the theme folder cannot be read".

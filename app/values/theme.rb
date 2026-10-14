@@ -152,10 +152,20 @@ class Theme
 
     private
 
+    # A gem's hook is replayed last (config/initializers/types.rb), so when it
+    # is the one that raised every registry of the CMS is filled, and saving
+    # the gem's file does nothing: its files are not the application's, and
+    # no reload follows them.
     def not_registered(error)
+      what =
+        if error.message.include?(ContentSpiel::Plugins::REPLAYED)
+          "Every registry of the CMS is filled; the block types from outside of this hook and of the hooks after it are missing. " \
+            "A gem's own files are not reloaded: restart the server after correcting it."
+        else
+          "The registries after the one that raised are empty until a reload registers them: correct the definition and save it."
+        end
       ThemeFolder::Invalid.new(
-        "The block and content types could not be registered on this reload: #{error.class}: #{error.message}. The registries " \
-        "after the one that raised are empty until a reload registers them: correct the definition and save it."
+        "The block and content types could not be registered on this reload: #{error.class}: #{error.message}. #{what}"
       ).tap { |refusal| refusal.set_backtrace(error.backtrace) }
     end
 
