@@ -124,8 +124,8 @@ module ContentSpiel
       # variable, `ThemeFolder.from_env`), so a THEME_PATH that names no
       # folder stops the boot at once with a message that names the variable
       # and the path, as a PUBLIC_HOST that is no address does. The checks
-      # against the contract follow when the application is prepared
-      # (config/initializers/theme.rb).
+      # against the contract follow when the application is prepared (the
+      # last lines of the to_prepare in config/initializers/types.rb).
       theme_folder = ThemeFolder.current
 
       if Rails.env.production?

@@ -1,6 +1,7 @@
 # The theme that draws the public site (theming spec §1 and §3). `Theme.current`
 # is built from the folder `THEME_PATH` names when the application is prepared
-# (`config/initializers/theme.rb`), as every registry is, and a test swaps it
+# (the last lines of the `to_prepare` in `config/initializers/types.rb`, after
+# the types it is checked against), as every registry is, and a test swaps it
 # for the length of a block (`Theme.with`, `test/support/theme_test_helper.rb`).
 # Without a folder it is the default theme: every question below is answered
 # with the CMS's own.
@@ -49,8 +50,8 @@ class Theme
     # `theme` for the length of the block, and the theme that was current
     # before afterwards, also when the block raises.
     #
-    # FOR TESTS ONLY, and so is `current=` outside the one assignment in
-    # `config/initializers/theme.rb`. `current` is one variable of the
+    # FOR TESTS ONLY, and so is `current=` outside the one assignment, last
+    # in the `to_prepare` of `config/initializers/types.rb`. `current` is one variable of the
     # PROCESS, not of a request or a thread: a swap made while a request is
     # being answered draws every other request of the process with the
     # other theme, and puts its fingerprint into their ETags. That is what a
@@ -72,7 +73,8 @@ class Theme
     # anything the contract does not name, or a template that cannot draw a
     # page or writes what is the CMS's to write (`Theme::Check`), with every
     # problem in the message: called when the application is prepared
-    # (`config/initializers/theme.rb`), whose first run is the boot, so such
+    # (`Theme.prepare`, last in the `to_prepare` of
+    # `config/initializers/types.rb`), whose first run is the boot, so such
     # a folder stops the boot (theming spec §8). A test loads the second
     # theme through here too (`test/support/theme_test_helper.rb`).
     #
@@ -128,7 +130,15 @@ class Theme
     # which is the list that was wrong. Not `Exception`: a `SyntaxError` in
     # the application's own code, an interrupt and an exhausted memory are
     # not the folder's and are not to be kept.
-    def prepare(folder, reload:)
+    #
+    # A REGISTRATION THAT RAISED on a reload (`unregistered`, the types'
+    # block in `config/initializers/types.rb`, which ends with this call) is
+    # kept the same way: the folder is not read, and the refusal says what
+    # was raised, so the public page shows it until a reload registers the
+    # types again. At boot the block raises it itself and never gets here.
+    def prepare(folder, reload:, unregistered: nil)
+      return new(refusal: not_registered(unregistered)) if unregistered && reload
+
       load(folder)
     rescue ThemeFolder::Invalid => error
       raise unless reload
@@ -141,6 +151,13 @@ class Theme
     end
 
     private
+
+    def not_registered(error)
+      ThemeFolder::Invalid.new(
+        "The block and content types could not be registered on this reload: #{error.class}: #{error.message}. The registries " \
+        "after the one that raised are empty until a reload registers them: correct the definition and save it."
+      ).tap { |refusal| refusal.set_backtrace(error.backtrace) }
+    end
 
     def unchecked(folder, error)
       ThemeFolder::Invalid.new(

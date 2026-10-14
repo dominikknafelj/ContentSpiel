@@ -18,6 +18,18 @@ class ThemeFolderTest < ActiveSupport::TestCase
     end
   end
 
+  # The boot's prepare raises on a refused folder and a reload's keeps the
+  # refusal: which one is running is state of this class with no writer,
+  # set by the hook `follow_boot` registered, so no other code can turn the
+  # boot's refusal into a kept one.
+  test "the boot is over once the application has started, and is followed once: a second follow_boot is refused" do
+    assert ThemeFolder.booted?
+    assert_not ThemeFolder.respond_to?(:booted=)
+    error = assert_raises(ArgumentError) { ThemeFolder.follow_boot(Rails.application.config) }
+    assert_includes error.message, "config/initializers/theme.rb"
+    assert ThemeFolder.booted?
+  end
+
   test "blank is the default theme" do
     [ nil, "", "   " ].each do |value|
       folder = ThemeFolder.from_env({ "THEME_PATH" => value })

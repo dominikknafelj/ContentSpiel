@@ -5,8 +5,10 @@ folder = ThemeFolder.current
 
 # A changed template, stylesheet or script of the theme reloads the
 # application in development, as a change under app/ does: the reload runs
-# `to_prepare` (its last lines are in config/initializers/types.rb), which builds a new Theme with the folder's new
-# fingerprint and new subclasses for the components it replaces. (Templates
+# `to_prepare` (the theme's prepare is the last lines of
+# config/initializers/types.rb's), which builds a new Theme with the
+# folder's new fingerprint and new subclasses for the components it
+# replaces. (Templates
 # under <theme>/views alone would need none of this: Action View watches
 # every view path.)
 Rails.application.config.watchable_dirs[folder.path.to_s] = %w[erb css js] if folder.configured?
@@ -23,9 +25,8 @@ folder.asset_paths.each { |directory| Rails.application.config.assets.paths << d
 # and the contract's block lines are read from the registered types. An order
 # written in one block is read; one that depended on these two files' names
 # was not. What stays here is what is done once at boot (the watched folder,
-# the asset paths above) and the flag that tells the boot's prepare from a
-# reload's: `after_initialize` runs once, after the boot's own prepare, so the
-# flag is false for exactly that first run (`Theme.prepare` says why the two
-# differ).
-Rails.application.config.x.theme_booted = false
-Rails.application.config.after_initialize { Rails.application.config.x.theme_booted = true }
+# the asset paths above) and the hook that tells the boot's prepare from a
+# reload's (`ThemeFolder.booted?`, false for exactly the boot's own prepare;
+# `Theme.prepare` says why the two differ). The state is ThemeFolder's own,
+# with no writer, so nothing else can turn the boot's refusal into a kept one.
+ThemeFolder.follow_boot(Rails.application.config)

@@ -48,6 +48,7 @@ module ContentModel
         definition.colour_index = (1..).find { |index| taken.exclude?(index) }
       end
       definition.finalize!
+      admit!(definition)
       registry[definition.name] = definition
     end
 
@@ -72,6 +73,11 @@ module ContentModel
     end
 
     private
+
+    # What a host refuses of a finished definition beside its own shape,
+    # given the definitions registered before it (`BlockTypes.admit!`).
+    # Nothing by default.
+    def admit!(definition) = nil
 
     def registry = (@registry ||= {})
   end

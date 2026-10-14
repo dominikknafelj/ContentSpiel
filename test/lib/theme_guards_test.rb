@@ -11,7 +11,7 @@ class ThemeGuardsTest < ActiveSupport::TestCase
   # the same file is still found. (`Theme` itself sets `@current`, which is
   # none of the spellings below, so it needs no entry here.)
   ALLOWED = {
-    "config/initializers/types.rb" => /\A\s*Theme\.current = Theme\.prepare\(ThemeFolder\.current, reload: Rails\.application\.config\.x\.theme_booted \|\| ThemeFolder\.checking\?\)\z/
+    "config/initializers/types.rb" => /\A\s*Theme\.current = Theme\.prepare\(ThemeFolder\.current, reload: ThemeFolder\.booted\? \|\| ThemeFolder\.checking\?, unregistered: unregistered\)\z/
   }.freeze
 
   # Every way to swap the process's theme: `Theme.with`, an assignment to
@@ -83,7 +83,7 @@ class ThemeGuardsTest < ActiveSupport::TestCase
       "app/views/pages/show.html.erb" => "<%# Theme.current = x %>\n<% Theme.current = Theme.new %>\n",
       "app/jobs/x_job.rb" => "Theme.send(:with, theme) { }\nTheme.current == theme\nTheme.current ||= theme\nTheme\n  .with(theme) { }\n",
       "app/models/x.rb" => "Theme.instance_variable_set(:@current, theme)\nTheme.current =\n  theme\nx = { Theme.current => 1 }\n",
-      "config/initializers/types.rb" => "  Theme.current = Theme.prepare(ThemeFolder.current, reload: Rails.application.config.x.theme_booted || ThemeFolder.checking?)\nTheme.current = Theme.new\n",
+      "config/initializers/types.rb" => "  Theme.current = Theme.prepare(ThemeFolder.current, reload: ThemeFolder.booted? || ThemeFolder.checking?, unregistered: unregistered)\nTheme.current = Theme.new\n",
       "app/values/theme.rb" => "    def with(theme)\n      @current = theme\n"
     )
 

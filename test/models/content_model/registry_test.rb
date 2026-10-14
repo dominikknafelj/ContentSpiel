@@ -42,6 +42,31 @@ class ContentModel::RegistryTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { BlockTypes.register("Bad Name") { |t| t.label "x" } }
   end
 
+  # A component's line in the theme contract is keyed by the component
+  # (`Theme::Contract.components`): an outside type that handed out a
+  # built-in's component would replace that built-in's line, a promise to
+  # every theme, with its gem's. Refused at registration, either order.
+  test "an outside type that hands out a built-in's component is refused at registration, and the built-in keeps it" do
+    BlockTypes.register(:image) { |t| t.label "Image"; t.component Blocks::ImageComponent }
+
+    error = assert_raises(ArgumentError) do
+      BlockTypes.register("gallery/album") { |t| t.label "Album"; t.component Blocks::ImageComponent }
+    end
+    assert_includes error.message, %("gallery/album")
+    assert_includes error.message, "Blocks::ImageComponent"
+    assert_includes error.message, %("image")
+    assert_equal %w[image], BlockTypes.names
+
+    BlockTypes.reset!
+    BlockTypes.register("gallery/album") { |t| t.label "Album"; t.component Blocks::ImageComponent }
+    assert_raises(ArgumentError) { BlockTypes.register(:image) { |t| t.label "Image"; t.component Blocks::ImageComponent } }
+    assert_equal %w[gallery/album], BlockTypes.names
+
+    BlockTypes.register("gallery/quote") { |t| t.label "Quote"; t.component TestQuoteComponent }
+    BlockTypes.register("other/quote") { |t| t.label "Quote"; t.component TestQuoteComponent }
+    assert_equal %w[gallery/album gallery/quote other/quote], BlockTypes.names, "a component no built-in hands out is not refused"
+  end
+
   test "unknown field types and nested field groups are rejected at registration" do
     assert_raises(ArgumentError) { BlockTypes.register(:x) { |t| t.field :a, :colour } }
     assert_raises(ArgumentError) { FieldGroups.register(:bad) { |c| c.field :inner, :group, of: :cta } }

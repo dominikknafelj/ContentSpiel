@@ -80,8 +80,11 @@ class Theme
 
     # THE TRANSITION (block types plan, Tasks 2 to 10): today's lines and
     # tokens of a built-in that declares nothing yet. Read only for a type
-    # whose definition has no `theme_methods` (no `tokens`); each type's
-    # conversion deletes its entry, and Task 10 deletes both constants.
+    # that declares neither `theme_methods` nor themed `tokens`: a type that
+    # declares either is read from its declarations alone, so a conversion
+    # that forgets its tokens loses them at once and the ledger says so.
+    # Each type's conversion deletes its entry, and Task 10 deletes both
+    # constants.
     #
     # A component's line is its path (where a theme puts its template) with
     # the methods its template may call. A method not listed is the CMS's to
@@ -137,7 +140,11 @@ class Theme
     end
 
     def self.themed_tokens
-      SHARED_THEMED_TOKENS + ::BlockTypes.all.flat_map { |definition| definition.themed_tokens.presence || WRITTEN_BLOCK_THEMED_TOKENS.fetch(definition.name, []) }
+      own = ::BlockTypes.all.flat_map do |definition|
+        declares = definition.theme_methods || definition.themed_tokens.any?
+        declares ? definition.themed_tokens : WRITTEN_BLOCK_THEMED_TOKENS.fetch(definition.name, [])
+      end
+      SHARED_THEMED_TOKENS + own
     end
 
     def self.fixed_tokens = SHARED_FIXED_TOKENS + ::BlockTypes.all.flat_map(&:fixed_tokens)

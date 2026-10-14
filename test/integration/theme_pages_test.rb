@@ -395,6 +395,32 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     Rails.application.reloader.prepare!
   end
 
+  # The theme is prepared last in the types' block, so a registration that
+  # raises on a development reload (a definition being edited, later a
+  # gem's) would end the block before it: `Theme.current` would stay the
+  # Theme of the last reload, over classes this one threw away, and nobody
+  # would be told. The error is kept as the theme's refusal instead, as a
+  # refused folder is, so every public page says why until a reload
+  # registers the types again.
+  test "a type whose registration raises on a reload leaves a theme that says why on every public page, and the next reload clears it" do
+    with_singleton_override(BlockTypes::Code, :register, -> { raise ArgumentError, "a typo in the code type" }) do
+      Rails.application.reloader.prepare!
+
+      assert_includes Theme.current.refusal.message, "ArgumentError: a typo in the code type"
+      [ "/about", "/" ].each do |address|
+        error = assert_raises(ThemeFolder::Invalid) { get address }
+        assert_includes error.message, "a typo in the code type"
+      end
+    end
+
+    Rails.application.reloader.prepare!
+    assert_nil Theme.current.refusal
+    get "/about"
+    assert_response :success
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   test "an empty theme draws the homepage as the default theme does" do
     get "/"
     default = response.body

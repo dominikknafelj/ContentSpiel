@@ -85,6 +85,22 @@ class Theme::ContractTest < ActiveSupport::TestCase
     Rails.application.reloader.prepare!
   end
 
+  # THE TRANSITION (block types plan, Tasks 2 to 10): a built-in that
+  # declares nothing is read from the written lines; one that declares its
+  # line is read from its declarations alone, so a conversion that forgets
+  # its tokens loses them here, and the ledger says so at once.
+  test "a type that declares its theme methods is read from its declarations alone: written tokens are not added for it" do
+    definition = ContentModel::BlockTypeDefinition.new("code")
+    definition.component Blocks::CodeComponent
+    definition.theme_methods(*%w[block page lines code language language_label filename caption string])
+    BlockTypes.registry_put(definition)
+
+    assert_empty Theme::Contract.themed_tokens.grep(/\Asyn-/), "the written syntax tokens are read for a type that declares its line"
+    assert_equal %w[block page lines code language language_label filename caption string], Theme::Contract.components.fetch("blocks/code_component")
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   test "every listed component has its default template and every method its template may call" do
     Theme::Contract.components.each do |path, methods|
       assert Theme::Contract.template_for(path).file?, "#{path} has no default template"

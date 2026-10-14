@@ -304,8 +304,8 @@ class Theme
       # A file that has no place in a theme is said once, as that: whether
       # its name is also one of the CMS's, and what it says inside, is
       # nothing its author can use before it has a place.
-      out_of_place, placed = files.partition { |file| misplaced(file) }
-      found += out_of_place.map { |file| misplaced(file) }
+      out_of_place, placed = files.partition { |file| misplaced(file, root: root) }
+      found += out_of_place.map { |file| misplaced(file, root: root) }
       found += folder.hidden_templates.reject { |file| strangers.include?(file.split("/", 2).first) }.map { |file| hidden(file) }
       found += shadowing(placed, cms_asset_roots(Pathname(root), paths: paths, folder: folder, started: started, gems: gems))
       # A template in another encoding (Latin-1 from an old editor) cannot be
@@ -327,7 +327,7 @@ class Theme
         "render that names it would still find it. Rename it without the dot, or take it out of the folder."
     end
 
-    def misplaced(file)
+    def misplaced(file, root: Rails.root)
       area, rest = file.split("/", 2)
       allowed =
         case area
@@ -341,14 +341,36 @@ class Theme
       # The owner's answer 3 (block types spec): a template of a component no
       # registered type hands out is a gem's that the site no longer has, or
       # a name misspelt; either way it is nobody's, and the check says so by
-      # name rather than leave the template unused.
-      if area == "components" && rest.end_with?(".html.erb")
-        return "#{file} replaces the template of #{rest.delete_suffix(".html.erb")}, which no registered block or content type " \
+      # name rather than leave the template unused. Not for one of the CMS's
+      # own components that is not a theme's to replace (`Media::PictureComponent`,
+      # rich text's): no type is missing there, and the sentence below says so.
+      path = rest.delete_suffix(".html.erb")
+      if area == "components" && rest.end_with?(".html.erb") && !Pathname(root).join("app/components/#{path}.rb").file?
+        type = type_named_by(path)
+        return "#{file} replaces the template of #{path}, which no registered type hands out: the block type \"#{type}\" it is " \
+               "named for is not installed. Remove the template from the theme, or install the type." if type
+
+        return "#{file} replaces the template of #{path}, which no registered block or content type " \
                "hands out: the type it belongs to is not installed. Remove the template from the theme, or install the type."
       end
 
       # `area` is one of the four: `problems` took everything else out.
       "#{file} is not part of the theme contract (#{MAY_HOLD.fetch(area)}). Rename it to a name the contract has, or take it out of the folder."
+    end
+
+    # The block type a component's path is named for, where the path says
+    # it: a built-in's `blocks/<type>_component`, an outside type's
+    # `<owner>/<name>_component` (`gallery/album_component` for
+    # `gallery/album`). Nil for anything else (a post component's name says
+    # nothing of its content type's), and the message names the path alone.
+    def type_named_by(path)
+      folder, name, more = path.split("/", 3)
+      return nil if more || name.nil? || !name.end_with?("_component") || folder == "posts"
+
+      type = name.delete_suffix("_component")
+      return nil unless type.match?(/\A[a-z][a-z0-9_]*\z/) && folder.match?(/\A[a-z][a-z0-9_]*\z/)
+
+      folder == "blocks" ? type : "#{folder}/#{type}"
     end
 
     def asset?(rest)
