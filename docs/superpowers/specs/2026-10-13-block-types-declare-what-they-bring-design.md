@@ -1,6 +1,6 @@
 # A block type declares everything it brings
 
-Status: For the owner's review (2026-10-13). The owner approved the direction the same day: a block type declares what it brings, every list that only repeats it is derived, built-in types stay where Rails puts them, and an outside type comes as a Rails engine through one registration hook. This spec is step 1; step 2 is named at the end and not designed.
+Status: approved by the owner (2026-10-13). The owner approved the direction the same day: a block type declares what it brings, every list that only repeats it is derived, built-in types stay where Rails puts them, and an outside type comes as a Rails engine through one registration hook. This spec is step 1; step 2 is named at the end and not designed.
 
 ## Why
 
@@ -171,14 +171,16 @@ The generated type passes the whole suite as written: that is the generator's ow
 - **A stored hook block holds whatever the engine's code does at registration**, run on every prepare. A hook that raises stops the boot with its place named, which is the behaviour wanted, and is also how a broken gem takes a site down.
 - **The check's strictness meets a removed gem** (decision 13).
 
-## For the owner
+## The owner's answers (2026-10-13)
 
-1. ~~Token values~~: answered 2026-10-13, decision 3 (in CS Studio a type follows CS Studio; on the site its tokens are defined from the theme's base tokens).
-2. Should the `:code` capability go now that the tile asks the type's `summary`, and should the Note block then register without `:note`?
-3. A site whose theme replaces the template of a type whose gem was removed does not start (the check refuses a template the contract does not name). Keep that strictness, or let the check refuse it with a message that names the missing type and still start?
-4. The built stylesheet would import `code.css` before `sections.css` (registration order). Accept that order when the before-and-after comparison shows the same rules, or keep `sections.css` first by a rule of the entry?
-5. The hook's name: `ContentSpiel::Plugins.block_types { |types| … }`, in the application's own module. Another name?
-6. `theme_methods` and `sample` required for every block type, `test/quote` included: agreed?
+The owner restated the aim: the block types are part of the CMS and ship with it; this change makes adding one cheap and leaves a door to extend the CMS later, through which nothing but a test passes in step 1.
+
+1. Colours: decision 3 (in CS Studio a type follows CS Studio; on the site its tokens are defined from the theme's base tokens).
+2. The `:code` capability goes (decision 9), and the Note block registers without a `:note` capability: a label nothing reads is not kept.
+3. A theme that replaces the template of a type no longer registered is refused by the check, strictly, with a message that names the missing type and says to remove the template; the check runs at the image's build, so it stops the build, not a running site.
+4. The default theme's own stylesheets (`sections.css` among them) come before every type's stylesheet, by a fixed rule of the entry, whatever the registration order.
+5. The hook is `ContentSpiel::Plugins.block_types { |types| … }`.
+6. `theme_methods` and `sample` are required of every block type, `test/quote` included.
 
 ## What the Note block changes
 
@@ -221,3 +223,5 @@ What a type no longer touches: the initializer beyond the generator's line, `The
 ## Documentation
 
 In this repository: the recipe above, the reference's "Rules a change can break silently" lines for the ledger and the hook, `docs/reference/theming.md` on outside types' lines, and `CLAUDE.md`'s two rules and "Where a class goes". In `contentspiel-docs`: none for step 1, which changes nothing a person sees; the gem guide is step 2.
+
+In the guide (`contentspiel-docs`, the owner asked for it explicitly): the integrators' pages on theming name the block tokens as defined from the theme's base tokens and list every block's template methods and tokens as the contract now derives them; a page "Adding a block type" for someone working on the CMS, from the rewritten recipe; and, marked as step 2's, a short page saying that the CMS can be extended with a block type from outside and that how a site installs one is not built yet. The pull request names these pages under "Documentation".
