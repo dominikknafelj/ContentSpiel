@@ -6,12 +6,13 @@ require "test_helper"
 # (`HeldFields`) keeps every name and value it had.
 class Admin::EditorScreen::BlockSamplesCardTest < ActiveSupport::TestCase
   include ComponentTestHelper
-  include TestTypes
+  include EveryBlockType
 
   def named(html) = Nokogiri::HTML5.fragment(html).css("[name]").map { |node| [ node["name"], node["value"] || node.text ] }
 
   test "every type's card draws a control for each field of its schema, and its held form keeps every name and value" do
-    with_test_types do
+    with_every_type do
+      assert_includes sampled_types.map(&:name), "gallery/album", "the outside type is in the run"
       page = create_page(title: "Cards")
       sampled_types.each do |definition|
         block = sample_block(page, definition.name)

@@ -9,7 +9,10 @@
 #
 # `assert_every_type_built` ends each shared test: it compares the types this
 # test built with the registry, in the test and not after the run, because
-# the suite runs in parallel workers.
+# the suite runs in parallel workers. It records names, not places: it says
+# a test built a block of each type somewhere, which catches a shared test
+# that forgot the helper, and not whether the block sat at the top level or
+# in a column (the smoke test checks that by what the page draws).
 module BlockSamples
   # THE TRANSITION (block types plan, Task 10 makes this BlockTypes.all): the
   # types that declare a sample yet.
@@ -55,4 +58,18 @@ module BlockSamples
     missing = names - Array(@built_block_types).uniq
     assert_empty missing, "this shared test built no block of #{missing.join(", ")}: build every type with sample_block or sample_every_type"
   end
+end
+
+# `with_every_type { … }`: every registered type for a block: the built-ins,
+# `test/quote` (a type with an owner's name, test/support/test_types.rb) and
+# `gallery/album` (an outside type through the plugin hook,
+# test/support/gallery_album.rb). `with_gallery_album` goes outside: it
+# prepares the registries again, which would drop a type `with_test_types`
+# had registered before it. Included by the shared tests that can run the
+# test types; the canary and the scaffold build the built-ins alone.
+module EveryBlockType
+  include TestTypes
+  include GalleryAlbum
+
+  def with_every_type(&block) = with_gallery_album { with_test_types(&block) }
 end

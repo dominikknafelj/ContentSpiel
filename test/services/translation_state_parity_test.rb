@@ -4,7 +4,7 @@ require "test_helper"
 # leave translation_states agreeing with it. One scenario per service; after
 # each, the stored rows are compared with a fresh computation.
 class TranslationStateParityTest < ActiveSupport::TestCase
-  include TestTypes
+  include EveryBlockType
 
   setup { with_locales(%w[en de es], default: "en") }
 
@@ -278,8 +278,9 @@ class TranslationStateParityTest < ActiveSupport::TestCase
   # the first.
   test "every type whose sample has translations keeps the stored state equal to a recomputation" do
     as_owner do
-      with_test_types do
+      with_every_type do
         typed = sampled_types.select { |definition| definition.sample.translations.any? }
+        assert_includes typed.map(&:name), "gallery/album", "the outside type is in the run"
         typed.each do |definition|
           page = create_page(title: "Parity #{definition.name}", translations: { "de" => { title: "Paritat #{definition.name}" }, "es" => { title: "Paridad #{definition.name}" } })
           block = sample_block(page, definition.name)
