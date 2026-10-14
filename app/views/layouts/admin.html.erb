@@ -9,10 +9,12 @@
     <%# Says on <html>, before anything is painted, whether this browser
         left the notes drawer open (`admin/shared/_notes_head`). %>
     <%= render "admin/shared/notes_head" %>
-    <%# And the width this browser chose for the page tree's column, with
-        whether it fits beside the notes (`admin/shared/_tree_head`). %>
-    <%= render "admin/shared/tree_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%# The width this browser chose for the page tree's column, with whether
+        it fits beside the notes (`admin/shared/_tree_head`). After the
+        stylesheet's link, because it reads the root's font size as the page
+        is laid out with it; still in <head>, so before anything is painted. %>
+    <%= render "admin/shared/tree_head" %>
     <%= javascript_importmap_tags "admin" %>
     <%# Per-screen head tags: `turbo-cache-control: no-cache` on the API
         token reveal (admin/api_tokens/create), on the page and post

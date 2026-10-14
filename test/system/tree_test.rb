@@ -92,6 +92,31 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_equal %w[Beta Gamma Alpha], tree_order
   end
 
+  # The handle is nothing at rest (`opacity-0`, which Cuprite counts as not
+  # visible) and shows while it has the focus. Reached as a keyboard reaches
+  # it -- it is the control before its row's link -- and with the pointer far
+  # from the row, so no hover is what shows it; found WITHOUT `visible: :all`.
+  test "a row's handle is not shown at rest, and Shift+Tab from the row's link shows it: Space then picks the row up" do
+    sign_in_via_form(users(:one))
+    visit admin_pages_path
+    await_admin_controllers
+    page.driver.browser.mouse.move(x: 900, y: 700)
+    assert_no_selector "button[aria-label='Move Alpha']"
+    assert_selector "button[aria-label='Move Alpha']", visible: :all
+
+    page.execute_script("document.querySelector('#tree a[title=Alpha]').focus()")
+    page.driver.browser.keyboard.type([ :shift, :tab ])
+
+    assert_selector "button[aria-label='Move Alpha']"
+    assert_equal "Move Alpha", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert_no_selector "button[aria-label='Move Beta']"
+
+    page.driver.browser.keyboard.type(:space)
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Alpha/, visible: :all
+    assert_selector "button[aria-label='Move Alpha']"
+    page.driver.browser.keyboard.type(:escape)
+  end
+
   test "Escape puts a picked page back without saving" do
     sign_in_via_form(users(:one))
     visit admin_pages_path

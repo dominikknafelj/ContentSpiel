@@ -233,7 +233,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_includes row[:class].split, "relative", "the handle is placed against its row"
     handle = row.find("button.admin-tree-node__handle[aria-label='Move Alpha'][aria-describedby=tree-drag-help]")
     classes = handle[:class].split
-    %w[absolute inset-y-0 -left-4 w-4 opacity-0 group-hover/node:opacity-100 focus:opacity-100 pointer-coarse:opacity-100].each do |token|
+    %w[absolute inset-y-0 -left-4 w-4 opacity-0 group-hover/node:opacity-100 focus:opacity-100 any-pointer-coarse:opacity-100].each do |token|
       assert_includes classes, token
     end
     # Out of the row's flow: it takes none of the title's room.
@@ -249,7 +249,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
 
     count = page.find("li[data-page-id='#{parent.id}'] > div [data-child-count][role=img][aria-label='1 subpage']")
     classes = count[:class].split
-    %w[sr-only group-hover/node:not-sr-only group-focus-within/node:not-sr-only pointer-coarse:not-sr-only].each { |token| assert_includes classes, token }
+    %w[sr-only group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only].each { |token| assert_includes classes, token }
   end
 
   test "the full title is available as a tooltip when the row truncates" do

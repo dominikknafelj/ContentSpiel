@@ -96,14 +96,40 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
   def keys(*pressed) = page.driver.browser.keyboard.type(*pressed)
 
   # Presses on the divider and walks the pointer until the column would be
-  # `width` wide; the caller asserts what it expects mid-drag and releases.
+  # `width` wide; the caller asserts what it expects mid-drag and releases
+  # (`mouse.up`: where the release lands does not matter to the divider).
   def drag_divider(to:)
     edge = box("#tree-column")[2]
     mouse = page.driver.browser.mouse
     mouse.move(x: edge, y: 400)
     mouse.down
-    mouse.move(x: edge + (to - tree_width), y: 420, steps: 5)
+    move_pressed(from: edge, to: edge + (to - tree_width))
     mouse
+  end
+
+  # The moves of a pressed mouse, sent through the protocol and not with
+  # Ferrum's `mouse.move`: that one names `buttons` but no `button`, and
+  # Chrome drops a pointer capture on such a move without a
+  # `lostpointercapture` (measured 2026-10-13, Ferrum 0.18.0: the same three
+  # moves keep the capture with `button: "left"` and lose it without). The
+  # divider's drag works either way (it listens on the window); this is the
+  # one that keeps the capture, as a real mouse's moves do.
+  def move_pressed(from:, to:, y: 420, steps: 5)
+    steps.times do |step|
+      page.driver.browser.page.command("Input.dispatchMouseEvent", type: "mouseMoved", x: from + ((to - from) * (step + 1) / steps.to_f), y: y, button: "left", buttons: 1)
+    end
+  end
+
+  def resizing? = page.evaluate_script("document.documentElement.hasAttribute('data-tree-resizing')")
+
+  # The browser's own font size, as a person sets it in its settings: the
+  # root's computed size, with nothing in the page saying so. Put back to the
+  # 16px every other test is laid out with.
+  def at_font_size(pixels)
+    page.driver.browser.page.command("Page.setFontSizes", fontSizes: { standard: pixels })
+    yield
+  ensure
+    page.driver.browser.page.command("Page.setFontSizes", fontSizes: { standard: 16 })
   end
 
   def open_notes
@@ -130,8 +156,9 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     main = box(".admin-shell__main")
     assert_in_delta main_before[2], main[2], 1, "the editor's right edge stays"
     assert_in_delta (main_before[2] - main_before[0]) - 100, main[2] - main[0], 1, "the editor is 100px narrower"
-    assert page.evaluate_script("document.documentElement.hasAttribute('data-tree-resizing')")
+    assert resizing?
     assert_selector ".admin-tree-divider[data-dragging]", visible: :all
+    assert page.evaluate_script("document.querySelector('.admin-tree-divider').hasPointerCapture(1)"), "the divider holds the pointer"
     assert_nil stored, "nothing is remembered before the release"
 
     mouse.up
@@ -241,19 +268,26 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert_equal "480px", chosen
       assert_in_delta 640, window_width - box(".admin-shell__main")[0], 1, "the editor column has exactly its 640px"
 
-      # A step from what is SHOWN, and End is where it already is.
-      keys(:left)
-      assert_tree 384
+      # A key that can move nothing writes nothing: Right and End at what is
+      # shown must not throw away the wider choice kept for a wider window.
+      keys(:right)
       keys(:end)
       assert_tree 400
+      assert_equal "480px", chosen
+      assert_equal "480", stored
     end
 
     # 1024px to 1279px: the sidebar is a drawer and takes no room.
     at_width(1100) do
       assert_eventually { value(:max) == 460 }
-      keys(:end)
       assert_tree 460, sidebar: 0
+      assert_equal "480px", chosen
       assert_in_delta 640, window_width - box(".admin-shell__main")[0], 1
+
+      # A step from what is SHOWN is a choice, and is stored as one.
+      keys(:left)
+      assert_tree 444, sidebar: 0
+      assert_equal "444px", chosen
     end
   end
 
@@ -305,8 +339,168 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     assert_tree 336
     assert_equal 480, value(:max)
-    assert_not page.evaluate_script("document.documentElement.hasAttribute('data-tree-resizing')")
-    assert_no_selector ".admin-tree-divider[data-dragging], .admin-tree-divider[data-hover]", visible: :all
+  end
+
+  # I1 of the review. The shell is laid out in rem and the design's figures
+  # are pixels at 16px: at 20px the sidebar is 300px, the tree 340px, its
+  # limits 275px and 600px, the editor's least 800px, a step 20px. The first
+  # build said 272 for the 340px column, made it narrower on "wider" and said
+  # it fits beside the notes from 1552px (300 + 340 + 400 + 800 = 1840).
+  test "at a browser font size of 20px the separator says the real column, the keys and a drag start from it, and the fold counts in the same unit" do
+    at_font_size(20) do
+      at_width(1800) do
+        open_editor
+        assert_equal "20px", page.evaluate_script("getComputedStyle(document.documentElement).fontSize"), "the premise: the browser's font size is 20px"
+        assert_equal "", chosen
+        assert_tree 340, sidebar: 300
+        assert_equal [ 275, 600 ], [ value(:min), value(:max) ]
+        # 300 + 340 + 400 + 800 = 1840: said by the head script, and kept by the controller.
+        assert_not fits?
+
+        focus_divider
+        assert_selector ".admin-tree-divider [data-tooltip]", text: "Tree width 340px. Arrow keys to resize."
+        keys(:right)
+        assert_tree 360, sidebar: 300
+        keys([ :shift, :left ])
+        assert_tree 280, sidebar: 300
+        keys(:left)
+        assert_tree 275, sidebar: 300
+        keys(:enter)
+        assert_tree 340, sidebar: 300
+
+        # A drag begins where the column is: 50px of pointer are 50px of column.
+        mouse = drag_divider(to: 390)
+        assert_tree 390, sidebar: 300
+        mouse.up
+        assert_eventually { stored == "390" }
+
+        # The head script, alone: a reload lays the same width out, and the
+        # limits it holds a stored width to are the scaled ones (500 is over
+        # the 480 of a 16px page and under the 600 of this one).
+        page.execute_script("window.localStorage.setItem('#{WIDTH_KEY}', '500')")
+        visit "/cs-studio/posts"
+        assert_selector "h1", text: "Posts"
+        assert_equal "500px", chosen
+        assert_not fits?
+        page.execute_script("window.localStorage.removeItem('#{WIDTH_KEY}')")
+
+        # The tree stays beside the notes from 1840px, not from 1552px.
+        open_editor(@docs, "?notes=open")
+        assert_selector "#notes-drawer #notes-list"
+        assert_not fits?
+        assert_no_selector "#tree-column"
+        page.current_window.resize_to(1850, 900)
+        assert_selector "#tree-column"
+        assert fits?
+        assert_tree 340, sidebar: 300
+        assert_operator box("#notes-drawer")[0] - box(".admin-shell__main")[0], :>=, 800
+      end
+    end
+  end
+
+  # I2 of the review: a drag always has an end.
+  test "a mouse that moves with no button down ends the drag: the width it reached is kept, and the pointer no longer moves the tree" do
+    open_editor
+    mouse = drag_divider(to: 340)
+    assert_tree 340
+    assert resizing?
+    edge = box("#tree-column")[2]
+
+    # The button was let go where the page did not hear it (a context menu,
+    # another window): the next move says so.
+    page.driver.browser.page.command("Input.dispatchMouseEvent", type: "mouseMoved", x: edge + 60, y: 420, button: "none", buttons: 0)
+
+    assert_eventually(message: "the drag did not end") { !resizing? }
+    assert_no_selector ".admin-tree-divider[data-dragging]", visible: :all
+    assert_eventually { stored == "340" }
+    page.driver.browser.page.command("Input.dispatchMouseEvent", type: "mouseMoved", x: edge + 120, y: 420, button: "none", buttons: 0)
+    await_frames # the move has been handled: it must have resized nothing
+    assert_tree 340
+  ensure
+    mouse&.up
+  end
+
+  test "the window losing the focus ends the drag, keeping the width" do
+    open_editor
+    mouse = drag_divider(to: 340)
+    assert resizing?
+
+    page.execute_script("window.dispatchEvent(new Event('blur'))")
+
+    assert_not resizing?
+    assert_no_selector ".admin-tree-divider[data-dragging]", visible: :all
+    assert_eventually { stored == "340" }
+    assert_tree 340
+  ensure
+    mouse&.up
+  end
+
+  test "a cancelled pointer puts the width back where the press found it and stores nothing" do
+    open_editor
+    focus_divider
+    keys(:right)
+    assert_tree 288
+    mouse = drag_divider(to: 400)
+    assert_tree 400
+
+    page.execute_script("window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1, pointerType: 'mouse' }))")
+
+    assert_not resizing?
+    assert_tree 288
+    assert_equal "288px", chosen
+    assert_equal "288", stored
+  ensure
+    mouse&.up
+  end
+
+  test "a press with Ctrl and a press with another button begin no drag" do
+    open_editor
+    edge = box("#tree-column")[2]
+    mouse = page.driver.browser.mouse
+    mouse.move(x: edge, y: 400)
+
+    mouse.down(modifiers: 2) # Ctrl: the context menu on macOS, which swallows the release
+    await_frames # the press has been handled: it must have begun nothing
+    assert_not resizing?
+    mouse.up(modifiers: 2)
+
+    mouse.down(button: :middle)
+    await_frames # as above
+    assert_not resizing?
+    mouse.up(button: :middle)
+    assert_tree 272
+  end
+
+  # `rest`: a page put away in the middle of a drag leaves nothing behind on
+  # <html>, which the next screen keeps.
+  test "leaving the screen in the middle of a drag leaves no drag behind: the next screen selects text and has its own cursor" do
+    open_editor
+    mouse = drag_divider(to: 340)
+    assert resizing?
+
+    within("nav[aria-label='Modules']") { find_link("Posts").execute_script("this.click()") } # press_by_script: the mouse is held down on the divider
+    assert_selector "h1", text: "Posts"
+
+    assert_not resizing?
+    assert_equal "340px", chosen, "the width the drag had reached stays the document's"
+  ensure
+    mouse&.up
+  end
+
+  # `data-hover` is the script's (a `pointerenter` and a 150ms timer), not a
+  # `hover:` style, so a moved mouse sets it in any browser.
+  test "a pointer resting on the divider marks it after its wait, and one that leaves unmarks it" do
+    open_editor
+    edge = box("#tree-column")[2]
+    mouse = page.driver.browser.mouse
+    assert_no_selector ".admin-tree-divider[data-hover]", visible: :all
+
+    mouse.move(x: edge, y: 400)
+    assert_selector ".admin-tree-divider[data-hover]", visible: :all
+    assert_equal "col-resize", page.evaluate_script("getComputedStyle(document.querySelector('.admin-tree-divider')).cursor")
+
+    mouse.move(x: edge + 200, y: 400)
+    assert_no_selector ".admin-tree-divider[data-hover]", visible: :all
   end
 
   # Private windows and blocked site data: reading `localStorage` throws.
@@ -363,6 +557,58 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       close_notes
       assert_eventually(message: -> { "the separator's maximum is #{value(:max)}" }) { value(:max) == 480 }
       assert_tree 320
+    end
+  end
+
+  # M1 of the review, ruled: a reset is the default, also where the default
+  # does not fit beside the notes. 240 + 240 + 400 + 640 = 1520 fits a 1530px
+  # window; the default's 1552 does not.
+  test "Enter beside the open notes resets to the default although it does not fit: the tree folds, and is the default column when the notes close" do
+    at_width(1530) do
+      open_editor
+      focus_divider
+      keys(:left, :left)
+      assert_tree 240
+      assert fits?
+      open_notes
+      assert_tree 240
+      assert_equal 250, value(:max)
+
+      focus_divider
+      keys(:enter)
+
+      assert_eventually(message: "the reset did not take the default") { chosen == "" }
+      assert_nil stored
+      assert_not fits?
+      assert_no_selector "#tree-column"
+      assert_selector ".admin-editor-header button[aria-controls='tree-column']"
+
+      close_notes
+      assert_tree 272
+    end
+  end
+
+  # M3 of the review. The sidebar is a column from 1280px only, so the sum
+  # steps there: at 1270px a 220px tree leaves the editor 1270 - 220 - 400 =
+  # 650px and stays; at 1280px the sidebar's 240px are in the sum and it folds.
+  test "either side of the sidebar's breakpoint: a 220px tree stays beside the notes at 1270px and folds at 1280px" do
+    at_width(1270) do
+      open_editor
+      focus_divider
+      keys(:home)
+      assert_tree 220, sidebar: 0
+      assert fits?
+      open_notes
+
+      assert_tree 220, sidebar: 0
+      assert_no_selector "button[aria-controls='tree-column']"
+      assert_operator box("#notes-drawer")[0] - box(".admin-shell__main")[0], :>=, 640, "the editor really has its 640px"
+
+      page.current_window.resize_to(1280, 900)
+      assert_no_selector "#tree-column"
+      assert_not fits?
+      assert_selector ".admin-editor-header button[aria-controls='tree-column']"
+      assert_equal "220px", chosen
     end
   end
 

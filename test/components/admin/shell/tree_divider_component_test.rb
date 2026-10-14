@@ -18,9 +18,26 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
 
   test "the numbers are the design's, and the default is the 17rem the column always was" do
     assert_equal [ 220, 272, 480, 640, 240, 400 ], [ Divider::MIN, Divider::DEFAULT, Divider::MAX, Divider::EDITOR, Divider::SIDEBAR, Divider::NOTES ]
-    assert_equal 17 * 16, Divider::DEFAULT
+    assert_equal 17 * Divider::BASE, Divider::DEFAULT
     # The design's own sum: at the default the tree stays beside the notes from a 1552px window.
     assert_equal 1552, Divider::SIDEBAR + Divider::DEFAULT + Divider::NOTES + Divider::EDITOR
+  end
+
+  # The figures are pixels at a 16px root font, and the stylesheet lays them
+  # out in rem: each of them as a rem literal is in the shell's rules, and none
+  # is left there as pixels (the notes column's 400px is the one that is).
+  test "the stylesheet holds every figure in rem, as the constants over the base: none as pixels" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    rules = css[/^:root \{\n  --admin-tree-room:.*?^\.admin-shell--tree \{[^\n]*\n/m]
+    assert rules, "the tree column's rules moved"
+    rem = ->(pixels) { format("%g", pixels.fdiv(Divider::BASE)) + "rem" }
+
+    assert_equal %w[13.75rem 17rem 30rem 40rem 15rem], [ Divider::MIN, Divider::DEFAULT, Divider::MAX, Divider::EDITOR, Divider::SIDEBAR ].map(&rem)
+    assert_includes rules, "--admin-tree-room: calc(100vw - #{rem.(Divider::SIDEBAR)} - #{rem.(Divider::EDITOR)});"
+    assert_includes rules, "--admin-tree-column: clamp(#{rem.(Divider::MIN)}, var(--admin-tree-width, #{rem.(Divider::DEFAULT)}), max(#{rem.(Divider::MIN)}, min(#{rem.(Divider::MAX)}, var(--admin-tree-room))));"
+    assert_includes rules, "@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - #{rem.(Divider::EDITOR)}); } }"
+    assert_no_match(/\d+px(?! \{)/, rules.gsub("1279px", ""), "a pixel length among the tree column's rules")
+    assert_match(/^:root \{ --admin-notes-width: #{Divider::NOTES}px; \}/, css)
   end
 
   test "the script is handed every number and the storage key as values, and the tooltip's sentence as a message" do
@@ -39,7 +56,8 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
     render_inline(Divider.new)
     actions = page.find("[role=separator]")["data-action"].split
 
-    %w[pointerdown->admin--shell--tree-width#press pointerenter->admin--shell--tree-width#enter pointerleave->admin--shell--tree-width#leave
+    %w[pointerdown->admin--shell--tree-width#press lostpointercapture->admin--shell--tree-width#release blur@window->admin--shell--tree-width#release
+       pointerenter->admin--shell--tree-width#enter pointerleave->admin--shell--tree-width#leave
        dblclick->admin--shell--tree-width#reset keydown->admin--shell--tree-width#key
        resize@window->admin--shell--tree-width#sync turbo:before-cache@document->admin--shell--tree-width#rest].each do |action|
       assert_includes actions, action

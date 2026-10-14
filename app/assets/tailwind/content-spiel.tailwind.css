@@ -89,24 +89,32 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    it always was.
 
    `--admin-tree-column` is the width the grid SHOWS: the choice held between
-   220px and 480px, and under whatever leaves the editor column 640px (the
+   13.75rem and 30rem, and under whatever leaves the editor column 40rem (the
    narrowest at which block cards and section lanes still work), so a width
    chosen on a wide window does not squeeze the editor on a narrow one; the
    choice itself is kept. `--admin-tree-room` is that limit: the window less
-   the editor's 640px and less the modules sidebar where it is a column (from
-   1280px). `100vw` is what a media query measures and what the script's
-   `innerWidth` is, so the two agree to the pixel. The figures are
-   `Admin::Shell::TreeDividerComponent`'s constants, repeated here because
-   `clamp()` cannot be handed one.
+   the editor's 40rem and less the modules sidebar where it is a column (from
+   1280px).
+
+   REM, ALL OF IT. The design's figures are 220, 272, 480, 640 and 240 pixels
+   at a root font size of 16px, and the shell was always laid out in rem (the
+   sidebar's 15rem, the tree's 17rem), so the new ones are rem too and the
+   whole of it grows with a browser set to a larger font. The two scripts
+   hold the same figures as `Admin::Shell::TreeDividerComponent`'s constants
+   (repeated here because `clamp()` cannot be handed one) and multiply each
+   by the root's font size over 16; `100vw` is what a media query measures
+   and what their `innerWidth` is. So the scripts and this agree at any font
+   size, not at 16px only. The notes column alone is pixels
+   (`--admin-notes-width`), here and there.
 
    Where the tree is a DRAWER the limit is not asked: below 1024px it keeps
    its fixed 17rem, and folded beside the notes column (further down) it is
    the chosen width, laid over the content. */
 :root {
-  --admin-tree-room: calc(100vw - 15rem - 640px);
-  --admin-tree-column: clamp(220px, var(--admin-tree-width, 17rem), max(220px, min(480px, var(--admin-tree-room))));
+  --admin-tree-room: calc(100vw - 15rem - 40rem);
+  --admin-tree-column: clamp(13.75rem, var(--admin-tree-width, 17rem), max(13.75rem, min(30rem, var(--admin-tree-room))));
 }
-@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - 640px); } }
+@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - 40rem); } }
 .admin-shell--tree { grid-template-columns: 15rem var(--admin-tree-column) minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a
@@ -205,11 +213,17 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 
    THE PAGE TREE STAYS BESIDE THE EDITOR WHILE IT FITS, AND FOLDS WHEN IT
    DOES NOT (Claude Design, 2026-10-13, T3; until then it folded at every
-   width). It fits while the editor column would still be 640px wide: the
-   modules sidebar (240px, where it is a column) + the tree at its CHOSEN
-   width + this 400px column + 640px are no more than the window. At the
-   default tree width that is a window of 1552px: the tree stays at 1600px
-   and folds at 1440px. A media query cannot read the chosen width, so the
+   width). It fits while the editor column would still be 40rem (640px) wide:
+   the modules sidebar (15rem, where it is a column) + the tree at its CHOSEN
+   width + this 400px column + 40rem are no more than the window. At the
+   default tree width and a 16px font that is a window of 1552px: the tree
+   stays at 1600px and folds at 1440px. The sidebar is a column from 1280px
+   only, so the sum steps there: a tree of 220 to 239px stays beside the
+   notes at 1260 to 1279px (the sidebar is a drawer, the editor really has
+   its 640px) and folds from 1280px until the window is 1500px wide. That is
+   the sidebar's breakpoint showing, the same step the editor's width takes
+   there without the notes, and not a fault of the rule, which is the
+   editor's true width. A media query cannot read the chosen width, so the
    sum is done in script and said on <html> as `data-tree-fits`: by the
    layout's head script before the first paint (`admin/shared/_tree_head`)
    and from then on by `admin--shell--tree-width`, on a resize and on every
@@ -220,7 +234,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    Studio never narrows the tree to make it fit. It folds at the width it
    has, and is a column of that same width again when the notes close; while
    it is a column beside the notes its divider stops at the width that still
-   fits (the script's `ceiling`), so a drag cannot fold it.
+   fits (the script's `ceiling`), so a drag cannot fold it. A reset to the
+   default can: where the default does not fit, it folds like any width.
 
    FOLDED, it is what it is below 1024px: the same element, the same
    `data-open`, `admin--shell--drawer` and the scrim -- these rules only add a

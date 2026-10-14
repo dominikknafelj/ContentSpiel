@@ -46,17 +46,23 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_select ".admin-tree-divider", count: 0
   end
 
-  test "the head script applies the remembered width and says whether the tree fits beside the notes, on every screen, guarded, before the stylesheet" do
+  test "the head script applies the remembered width and says whether the tree fits beside the notes, on every screen, guarded, in the stylesheet's unit" do
     [ "/cs-studio/pages/#{@b.id}", "/cs-studio/posts" ].each do |path|
       get path
       script = css_select("head script").map(&:text).find { |text| text.include?("--admin-tree-width") }
       assert script, "#{path} has no head script for the tree's width"
-      assert_includes script, %(try { stored = parseInt(localStorage.getItem("cs-tree-width"), 10); } catch (e) {})
-      assert_includes script, "stored >= 220 && stored <= 480"
+      assert_includes script, %(try { stored = parseFloat(localStorage.getItem("cs-tree-width")); } catch (e) {})
+      # Every figure but the notes' is multiplied by the root's font size over 16.
+      assert_includes script, "var scale = size > 0 ? size / 16 : 1;"
+      assert_includes script, "stored >= 220 * scale && stored <= 480 * scale"
+      assert_includes script, "var width = 272 * scale;"
+      assert_includes script, "240 * scale : 0"
+      assert_includes script, "sidebar + width + 400 + 640 * scale"
       assert_includes script, %(root.setAttribute("data-tree-fits", ""))
-      assert_includes script, "sidebar + width + 400 + 640"
+      # After the stylesheet's link (a script waits for the stylesheets before
+      # it, so the font size it reads is the page's) and still in <head>.
       head = response.body[/<head>.*<\/head>/m]
-      assert_operator head.index("--admin-tree-width"), :<, head.index('rel="stylesheet"'), "the width is said before the stylesheet is linked"
+      assert_operator head.index('rel="stylesheet"'), :<, head.index("--admin-tree-width"), "the head script reads the font size before the stylesheet is in"
     end
   end
 

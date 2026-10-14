@@ -9,29 +9,41 @@
 
     `data-tree-fits` is the other thing the stylesheet cannot work out for
     itself: whether the tree, at that width, still fits BESIDE the notes
-    column with 640px left for the editor (T3; a media query cannot read a
+    column with the editor's least left (T3; a media query cannot read a
     custom property). It is said here for every screen, whether or not the
     notes are open or the screen has a tree: the stylesheet asks it only
     where both are so, and `admin--shell--tree-width` keeps it current from
     then on (a resized window, another width).
 
+    THE UNIT IS THE STYLESHEET'S. The divider's figures
+    (`Admin::Shell::TreeDividerComponent`) are pixels at a root font size of
+    16px, and the stylesheet lays them out in rem, so each is multiplied here
+    by the root's computed font size over 16, exactly as the controller does
+    (its `scale`); only the notes column is pixels at any size. That is why
+    this script is rendered AFTER the stylesheet's link and not before it as
+    the other two head scripts are: a script waits for the stylesheets
+    linked before it, so the font size it reads is the one the page is laid
+    out with, whoever sets it (today nobody does: it is the browser's own).
+    Still before <body> exists, so still before the first paint.
+
     Both stay on <html> for the life of the document: Turbo replaces <body>
     and merges <head>, never the root element, so a visit and Back find them
     as they were. Guarded like the theme's (`shared/_theme_head`):
-    `localStorage` can throw, and the page is then laid out at the default.
-    The numbers are the divider's (`Admin::Shell::TreeDividerComponent`). %>
+    `localStorage` can throw, and the page is then laid out at the default. %>
 <% divider = Admin::Shell::TreeDividerComponent %>
 <%= javascript_tag nonce: true do %>
   (function () {
     var root = document.documentElement;
-    var width = <%= divider::DEFAULT %>;
+    var size = parseFloat(window.getComputedStyle(root).fontSize);
+    var scale = size > 0 ? size / <%= divider::BASE %> : 1;
+    var width = <%= divider::DEFAULT %> * scale;
     var stored = NaN;
-    try { stored = parseInt(localStorage.getItem("<%= divider::STORAGE_KEY %>"), 10); } catch (e) {}
-    if (stored >= <%= divider::MIN %> && stored <= <%= divider::MAX %>) {
+    try { stored = parseFloat(localStorage.getItem("<%= divider::STORAGE_KEY %>")); } catch (e) {}
+    if (stored >= <%= divider::MIN %> * scale && stored <= <%= divider::MAX %> * scale) {
       width = stored;
       root.style.setProperty("--admin-tree-width", stored + "px");
     }
-    var sidebar = window.matchMedia("(min-width: 1280px)").matches ? <%= divider::SIDEBAR %> : 0;
-    if (window.innerWidth >= sidebar + width + <%= divider::NOTES %> + <%= divider::EDITOR %>) root.setAttribute("data-tree-fits", "");
+    var sidebar = window.matchMedia("(min-width: 1280px)").matches ? <%= divider::SIDEBAR %> * scale : 0;
+    if (window.innerWidth >= sidebar + width + <%= divider::NOTES %> + <%= divider::EDITOR %> * scale) root.setAttribute("data-tree-fits", "");
   })();
 <% end %>

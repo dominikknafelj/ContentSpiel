@@ -25,8 +25,12 @@
             only the homepage is not in a children list, and it has no handle.
             It is shown the way the hover control in a block card's header
             is (a control that is nothing at rest): by `opacity`,
-            on hover of its row and while it has the focus, and always for a
-            coarse pointer, which cannot hover. `focus:` and not `focus-visible:`, because a row
+            on hover of its row and while it has the focus, and always where
+            ANY pointer of the device is coarse (`any-pointer-coarse:`, not
+            `pointer-coarse:`, which asks about the first pointer only: on a
+            touch-screen laptop that is the mouse, and the finger that cannot
+            hover would never see a handle that until now was always there).
+            `focus:` and not `focus-visible:`, because a row
             picked up with Space after a click on its handle must show what
             holds it. Not shown by `opacity` it is still there: in the Tab
             order, which is the keyboard's way to it, and under the pointer,
@@ -34,7 +38,7 @@
             it keeps the row hovered while the pointer is on it, and it
             abuts the row, so the pointer crosses no gap on its way. Its
             chrome ground covers the guide line it stands on while it shows. %>
-        <button type="button" class="admin-tree-node__handle absolute inset-y-0 -left-4 w-4 cursor-grab select-none rounded-cs bg-chrome text-center text-meta opacity-0 hover:text-ink focus:opacity-100 focus-visible:outline-2 focus-visible:outline-accent group-hover/node:opacity-100 pointer-coarse:opacity-100"
+        <button type="button" class="admin-tree-node__handle absolute inset-y-0 -left-4 w-4 cursor-grab select-none rounded-cs bg-chrome text-center text-meta opacity-0 hover:text-ink focus:opacity-100 focus-visible:outline-2 focus-visible:outline-accent group-hover/node:opacity-100 any-pointer-coarse:opacity-100"
                 aria-label="Move <%= title %>" aria-describedby="tree-drag-help"
                 data-action="keydown->admin--pages--tree#key focusout->admin--pages--tree#blur">⠿</button>
       <% end %>
@@ -80,13 +84,13 @@
             tree has no collapsing, so every row's children are in view below
             it and the count takes room from the title for nothing; it shows
             while the pointer is on the row or the focus is in it, and always
-            for a coarse pointer. `sr-only` and not `hidden`, so a screen
+            where any pointer is coarse (as the handle). `sr-only` and not `hidden`, so a screen
             reader still reads "3 subpages" on a row at rest and the count
             takes no room there. When the tree learns to collapse, a
             collapsed row shows it at rest. %>
         <%= tag.span child_count, data: { child_count: true }, role: "img", aria: { label: pluralize(child_count, "subpage") },
               title: pluralize(child_count, "subpage"),
-              class: "sr-only shrink-0 font-cs-mono text-label text-meta group-hover/node:not-sr-only group-focus-within/node:not-sr-only pointer-coarse:not-sr-only" %>
+              class: "sr-only shrink-0 font-cs-mono text-label text-meta group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only" %>
       <% end %>
 
       <% if can_add_child? %>

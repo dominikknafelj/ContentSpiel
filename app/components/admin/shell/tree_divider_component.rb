@@ -19,8 +19,14 @@ module Admin
     # THE NUMBERS are here once for the three that need them: this markup, the
     # layout's head script (`admin/shared/_tree_head`, which applies the
     # remembered width before the first paint) and the script, which reads them
-    # from its values. The stylesheet holds the same figures as literals
-    # (`--admin-tree-column` in content-spiel.tailwind.css), since a media
+    # from its values. They are the design's figures, which are PIXELS AT A
+    # ROOT FONT SIZE OF 16PX: the stylesheet lays the shell out in rem
+    # (`--admin-tree-column` in content-spiel.tailwind.css: 13.75rem, 17rem,
+    # 30rem, 40rem, 15rem), and both scripts multiply each figure by the
+    # root's font size over `BASE` before they use it, so a browser set to a
+    # larger font gets a larger tree and a separator that says so. `NOTES`
+    # alone is pixels at any font size, as `--admin-notes-width` is. The
+    # stylesheet holds the figures as literals, since a media
     # query and `clamp()` cannot be handed a Ruby constant: change one, change
     # the other, and `test/system/admin/tree_column_test.rb` ("the maximum is
     # what leaves the editor 640px…") compares what the script allows with
@@ -51,14 +57,17 @@ module Admin
       EDITOR = 640
       SIDEBAR = 240
       NOTES = 400
+      # The root font size the figures above are for (all but `NOTES`).
+      BASE = 16
       # `localStorage`, per browser: a convenience, like the theme and the
       # notes drawer's "open".
       STORAGE_KEY = "cs-tree-width".freeze
 
-      # A drag's moves and its release are not here: the script listens for
-      # them on the window for as long as a drag lasts.
+      # A drag's moves, its release and its cancel are not here: the script
+      # listens for them on the window for as long as a drag lasts. A lost
+      # capture and the window's `blur` end a drag whose release never came.
       ACTIONS = %w[
-        pointerdown->admin--shell--tree-width#press
+        pointerdown->admin--shell--tree-width#press lostpointercapture->admin--shell--tree-width#release blur@window->admin--shell--tree-width#release
         pointerenter->admin--shell--tree-width#enter pointerleave->admin--shell--tree-width#leave
         dblclick->admin--shell--tree-width#reset keydown->admin--shell--tree-width#key focus->admin--shell--tree-width#sync
         resize@window->admin--shell--tree-width#sync turbo:frame-load@document->admin--shell--tree-width#sync
