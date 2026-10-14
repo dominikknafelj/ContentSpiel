@@ -1,9 +1,9 @@
 module Admin
   module EditorScreen
     # One line of a block's content on its tile (sections spec §4.2): the
-    # start of a text, an image's file name with a small thumbnail, a post
-    # list's filter, or the line a type with a `summary` answers itself (the
-    # Code block's file name, or its language and first line).
+    # start of a text, an image's file name with a small thumbnail, or the
+    # line a type with a `summary` answers itself (the Code block's file
+    # name, or its language and first line; a post list's filter).
     # A block in a section's column is a tile until it is opened, so this
     # line is all that says which block it is -- and what marks the ones that
     # need attention, as a card would: an image block without an image, a
@@ -11,10 +11,10 @@ module Admin
     # (`invalid:`).
     #
     # WHAT THE LINE IS comes from the type's definition, never from its name:
-    # the columns it uses (`uses_columns`) and its capabilities, so a type a
+    # the columns it uses (`uses_columns`) or its own `summary`, so a type a
     # plugin registers gets a sensible tile without being known here. A type
     # that uses an image AND a body is summarised by its image, the first rule
-    # that matches. A type with neither, no summary and no listing has no
+    # that matches. A type with neither and no summary has no
     # line at all; its tile is its label.
     #
     # A type that declares `summary` answers its own line as parts (block
@@ -98,7 +98,6 @@ module Admin
         elsif definition.summary then own_summary
         elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
         elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
-        elsif definition.capability?(:lists_posts) then listing
         end
       end
 
@@ -140,17 +139,6 @@ module Admin
 
       def word(key, **values)
         t("admin.components.editor_screen.tile_summary.types.#{block.block_type.tr("/", ".")}.#{key}", **values)
-      end
-
-      # A listing's filter: the content type it lists (or "All posts"), then
-      # its tag. A content type that is no longer registered reads as its
-      # stored name, as the block card's own field shows it.
-      def listing
-        settings = block.settings_object(locale: locale)
-        type = settings&.content_type.presence
-        tag = settings&.tag.presence
-
-        [ type ? (::ContentTypes.find(type)&.label || type) : t(".any_type"), (t(".tag", name: tag) if tag) ].compact.join(" · ")
       end
     end
   end

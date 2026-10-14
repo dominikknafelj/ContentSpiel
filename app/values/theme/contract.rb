@@ -89,10 +89,7 @@ class Theme
     # A component's line is its path (where a theme puts its template) with
     # the methods its template may call. A method not listed is the CMS's to
     # change.
-    WRITTEN_BLOCK_LINES = {
-      "blocks/post_list_component" => %w[block page list_component],
-      "blocks/section_component" => %w[block page columns layout background width]
-    }.freeze
+    WRITTEN_BLOCK_LINES = {}.freeze
 
     # The content types' components, written here: a content type declares
     # no line of its own (block types spec, "not part of this").

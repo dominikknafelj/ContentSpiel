@@ -12,7 +12,28 @@ module BlockTypes
         t.field :limit, :integer, min: 1
         t.capability :lists_posts
         t.component Blocks::PostListComponent
+        t.theme_methods :block, :page, :list_component
+        t.summary ->(block, locale:) { PostList.summary(block, locale: locale) }
+        # The one type whose sample leaves a field empty: `tag` (the smoke
+        # test names it in UNFILLED_FIELDS; the canary's own "ruby" list
+        # compares it). A sample makes no posts: the tests that draw it
+        # create the posts it lists.
+        t.sample settings: { "content_type" => "blog", "limit" => 5 }, shows: [ "content-block--post-list" ]
       end
+    end
+
+    # The tile's line of a closed post list (block types spec, decision 8):
+    # the content type it lists, or "All posts", then its tag. A content
+    # type that is no longer registered reads as its stored name, as the
+    # block card's own field shows it; a block with no settings is "All
+    # posts".
+    def self.summary(block, locale:)
+      settings = block.settings_object(locale: locale)
+      type = settings&.content_type.presence
+      tag = settings&.tag.presence
+
+      [ (type ? [ :text, ContentTypes.find(type)&.label || type ] : [ :word, :any_type ]),
+        *([ [ :text, " · " ], [ :word, :tag, { name: tag } ] ] if tag) ]
     end
 
     # The published posts a post_list block with these settings is

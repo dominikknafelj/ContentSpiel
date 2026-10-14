@@ -104,4 +104,17 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert image.sample.image
     assert_equal %w[alt caption], image.sample.translations.fetch("en").keys.map(&:to_s).sort
   end
+
+  test "post list and section declare their contract lines and a sample; the list's tile line is its own, the section brings no stylesheet" do
+    list = BlockTypes.fetch(:post_list)
+    section = BlockTypes.fetch(:section)
+
+    assert_equal %w[block page list_component], list.theme_methods
+    assert_equal %w[block page columns layout background width], section.theme_methods
+    assert list.summary
+    assert_nil section.summary, "a section's tile is its lanes"
+    assert_nil section.stylesheet, "sections.css is the default theme's own stylesheet, imported by theme.css before every type's"
+    assert_equal({ "content_type" => "blog", "limit" => 5 }, list.sample.settings, "the tag is left out on purpose (UNFILLED_FIELDS); the limit is filled so the canary compares it")
+    assert_equal "tinted", section.sample.settings.fetch("background")
+  end
 end

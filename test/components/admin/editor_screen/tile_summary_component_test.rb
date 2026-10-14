@@ -149,6 +149,13 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_no_selector attention
   end
 
+  test "a post list naming a content type that is no longer registered reads as its stored name" do
+    retired = block("post_list", settings: { "content_type" => "blog", "tag" => "old" })
+    retired.update_column(:settings, { "content_type" => "retired", "tag" => "old" }) # version: none (a test stores a type the registry no longer holds)
+    render_summary retired.reload
+    assert_selector line, text: "retired · tag old", exact_text: true
+  end
+
   test "a type that is no longer registered says so and needs attention" do
     gone = block("rich_text")
     gone.update_column(:block_type, "gone/thing")

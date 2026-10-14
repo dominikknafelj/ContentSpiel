@@ -24,6 +24,11 @@ module BlockTypes
         t.capability :container
         t.columns ->(settings) { weights(settings["layout"]).size }
         t.component Blocks::SectionComponent
+        t.theme_methods :block, :page, :columns, :layout, :background, :width
+        # No `stylesheet` and no `summary` (block types plan, departure 1):
+        # sections.css is the default theme's own file, imported by
+        # theme.css before every type's, and a section's tile is its lanes.
+        t.sample settings: { "layout" => "two", "background" => "tinted", "width" => "content" }, shows: [ "content-section--tinted" ]
       end
     end
 

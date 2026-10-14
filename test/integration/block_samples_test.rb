@@ -32,8 +32,11 @@ class BlockSamplesTest < ActionDispatch::IntegrationTest
     main = main_of(body)
     top = main.dup
     top.css(".content-section").each(&:remove)
+    # A container is what the top level was stripped of, so it is read from
+    # the whole of main: its sample draws its own wrapper.
     sampled_types.each do |definition|
-      definition.sample.shows.each { |text| assert_includes top.to_html, text, "#{definition.name}'s sample draws #{text.inspect} at the top level #{where}" }
+      drawn = definition.capability?(:container) ? main.to_html : top.to_html
+      definition.sample.shows.each { |text| assert_includes drawn, text, "#{definition.name}'s sample draws #{text.inspect} at the top level #{where}" }
     end
     return if sampled_types.none? { |definition| definition.capability?(:container) }
 
