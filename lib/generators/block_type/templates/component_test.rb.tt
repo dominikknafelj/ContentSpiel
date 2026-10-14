@@ -1,0 +1,27 @@
+require "test_helper"
+
+class Blocks::<%= class_name %>ComponentTest < ActiveSupport::TestCase
+  include ComponentTestHelper
+
+  def block_with(text)
+    block = ContentBlock.new(owner: root_page, block_type: "<%= file_name %>")
+    block.assign_settings({ "text" => text }, locale: "en")
+    block
+  end
+
+  test "the sample's text is drawn in the block's element" do
+    render_inline Blocks::<%= class_name %>Component.new(block: block_with("A sample <%= human_name.downcase %>"), page: root_page)
+    assert_selector ".content-block--<%= file_name %>", text: "A sample <%= human_name.downcase %>"
+  end
+
+  test "an empty block draws nothing" do
+    render_inline Blocks::<%= class_name %>Component.new(block: block_with(""), page: root_page)
+    assert_no_selector ".content-block--<%= file_name %>"
+  end
+
+  test "text that looks like markup is text" do
+    render_inline Blocks::<%= class_name %>Component.new(block: block_with("<script>x</script>"), page: root_page)
+    assert_no_selector "script", visible: :all
+    assert_includes rendered_content, "&lt;script&gt;"
+  end
+end

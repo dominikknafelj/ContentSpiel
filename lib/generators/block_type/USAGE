@@ -1,0 +1,14 @@
+Description:
+    Writes a built-in block type of this repository: its definition in
+    app/models/block_types (one translated :text field, its theme methods,
+    its stylesheet and a sample), its line in config/initializers/types.rb,
+    its public component and template in app/components/blocks, its
+    stylesheet in the default theme's folder (colours as --th- tokens only),
+    an empty scope for its words under public.blocks and under the tile's
+    types (each below its marker line; a file without the marker gets
+    nothing, and the generator says so), a Lookbook preview built from the
+    sample, and two tests. An owner/name type is an engine's, and its
+    generator is not built yet (block types spec, step 2).
+
+Example:
+    bin/rails generate block_type callout

@@ -1,0 +1,12 @@
+require "test_helper"
+
+class BlockTypes::<%= class_name %>Test < ActiveSupport::TestCase
+  test "<%= file_name %> is one translated text, nothing required" do
+    definition = BlockTypes.fetch(:<%= file_name %>)
+
+    assert_equal [ %w[text text] ], definition.fields.map { |field| [ field.name, field.type.to_s ] }
+    assert definition.fields.none?(&:required?)
+    assert definition.fields.all?(&:translated?)
+    assert_equal Blocks::<%= class_name %>Component, definition.component
+  end
+end

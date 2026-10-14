@@ -25,6 +25,7 @@ Rails.application.config.to_prepare do
     BlockTypes::Code.register
     BlockTypes::PostList.register
     BlockTypes::Section.register
+    # bin/rails generate block_type adds a built-in's line above this one.
 
     # Registration order matters: it defines `names` order and
     # `ContentTypes.default` (the first one registered -- `blog`).

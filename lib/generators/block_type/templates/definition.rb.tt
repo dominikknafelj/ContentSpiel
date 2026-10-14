@@ -1,0 +1,17 @@
+module BlockTypes
+  # A <%= human_name.downcase %> block. Say here what it is for, where each of
+  # its values is stored and why (docs/reference/content-blocks-and-types.md,
+  # "Adding a block type").
+  module <%= class_name %>
+    def self.register
+      BlockTypes.register :<%= file_name %> do |t|
+        t.label "<%= human_name %>"
+        t.field :text, :text, translated: true
+        t.component Blocks::<%= class_name %>Component
+        t.theme_methods :block, :page
+        t.stylesheet "<%= file_name %>.css"
+        t.sample translations: { "en" => { text: "A sample <%= human_name.downcase %>" } }, shows: [ "A sample <%= human_name.downcase %>" ]
+      end
+    end
+  end
+end

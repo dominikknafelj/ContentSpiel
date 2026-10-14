@@ -1,0 +1,5 @@
+/* The <%= human_name.downcase %> block's public styles. Every colour is a --th- token:
+   a built-in's token values are written in tokens.css, light and dark, and
+   declared in the type's `tokens` (block types spec, decision 3). */
+.content-block--<%= file_name %> {
+}

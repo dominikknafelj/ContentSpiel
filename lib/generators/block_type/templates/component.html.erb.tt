@@ -1,0 +1,1 @@
+<div class="content-block content-block--<%= file_name %>"><%%= block.settings_object(fallback: true).text %></div>

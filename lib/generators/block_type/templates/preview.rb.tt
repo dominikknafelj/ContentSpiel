@@ -1,0 +1,16 @@
+require_relative "../preview_fixtures"
+
+module Blocks
+  # `Blocks::<%= class_name %>Component`, its block filled from the type's sample.
+  class <%= class_name %>ComponentPreview < ViewComponent::Preview
+    def default
+      page = PreviewFixtures.page(title: "<%= human_name %> preview")
+      sample = BlockTypes.fetch(:<%= file_name %>).sample
+      block = page.content_blocks.create!(block_type: :<%= file_name %>, position: 0)
+      block.assign_settings(sample.translations.fetch("en").transform_keys(&:to_s), locale: "en")
+      block.save!
+
+      render Blocks::<%= class_name %>Component.new(block: block, page: page)
+    end
+  end
+end
