@@ -159,6 +159,16 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/renderer.js
     app/javascript/mind_graph/search_box.js
     app/javascript/mind_graph/theme.js
+    app/javascript/mind_graph/ids.js
+    app/javascript/mind_graph/marks.js
+    app/javascript/mind_graph/graph_data.js
+    app/javascript/mind_graph/layout_parameters.js
+    app/javascript/mind_graph/summary.js
+    app/javascript/mind_graph/swatches.js
+    app/javascript/controllers/admin/mind_graph/swatches_controller.js
+    app/components/admin/mind_graph_screen/status_key_component.rb
+    app/components/admin/mind_graph_screen/status_key_component.html.erb
+    app/components/admin/mind_graph_screen/swatch_component.rb
     app/components/admin/editor_screen/section_card_component.rb
     app/components/admin/editor_screen/section_card_component.html.erb
     app/components/admin/editor_screen/section_group_component.rb
@@ -452,6 +462,22 @@ class AdminI18nTest < ActiveSupport::TestCase
   def erb(source)
     markup, code, ok_lines = split_erb(source)
     markup_offences(markup) + code.flat_map { |line, ruby| ruby_offences(ruby, first_line: line, ok_lines: ok_lines) }
+  end
+
+  # The Mind graph is converted whole, so a file added to it is held from the
+  # day it is added: its components, its controllers, and the modules that
+  # put words together or write into the page (`MIND_GRAPH_WORDLESS` are the
+  # ones that only compute or draw: the layout, the camera, the geometry).
+  MIND_GRAPH_WORDLESS = %w[camera card_placement hit_test labels layout_client layout_worker].freeze
+
+  test "every component, controller and wording module of the Mind graph is listed" do
+    files = Dir[Rails.root.join("app/components/admin/mind_graph_screen/*"), Rails.root.join("app/javascript/controllers/admin/mind_graph/*.js"), Rails.root.join("app/javascript/mind_graph/*.js")]
+      .map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+      .reject { |path| path.start_with?("app/javascript/mind_graph/") && MIND_GRAPH_WORDLESS.include?(File.basename(path, ".js")) }
+
+    assert_operator files.size, :>, 15
+    assert_empty files - CONVERTED, "Add to CONVERTED (and move any English in it to a locale key):"
+    MIND_GRAPH_WORDLESS.each { |name| assert File.exist?(Rails.root.join("app/javascript/mind_graph/#{name}.js")), "#{name}.js is gone: take it off the list" }
   end
 
   test "markup: a literal word in a text node or a copy attribute is an offence, a lookup is not" do

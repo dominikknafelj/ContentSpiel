@@ -10,13 +10,108 @@
 // `data-zoom`, `data-labelled`, `data-selected` (the selected node's id, or
 // empty), `data-neighbours` (the ids of the selection's direct neighbours
 // by the edges shown, comma-separated, or empty; written when the selection
-// or the filter changes, never per frame), `data-hovered` (the hovered node's
+// or the filter changes, never per frame), `data-nodes` and `data-edges`
+// (how many the legend's toggles show; written by the toggle itself, before
+// the layout has moved), `data-hovered` (the hovered node's
 // id, or empty) and `data-pinned` (how many nodes are pinned).
 // `element.mindGraph.screenPosition(id)` answers where a visible node is, in
 // client coordinates (null for one the filter hides, and for every node until
 // the layout has placed them), `.labelBox(id)` the box of its label as the
-// last frame drew it (null when it drew none), and `.draws()` how many frames
-// have been drawn.
+// last frame drew it (null when it drew none), `.markBox(id)` the box of a
+// mark that is one (a page's card, the pill; null for any other),
+// `.graphPosition(id)` where the
+// layout has a node in GRAPH units, the camera not applied (null until the
+// layout has placed them), and `.draws()` how many frames have been drawn.
+//
+// WHAT IS DRAWN (pages in the mind graph, spec §4). Five kinds of node
+// (`graph_data.js` makes them from the payload; `marks.js` draws each): a
+// page, a post, a tag, a post type a page lists (with the one "All posts")
+// and, in a page's local view, a "+N more" pill per target. Five kinds of
+// line (`renderer.js`). Labels go to Home first, then the top-level pages
+// and the post types, which are named at any zoom, then the rest by their
+// links. ONE NODE RESTS AT THE CENTRE of the layout (`graph_data.js`,
+// `anchorOf`): Home in the whole graph, the focus in a local view, where
+// Home is a page like any other. The worker holds it there
+// (`layout_worker.js`, the anchor). That is not a pin: `state.pinned` does
+// not hold it, nothing shows it as pinned, and nothing here can release it.
+// Dragged, it is pinned where it is dropped like any node, and released it
+// eases back to the centre.
+//
+// THE LEGEND IS THE FILTER (pages spec §6). Its checkboxes say which kinds
+// of node and of line are shown, and `graph_data.js`'s `visible` is the one
+// place that decides what that means; the state is the checkboxes' own and
+// nothing here keeps a copy. A toggle changes what is drawn, the list
+// beside the canvas and the canvas's name, and leaves each toggle's COUNT
+// as it is: a count is what the response holds, written once per load
+// (`writeCounts`).
+//
+// A TOGGLE IS A FILTER ON WHAT IS DRAWN, NOT A NEW LAYOUT (the ruling on the
+// review of the pages plan's Task 6). THIS DEPARTS FROM THE PAGES SPEC §5,
+// which hands a toggle "to the worker as today's filter is": that was the
+// old radios' way, it re-ran the layout on every change, and with eight
+// toggles, four of them of lines alone, the picture reshuffled when a line
+// was hidden and a node nobody touched could leave the view. So THE LAYOUT
+// IS COMPUTED ONCE, OVER EVERYTHING THE DATA HOLDS, and a toggle sends the
+// worker nothing: no node moves, nothing warms up, `data-settled` stays,
+// the camera stays. Every node keeps its place, shown or not, and what is
+// switched back on comes back where it was. What a toggle changes is
+// `state.visibleNodes` and `state.visibleEdges`, which the renderer, the
+// hit test, the labels, the list and the summary read. A PIN IS THE
+// LAYOUT'S, so a toggle does not touch it either: a pinned node that is
+// hidden is still held, still counted by "Release N pinned", and comes
+// back pinned (letting it go would warm the layout up). The selection and
+// the hover are of what is drawn, and go with a node that is hidden. The
+// price: a cluster does not close up when what held it apart is hidden.
+// (A post ADDED from the list is a change of the graph itself, and the
+// layout is told of that: `addPost`.) THE CANVAS'S NAME is the
+// summary of what is in view (`summary.js`); after a toggle the same words
+// go into the notice's live region, hidden from the eye, which is how the
+// change is announced.
+//
+// THE LIST (`node_list.js`; pages spec §7) shows the four groups of what is
+// drawn, or a read's rows in their place: the posts no page lists while "Not
+// listed on any page" is on (`data-unlisted-url`), and the posts behind a
+// "+N more" after a press on it (`data-listed-url`, the pill's page and
+// target), with "Open in Posts →" under them. A pill is NOT SELECTED: a
+// press on it opens the list (design answer F4), and so does its ROW in the
+// list, which is the keyboard's and a screen reader's way to the same rows
+// (`openMore`). THE WAY BACK to the groups is on screen, "Back to the list"
+// over a pill's rows, and Escape pressed in them (`backToList`: the focus
+// returns to the pill's row); Escape on the canvas or a click on empty
+// space, with nothing selected, gives the groups back too (`dismiss`). A row
+// of such a read whose post the canvas does not draw is "not in view", and
+// a press ADDS the post (`addPost`): the row is the post's node as the data
+// has it, so nothing is fetched; it joins the hub that brings it in (`via`)
+// by that hub's line, the layout is told (the worker's `add`) and the post
+// is selected. WITH "POSTS" SWITCHED OFF the press switches it back on
+// first: the row says "Activate to add it to the graph", and that is true
+// only of a post that is then drawn. AFTER A ROW IS ADDED EVERY FIGURE IS
+// TRUE: the pill stands for one post fewer (its words, its width, and at
+// none the pill itself and its rows go), the canvas's name counts the pills
+// as they now are, and the notice no longer counts the post among those
+// that aren't shown -- all three read what the page holds
+// (`graph_data.js`, `countAdded`). A read that fails says so in the list,
+// with "Try again" (G5) and, for a pill's, the way back; the error line
+// stays through a toggle of the legend, until the read is asked again or
+// let go (`failed`).
+//
+// A SITE WITH TOO MANY LINES FOR ONE PICTURE (pages spec, decision 6; design
+// answer, part one §6) opens around Home. The data's answer says where
+// (`open`, and how many lines the site has); this page then reads that
+// page's local view (`data-open-url`), writes the figure on the element
+// (`data-opened-lines`, which the canvas's name reads: "Showing the area
+// around Home. The site has ...", H5) and shows the bar that says why, with
+// "Show everything". That is a BUTTON: it reads the whole graph
+// (`data-everything-url`) into this page and navigates nowhere, so the
+// choice is in no address and a reload opens around Home again (the third
+// design answers: not remembered). Whatever of this is written into the
+// page, the controller's `reset` takes back.
+//
+// A LABEL'S WIDTH is measured in the font the label is drawn in
+// (`renderer.js`, `labelFont`): a tag's in mono, and the selected node's in
+// semibold, so `state.widths` holds the selected node's semibold width while
+// it is selected. The label rule, the hit test and the hover's backing all
+// read that one array.
 //
 // MOTION (spec §4.2). How fast the layout is shown is the worker's business
 // (`layout_worker.js`, PACING): this page draws every `tick` it is sent. All
@@ -56,8 +151,8 @@
 // Unpin, "Release N pinned" beside the zoom buttons lets all of them go, and
 // a double click on a pinned node lets that one go. Pins live in this page
 // only -- `state.pinned`, nothing stored -- so a reload or leaving the screen
-// forgets them, and a filter change forgets those of the nodes it hides (the
-// worker lets go of them too). The node is held where it was grabbed, not by
+// forgets them. A toggle of the legend does not: a pin is the layout's, and a
+// toggle changes only what is drawn. The node is held where it was grabbed, not by
 // its centre: a drag by the label must not make the mark jump to the pointer.
 // While its own node is dragged the card is out of the way, and comes back
 // with the drop.
@@ -68,9 +163,14 @@ import { nodeAt } from "mind_graph/hit_test"
 import { chooseLabels, labelAt, LABEL_GAP, LABEL_HEIGHT } from "mind_graph/labels"
 import { placeCard } from "mind_graph/card_placement"
 import { readTheme, watchTheme } from "mind_graph/theme"
-import { draw, radiusFor } from "mind_graph/renderer"
+import { draw, radiusFor, labelFont } from "mind_graph/renderer"
+import { collisionRadius, boxOf, moreWidth } from "mind_graph/marks"
+import { nodesOf, anchorOf, visible, counts, countAdded, placedFor, NODE_TOGGLES, LINE_TOGGLES } from "mind_graph/graph_data"
+import { summaryOf } from "mind_graph/summary"
 import { attachInput } from "mind_graph/input"
-import { createCard } from "mind_graph/card"
+import { createCard, fill } from "mind_graph/card"
+import { recordId } from "mind_graph/ids"
+import { paintMarks } from "mind_graph/swatches"
 import { attachSearch } from "mind_graph/search_box"
 import { createList } from "mind_graph/node_list"
 
@@ -85,6 +185,9 @@ const LOAD_TIMEOUT_MS = 15_000
 // would otherwise leave the box.
 const TOOLTIP_OFFSET = 14
 const TOOLTIP_MARGIN = 4
+// How far from its hub (or, with none, from the centre) a post added from
+// the list starts, in graph units each way: the layout takes it from there.
+const ADDED_OFFSET = 30
 
 // Exported for the test that asks it directly: a drawn label is not an
 // element to read.
@@ -96,7 +199,9 @@ export function labelFor(node) {
 }
 
 export function mount(element) {
-  const canvas = element.querySelector("canvas")
+  // The graph's own canvas, by its target: the legend's swatches are
+  // canvases too, and come before it in the document.
+  const canvas = element.querySelector("[data-admin--mind-graph--graph-target='canvas']")
   const notice = element.querySelector("[data-admin--mind-graph--graph-target='notice']")
   const context = canvas.getContext("2d")
   const text = messages(element)
@@ -109,21 +214,33 @@ export function mount(element) {
   // `.target`, `visibleNodes`, `visibleEdges`, `selected`, `neighbours` and
   // `focusIndex`, `hovered` and the members of `pinned` are all INDEXES into
   // `nodes` (or `edges`); `positions` is the worker's x/y pairs, in the order
-  // of `nodes`. `order` is the visible nodes, best-connected first. `labels`
-  // is what the last frame drew, which is what the hit test may answer for.
+  // of `nodes`. `order` is the visible nodes that have a label, in the order
+  // labels go to them, and `free` those of them that are named at any zoom
+  // (`graph_data.js`). `boxes` is each node's box, for one that is a box
+  // (a page's card, the pill), else null. `labels` is what the last frame
+  // drew, which is what the hit test may answer for.
   const state = {
-    nodes: [], edges: [], positions: new Float32Array(0), radii: [], widths: [], order: [],
+    nodes: [], edges: [], positions: new Float32Array(0), radii: [], boxes: [], widths: [], order: [], free: new Set(),
     visibleNodes: [], visibleEdges: [], camera: identity(), selected: -1, neighbours: new Set(), focusIndex: -1,
     hovered: -1, pinned: new Set(), labels: [],
     theme: readTheme(canvas), width: 0, height: 0, ratio: 1, fitted: false, placed: false, data: null
   }
   let destroyed = false
   let layout = null
+  // The address the graph was last asked from: the page's own (`data-url`),
+  // the local view a large site opens in, or the whole graph after "Show
+  // everything". Retry asks the same one again.
+  let source = element.dataset.url
   let frame = null
   let draws = 0
   let labelled = null
   let zoom = null
   let indexOf = new Map()
+  // Each label's width in its regular font and in the selected node's
+  // (semibold): `state.widths` is the first, with the selected node's entry
+  // from the second.
+  let plainWidths = []
+  let strongWidths = []
   // The node a press is on (an index, -1 for none), where on it the press
   // took hold (in graph units from its centre) and whether it has become a
   // drag: a press becomes one only once it has moved, and a plain click must
@@ -150,12 +267,18 @@ export function mount(element) {
   const zoomReadout = element.querySelector("[data-mind-graph-zoom]")
   const cardElement = element.querySelector("[data-mind-graph-card]")
   const dotClasses = JSON.parse(element.dataset.dotClasses)
+  const typeLabels = JSON.parse(element.dataset.typeLabels)
+  const buttonClasses = JSON.parse(element.dataset.buttonClasses)
   const card = createCard(cardElement, {
     text,
-    urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl, postNotes: element.dataset.postNotesUrl },
-    typeLabels: JSON.parse(element.dataset.typeLabels),
+    number,
+    urls: {
+      postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl, postNotes: element.dataset.postNotesUrl,
+      pageFocus: element.dataset.pageFocusUrl, pageNotes: element.dataset.pageNotesUrl
+    },
+    typeLabels,
     dotClasses,
-    buttonClasses: JSON.parse(element.dataset.buttonClasses),
+    buttonClasses,
     // The button goes with the card it is in; the focus goes back to where the
     // card was opened from.
     onClose: closeCard,
@@ -174,7 +297,7 @@ export function mount(element) {
   })
   // Escape closes the card from inside it too, not only from the canvas
   // (`input.js` hears the canvas's keys alone).
-  // Enter opens the selected post while the focus is on the card ITSELF,
+  // Enter opens the selected post or page while the focus is on the card ITSELF,
   // where the list hands it: on a control inside the card Enter is that
   // control's own (a link, a button, a line break in the note's field).
   const cardKeydown = (event) => {
@@ -192,26 +315,55 @@ export function mount(element) {
   // The search field is HTML beside the canvas, not part of the data request:
   // it works whatever the graph is doing, a failed load included (spec §6).
   const search = element.querySelector("[data-mind-graph-search]")
-  // The list beside the canvas (spec §5.7): rewritten by `applyFilter`, which
-  // runs once per load and once per filter change, never per frame.
+  // The list beside the canvas (spec §5.7): rewritten by `drawList`, which
+  // runs once per load, once per filter change and once per answer of one
+  // of the list's reads, never per frame. "Not listed on any page" is there
+  // only for a viewer the server gave its address (one who reads a page).
   const list = createList(element.querySelector("[data-mind-graph-list]"), {
-    text, dotClasses,
+    text, number, dotClasses, typeLabels, retryClass: buttonClasses.secondary, unlisted: Boolean(element.dataset.unlistedUrl),
     onSelect: (id) => {
       const index = indexOf.get(id)
-      if (index == null) return
-      select(index)
-      openedFromRow = id
-      centre(index)
-      cardElement.focus()
+      if (index != null) reveal(index)
     },
     onHover: (id) => {
       rowHover = id == null ? -1 : indexOf.get(id) ?? -1
       syncHover()
+    },
+    onAdd: addPost,
+    // A pill's row: what a press on the pill does.
+    onMore: (id) => {
+      const index = indexOf.get(id)
+      if (index != null) openMore(state.nodes[index])
+    },
+    onUnlisted: (on) => {
+      if (on) showRowsFrom(element.dataset.unlistedUrl)
+      else showGroups()
     }
   })
-  const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text, status: search.querySelector("[data-mind-graph-status]") })
+  // The list's rows while a read's are shown in place of the groups: the
+  // read's answer (`heading`, `rows`, `link`) and, for a pill's, the pill
+  // (`pill`, its node's id). `asked` counts the reads, so that an answer
+  // that comes after a later ask, or after the groups were asked back, is
+  // not drawn. `failed` is the read that failed and has not been asked
+  // again or let go (`{ pill }`): while it is set the list shows its error
+  // line, and nothing draws the groups over it.
+  let rowsShown = null
+  let failed = null
+  // The graph that is being read was asked for by "Show everything": its
+  // summary is announced when it is drawn, as the opened view's was.
+  let announceNext = false
+  let asked = 0
+  // The bar of the view a large site opens in, its sentence and its button
+  // (absent from a focused view's page: such a view is never opened by rule).
+  const openedBar = element.querySelector("[data-mind-graph-opened]")
+  const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text, status: search.querySelector("[data-mind-graph-status]"), dotClasses })
 
-  const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
+  // The legend's toggles (pages spec §6): the state is the checkboxes' own,
+  // so Back restores what the person had chosen. `switched(name, true)` is
+  // the kinds that are on, `switched(name, false)` those that are off, each
+  // in the legend's order.
+  const toggles = (name) => Array.from(element.querySelectorAll(`[data-mind-graph-legend] input[name="${name}"]`))
+  const switched = (name, on) => toggles(name).filter((input) => input.checked === on).map((input) => input.value)
   const setState = (value) => { element.dataset.state = value }
 
   // A figure that goes into a sentence is written the way the sentence's
@@ -236,14 +388,36 @@ export function mount(element) {
 
   // The lines over the canvas's top-left corner (a polite live region). A line is a string or a node
   // (the Retry button); always `textContent`, never markup.
+  //
+  // A LINE THAT SAYS WHAT IT SAID IS LEFT WHERE IT IS: the region is live,
+  // and a paragraph that is added is announced, also one that was only taken
+  // out and put back. So a sentence that did not change when a post was
+  // added (`notify`) is not touched at all: it is found BY ITS WORDS, not by
+  // its place (a line before it may have come or gone), it stays in the
+  // document, and only the lines that are new are inserted around it and
+  // the ones no longer said removed. The announced summary's line is never
+  // kept: it goes with every write, as before.
   function say(...lines) {
-    notice.replaceChildren(...lines.filter(Boolean).map((line) => {
+    const kept = new Map()
+    for (const held of notice.children) if (!held.hasAttribute("data-mind-graph-announced") && held.childElementCount === 0 && !kept.has(held.textContent)) kept.set(held.textContent, held)
+    const wanted = lines.filter(Boolean).map((line) => {
+      if (!(line instanceof Node) && kept.has(line)) {
+        const held = kept.get(line)
+        kept.delete(line)
+        return held
+      }
       const paragraph = document.createElement("p")
       paragraph.className = "m-0 w-fit rounded-cs bg-surface px-1"
       if (line instanceof Node) paragraph.append(line)
       else paragraph.textContent = line
       return paragraph
-    }))
+    })
+    for (const held of Array.from(notice.children)) if (!wanted.includes(held)) held.remove()
+    let next = notice.firstChild
+    for (const paragraph of wanted) {
+      if (paragraph === next) next = next.nextSibling
+      else notice.insertBefore(paragraph, next)
+    }
   }
 
   // One redraw per animation frame, and only when something asked for one.
@@ -263,13 +437,15 @@ export function mount(element) {
       // canvas's top-left corner -- so a frame drawn before then (the data has
       // just come, or the worker never started) is an empty one, not a pile.
       const labels = state.placed ? chooseLabels({ order: state.order, positions: state.positions, widths: state.widths, radii: state.radii,
-        camera: state.camera, width: state.width, height: state.height, always }) : []
+        camera: state.camera, width: state.width, height: state.height, always, free: state.free }) : []
       // With reduced motion a label switches on, it does not fade in (§5.2).
       if (reducedMotion.matches) labels.forEach((label) => { label.alpha = 1 })
       // The hovered node's label is drawn whatever the rule said of it: marked
       // where the rule placed it, added on top where it did not (a node
       // outside the canvas has none either way).
-      if (state.placed && state.hovered >= 0 && state.visibleNodes.includes(state.hovered)) {
+      // A node with no label (the pill: its words are inside it) has none
+      // when hovered either.
+      if (state.placed && state.hovered >= 0 && state.nodes[state.hovered].label && state.visibleNodes.includes(state.hovered)) {
         const ruled = labels.find((label) => label.index === state.hovered)
         const own = ruled || labelAt({ index: state.hovered, positions: state.positions, radii: state.radii, camera: state.camera })
         own.hover = true
@@ -358,42 +534,349 @@ export function mount(element) {
   // when the worker failed that is for good.
   function hit(x, y) {
     if (!state.placed) return -1
-    return nodeAt({ positions: state.positions, indexes: state.visibleNodes, radii: state.radii, camera: state.camera, sx: x, sy: y, labels: state.labels, widths: state.widths })
+    return nodeAt({ positions: state.positions, indexes: state.visibleNodes, radii: state.radii, boxes: state.boxes, camera: state.camera, sx: x, sy: y, labels: state.labels, widths: state.widths })
   }
 
-  // What the filter shows: every edge of the chosen kind, and under "All"
-  // every node, otherwise only the nodes such an edge touches.
+  // What the legend shows (`graph_data.js`): a kind of node that is off takes
+  // its nodes and their lines; a kind of line that is off takes its lines
+  // and nothing else.
   function applyFilter() {
-    const chosen = mode()
-    state.visibleEdges = state.edges.flatMap((edge, index) => (chosen === "all" || edge.kind === chosen ? [ index ] : []))
-    const touched = new Set(state.visibleEdges.flatMap((index) => [ state.edges[index].source, state.edges[index].target ]))
-    state.visibleNodes = state.nodes.flatMap((_, index) => (chosen === "all" || touched.has(index) ? [ index ] : []))
-    state.order = state.visibleNodes.slice().sort((a, b) => state.nodes[b].degree - state.nodes[a].degree || a - b)
+    // A kind is hidden only by a toggle that is switched OFF: one the viewer
+    // has no toggle for (the legend gives none for a kind they cannot read,
+    // and the data then holds none of it) is never hidden by its absence.
+    const on = (all, name) => new Set(all.filter((kind) => !switched(name, false).includes(kind)))
+    const shownNow = visible({ nodes: state.nodes, edges: state.edges, on: { nodes: on(NODE_TOGGLES, "mind_graph_nodes"), lines: on(LINE_TOGGLES, "mind_graph_lines") } })
+    state.visibleNodes = shownNow.visibleNodes
+    state.visibleEdges = shownNow.visibleEdges
+    state.order = shownNow.order
+    state.free = shownNow.free
     // The selection goes with a node the filter hides; one that stays keeps
     // its place, but its neighbours are the ones the shown edges give it now,
     // so nothing stays lit (or dimmed) by an edge that is no longer drawn.
     if (state.selected >= 0) select(state.visibleNodes.includes(state.selected) ? state.selected : -1)
-    // A pin is for a node on screen: one the filter hides is let go (the
-    // worker does the same with its `filter`), the others stay.
-    const shown = new Set(state.visibleNodes)
-    state.pinned.forEach((index) => { if (!shown.has(index)) state.pinned.delete(index) })
+    // (A pin is the layout's and stays, also on a node that is hidden.)
     // Nor is a node the filter hides hovered any longer, by either source.
+    const shown = new Set(state.visibleNodes)
     if (rowHover >= 0 && !shown.has(rowHover)) rowHover = -1
     if (pointerHover >= 0 && !shown.has(pointerHover)) pointerHover = -1
     element.dataset.nodes = state.visibleNodes.length
     element.dataset.edges = state.visibleEdges.length
-    list.render(state.visibleNodes.map((index) => state.nodes[index]))
-    list.mark(state.selected >= 0 ? state.nodes[state.selected].id : null)
+    drawList()
     pinsChanged()
     syncHover()
+    summarise()
+  }
+
+  // The list shows the groups of what is drawn, or -- while "Not listed on
+  // any page" is on, or after "+N more" -- a read's rows in their place,
+  // drawn again whenever what is in view changes (a post was added, a kind
+  // switched). A row whose post IS drawn is the drawn node, with the
+  // connections it has on the canvas; one that is not is the read's row.
+  //
+  // A READ THAT FAILED keeps its error line: it is not drawn over by the
+  // groups when a kind is switched (under a checkbox that is still ticked,
+  // that would be a list that is not what the checkbox says), until the
+  // read is asked again or let go.
+  function drawList() {
+    if (failed) return
+    if (rowsShown) {
+      const shown = new Set(state.visibleNodes)
+      const drawn = (id) => shown.has(indexOf.get(id))
+      // A pill's rows are headed by what the pill counts NOW ("More from Blog
+      // · 4" beside "+4 more"), not by what the read answered: one figure
+      // for "more" on the screen. The checkbox's rows keep the read's total.
+      const pill = rowsShown.pill == null ? null : state.nodes[indexOf.get(rowsShown.pill)]
+      list.showRows({
+        heading: pill ? text.t("mind_graph.script.list.more_heading", { target: pill.of, count: number(pill.count) }) : rowsShown.heading, link: rowsShown.link, inView: drawn, rows: rowsShown.rows.map((row) => (drawn(row.id) ? state.nodes[indexOf.get(row.id)] : row)),
+        back: rowsShown.pill ? wayBack() : null, addable: Boolean(state.data)
+      })
+    } else {
+      list.render(state.visibleNodes.map((index) => state.nodes[index]))
+    }
+    list.mark(state.selected >= 0 ? state.nodes[state.selected].id : null)
+  }
+
+  // A read that is still out is let go: its answer will not be drawn
+  // (`asked`), and the list is no longer waiting for it.
+  function letGo() {
+    asked += 1
+    list.setBusy(false)
+  }
+
+  function showGroups() {
+    letGo()
+    rowsShown = null
+    failed = null
+    list.setUnlisted(false)
+    drawList()
+  }
+
+  // "Back to the list", over a pill's rows and beside "Try again" when a
+  // pill's read failed; Escape in the list does the same (`node_list.js`).
+  // Both are pressed IN the list, so the focus goes back to where the rows
+  // were asked from: the pill's row (the list itself puts it on the first
+  // row when the pill has gone).
+  const wayBack = () => ({ label: text.t("mind_graph.script.list.back"), onBack: backToList })
+  function backToList() {
+    const pill = rowsShown?.pill ?? failed?.pill
+    showGroups()
+    if (pill) list.row(pill)?.focus()
+  }
+
+  // One of the list's reads (`unlisted`, or a pill's `listed`). A plain
+  // `fetch`, ended with everything else when the screen is left, and GIVEN
+  // UP after `LOAD_TIMEOUT_MS` like the graph's own load (a TimeoutError is
+  // a failure like any other): without a limit a request that stalled left
+  // the checkbox ticked over the groups for good, and nothing was ever
+  // said. WHILE IT IS OUT the rows' region is busy (`list.setBusy`,
+  // `aria-busy`): what is in it is about to be replaced. That is all the
+  // pending state there is; nobody gave words for one. A read
+  // that fails says so in the list with "Try again" (design answer G5),
+  // which asks for the same read; `again` says the ask came from that
+  // button: if the read fails once more, the new button takes the focus the
+  // old one had, and when it brings the rows the list itself puts the focus
+  // on the first of them (`node_list.js`: the focus was in the rows' region).
+  // The heading's figure is the read's whole `total`, which can be more
+  // than its rows (the server answers the first `PostGraph::ROW_LIMIT`);
+  // over a pill's rows it is the pill's own count, which falls as its
+  // posts are added.
+  // "Open in Posts →" stands under a pill's rows (`pill`), where there are
+  // any: the server names the address also when it found none.
+  async function showRowsFrom(url, { pill = null, again = false } = {}) {
+    const mine = (asked += 1)
+    list.setBusy(true)
+    try {
+      const signal = AbortSignal.any([ aborter.signal, AbortSignal.timeout(LOAD_TIMEOUT_MS) ])
+      const response = await fetch(url, { headers: { Accept: "application/json" }, signal })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const answer = await response.json()
+      if (destroyed || mine !== asked) return
+      list.setBusy(false)
+      failed = null
+      // A pill's rows are named by what the pill hangs off and counted by
+      // the pill (`drawList`), and have a way back; the checkbox's are
+      // "Posts", and the checkbox is their way back.
+      rowsShown = {
+        pill,
+        heading: text.t("mind_graph.script.list.posts", { count: number(answer.total) }),
+        rows: answer.rows,
+        link: pill && answer.posts_url && answer.rows.length > 0 ? { href: answer.posts_url, label: text.t("mind_graph.script.list.open_in_posts") } : null
+      }
+      drawList()
+    } catch (error) {
+      if (destroyed || error.name === "AbortError" || mine !== asked) return
+      list.setBusy(false)
+      rowsShown = null
+      failed = { pill }
+      list.fail(text.t("mind_graph.script.list.failed"), {
+        label: text.t("mind_graph.script.list.try_again"), focus: again, onRetry: () => showRowsFrom(url, { pill, again: true }), back: pill ? wayBack() : null
+      })
+    }
+  }
+
+  // "+N more" pressed, on the canvas or as its row in the list (design
+  // answer F4; H1: a pill per target): the list shows the posts THIS pill
+  // stands for, read for its page and its target. Pressed again it reads
+  // them again. When the press was the row's, the focus is in the list and
+  // the list puts it on the first of the rows it then draws. THE WAY BACK
+  // to the groups: "Back to the list" and Escape in the rows
+  // (`backToList`), or what already clears what a press on the canvas
+  // brought (`dismiss`).
+  function openMore(pill) {
+    list.setUnlisted(false)
+    showRowsFrom(fill(fill(element.dataset.listedUrl, "__ID__", recordId(pill.page)), "__TARGET__", pill.target), { pill: pill.id })
+  }
+
+  // A post the canvas does not draw, added from its row (pages spec §7): the
+  // row IS the post's node, so nothing is fetched. Added once: pressed again,
+  // or for a post that is drawn after all, it selects. A row of a page's
+  // "+N more" says which hub brings its post in (`via`), and the post gets
+  // that hub's line, as the posts the view drew have theirs: a faint line
+  // from a post type or "All posts", its own "Shares a tag" line to a tag.
+  // A row of "Not listed on any page" has no hub, and its post no line.
+  //
+  // WHAT THE PAGE DOES NOT KNOW IT DOES NOT SAY: the row was read with no
+  // line counted, so the post's related posts and tags are not known here.
+  // Its `degree` is the lines it was given, and its two counts are null,
+  // which the card leaves out (`card.js`) instead of saying "0 related".
+  //
+  // "POSTS" SWITCHED OFF is switched back on by the press (the ruling on the
+  // review of Task 7): the row's name says "Activate to add it to the
+  // graph", and with posts hidden the press would add a node nobody sees,
+  // or do nothing at all. The checkbox is the state, so it follows; the
+  // change is announced as a toggle's is.
+  //
+  // WITHOUT A GRAPH THERE IS NOTHING TO ADD TO (it is still being read, its
+  // read failed, or "Show everything" is on its way): the press does
+  // nothing, and the list draws such a row as one that only says it is not
+  // in view (`drawList`, `addable`). The checkbox's rows are kept when the
+  // graph arrives (`show`), and are then rows that add.
+  function addPost(row) {
+    if (!state.data) return
+    const switchedOn = showPosts()
+    const known = indexOf.get(row.id)
+    if (known != null) {
+      if (switchedOn) refilter()
+      return state.visibleNodes.includes(known) ? reveal(known) : undefined
+    }
+
+    const hub = row.via == null ? -1 : indexOf.get(row.via) ?? -1
+    const index = state.nodes.length
+    const lines = hub < 0 ? [] : state.nodes[hub].kind === "tag" ? [ { kind: "tag", source: index, target: hub } ] : [ { kind: "brings", source: hub, target: index } ]
+    // `added`: the person put it there, which the canvas's name says of a
+    // post no page lists (`summary.js`).
+    const node = { ...row, kind: "post", degree: lines.length, related_count: null, tag_count: null, added: true }
+    node.label = labelFor(node)
+    node.cut = !node.label.startsWith(String(node.title))
+    state.nodes.push(node)
+    indexOf.set(node.id, index)
+    state.radii.push(radiusFor(node))
+    state.boxes.push(boxOf(node))
+    for (const [ widths, selected ] of [ [ plainWidths, false ], [ strongWidths, true ] ]) {
+      context.font = labelFont(state.theme, node, selected)
+      widths.push(context.measureText(node.label).width)
+    }
+    state.widths.push(plainWidths[index])
+
+    // Beside its hub, or beside the centre: where the layout starts it.
+    const at = hub >= 0 && state.placed ? [ state.positions[hub * 2] + ADDED_OFFSET, state.positions[hub * 2 + 1] + ADDED_OFFSET ] : [ ADDED_OFFSET, ADDED_OFFSET ]
+    const positions = new Float32Array(state.nodes.length * 2)
+    positions.set(state.positions)
+    positions.set(at, index * 2)
+    state.positions = positions
+    state.edges.push(...lines)
+
+    // What the page holds now says the post is drawn: its pill stands for
+    // one fewer (and is written and measured again), and at none its rows
+    // go with it; an unconnected post is no longer one that isn't shown.
+    const pill = countAdded(state.nodes, state.data, row)
+    if (pill >= 0) {
+      sizePill(pill)
+      if (state.nodes[pill].count <= 0) {
+        // A SPENT PILL is not shown again (`graph_data.js`, `spent`), so a
+        // pin on it is let go: "Release 1 pinned" would name something
+        // nobody can see.
+        unpin([ pill ])
+        if (rowsShown?.pill === state.nodes[pill].id) {
+          letGo()
+          rowsShown = null
+        }
+      }
+    }
+
+    applyFilter()
+    writeCounts()
+    // (Only over a graph that is drawn: the notice of a worker that failed
+    // says so, and stays.)
+    if (element.dataset.state === "ready") notify()
+    if (switchedOn) summarise({ announce: true })
+    if (layout) {
+      element.removeAttribute("data-settled")
+      // The layout holds every node, whatever the legend hides, so the
+      // post's hub is there for its line also while "Post types" is off.
+      layout.add({ id: node.id, radius: collisionRadius(node), x: at[0], y: at[1] }, lines.map((line) => ({ source: state.nodes[line.source].id, target: state.nodes[line.target].id, kind: line.kind })))
+    } else if (element.dataset.state === "ready") {
+      // Nothing was drawn, so no layout was started: there is something now.
+      element.removeAttribute("data-settled")
+      startLayout()
+    }
+    if (state.visibleNodes.includes(index)) reveal(index)
+  }
+
+  // The "Posts" toggle, switched on if it was off: whether it was. A viewer
+  // with no such toggle has no posts hidden.
+  function showPosts() {
+    const toggle = toggles("mind_graph_nodes").find((input) => input.value === "post")
+    if (!toggle || toggle.checked) return false
+    toggle.checked = true
+    return true
+  }
+
+  // A pill's words for its count, and its size for its words: when the data
+  // arrives, and again whenever one of its posts is added. A pill grows to
+  // fit ("+1,980 more", design answer H4): its figure is grouped as the
+  // messages' language groups it, and `count` in that message is the figure
+  // as text, not a plural's number, because the words have one form.
+  const pillWords = (count) => text.t("mind_graph.script.more", { count: number(count) })
+  function sizePill(index) {
+    const node = state.nodes[index]
+    node.title = pillWords(node.count)
+    context.font = state.theme.countFont
+    node.width = moreWidth(context.measureText(node.title).width)
+    state.radii[index] = radiusFor(node)
+    state.boxes[index] = boxOf(node)
+  }
+
+  // Escape on the canvas and a click on empty space take back what the last
+  // press on the canvas brought: the selection, and with nothing selected
+  // the rows of a "+N more", or the error line of a pill's read that failed
+  // (the list shows its groups again). The rows of "Not listed on any page"
+  // are not a press's: its checkbox lets them go.
+  function dismiss() {
+    if (state.selected < 0 && (rowsShown?.pill || failed?.pill)) showGroups()
+    else select(-1)
+  }
+
+  // What a row does to its node: select it, bring it to the middle, and
+  // hand the focus to its card.
+  function reveal(index) {
+    select(index)
+    openedFromRow = state.nodes[index].id
+    centre(index)
+    cardElement.focus()
+  }
+
+  // The canvas is one image to a screen reader, and its name says what is on
+  // it NOW (`summary.js`; design answers G6 and H5). After a toggle
+  // (`announce`) the same words are put into the notice's polite live
+  // region, in a line hidden from the eye, beside whatever the notice shows.
+  function summarise({ announce = false } = {}) {
+    const summary = summaryOf({
+      nodes: state.nodes, visibleNodes: state.visibleNodes, lines: state.visibleEdges.length, data: state.data,
+      off: { nodes: switched("mind_graph_nodes", false), lines: switched("mind_graph_lines", false) }, toggles: toggles("mind_graph_nodes").length,
+      // The view the 3,000-line rule opened (the server says so on the element).
+      aroundHome: opened()
+    }, { text, number })
+    canvas.setAttribute("aria-label", summary)
+    if (!announce) return
+
+    notice.querySelector("[data-mind-graph-announced]")?.remove()
+    const line = document.createElement("p")
+    line.className = "sr-only"
+    line.dataset.mindGraphAnnounced = ""
+    line.textContent = summary
+    notice.append(line)
+  }
+
+  // Each toggle's count beside its name, and its whole name for a screen
+  // reader ("Pages, 200"). What the RESPONSE holds, so switching a toggle
+  // changes none of them. The controller's `reset` takes both back.
+  function writeCounts() {
+    const held = counts(state.nodes, state.edges)
+    for (const [ name, group ] of [ [ "mind_graph_nodes", held.nodes ], [ "mind_graph_lines", held.lines ] ]) {
+      for (const input of toggles(name)) {
+        const count = number(group[input.value] ?? 0)
+        input.closest("label").querySelector("[data-legend-count]").textContent = count
+        input.setAttribute("aria-label", text.t("mind_graph.script.legend.toggle", { name: input.dataset.name, count }))
+      }
+    }
   }
 
   function select(index) {
+    // "+N more" is not something to select (design answer F4): it opens the
+    // list beside the canvas with the posts it stands for, each a row "not
+    // in view", and "Open in Posts →" under them. The selection stays as
+    // it was.
+    if (index >= 0 && state.nodes[index].kind === "more") return openMore(state.nodes[index])
+
     openedFromRow = null
     // The node the card already shows: a second click on it, or a filter
     // change that keeps it, must not build the card again -- that would
     // throw away a note half typed in it and fetch its notes once more.
     const shown = index >= 0 && index === state.selected && cardElement.childElementCount > 0
+    // The selected label is semibold, and as wide as that.
+    if (state.selected >= 0) state.widths[state.selected] = plainWidths[state.selected]
+    if (index >= 0) state.widths[index] = strongWidths[index]
     state.selected = index
     state.neighbours = new Set()
     if (index >= 0) {
@@ -510,20 +993,63 @@ export function mount(element) {
   }
 
   function show(data) {
+    // TOO MANY LINES FOR ONE PICTURE (pages spec, decision 6): the server
+    // says where to open instead, and this page reads that page's local
+    // view in the whole graph's place. Nothing navigates: the address stays
+    // the screen's own, so a reload asks the server again. The figure is
+    // written for the bar and for the canvas's name, and is a whole number
+    // or the answer is no answer. Only the page's OWN address may be
+    // answered so: a local view or "everything" that said "open" would be
+    // asked for ever.
+    if (data.open) {
+      if (source !== element.dataset.url || !Number.isSafeInteger(data.edges) || data.edges < 0) throw new Error("mind graph: an answer that says where to open, where none can")
+      element.dataset.openedLines = data.edges
+      return load(fill(element.dataset.openUrl, "__ID__", recordId(data.open)))
+    }
+
+    // (A graph was drawn before this one, after "Show everything": its
+    // layout ends here, if `clear` has not ended it.)
+    layout?.stop()
+    layout = null
     state.data = data
-    state.nodes = [ ...data.nodes.map((node) => ({ ...node, kind: "post" })), ...data.tags.map((tag) => ({ ...tag, title: tag.name, kind: "tag" })) ]
-    indexOf = new Map(state.nodes.map((node, index) => [ node.id, index ]))
-    state.edges = data.edges.map((edge) => ({ kind: edge.kind, source: indexOf.get(edge.source), target: indexOf.get(edge.target) }))
-    state.positions = new Float32Array(state.nodes.length * 2)
-    state.radii = state.nodes.map(radiusFor)
-    context.font = state.theme.font
-    state.nodes.forEach((node) => {
-      node.label = labelFor(node)
-      // Whether the label leaves some of the title out (a tag's count after
-      // its whole name does not).
-      node.cut = !node.label.startsWith(String(node.title))
+    state.nodes = nodesOf(data, {
+      allPosts: text.t("mind_graph.script.all_posts"),
+      more: pillWords,
+      retired: (name) => text.t("mind_graph.script.retired_type", { name })
     })
-    state.widths = state.nodes.map((node) => context.measureText(node.label).width)
+    indexOf = new Map(state.nodes.map((node, index) => [ node.id, index ]))
+    // What a pill hangs off, by name: its row in the list and the heading
+    // of its rows say it.
+    for (const node of state.nodes) if (node.kind === "more") node.of = state.nodes[indexOf.get(node.target)]?.title ?? ""
+    // Every end of a line is a node the server sent with it. One whose end
+    // is missing all the same is left out, not drawn to the canvas's corner.
+    state.edges = data.edges.map((edge) => ({ kind: edge.kind, source: indexOf.get(edge.source), target: indexOf.get(edge.target) }))
+      .filter((edge) => edge.source != null && edge.target != null)
+    state.positions = new Float32Array(state.nodes.length * 2)
+    // A pill grows to fit its words: measured in the font they are drawn in,
+    // BEFORE the sizes are read, because a pill's size is its width.
+    context.font = state.theme.countFont
+    for (const node of state.nodes) if (node.kind === "more") node.width = moreWidth(context.measureText(node.title).width)
+    state.radii = state.nodes.map(radiusFor)
+    state.boxes = state.nodes.map(boxOf)
+    state.nodes.forEach((node) => {
+      // The pill has no label: its words are inside it.
+      node.label = node.kind === "more" ? "" : labelFor(node)
+      // Whether the label leaves some of the title out (a tag's count after
+      // its whole name does not, and a node without a label has nothing cut).
+      node.cut = node.label !== "" && !node.label.startsWith(String(node.title))
+    })
+    // Each label is measured in the font it is drawn in: a tag's is mono,
+    // the selected node's semibold. Both once, here, never in a frame.
+    const measured = (selected) => state.nodes.map((node) => {
+      context.font = labelFont(state.theme, node, selected)
+      return context.measureText(node.label).width
+    })
+    plainWidths = measured(false)
+    strongWidths = measured(true)
+    state.widths = plainWidths.slice()
+    // The selection of the data before this is not one of these nodes.
+    state.selected = -1
     state.focusIndex = data.focus ? indexOf.get(data.focus.node_id) ?? -1 : -1
     state.fitted = false
     state.placed = false
@@ -532,23 +1058,27 @@ export function mount(element) {
     state.hovered = pointerHover = rowHover = -1
     element.dataset.hovered = ""
     select(-1)
+    // A pill's rows, or its read, were of the graph before this one and go
+    // with it. THE CHECKBOX'S ROWS STAY: "Not listed on any page" is a read
+    // of its own, a person may have ticked it while the graph was still on
+    // its way, and what they asked for is not taken from them when it
+    // arrives (the rows are drawn again by `applyFilter`, now as rows that
+    // can add their post).
+    if (rowsShown?.pill || failed?.pill) {
+      letGo()
+      rowsShown = null
+      failed = null
+    }
+    showOpened()
     applyFilter()
-    // The canvas is one image to a screen reader, and its name says what is on it.
-    canvas.setAttribute("aria-label", text.t("mind_graph.script.summary", { posts: state.nodes.length, edges: state.edges.length }))
-
-    // The two views cut differently (`PostGraph::Global` keeps the best
-    // connected, `PostGraph::Local` the nearest to the focus), so each has its
-    // own sentence. A figure in a sentence is grouped (`number`); `count`
-    // only chooses the plural form.
-    const cut = { shown: number(data.shown), total: number(data.total) }
-    const capped = data.focus ? text.t("mind_graph.script.capped_local", cut) : text.t("mind_graph.script.capped", cut)
-    say(
-      state.edges.length === 0 ? text.t("mind_graph.script.no_connections") : null,
-      data.shown < data.total ? capped : null,
-      // "Other" posts, beside the ones drawn; with nothing drawn there are no
-      // others, and the sentence is the plain one.
-      data.isolated > 0 ? text.t(state.nodes.length > 0 ? "mind_graph.script.isolated" : "mind_graph.script.isolated_only", { count: data.isolated, figure: number(data.isolated) }) : null
-    )
+    writeCounts()
+    notify()
+    // The view a large site opened in is not what was asked for: where it
+    // is, and what the site holds, is announced (the canvas's name, into
+    // the notice's live region, hidden from the eye: the bar says it there).
+    // So is the whole graph that "Show everything" put in its place.
+    if (opened() || announceNext) summarise({ announce: true })
+    announceNext = false
     setState("ready")
 
     // Nothing to lay out: settled as it stands, and no worker is started.
@@ -559,26 +1089,115 @@ export function mount(element) {
     startLayout()
   }
 
+  // The notice's sentences about what is NOT drawn, from what the page holds
+  // now: said when the data arrives, and again when a post was added from
+  // the list (`data.isolated` is then one fewer, `graph_data.js`).
+  //
+  // The two views cut differently (`PostGraph::Global` keeps the best
+  // connected, `PostGraph::Local` the nearest to the focus), so each has its
+  // own sentence. A figure in a sentence is grouped (`number`); `count`
+  // only chooses the plural form.
+  function notify() {
+    const data = state.data
+    const cut = { shown: number(data.shown), total: number(data.total) }
+    const capped = data.focus ? text.t("mind_graph.script.capped_local", cut) : text.t("mind_graph.script.capped", cut)
+    say(
+      state.edges.length === 0 ? text.t("mind_graph.script.no_connections") : null,
+      data.shown < data.total ? capped : null,
+      // "Other" posts, beside the ones drawn; with nothing drawn there are no
+      // others, and the sentence is the plain one.
+      data.isolated > 0 ? text.t(state.nodes.length > 0 ? "mind_graph.script.isolated" : "mind_graph.script.isolated_only", { count: data.isolated, figure: number(data.isolated) }) : null
+    )
+  }
+
+  // Whether what is drawn is the view a large site opened in: the server
+  // said where to open (`data-opened-lines`), and this is that local view.
+  const opened = () => Boolean(element.dataset.openedLines) && Boolean(state.data?.focus)
+
+  // The bar of that view: why the whole graph is not what is drawn, and
+  // "Show everything", whose whole name says how many lines that is. Shown
+  // while the view is drawn, hidden and emptied otherwise.
+  function showOpened() {
+    if (!openedBar) return
+    const lines = Number(element.dataset.openedLines)
+    const button = openedBar.querySelector("[data-mind-graph-everything]")
+    openedBar.hidden = !opened()
+    openedBar.querySelector("[data-mind-graph-opened-line]").textContent = opened() ? text.t("mind_graph.script.opened.line", { count: lines, figure: number(lines) }) : ""
+    if (opened()) button.setAttribute("aria-label", text.t("mind_graph.script.opened.everything_name", { count: lines, figure: number(lines) }))
+    else button.removeAttribute("aria-label")
+  }
+
+  // The graph that is drawn goes, before another is read in its place: its
+  // layout, its selection and its card, its rows and its name. What `show`
+  // writes when the data arrives is written again then.
+  function clear() {
+    layout?.stop()
+    layout = null
+    select(-1)
+    letGo()
+    rowsShown = null
+    failed = null
+    state.data = null
+    state.nodes = []
+    state.edges = []
+    state.visibleNodes = []
+    state.visibleEdges = []
+    state.order = []
+    state.labels = []
+    state.placed = false
+    state.pinned = new Set()
+    state.focusIndex = -1
+    state.hovered = pointerHover = rowHover = -1
+    indexOf = new Map()
+    element.dataset.hovered = ""
+    element.dataset.nodes = 0
+    element.dataset.edges = 0
+    pinsChanged()
+    hideTooltip()
+    list.setUnlisted(false)
+    list.clear()
+    canvas.setAttribute("aria-label", canvas.dataset.label)
+    requestDraw()
+  }
+
+  // "Show everything" (pages spec, decision 6): the whole graph is read into
+  // this page. The figure and the bar go first, so nothing says "around
+  // Home" of what is then drawn; the focus, which was on the button the bar
+  // hides, goes to the canvas. NOT REMEMBERED: nothing is stored and the
+  // address is not touched, so a reload, and Back to this page, open around
+  // Home again.
+  function showEverything() {
+    if (destroyed || !openedBar || !opened()) return
+    const focused = openedBar.contains(document.activeElement)
+    element.removeAttribute("data-opened-lines")
+    clear()
+    showOpened()
+    if (focused) canvas.focus()
+    announceNext = true
+    load(element.dataset.everythingUrl)
+  }
+
   function startLayout() {
     try {
       layout = createLayout({
         workerUrl: element.dataset.workerUrl,
         d3Url: element.dataset.d3Url,
         onTick: (positions) => {
-          state.positions = positions
+          // Whole, also when the worker answered before it took a node this
+          // page has added since (`graph_data.js`, `placedFor`).
+          state.positions = placedFor(positions, state.positions, state.nodes.length)
           state.placed = true
           // The first view fits everything as soon as there is a shape to fit;
           // after that the camera moves only when the user moves it.
-          if (!state.fitted) state.camera = fit(bounds(positions, state.visibleNodes), state.width, state.height)
+          if (!state.fitted) state.camera = fit(bounds(state.positions, state.visibleNodes), state.width, state.height)
           // The first positions: a card opened from the list before there was
           // a layout now has a node to stand beside.
           cardPlace = null
           requestDraw()
         },
         // Only a `settled` that answers everything sent so far arrives here
-        // (`layout_client.js`), so with a filter sent right behind `start` --
-        // Back to a screen whose control says "Related" -- the fit is made on
-        // the filtered layout, not on the one before it.
+        // (`layout_client.js`). The fit is of what is SHOWN: Back to a
+        // screen whose legend has "Tags" switched off fits what is drawn.
         onSettled: () => {
           if (!state.fitted) fitAll()
           element.setAttribute("data-settled", "")
@@ -588,18 +1207,17 @@ export function mount(element) {
     } catch (error) {
       return workerFailed(error.message)
     }
-    // The worker handles its messages strictly in order, so the filter may
-    // follow `start` at once.
+    // EVERY node and line of the data, whatever the legend shows: a toggle
+    // is no business of the layout's.
     // The worker can't ask about motion itself, so it is told (as the page
     // found it now; a change of the setting applies from the next load).
-    layout.start(state.nodes.map((node, index) => ({ id: node.id, radius: state.radii[index] })),
-      state.edges.map((edge) => ({ source: state.nodes[edge.source].id, target: state.nodes[edge.target].id })),
+    // What the layout keeps clear around a node is its mark's reach (a box's
+    // is half its diagonal). One node is the anchor, held at the centre:
+    // Home in the whole graph, the focus in a local view.
+    const anchor = anchorOf(state.data)
+    layout.start(state.nodes.map((node) => ({ id: node.id, radius: collisionRadius(node), anchor: node.id === anchor })),
+      state.edges.map((edge) => ({ source: state.nodes[edge.source].id, target: state.nodes[edge.target].id, kind: edge.kind })),
       { reducedMotion: reducedMotion.matches })
-    if (mode() !== "all") sendFilter()
-  }
-
-  function sendFilter() {
-    layout?.filter(state.visibleNodes.map((index) => state.nodes[index].id), state.visibleEdges)
   }
 
   // Loud on purpose: the system tests fail on any console error, so a worker
@@ -617,7 +1235,11 @@ export function mount(element) {
     say(text.t("mind_graph.script.worker_failed"))
   }
 
-  async function load() {
+  // Reads the graph from `url`: the address it was last read from, unless
+  // another is named (the local view a large site opens in, the whole graph
+  // after "Show everything"). Retry asks `source` again.
+  async function load(url = source) {
+    source = url
     setState("loading")
     element.removeAttribute("data-settled")
     say(text.t("mind_graph.script.loading"))
@@ -626,7 +1248,7 @@ export function mount(element) {
       // (`aborter`, an AbortError, silent) and no answer in time (a
       // TimeoutError, which is a failure like any other and gets Retry).
       const signal = AbortSignal.any([ aborter.signal, AbortSignal.timeout(LOAD_TIMEOUT_MS) ])
-      const response = await fetch(element.dataset.url, { headers: { Accept: "application/json" }, signal })
+      const response = await fetch(source, { headers: { Accept: "application/json" }, signal })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       if (!destroyed) show(data)
@@ -637,7 +1259,7 @@ export function mount(element) {
       retry.type = "button"
       retry.className = "pointer-events-auto cursor-pointer font-semibold text-ink underline"
       retry.textContent = text.t("mind_graph.script.retry")
-      retry.addEventListener("click", load, { once: true })
+      retry.addEventListener("click", () => load(), { once: true })
       say(text.t("mind_graph.script.load_failed"), retry)
     }
   }
@@ -700,25 +1322,46 @@ export function mount(element) {
       pressed = -1
       dragging = false
     },
-    onClick: (x, y) => select(hit(x, y)),
+    onClick: (x, y) => {
+      const index = hit(x, y)
+      if (index < 0) dismiss()
+      else select(index)
+    },
     // The shortcut for "let this one go". (Both of its clicks have selected
     // the node already.)
     onDoubleClick: (x, y) => {
       const index = hit(x, y)
       if (index >= 0) unpin([ index ])
     },
-    onEscape: () => select(-1),
-    // Enter with a post selected opens it (the card's own "Open post").
+    onEscape: dismiss,
+    // Enter with a post or a page selected opens it (the card's own "Open
+    // post" or "Open page").
     onEnter: () => card.open(),
     onHover: hover,
     onPan: (dx, dy) => moveCamera(panBy(state.camera, dx, dy)),
     onZoom: (x, y, factor) => moveCamera(zoomAt(state.camera, x, y, factor))
   })
-  const stopTheme = watchTheme(() => { state.theme = readTheme(canvas); requestDraw() })
+  // A canvas holds colours, not tokens: the graph's and the rows' marks
+  // (the list's, the open search results') are drawn again.
+  const stopTheme = watchTheme(() => {
+    state.theme = readTheme(canvas)
+    paintMarks(element)
+    requestDraw()
+  })
   const observer = new ResizeObserver(resize)
   observer.observe(canvas)
   resize()
   load()
+
+  // A toggle of the legend changed (or was switched back on by a row that
+  // adds a post): what is drawn changes, and nothing else.
+  function refilter() {
+    if (!state.data) return
+    applyFilter()
+    summarise({ announce: true })
+    rehover()
+    requestDraw()
+  }
 
   const zoomBy = (factor) => moveCamera(zoomAt(state.camera, state.width / 2, state.height / 2, factor))
 
@@ -735,6 +1378,20 @@ export function mount(element) {
       const box = canvas.getBoundingClientRect()
       return { left: box.left + label.x - LABEL_GAP, right: box.left + label.x + state.widths[label.index], top: box.top + label.y - LABEL_HEIGHT / 2, bottom: box.top + label.y + LABEL_HEIGHT / 2 }
     },
+    // The box of a visible node whose mark is one (a page's card, the pill),
+    // in client coordinates; null for a mark that is a circle or a square.
+    markBox(id) {
+      const index = indexOf.get(id)
+      const at = this.screenPosition(id)
+      const size = index == null ? null : state.boxes[index]
+      return at && size ? { left: at.x - size.width / 2, right: at.x + size.width / 2, top: at.y - size.height / 2, bottom: at.y + size.height / 2 } : null
+    },
+    // Where the layout has a node, in GRAPH units (the camera not applied):
+    // the anchor's is 0, 0 while nobody holds it.
+    graphPosition(id) {
+      const index = indexOf.get(id)
+      return index == null || !state.placed ? null : { x: state.positions[index * 2], y: state.positions[index * 2 + 1] }
+    },
     draws: () => draws
   }
 
@@ -743,19 +1400,14 @@ export function mount(element) {
     zoomOut: () => zoomBy(1 / BUTTON_ZOOM),
     fit: fitAll,
     releasePinned: () => unpin(Array.from(state.pinned)),
-    // The control changed: hand the layout only what is shown now. The camera
-    // stays where it is. The list and the counts follow the control whenever
-    // there is data, a layout or not: when the worker could not start, the
-    // list is all there is, and it must show what the control says.
-    filter() {
-      if (!state.data) return
-      applyFilter()
-      rehover()
-      if (!layout) return
-      element.removeAttribute("data-settled")
-      sendFilter()
-      requestDraw()
-    },
+    // A toggle of the legend changed: what is drawn changes, and nothing
+    // else. The layout is told nothing and the camera stays where it is.
+    // The list, `data-nodes` and `data-edges` and the canvas's name follow
+    // the legend whenever there is data, a layout or not: when the worker
+    // could not start, the list is all there is, and it must show what the
+    // legend says.
+    filter: refilter,
+    showEverything,
     destroy() {
       destroyed = true
       aborter.abort()

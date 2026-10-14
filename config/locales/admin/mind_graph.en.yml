@@ -2,12 +2,47 @@
 # view's own lazy-lookup scope, `script` what `mind_graph/app.js` and its
 # modules show (handed over through the element's `data-messages`).
 #
-# `show.canvas_label` names the canvas until the data has arrived; `script.
-# summary` is the whole name it has afterwards (the same words, then what is
-# drawn), so the script never joins two strings with punctuation of its own;
-# `script.list.select_post` and `select_tag` are a row's whole accessible name
-# for the same reason: what it is, how connected, and what pressing it does.
-# `script.list.posts` and `tags` are a group's heading with how many it holds.
+# `show.canvas_label` names the canvas until the data has arrived, and is the
+# summary's first words. `script.summary.*` is the name it has afterwards
+# (`mind_graph/summary.js`; design answers G6 and H5): WHOLE SENTENCES and
+# the parts of one, and the script puts one space between two sentences and
+# nothing else of its own. "Mind graph: 9 pages, 3 post types, 13 posts and 4
+# tags, 27 connections. Showing everything." is `whole`, then `everything`;
+# "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts.
+# 92 more are in the list." is `local`, then `more`. A kind that is switched
+# off adds its `hidden` sentence and a kind of line its `hidden_lines` one
+# ("Showing everything. Tags hidden." are both said, in that order:
+# "everything" means no cap, not no filters). With nothing in view the name
+# is `nothing`, then `all_hidden` when every kind is switched off or
+# `none_yet` when there is nothing to draw. In the view the 3,000-line rule
+# opened, `around_home` and `site` follow ("Showing the area around Home. The
+# site has 212 pages, 2,040 posts and 64 tags."). `%{kinds}` is the counts of
+# what is in view, joined by `pair` and `series` (so there is no comma before
+# "and", and another language can join otherwise); `%{figure}` is a count as
+# the sentence's language groups it, `count` only chooses the form.
+# `script.legend.toggle` is a toggle's whole accessible name once its count
+# is known ("Pages, 200").
+#
+# `script.list.select_page`, `select_post`, `select_tag` and `select_type` are
+# a row's WHOLE accessible name, so the script never joins two strings with
+# punctuation of its own: what it is, how connected (a post type: how many
+# posts it has, the number its row shows), and what pressing it does.
+# `script.list.add_post` is the whole name of a row whose post the canvas
+# does not draw, the design answer's sentence (G5): `%{type}` is the post
+# TYPE's label in lower case, so the row says "blog post" and never a bare
+# "post"; `add_retired_post` is its form for a post of a type that is no
+# longer registered (H7: "talk, retired type"), where `%{type}` is the
+# stored name in lower case. `absent_post` and `absent_retired_post` are the
+# same rows' names while there is no graph to add a post to (it is still
+# being read, or its read failed): the design's sentence without its second
+# half, since activating such a row adds nothing. `not_in_view` stands where such a row's count
+# would. `script.list.pages`, `posts`, `tags` and `types` are a group's
+# heading with how many it holds; `posts` is also the heading of the rows a
+# filter shows ("Not listed on any page", a "+N more" pill), where the
+# figure is the read's whole total. `failed` and `try_again` are the design
+# answer's too (G5): a read of the list's that failed, said in the list.
+#
+# `script.search.groups.*` head the three groups of the search's results.
 #
 # `show.zoom_out`, `zoom_in` and `fit` are the zoom buttons' whole names (their
 # `aria-label` and tooltip); what is drawn on them is a glyph, or `fit_short`.
@@ -17,35 +52,66 @@
 # focus). In `script.isolated`, `%{figure}` is the count as the sentence's
 # language groups it ("1,214"), handed over by the script; `count` only
 # chooses the form.
+#
+# `script.card.status`: `draft`, `scheduled` and `live` are the chip's first
+# part, with its dot. A live record that has more to say gets a second part
+# after a "·" (design answer G4, verbatim): `unpublished_changes`, with no
+# dot, or `change_scheduled` behind a warn dot, where `%{date}` is the node's
+# `change_on`, a day the SERVER has already written in CS Studio's short date
+# format, so the script formats no date. Those two rows are for the eye;
+# `live_with_changes` and `live_change_scheduled` are the whole chip as a
+# screen reader is given it, the Status key's own words with the day added
+# (H6: one set of words). `card.child_pages` and `card.lists_posts` are the
+# two halves of a page's line of counts ("4 child pages · lists 112 posts");
+# a post type's card says its posts with `card.tag_posts`. In every count of
+# the card `%{figure}` is the count as the messages' language groups it
+# ("lists 2,040 posts"), and `count` only chooses the form.
+#
+# `script.opened.*` is the view the 3,000-line rule opened: `line` the bar's
+# sentence and `everything_name` the whole accessible name of "Show
+# everything" (`show.opened.everything` is what is written on it), which
+# says how many lines pressing it draws; `%{figure}` is the grouped count.
+#
+# `script.list.more_row` is the whole name of a "+N more" pill's row in the
+# list (its visible words are the pill's own, `script.more`): `%{target}` is
+# the post type or tag the pill hangs off, `%{figure}` the grouped count and
+# `%{words}` the pill's own words as the row shows them, FIRST in the name:
+# a name that holds the visible words is one voice control can press.
+# `more_heading` heads the rows a pill opened, and `back` is the button
+# beside it (and beside "Try again" when a pill's read failed).
+#
+# `script.all_posts` names the one node a list block with no filter points
+# at. `script.more` is a "+N more" pill's words: `%{count}` is the figure as
+# the script has already grouped it ("+1,980 more"), not a plural's number,
+# because the words have one form. `script.retired_type` is the whole label
+# of the hub of a post type that is no longer registered.
 en:
   admin:
     mind_graph:
       show:
         title: "Mind graph"
-        intro: "How your posts relate to each other. Scroll or pinch to zoom, drag to move."
-        no_posts: "No posts yet."
-        filter:
-          legend: "Show connections"
-          all: "All"
-          related: "Related"
-          tag: "Tags"
-        canvas_label: "Post relationship graph"
+        intro: "How your pages, posts and tags connect. Scroll or pinch to zoom, drag to move."
+        no_content: "No pages or posts yet."
+        canvas_label: "Mind graph"
         zoom: "Zoom"
         zoom_in: "Zoom in"
         zoom_out: "Zoom out"
         fit: "Fit all"
         fit_short: "Fit"
         card_label: "Selected in the graph"
-        list_label: "Posts and tags in this graph"
+        list_label: "Pages, posts, tags and post types in this graph"
         focus:
           around_post: "Around “%{title}”"
           around_tag: "Around the tag “%{title}”"
+          around_page: "Around the page “%{title}”"
           depth: "Depth"
           depth_n: "Depth %{depth}"
           whole: "Whole graph"
+        opened:
+          everything: "Show everything"
         search:
-          label: "Find a post or tag"
-          placeholder: "Find a post or tag…"
+          label: "Find a page, post or tag"
+          placeholder: "Find a page, post or tag…"
       script:
         loading: "Loading the graph…"
         load_failed: "The graph could not be loaded."
@@ -63,18 +129,77 @@ en:
         release_pinned:
           one: "Release %{count} pinned"
           other: "Release %{count} pinned"
-        summary: "Post relationship graph: %{posts} posts and tags, %{edges} connections."
+        summary:
+          whole: "Mind graph: %{kinds}, %{connections}."
+          local: "Mind graph around %{title}, depth %{depth}: %{kinds}."
+          everything: "Showing everything."
+          nothing: "Mind graph: nothing to show."
+          all_hidden: "All types are hidden."
+          none_yet: "No pages, posts or tags yet."
+          around_home: "Showing the area around Home."
+          site: "The site has %{kinds}."
+          more:
+            one: "%{figure} more is in the list."
+            other: "%{figure} more are in the list."
+          pages:
+            one: "%{figure} page"
+            other: "%{figure} pages"
+          types:
+            one: "%{figure} post type"
+            other: "%{figure} post types"
+          posts:
+            one: "%{figure} post"
+            other: "%{figure} posts"
+          posts_of: "%{figure} of %{total} posts"
+          tags:
+            one: "%{figure} tag"
+            other: "%{figure} tags"
+          connections:
+            one: "%{figure} connection"
+            other: "%{figure} connections"
+          pair: "%{first} and %{last}"
+          series: "%{first}, %{rest}"
+          hidden:
+            page: "Pages hidden."
+            post: "Posts hidden."
+            tag: "Tags hidden."
+            type: "Post types hidden."
+          hidden_lines:
+            tree: "Tree lines hidden."
+            lists: "Lists lines hidden."
+            related: "Related lines hidden."
+            tag: "Shares-a-tag lines hidden."
+        opened:
+          line:
+            one: "This site has %{figure} connection, so the graph opens around Home."
+            other: "This site has %{figure} connections, so the graph opens around Home."
+          everything_name:
+            one: "Show everything: %{figure} connection"
+            other: "Show everything: all %{figure} connections"
+        legend:
+          toggle: "%{name}, %{count}"
+        all_posts: "All posts"
+        more: "+%{count} more"
+        retired_type: "%{name} (retired)"
         card:
           related:
-            one: "%{count} related"
-            other: "%{count} related"
+            one: "%{figure} related"
+            other: "%{figure} related"
           tags:
-            one: "%{count} tag"
-            other: "%{count} tags"
+            one: "%{figure} tag"
+            other: "%{figure} tags"
           tag_posts:
-            one: "%{count} post"
-            other: "%{count} posts"
+            one: "%{figure} post"
+            other: "%{figure} posts"
           open_post: "Open post"
+          open_page: "Open page"
+          post_type: "Post type"
+          child_pages:
+            one: "%{figure} child page"
+            other: "%{figure} child pages"
+          lists_posts:
+            one: "lists %{figure} post"
+            other: "lists %{figure} posts"
           focus: "Focus"
           pin: "Pin"
           unpin: "Unpin"
@@ -85,21 +210,49 @@ en:
             draft: "Draft"
             scheduled: "Scheduled"
             live: "Live"
+            unpublished_changes: "Unpublished changes"
+            change_scheduled: "Change scheduled %{date}"
+            live_with_changes: "Live, unpublished changes"
+            live_change_scheduled: "Live, change scheduled %{date}"
         list:
+          pages: "Pages · %{count}"
           posts: "Posts · %{count}"
           tags: "Tags · %{count}"
+          types: "Post types · %{count}"
           empty: "Nothing is drawn yet."
+          unlisted: "Not listed on any page"
+          not_in_view: "not in view"
+          open_in_posts: "Open in Posts →"
+          failed: "The list couldn't be loaded."
+          try_again: "Try again"
+          back: "Back to the list"
+          more_heading: "More from %{target} · %{count}"
+          more_row:
+            one: "%{words}: %{figure} more post %{target} lists, not in view. Activate to show it."
+            other: "%{words}: %{figure} more posts %{target} lists, not in view. Activate to show them."
+          select_page:
+            one: "%{title}: page, %{count} connection. Shows it in the graph."
+            other: "%{title}: page, %{count} connections. Shows it in the graph."
           select_post:
             one: "%{title}: post, %{count} connection. Shows it in the graph."
             other: "%{title}: post, %{count} connections. Shows it in the graph."
           select_tag:
             one: "%{title}: tag, %{count} connection. Shows it in the graph."
             other: "%{title}: tag, %{count} connections. Shows it in the graph."
+          select_type:
+            one: "%{title}: post type, %{count} post. Shows it in the graph."
+            other: "%{title}: post type, %{count} posts. Shows it in the graph."
+          add_post: "%{title}, %{type} post, not in view. Activate to add it to the graph."
+          add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
+          absent_post: "%{title}, %{type} post, not in view."
+          absent_retired_post: "%{title}, %{type}, retired type, not in view."
         search:
           count:
             one: "%{count} result"
             other: "%{count} results"
-          none: "No post or tag matches."
+          none: "No page, post or tag matches."
           failed: "Search failed — check your connection."
-          post: "Post"
-          tag: "Tag"
+          groups:
+            page: "Pages"
+            post: "Posts"
+            tag: "Tags"

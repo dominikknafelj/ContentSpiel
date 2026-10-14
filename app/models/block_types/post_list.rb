@@ -57,6 +57,20 @@ module BlockTypes
       scope
     end
 
+    # The same criteria for a caller that holds a post's stored type and its
+    # tags' names and no record: the mind graph asks for every readable post
+    # at once (`PostGraph::Listings`), from rows it has already loaded. THE
+    # ONE PLACE the per-post test is written: `lists?` below is this, so the
+    # listing, a post's address and the graph cannot come to disagree about
+    # which page lists which post. Still in lockstep with `listed_posts`.
+    def self.matches?(settings, content_type:, tag_names:)
+      return false if ContentTypes.find(content_type).nil?
+      return false if settings.content_type.present? && settings.content_type.to_s != content_type.to_s
+
+      tag = settings.tag.to_s.strip
+      tag.blank? || tag_names.any? { |name| name.to_s.downcase == tag.downcase }
+    end
+
     # Whether a post_list block with these settings would list `post`,
     # ignoring publication: the same content-type-and-tag criteria
     # `listed_posts` applies, minus its `Post.published`/`Post.all` scope.
@@ -76,11 +90,7 @@ module BlockTypes
     # itself (`t.lists_posts_with ...`) instead of a capability-wide
     # dispatch.
     def self.lists?(settings, post)
-      return false if post.definition.nil?
-      return false if settings.content_type.present? && settings.content_type != post.content_type
-
-      tag = settings.tag.to_s.strip
-      tag.blank? || post.tags.any? { |t| t.name.downcase == tag.downcase }
+      matches?(settings, content_type: post.content_type, tag_names: post.tags.map(&:name))
     end
   end
 end

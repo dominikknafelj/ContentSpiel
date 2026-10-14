@@ -203,6 +203,7 @@ en:
           notes:
             title: "Open notes · %{count}"
             label: "Write a note on this post"
+            label_page: "Write a note on this page"
             add: "Add note"
             # The button while the note is being sent (decision 41).
             sending: "Sending…"

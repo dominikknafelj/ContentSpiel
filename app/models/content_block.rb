@@ -130,6 +130,12 @@ class ContentBlock < ApplicationRecord
   # that `post_list` is a registered type rather than a hardcoded enum value.
   scope :listing, -> { where(block_type: BlockTypes.with_capability(:lists_posts).map(&:name)) }
 
+  # Blocks whose type has the `container` capability: the sections, which
+  # hold other blocks and so say where those stand on the page. What a reader
+  # of a page's order needs beside the blocks it is after (`PostGraph::Listings`
+  # loads them with the list blocks, for `BlockOutline`).
+  scope :containers, -> { where(block_type: BlockTypes.with_capability(:container).map(&:name)) }
+
   # `ActiveModel::Validations` aliases this to `#send` by default, which
   # chokes on the dotted paths `settings_are_valid` below adds errors under
   # (`settings.content_type` is not a method) -- generating an error's full

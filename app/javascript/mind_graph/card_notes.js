@@ -1,9 +1,10 @@
-// A post's open notes in the selection card (notes spec §4.4; handoff, "Node
+// A post's or a page's open notes in the selection card (notes spec §4.4; handoff, "Node
 // card thread list"): each thread's first message, who wrote it and how many
-// replies it has, a link into the post's editor with the drawer open at that
+// replies it has, a link into the record's editor with the drawer open at that
 // thread, and a field to start a note without leaving the graph.
 //
-// Read as JSON from the notes endpoint scoped to that post (`url`), so what a
+// Read as JSON from the notes endpoint scoped to that record (`url`: a
+// post's or a page's, the template the view built for its `type`), so what a
 // viewer sees here is what they may read; written with `textContent` and
 // `href` only, like the rest of the card -- a note's text and its author's
 // name are a person's, whatever they contain. A note is started with a form
@@ -32,8 +33,9 @@
 // and Escape in the field, a click on the canvas and another node all close
 // it: a half-typed note went with it. So what is typed is kept like a
 // composer's (`admin--notes--composer`), per person and per post, under
-// `cs-note-draft:<user id>:graph-Post-<id>` in `sessionStorage`; put back
-// when that post's card is built again; removed when the note is saved or
+// `cs-note-draft:<user id>:graph-Post-<id>` (a page's: `graph-Page-<id>`, so
+// a page and a post of one database id keep two drafts) in `sessionStorage`;
+// put back when that record's card is built again; removed when the note is saved or
 // the field emptied, and with every other draft when the person signs out
 // (`forgetDrafts`). The person is the one `admin--notes--inbox` was given on
 // <body>. While a note is on its way the field is read-only, so nothing is
@@ -45,7 +47,9 @@
 // `reset()` empties on a page Turbo restored. An answer that arrives after
 // that fills a section nobody sees.
 //
-// `cardNotes(node, { text, url, postUrl, onChange })` answers the section
+// `cardNotes(node, { text, type, url, recordUrl, onChange })` (`type` is
+// "post" or "page", what the notes are on; `recordUrl` the record's editor,
+// which arrives with its node) answers the section
 // (`section[data-mind-graph-card-notes]`), which the card draws under the
 // title and above its actions (`card.js` says how); a row is `li[data-note-row]`, with
 // `data-unread` while it holds something the viewer has not read -- ink for
@@ -53,6 +57,7 @@
 // the word "new" for a screen reader, so it is never colour alone -- and the
 // link to the rest is `a[data-note-more]`.
 import { draftKey } from "controllers/admin/notes/composer_controller"
+import { recordId } from "mind_graph/ids"
 
 const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
 // Three rows, then "+N more" (handoff, "Node card thread list").
@@ -74,12 +79,12 @@ function element(tag, className, content) {
   return node
 }
 
-export function cardNotes(node, { text, url, postUrl, onChange }) {
+export function cardNotes(node, { text, type = "post", url, recordUrl, onChange }) {
   const section = element("section", "flex flex-col gap-2")
   section.dataset.mindGraphCardNotes = ""
   section.setAttribute("data-admin--notes--live-target", "record")
-  section.dataset.notesType = "post"
-  section.dataset.notesId = node.id
+  section.dataset.notesType = type
+  section.dataset.notesId = recordId(node.id)
   const heading = element("h3", LABEL)
   const list = element("ul", "m-0 flex list-none flex-col gap-2 p-0")
   const status = element("p", "m-0 text-[12px] text-danger-ink")
@@ -92,13 +97,16 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   field.rows = 2
   field.maxLength = 4000
   field.required = true
-  field.setAttribute("aria-label", text.t("mind_graph.script.card.notes.label"))
-  field.placeholder = text.t("mind_graph.script.card.notes.label")
+  // "Write a note on this post", or "on this page": the field says what the
+  // note is on.
+  const fieldLabel = type === "page" ? text.t("mind_graph.script.card.notes.label_page") : text.t("mind_graph.script.card.notes.label")
+  field.setAttribute("aria-label", fieldLabel)
+  field.placeholder = fieldLabel
   const submit = element("button", "cursor-pointer rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50", text.t("mind_graph.script.card.notes.add"))
   submit.type = "submit"
   form.append(field, submit)
 
-  const key = draftKey(document.body.getAttribute("data-admin--notes--inbox-person-value") || "", `graph-Post-${node.id}`)
+  const key = draftKey(document.body.getAttribute("data-admin--notes--inbox-person-value") || "", `graph-${type === "page" ? "Page" : "Post"}-${recordId(node.id)}`)
   const draft = {
     read() {
       try {
@@ -120,11 +128,11 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   field.value = draft.read()
   field.addEventListener("input", () => draft.write())
 
-  // The post's editor with the drawer open, at one thread or at the list.
+  // The record's editor with the drawer open, at one thread or at the list.
   // The editor's URL arrives with the node; only the two parameters are
   // written here.
   function notesUrl(thread) {
-    const target = new URL(postUrl, window.location.origin)
+    const target = new URL(recordUrl, window.location.origin)
     target.searchParams.set("notes", "open")
     if (thread != null) target.searchParams.set("thread", thread)
     return target.pathname + target.search
@@ -178,7 +186,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
       const data = await response.json()
       list.replaceChildren(...data.threads.slice(0, ROWS).map(row))
       // `open` is exact; `threads` is the listing's first page. What the
-      // rows don't show is behind "+N more", which opens the post's notes.
+      // rows don't show is behind "+N more", which opens the record's notes.
       const rest = data.open - Math.min(ROWS, data.threads.length)
       if (rest > 0) {
         const more = element("li")

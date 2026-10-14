@@ -66,16 +66,15 @@ module Admin
       def no_pages? = !Page.exists?(parent_id: nil)
 
       # Depth-first, siblings in tree order, so the indented list reads like the
-      # tree: by position, a page without one last, then by id, the key of
-      # `Admin::PagesScreen::TreeNodeComponent#children` and of
-      # `PublicSite::Branch#in_tree_order` (`position.to_i` alone put a page
-      # without a position first). Ancestors the viewer can't create under are
-      # walked but not listed.
+      # tree: by position, a page without one last, then by id, the one rule
+      # `TreeOrder` holds for CS Studio's tree and the public branch too
+      # (sorting by the position made a number put a page without one first).
+      # Ancestors the viewer can't create under are walked but not listed.
       def choices
         @choices ||= begin
           kept = Page.kept.select(:id, :parent_id, :position, :title).to_a
           allowed = AccessControl.creatable_parents(Current.actor, kept).map(&:id).to_set
-          children = kept.group_by(&:parent_id).transform_values { |pages| pages.sort_by { |page| [ page.position.nil? ? 1 : 0, page.position.to_i, page.id ] } }
+          children = kept.group_by(&:parent_id).transform_values { |pages| ::TreeOrder.sort(pages) }
           paths = allowed.empty? ? {} : PublicPath.current.where(record_type: "Page", record_id: allowed.to_a, locale: locale).pluck(:record_id, :path).to_h
           prefix = PublicSite::Urls.new.prefix(locale)
           list = []

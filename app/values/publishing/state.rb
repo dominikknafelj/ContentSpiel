@@ -71,11 +71,30 @@ module Publishing
     STATES = %i[draft scheduled live live_with_changes live_change_scheduled].freeze
     ACTIONS = %i[publish schedule publish_changes cancel_scheduled_change discard_changes unpublish].freeze
 
-    def self.of(record, now: Time.current) = new(record, now: now)
+    # `pending_at:` hands over the answer to the one question that costs a
+    # statement (fact 2 above), for a caller that has read the pending copies
+    # of many records at once: the mind graph draws the fifth state on every
+    # node, and asks once for all of them. Given (a time, or nil for "none"),
+    # `pending_at` and `state` ask the database nothing. Not given, they read
+    # it the first time, as before. A draft's is ignored either way.
+    #
+    # WHAT THE CALLER WHO HANDS IT OWES: the time is trusted, not checked.
+    # It is the `live_at` of the record's copy read with
+    # `Publishing::Version.pending(now)`, `Publishing.pending`'s own scope,
+    # and with the SAME `now` this state is given; nil when that read found
+    # none. A time that is not later than `now` (a copy already in force)
+    # would be answered as a change still scheduled. And only `pending_at`
+    # and `state` are free: `actions` still asks one statement for a record
+    # with a copy pending (`in_force?`), so a list never calls it per row.
+    NOT_READ = Object.new.freeze
+    private_constant :NOT_READ
 
-    def initialize(record, now: Time.current)
+    def self.of(record, now: Time.current, pending_at: NOT_READ) = new(record, now: now, pending_at: pending_at)
+
+    def initialize(record, now: Time.current, pending_at: NOT_READ)
       @record = record
       @now = now
+      @pending_at = pending_at unless pending_at.equal?(NOT_READ)
     end
 
     # "draft", "scheduled" or "live": the cheap answer lists and chips use,

@@ -137,4 +137,33 @@ class Publishing::StateTest < ActiveSupport::TestCase
       assert_not Publishing::DiscardChanges.call(record).ok?
     end
   end
+
+  test "a state that is handed its pending time asks the database nothing, and is the state it would have read" do
+    TABLE.each do |(time, pending, mark), (state, _changes, _actions)|
+      record = record_with(time, pending, mark)
+      at = Publishing.pending(record)&.live_at
+
+      read = Publishing::State.of(record)
+      expected = [ state, read.status, read.changes?, read.pending_at ]
+      statements = capture_sql do
+        handed = Publishing::State.of(record, pending_at: at)
+        assert_equal expected, [ handed.state, handed.status, handed.changes?, handed.pending_at ], "#{time} pending=#{pending} mark=#{mark}"
+      end
+
+      assert_empty statements
+      # A draft uses no copy, handed or read; any other record's is the time handed.
+      if pending && time != :none
+        assert_equal at, read.pending_at, "#{time} pending=#{pending} mark=#{mark}"
+      else
+        assert_nil read.pending_at, "#{time} pending=#{pending} mark=#{mark}"
+      end
+    end
+  end
+
+  test "handed nil, a live record has no change scheduled, whatever its copies say" do
+    record = record_with(:past, true, false)
+
+    assert_equal :live, Publishing::State.of(record, pending_at: nil).state
+    assert_equal :live_change_scheduled, Publishing::State.of(record).state
+  end
 end

@@ -593,16 +593,21 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
 
     get "/cs-studio/mind_graph/data"
-    assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, @gone_post.id
-    assert(response.parsed_body["nodes"].none? { |node| node["id"] == @gone_post.id })
-    assert_empty response.parsed_body["edges"]
+    assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, "post-#{@gone_post.id}"
+    assert(response.parsed_body["nodes"].none? { |node| node["id"] == "post-#{@gone_post.id}" })
+    assert_empty response.parsed_body["edges"].select { |edge| %w[related tag].include?(edge["kind"]) }
+    pages = response.parsed_body["pages"].map { |page| page["id"] }
+    assert_includes pages, "page-#{@kept_page.id}"
+    assert_not_includes pages, "page-#{@gone_page.id}"
+    assert_no_match(/page-#{@gone_page.id}\b/, response.body, "a line to a trashed page, or its id as a parent")
+    assert_not_includes response.body, "Gone page"
     get "/cs-studio/mind_graph/data", params: { post: @gone_post.id }
     assert_response :not_found
     get "/cs-studio/notes/post/#{@gone_post.id}/threads"
     assert_response :not_found
     assert_not_includes response.body, "A note"
     get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
-    assert_equal [ @kept_post.id ], response.parsed_body["nodes"].map { |n| n["id"] }
+    assert_equal [ "post-#{@kept_post.id}" ], response.parsed_body["nodes"].map { |n| n["id"] }
     # The kept post has no thread; the trashed one's are counted nowhere.
     assert_equal [ 0 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }
     # And a kept post's own note is counted, so the zero above is not the
@@ -612,8 +617,18 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ 1 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }
     get "/cs-studio/notes/post/#{@kept_post.id}/threads"
     assert_equal [ 1, 1 ], [ response.parsed_body["open"], response.parsed_body["threads"].size ]
+    # The search (pages in the mind graph, Task 7) finds pages too, and a tag
+    # a page's list block names: neither the trashed page ("Gone page") nor
+    # the trashed post, nor a tag only a trashed page lists, is a row.
+    listed = Tag.create!(name: "gone-listed")
+    ContentBlock.create!(owner: @gone_page, block_type: :post_list, position: 2, settings: { "tag" => "gone-listed" })
     get "/cs-studio/mind_graph/search", params: { q: "gone" }
     assert_empty response.parsed_body
+    # And the same block on a kept page makes the tag a row, so the empty
+    # answer above is the trash's doing.
+    ContentBlock.create!(owner: @kept_page, block_type: :post_list, position: 2, settings: { "tag" => "gone-listed" })
+    get "/cs-studio/mind_graph/search", params: { q: "gone" }
+    assert_equal [ "tag-#{listed.id}" ], response.parsed_body.map { |row| row["id"] }
   end
 
   # The mind graph's tag nodes (round 3, Task 17): a tag counts only the KEPT
@@ -628,13 +643,112 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/data"
     data = response.parsed_body
     assert_equal [ { "id" => "tag-#{tag.id}", "name" => "graph-shared", "count" => 2, "degree" => 2 } ], data["tags"]
-    assert_equal [ @kept_post.id, other.id ].sort, data["edges"].select { |e| e["kind"] == "tag" }.map { |e| e["source"] }.sort
+    assert_equal [ "post-#{@kept_post.id}", "post-#{other.id}" ].sort, data["edges"].select { |e| e["kind"] == "tag" }.map { |e| e["source"] }.sort
 
     other.update_column(:trashed_at, Time.current)
     get "/cs-studio/mind_graph/data"
     data = response.parsed_body
     assert_empty data["tags"], "one kept post is not a connection"
-    assert_empty data["edges"]
+    assert_empty data["edges"].select { |edge| %w[related tag].include?(edge["kind"]) }
+  end
+
+  test "a trashed page's child is drawn in the mind graph without a line to it, and a trashed page lists nothing" do
+    sign_in_as users(:one)
+    child = create_page(title: "Child of gone", parent: @kept_page)
+    Page.where(id: @kept_page.id).update_all(trashed_at: Time.current) # version: none (a test trashes one page and leaves its child) # changes: none (a test trashes one page)
+    Page.where(id: @blog.id).update_all(trashed_at: Time.current)      # version: none (a test trashes one page) # changes: none (a test trashes one page)
+
+    get "/cs-studio/mind_graph/data"
+    data = response.parsed_body
+
+    assert_nil data["pages"].find { |page| page["id"] == "page-#{child.id}" }.fetch("parent")
+    assert_no_match(/page-#{@kept_page.id}\b|page-#{@blog.id}\b/, response.body)
+    assert_empty data["edges"].select { |edge| edge["kind"] == "lists" }
+    assert_empty data["types"]
+    assert(data["nodes"].none? { |node| node["listed"] })
+  end
+
+  # A page as the mind graph's focus, and the list's two reads (pages in the
+  # mind graph, Task 4): a trashed page is no focus, from the page, from
+  # `data` and from `listed` alike; a trashed post is no row of either read
+  # and in no total; a trashed page lists nothing, so its posts are unlisted;
+  # and a kept page's local view names no trashed page and no trashed post.
+  test "a trashed page is no focus of the mind graph, and a trashed post is no row of its list's two reads" do
+    sign_in_as users(:one)
+
+    [ "/cs-studio/mind_graph", "/cs-studio/mind_graph/data", "/cs-studio/mind_graph/listed" ].each do |path|
+      get path, params: { page: @gone_page.id }
+      assert_response :not_found, path
+      assert_not_includes response.body, "Gone page"
+      get path, params: { page: @kept_page.id }
+      assert_response :success, path
+    end
+
+    # `@blog` lists the blog posts, so neither blog post could be a row here.
+    # Two posts of a type NO page lists tell the trash apart: the kept one
+    # is the one row, and the trashed one is no row and not in the total.
+    kept_entry = create_post(title: "Kept entry", content_type: "resume_entry")
+    gone_entry = create_post(title: "Gone entry", content_type: "resume_entry")
+    gone_entry.update!(trashed_at: Time.current)
+    get "/cs-studio/mind_graph/unlisted"
+    assert_equal [ 1, [ "post-#{kept_entry.id}" ] ], [ response.parsed_body["total"], response.parsed_body["rows"].map { |row| row["id"] } ]
+    assert_no_match(/Gone entry|post-#{gone_entry.id}\b/, response.body)
+
+    # Behind the pill: with twenty newer posts the oldest KEPT post is the
+    # one left out. The trashed post is older still and is not counted.
+    @kept_post.update_columns(published_at: 1.month.ago) # version: none (a test sets a time) # changes: none (a test sets a time)
+    @gone_post.update_columns(published_at: 1.year.ago)  # version: none (a test sets a time) # changes: none (a test sets a time)
+    20.times { |index| create_post(title: "Newer #{index}") }
+    get "/cs-studio/mind_graph/listed", params: { page: @blog.id, target: "type-blog" }
+    assert_equal [ 1, [ "post-#{@kept_post.id}" ] ], [ response.parsed_body["total"], response.parsed_body["rows"].map { |row| row["id"] } ]
+    assert_not_includes response.body, "Gone post"
+
+    # The local view around a kept page that lists them: the trashed post is
+    # no node and behind no pill's count, the trashed page (a sibling) no node.
+    get "/cs-studio/mind_graph/data", params: { page: @blog.id, depth: 2 }
+    data = response.parsed_body
+    assert_equal 20, data["nodes"].size
+    assert_equal [ 1 ], data["more"].map { |pill| pill["count"] }
+    assert_includes data["pages"].map { |page| page["id"] }, "page-#{@kept_page.id}", "a sibling, two steps along the tree"
+    assert_no_match(/Gone page|Gone post|page-#{@gone_page.id}\b|post-#{@gone_post.id}\b/, response.body)
+    get "/cs-studio/mind_graph/data", params: { page: @kept_page.id, depth: 2 }
+    assert_no_match(/Gone page|Gone post|page-#{@gone_page.id}\b|post-#{@gone_post.id}\b/, response.body)
+
+    # A trashed page lists nothing: its posts are unlisted, the kept ones.
+    @blog.update_column(:trashed_at, Time.current)
+    get "/cs-studio/mind_graph/unlisted"
+    assert_equal 22, response.parsed_body["total"], "the twenty-one kept blog posts and the kept entry"
+    assert_includes response.parsed_body["rows"].map { |row| row["id"] }, "post-#{@kept_post.id}"
+    assert_not_includes response.parsed_body["rows"].map { |row| row["id"] }, "post-#{@gone_post.id}"
+    assert_not_includes response.body, "Gone post"
+    get "/cs-studio/mind_graph/listed", params: { page: @blog.id, target: "type-blog" }
+    assert_response :not_found
+  end
+
+  # What the mind graph loads of the site (pages in the mind graph, Task 2):
+  # `PostGraph::Site` holds no trashed page and no trashed post, so no line
+  # of a trashed page's list block, no count and no "listed" comes from one.
+  test "what the mind graph loads of the site holds no trashed page, no trashed post and no line of a trashed page's list block" do
+    tag = Tag.create!(name: "graph-site")
+    [ @kept_post, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: @gone_page), attributes: { block_type: "post_list", settings: { "tag" => "graph-site" } }).ok?
+
+    site = as_owner { PostGraph::Site.load(actor: users(:one)) }
+
+    assert_includes site.pages.map(&:id), @kept_page.id
+    assert_not_includes site.pages.map(&:id), @gone_page.id
+    assert_nil site.page(@gone_page.id)
+    assert_not_includes site.tree.order, @gone_page.id
+    assert_equal [ @kept_post.id ], site.post_rows.map(&:first)
+    assert_equal [ [ tag.id, @kept_post.id ] ], site.tag_links
+    assert_equal({ tag.id => 1 }, site.tag_counts)
+    assert_equal [ [ @blog.id, "type-blog" ] ], site.listings.edges, "the trashed page's block makes no line"
+    assert_empty site.listings.pages_of("tag-#{tag.id}")
+    assert_equal [ @kept_post.id ], site.listings.posts_of(@blog.id)
+    assert_equal [ 1, 1 ], [ site.listings.type_count("blog"), site.listings.post_count ]
+    assert_empty site.listings.unlisted
+    assert_not site.listings.listed?(@gone_post.id)
+    assert_equal [ @blog.id, @kept_page.id ].sort, PostGraph.paths(Page.pluck(:id), locale: :en).keys.sort - [ root_page.id ], "a trashed page has no current address to hand up"
   end
 
   # The Tags list (round 3, Task 13): its "Posts" column counts the KEPT posts the

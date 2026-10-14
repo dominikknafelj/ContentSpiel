@@ -13,12 +13,45 @@ require "application_system_test_case"
 # (`pixel_at`): a canvas can pass every other test and still draw nothing.
 class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   GRAPH = "[data-controller~='admin--mind-graph--graph']".freeze
-  CANVAS = "#{GRAPH} canvas".freeze
+  # The graph's own canvas: the legend's swatches are canvases too.
+  CANVAS = "#{GRAPH} canvas[data-admin--mind-graph--graph-target='canvas']".freeze
   LIST = "#{GRAPH} [data-mind-graph-list]".freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
+  end
+
+  # A test that stubs `window.fetch` or `AbortSignal.timeout` remembers the
+  # real one (`window.realFetch`, `window.realTimeout`: every stub in this
+  # file writes it before it replaces anything), and it is put back here,
+  # whatever happened in the test. Nothing depended on it (the next test's
+  # first visit is a new document), which is why a stub that stayed was
+  # never noticed (Task 7's review, M9); a test that goes on in the same
+  # window after its stub's work is done, or a session that is one day kept
+  # between tests, would have met it.
+  teardown do
+    page.execute_script(<<~JS)
+      if (window.realFetch) { window.fetch = window.realFetch; delete window.realFetch }
+      if (window.realTimeout) { AbortSignal.timeout = window.realTimeout; delete window.realTimeout }
+    JS
+  rescue Ferrum::Error, Capybara::CapybaraError
+    # The browser has gone with the test: there is no window to put right.
+  end
+
+  test "every stub of fetch in this file remembers the real one, so the teardown can put it back" do
+    source = File.read(__FILE__)
+    # Any assignment but one that puts a real fetch back (`= real`, `= window.realFetch`).
+    stubs = source.lines.each_with_index.select { |line, _| line.match?(/window\.fetch = (?!real\b|window\.realFetch)/) }.map { |_, index| index }
+
+    assert_operator stubs.size, :>, 12
+    # Looked for in the lines above the stub, up to the script's own start (a
+    # here-document or a one-line script), not within a fixed distance.
+    forgetful = stubs.reject do |index|
+      start = index.downto(0).find { |line| source.lines[line].match?(/execute_script|evaluate_(?:async_)?script/) } || 0
+      source.lines[start..index].join.match?(/window\.realFetch (?:\?\?=|=) /)
+    end
+    assert_empty forgetful.map { |index| "line #{index + 1}" }
   end
 
   test "the graph loads, settles, and the first view fits every node inside the canvas" do
@@ -30,9 +63,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_equal "7", graph["data-nodes"], "six posts and the tag they share"
     assert_equal "7", graph["data-edges"], "one related and six tag edges"
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 7 posts and tags, 7 connections.']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 6 posts and 1 tag, 7 connections. Showing everything.']"
+    assert_equal [ "Posts 6", "Tags 1", "Related 1", "Shares a tag 6" ], legend_counts, "no page is read here, so no toggle of pages"
     box = canvas_box
-    (posts.map(&:id) + [ "tag-#{Tag.find_by!(name: "shared").id}" ]).each do |id|
+    (posts + [ Tag.find_by!(name: "shared") ]).map { |record| nid(record) }.each do |id|
       point = screen_position(id)
       assert point, "no position for #{id}"
       assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{id} is outside the canvas: #{point} in #{box}"
@@ -100,12 +134,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_operator sizes[0], :>, 0
   end
 
-  # Mind graph canvas spec §5.1, read from the pixels. Both posts have one
-  # connection, so both are drawn seven pixels in radius; four pixels left of the
-  # centre is inside a filled dot, and in a draft's ring it is the gap between
-  # the core (2.8 px) and the dashed outline (from 6 px). Left, because the
-  # label is on the right.
-  test "a live post is a filled dot, a draft a ring with a core: the status is a shape, not a colour" do
+  # One look read from the canvas's own pixels, so that "it draws at all" and
+  # "a draft is dashed" are seen on the real canvas, not only asked of a
+  # recording one (every look's detail is in the module tests): a live post is
+  # filled to its edge; a draft is empty inside, and its outline is there at
+  # some points round it and not at others.
+  #
+  # The ring is read 6.25px from the centre: the middle of the outline's
+  # band, which is INSIDE the mark's edge (5.5 to 7, on a surface disk of
+  # radius 7), so every sample has the surface under it. A sample in a gap is
+  # the surface's own colour, one on a dash is mixed with the outline's. And
+  # nothing is drawn a pixel beyond the mark's own radius: a draft is as
+  # large as a live post's fill, not half a stroke larger.
+  test "a live post is filled and a draft is an empty, dashed outline" do
     live = create_post(title: "Live one")
     draft = create_post(title: "Draft one")
     draft.update_column(:published_at, nil)
@@ -116,12 +157,72 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     surface = pixel_at(*canvas_box.first(2).map { |edge| edge + 3 })
     live_centre, live_inside = pixels_of(live)
     draft_centre, draft_inside = pixels_of(draft)
+    round = ring_pixels(draft, radius: 6.25, samples: 96)
+    beyond = ring_pixels(draft, radius: 8, samples: 24, quadrant: :left)
+    far = ->(pixel) { pixel.first(3).zip(draft_centre.first(3)).map { |a, b| (a - b).abs }.max }
 
     assert_operator surface[3], :<, 10, "the canvas's corner is not empty: #{surface}"
     assert_equal 255, live_centre[3], "nothing is drawn where the live post is"
     assert_equal live_centre, live_inside, "a live post is filled out to its edge"
-    assert_equal live_centre, draft_centre, "both are the same type: the draft's core has the type's hue"
-    assert_not_equal draft_centre, draft_inside, "a draft is a ring around a core, not a filled dot"
+    assert_equal 255, draft_centre[3], "a draft has no surface inside"
+    assert_not_equal live_centre, draft_centre, "a draft is empty inside: no core in its type's hue"
+    assert_equal draft_centre, draft_inside, "a draft is empty inside, out to its outline"
+    assert_operator round.count { |pixel| far.call(pixel) <= 8 }, :>, 12, "the outline has no gaps: it is not dashed"
+    assert_operator round.count { |pixel| far.call(pixel) > 24 }, :>, 12, "no outline is drawn round the draft"
+    assert_operator beyond.count { |pixel| pixel[3] > 40 }, :<, 8, "an outline is drawn beyond the draft's radius: it is not inside the mark's edge (a line to a neighbour may cross a few of the samples)"
+  end
+
+  # Pages spec §4, §5: pages, the post type a page lists and All posts are on
+  # the canvas; Home rests at the centre of the layout and is no pin; dragged,
+  # it is pinned where it is dropped, and released it goes back.
+  test "pages and what they list are drawn, and Home rests at the centre without being pinned" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: home, block_type: :post_list, position: 0, settings: {})
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+
+    visit admin_mind_graph_path
+    await_graph
+
+    assert_equal [ "6", "4" ], [ graph["data-nodes"], graph["data-edges"] ], "two pages, two posts, the type and All posts; a tree line, two lists lines and one related"
+    [ home, blog, a, "type-blog", "all-posts" ].each { |node| assert screen_position(nid(node)), "#{nid(node)} is not drawn" }
+    at = graph_position(home)
+    assert_in_delta 0, at["x"], 0.5
+    assert_in_delta 0, at["y"], 0.5
+    assert_equal "0", graph["data-pinned"]
+    assert_no_button "Release 1 pinned"
+    labelled = graph["data-labelled"].split(",")
+    assert_equal nid(home), labelled.first, "Home's label is placed first"
+    assert_empty [ nid(blog), "type-blog", "all-posts" ] - labelled, "a top-level page, a post type and All posts are named: #{labelled}"
+    # The marks on the real canvas. Home is a card 18 wide and 13 high, not a
+    # dot. Ink 7.5px right of its centre and in its corner (7.5 right, 5
+    # down: 9px from the centre), where a dot as high as it has nothing; and
+    # nothing 8px above and below its centre, where a dot as wide as it is
+    # filled (the lower of the two readings, since a line may cross one). No
+    # one pixel tells a card's corner from a dot of radius 9: the two differ
+    # there by less than the pixel the mark may be off the grid, so it is the
+    # height that says "not a dot as wide".
+    home_at = screen_position(home)
+    centre = pixel_at(home_at["x"], home_at["y"])
+    assert_equal 255, centre[3]
+    assert_equal centre, pixel_at(home_at["x"] + 7.5, home_at["y"]), "Home is not 18 wide: nothing 7.5px right of its centre"
+    assert_operator pixel_at(home_at["x"] + 7.5, home_at["y"] + 5)[3], :>, 200, "Home's card has no corner"
+    assert_operator [ pixel_at(home_at["x"], home_at["y"] + 8)[3], pixel_at(home_at["x"], home_at["y"] - 8)[3] ].min, :<, 100, "Home is as high as it is wide: a dot, not a card"
+    hub = screen_position("type-blog")
+    assert_not_equal pixel_at(hub["x"], hub["y"]), pixel_at(hub["x"] + 3.75, hub["y"]), "the hub has no ring inside it: it is one more post"
+
+    drag_node(nid(home), by: [ 90, 60 ])
+    assert_equal "1", graph["data-pinned"]
+    await_graph
+    assert_operator Math.hypot(graph_position(home)["x"], graph_position(home)["y"]), :>, 20, "a dragged Home is held where it was dropped"
+
+    press "Release 1 pinned"
+    await_graph
+    assert_in_delta 0, graph_position(home)["x"], 0.5, "a released Home did not go back to the centre"
+    assert_in_delta 0, graph_position(home)["y"], 0.5
+    assert_equal "0", graph["data-pinned"]
   end
 
   # Mind graph canvas spec §5.2: hubs are labelled first and the rest arrive
@@ -169,7 +270,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     before = graph["data-zoom"].to_f
-    first_id = Post.order(:id).first.id
+    first_id = nid(Post.order(:id).first)
     corner = canvas_box.first(2).map { |edge| edge + 12 }
 
     # Ferrum's mouse has no wheel (its `scroll_to` is `window.scrollTo`), so the
@@ -184,7 +285,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: corner[0] + 60, y: corner[1] + 40)
     mouse.up
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id}); return Math.abs(p.x - #{moved_from["x"] + 60}) < 2 && Math.abs(p.y - #{moved_from["y"] + 40}) < 2 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{moved_from["x"] + 60}) < 2 && Math.abs(p.y - #{moved_from["y"] + 40}) < 2 })()")
   end
 
   # Mind graph canvas spec §4.4: with the canvas focused, + and - zoom around
@@ -193,7 +294,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     visit admin_mind_graph_path
     await_graph
-    first_id = Post.order(:id).first.id
+    first_id = nid(Post.order(:id).first)
     zoom = -> { graph["data-zoom"].to_f }
     fitted = zoom.call
 
@@ -206,34 +307,216 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     from = screen_position(first_id)
     canvas.send_keys(:right)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"]}) < 1 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"]}) < 1 })()")
     canvas.send_keys(:down)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
   end
 
-  test "the filter hands the layout only what is shown" do
+  # Pages spec §6: each toggle hides its kind and only its kind, the counts
+  # stay what the graph holds, and the list follows. What a toggle shows is
+  # written by the change itself, before the layout moves, so nothing here
+  # waits for a layout but the first load and the last look.
+  test "each toggle of the legend hides its kind and only its kind, and the counts stay" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     a, b, c = 3.times.map { |i| create_post(title: "P#{i}") }
     PostRelation.create!(post: a, related_post: b)
     [ b, c ].each { |post| PostTag.create!(post: post, tag: Tag.find_or_create_by!(name: "t")) }
+    tag = Tag.find_by!(name: "t")
     visit admin_mind_graph_path
     await_graph
-    assert_equal [ "4", "3" ], [ graph["data-nodes"], graph["data-edges"] ]
+    counts = [ "Pages 2", "Posts 3", "Tags 1", "Post types 1", "Tree 1", "Lists 1", "Related 1", "Shares a tag 2" ]
+    shows = lambda do |nodes, edges|
+      assert_selector "#{GRAPH}[data-nodes='#{nodes}'][data-edges='#{edges}']"
+      assert_equal counts, legend_counts
+    end
 
-    find("label", text: "Related").click
-    await_graph
-    assert_equal [ "2", "1" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert_nil screen_position(c.id), "a hidden node has no place on screen"
-    assert_nil screen_position("tag-#{Tag.find_by!(name: "t").id}"), "a hidden tag has no place on screen"
+    shows.call(7, 5)
+    assert_selector "#{GRAPH} input[name=mind_graph_nodes][value=page][aria-label='Pages, 2']", visible: :all
+    assert_selector "#{GRAPH} input[name=mind_graph_lines][value=tag][aria-label='Shares a tag, 2']", visible: :all
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 pages, 1 post type, 3 posts and 1 tag, 5 connections. Showing everything.']"
+    assert_no_selector "#{GRAPH} [role=status] [data-mind-graph-announced]", visible: :all
 
-    find("label", text: "Tags").click
-    await_graph
-    assert_equal [ "3", "2" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert_nil screen_position(a.id)
+    toggle "Related"
+    shows.call(7, 4)
+    assert screen_position(a), "a line switched off hid a node"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 pages, 1 post type, 3 posts and 1 tag, 4 connections. Showing everything. Related lines hidden.']"
+    toggle "Related"
 
-    find("label", text: "All").click
+    toggle "Tags"
+    shows.call(6, 3)
+    assert_nil screen_position(tag)
+    within(LIST) { assert_no_selector "h2", text: /tags/i }
+    toggle "Tags"
+
+    toggle "Post types"
+    shows.call(6, 4)
+    assert_nil screen_position("type-blog")
+    toggle "Post types"
+
+    toggle "Lists"
+    shows.call(7, 4)
+    assert screen_position("type-blog"), "the type stays, without its line"
+    toggle "Tree"
+    shows.call(7, 3)
+    toggle "Lists"
+    toggle "Tree"
+
+    toggle "Pages"
+    shows.call(5, 3)
+    assert_nil screen_position(home)
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 1 post type, 3 posts and 1 tag, 3 connections. Showing everything. Pages hidden.']"
+    # A change of the legend is announced: the same words in the notice's
+    # live region, once, hidden from the eye.
+    assert_selector "#{GRAPH} [role=status] p.sr-only[data-mind-graph-announced]", count: 1, visible: :all,
+      text: "Mind graph: 1 post type, 3 posts and 1 tag, 3 connections. Showing everything. Pages hidden."
+    toggle "Pages"
+
+    shows.call(7, 5)
     await_graph
-    assert_equal [ "4", "3" ], [ graph["data-nodes"], graph["data-edges"] ]
-    assert screen_position(a.id)
+    assert screen_position(home)
+  end
+
+  # A TOGGLE IS A FILTER ON WHAT IS DRAWN, NOT A NEW LAYOUT (the ruling on
+  # Task 6's review, which departs from spec §5). The layout is computed once
+  # over everything the data holds: switching a kind or a kind of line off or
+  # on sends the worker nothing, warms nothing up, and leaves every node --
+  # shown or hidden -- exactly where it was, so what is switched back on
+  # comes back where it was and nothing that stays leaves the view.
+  test "a toggle moves nothing: after each of the eight, off and on again, every node is where it was and the layout was told nothing" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    a, b, c = 3.times.map { |i| create_post(title: "P#{i}") }
+    PostRelation.create!(post: a, related_post: b)
+    [ b, c ].each { |post| PostTag.create!(post: post, tag: Tag.find_or_create_by!(name: "t")) }
+    ids = [ home, blog, a, b, c, Tag.find_by!(name: "t") ].map { |record| nid(record) } + [ "type-blog" ]
+    visit admin_mind_graph_path
+    await_graph
+    places = -> { page.evaluate_script("#{ids.to_json}.map((id) => { const at = document.querySelector(#{GRAPH.to_json}).mindGraph.graphPosition(id); return [ at.x, at.y ] })") }
+    on_screen = -> { ids.map { |id| screen_position(id) } }
+    before = places.call
+    seen = on_screen.call
+    box = canvas_box
+    assert_equal 7, before.uniq.size, "the layout has not placed the nodes apart"
+    record_worker_messages
+
+    [ "Pages", "Posts", "Tags", "Post types", "Tree", "Lists", "Related", "Shares a tag" ].each do |name|
+      shown = [ graph["data-nodes"], graph["data-edges"] ]
+      toggle name
+      assert_no_selector "#{GRAPH}[data-nodes='#{shown[0]}'][data-edges='#{shown[1]}']"
+      await_frames
+      assert_equal before, places.call, "#{name} off moved a node"
+      assert_selector "#{GRAPH}[data-settled]"
+      on_screen.call.each_with_index do |point, index|
+        next unless point
+
+        assert_equal seen[index], point, "#{name} off: #{ids[index]} is drawn somewhere else"
+        assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{name} off: #{ids[index]} left the view"
+      end
+
+      toggle name
+      assert_selector "#{GRAPH}[data-nodes='7'][data-edges='5'][data-settled]"
+      await_frames
+      assert_equal before, places.call, "#{name} on again moved a node"
+      assert_equal seen, on_screen.call, "#{name} on again: a node did not come back where it was"
+    end
+
+    assert_equal [], worker_messages, "a toggle sent the layout a message"
+  end
+
+  # The legend by the keyboard: a toggle is a checkbox, a Tab stop that Space
+  # switches, and the graph follows it as it follows a click.
+  test "Space on a focused toggle switches it" do
+    create_post(title: "Alpha", tags: [ "t" ])
+    create_post(title: "Beta", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+    assert_selector "#{GRAPH}[data-nodes='3'][data-edges='2']"
+
+    find("#{GRAPH} input[name=mind_graph_nodes][value=tag]").execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Space)
+
+    assert_selector "#{GRAPH}[data-nodes='2'][data-edges='0']"
+    assert_no_selector "#{GRAPH} input[name=mind_graph_nodes][value=tag]:checked", visible: :all
+    page.driver.browser.keyboard.type(:Space)
+    assert_selector "#{GRAPH}[data-nodes='3'][data-edges='2']"
+    await_graph
+  end
+
+  # Third design answers and H6: status is not a filter. The key is a dialog
+  # named "Status key" behind the legend's "Status" link, in the chip's words.
+  test "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" do
+    create_post(title: "Alpha", tags: [ "t" ])
+    create_post(title: "Beta", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+    key = "dialog#mind-graph-status-key"
+    assert_no_selector "#{key}[open]", visible: :all
+    before = [ graph["data-nodes"], graph["data-edges"] ]
+
+    button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status")
+    button.execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Enter)
+
+    assert_selector "#{key}[open] h2", text: "Status key"
+    assert_equal [ "Live", "Draft", "Scheduled", "Live, unpublished changes", "Live, change scheduled" ], all("#{key} li[data-legend-state]").map { |item| item.text.squish }
+    await_js("document.querySelector('#mind-graph-status-key').contains(document.activeElement)")
+    assert_no_selector "#{key} .admin-dialog__body input, #{key} .admin-dialog__body button, #{key} .admin-dialog__body a"
+    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "the key filters nothing"
+    # Its five swatches are drawn (by the graph's own renderer), each its own.
+    await_js("Array.from(document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]')).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))")
+    drawings = page.evaluate_script("Array.from(document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]'), (canvas) => canvas.toDataURL())")
+    assert_equal 5, drawings.uniq.size, "two looks of the key are one drawing"
+
+    page.driver.browser.keyboard.type(:Escape)
+
+    assert_no_selector "#{key}[open]", visible: :all
+    await_js("document.activeElement?.textContent.trim() === 'Status'")
+    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "Escape closed the key and nothing of the graph"
+  end
+
+  test "a kind switched off takes the selection and the card of its node with it, and switched on again the node is back where it was, pinned as it was and not selected" do
+    blog = create_page(title: "Blog")
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    drag_node(nid(blog), by: [ 60, 40 ])
+    await_graph
+    click_node(nid(blog))
+    assert_equal [ nid(blog), "1" ], [ graph["data-selected"], graph["data-pinned"] ]
+    dropped = screen_position(nid(blog))
+
+    toggle "Pages"
+
+    assert_selector "#{GRAPH}[data-selected=''][data-pinned='1'][data-hovered='']"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_nil screen_position(nid(blog))
+
+    toggle "Pages"
+    assert_selector "#{GRAPH}[data-selected=''][data-pinned='1']"
+    assert_equal dropped, screen_position(nid(blog)), "the page did not come back where it was dropped"
+  end
+
+  test "with every kind off nothing is drawn and the list says so" do
+    create_page(title: "Blog")
+    a = create_post(title: "Alpha", tags: [ "t" ])
+    create_post(title: "Beta", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+
+    [ "Pages", "Posts", "Tags", "Post types" ].each { |name| toggle name }
+
+    assert_selector "#{GRAPH}[data-nodes='0'][data-edges='0']"
+    assert_selector "#{LIST} p", text: "Nothing is drawn yet."
+    assert_selector "#{CANVAS}[aria-label='Mind graph: nothing to show. All types are hidden.']"
+    assert_nil screen_position(a)
+    toggle "Posts"
+    assert_selector "#{GRAPH}[data-nodes='2']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts, 0 connections. Showing everything. Pages hidden. Tags hidden. Post types hidden.']"
+    await_graph
   end
 
   test "posts with no connection are counted, not drawn" do
@@ -244,7 +527,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_equal "2", graph["data-nodes"]
-    assert_nil screen_position(alone.id)
+    assert_nil screen_position(alone)
     # "Other", and "isn't shown": beside two connected posts the bare "1 post
     # has no connections yet." read as a contradiction.
     assert_text "1 other post has no connections yet and isn't shown."
@@ -260,13 +543,15 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # Nothing is drawn, so there are no "other" posts: the plain sentence.
     assert_text "2 posts have no connections yet."
     assert_no_text "other posts"
+    # The canvas's name says what the notice says, not that there are no posts.
+    assert_selector "#{CANVAS}[aria-label='Mind graph: nothing to show. 2 posts have no connections yet.']"
     assert_equal "0", graph["data-nodes"]
   end
 
-  test "no readable post: 'No posts yet.' and no canvas" do
+  test "no readable page or post: 'No pages or posts yet.' and no canvas" do
     visit admin_mind_graph_path
 
-    assert_text "No posts yet."
+    assert_text "No pages or posts yet."
     assert_no_selector "canvas"
   end
 
@@ -302,6 +587,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.failGraph = true
       window.fetch = (url, options) => (window.failGraph && String(url).includes("/mind_graph/data") ? Promise.reject(new TypeError("Failed to fetch")) : original(url, options))
     JS
@@ -324,6 +610,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => (String(url).includes("/mind_graph/data") ? Promise.resolve(new Response("", { status: 500 })) : original(url, options))
     JS
 
@@ -345,6 +632,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
+      window.realTimeout ??= AbortSignal.timeout
       const timeout = AbortSignal.timeout.bind(AbortSignal)
       window.hangGraph = true
       window.askedFor = []
@@ -387,6 +676,121 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "2", graph["data-nodes"]
   end
 
+  # The whole-branch review's M3 and M9. At the posts' cap a connected post
+  # the cut left out, added from the list, is one more of those shown, and
+  # an unconnected one is one fewer of those that aren't: each sentence
+  # follows its own figure. And the notice is a live region: a sentence that
+  # still says what it said is left as it is (the same element), so a
+  # screen reader is not read both again for every post a person adds.
+  # The two reads are played (nobody builds a site over the cap); every
+  # other request goes to the real fetch, and the list's stub puts it back.
+  test "at the cap an added post moves the figure of its own sentence and no other, and a sentence that did not change is not written again" do
+    create_post(title: "A")
+    create_page(title: "Blog") # a viewer who reads a page has the filter's checkbox
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(CAPPED_GRAPH)
+    page.execute_script(<<~JS)
+      const real = window.fetch
+      window.realFetch ??= real
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/unlisted")) return real(url, options)
+        window.fetch = real
+        const row = (id, title, unconnected) => ({ id, title, type: "blog", colour_index: 1, status: "live", changes: null, listed: false, url: "/row", degree: 0, related_count: 0, tag_count: 0, open_notes: 0, unconnected })
+        return Promise.resolve(new Response(JSON.stringify({ total: 2, rows: [ row("post-50", "Cut by the cap", false), row("post-51", "No connection", true) ] }), { headers: { "Content-Type": "application/json" } }))
+      }
+    JS
+    lines = -> { all("#{GRAPH} [role=status] p:not([data-mind-graph-announced])").map { |line| [ line.text, line["data-heard"] ] } }
+    heard = -> { page.execute_script("document.querySelectorAll(#{"#{GRAPH} [role=status] p".to_json}).forEach((line) => { line.dataset.heard = 'before' })") }
+    # What is ADDED to the live region is what a screen reader is read: every paragraph put in, by its words.
+    watch = <<~JS
+      window.noticeAdded = []
+      new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => window.noticeAdded.push(node.textContent))))
+        .observe(document.querySelector(#{"#{GRAPH} [data-admin--mind-graph--graph-target='notice']".to_json}), { childList: true })
+    JS
+    added = -> { page.evaluate_script("window.noticeAdded.splice(0)") }
+
+    with_reduced_motion do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      await_graph
+      assert_equal [ "Showing the 2,000 best-connected of 6,000 posts.", "1,214 other posts have no connections yet and aren't shown." ], lines.call.map(&:first)
+      find("#{LIST} label", text: "Not listed on any page").click
+      assert_selector "#{LIST} button[data-not-in-view]", count: 2
+      page.execute_script(watch)
+
+      heard.call
+      find("#{LIST} button[data-node-id='post-50']").click
+      assert_selector "#{GRAPH}[data-selected='post-50'][data-nodes='3']"
+      assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", nil ], [ "1,214 other posts have no connections yet and aren't shown.", "before" ] ], lines.call,
+        "one more is shown; the other sentence is the element it was"
+      assert_equal [ "Showing the 2,001 best-connected of 6,000 posts." ], added.call, "and it was never taken out and put back: only the sentence that changed is put into the live region"
+      assert_includes find(CANVAS)["aria-label"], "Showing the 2,001 best-connected of 6,000 posts."
+
+      heard.call
+      find("#{LIST} button[data-node-id='post-51']").click
+      assert_selector "#{GRAPH}[data-selected='post-51'][data-nodes='4']"
+      assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", "before" ], [ "1,213 other posts have no connections yet and aren't shown.", nil ] ], lines.call,
+        "one fewer isn't shown; the cap's sentence is the element it was"
+      assert_equal [ "1,213 other posts have no connections yet and aren't shown." ], added.call
+    end
+  end
+
+  # The whole-branch review's I1. "Not listed on any page" is a read of its
+  # own and its checkbox is there before the graph is: its rows can come
+  # while the graph is still being read, or after that read failed. There is
+  # then nothing to add a post to, so a row only says it is not in view, a
+  # press does nothing and raises nothing, and once the graph has come the
+  # same rows, still there, add their post. The graph's first read is held
+  # by the test and then failed; every other request goes to the real fetch.
+  test "a row of Not listed on any page pressed while the graph is being read, and after that read failed, does nothing and raises nothing, and adds its post once the graph is there" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    row = "#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]"
+    blog = ContentTypes.fetch("blog").label.downcase
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const real = window.fetch
+      window.realFetch ??= real
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/data")) return real(url, options)
+        window.fetch = real
+        return new Promise((resolve, reject) => { window.failGraphRead = () => reject(new TypeError("Failed to fetch")) })
+      }
+    JS
+
+    with_reduced_motion do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      assert_selector "#{GRAPH}[data-state='loading']"
+      await_js("typeof window.failGraphRead === 'function'")
+      find("#{LIST} label", text: "Not listed on any page").click
+      assert_selector "#{row}[aria-disabled='true'][aria-label='Alone, #{blog} post, not in view.']", text: /Alone\s*not in view/
+
+      find(row).click
+      await_frames
+      assert_selector "#{GRAPH}[data-state='loading']:not([data-nodes])"
+      assert_selector "#{row}[aria-disabled='true']", count: 1
+      assert_no_selector "[data-mind-graph-card]", visible: :visible, wait: 0
+
+      page.execute_script("window.failGraphRead()")
+      assert_selector "#{GRAPH}[data-state='failed']"
+      find(row).click
+      await_frames
+      assert_selector "#{row}[aria-disabled='true']", count: 1
+      assert_selector "#{LIST} input[data-mind-graph-unlisted]:checked", visible: :all
+
+      # The graph comes: what the person asked for is still there, and now it adds.
+      press "Retry"
+      await_graph
+      assert_selector "#{LIST} input[data-mind-graph-unlisted]:checked", visible: :all
+      assert_selector "#{row}:not([aria-disabled])"
+      within(LIST) { assert_row "Alone, #{blog} post, not in view. Activate to add it to the graph." }
+      find(row).click
+      assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='3']"
+      assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
+    end
+  end
+
   # A local view is cut differently (`PostGraph::Local#cut`: the nearest posts
   # first, then the better connected), so it has a sentence of its own: "best-
   # connected" would be untrue of it.
@@ -404,6 +808,123 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "2", graph["data-nodes"]
   end
 
+  # The ruling on Task 5's review: Home is held at the centre in the whole
+  # graph only. In a local view it is the FOCUS that rests at the centre --
+  # a person who asks for the graph around a page expects that page in the
+  # middle -- and Home, when it is drawn, is a page like any other. Neither
+  # is a pin.
+  test "in a local view the focus rests at the centre and Home does not" do
+    home = root_page
+    journal = create_page(title: "Journal")
+    create_page(title: "Archive", parent: journal)
+
+    visit admin_mind_graph_path(page: journal.id)
+    await_graph
+
+    assert_equal "3", graph["data-nodes"]
+    at = graph_position(journal)
+    assert_in_delta 0, at["x"], 0.5, "the focus is not at the centre"
+    assert_in_delta 0, at["y"], 0.5
+    assert_operator Math.hypot(graph_position(home)["x"], graph_position(home)["y"]), :>, 20, "Home is held at the centre of a view that is not its own"
+    assert_equal "0", graph["data-pinned"]
+    assert_no_button "Release 1 pinned"
+  end
+
+  # One number is three nodes (pages spec, decision 4): the post, the tag
+  # and the page of id 12 are each drawn, each selected by its own id, with
+  # its own neighbours. A page's card and a pill's are their name and Pin
+  # until each has its own (pages plan, Task 8). The pill is as wide as its
+  # words, is pressed on its box and not on a circle as wide as it, and has
+  # no label beside it, hovered or not.
+  test "a post, a tag and a page of one database id are three nodes, and a page, a type and a pill are drawn and pressed" do
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(SHARED_ID_GRAPH)
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+
+    assert_equal [ "6", "6" ], [ graph["data-nodes"], graph["data-edges"] ], "two posts, the tag, the page, the type and the pill; every line the data holds"
+    # The legend has no toggle for pages here (the viewer reads none, and the
+    # data is a stub's): a kind is hidden by a toggle switched off, never by
+    # a toggle that is not there.
+    assert_no_selector "#{GRAPH} label[data-legend-toggle=page], #{GRAPH} label[data-legend-toggle=type]"
+    # A selected label is semibold, and its box is measured in that font: the
+    # hit target and the hover's backing are as wide as the words drawn.
+    click_node("post-12")
+    assert_equal "post-12", graph["data-selected"]
+    assert_equal %w[post-13 tag-12], graph["data-neighbours"].split(",").sort
+    await_frames
+    widths = page.evaluate_script(<<~JS)
+      (() => {
+        const canvas = document.querySelector(#{CANVAS.to_json})
+        const box = canvas.parentElement.closest(#{GRAPH.to_json}).mindGraph.labelBox("post-12")
+        const context = document.createElement("canvas").getContext("2d")
+        const measured = (weight) => { context.font = `${weight}12px ${getComputedStyle(canvas).fontFamily}`; return context.measureText("Twelve").width }
+        return { box: box.right - box.left - 4, regular: measured(""), semibold: measured("600 ") }
+      })()
+    JS
+    assert_operator widths["semibold"], :>, widths["regular"] + 0.5, "the two fonts are as wide as each other here: the test shows nothing"
+    assert_in_delta widths["semibold"], widths["box"], 0.01, "the selected label's box is not as wide as the semibold words drawn"
+    click_node("tag-12")
+    assert_equal "tag-12", graph["data-selected"]
+    assert_equal %w[page-12 post-12 post-13], graph["data-neighbours"].split(",").sort
+    click_node("page-12")
+    assert_equal "page-12", graph["data-selected"]
+    assert_equal %w[tag-12 type-blog], graph["data-neighbours"].split(",").sort
+    within("[data-mind-graph-card]") do
+      assert_selector "h2", exact_text: "Page twelve"
+      assert_button "Pin"
+      assert_no_link "Open post"
+      # A page and a post of ONE database id: the page's card leads to the
+      # page, and its notes are the page's, not post 12's.
+      assert_link "Open page", href: %r{/pages/12\z}
+      assert_link "Focus", href: /mind_graph\?page=12\z/
+      assert_selector "[data-mind-graph-card-notes][data-notes-type=page][data-notes-id='12']"
+    end
+    assert_raises(ArgumentError) { nid(12) }
+
+    # The pill: "+1,980 more" in the messages' language, wider than the least.
+    escape_on_canvas
+    pill = screen_position("more-type-blog")
+    box = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.markBox('more-type-blog')")
+    width = box["right"] - box["left"]
+    assert_equal [ 16, pill["x"] ], [ box["bottom"] - box["top"], (box["left"] + box["right"]) / 2 ]
+    assert_nil page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.markBox('type-blog')"), "a hub is a circle"
+    assert_operator width, :>, 60, "the pill did not grow with its words"
+    mouse = page.driver.browser.mouse
+    mouse.click(x: pill["x"], y: pill["y"] - 20)
+    assert_equal "", graph["data-selected"], "20px above the pill is not on it, though it is within a circle as wide as the pill"
+    mouse.move(x: pill["x"] + (width / 2) - 2, y: pill["y"] + 5)
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === 'more-type-blog'")
+    await_frames
+    assert_not_includes graph["data-labelled"].split(","), "more-type-blog", "a pill has no label beside it"
+    # Pressed near its end, the pill is not selected (design answer F4): it
+    # opens the list with its posts, asked for by its page's NUMBER and its
+    # target (the pill carries the page as a node's id, "page-12"). The read
+    # is played here, since page 12 is the stub's; every other request goes
+    # to the real fetch.
+    page.execute_script(<<~JS)
+      const real = window.fetch
+      window.realFetch ??= real
+      window.listedAsked = []
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/listed")) return real(url, options)
+        window.listedAsked.push(String(url))
+        const rows = [ { id: "post-99", title: "Ninety-nine", type: "blog", colour_index: 1, status: "live", degree: 0, related_count: 0, tag_count: 0, open_notes: 0, url: "/ninety-nine", via: "type-blog" } ]
+        return Promise.resolve(new Response(JSON.stringify({ total: 1980, rows, posts_url: "/cs-studio/posts?type=blog" }), { headers: { "Content-Type": "application/json" } }))
+      }
+    JS
+    mouse.click(x: pill["x"] + (width / 2) - 2, y: pill["y"] + 5)
+    within(LIST) do
+      assert_equal [ "MORE FROM BLOG POST · 1,980" ], all("h2").map { |heading| heading.text.upcase }, "named by what the pill hangs off, with the read's whole total, grouped, though it answered one row"
+      assert_row "Ninety-nine, #{ContentTypes.fetch("blog").label.downcase} post, not in view. Activate to add it to the graph."
+    end
+    assert_equal [ "/cs-studio/mind_graph/listed?page=12&target=type-blog" ], page.evaluate_script("window.listedAsked")
+    assert_equal "", graph["data-selected"], "more is not selected"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+  end
+
   # A notice line is a chip around its own words, not a bar as wide as the
   # longest line beside it, and an action of the card is a button around its
   # own word, so a click beside it is not a click on it. The line is `w-fit`,
@@ -418,7 +939,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     stub_graph_data(CAPPED_GRAPH)
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     await_graph
-    click_node(1)
+    click_node("post-1")
     assert_selector "[data-mind-graph-card] a", text: "Open post"
 
     widths = page.evaluate_script(<<~JS)
@@ -507,7 +1028,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"].to_s
-    assert_nil screen_position(post.id), "an unplaced node has no place on screen"
+    assert_nil screen_position(post), "an unplaced node has no place on screen"
   end
 
   # Spec §6: the list is filled before the layout starts, so a worker that
@@ -548,7 +1069,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # With no layout the list is all there is, so it has to follow the filter:
-  # the control saying "Related" over a list that still holds the tag would be
+  # the legend saying "Tags" is off over a list that still holds the tag would be
   # the screen contradicting itself.
   test "the worker can't start: the filter still narrows the list and the counts" do
     a = create_post(title: "Alpha", tags: [ "shared" ])
@@ -563,14 +1084,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     end
     assert_selector "#{LIST} li", count: 4
 
-    find("label", text: "Related").click
+    toggle "Tags"
 
-    assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='2'][data-edges='1']"
+    assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='3'][data-edges='1']"
     within(LIST) do
-      assert_selector "li", count: 2
+      assert_selector "li", count: 3
       assert_selector "button", text: "Alpha"
+      assert_selector "button", text: "Beta"
       assert_selector "button", text: "Gamma"
-      assert_no_selector "button", text: "Beta"
       assert_no_selector "button", text: "shared"
     end
     assert_no_selector "#{GRAPH}[data-settled]"
@@ -603,6 +1124,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     count_workers
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.holdGraph = true
       window.heldRequests = 0
       window.abortedRequests = 0
@@ -652,7 +1174,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       window.leftGraph = document.querySelector(#{GRAPH.to_json})
       window.leftDraws = window.leftGraph.mindGraph.draws
       window.drawnAfter = null
-      const context = window.leftGraph.querySelector("canvas").getContext("2d")
+      const context = document.querySelector(#{CANVAS.to_json}).getContext("2d")
       const clear = context.clearRect.bind(context)
       context.clearRect = (...args) => { if (window.drawnAfter !== null) window.drawnAfter += 1; clear(...args) }
       // The moment of leaving: Stimulus disconnects the controller when the
@@ -680,15 +1202,18 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # "ready"`, `data-settled`, the counts -- before anything is fetched, so the
   # controller takes those back on connect; `data-url` is fetched once more
   # and the graph drawn from it.
-  test "Back to the graph draws it once, with the filter the control shows" do
+  test "Back to the graph draws it once, with what the legend shows: its counts gone until the data is back, its checkboxes kept" do
     a, b = 2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     PostRelation.create!(post: a, related_post: b)
     visit admin_mind_graph_path
     await_graph
-    find("label", text: "Related").click
+    assert_equal "3", graph["data-nodes"]
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts and 1 tag, 3 connections. Showing everything.']"
+    toggle "Tags"
     await_graph
-    assert_equal "2", graph["data-nodes"]
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 3 posts and tags, 3 connections.']"
+    assert_equal [ "2", "1" ], [ graph["data-nodes"], graph["data-edges"] ]
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts, 1 connection. Showing everything. Tags hidden.']"
+    assert_selector "#{GRAPH} [data-mind-graph-announced]", visible: :all
 
     within("nav[aria-label='Modules']") { click_link "Tags" }
     assert_selector "h1", text: "Tags"
@@ -697,6 +1222,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       window.graphFetches = 0
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/data")) return original(url, options)
         window.graphFetches += 1
@@ -706,22 +1232,38 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.go_back
     assert_selector "h1", text: "Mind graph"
     await_js("window.graphFetches === 1")
-    # The snapshot's canvas was named with the counts of the visit that was
+    # The snapshot's canvas was named with the summary of the visit that was
     # left; until this visit's data has come, it has the server's name again.
+    # So with the legend: its counts and the names made of them are gone,
+    # and the announcement with the notice; the checkboxes are the person's
+    # choice and are kept, so "Tags" is still off.
     assert_selector "#{GRAPH}[data-state='loading']"
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph']"
+    assert_equal [ "Posts", "Tags", "Related", "Shares a tag" ], legend_counts, "a count of the visit that was left is still beside its toggle"
+    assert_no_selector "#{GRAPH} [data-mind-graph-legend] input[aria-label]", visible: :all
+    assert_no_selector "#{GRAPH} [data-mind-graph-announced]", visible: :all
+    assert_no_selector "#{GRAPH} input[name=mind_graph_nodes][value=tag]:checked", visible: :all
+    assert_selector "#{GRAPH} input[name=mind_graph_nodes][value=post]:checked", visible: :all
     page.execute_script("window.releaseGraph()")
     await_graph
-    # (The name counts what was loaded, not what the filter shows.)
-    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 3 posts and tags, 3 connections.']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph: 2 posts, 1 connection. Showing everything. Tags hidden.']"
+    assert_equal [ "Posts 2", "Tags 1", "Related 1", "Shares a tag 2" ], legend_counts, "the counts are what was loaded, not what the legend shows"
 
-    assert_equal "2", graph["data-nodes"], "the Related filter is still chosen, so the tag is not drawn"
+    assert_equal "2", graph["data-nodes"], "Tags is still switched off, so the tag is not drawn"
     assert_equal "1", graph["data-edges"]
-    assert_selector "#{GRAPH} canvas", count: 1
+    assert_selector CANVAS, count: 1
+    # The swatches are drawn again in the restored page: a snapshot keeps a
+    # canvas and none of its pixels.
+    # So are the Status key's, outside the graph's element: the whole body is
+    # the snapshot's.
+    drawn = ->(selector) { "Array.from(document.querySelectorAll(#{selector.to_json})).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))" }
+    assert_equal [ 6, 5 ], page.evaluate_script("[ document.querySelectorAll(#{"#{GRAPH} canvas[data-swatch]".to_json}).length, document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]').length ]")
+    await_js(drawn.call("#{GRAPH} canvas[data-swatch]"))
+    await_js(drawn.call("#mind-graph-status-key canvas[data-swatch]"))
     assert_equal 1, page.evaluate_script("window.graphFetches")
     box = canvas_box
     [ a, b ].each do |post|
-      point = screen_position(post.id)
+      point = screen_position(post)
       assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{post.id} is outside the canvas after Back: #{point} in #{box}"
     end
   end
@@ -740,7 +1282,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       press "Fit all"
       box = canvas_box
       posts.each do |post|
-        point = screen_position(post.id)
+        point = screen_position(post)
         assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{post.id} is outside the resized canvas: #{point} in #{box}"
       end
       assert_equal 255, pixels_of(posts.first).first[3], "nothing is drawn at the new size"
@@ -757,11 +1299,18 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     before = pixels_of(posts.first).first
     draws = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.draws()")
     theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
+    # A swatch is a canvas too: it holds colours, not tokens, so the
+    # legend's and the Status key's are drawn again with the theme (the key
+    # is a closed dialog outside the graph's element, with its own painter).
+    swatches = "Array.from(document.querySelectorAll('[data-mind-graph-legend] canvas[data-swatch], #mind-graph-status-key canvas[data-swatch]'), (canvas) => canvas.toDataURL())"
+    await_js("#{swatches}.length === 11 && document.querySelector('#mind-graph-status-key canvas').getContext('2d').getImageData(0, 0, 18, 18).data.some((value) => value > 0)")
+    painted = page.evaluate_script(swatches)
     begin
       page.execute_script("document.documentElement.setAttribute('data-theme', #{(theme == "dark" ? "light" : "dark").to_json})")
       await_js("document.querySelector(#{GRAPH.to_json}).mindGraph.draws() > #{draws}")
 
       assert_not_equal before, pixels_of(posts.first).first, "the post's dot kept the other theme's colour"
+      await_js("(() => { const before = #{painted.to_json}; return #{swatches}.every((drawing, index) => drawing !== before[index]) })()")
     ensure
       page.execute_script("document.documentElement.setAttribute('data-theme', #{theme.to_json})")
     end
@@ -775,9 +1324,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_no_selector "[data-mind-graph-card]", visible: :visible
 
-    click_node(a.id)
+    click_node(a)
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     within("[data-mind-graph-card]") do
       assert_text "Alpha"
       assert_text ContentTypes.fetch("resume_entry").label
@@ -807,7 +1356,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
 
     card = find("[data-mind-graph-card]")
     # Close is the last child, so Tab meets the actions before it; on screen
@@ -848,7 +1397,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card] [data-status='draft']", text: "Draft"
   end
@@ -883,19 +1432,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     corner = page.evaluate_script("(() => { const r = document.querySelector(#{CANVAS.to_json}).getBoundingClientRect(); return [r.left + 6, r.top + 6] })()")
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card]"
     page.driver.browser.mouse.click(x: corner[0], y: corner[1])
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"]
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card]"
     escape_on_canvas
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"]
 
-    click_node(a.id)
+    click_node(a)
     within("[data-mind-graph-card]") { press "Close" }
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"]
@@ -911,14 +1460,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     6.times { press "Zoom out" }
     last = spokes.last
 
-    click_node(last.id)
+    click_node(last)
 
     # The neighbours are said directly; a neighbour's LABEL may give way to
     # another's where the two would overlap (no overlap wins), the selected
     # node's never does: it places first.
-    assert_equal [ hub.id, spokes[28].id ].map(&:to_s).sort, graph["data-neighbours"].split(",").sort
-    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{last.id}')")
-    assert_equal last.id.to_s, graph["data-labelled"].split(",").first, "the selected node's label is placed first"
+    assert_equal [ hub, spokes[28] ].map { |post| nid(post) }.sort, graph["data-neighbours"].split(",").sort
+    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{nid(last)}')")
+    assert_equal nid(last), graph["data-labelled"].split(",").first, "the selected node's label is placed first"
   end
 
   # What dims is everything but the selection and its neighbours: read from the
@@ -931,7 +1480,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     before = { b => pixels_of(b).first, c => pixels_of(c).first }
 
-    click_node(a.id)
+    click_node(a)
 
     assert_equal before[b], pixels_of(b).first, "a neighbour stays at full strength"
     assert_operator pixels_of(c).first[3], :<, before[c][3] / 2, "a node that is neither selected nor a neighbour dims"
@@ -951,18 +1500,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_equal "", graph["data-neighbours"].to_s
 
-    click_node(a.id)
-    assert_equal [ c.id.to_s, tag_id ].sort, neighbours.call
+    click_node(a)
+    assert_equal [ nid(c), tag_id ].sort, neighbours.call
 
-    find("label", text: "Related").click
+    toggle "Shares a tag"
     await_graph
-    assert_equal a.id.to_s, graph["data-selected"], "a selection the filter still shows stays"
+    assert_equal nid(a), graph["data-selected"], "a selection the filter still shows stays"
     assert_selector "[data-mind-graph-card]", text: "P0"
-    assert_equal [ c.id.to_s ], neighbours.call, "the tag is no neighbour while its edges are not shown"
+    assert_equal [ nid(c) ], neighbours.call, "the tag is no neighbour while its lines are not shown"
+    assert screen_position(tag_id), "a line switched off hides no node"
 
-    find("label", text: "All").click
+    toggle "Shares a tag"
     await_graph
-    assert_equal [ c.id.to_s, tag_id ].sort, neighbours.call, "back under All the tag is a neighbour again"
+    assert_equal [ nid(c), tag_id ].sort, neighbours.call, "with its lines back the tag is a neighbour again"
 
     escape_on_canvas
     assert_equal "", graph["data-neighbours"]
@@ -978,7 +1528,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_node("tag-#{tag.id}")
     assert_selector "[data-mind-graph-card]", text: /2 posts/i
 
-    find("label", text: "Related").click
+    toggle "Tags"
     await_graph
     assert_equal "", graph["data-selected"]
     assert_no_selector "[data-mind-graph-card]", visible: :visible
@@ -991,7 +1541,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
 
     within("[data-mind-graph-card]") { assert_text %(</script><img src=x onerror="window.pwned=1"> "quoted" 🎉) }
     assert_no_selector "[data-mind-graph-card] img", visible: :all
@@ -1003,7 +1553,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    from = screen_position(a.id)
+    from = screen_position(a)
     zoom = graph["data-zoom"]
     record_worker_messages
 
@@ -1012,7 +1562,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: from["x"] + 40, y: from["y"] + 30)
     mouse.move(x: from["x"] + 80, y: from["y"] + 60)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{a.id}); return Math.abs(p.x - #{from["x"] + 80}) < 6 && Math.abs(p.y - #{from["y"] + 60}) < 6 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(a).to_json}); return Math.abs(p.x - #{from["x"] + 80}) < 6 && Math.abs(p.y - #{from["y"] + 60}) < 6 })()")
     # Not a pan, which would move the node on screen just the same: the layout
     # was told to hold the node, and is running again.
     assert_no_selector "#{GRAPH}[data-settled]"
@@ -1042,17 +1592,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_equal "0", graph["data-pinned"]
     assert_no_selector "[data-mind-graph-release]", visible: :visible
-    neighbour = screen_position(b.id)
+    neighbour = screen_position(b)
     unpinned_corner = pin_pixel(a)
 
-    dropped = drag_node(a.id, by: [ 90, 70 ])
+    dropped = drag_node(a, by: [ 90, 70 ])
     assert_equal "1", graph["data-pinned"]
     await_graph
 
-    at = screen_position(a.id)
+    at = screen_position(a)
     assert_in_delta dropped["x"], at["x"], 2, "the node did not stay where it was dropped"
     assert_in_delta dropped["y"], at["y"], 2
-    moved = screen_position(b.id)
+    moved = screen_position(b)
     assert_operator Math.hypot(moved["x"] - neighbour["x"], moved["y"] - neighbour["y"]), :>, 20, "the neighbour did not follow the dragged node"
     assert_equal "1", graph["data-pinned"]
     assert_button "Release 1 pinned"
@@ -1070,9 +1620,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    dropped = drag_node(a.id, by: [ 110, 60 ])
+    dropped = drag_node(a, by: [ 110, 60 ])
     await_graph
-    click_node(a.id)
+    click_node(a)
     within("[data-mind-graph-card]") do
       assert_no_button "Pin", exact: true
       press "Unpin"
@@ -1081,14 +1631,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "0", graph["data-pinned"]
     assert_no_selector "[data-mind-graph-release]", visible: :visible
     await_graph
-    freed = screen_position(a.id)
+    freed = screen_position(a)
     assert_operator Math.hypot(freed["x"] - dropped["x"], freed["y"] - dropped["y"]), :>, 5, "an unpinned node stayed exactly where it was held"
 
     # Pin from the card: where it stands, and nothing moves.
     within("[data-mind-graph-card]") { press "Pin" }
     assert_equal "1", graph["data-pinned"]
     await_graph
-    assert_equal freed, screen_position(a.id)
+    assert_equal freed, screen_position(a)
     within("[data-mind-graph-card]") { assert_button "Unpin" }
     press "Release 1 pinned"
     assert_equal "0", graph["data-pinned"]
@@ -1098,17 +1648,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     escape_on_canvas
 
     # Two pinned: the button counts them, and a double click frees the one.
-    drag_node(a.id, by: [ 40, 80 ])
-    drag_node(c.id, by: [ -50, 40 ])
+    drag_node(a, by: [ 40, 80 ])
+    drag_node(c, by: [ -50, 40 ])
     assert_button "Release 2 pinned"
     await_graph
-    point = screen_position(c.id)
+    point = screen_position(c)
     mouse = page.driver.browser.mouse
     mouse.click(x: point["x"], y: point["y"])
     mouse.click(x: point["x"], y: point["y"], count: 2)
     assert_button "Release 1 pinned"
     assert_equal "1", graph["data-pinned"]
-    assert_equal c.id.to_s, graph["data-selected"], "the double click's clicks select the node, as any click does"
+    assert_equal nid(c), graph["data-selected"], "the double click's clicks select the node, as any click does"
     await_graph
     press "Release 1 pinned"
     assert_equal "0", graph["data-pinned"]
@@ -1122,14 +1672,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     record_worker_messages
-    point = screen_position(a.id)
+    point = screen_position(a)
 
     mouse = page.driver.browser.mouse
     mouse.click(x: point["x"], y: point["y"])
     mouse.click(x: point["x"], y: point["y"], count: 2)
     await_frames
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert_equal [], worker_messages
     assert_equal "0", graph["data-pinned"]
   end
@@ -1137,7 +1687,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # Pins are for nodes on screen: the filter keeps those of the nodes that
   # stay (and the node stays put through the new layout) and forgets those of
   # the nodes it hides.
-  test "a filter change keeps the pins of the nodes that remain and forgets the others" do
+  test "a toggle keeps every pin, also of a node it hides, which comes back pinned where it was dropped" do
     a, b, c = 3.times.map { |i| create_post(title: "P#{i}") }
     PostRelation.create!(post: a, related_post: b)
     [ b, c ].each { |post| PostTag.create!(post: post, tag: Tag.find_or_create_by!(name: "t")) }
@@ -1145,22 +1695,21 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    dropped = drag_node(a.id, by: [ 70, -60 ])
+    drag_node(a, by: [ 70, -60 ])
     drag_node(tag_id, by: [ -60, 50 ])
     assert_equal "2", graph["data-pinned"]
     await_graph
+    dropped = [ screen_position(a), screen_position(tag_id) ]
 
-    find("label", text: "Related").click
-    assert_equal "1", graph["data-pinned"], "the hidden tag's pin was kept"
-    assert_button "Release 1 pinned"
-    await_graph
-    at = screen_position(a.id)
-    assert_in_delta dropped["x"], at["x"], 2, "a pinned node that the filter still shows moved"
-    assert_in_delta dropped["y"], at["y"], 2
+    toggle "Tags"
+    assert_selector "#{GRAPH}[data-nodes='3'][data-pinned='2'][data-settled]"
+    assert_button "Release 2 pinned"
+    assert_nil screen_position(tag_id)
+    assert_equal dropped[0], screen_position(a), "a pinned node that is still shown moved"
 
-    find("label", text: "All").click
-    await_graph
-    assert_equal "1", graph["data-pinned"], "a pin came back with the node"
+    toggle "Tags"
+    assert_selector "#{GRAPH}[data-nodes='4'][data-pinned='2'][data-settled]"
+    assert_equal dropped, [ screen_position(a), screen_position(tag_id) ], "the tag did not come back where it was dropped"
   end
 
   # Pins live in the page that made them. Turbo's snapshot holds the count and
@@ -1170,7 +1719,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    drag_node(a.id, by: [ 80, 60 ])
+    drag_node(a, by: [ 80, 60 ])
     assert_button "Release 1 pinned"
     await_graph
 
@@ -1195,20 +1744,20 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
-    assert_card_beside(a.id, side: "right")
+    click_node(a)
+    assert_card_beside(a, side: "right")
 
     box = canvas_box
     mouse = page.driver.browser.mouse
-    before = screen_position(a.id)
+    before = screen_position(a)
     mouse.move(x: box[0] + 200, y: box[3] - 12)
     mouse.down
     mouse.move(x: box[0] + 160, y: box[3] - 42)
     mouse.move(x: box[0] + 120, y: box[3] - 72)
     mouse.up
     await_frames
-    assert_in_delta before["x"] - 80, screen_position(a.id)["x"], 2, "the view did not pan"
-    assert_card_beside(a.id, side: "right")
+    assert_in_delta before["x"] - 80, screen_position(a)["x"], 2, "the view did not pan"
+    assert_card_beside(a, side: "right")
 
     zoom = graph["data-zoom"]
     # (A zoom is around the canvas's middle, so it moves the node; the card
@@ -1216,8 +1765,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     press "Zoom in"
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.zoom !== #{zoom.to_json}")
     await_frames
-    assert_card_beside(a.id)
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_card_beside(a)
+    assert_equal nid(a), graph["data-selected"]
   end
 
   # Near the canvas's right edge there is no room on the right: the card
@@ -1227,12 +1776,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
-    assert_card_beside(a.id, side: "right")
+    click_node(a)
+    assert_card_beside(a, side: "right")
 
     # Pan the node to 60 px from the right edge, by a drag on empty space.
     box = canvas_box
-    node = screen_position(a.id)
+    node = screen_position(a)
     shift = box[2] - 60 - node["x"]
     mouse = page.driver.browser.mouse
     mouse.move(x: box[0] + 12, y: box[3] - 12)
@@ -1242,8 +1791,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.up
     await_frames
 
-    assert_in_delta box[2] - 60, screen_position(a.id)["x"], 2
-    assert_card_beside(a.id, side: "left")
+    assert_in_delta box[2] - 60, screen_position(a)["x"], 2
+    assert_card_beside(a, side: "left")
     card = element_box("[data-mind-graph-card]")
     assert_operator card["right"], :<, box[2]
   end
@@ -1253,20 +1802,20 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card]", visible: :visible
 
     # Towards the card and over where it stands, in small steps as a hand
     # moves: the first few pixels make the press a drag, which takes the card
     # out of the way before the pointer gets there.
-    drag_node(a.id, by: [ 60, 90 ], release: false, steps: 12)
+    drag_node(a, by: [ 60, 90 ], release: false, steps: 12)
     assert_no_selector "[data-mind-graph-card]", visible: :visible
-    assert_equal a.id.to_s, graph["data-selected"], "the drag cleared the selection"
+    assert_equal nid(a), graph["data-selected"], "the drag cleared the selection"
     page.driver.browser.mouse.up
 
     assert_selector "[data-mind-graph-card]", visible: :visible
     await_graph
-    assert_card_beside(a.id, side: "right")
+    assert_card_beside(a, side: "right")
     within("[data-mind-graph-card]") { assert_button "Unpin" }
   end
 
@@ -1278,9 +1827,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{a.id}')")
-    label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{a.id})")
-    node = screen_position(a.id)
+    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{nid(a)}')")
+    label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{nid(a).to_json})")
+    node = screen_position(a)
     point = [ label["left"] + 12, (label["top"] + label["bottom"]) / 2 ]
     assert_operator point[0] - node["x"], :>, 13, "the point is inside the dot's own target"
 
@@ -1292,11 +1841,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_not_equal "pointer", page.evaluate_script("getComputedStyle(document.querySelector(#{CANVAS.to_json})).cursor")
 
     mouse.move(x: point[0], y: point[1])
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(a)}'")
     assert_equal "pointer", page.evaluate_script("getComputedStyle(document.querySelector(#{CANVAS.to_json})).cursor")
     mouse.click(x: point[0], y: point[1])
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert_selector "[data-mind-graph-card] h2", text: "A title long enough to press"
   end
 
@@ -1309,13 +1858,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: c, related_post: d)
     visit admin_mind_graph_path
     await_graph
-    point = screen_position(a.id)
+    point = screen_position(a)
     # 9.5 px left of the centre: outside the 7 px dot, on the hover's ring.
     ring_before = pixel_at(point["x"] - 9.5, point["y"])
     others = [ c, d ].to_h { |post| [ post, pixels_of(post).first ] }
 
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(a)}'")
 
     assert_not_equal ring_before, pixel_at(point["x"] - 9.5, point["y"]), "no ring round the hovered node"
     others.each { |post, pixel| assert_equal pixel, pixels_of(post).first, "#{post.title} changed while another node was hovered" }
@@ -1337,13 +1886,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     4.times { press "Zoom out" }
     await_frames
     labelled = graph["data-labelled"].split(",")
-    hidden = posts.find { |post| labelled.exclude?(post.id.to_s) }
+    hidden = posts.find { |post| labelled.exclude?(nid(post)) }
     assert hidden, "every post is labelled: nothing to show"
 
-    point = screen_position(hidden.id)
+    point = screen_position(hidden)
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{hidden.id}'")
-    hovered = hidden.id
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(hidden)}'")
+    hovered = nid(hidden)
     await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{hovered}')")
 
     box = canvas_box
@@ -1368,10 +1917,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       await_graph
       assert_equal %w[tick settled], worker_answers, "the layout was shown in more than one step"
 
-      neighbours = [ screen_position(b.id), screen_position(c.id) ]
-      dropped = drag_node(a.id, by: [ 90, 70 ], release: false)
+      neighbours = [ screen_position(b), screen_position(c) ]
+      dropped = drag_node(a, by: [ 90, 70 ], release: false)
       await_frames
-      assert_equal neighbours, [ screen_position(b.id), screen_position(c.id) ], "a neighbour moved while the node was still held"
+      assert_equal neighbours, [ screen_position(b), screen_position(c) ], "a neighbour moved while the node was still held"
       drags = worker_answers.size - 2
       assert_operator drags, :>=, 1
       assert_equal [ "tick" ], worker_answers.last(drags).uniq, "a drag was answered by something other than the node's own move"
@@ -1380,8 +1929,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       await_graph
       assert_equal %w[tick settled], worker_answers.last(2)
       assert_equal drags + 4, worker_answers.size, "the drop was shown in more than one step: #{worker_answers}"
-      assert_not_equal neighbours, [ screen_position(b.id), screen_position(c.id) ], "the drop did not lay the neighbours out again"
-      at = screen_position(a.id)
+      assert_not_equal neighbours, [ screen_position(b), screen_position(c) ], "the drop did not lay the neighbours out again"
+      at = screen_position(a)
       assert_in_delta dropped["x"], at["x"], 2
       assert_in_delta dropped["y"], at["y"], 2
     end
@@ -1414,7 +1963,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     # The focus is put on a link of the card by script: Cuprite's `send_keys`
     # CLICKS an element that is not focused, and a click here would follow the
@@ -1436,16 +1985,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: b)
     visit admin_mind_graph_path
     await_graph
-    before = [ screen_position(a.id), screen_position(b.id) ]
+    before = [ screen_position(a), screen_position(b) ]
     record_worker_messages
 
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card]"
     await_frames
     assert_equal [], worker_messages, "a click sent the layout something"
     assert_selector "#{GRAPH}[data-settled]"
-    assert_equal before, [ screen_position(a.id), screen_position(b.id) ]
+    assert_equal before, [ screen_position(a), screen_position(b) ]
   end
 
   test "hovering a node shows its full title" do
@@ -1454,7 +2003,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    point = screen_position(a.id)
+    point = screen_position(a)
 
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
 
@@ -1470,7 +2019,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     click_frame_link { within("[data-mind-graph-card]") { click_link "Open post" } }
     assert_current_path admin_post_path(a)
 
@@ -1488,14 +2037,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
     click_frame_link { within("[data-mind-graph-card]") { click_link "Focus" } }
 
     assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
     await_graph
     assert_equal "2", graph["data-nodes"]
     # `data-settled` is written before the frame that writes `data-labelled`.
-    assert await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{a.id}')"), "the focus is always labelled"
+    assert await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{nid(a)}')"), "the focus is always labelled"
 
     click_frame_link { within("[data-mind-graph-focus]") { click_link "2" } }
     await_graph
@@ -1517,9 +2066,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     alone = create_post(title: "Hidden gem")
     visit admin_mind_graph_path
     await_graph
-    assert_nil screen_position(alone.id)
+    assert_nil screen_position(alone)
 
-    fill_in "Find a post or tag", with: "hidden"
+    fill_in "Find a page, post or tag", with: "hidden"
     click_frame_link { within("[data-mind-graph-results]") { click_link "Hidden gem" } }
 
     assert_selector "[data-mind-graph-focus]", text: "Around “Hidden gem”"
@@ -1532,19 +2081,20 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    fill_in "Find a post or tag", with: "rub"
+    fill_in "Find a page, post or tag", with: "rub"
     within("[data-mind-graph-results]") do
-      assert_link "ruby"
-      assert_text "Tag"
+      # A row's text is its label; its kind is the heading of its group.
+      assert_selector "[data-search-group=tag] a", exact_text: "ruby"
+      assert_equal [ "TAGS" ], all("[data-search-group] > p").map { |heading| heading.text.upcase }
     end
 
     assert_selector "[data-mind-graph-status]", text: "1 result", visible: :all
 
-    fill_in "Find a post or tag", with: "zzzz"
-    assert_selector "[data-mind-graph-results]", text: "No post or tag matches."
-    assert_selector "[data-mind-graph-status]", text: "No post or tag matches.", visible: :all
+    fill_in "Find a page, post or tag", with: "zzzz"
+    assert_selector "[data-mind-graph-results]", text: "No page, post or tag matches."
+    assert_selector "[data-mind-graph-status]", text: "No page, post or tag matches.", visible: :all
 
-    find_field("Find a post or tag").send_keys(:escape)
+    find_field("Find a page, post or tag").send_keys(:escape)
     assert_no_selector "[data-mind-graph-results]", visible: :visible
   end
 
@@ -1553,7 +2103,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    field = find_field("Find a post or tag")
+    field = find_field("Find a page, post or tag")
     field.fill_in with: "hidden"
     assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
     click_frame_link { field.send_keys(:tab, :enter) }
@@ -1567,10 +2117,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => String(url).includes("/mind_graph/search") ? Promise.reject(new TypeError("Failed to fetch")) : original(url, options)
     JS
 
-    fill_in "Find a post or tag", with: "hidden"
+    fill_in "Find a page, post or tag", with: "hidden"
 
     assert_selector "[data-mind-graph-results]", text: "Search failed — check your connection."
     assert_selector "[data-mind-graph-status][role=status]", text: "Search failed — check your connection.", visible: :all
@@ -1582,11 +2133,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Zebra")
     visit admin_mind_graph_path
     await_graph
-    field = find_field("Find a post or tag")
+    field = find_field("Find a page, post or tag")
     field.fill_in with: "hidden"
     assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
     # Hold the next answer back, so what is on screen meanwhile is the point.
-    page.execute_script("const original = window.fetch; window.fetch = (url, options) => String(url).includes('/mind_graph/search') ? new Promise(() => {}) : original(url, options)")
+    page.execute_script("const original = window.fetch; window.realFetch ??= original; window.fetch = (url, options) => String(url).includes('/mind_graph/search') ? new Promise(() => {}) : original(url, options)")
 
     field.send_keys("x")
 
@@ -1597,7 +2148,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Hidden gem")
     visit admin_mind_graph_path
     await_graph
-    field = find_field("Find a post or tag")
+    field = find_field("Find a page, post or tag")
     field.fill_in with: "hidden"
     assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
 
@@ -1612,7 +2163,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    fill_in "Find a post or tag", with: "gem"
+    fill_in "Find a page, post or tag", with: "gem"
 
     assert_selector "[data-mind-graph-results] a", text: "<img src=x onerror=alert(1)> gem"
     assert_no_selector "[data-mind-graph-results] img", visible: :all
@@ -1622,7 +2173,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Hidden gem")
     visit admin_mind_graph_path
     await_graph
-    fill_in "Find a post or tag", with: "hidden"
+    fill_in "Find a page, post or tag", with: "hidden"
     click_frame_link { within("[data-mind-graph-results]") { click_link "Hidden gem" } }
     assert_selector "[data-mind-graph-focus]"
 
@@ -1630,7 +2181,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_no_selector "[data-mind-graph-results]", visible: :visible
-    assert_equal "", find_field("Find a post or tag").value
+    assert_equal "", find_field("Find a page, post or tag").value
   end
 
   test "leaving the screen aborts a search request still in flight" do
@@ -1641,13 +2192,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       window.searchSignals = []
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/search")) return original(url, options)
         window.searchSignals.push(options.signal)
         return new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))))
       }
     JS
-    fill_in "Find a post or tag", with: "hid"
+    fill_in "Find a page, post or tag", with: "hid"
     assert_eventually(wait: 3, message: "the search request was never sent") { page.evaluate_script("window.searchSignals.length") == 1 }
 
     # Left through a real link (the sidebar's Posts), a Turbo visit: the window,
@@ -1655,6 +2207,824 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_frame_link { within("nav[aria-label='Modules']") { click_link "Posts" } }
 
     assert page.evaluate_script("window.searchSignals.every((signal) => signal.aborted)"), "the request was left open after the screen was left"
+  end
+
+  # --- pages in the search and the list (pages in the mind graph, spec §5, §7) ---
+
+  test "search finds a page, groups its rows under Pages, Posts and Tags, shows a page's path, and opens the page's neighbourhood" do
+    docs = create_page(title: "Ruby docs")
+    create_post(title: "Ruby notes", tags: [ "ruby" ])
+    create_post(title: "Other", tags: [ "ruby" ])
+    visit admin_mind_graph_path
+    await_graph
+
+    fill_in "Find a page, post or tag", with: "ruby"
+
+    within("#{GRAPH} [data-mind-graph-results]") do
+      assert_equal %w[PAGES POSTS TAGS], all("[data-search-group] > p").map { |heading| heading.text.upcase }
+      assert_selector "[data-search-group=page] a", text: "Ruby docs"
+      assert_selector "[data-search-group=page] a span.font-cs-mono", text: PublicPath.current.where(record: docs).pick(:path)
+      assert_selector "[data-search-group=post] a", text: "Ruby notes"
+      assert_selector "[data-search-group=tag] a", text: "ruby"
+      # Each row's mark: a page's is the renderer's small canvas, a post's
+      # its type's dot, a tag's the square. All decoration.
+      assert_selector "a > [aria-hidden='true']", count: 3
+      assert_selector "[data-search-group=page] a > canvas[data-mark=page]"
+      assert_selector "[data-search-group] ul[role=list][aria-labelledby]", count: 3
+    end
+    assert_marks_drawn "#{GRAPH} [data-mind-graph-results]"
+    click_frame_link { find("#{GRAPH} [data-search-group=page] a").click }
+
+    assert_current_path admin_mind_graph_path(page: docs.id)
+    assert_selector "[data-mind-graph-focus]", text: "Around the page “Ruby docs”"
+    await_graph
+    assert_equal nid(docs), graph["data-labelled"].split(",").first, "the focus is labelled first"
+  end
+
+  test "Not listed on any page shows the posts no page lists in place of the groups, and a row that is not in view adds its post once" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    listed = create_post(title: "Listed")
+    PostRelation.create!(post: listed, related_post: create_post(title: "Also listed"))
+    drawn = create_post(title: "Entry drawn", content_type: "resume_entry")
+    PostRelation.create!(post: drawn, related_post: listed)
+    alone = create_post(title: "Entry alone", content_type: "resume_entry")
+    visit admin_mind_graph_path
+    await_graph
+    assert_nil screen_position(alone), "a post with no connection is not drawn"
+    assert_selector "#{GRAPH} [role=status] p", text: "1 other post has no connections yet and isn't shown."
+    before = [ graph["data-nodes"], graph["data-edges"] ]
+    assert_equal %w[6 4], before, "two pages, three posts and the type; the tree's line, the lists line and two related"
+
+    find("#{LIST} label", text: "Not listed on any page").click
+
+    within(LIST) do
+      assert_equal [ "POSTS · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_selector "button[data-node-id='#{nid(drawn)}']:not([data-not-in-view])", text: "Entry drawn"
+      assert_row "Entry drawn: post, 1 connection. Shows it in the graph."
+      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: /Entry alone\s*not in view/
+      assert_row "Entry alone, #{ContentTypes.fetch("resume_entry").label.downcase} post, not in view. Activate to add it to the graph."
+      assert_no_selector "button", text: "Listed"
+    end
+    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "the canvas is left as it is"
+
+    find("#{LIST} button[data-node-id='#{nid(alone)}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='7'][data-edges='4']"
+    assert_selector "[data-mind-graph-card] h2", text: "Entry alone"
+    # It is shown now: the notice no longer counts it among those that aren't.
+    assert_no_selector "#{GRAPH} [role=status] p", text: /isn't shown|aren't shown/
+    # The page does not know the added post's connections (its row was read
+    # with none counted), so its card says nothing of them.
+    assert_no_selector "[data-mind-graph-card]", text: /related/i
+    assert_selector "[data-mind-graph-card]:focus", wait: 2
+    assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
+    await_graph
+    assert_kind_of Numeric, screen_position(alone)["x"], "the layout has no place for the added post"
+    # Its label is measured like every other node's (selected, so it is
+    # drawn, and in semibold): a label with no width could not be pressed.
+    label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{nid(alone).to_json})")
+    assert label && label["right"].is_a?(Numeric) && label["right"] - label["left"] > 20, "the added post's label was not measured: #{label.inspect}"
+
+    # Closing the card gives the focus back to the row that opened it, which
+    # is a new element since the rows were drawn again.
+    find("[data-mind-graph-card-close]").click
+    await_js("document.activeElement?.dataset.nodeId === #{nid(alone).to_json}")
+
+    find("#{LIST} button[data-node-id='#{nid(alone)}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='7']"
+    assert_equal "Posts 4", legend_counts[1], "the count of posts follows what the graph holds"
+
+    # The rows follow the legend: with the posts switched off none is in view.
+    toggle "Posts"
+    assert_selector "#{LIST} button[data-not-in-view]", count: 2
+    # A row that says "Activate to add it to the graph" does: with "Posts"
+    # off, a press switches them back on, and selects the post.
+    find("#{LIST} button[data-node-id='#{nid(drawn)}']").click
+    assert_selector "#{GRAPH} input#mind-graph-nodes-post:checked", visible: :all
+    assert_selector "#{GRAPH}[data-selected='#{nid(drawn)}'][data-nodes='7']"
+    assert_no_selector "#{LIST} button[data-not-in-view]"
+    assert_selector "#{GRAPH} [role=status] p[data-mind-graph-announced]", text: /\AMind graph: 2 pages, 1 post type and 4 posts, 4 connections\. Showing everything\.\z/, visible: :all
+
+    find("#{LIST} label", text: "Not listed on any page").click
+    within(LIST) do
+      assert_equal [ "PAGES · 2", "POSTS · 4", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_row "#{ContentTypes.fetch("blog").label}: post type, 2 posts. Shows it in the graph."
+      assert_selector "button[data-node-id='type-blog'] > canvas[data-mark=type][data-mark-of='#{ContentTypes.fetch("blog").colour_index}'][aria-hidden='true']"
+      assert_equal "2", find("button[data-node-id='type-blog']").all("span").last.text, "the number of posts of the type, where a tag's row has its connections"
+    end
+    # The fourth group is the keyboard's way to a post type's node: its row
+    # selects it, as any row does.
+    find("#{LIST} button[data-node-id='type-blog']").click
+    assert_selector "#{GRAPH}[data-selected='type-blog']"
+    assert_selector "[data-mind-graph-card] h2", text: ContentTypes.fetch("blog").label
+  end
+
+  # Design answer G5: a read that fails says so in the list, not in a toast,
+  # with a small "Try again" button. The stub answers the first request for
+  # the unlisted posts itself and hands every other request to the real fetch.
+  test "a failed read of the unlisted posts says so in the list, Try again loads them, and Back shows the groups again" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    visit admin_mind_graph_path
+    await_graph
+    # The first request for the unlisted posts is held until the test lets
+    # it go, the second fails, and the third and every other request go to
+    # the real fetch.
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.realFetch ??= original
+      window.unlistedAsked = 0
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/unlisted")) return original(url, options)
+        window.unlistedAsked += 1
+        if (window.unlistedAsked === 1) {
+          // The held answer says when the page has READ it: its `json()` is
+          // wrapped, and the flag is set in the turn the page's own
+          // continuation runs in, so what follows it is not a wait.
+          return new Promise((resolve) => {
+            window.releaseUnlisted = () => original(url, options).then((response) => {
+              const json = response.json.bind(response)
+              response.json = () => json().then((body) => { window.unlistedRead = body.rows.length; return body })
+              resolve(response)
+            })
+          })
+        }
+        if (window.unlistedAsked === 2) return Promise.resolve(new Response("", { status: 500 }))
+        return original(url, options)
+      }
+    JS
+
+    # An answer that comes after the filter was let go again is not drawn.
+    filter = find("#{LIST} label", text: "Not listed on any page")
+    filter.click
+    await_js("window.unlistedAsked === 1")
+    filter.click
+    page.execute_script("window.releaseUnlisted()")
+    # NOT "released, then three frames": reading the body can take longer
+    # than that on a slow machine, and the assertion below would then pass
+    # before the late answer had come at all (Task 7's review, M9). The page
+    # has read the answer when the flag is set, and has acted on it (or
+    # dropped it) in that same turn, before any frame.
+    await_js("window.unlistedRead === 1", wait: 10)
+    await_frames
+    within(LIST) do
+      assert_equal [ "PAGES · 2" ], all("h2").map { |heading| heading.text.upcase }, "the late answer replaced the groups"
+      assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+    end
+
+    find("#{LIST} label", text: "Not listed on any page").click
+
+    within(LIST) do
+      assert_selector "[role=alert] p", text: "The list couldn't be loaded."
+      assert_no_selector "button[data-node-id]"
+      assert_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+      assert_no_selector "button", text: "Back to the list", wait: 0
+    end
+    # The error line stays through a toggle of the legend: the groups are
+    # not drawn under a checkbox that is still ticked.
+    toggle "Pages"
+    assert_selector "#{GRAPH}[data-nodes='0']"
+    toggle "Pages"
+    assert_selector "#{GRAPH}[data-nodes='2']"
+    within(LIST) do
+      assert_selector "[role=alert] p", text: "The list couldn't be loaded."
+      assert_no_selector "button[data-node-id]"
+      assert_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+      press "Try again"
+      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
+      assert_no_selector "[role=alert]"
+    end
+    await_js("document.activeElement?.dataset.nodeId === #{nid(alone).to_json}")
+    assert_equal "ready", graph["data-state"], "the graph itself is untouched by the list's failed read"
+    assert_no_selector ".admin-toast", wait: 0
+
+    # Whatever the script wrote into the list is the visit's that was left:
+    # Back shows the groups, and the filter is off.
+    click_frame_link { within("nav[aria-label='Modules']") { click_link "Posts" } }
+    page.go_back
+    await_graph
+    within(LIST) do
+      assert_equal [ "PAGES · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+      assert_selector "input[data-mind-graph-unlisted]", count: 1, visible: :all
+    end
+  end
+
+  # Task 7's review, M4: the graph's own load gives up after fifteen seconds;
+  # a read of the list had no limit, so a request that stalled left the box
+  # ticked over the groups for good and the designer's line was never said.
+  # The stub never answers but honours its signal, as `fetch` does; the
+  # fifteen seconds are made 50 milliseconds as in the graph's own test. And
+  # while a read is out the rows' region says so (`aria-busy`), which is all
+  # the pending state there is: nobody gave words for one.
+  test "a read of the list that gets no answer is given up after fifteen seconds and says so in the list, and the list is busy while a read is out" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    visit admin_mind_graph_path
+    await_graph
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.realFetch ??= original
+      window.realTimeout ??= AbortSignal.timeout
+      const timeout = AbortSignal.timeout.bind(AbortSignal)
+      window.listMode = "hang"
+      window.askedFor = []
+      // (For the whole window while the mode is "hang": anything else that asked for a timeout then would get 50 ms. Nothing else on this screen asks.)
+      AbortSignal.timeout = (milliseconds) => { window.askedFor.push(milliseconds); return timeout(window.listMode === "hang" ? 50 : milliseconds) }
+      window.fetch = (url, options) => {
+        if (window.listMode === "real" || !String(url).includes("/mind_graph/unlisted")) return original(url, options)
+        if (window.listMode === "hang") return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => reject(options.signal.reason)))
+        return new Promise((resolve) => { window.releaseList = () => resolve(original(url, options)) })
+      }
+    JS
+
+    find("#{LIST} label", text: "Not listed on any page").click
+    within(LIST) do
+      assert_selector "[role=alert] p", text: "The list couldn't be loaded."
+      assert_button "Try again"
+      assert_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+      assert_no_selector "[aria-busy='true']", wait: 0
+    end
+    assert_equal [ 15_000 ], page.evaluate_script("window.askedFor"), "the read is given fifteen seconds"
+    assert_equal "ready", graph["data-state"]
+
+    page.execute_script("window.listMode = 'hold'")
+    within(LIST) { press "Try again" }
+    assert_selector "#{LIST} [aria-busy='true']"
+    page.execute_script("window.listMode = 'real'; window.releaseList()")
+    within(LIST) do
+      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
+      assert_no_selector "[aria-busy='true']", wait: 0
+    end
+
+    # A read that is let go while it is out leaves nothing busy behind.
+    page.execute_script("window.listMode = 'hold'")
+    filter = find("#{LIST} label", text: "Not listed on any page")
+    filter.click
+    assert_no_selector "#{LIST} button[data-node-id='#{nid(alone)}']"
+    filter.click
+    assert_selector "#{LIST} [aria-busy='true']"
+    filter.click
+    assert_no_selector "#{LIST} [aria-busy='true']"
+    assert_equal [ "PAGES · 2" ], within(LIST) { all("h2").map { |heading| heading.text.upcase } }
+  end
+
+  test "the list's Pages group is the tree, a page's title and path with markup in them are text in the list, the search and the card" do
+    docs = create_page(title: "<b>Docs</b>")
+    create_page(title: "Guide", parent: docs)
+    visit admin_mind_graph_path
+    await_graph
+
+    within(LIST) do
+      assert_equal [ "PAGES · 3" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "Home", "<b>Docs</b>", "Guide" ], all("li button span.truncate").map(&:text)
+      assert_no_selector "b"
+      # A tree for a screen reader too: a page's row is in a list inside its
+      # parent's item, three levels deep here.
+      assert_selector "ul[role=list] > li > ul[role=list] > li > ul[role=list] > li > button[data-node-id='#{nid(Page.find_by!(parent: docs))}']"
+      assert_selector "li > button > canvas[data-mark=page][aria-hidden='true']", count: 3
+    end
+    assert_marks_drawn LIST
+    # In the Tab order the filter's checkbox is the list's first stop, after
+    # the canvas, and the rows follow it.
+    stops = page.evaluate_script(<<~JS)
+      Array.from(document.querySelector(#{GRAPH.to_json}).querySelectorAll("input, button, a[href], canvas[tabindex='0']"))
+        .filter((element) => element.checkVisibility() && !element.closest("[hidden]") && (element.tagName === "CANVAS" || element.closest("[data-mind-graph-list]")))
+        .map((element) => element.tagName === "CANVAS" ? "canvas" : element.type === "checkbox" ? "checkbox" : "row")
+    JS
+    assert_equal %w[canvas checkbox row row row], stops
+
+    # A canvas holds colours, not tokens: a row's mark is drawn again when
+    # the theme changes, like the graph.
+    mark = "document.querySelector(#{"#{LIST} canvas[data-mark=page]".to_json}).toDataURL()"
+    before = page.evaluate_script(mark)
+    theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
+    begin
+      page.execute_script("document.documentElement.setAttribute('data-theme', #{(theme == "dark" ? "light" : "dark").to_json})")
+      await_js("#{mark} !== #{before.to_json}")
+    ensure
+      page.execute_script("document.documentElement.setAttribute('data-theme', #{theme.to_json})")
+    end
+    await_js("#{mark} === #{before.to_json}")
+
+    click_node(nid(docs))
+    assert_selector "[data-mind-graph-card] h2", text: "<b>Docs</b>"
+    assert_no_selector "[data-mind-graph-card] b"
+    fill_in "Find a page, post or tag", with: "docs"
+    assert_selector "#{GRAPH} [data-search-group=page] a", text: "<b>Docs</b>"
+    assert_no_selector "#{GRAPH} [data-mind-graph-results] b"
+  end
+
+  # Pages spec §7, design answers F4, F5 and the third answers: around a page
+  # at depth 2 the twenty newest posts it lists are drawn, each hanging off
+  # the hub that brings it in; the rest stand behind "+N more", which hangs
+  # off the same hub and opens the list; a row there adds its post, joined
+  # to its hub and not to the page.
+  test "around a page, more opens the list with the posts that are not drawn, a row adds its post to its hub, and Open in Posts leads there" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
+    posts = 22.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    visit admin_mind_graph_path(page: blog.id, depth: 2)
+    await_graph
+    assert_selector "[data-mind-graph-focus]", text: "Around the page “Blog”"
+    lines = graph["data-edges"].to_i
+    assert_equal 23, lines, "the tree line to Home, the lists line to the type, and the hub's faint lines to twenty posts and to more"
+    assert_nil screen_position(posts.last)
+    assert screen_position("more-type-resume_entry"), "the pill is not drawn"
+    assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 20 of 22 posts. 2 more are in the list.']"
+    assert_not_includes graph["data-labelled"].split(","), "more-type-resume_entry", "the pill carries its words: it has no label beside it"
+    entry = ContentTypes.fetch("resume_entry").label
+
+    click_node("more-type-resume_entry")
+
+    within(LIST) do
+      assert_equal [ "MORE FROM #{entry.upcase} · 2" ], all("h2").map { |heading| heading.text.upcase }, "the rows are named by what the pill hangs off"
+      assert_selector "section button[data-mind-graph-back]", text: "Back to the list"
+      assert_equal [ "Entry 20", "Entry 21" ], all("li button span.truncate").map(&:text)
+      assert_selector "button[data-not-in-view]", count: 2
+      assert_row "Entry 21, #{entry.downcase} post, not in view. Activate to add it to the graph."
+      assert_selector "a[data-mind-graph-posts-link]", text: "Open in Posts →"
+      assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
+    end
+    assert_equal "", graph["data-selected"], "more is not selected"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+
+    find("#{LIST} button[data-node-id='#{nid(posts.last)}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(posts.last)}'][data-edges='#{lines + 1}']"
+    assert_equal [ "type-resume_entry" ], graph["data-neighbours"].split(","), "the added post is joined to the hub that brings it in, and not to the page"
+    within(LIST) { assert_row "Entry 21: post, 1 connection. Shows it in the graph." }
+    # The figures are true of what is drawn now: one more post, one fewer behind the pill.
+    assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 21 of 22 posts. 1 more is in the list.']"
+    # The heading over the rows counts what the pill counts: one figure for "more" on the screen.
+    within(LIST) do
+      assert_selector "h2", text: /· 1\z/
+      assert_equal [ "MORE FROM #{entry.upcase} · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_selector "li button[data-node-id^='post-']", count: 2
+    end
+    await_graph
+    assert_kind_of Numeric, screen_position(posts.last)["x"], "the layout has no place for the added post"
+
+    # The added line is the hub's, and follows "Lists" as the others do.
+    toggle "Lists"
+    assert_selector "#{GRAPH}[data-edges='1']"
+    toggle "Lists"
+
+    # The way back to the groups: Escape on the canvas clears the selection,
+    # and with nothing selected it lets the pill's rows go.
+    escape_on_canvas
+    assert_selector "#{GRAPH}[data-selected='']"
+    within(LIST) { assert_selector "a[data-mind-graph-posts-link]" }
+    escape_on_canvas
+    within(LIST) do
+      assert_equal [ "PAGES · 2", "POSTS · 21", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_no_selector "a[data-mind-graph-posts-link]"
+      # The pill's row says what the pill says: one post is still behind it.
+      assert_selector "button[data-node-id='more-type-resume_entry'][data-more]", exact_text: "+1 more"
+      assert_row "+1 more: 1 more post #{entry} lists, not in view. Activate to show it."
+    end
+
+    await_graph
+    click_node("more-type-resume_entry")
+    click_frame_link "Open in Posts →"
+    assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(current_url).query).slice("type", "tag"))
+  end
+
+  # The rulings on the review of Task 7 (I1, I2, I3, M2). Nothing on a canvas
+  # can be pressed by a keyboard, and the canvas's name tells a screen reader
+  # that "2 more are in the list": each pill has a row there, and Enter on it
+  # is a press on the pill. The focus goes to the first of the rows it
+  # brings; Escape in them, and "Back to the list" over them, give the groups
+  # back with the focus on the pill's row; a read that failed keeps the way
+  # back. With "Posts" off a row that says "Activate to add it to the graph"
+  # switches them on. The last post added takes the pill, its row and its
+  # rows' heading away, and every figure says so.
+  #
+  # The layout is not waited for until the end: the rows are there with the
+  # data, and a post added while the layout still moves must have a place.
+  test "a pill's row opens its rows from the keyboard with the focus on the first, Escape and Back to the list return to it, a failed read keeps a way back, a row switches Posts back on, and the last post added takes the pill away" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
+    posts = 22.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    entry = ContentTypes.fetch("resume_entry").label
+    pill = "#{LIST} button[data-node-id='more-type-resume_entry']"
+    focused = ->(id) { await_js("document.activeElement?.dataset.nodeId === #{id.to_json}") }
+    keyboard = page.driver.browser.keyboard
+    visit admin_mind_graph_path(page: blog.id, depth: 2)
+    assert_selector "#{GRAPH}[data-state='ready']", wait: 15
+
+    assert_selector pill, exact_text: "+2 more"
+    within(LIST) do
+      assert_row "+2 more: 2 more posts #{entry} lists, not in view. Activate to show them."
+      assert_equal %w[type-resume_entry more-type-resume_entry], all("section:last-of-type button").map { |button| button["data-node-id"] }, "the pill's row stands under its hub's"
+      assert_equal [ "PAGES · 2", "POSTS · 20", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }, "and is counted in no heading"
+    end
+
+    # The first read fails (the stub answers it and puts the real fetch back).
+    page.execute_script(<<~JS)
+      const real = window.fetch
+      window.realFetch ??= real
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/listed")) return real(url, options)
+        window.fetch = real
+        return Promise.resolve(new Response("", { status: 500 }))
+      }
+    JS
+    find(pill).execute_script("this.focus()")
+    keyboard.type(:Enter)
+    within(LIST) do
+      assert_selector "[role=alert] p", text: "The list couldn't be loaded."
+      assert_selector "[role=alert] button[data-mind-graph-retry]", text: "Try again"
+      assert_selector "[role=alert] button[data-mind-graph-back]", text: "Back to the list"
+    end
+    await_js("document.activeElement?.hasAttribute('data-mind-graph-retry')")
+    keyboard.type(:Escape)
+    assert_selector pill
+    assert_no_selector "#{LIST} [role=alert]"
+    focused.call("more-type-resume_entry")
+
+    keyboard.type(:Enter)
+    focused.call(nid(posts[20]))
+    within(LIST) do
+      assert_equal [ "MORE FROM #{entry.upcase} · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "Entry 20", "Entry 21" ], all("li button span.truncate").map(&:text)
+    end
+    assert_equal "", graph["data-selected"], "the pill is not selected by its row either"
+
+    keyboard.type(:Escape)
+    assert_selector pill
+    focused.call("more-type-resume_entry")
+    keyboard.type(:Enter)
+    focused.call(nid(posts[20]))
+    within(LIST) { press "Back to the list" }
+    focused.call("more-type-resume_entry")
+    keyboard.type(:Enter)
+    focused.call(nid(posts[20]))
+
+    # "Posts" off: the pill goes with the posts, its rows stay, and a row
+    # that is activated switches the posts back on and adds its post.
+    toggle "Posts"
+    assert_selector "#{GRAPH} input#mind-graph-nodes-post:not(:checked)", visible: :all
+    assert_selector "#{LIST} button[data-not-in-view]", count: 2
+    find("#{LIST} button[data-node-id='#{nid(posts[20])}']").click
+    assert_selector "#{GRAPH} input#mind-graph-nodes-post:checked", visible: :all
+    assert_selector "#{GRAPH}[data-selected='#{nid(posts[20])}']"
+    assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 21 of 22 posts. 1 more is in the list.']"
+    assert_selector "#{GRAPH} [role=status] p[data-mind-graph-announced]", text: "21 of 22 posts. 1 more is in the list.", visible: :all
+    assert_selector "#{LIST} button[data-not-in-view]", count: 1
+
+    # The pill is dragged, which pins it where it is dropped, and hovered.
+    escape_on_canvas
+    dropped = drag_node("more-type-resume_entry", by: [ 24, 18 ])
+    assert_selector "#{GRAPH}[data-pinned='1']"
+    assert_selector "#{GRAPH} [data-mind-graph-release]", text: "Release 1 pinned"
+    page.driver.browser.mouse.move(x: dropped["x"], y: dropped["y"])
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === 'more-type-resume_entry'")
+
+    # The last one: nothing is behind the pill, so the pill, its row and its
+    # rows go, and the list is the groups again. A SPENT PILL IS NOTHING: no
+    # pin (nothing is left to release), and where it stood no hover, no
+    # press, no label and no row; no count holds it.
+    find("#{LIST} button[data-node-id='#{nid(posts[21])}']").click
+    assert_selector "#{GRAPH}[data-selected='#{nid(posts[21])}'][data-edges='24'][data-pinned='0']"
+    assert_no_selector "#{GRAPH} [data-mind-graph-release]", wait: 0
+    assert_equal "25", graph["data-nodes"], "two pages, the hub and twenty-two posts: the pill is not among what is drawn"
+    assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 22 posts.']"
+    within(LIST) do
+      assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_no_selector "button[data-more]"
+      assert_no_selector "button[data-mind-graph-back]"
+      assert_selector "button[data-node-id='#{nid(posts[21])}'][aria-current='true']"
+    end
+    await_graph
+    assert_nil screen_position("more-type-resume_entry"), "a pill that stands for nothing is not drawn"
+    assert_nil page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.markBox('more-type-resume_entry')")
+    assert_not_includes graph["data-labelled"].split(","), "more-type-resume_entry"
+    mouse = page.driver.browser.mouse
+    mouse.move(x: dropped["x"] + 1, y: dropped["y"] + 1)
+    await_frames
+    assert_not_equal "more-type-resume_entry", graph["data-hovered"], "where the pill was dropped nothing of it is hovered"
+    lines = graph["data-edges"]
+    mouse.click(x: dropped["x"], y: dropped["y"])
+    await_frames
+    assert_not_equal "more-type-resume_entry", graph["data-selected"]
+    within(LIST) { assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }, "a press where it stood opens no rows" }
+    assert_equal lines, graph["data-edges"]
+    assert_equal "Posts 22", legend_counts[1]
+    places = page.evaluate_script("#{posts.last(2).map { |post| nid(post) }.to_json}.map((id) => document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(id)).flatMap((at) => [ at.x, at.y ])")
+    assert places.size == 4 && places.all? { |value| value.is_a?(Numeric) && value.finite? }, "an added post has no place: #{places.inspect}"
+  end
+
+  # Ruling M5 on the review of Task 7: a `tick` the worker posted BEFORE it
+  # took an `add` is two numbers short of the page's nodes. Whether one is in
+  # flight is a matter of milliseconds, so the test plays it: the worker's
+  # wrapper hands the page the last positions it answered (which know
+  # nothing of the new post) in the same task as the `add`, and asks at once
+  # where the added post is. It is where the page put it; taken as it came,
+  # the short answer left it nowhere (NaN) until the worker's next.
+  test "a tick the worker posted before it took an added post leaves that post where the page put it" do
+    create_page(title: "Blog")
+    alone = create_post(title: "Alone")
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      window.RealWorker = window.Worker
+      window.Worker = class extends window.RealWorker {
+        constructor(...args) {
+          super(...args)
+          this.addEventListener("message", ({ data }) => { if (data.type === "tick") this.lastTick = Float32Array.from(data.positions) })
+        }
+        postMessage(message, ...rest) {
+          super.postMessage(message, ...rest)
+          if (message.type !== "add" || !this.lastTick) return
+          this.dispatchEvent(new MessageEvent("message", { data: { type: "tick", positions: this.lastTick } }))
+          const at = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(message.node.id)
+          window.afterShortTick = { known: this.lastTick.length / 2, placed: Boolean(at) && Number.isFinite(at.x) && Number.isFinite(at.y) }
+        }
+      }
+    JS
+    begin
+      with_reduced_motion do
+        within("nav[aria-label='Modules']") { click_link "Mind graph" }
+        await_graph
+        find("#{LIST} label", text: "Not listed on any page").click
+        find("#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]").click
+        assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='3']"
+        assert_equal({ "known" => 2, "placed" => true }, page.evaluate_script("window.afterShortTick"), "the worker's answer knew two nodes, the page holds three: the third must keep its place")
+        await_graph
+        assert_kind_of Numeric, screen_position(alone)["x"]
+      end
+    ensure
+      page.execute_script("if (window.RealWorker) { window.Worker = window.RealWorker; delete window.RealWorker }")
+    end
+  end
+
+  # Design answer H1: ONE PILL PER TARGET. A page with two list blocks has
+  # two pills, each on its own hub or tag, each with its own posts, its own
+  # row in the list and its own way to Posts.
+  test "a page with two list blocks has two pills, each with its own row, its own posts and its own way to Posts, and a post a tag brings in is joined to that tag" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "tag" => "pill" })
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 1, settings: { "content_type" => "resume_entry" })
+    stray = create_post(title: "Stray") # no page lists it: a plain post with no tag
+    pills = 15.times.map { |index| create_post(title: "Pill #{index}", tags: [ "pill" ]) }
+    entries = 15.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
+    pills.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 1).hours.ago) }   # version: none (a test sets a time) # changes: none (a test sets a time)
+    entries.each_with_index { |post, index| post.update_columns(published_at: (2 * index + 2).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
+    tag = "tag-#{Tag.find_by!(name: "pill").id}"
+    entry = ContentTypes.fetch("resume_entry").label
+
+    with_reduced_motion do
+      visit admin_mind_graph_path(page: blog.id, depth: 2)
+      await_graph
+
+      # The twenty newest are ten of each; five of each are left out.
+      [ "more-#{tag}", "more-type-resume_entry" ].each { |id| assert screen_position(id), "#{id} is not drawn" }
+      assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 20 of 30 posts and 1 tag. 10 more are in the list.']"
+      within(LIST) do
+        assert_equal [ [ "more-#{tag}", "+5 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("button[data-more]").map { |button| [ button["data-node-id"], button.text ] }
+        assert_row "+5 more: 5 more posts pill lists, not in view. Activate to show them."
+        assert_row "+5 more: 5 more posts #{entry} lists, not in view. Activate to show them."
+      end
+
+      # A pill's read that fails says so with a way back, and what clears a
+      # press on the canvas clears this too: Escape there, nothing selected.
+      # (The stub fails the one read and puts the real fetch back.)
+      page.execute_script(<<~JS)
+        const real = window.fetch
+      window.realFetch ??= real
+        window.fetch = (url, options) => {
+          if (!String(url).includes("/mind_graph/listed")) return real(url, options)
+          window.fetch = real
+          return Promise.resolve(new Response("", { status: 500 }))
+        }
+      JS
+      click_node("more-type-resume_entry")
+      assert_selector "#{LIST} [role=alert] button[data-mind-graph-back]", text: "Back to the list"
+      toggle "Tree"
+      toggle "Tree"
+      assert_selector "#{LIST} [role=alert] p", text: "The list couldn't be loaded."
+      escape_on_canvas
+      assert_no_selector "#{LIST} [role=alert]"
+      assert_selector "#{LIST} button[data-more]", count: 2
+
+      click_node("more-type-resume_entry")
+      within(LIST) do
+        assert_selector "button[data-mind-graph-back]"
+        assert_equal [ "MORE FROM #{entry.upcase} · 5" ], all("h2").map { |heading| heading.text.upcase }
+        assert_equal entries.last(5).map(&:title), all("li button span.truncate").map(&:text)
+        assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
+      end
+
+      click_node("more-#{tag}")
+      within(LIST) do
+        assert_selector "h2", text: /more from pill/i
+        assert_equal [ "MORE FROM PILL · 5" ], all("h2").map { |heading| heading.text.upcase }
+        assert_equal pills.last(5).map(&:title), all("li button span.truncate").map(&:text), "the other pill's posts, and none of the first's"
+        assert_equal({ "tag" => "pill" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
+      end
+      lines = graph["data-edges"].to_i
+      find("#{LIST} button[data-node-id='#{nid(pills.last)}']").click
+      assert_selector "#{GRAPH}[data-selected='#{nid(pills.last)}'][data-edges='#{lines + 1}']"
+      assert_equal [ tag ], graph["data-neighbours"].split(","), "a post a tag brings in gets its own line to that tag"
+      # Each pill counts its own: the tag's stands for one fewer, the type's for as many as before.
+      assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 21 of 30 posts and 1 tag. 9 more are in the list.']"
+      within(LIST) do
+        assert_selector "h2", text: /· 4\z/
+        assert_equal [ "MORE FROM PILL · 4" ], all("h2").map { |heading| heading.text.upcase }, "the heading follows its own pill, and the other pill's count is untouched"
+      end
+      within(LIST) { press "Back to the list" }
+      within(LIST) do
+        assert_equal [ [ "more-#{tag}", "+4 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("button[data-more]").map { |button| [ button["data-node-id"], button.text ] }
+      end
+      # A post the person adds from "Not listed on any page" is in view and is
+      # not one the page lists: it is counted beside them, so 21 and 9 still
+      # make the page's 30.
+      find("#{LIST} label", text: "Not listed on any page").click
+      find("#{LIST} button[data-node-id='#{nid(stray)}'][data-not-in-view]").click
+      assert_selector "#{GRAPH}[data-selected='#{nid(stray)}']"
+      assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 21 of 30 posts, 1 post and 1 tag. 9 more are in the list.']"
+      await_graph
+    end
+  end
+
+  # Pages spec §7; design answer, part one §5, F1 and G4, on a real site: what
+  # a page's card says is what the data holds for this viewer, its notes are
+  # the page's own, "Open page" is the page's editor, and Enter on a selected
+  # page opens it. (Each card's order, the five states of the chip and a
+  # retired type's card are held against plain data in the modules test.)
+  test "a page's card says its address, state, counts and notes and opens the page, a scheduled change says its day behind a warn dot, and a post type's and All posts' cards say their posts" do
+    home = root_page
+    blog = create_page(title: "Blog")
+    create_page(title: "Archive", parent: blog)
+    pending = create_page(title: "Pending")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: home, block_type: :post_list, position: 0, settings: {})
+    2.times { |index| create_post(title: "Post #{index}") }
+    at = 3.days.from_now
+    Publishing::Version.take!(pending, live_at: at)
+    pending.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+    day = I18n.l(at, format: :"admin.short")
+    assert_equal :live_change_scheduled, Publishing::State.of(pending.reload).state, "the test's page has no change scheduled: it shows nothing"
+    state = Publishing::State.of(blog.reload).state
+    seen = { live: "Live", live_with_changes: "Live · Unpublished changes" }.fetch(state)
+    as(users(:two)) { assert Notes::Start.call(blog, body: "Check the intro").ok? }
+    chip = "[data-mind-graph-card] .admin-status-chip"
+    dots = -> { all("#{chip} span.rounded-full").map { |dot| dot[:class][/bg-[a-z]+/] } }
+
+    with_reduced_motion do
+      visit admin_mind_graph_path
+      await_graph
+
+      click_node(nid(blog))
+      within("[data-mind-graph-card]") do
+        assert_selector "span.font-cs-mono", exact_text: "/blog"
+        assert_equal seen, find(".admin-status-chip[data-status='#{state}']#{" span[data-chip-seen]" unless state == :live}").text.squish
+        assert_selector "h2", exact_text: "Blog"
+        assert_text(/1 child page\s*·\s*lists 2 posts/i)
+        assert_selector "canvas[data-mark=page][aria-hidden='true']"
+        assert_selector "[data-mind-graph-card-notes][data-notes-type=page][data-notes-id='#{blog.id}'] li[data-note-row]", text: "Check the intro"
+        assert_selector "[data-mind-graph-card-notes] li[data-note-row] a[href$='/pages/#{blog.id}?notes=open&thread=#{Notes::Thread.order(:id).last.id}']"
+        assert_equal [ "Open page", "Focus", "Pin" ], find("[data-mind-graph-card-pin]").find(:xpath, "..").all("a, button").map(&:text)
+        assert_link "Open page", href: %r{/cs-studio/pages/#{blog.id}\z}
+        assert_link "Focus", href: /mind_graph\?page=#{blog.id}\z/
+        # A note started from the card is the page's.
+        find("textarea").send_keys("From the graph")
+        press "Add note"
+        assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
+      end
+      assert_marks_drawn "[data-mind-graph-card]"
+      assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(blog)}']"
+      assert_equal [ [ "Page", blog.id ] ] * 2, Notes::Thread.order(:id).last(2).map { |thread| [ thread.container_type, thread.container_id ] }
+
+      # A live page with a change scheduled: "● Live · ● Change scheduled 14 Oct".
+      escape_on_canvas
+      click_node(nid(pending))
+      assert_equal "Live · Change scheduled #{day}", find("#{chip}[data-status='live_change_scheduled'] span[data-chip-seen]").text.squish
+      assert_equal "Live, change scheduled #{day}", find("#{chip} .sr-only", visible: :all).text(:all).squish
+      assert_equal %w[bg-ok bg-warn], dots.call, "a warn dot before the second part"
+
+      # A post type a page lists, and "All posts": no link, the posts the viewer reads.
+      escape_on_canvas
+      click_node("type-blog")
+      within("[data-mind-graph-card]") do
+        assert_selector "h2", exact_text: ContentTypes.fetch("blog").label
+        assert_selector "canvas[data-mark=type][data-mark-of='#{ContentTypes.fetch("blog").colour_index}']"
+        assert_text(/2 posts/i)
+        assert_no_selector "a"
+        assert_selector "button[data-mind-graph-card-pin]", text: "Pin"
+      end
+      escape_on_canvas
+      click_node("all-posts")
+      within("[data-mind-graph-card]") do
+        assert_selector "h2", exact_text: "All posts"
+        assert_selector "canvas[data-mark=type][data-mark-of='all-posts']"
+        assert_no_selector "a"
+      end
+
+      # Enter on a selected page opens it: the card's own "Open page", pressed.
+      escape_on_canvas
+      click_node(nid(home))
+      assert_selector "[data-mind-graph-card] a[data-mind-graph-card-open]", text: "Open page"
+      assert_selector "[data-mind-graph-card] span.font-cs-mono", exact_text: "/"
+      find(CANVAS).execute_script("this.focus()")
+      click_frame_link { page.driver.browser.keyboard.type(:Enter) }
+      assert_current_path admin_page_path(home)
+    end
+  end
+
+  # Pages spec, decision 6; design answer, part one §6 and H5; the third
+  # answers ("not remembered after a reload"). The threshold is lowered for
+  # the server this test's browser talks to: nobody builds three thousand
+  # lines, and no request is played.
+  test "a site with too many lines opens around Home and says why, Show everything draws the whole graph in the same page, and neither a reload nor Back remembers it" do
+    home = root_page
+    first = create_page(title: "Page 0")
+    2.times { |index| create_page(title: "Page #{index + 1}") }
+    create_page(title: "Deep", parent: first)
+    whole = PostGraph::Global.method(:call)
+    bar = "#{GRAPH} [data-mind-graph-opened]"
+    around_home = lambda do
+      assert_selector "#{bar}:not([hidden])", text: "This site has 4 connections, so the graph opens around Home."
+      assert_equal %w[4 4 3], [ graph["data-opened-lines"], graph["data-nodes"], graph["data-edges"] ], "Home and its three children: the grandchild is not in this view"
+      assert_selector "#{CANVAS}[aria-label='Mind graph around Home, depth 1: 4 pages. Showing the area around Home. The site has 5 pages.']"
+    end
+
+    with_singleton_override(PostGraph::Global, :call, ->(**options) { whole.call(**options, open_above: 3) }) do
+      with_reduced_motion do
+        visit admin_mind_graph_path
+        await_graph
+
+        around_home.call
+        assert_current_path admin_mind_graph_path, ignore_query: false
+        assert_selector "#{bar} button[type=button][aria-label='Show everything: all 4 connections'][aria-describedby='mind-graph-opened-line']", exact_text: "Show everything"
+        assert_no_selector "[data-mind-graph-focus]"
+        assert_selector "#{GRAPH} [role=status] p.sr-only[data-mind-graph-announced]", text: "Showing the area around Home. The site has 5 pages.", visible: :all
+        assert_nil screen_position("page-#{Page.find_by!(parent: first).id}")
+        at = graph_position(home)
+        assert_in_delta 0, at["x"], 0.5, "Home, the focus of the view, rests at the centre"
+        assert_in_delta 0, at["y"], 0.5
+        click_node(nid(first))
+        assert_selector "[data-mind-graph-card]", text: /1 child page/i
+
+        within(bar) { press "Show everything" }
+        assert_selector "#{GRAPH}[data-nodes='5'][data-edges='4']", wait: 10
+        await_graph
+        assert_no_selector bar
+        assert_nil graph["data-opened-lines"]
+        assert_equal "", graph["data-selected"], "the selection was of the view that went"
+        assert_no_selector "[data-mind-graph-card]", visible: :visible
+        assert_selector "#{CANVAS}[aria-label='Mind graph: 5 pages, 4 connections. Showing everything.']"
+        # The press is answered for a screen reader too: the whole graph's summary, in the notice's live region.
+        assert_selector "#{GRAPH} [role=status] p.sr-only[data-mind-graph-announced]", text: /\AMind graph: 5 pages, 4 connections\. Showing everything\.\z/, visible: :all
+        within(LIST) { assert_equal [ "PAGES · 5" ], all("h2").map { |heading| heading.text.upcase } }
+        assert screen_position("page-#{Page.find_by!(parent: first).id}")
+        assert_current_path admin_mind_graph_path, ignore_query: false
+        assert_equal "/cs-studio/mind_graph/data", graph["data-url"], "nothing of the page says everything: the choice is in no address"
+
+        # Not remembered after a reload.
+        visit admin_mind_graph_path
+        await_graph
+        around_home.call
+
+        # Nor by Back: the page Turbo restores is the page as it is served.
+        within(bar) { press "Show everything" }
+        assert_selector "#{GRAPH}[data-nodes='5']", wait: 10
+        await_graph
+        click_frame_link { within("nav[aria-label='Modules']") { click_link "Tags" } }
+        assert_selector "h1", text: "Tags"
+        page.go_back
+        await_graph
+        around_home.call
+        assert_selector "#{bar} button[aria-label='Show everything: all 4 connections']"
+
+        # Left while it says "around Home", and the data then fails: the page
+        # Turbo restores says nothing of a view that is not drawn (the
+        # controller's `reset` took the figure and the bar back). The stub
+        # fails the one request and puts the real fetch back.
+        click_frame_link { within("nav[aria-label='Modules']") { click_link "Tags" } }
+        assert_selector "h1", text: "Tags"
+        page.execute_script(<<~JS)
+          const real = window.fetch
+      window.realFetch ??= real
+          window.fetch = (url, options) => {
+            if (!String(url).includes("/mind_graph/data")) return real(url, options)
+            window.fetch = real
+            return Promise.reject(new TypeError("Failed to fetch"))
+          }
+        JS
+        page.go_back
+        assert_selector "#{GRAPH}[data-state='failed']", wait: 10
+        assert_nil graph["data-opened-lines"]
+        assert_no_selector bar
+        assert_selector "#{bar}[hidden] [data-mind-graph-opened-line]:empty", visible: :all
+        assert_selector "#{bar} button:not([aria-label])", visible: :all
+        press "Retry"
+        await_graph
+        around_home.call
+      end
+    end
   end
 
   # --- notes (notes spec §4.4) ------------------------------------------------
@@ -1665,7 +3035,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(a, body: "Check the dates, @[#{users(:one).id}]") }
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row][data-unread]", text: "Check the dates"
     # The heading is in the small upper-case label style: matched whatever the case, as the card's counts are.
@@ -1697,7 +3067,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card-notes][data-admin--notes--live-target=record][data-notes-type=post][data-notes-id='#{a.id}'] textarea"
     assert_no_selector "[data-mind-graph-card-notes] li[data-note-row]"
     await_notes_live
@@ -1712,6 +3082,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       window.__noteReads = 0
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (...args) => {
         if (String(args[0].url || args[0]).includes("/notes/post/") && !args[1]?.method) window.__noteReads += 1
         return original(...args)
@@ -1739,7 +3110,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 3
     assert_selector "[data-mind-graph-card-notes] a[data-note-more][href$='/posts/#{a.id}?notes=open']", text: "+2 more"
     # The notes arrive after the card was first measured: it is measured
@@ -1750,7 +3121,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_operator card["top"], :>=, canvas[1] + 7, "the card with its notes reaches above the canvas"
 
     escape_on_canvas # the open card may stand over the other node
-    click_node(b.id)
+    click_node(b)
     assert_selector "[data-mind-graph-card-notes] textarea"
     assert_no_selector "[data-mind-graph-card-notes] li"
     assert_no_selector "[data-mind-graph-card-notes] h3" # zero threads: only the field (handoff)
@@ -1764,7 +3135,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(a, body: "<img src=x onerror='window.pwned = 2'> see") }
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 2'> see"
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 1'>"
@@ -1780,7 +3151,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
 
     within("[data-mind-graph-card-notes]") do
       find("textarea").send_keys("Ask @[#{stranger.id}]")
@@ -1804,7 +3175,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     key = "cs-note-draft:#{users(:one).id}:graph-Post-#{a.id}"
 
-    click_node(a.id)
+    click_node(a)
     find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
     assert_eventually { page.evaluate_script("JSON.parse(window.sessionStorage.getItem(#{key.to_json}) || '{}').body") == "Half a thought" }
     find("[data-mind-graph-card-notes] textarea").send_keys(:escape)
@@ -1838,10 +3209,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     find("[data-mind-graph-card-notes] textarea").send_keys("On its way")
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (...args) => {
         if (String(args[1]?.method || "GET").toUpperCase() !== "POST" || window.__held) return original(...args)
         window.__held = true
@@ -1887,7 +3259,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_equal "undefined", page.evaluate_script("typeof CanvasRenderingContext2D.prototype.roundRect")
     assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row]", text: "Check the dates"
   ensure
     page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
@@ -1919,15 +3291,15 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
     visit admin_mind_graph_path
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 1
     find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
     page.execute_script("document.querySelector('[data-mind-graph-card-notes]').dataset.same = 'yes'; window.notesFetches = 0; window.realFetch = window.fetch; window.fetch = (...args) => { if (String(args[0]).includes('/notes/')) window.notesFetches += 1; return window.realFetch(...args) }")
 
-    click_node(a.id)
+    click_node(a)
     await_frames
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert_selector "[data-mind-graph-card-notes][data-same='yes']"
     assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
     assert_equal 0, page.evaluate_script("window.notesFetches"), "the card's notes were fetched again"
@@ -1943,7 +3315,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     bare = notes_badge_pixel(a)
-    click_node(a.id)
+    click_node(a)
     within("[data-mind-graph-card-notes]") do
       find("textarea").send_keys("Check the dates")
       press "Add note"
@@ -1957,10 +3329,29 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   # What the endpoint answers for a site over the cap, cut down to two nodes:
   # the counts are the point.
+  # A post, a tag and a page of ONE database id (pages spec, decision 4: the
+  # three tables count on their own), with a page's lines to a tag and to a
+  # post type, and a pill hanging off the type by a `brings` line as in a
+  # page's local view.
+  SHARED_ID_GRAPH = <<~JS.freeze
+    ({
+      nodes: [ { id: "post-12", title: "Twelve", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, listed: true, url: "/twelve", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 },
+               { id: "post-13", title: "Thirteen", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, listed: true, url: "/thirteen", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 } ],
+      tags: [ { id: "tag-12", name: "twelve", count: 2, degree: 3 } ],
+      pages: [ { id: "page-12", title: "Page twelve", path: "/twelve", depth: 0, home: true, parent: null, order: 0, status: "live", changes: null, change_at: null, url: "/pages/12", degree: 2, child_count: 0, listed_count: 2, open_notes: 0 } ],
+      types: [ { id: "type-blog", name: "blog", label: "Blog post", colour_index: 1, count: 2, degree: 1 } ],
+      edges: [ { source: "post-12", target: "post-13", kind: "related" }, { source: "post-12", target: "tag-12", kind: "tag" }, { source: "post-13", target: "tag-12", kind: "tag" },
+               { source: "page-12", target: "tag-12", kind: "lists" }, { source: "page-12", target: "type-blog", kind: "lists" },
+               { source: "type-blog", target: "more-type-blog", kind: "brings" } ],
+      more: [ { id: "more-type-blog", count: 1980, page: "page-12", target: "type-blog" } ],
+      total: 2, shown: 2, isolated: 0
+    })
+  JS
+
   CAPPED_GRAPH = <<~JS.freeze
     ({
-      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
-      tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 6000, shown: 2000, isolated: 1214
+      nodes: [ { id: "post-1", title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: "post-2", title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
+      tags: [], edges: [ { source: "post-1", target: "post-2", kind: "related" } ], total: 6000, shown: 2000, isolated: 1214
     })
   JS
 
@@ -1968,9 +3359,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # more posts than the cap keeps.
   CAPPED_LOCAL_GRAPH = <<~JS.freeze
     ({
-      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
-      tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 2695, shown: 2000,
-      focus: { kind: "post", id: 1, node_id: 1, title: "One", depth: 2 }
+      nodes: [ { id: "post-1", title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: "post-2", title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
+      tags: [], edges: [ { source: "post-1", target: "post-2", kind: "related" } ], total: 2695, shown: 2000,
+      focus: { kind: "post", id: 1, node_id: "post-1", title: "One", depth: 2 }
     })
   JS
 
@@ -1978,11 +3369,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # each also on one of 30 tags. A JavaScript expression, made in the page.
   BIG_GRAPH = <<~JS.freeze
     (() => {
-      const nodes = Array.from({ length: 1500 }, (_, index) => ({ id: index + 1, title: `Post ${index + 1}`, type: "blog", colour_index: 1, status: "live", url: "/post", degree: 3, related_count: 2, tag_count: 1 }))
+      const nodes = Array.from({ length: 1500 }, (_, index) => ({ id: `post-${index + 1}`, title: `Post ${index + 1}`, type: "blog", colour_index: 1, status: "live", url: "/post", degree: 3, related_count: 2, tag_count: 1 }))
       const tags = Array.from({ length: 30 }, (_, index) => ({ id: `tag-${index + 1}`, name: `tag ${index + 1}`, count: 50, degree: 50 }))
       const edges = [
-        ...nodes.slice(1).map((node) => ({ source: node.id - 1, target: node.id, kind: "related" })),
-        ...nodes.map((node) => ({ source: node.id, target: `tag-${(node.id % 30) + 1}`, kind: "tag" }))
+        ...nodes.slice(1).map((node, index) => ({ source: `post-${index + 1}`, target: node.id, kind: "related" })),
+        ...nodes.map((node, index) => ({ source: node.id, target: `tag-${((index + 1) % 30) + 1}`, kind: "tag" }))
       ]
       return { nodes, tags, edges, total: 1500, shown: 1500, isolated: 0 }
     })()
@@ -1995,6 +3386,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   def stub_graph_data(payload)
     page.execute_script(<<~JS)
       const original = window.fetch
+      window.realFetch ??= original
       window.fetch = (url, options) => {
         if (!String(url).includes("/mind_graph/data")) return original(url, options)
         if (window.failGraph) return Promise.reject(new TypeError("Failed to fetch"))
@@ -2042,13 +3434,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_row "shared: tag, 2 connections. Shows it in the graph."
       assert_selector "li button > span[aria-hidden='true']", count: 4
       assert_no_selector "a", visible: :all
+      # Nobody reads a page here (there is none), so "Not listed on any
+      # page" would say nothing: the filter is not offered.
+      assert_no_selector "input, label", visible: :all
     end
 
-    find("label", text: "Related").click
+    toggle "Tags"
     await_graph
     within(LIST) do
-      assert_equal [ "POSTS · 2" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal %w[Alpha Gamma], all("li button span.truncate").map(&:text)
+      assert_equal [ "POSTS · 3" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal %w[Alpha Beta Gamma], all("li button span.truncate").map(&:text)
     end
   end
 
@@ -2076,19 +3471,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     box = canvas_box
     centre = [ (box[0] + box[2]) / 2, (box[1] + box[3]) / 2 ]
-    from = screen_position(a.id)
+    from = screen_position(a)
     assert_operator Math.hypot(from["x"] - centre[0], from["y"] - centre[1]), :>, 20, "the node is in the middle already: nothing to see"
     zoom = graph["data-zoom"]
 
     within(LIST) { find("button", text: "Alpha").click }
 
-    assert_equal a.id.to_s, graph["data-selected"]
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{a.id}); return Math.abs(p.x - #{centre[0]}) < 2 && Math.abs(p.y - #{centre[1]}) < 2 })()")
+    assert_equal nid(a), graph["data-selected"]
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(a).to_json}); return Math.abs(p.x - #{centre[0]}) < 2 && Math.abs(p.y - #{centre[1]}) < 2 })()")
     assert_equal zoom, graph["data-zoom"], "centring changed the zoom"
     assert_selector "#{LIST} button[aria-current='true']", text: "Alpha", count: 1
     assert_selector "[data-mind-graph-card] h2", text: "Alpha"
     await_frames
-    assert_card_beside(a.id, side: "right")
+    assert_card_beside(a, side: "right")
     assert_current_path admin_mind_graph_path
 
     # Another row moves the mark; clearing the selection takes it away.
@@ -2107,13 +3502,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     # The last row: one of the chain's two ends, which have one connection.
     last = posts.last
-    row_in_view = "(() => { const list = document.querySelector(#{LIST.to_json}).getBoundingClientRect(); const row = document.querySelector(#{LIST.to_json} + ' button[data-node-id=\"#{last.id}\"]').getBoundingClientRect(); return row.top >= list.top - 1 && row.bottom <= list.bottom + 1 })()"
+    row_in_view = "(() => { const list = document.querySelector(#{LIST.to_json}).getBoundingClientRect(); const row = document.querySelector(#{LIST.to_json} + ' button[data-node-id=\"#{nid(last)}\"]').getBoundingClientRect(); return row.top >= list.top - 1 && row.bottom <= list.bottom + 1 })()"
     assert_not page.evaluate_script(row_in_view), "the row is in view before anything is selected: the list is not long enough for this test"
     scrolled = page.evaluate_script("window.scrollY")
 
-    click_node(last.id)
+    click_node(last)
 
-    assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{last.id}']"
+    assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(last)}']"
     await_js(row_in_view)
     assert_equal scrolled, page.evaluate_script("window.scrollY"), "the page scrolled, not the list"
   end
@@ -2124,12 +3519,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
-    point = screen_position(a.id)
+    point = screen_position(a)
     ring_before = pixel_at(point["x"] - 9.5, point["y"])
 
     find("#{LIST} button", text: "Alpha").hover
 
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(a)}'")
     assert_not_equal ring_before, pixel_at(point["x"] - 9.5, point["y"]), "no ring round the node whose row is hovered"
     assert_equal "", graph["data-selected"].to_s
 
@@ -2154,7 +3549,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     find("#{LIST} button", text: "Alpha").execute_script("this.focus()")
     page.driver.browser.keyboard.type(:Enter)
 
-    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal nid(a), graph["data-selected"]
     assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the focus did not move to the card"
     assert_equal "mind-graph-card-title", find("[data-mind-graph-card]")["aria-labelledby"], "the card is not named by its title"
     # Tab meets the card in its reading order: the notes' field, then the actions.
@@ -2190,7 +3585,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_frames
     assert_current_path admin_mind_graph_path
 
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card] a", text: "Open post"
     # In the note's field Enter is the field's own.
     field = find("[data-mind-graph-card] textarea")
@@ -2214,7 +3609,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path(post: a.id)
     await_graph
-    click_node(a.id)
+    click_node(a)
     assert_selector "[data-mind-graph-card] a", text: "Open post"
 
     stops = page.evaluate_script(<<~JS)
@@ -2223,7 +3618,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         .map((element) => {
           if (element.id === "mind-graph-search") return "search"
           if (element.closest("[data-mind-graph-focus]")) return "focus bar"
-          if (element.name === "mind_graph_filter") return "filter"
+          if (element.closest("[data-mind-graph-legend]")) return "legend"
           if (element.dataset.action?.includes("admin--mind-graph--graph#")) return "zoom"
           if (element.tagName === "CANVAS") return "canvas"
           if (element.closest("[data-mind-graph-card]")) return "card"
@@ -2232,7 +3627,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         })
     JS
 
-    assert_equal [ "search", "focus bar", "filter", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
+    assert_equal [ "search", "focus bar", "legend", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
+    # The toggles, then "Status", and every one of them a stop the Tab key
+    # makes: none is taken out of the order.
+    legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
+    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status", 0 ] ], legend
   end
 
   test "a title with markup in it is text in the list and in the search results" do
@@ -2243,7 +3642,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     within(LIST) { assert_selector "button span.truncate", exact_text: nasty }
-    fill_in "Find a post or tag", with: "onerror"
+    fill_in "Find a page, post or tag", with: "onerror"
     within("[data-mind-graph-results]") { assert_link nasty }
 
     assert_no_selector "#{LIST} img, [data-mind-graph-results] img", visible: :all
@@ -2261,6 +3660,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # A row of the list by its accessible name (Capybara's button locator does
   # not read `aria-label`).
   def assert_row(name) = assert_selector("button[aria-label=#{name.to_json}]")
+
+  # Every mark of a row inside `selector` that is a canvas has been drawn:
+  # something is on each one (a canvas that was never painted is all zeros).
+  def assert_marks_drawn(selector)
+    await_js(<<~JS)
+      (() => {
+        const canvases = Array.from(document.querySelectorAll(#{"#{selector} canvas[data-mark]".to_json}))
+        return canvases.length > 0 && canvases.every((canvas) => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))
+      })()
+    JS
+  end
 
   # A real click where the node is drawn.
   def click_node(id)
@@ -2290,7 +3700,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: from["x"] + (by[0] / 2), y: from["y"] + (by[1] / 2), steps: steps)
     mouse.move(x: to["x"], y: to["y"], steps: steps)
-    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{id.to_json}); return Math.abs(p.x - #{to["x"]}) < 2 && Math.abs(p.y - #{to["y"]}) < 2 })()")
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(id).to_json}); return Math.abs(p.x - #{to["x"]}) < 2 && Math.abs(p.y - #{to["y"]}) < 2 })()")
     mouse.up if release
     to
   end
@@ -2331,14 +3741,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # The canvas's colour where a pinned node's mark is: up and to the right of
   # the centre of a 7 px dot.
   def pin_pixel(post)
-    point = screen_position(post.id)
+    point = screen_position(post)
     pixel_at(point["x"] + 5.04, point["y"] - 5.04)
   end
 
   # The canvas's colour where a node's notes badge is: up and to the LEFT of
   # the centre of a 7 px dot (the pin's corner is up and to the right).
   def notes_badge_pixel(post)
-    point = screen_position(post.id)
+    point = screen_position(post)
     pixel_at(point["x"] - 5.04, point["y"] - 5.04)
   end
 
@@ -2381,6 +3791,14 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   def graph = find(GRAPH)
 
+  # A toggle of the legend, by the name on it. No `await_graph` is needed to
+  # read what it shows: `data-nodes`, `data-edges`, the list and the canvas's
+  # name are written by the change itself, before the layout moves.
+  def toggle(name) = find("#{GRAPH} [data-mind-graph-legend] label", text: name).click
+
+  # Each toggle as a person reads it: its name, and its count once written.
+  def legend_counts = all("#{GRAPH} label[data-legend-toggle]").map { |label| label.text.squish }
+
   # The graph is loaded and its layout has cooled down -- and the frame that
   # was asked for when it did has been drawn. `data-settled` is written BEFORE
   # that frame, which is the one that writes `data-zoom` and `data-labelled`
@@ -2402,8 +3820,24 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script("if (window.RealWorker) { window.Worker = window.RealWorker; delete window.RealWorker }")
   end
 
+  # A node's id as the data and the page write it (pages spec, decision 4):
+  # of a record (a post, a tag, a page), or the id itself as a string
+  # ("post-12", "type-blog"). NEVER of a bare number: 12 is a post, a tag
+  # and a page at once, and a helper that read it as a post would press the
+  # wrong node for the other two and call it found. A number is refused.
+  def nid(node)
+    case node
+    when String then node
+    when ApplicationRecord then "#{node.class.name.underscore}-#{node.id}"
+    else raise ArgumentError, "a node is named by its record or by its id as a string (\"post-12\"), not by #{node.inspect}: a bare number names no kind"
+    end
+  end
+
+  # Where the layout has a node, in graph units (the camera not applied).
+  def graph_position(id) = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.graphPosition(#{nid(id).to_json})")
+
   def screen_position(id)
-    page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{id.to_json})")
+    page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(id).to_json})")
   end
 
   # The canvas's box in client coordinates: left, top, right, bottom.
@@ -2425,9 +3859,31 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     JS
   end
 
+  # The canvas's colours at `samples` points evenly round a node's centre,
+  # `radius` pixels from it: one read, after the frames `pixel_at` waits for.
+  # `quadrant: :left` reads the quarter on the node's left only, where there
+  # is no label.
+  def ring_pixels(node, radius:, samples:, quadrant: nil)
+    point = screen_position(node)
+    await_frames
+    page.evaluate_script(<<~JS)
+      (() => {
+        const canvas = document.querySelector(#{CANVAS.to_json})
+        const box = canvas.getBoundingClientRect()
+        const ratio = canvas.width / box.width
+        const context = canvas.getContext("2d")
+        return Array.from({ length: #{samples} }, (_, step) => {
+          const angle = #{quadrant == :left ? "Math.PI * 0.75 + step * Math.PI / 2 / #{samples}" : "step * 2 * Math.PI / #{samples}"}
+          const x = #{point["x"]} + #{radius} * Math.cos(angle), y = #{point["y"]} + #{radius} * Math.sin(angle)
+          return Array.from(context.getImageData(Math.round((x - box.left) * ratio), Math.round((y - box.top) * ratio), 1, 1).data)
+        })
+      })()
+    JS
+  end
+
   # A post's mark at its centre and four pixels to the left of it.
   def pixels_of(post)
-    point = screen_position(post.id)
+    point = screen_position(post)
     [ pixel_at(point["x"], point["y"]), pixel_at(point["x"] - 4, point["y"]) ]
   end
 end
