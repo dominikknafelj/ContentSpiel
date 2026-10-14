@@ -78,36 +78,20 @@ class Theme
     # rendered as `render "theme/anything"`.
     OWN_PARTIALS = "theme/".freeze
 
-    # THE TRANSITION (block types plan, Tasks 2 to 10): today's lines and
-    # tokens of a built-in that declares nothing yet. Read only for a type
-    # that declares neither `theme_methods` nor themed `tokens`: a type that
-    # declares either is read from its declarations alone, so a conversion
-    # that forgets its tokens loses them at once and the ledger says so.
-    # Each type's conversion deletes its entry, and Task 10 deletes both
-    # constants.
+    # THE TRANSITION (block types plan, Tasks 2 to 10): today's lines of a
+    # built-in that declares none yet. Read only for a type that declares no
+    # `theme_methods`. Each type's conversion deletes its entry, and Task 10
+    # deletes the constant. (Its sibling for tokens went with the Code
+    # block's conversion, the one built-in with tokens of its own: every
+    # type's tokens are its declaration's now, so a conversion that forgets
+    # them loses them at once and the ledger says so.)
     #
     # A component's line is its path (where a theme puts its template) with
     # the methods its template may call. A method not listed is the CMS's to
     # change.
     WRITTEN_BLOCK_LINES = {
-      # `lines` is one array per line of [role, text] pairs, the role nil or
-      # one of the seven a `syn-` token exists for; `string(key)` is one of
-      # the copy button's four words (:copy, :copy_code, :copied, :failed) in
-      # the visitor's language, and of nothing else. When the bar around the
-      # copy button is the script's to show, and the id of the file name's
-      # element, are a template's own layout and no method: the default
-      # template writes both out from these names. The markup the copy script
-      # asks of any template is in docs/reference/theming.md, "The Code block".
-      "blocks/code_component" => %w[block page lines code language language_label filename caption string],
       "blocks/post_list_component" => %w[block page list_component],
       "blocks/section_component" => %w[block page columns layout background width]
-    }.freeze
-
-    # The Code block's syntax colours, one per role of `CodeHighlight::ROLES`
-    # and in its order (the highlighter is not named here:
-    # `test/values/theme/contract_test.rb` holds the two together).
-    WRITTEN_BLOCK_THEMED_TOKENS = {
-      "code" => %w[syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed]
     }.freeze
 
     # The content types' components, written here: a content type declares
@@ -137,13 +121,7 @@ class Theme
       blocks.to_h.merge(POST_COMPONENTS).freeze
     end
 
-    def self.themed_tokens
-      own = ::BlockTypes.all.flat_map do |definition|
-        declares = definition.theme_methods || definition.themed_tokens.any?
-        declares ? definition.themed_tokens : WRITTEN_BLOCK_THEMED_TOKENS.fetch(definition.name, [])
-      end
-      SHARED_THEMED_TOKENS + own
-    end
+    def self.themed_tokens = SHARED_THEMED_TOKENS + ::BlockTypes.all.flat_map(&:themed_tokens)
 
     def self.fixed_tokens = SHARED_FIXED_TOKENS + ::BlockTypes.all.flat_map(&:fixed_tokens)
 

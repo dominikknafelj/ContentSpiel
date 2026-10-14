@@ -14,7 +14,17 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_equal "Code", code.label
     assert_equal [ %w[language select], %w[filename string], %w[code code] ], code.fields.map { |field| [ field.name, field.type.to_s ] }
     assert_equal %w[caption], code.uses_columns
-    assert code.capability?(:code)
+    assert_not code.capability?(:code), "the capability's one reader was the tile's branch, which is the type's summary now"
+    assert_equal %w[block page lines code language language_label filename caption string], code.theme_methods
+    assert_equal CodeHighlight::ROLES.map { |role| "syn-#{role}" }, code.themed_tokens
+    assert_equal "code.css", code.stylesheet
+    assert_equal %w[admin--editor--code-limit#update], code.read_only_actions
+    # The values of the hand-written rows the sample replaced (the scaffold's
+    # /wide and the canary's Alpha, block types review I2): markup-looking ERB
+    # coloured as ERB, and a caption in each of the three languages.
+    assert_equal [ "show.html.erb", %(<span class="syn-embed">), "A template" ], code.sample.shows
+    assert_equal({ "language" => "erb", "filename" => "show.html.erb", "code" => "<p class=\"a\"><%= 1 %></p>\n<%# note %>" }, code.sample.settings)
+    assert_equal %w[en de es], code.sample.translations.keys
     assert_equal Blocks::CodeComponent, code.component
     assert code.fields.none? { |field| field.required? || field.translated? }
     assert_equal CodeHighlight::LANGUAGES, code.fields.first.options[:options]
@@ -37,31 +47,6 @@ class BuiltInTypesTest < ActiveSupport::TestCase
 
     error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| t.label "Band"; t.capability :container } }
     assert_equal "a container block type needs `columns`", error.message
-  ensure
-    BlockTypes.reset!
-    saved.each { |definition| BlockTypes.registry_put(definition) }
-  end
-
-  # The editor's tile asks a `:code` type's settings for three fields by name
-  # (`TileSummaryComponent#code_line`), without a guard.
-  test "a type with the code capability and without its three fields is refused, and the message names what is missing" do
-    saved = BlockTypes.all.dup
-
-    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.field :code, :code; t.capability :code } }
-    assert_equal "a code block type needs language and filename field(s)", error.message
-    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.capability :code } }
-    assert_equal "a code block type needs language and filename and code field(s)", error.message
-    assert_nil BlockTypes.find(:test_listing), "a refused type is not registered"
-
-    BlockTypes.register(:test_listing) do |t|
-      t.label "Listing"
-      t.field :language, :string
-      t.field :filename, :string
-      t.field :code, :code
-      t.capability :code
-      t.component Blocks::CodeComponent
-    end
-    assert BlockTypes.find(:test_listing).capability?(:code)
   ensure
     BlockTypes.reset!
     saved.each { |definition| BlockTypes.registry_put(definition) }

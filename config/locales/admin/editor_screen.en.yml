@@ -30,11 +30,16 @@ en:
           unavailable: "Unavailable type — %{type}"
           no_image: "No image chosen"
           empty_text: "Empty text"
-          empty_code: "Empty"
           any_type: "All posts"
           tag: "tag %{name}"
           needs_fixing: "Needs fixing"
           attention: "Needs attention"
+          # A block type's own words on its tile, by type (a slash in its
+          # name read as a dot): read by the tile for the parts its `summary`
+          # answers (block types spec, decision 8).
+          types:
+            code:
+              empty: "Empty"
         # A tile's "⋯" menu (sections spec §4.4): every move a drag makes,
         # by name. `actions` names the button, whose label is the glyph.
         block_tile:

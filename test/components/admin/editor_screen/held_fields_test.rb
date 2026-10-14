@@ -125,7 +125,7 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     "focusout->admin--rich-text--editor#containFocus",
     "click->admin--ui--menu#select",
     "click->admin--ui--menu#close",
-    "input->admin--editor--code-limit#update" # the Code type's, until it declares it (block types plan, Task 8)
+    "input->admin--editor--code-limit#update" # the Code type's declared action
   ].freeze
 
   def assert_survives(html)
@@ -232,9 +232,10 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
   test "the allow-list is the CMS's four and every type's declared read-only actions, each a method of a controller file" do
     assert_equal CMS, Admin::EditorScreen::HeldFields::CMS_ACTIONS
     declared = BlockTypes.all.flat_map(&:read_only_actions)
-    assert_equal (CMS + Admin::EditorScreen::HeldFields::WRITTEN_TYPE_ACTIONS + declared).uniq, Admin::EditorScreen::HeldFields.allowed_actions
+    assert_includes declared, "admin--editor--code-limit#update", "the Code type declares its counter"
+    assert_equal (CMS + declared).uniq, Admin::EditorScreen::HeldFields.allowed_actions
 
-    (declared + Admin::EditorScreen::HeldFields::WRITTEN_TYPE_ACTIONS).each do |action|
+    declared.each do |action|
       identifier, method = action.split("#")
       file = Rails.root.join("app/javascript/controllers", "#{identifier.split("--").join("/").tr("-", "_")}_controller.js")
       assert file.file?, "#{action} names no controller file (#{file.relative_path_from(Rails.root)})"

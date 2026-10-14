@@ -28,8 +28,9 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
   # not what the default theme draws. An image, a section of three columns
   # (tinted, full width) holding a text, an image and a blog list, a resume
   # list, a "now" list, an image block with no image, a struck text, a code
-  # block with a file name, a language and a caption and one with none; and
-  # a post of each type, whose own page is the detail component.
+  # block with nothing but its code (a bare head strip; the Code sample on
+  # "/samples" is the one with a file name, a language and a caption); and a
+  # post of each type, whose own page is the detail component.
   def wide_page
     wide = create_page(title: "Wide", translations: { "es" => { title: "Ancho", slug: "ancho" } })
     asset = create_media_asset
@@ -47,7 +48,6 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     add.("post_list", { settings: { "content_type" => "now_update" } })
     add.("image")
     add.("rich_text", {}, { "en" => { body: rich_doc("Kept and ~~struck~~ words, a [link](https://example.com)\n\n- one\n- two\n\n> quoted") } })
-    add.("code", { settings: { "language" => "erb", "filename" => "show.html.erb", "code" => "<p class=\"a\"><%= 1 %></p>\n<%# note %>" } }, { "en" => { caption: "A template" } })
     add.("code", { settings: { "code" => "plain words" } })
     publish_changes(wide)
 
@@ -126,7 +126,7 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       default = paths.index_with { |path| body_of(path) }
       # What the comparison is ON: each of these is on a compared page.
       { "/wide" => [ "content-block--image", "<s>struck</s>", "Engineer", "Updated ", "First post", "In a column", "<figcaption",
-                     "content-block--code", "show.html.erb", %(<span class="syn-embed">), "A template", %(data-code-copy-target="strip"), "plain words" ],
+                     %(data-code-copy-target="strip"), "plain words" ],
         "/wide/engineer" => [ "Engineer" ], "/wide/doing-now" => [ "Doing now" ], "/blog/first-post" => [ "First post" ],
         "/es/ancho" => [ "Ancho" ], "/samples" => sampled_types.flat_map { |definition| definition.sample.shows } }.each do |path, words|
         get path

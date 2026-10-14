@@ -215,4 +215,26 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     render_summary block("code"), invalid: true
     assert_equal "Empty · Needs fixing", page.find(line).text
   end
+
+  # Task 4 review M5: the line is the type's summary now, and each kind of
+  # part it answers is text on the tile, the file name's plain part as much
+  # as the code's monospace one.
+  test "a code block's file name that looks like markup is text on the type's summary path" do
+    assert BlockTypes.fetch(:code).summary, "the Code type answers its own line"
+    render_summary block("code", settings: { "filename" => "<i>x</i> & <script>y</script>.erb", "code" => "a" })
+
+    assert_equal "<i>x</i> & <script>y</script>.erb", page.find(line).text
+    assert_no_selector "#{line} i, #{line} script", visible: :all
+  end
+
+  # A language can be stored around the services (the select refuses it),
+  # and the summary asks `CodeHighlight.label`, which knows only the list.
+  test "a code block whose stored language is not on the list reads as plain text: its first line alone" do
+    code = block("code", settings: { "code" => "x = 1\ny = 2" })
+    code.update_columns(settings: code.settings.merge("language" => "xojo")) # version: none (a test)
+    render_summary code.reload
+    assert_equal "x = 1", page.find(line).text
+    assert_selector "#{line} > span.font-cs-mono", exact_text: "x = 1"
+    assert_no_selector attention
+  end
 end

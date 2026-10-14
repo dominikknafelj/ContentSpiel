@@ -78,8 +78,6 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
       assert Pages::Save.call(page, attributes: { hero_media_asset_id: @picture.id }).ok?
       text(page, "Alpha opening")
       block(page, "image", media_asset_id: @picture.id, translations: LOCALES.index_with { |locale| { alt: "Alt #{locale}", caption: "Caption #{locale}" } })
-      block(page, "code", settings: { "language" => "ruby", "filename" => "app/models/sample.rb", "code" => "sample = 1" },
-        translations: LOCALES.index_with { |locale| { caption: "Code caption #{locale}" } })
       section = block(page, "section", settings: { "layout" => "two" })
       text(page, "Left of the section", section_id: section.id, section_column: 1)
       block(page, "image", media_asset_id: @picture.id, section_id: section.id, section_column: 2)
@@ -212,16 +210,19 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     sitemap_before = sitemap
     assert_operator before.size, :>=, 20, "the site is too small to mean anything"
     assert_includes before.values.flatten.join, "Deletable words en"
-    # Task 8 takes Code's hand-written row off Alpha: this line then goes, and
-    # the samples page's check below is what says the site has a Code block
-    # on it (with a caption in another language only if Code's sample carries
-    # one, block types review I2).
-    assert_includes before.values.flatten.join, "Code caption de", "the site has a Code block on it"
     # The samples page draws every sample before anything is overwritten, so
     # an equal look afterwards is a comparison of something.
     samples_path = PublicSite::Urls.new.path_for(@samples, "en")
     sampled_types.each do |definition|
       definition.sample.shows.each { |text| assert_includes before.fetch(samples_path).join, text, "the samples page draws #{definition.name}'s #{text.inspect}" }
+    end
+    # And in the two other languages, a sample's own words in that language
+    # (the Code block's caption, written in all three; block types review
+    # I2), so the comparison of those pages is of something too.
+    (LOCALES - [ "en" ]).each do |locale|
+      words = sampled_types.flat_map { |definition| definition.sample.translations.fetch(locale, {}).values.grep(String) }
+      assert_includes words, "Code caption #{locale}", "the Code block's sample carries its caption in #{locale}"
+      words.each { |text| assert_includes before.fetch(PublicSite::Urls.new.path_for(@samples, locale)).join, text, "the #{locale} samples page draws #{text.inspect}" }
     end
     deleted_text = "Deletable words"
 

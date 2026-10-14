@@ -1,8 +1,9 @@
 module Admin
   module EditorScreen
     # One line of a block's content on its tile (sections spec §4.2): the
-    # start of a text, an image's file name with a small thumbnail, a code
-    # block's file name or its language and first line, a post list's filter.
+    # start of a text, an image's file name with a small thumbnail, a post
+    # list's filter, or the line a type with a `summary` answers itself (the
+    # Code block's file name, or its language and first line).
     # A block in a section's column is a tile until it is opened, so this
     # line is all that says which block it is -- and what marks the ones that
     # need attention, as a card would: an image block without an image, a
@@ -13,8 +14,8 @@ module Admin
     # the columns it uses (`uses_columns`) and its capabilities, so a type a
     # plugin registers gets a sensible tile without being known here. A type
     # that uses an image AND a body is summarised by its image, the first rule
-    # that matches. A type with neither, no code and no listing has no line
-    # at all; its tile is its label.
+    # that matches. A type with neither, no summary and no listing has no
+    # line at all; its tile is its label.
     #
     # A type that declares `summary` answers its own line as parts (block
     # types spec, decision 8) and that is drawn first; a type without one
@@ -97,7 +98,6 @@ module Admin
         elsif definition.summary then own_summary
         elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
         elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
-        elsif definition.capability?(:code) then code_line
         elsif definition.capability?(:lists_posts) then listing
         end
       end
@@ -151,26 +151,6 @@ module Admin
         tag = settings&.tag.presence
 
         [ type ? (::ContentTypes.find(type)&.label || type) : t(".any_type"), (t(".tag", name: tag) if tag) ].compact.join(" · ")
-      end
-
-      # What tells one code block from another at a glance (design answer
-      # C7): its file name if it has one; otherwise its language as an editor
-      # reads it, " · ", and the first line of its code, or that line alone
-      # for plain text. The line of code is in the monospace face, without
-      # the indentation it starts with. A block with no file name and no
-      # code says "Empty", whatever language is chosen for the code to come,
-      # and is not marked: an empty block is the state the picker leaves it
-      # in.
-      def code_line
-        settings = block.settings_object(locale: locale)
-        name = settings&.filename.presence
-        return name if name
-
-        first = settings&.code.to_s.lines.first.to_s.strip.truncate(LENGTH).presence
-        return [ [ t(".empty_code"), "text-meta" ] ] unless first
-
-        language = ::CodeHighlight.label(settings&.language)
-        [ ([ "#{language}#{SEPARATOR}", nil ] if language), [ first, "font-cs-mono" ] ].compact
       end
     end
   end

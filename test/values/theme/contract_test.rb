@@ -15,6 +15,7 @@ require "test_helper"
 # held by the ledger (test/values/theme/contract_ledger_test.rb).
 class Theme::ContractTest < ActiveSupport::TestCase
   include ComponentTestHelper
+  include GalleryAlbum
 
   TOKENS_CSS = Rails.root.join("app/assets/tailwind/themes/default/tokens.css")
   COLOUR = /#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/
@@ -197,11 +198,17 @@ class Theme::ContractTest < ActiveSupport::TestCase
 
   # A type with an owner's own stylesheet (one outside the default theme's
   # folder) defines its tokens there, in the same three blocks; every other
-  # type's are in tokens.css (block types spec, decision 7). Today no type
-  # has an owner, so the second half runs from Task 6 on (its gallery).
+  # type's are in tokens.css (block types spec, decision 7). No built-in has
+  # such a stylesheet: the first half runs with the outside type registered
+  # (test/support/gallery_album.rb), and says that it ran.
   test "every declared token is defined, a themed one for light and for dark, and no --th- name is undeclared" do
+    with_gallery_album { every_declared_token_is_defined }
+  end
+
+  def every_declared_token_is_defined
     default_folder = Rails.root.join("app/assets/tailwind/themes/default")
     owned = BlockTypes.all.select { |definition| (path = definition.stylesheet_path) && path.dirname != default_folder }
+    assert_equal [ "gallery/album" ], owned.map(&:name), "no type has a stylesheet of its own: the half below would check nothing"
     owned.each do |definition|
       sheet = definition.stylesheet_path.read
       light = sheet[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1].to_s.scan(/(--th-[\w-]+):/).flatten.sort

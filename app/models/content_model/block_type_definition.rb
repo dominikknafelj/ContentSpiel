@@ -239,12 +239,6 @@ module ContentModel
     # `columns` on every container block without a guard, so a container type
     # registered without it is refused here too.
     #
-    # And for `:code`: the editor's tile asks a block of such a type for its
-    # `filename`, its `code` and its `language` by name
-    # (`Admin::EditorScreen::TileSummaryComponent#code_line`), so a type that
-    # claims the capability without all three was a `NoMethodError` in the
-    # page editor the first time a block of it sat in a section.
-    #
     # An outside type's own refusals come first (`refuse_outside!`): one
     # that claims `:lists_posts` is told it may not, rather than which
     # fields the claim would need.
@@ -255,11 +249,6 @@ module ContentModel
       if capability?(:lists_posts)
         missing = %w[content_type tag] - fields.map(&:name)
         raise ArgumentError, "a lists_posts block type needs #{missing.join(' and ')} field(s)" if missing.any?
-      end
-
-      if capability?(:code)
-        missing = %w[language filename code] - fields.map(&:name)
-        raise ArgumentError, "a code block type needs #{missing.join(' and ')} field(s)" if missing.any?
       end
     end
 

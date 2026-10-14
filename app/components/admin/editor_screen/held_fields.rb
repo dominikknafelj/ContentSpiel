@@ -55,13 +55,9 @@ module Admin
         admin--ui--menu#select
         admin--ui--menu#close
       ].freeze
-      # THE TRANSITION (block types plan, Task 8 deletes it): the Code type's
-      # counter, until the type declares it.
-      WRITTEN_TYPE_ACTIONS = %w[admin--editor--code-limit#update].freeze
-
       # Every action that survives in a held form: the CMS's, and each
       # registered block type's declared ones.
-      def self.allowed_actions = (CMS_ACTIONS + WRITTEN_TYPE_ACTIONS + ::BlockTypes.all.flat_map(&:read_only_actions)).uniq.freeze
+      def self.allowed_actions = (CMS_ACTIONS + ::BlockTypes.all.flat_map(&:read_only_actions)).uniq.freeze
 
       # The rules as data, for the browser's counterpart (`editing/freeze`),
       # which turns ONE form read-only in place: the region renders this into
