@@ -62,11 +62,14 @@ class BuiltInTypesTest < ActiveSupport::TestCase
   # `ContentBlock#column_count` calls the type's `columns` without a guard, so
   # a container type that doesn't say how many it has is refused when it is
   # registered, not when a page renders.
-  test "a container type registered without columns is refused" do
+  test "a container type registered without columns, and a listing type without its two fields, are refused with the type's name first" do
     saved = BlockTypes.all.dup
 
     error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| TestTypes.declare(t); t.label "Band"; t.capability :container } }
-    assert_equal "a container block type needs `columns`", error.message
+    assert_equal "test_band: a container block type needs `columns`", error.message
+
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_list) { |t| TestTypes.declare(t); t.label "List"; t.capability :lists_posts } }
+    assert_equal "test_list: a lists_posts block type needs content_type and tag field(s)", error.message
   ensure
     BlockTypes.reset!
     saved.each { |definition| BlockTypes.registry_put(definition) }

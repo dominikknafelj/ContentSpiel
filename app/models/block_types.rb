@@ -24,20 +24,20 @@ module BlockTypes
   end
 
   # One component, one line of the theme contract (`Theme::Contract.components`
-  # is keyed by the component's path): an outside type (`gallery/album`)
-  # that handed out a built-in's component would replace the built-in's
-  # line, a promise to every theme, with its gem's. Refused, in either
-  # order of registration. Two built-ins, or two outside types, are not
-  # held to this here.
+  # is keyed by the component's path, and a second line for one path would
+  # replace the first in silence): a type that hands out a component another
+  # registered type hands out already is refused, whichever registered
+  # first. An outside type (`gallery/album`) would otherwise replace a
+  # built-in's line, a promise to every theme, with its gem's, and two gems
+  # one another's.
   def self.admit!(definition)
     return if definition.component.nil?
 
-    other = all.find { |each| each.component == definition.component && each.owner.nil? != definition.owner.nil? }
+    other = all.find { |each| each.component == definition.component }
     return if other.nil?
 
-    outside, built_in = definition.owner ? [ definition, other ] : [ other, definition ]
-    raise ArgumentError, "the block type #{outside.name.inspect} hands out #{definition.component.name}, the component of the built-in " \
-                         "type #{built_in.name.inspect}: an outside type hands out a component of its own"
+    raise ArgumentError, "#{definition.name}: the block type hands out #{definition.component.name}, the component of the type " \
+                         "#{other.name.inspect}: a block type hands out a component of its own (one component, one line of the theme contract)"
   end
   private_class_method :admit!
 

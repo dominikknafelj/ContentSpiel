@@ -44,16 +44,16 @@ class ContentModel::RegistryTest < ActiveSupport::TestCase
   end
 
   # A component's line in the theme contract is keyed by the component
-  # (`Theme::Contract.components`): an outside type that handed out a
-  # built-in's component would replace that built-in's line, a promise to
-  # every theme, with its gem's. Refused at registration, either order.
-  test "an outside type that hands out a built-in's component is refused at registration, and the built-in keeps it" do
+  # (`Theme::Contract.components`): a type that handed out another's
+  # component would replace that type's line, a promise to every theme, in
+  # silence. Refused at registration, either order, built-in or outside.
+  test "a type that hands out another type's component is refused at registration, and the first keeps it" do
     BlockTypes.register(:image) { |t| TestTypes.declare(t); t.label "Image"; t.component Blocks::ImageComponent }
 
     error = assert_raises(ArgumentError) do
       BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.label "Album"; t.component Blocks::ImageComponent }
     end
-    assert_includes error.message, %("gallery/album")
+    assert_includes error.message, "gallery/album: "
     assert_includes error.message, "Blocks::ImageComponent"
     assert_includes error.message, %("image")
     assert_equal %w[image], BlockTypes.names
@@ -63,9 +63,12 @@ class ContentModel::RegistryTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { BlockTypes.register(:image) { |t| TestTypes.declare(t); t.label "Image"; t.component Blocks::ImageComponent } }
     assert_equal %w[gallery/album], BlockTypes.names
 
+    # Final review M6: two outside types, two gems, one component.
     BlockTypes.register("gallery/quote") { |t| TestTypes.declare(t); t.label "Quote"; t.component TestQuoteComponent }
-    BlockTypes.register("other/quote") { |t| TestTypes.declare(t); t.label "Quote"; t.component TestQuoteComponent }
-    assert_equal %w[gallery/album gallery/quote other/quote], BlockTypes.names, "a component no built-in hands out is not refused"
+    error = assert_raises(ArgumentError) { BlockTypes.register("other/quote") { |t| TestTypes.declare(t); t.label "Quote"; t.component TestQuoteComponent } }
+    assert_includes error.message, "other/quote: "
+    assert_includes error.message, %("gallery/quote")
+    assert_equal %w[gallery/album gallery/quote], BlockTypes.names
   end
 
   test "unknown field types and nested field groups are rejected at registration" do

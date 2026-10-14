@@ -133,10 +133,7 @@ module Admin
           raise ArgumentError, "#{block.block_type}'s summary answered a part of kind #{kind.inspect}: a part is one of #{LOOKS.keys.join(", ")}" unless LOOKS.key?(kind)
 
           look = LOOKS.fetch(kind)
-          # A plain String, whatever the type handed: a part is text, and the
-          # template escapes it. (Joining a run drops `html_safe` as well, but
-          # the rule is not left to what Array#join happens to do.)
-          [ String.new(%i[word hint].include?(kind) ? word(value, **values) : value.to_s), look ]
+          [ %i[word hint].include?(kind) ? word(value, **values) : value.to_s, look ]
         end.slice_when { |a, b| a.last != b.last }.map { |run| [ run.map(&:first).join, run.first.last ] }
       end
 

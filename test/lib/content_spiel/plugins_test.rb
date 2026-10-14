@@ -43,6 +43,29 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     assert_equal BUILT_INS, BlockTypes.names, "a removed hook registers nothing at the next prepare"
   end
 
+  # Final review M8: the theme's template of an outside type is the one a
+  # visitor is drawn, as for a built-in (`Theme#component_for`).
+  test "a theme that replaces an outside type's template draws it on the public page" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    with_gallery_album do
+      page = create_page(title: "Album page")
+      sample_block(page, "gallery/album")
+      publish_changes(page)
+
+      with_theme_copy do |dir|
+        dir.join("components/gallery").mkpath
+        dir.join("components/gallery/album_component.html.erb").write(%(<div class="theme-album"><%= title %></div>\n))
+        Theme.with(Theme.load(ThemeFolder.new(dir))) { get PublicSite::Urls.new.path_for(page.reload, "en") }
+      end
+      assert_response :success
+      assert_select "div.theme-album", text: "Holiday pictures"
+      assert_select "figure.content-block--gallery-album", count: 0
+
+      get PublicSite::Urls.new.path_for(page, "en")
+      assert_select "figure.content-block--gallery-album", text: "Holiday pictures"
+    end
+  end
+
   test "a bare name, a second owner in one call and a duplicate are refused, and the message names the place of the call" do
     line = __LINE__ + 1
     bare = ContentSpiel::Plugins.block_types { |types| types.register("album") { |t| TestTypes.declare(t) } }
@@ -109,6 +132,39 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     end
     assert_nil Theme.current.refusal
     assert_equal BUILT_INS, BlockTypes.names
+  end
+
+  # Final review M7: an owner's prefix is what keeps two gems' tokens and
+  # names apart, so an owner is one hook's.
+  test "an owner a hook has registered under is refused to another hook, naming both places" do
+    first = __LINE__ + 1
+    one = ContentSpiel::Plugins.block_types { |types| types.register("gallery/album") { |t| TestTypes.declare(t) } }
+    second = __LINE__ + 1
+    two = ContentSpiel::Plugins.block_types { |types| types.register("gallery/strip") { |t| TestTypes.declare(t) } }
+    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_block_types(BlockTypes) }
+    assert_includes error.message, "gallery/strip"
+    assert_includes error.message, "#{__FILE__}:#{first}"
+    assert_includes error.message, "#{__FILE__}:#{second}"
+  ensure
+    ContentSpiel::Plugins.remove(one) if one
+    ContentSpiel::Plugins.remove(two) if two
+    Rails.application.reloader.prepare!
+  end
+
+  # Final review I1: the held form's allow-list is one list for every form
+  # of the site, and an outside type brings no editor script until step 2,
+  # so an action it named would be one of the CMS's, alive in every held form.
+  test "an outside type may not declare read_only_actions" do
+    saved = BlockTypes.all.dup
+    error = assert_raises(ArgumentError) do
+      BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.read_only_actions "admin--editor--blocks#move" }
+    end
+    assert_includes error.message, "gallery/album: "
+    assert_includes error.message, "read_only_actions"
+    assert_includes error.message, "admin--editor--blocks#move"
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
   test "an outside type may not claim :container or :lists_posts" do

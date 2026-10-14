@@ -21,11 +21,7 @@ module ContentModel
     # the editor's tile, `read_only_actions` by the held form's allow-list,
     # `sample` by the shared tests. A declaration nothing reads would be
     # documentation in code; none of these is.
-    #
-    # The columns a block type may name with `uses`: the block card draws and
-    # the save services write these four and no other (`BlockCardComponent`'s
-    # template, `Admin::ContentBlocksController::TRANSLATED_COLUMNS`), so a
-    # fifth name was silently drawn as nothing (decision 12).
+
     # The capabilities something in the CMS asks for (`capability?`): a type
     # claiming another is refused at registration, since nothing would read it.
     CAPABILITIES = %i[container lists_posts].freeze
@@ -36,6 +32,10 @@ module ContentModel
     # `BlockTypes::Code`'s summary both read it.
     SUMMARY_LENGTH = 80
 
+    # The columns a block type may name with `uses`: the block card draws and
+    # the save services write these four and no other (`BlockCardComponent`'s
+    # template, `Admin::ContentBlocksController::TRANSLATED_COLUMNS`), so a
+    # fifth name was silently drawn as nothing (decision 12).
     COLUMNS = %w[body caption alt image].freeze
 
     METHOD_NAME = /\A[a-z_][a-z0-9_]*\??\z/
@@ -205,8 +205,9 @@ module ContentModel
 
     # The component's own template, found beside its source file, not
     # through ViewComponent's `sidecar_files` (`Theme#component_for` is the
-    # one place that names that, `CLAUDE.md`). `theme:new` copies it and the
-    # build scans its folder when it is outside app/components/blocks.
+    # one place that names that, `CLAUDE.md`). `theme:new` copies it; the
+    # build scans the component's folder (`component_folder`), template or
+    # not, when it is outside app/components/blocks.
     def component_template
       return nil unless component&.name
 
@@ -256,11 +257,11 @@ module ContentModel
       refuse_outside! if owner
       unknown = capabilities - CAPABILITIES
       refuse "no reader of the CMS asks for the capability #{unknown.map(&:inspect).to_sentence}; a block type claims #{CAPABILITIES.map(&:inspect).to_sentence} and no other" if unknown.any?
-      raise ArgumentError, "a container block type needs `columns`" if capability?(:container) && columns.nil?
+      refuse "a container block type needs `columns`" if capability?(:container) && columns.nil?
 
       if capability?(:lists_posts)
         missing = %w[content_type tag] - fields.map(&:name)
-        raise ArgumentError, "a lists_posts block type needs #{missing.join(' and ')} field(s)" if missing.any?
+        refuse "a lists_posts block type needs #{missing.join(' and ')} field(s)" if missing.any?
       end
 
       # Required of every block type (block types spec, decision 2): a theme
@@ -279,12 +280,21 @@ module ContentModel
     # bound to `BlockTypes::PostList`'s criteria, which decide posts'
     # addresses; tokens named after its owner, so two gems cannot claim one
     # name and none a built-in's; a stylesheet of its own, given as an
-    # absolute path, whose colours are the theme's base tokens. The
+    # absolute path, whose colours are the theme's base tokens; and no
+    # `read_only_actions`: the held form's allow-list is one list for every
+    # form of the site (`HeldFields.allowed_actions`), an outside type has no
+    # editor script of its own until step 2, so any action it named would be
+    # one of the CMS's, kept alive in every held form. Step 2 opens it, with
+    # the owner's prefix on the identifier. The
     # stylesheet is read here, once, at registration: one that is not there
     # stops the boot as this type's, not as a bare system error.
     def refuse_outside!
       %i[container lists_posts].each do |capability|
         refuse "a block type from outside may not claim :#{capability} (it has no seam for one yet)" if capability?(capability)
+      end
+      if read_only_actions.any?
+        refuse "a block type from outside declares no read_only_actions yet: it brings no editor script of its own, and an " \
+               "action it named would be one of the CMS's, kept in every held form of the site: #{read_only_actions.inspect}"
       end
       # A token name has no underscore (`TOKEN_NAME`), so `photo_gallery`'s
       # tokens start with `photo-gallery-`.

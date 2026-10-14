@@ -22,12 +22,15 @@ module ContentSpiel
     Hook = Data.define(:block, :location)
 
     # What a hook's block is handed: `register` with the registry's own
-    # signature, refusing a bare name (the built-ins') and a second owner in
-    # one call.
+    # signature, refusing a bare name (the built-ins'), a second owner in
+    # one call, and an owner another hook has registered under in this
+    # replay (`owners`: owner => the place of the hook that took it), since
+    # an owner's prefix is what keeps two gems' tokens apart.
     class Registrar
-      def initialize(registry, location)
+      def initialize(registry, location, owners = {})
         @registry = registry
         @location = location
+        @owners = owners
         @owner = nil
       end
 
@@ -38,6 +41,12 @@ module ContentSpiel
 
         @owner ||= owner
         raise ArgumentError, "#{name.inspect}: one call of the hook registers the types of one owner, and #{@owner.inspect} came first" unless owner == @owner
+
+        taken = @owners[owner]
+        if taken && taken != @location
+          raise ArgumentError, "#{name.inspect}: the owner #{owner.inspect} is another hook's, called at #{taken}; one owner is one gem's"
+        end
+        @owners[owner] = @location
 
         @registry.register(name, &definition)
       end
@@ -61,8 +70,9 @@ module ContentSpiel
       # raised again, as the same class, with the place of the hook's call in
       # the message, so a site's log names the gem that stopped the boot.
       def register_block_types(registry)
+        owners = {}
         @hooks.each do |hook|
-          hook.block.call(Registrar.new(registry, hook.location))
+          hook.block.call(Registrar.new(registry, hook.location, owners))
         rescue StandardError => error
           raise error.exception("#{error.message} (#{REPLAYED} #{hook.location})")
         end
