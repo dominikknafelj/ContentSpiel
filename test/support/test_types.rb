@@ -66,6 +66,10 @@ module TestTypes
       # #speakers` already exercises it for a post's typed `fields`.
       t.field :speakers, :groups, of: "test/speaker"
       t.component TestQuoteComponent
+      t.theme_methods :block, :page, :settings
+      t.sample settings: { "cite" => "https://example.com/source" },
+               translations: { "en" => { text: "A line worth quoting" } },
+               shows: [ "A line worth quoting" ]
     end
 
     FieldGroups.register "test/speaker" do |c|

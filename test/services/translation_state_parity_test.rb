@@ -4,6 +4,8 @@ require "test_helper"
 # leave translation_states agreeing with it. One scenario per service; after
 # each, the stored rows are compared with a fresh computation.
 class TranslationStateParityTest < ActiveSupport::TestCase
+  include TestTypes
+
   setup { with_locales(%w[en de es], default: "en") }
 
   def assert_parity(*records)
@@ -267,6 +269,40 @@ class TranslationStateParityTest < ActiveSupport::TestCase
       assert_parity page
       assert_equal "outdated", stored_state(page, "de")
       assert_equal "complete", stored_state(page, "es")
+    end
+  end
+
+  # Block types spec, "Tests": every type whose sample has translations is
+  # tracked like any block, the stored state equal to a recomputation, when
+  # the sample's values are written in a second language and then changed in
+  # the first.
+  test "every type whose sample has translations keeps the stored state equal to a recomputation" do
+    as_owner do
+      with_test_types do
+        typed = sampled_types.select { |definition| definition.sample.translations.any? }
+        typed.each do |definition|
+          page = create_page(title: "Parity #{definition.name}", translations: { "de" => { title: "Paritat #{definition.name}" }, "es" => { title: "Paridad #{definition.name}" } })
+          block = sample_block(page, definition.name)
+          assert_parity page
+
+          english = definition.sample.translations.fetch("en").transform_keys(&:to_s)
+          own = english.slice(*definition.fields.map(&:name))
+          german = english.except(*own.keys).transform_keys(&:to_sym).merge(own.any? ? { settings: own } : {})
+          assert ContentBlocks::Save.call(block, translations: { "de" => german }).ok?
+          assert_parity page
+
+          # Then changed in the first language, as the default-language card
+          # sends it: a translated schema field with the settings, a column
+          # in the language's own translations.
+          changed = ->(value) { "#{value} changed" }
+          english_columns = english.except(*own.keys).transform_keys(&:to_sym).transform_values(&changed)
+          attributes = own.any? ? { settings: definition.sample.settings.merge(own.transform_values(&changed)) } : {}
+          assert ContentBlocks::Save.call(block, attributes: attributes, translations: english_columns.any? ? { "en" => english_columns } : {}).ok?
+          assert_parity page
+          assert_equal "outdated", stored_state(page, "de"), "#{definition.name}: a change in the first language makes the second outdated"
+        end
+        assert_every_type_built(typed.map(&:name))
+      end
     end
   end
 end

@@ -18,6 +18,12 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     end
     create_post(title: "First post")
     wide_page
+    # One block of every type that declares a sample, at the top level and in
+    # a column of each container (test/support/block_samples.rb): a type's
+    # template is compared byte for byte the day the type is registered.
+    @samples = create_page(title: "Samples")
+    sample_every_type(@samples)
+    publish_changes(@samples)
   end
 
   # A page that every component of the contract draws: the scaffold copies
@@ -111,14 +117,14 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a site under the folder it writes is drawn byte for byte as under the default theme: every block type, a section, the three lists, a post of each type, a 404 and two more languages" do
-    paths = [ "/", "/blog", "/blog/first-post", "/wide", "/wide/engineer", "/wide/doing-now", "/de/", "/es/ancho", "/no-such-page" ]
+  test "a site under the folder it writes is drawn byte for byte as under the default theme: every block type, a section, the three lists, a post of each type, a 404, two more languages and a sample of every type" do
+    paths = [ "/", "/blog", "/blog/first-post", "/wide", "/wide/engineer", "/wide/doing-now", "/de/", "/es/ancho", "/no-such-page", "/samples" ]
     default = paths.index_with { |path| body_of(path) }
     # What the comparison is ON: each of these is on a compared page.
     { "/wide" => [ "content-block--image", "<s>struck</s>", "Engineer", "Updated ", "First post", "In a column", "<figcaption",
                    "content-block--code", "show.html.erb", %(<span class="syn-embed">), "A template", %(data-code-copy-target="strip"), "plain words" ],
       "/wide/engineer" => [ "Engineer" ], "/wide/doing-now" => [ "Doing now" ], "/blog/first-post" => [ "First post" ],
-      "/es/ancho" => [ "Ancho" ] }.each do |path, words|
+      "/es/ancho" => [ "Ancho" ], "/samples" => sampled_types.flat_map { |definition| definition.sample.shows } }.each do |path, words|
       get path
       assert_response :success, path
       words.each { |word| assert_includes default.fetch(path), word, "#{path} does not draw #{word}: the comparison would be on less than it says" }
@@ -135,6 +141,8 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
         paths.each { |path| assert_equal default.fetch(path), body_of(path), "#{path} differs under the copied theme" }
       end
     end
+
+    assert_every_type_built
   end
 
   # An integrator makes the repository first: `mkdir theme && cd theme &&

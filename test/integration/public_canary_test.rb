@@ -90,6 +90,11 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     @blog = live_page("Blog") { |page| block(page, "post_list", settings: { "content_type" => "blog" }) }
     @now = live_page("Now") { |page| block(page, "post_list", settings: { "content_type" => "now_update" }) }
     @resume = live_page("Resume") { |page| block(page, "post_list", settings: { "content_type" => "resume_entry" }) }
+    # One block of every type that declares a sample, at the top level and
+    # in a column of each container (test/support/block_samples.rb): a type
+    # is in the canary the day it is registered. `overwrite_rows!` overwrites
+    # every live block's rows, so nothing more is written for it.
+    @samples = live_page("Samples") { |page| sample_every_type(page) }
     @posts = [
       live_post("Ruby post", "blog", tags: %w[ruby rails], body: rich_doc(%(::image{asset="#{@picture.id}"}\n\nRuby words))),
       live_post("Plain post", "blog", tags: %w[misc]),
@@ -241,6 +246,8 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     @posts.each do |post|
       assert_includes Publishing.current(post.reload).snapshot.to_json, CANARY, "#{post.title} was not published"
     end
+
+    assert_every_type_built
   end
 
   # Theming spec §7: a theme's templates may ask for a branch of the page
