@@ -6,6 +6,14 @@ module Admin
     # page's own children rendered the same way -- recursively, so an N-deep
     # branch is just N nested renders of this one component.
     #
+    # The column is narrow and a title is what a row is for (Claude Design,
+    # 2026-10-13, T2): a level indents 16px, the drag handle stands in that
+    # indent to the row's left and shows on hover or focus, and so does the
+    # child count (the tree does not collapse, so a count at rest would say
+    # what is in view anyway). A title that still does not fit is cut with an
+    # ellipsis and whole in the link's `title`; a row never wraps (rows of
+    # uneven height make drop targets jump).
+    #
     # `children_by_parent` is the *whole* tree's pages grouped by `parent_id`
     # (`Page.all.to_a.group_by(&:parent_id)`), computed once by
     # `Admin::PagesScreen::TreeComponent` and threaded through every recursive render --

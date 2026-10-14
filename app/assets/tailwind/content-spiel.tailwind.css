@@ -80,21 +80,87 @@
    wraps onto two or three lines is taller than any fixed offset), 4rem until
    it has been measured. */
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
-.admin-shell--tree { grid-template-columns: 15rem 17rem minmax(0, 1fr); }
+/* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT (Claude Design,
+   2026-10-13, T1). `--admin-tree-width` on <html> is the CHOSEN width, in
+   pixels: the layout's head script puts it there from this browser's memory
+   before the first paint (`admin/shared/_tree_head`) and the divider's script
+   writes it on every drag and key (`admin--shell--tree-width`). Without it --
+   nobody chose, the storage is refused, no script -- the column is the 17rem
+   it always was.
+
+   `--admin-tree-column` is the width the grid SHOWS: the choice held between
+   13.75rem and 30rem, and under whatever leaves the editor column 40rem (the
+   narrowest at which block cards and section lanes still work), so a width
+   chosen on a wide window does not squeeze the editor on a narrow one; the
+   choice itself is kept. `--admin-tree-room` is that limit: the window less
+   the editor's 40rem and less the modules sidebar where it is a column (from
+   1280px).
+
+   REM, ALL OF IT. The design's figures are 220, 272, 480, 640 and 240 pixels
+   at a root font size of 16px, and the shell was always laid out in rem (the
+   sidebar's 15rem, the tree's 17rem), so the new ones are rem too and the
+   whole of it grows with a browser set to a larger font. The two scripts
+   hold the same figures as `Admin::Shell::TreeDividerComponent`'s constants
+   (repeated here because `clamp()` cannot be handed one) and multiply each
+   by the root's font size over 16; `100vw` is what a media query measures
+   and what their `innerWidth` is. So the scripts and this agree at any font
+   size, not at 16px only. The notes column alone is pixels
+   (`--admin-notes-width`), here and there.
+
+   Where the tree is a DRAWER the limit is not asked: below 1024px it keeps
+   its fixed 17rem, and folded beside the notes column (further down) it is
+   the chosen width, laid over the content. */
+:root {
+  --admin-tree-room: calc(100vw - 15rem - 40rem);
+  --admin-tree-column: clamp(13.75rem, var(--admin-tree-width, 17rem), max(13.75rem, min(30rem, var(--admin-tree-room))));
+}
+@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - 40rem); } }
+.admin-shell--tree { grid-template-columns: 15rem var(--admin-tree-column) minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a
    long page (round 1 departure, dark and light). Only the nav inside is
    sticky: viewport-high, scrolling its own module list. */
 .admin-shell__sidebar { align-self: stretch; background: var(--cs-chrome); }
 .admin-sidebar { position: sticky; top: 0; height: 100vh; }
-.admin-shell__tree { border-right: 1px solid var(--cs-line); background: var(--cs-chrome); padding: 1rem; }
+/* `position: relative` for the divider on its right edge; the drawer rules
+   below make the column `fixed`, which holds the (hidden) divider as well. */
+.admin-shell__tree { position: relative; border-right: 1px solid var(--cs-line); background: var(--cs-chrome); padding: 1rem; }
+/* The divider (`Admin::Shell::TreeDividerComponent`, T1). AT REST it is
+   nothing but the column's own 1px line: this element is the 8px HIT AREA,
+   centred on that line (the line is the column's last pixel, so the area
+   starts 4.5px inside the column and ends 3.5px inside the editor) and as
+   tall as the column, which is as tall as the page. Its `::after` is the 2px
+   line the three states draw over the 1px one, centred on it too:
+   - `data-hover`, which the script sets 150ms after the pointer arrived (a
+     pointer on its way across makes nothing flicker): `--cs-line-strong`, and
+     only then the `col-resize` cursor;
+   - `data-dragging`: `--cs-accent`, and `data-tree-resizing` on <html> keeps
+     the cursor and stops text being selected wherever the pointer goes;
+   - keyboard focus: `--cs-accent` along the full height, and no outline box
+     (a ring around an 8px strip as tall as the page says less than the line).
+   Nothing animates, so there is nothing to turn off for reduced motion.
+   `z-index: 15`: over the editor's sticky header (10), whose left edge the
+   area's last pixels lie on, and under the top bar (20). `touch-action:
+   none`: a finger on it drags the divider, not the page.
+
+   `__tip` is where the shared tooltip hangs: a sticky box of no height near
+   the top of the window, because "under the host" would be below the last
+   row of a page-high divider. */
+.admin-tree-divider { position: absolute; z-index: 15; top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
+.admin-tree-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
+.admin-tree-divider[data-hover] { cursor: col-resize; }
+.admin-tree-divider[data-hover]::after { background: var(--cs-line-strong); }
+.admin-tree-divider:focus-visible::after,
+.admin-tree-divider[data-dragging]::after { background: var(--cs-accent); }
+.admin-tree-divider__tip { position: sticky; top: calc(var(--admin-top-offset) + 3rem); display: block; height: 0; }
+:root[data-tree-resizing], :root[data-tree-resizing] * { cursor: col-resize; user-select: none; }
 .admin-top-bar { display: none; }
 .admin-shell__scrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
 
 @media (max-width: 1279px) {
   .admin-top-bar { display: flex; }
   .admin-shell { grid-template-columns: minmax(0, 1fr); }
-  .admin-shell--tree { grid-template-columns: 17rem minmax(0, 1fr); }
+  .admin-shell--tree { grid-template-columns: var(--admin-tree-column) minmax(0, 1fr); }
   .admin-shell__sidebar { position: fixed; z-index: 40; top: 0; left: 0; height: 100vh; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
   .admin-shell__sidebar[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
 }
@@ -102,6 +168,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
   .admin-shell__tree { position: fixed; z-index: 40; top: 3rem; bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
   .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+  /* A drawer has a fixed width and no divider. */
+  .admin-tree-divider { display: none; }
 }
 @media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
 /* The scrim belongs to a drawer, and `admin--shell--drawer` only un-hides it when
@@ -143,16 +211,44 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    `admin--notes--drawer` owns it from then on (`setOpen`); a screen without a drawer
    never matches.
 
-   THE PAGE TREE FOLDS while the column is there, at every width from 1024px,
-   the way it does below 1024px: the same element, the same `data-open`,
-   `admin--shell--drawer` and the scrim -- these rules only add a second condition
-   to the ones above. What opens it is a "Pages ▾" button: from 1024px to
-   1279px the top bar's own, and from 1280px, where there is no top bar, the
-   one at the start of the page editor's breadcrumb row
+   THE PAGE TREE STAYS BESIDE THE EDITOR WHILE IT FITS, AND FOLDS WHEN IT
+   DOES NOT (Claude Design, 2026-10-13, T3; until then it folded at every
+   width). It fits while the editor column would still be 40rem (640px) wide:
+   the modules sidebar (15rem, where it is a column) + the tree at its CHOSEN
+   width + this 400px column + 40rem are no more than the window. At the
+   default tree width and a 16px font that is a window of 1552px: the tree
+   stays at 1600px and folds at 1440px. The sidebar is a column from 1280px
+   only, so the sum steps there: a tree of 220 to 239px stays beside the
+   notes at 1260 to 1279px (the sidebar is a drawer, the editor really has
+   its 640px) and folds from 1280px until the window is 1500px wide. That is
+   the sidebar's breakpoint showing, the same step the editor's width takes
+   there without the notes, and not a fault of the rule, which is the
+   editor's true width. A media query cannot read the chosen width, so the
+   sum is done in script and said on <html> as `data-tree-fits`: by the
+   layout's head script before the first paint (`admin/shared/_tree_head`)
+   and from then on by `admin--shell--tree-width`, on a resize and on every
+   change of the width. The attribute is there or not whether or not the
+   notes are open; only the rules below ask it, and they ask for its ABSENCE,
+   so without the script the tree folds as it always did.
+
+   Studio never narrows the tree to make it fit. It folds at the width it
+   has, and is a column of that same width again when the notes close; while
+   it is a column beside the notes its divider stops at the width that still
+   fits (the script's `ceiling`), so a drag cannot fold it. A reset to the
+   default can: where the default does not fit, it folds like any width.
+
+   FOLDED, it is what it is below 1024px: the same element, the same
+   `data-open`, `admin--shell--drawer` and the scrim -- these rules only add a
+   condition to the ones above -- but at the chosen width and not a fixed
+   one, and with no divider. What opens it is a "Pages ▾" button: from 1024px
+   to 1279px the top bar's own, and from 1280px, where there is no top bar,
+   the one at the start of the page editor's breadcrumb row
    (`.admin-editor-header__tree`, `Admin::EditorScreen::HeaderComponent`,
    shown only then). From 1280px the drawer stands BESIDE the modules
    sidebar, where the tree's column was (`left: 15rem`), and fades in rather
-   than slides: a slide would cross the sidebar. */
+   than slides: a slide would cross the sidebar. Where the tree fits, none of
+   this applies: no button is shown, and the tree is the column it is without
+   the notes. */
 :root { --admin-notes-width: 400px; }
 .admin-editor-header__tree { display: none; }
 @media (min-width: 1024px) {
@@ -160,21 +256,22 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header { margin-right: calc(-1.5rem - var(--admin-notes-width)); }
   .admin-notes-drawer { top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); }
 
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { position: fixed; z-index: 40; top: var(--admin-top-offset); bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { position: fixed; z-index: 40; top: var(--admin-top-offset); bottom: 0; left: 0; width: var(--admin-tree-width, 17rem); overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-tree-divider { display: none; }
   /* The scrim of the folded tree: the two rules above hide it from 1024px
      unless the modules sidebar is the open drawer, and at all from 1280px. */
-  :root[data-notes-open] body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }
 }
 @media (min-width: 1280px) {
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: 15rem minmax(0, 1fr); }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { left: 15rem; transform: none; opacity: 0; transition: opacity 0.15s var(--cs-ease), visibility 0s linear 0.15s; }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree[data-open] { opacity: 1; transition: opacity 0.15s var(--cs-ease), visibility 0s; }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header__tree { display: inline-block; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: 15rem minmax(0, 1fr); }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { left: 15rem; transform: none; opacity: 0; transition: opacity 0.15s var(--cs-ease), visibility 0s linear 0.15s; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree[data-open] { opacity: 1; transition: opacity 0.15s var(--cs-ease), visibility 0s; }
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-editor-header__tree { display: inline-block; }
 }
-@media (prefers-reduced-motion: reduce) { :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
+@media (prefers-reduced-motion: reduce) { :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
 
 /* Admin::Ui::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::Ui::DialogComponent::WIDTHS). */

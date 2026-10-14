@@ -211,6 +211,47 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "li[data-page-id='#{parent.id}'] > div [data-child-count]", text: "1"
   end
 
+  # Claude Design, 2026-10-13, T2: more of a title in a narrow column.
+  test "a level indents 16px: 8px to the guide line, the line, 7px to the row" do
+    parent = create_page(title: "Parent")
+    create_page(title: "Child", parent: parent)
+    render_tree
+
+    lists = page.all("ul[data-parent-id]")
+    assert_operator lists.size, :>=, 2
+    lists.each do |list|
+      classes = list[:class].split
+      assert_equal %w[border-l border-line ml-2 pl-[7px]], classes.grep(/\A(ml|pl|border)-/).sort, "a children list indents 8 + 1 + 7 and keeps its guide line"
+    end
+  end
+
+  test "the drag handle stands in the row's gutter, 16px wide to its left, and is shown by opacity on hover and focus" do
+    alpha = create_page(title: "Alpha")
+    render_tree
+
+    row = page.find("li[data-page-id='#{alpha.id}'] > div")
+    assert_includes row[:class].split, "relative", "the handle is placed against its row"
+    handle = row.find("button.admin-tree-node__handle[aria-label='Move Alpha'][aria-describedby=tree-drag-help]")
+    classes = handle[:class].split
+    %w[absolute inset-y-0 -left-4 w-4 opacity-0 group-hover/node:opacity-100 focus:opacity-100 any-pointer-coarse:opacity-100].each do |token|
+      assert_includes classes, token
+    end
+    # Out of the row's flow: it takes none of the title's room.
+    assert_not_includes classes, "shrink-0"
+    # The homepage has no handle and no gutter to put one in.
+    assert_no_selector "li[data-page-id='#{root_page.id}'] > div .admin-tree-node__handle"
+  end
+
+  test "the child count takes no room at rest: it is read by a screen reader and shown on hover and focus of its row" do
+    parent = create_page(title: "Parent")
+    create_page(title: "Child", parent: parent)
+    render_tree
+
+    count = page.find("li[data-page-id='#{parent.id}'] > div [data-child-count][role=img][aria-label='1 subpage']")
+    classes = count[:class].split
+    %w[sr-only group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only].each { |token| assert_includes classes, token }
+  end
+
   test "the full title is available as a tooltip when the row truncates" do
     leaf = create_page(title: "A rather long page title that the narrow tree column will cut off")
     render_tree

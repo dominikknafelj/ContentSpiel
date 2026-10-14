@@ -1,0 +1,16 @@
+# CS Studio's shell, the components in `app/components/admin/shell/`
+# (docs/reference/i18n.md). A component's keys are
+# `admin.components.shell.<its class name without Admin::Shell:: and Component, underscored>`.
+# Only the page tree's divider is here so far: the sidebar, the top bar and
+# the palette still hold their English as literals and move here with the
+# shell's own conversion (`CONVERTED` in test/lib/admin_i18n_test.rb).
+en:
+  admin:
+    components:
+      shell:
+        tree_divider:
+          # The separator's accessible name; its value (the width in pixels) is read after it.
+          label: "Page tree width"
+          # The shared tooltip, on keyboard focus and on hover. The script writes
+          # it again with the current width (`admin--shell--tree-width`).
+          tooltip: "Tree width %{width}px. Arrow keys to resize."

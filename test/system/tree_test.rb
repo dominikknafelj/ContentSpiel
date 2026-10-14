@@ -18,10 +18,15 @@ class TreeSystemTest < ApplicationSystemTestCase
     root_page.reload.children.order(:position).map { |page| page.title }
   end
 
+  # A row's drag handle. It stands in the row's gutter and is shown only on
+  # hover or focus (`Admin::PagesScreen::TreeNodeComponent`); a test never
+  # waits for what only a hover reveals, so it is found whatever it shows.
+  def handle(title) = find("button[aria-label='Move #{title}']", visible: :all)
+
   # The top-level pages in the order the tree shows them, read off their
   # handles (the homepage has none, nor does any row's "+" link).
   def tree_order
-    page.all("#tree .admin-tree-node__handle").map { |handle| handle["aria-label"].delete_prefix("Move ") }
+    page.all("#tree .admin-tree-node__handle", visible: :all).map { |handle| handle["aria-label"].delete_prefix("Move ") }
   end
 
   test "Space, ArrowDown, Space moves a page down; Undo puts it back" do
@@ -29,11 +34,11 @@ class TreeSystemTest < ApplicationSystemTestCase
     visit admin_pages_path
     await_admin_controllers
 
-    find("button[aria-label='Move Alpha']").send_keys(:space)
+    handle("Alpha").send_keys(:space)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Alpha. Position 1 of 3/, visible: :all
-    find("button[aria-label='Move Alpha']").send_keys(:down)
+    handle("Alpha").send_keys(:down)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
-    find("button[aria-label='Move Alpha']").send_keys(:space)
+    handle("Alpha").send_keys(:space)
 
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Alpha./, wait: 10
     assert_equal %w[Beta Alpha Gamma], children_titles
@@ -44,7 +49,7 @@ class TreeSystemTest < ApplicationSystemTestCase
     # Undo posts the toast's own button. Make a second move so there is a
     # fresh toast on this page load, then undo it.
     await_admin_controllers
-    find("button[aria-label='Move Gamma']").send_keys(:space, :up, :space)
+    handle("Gamma").send_keys(:space, :up, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Gamma./, wait: 10
     assert_equal %w[Beta Gamma Alpha], children_titles
 
@@ -87,12 +92,37 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_equal %w[Beta Gamma Alpha], tree_order
   end
 
+  # The handle is nothing at rest (`opacity-0`, which Cuprite counts as not
+  # visible) and shows while it has the focus. Reached as a keyboard reaches
+  # it -- it is the control before its row's link -- and with the pointer far
+  # from the row, so no hover is what shows it; found WITHOUT `visible: :all`.
+  test "a row's handle is not shown at rest, and Shift+Tab from the row's link shows it: Space then picks the row up" do
+    sign_in_via_form(users(:one))
+    visit admin_pages_path
+    await_admin_controllers
+    page.driver.browser.mouse.move(x: 900, y: 700)
+    assert_no_selector "button[aria-label='Move Alpha']"
+    assert_selector "button[aria-label='Move Alpha']", visible: :all
+
+    page.execute_script("document.querySelector('#tree a[title=Alpha]').focus()")
+    page.driver.browser.keyboard.type([ :shift, :tab ])
+
+    assert_selector "button[aria-label='Move Alpha']"
+    assert_equal "Move Alpha", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert_no_selector "button[aria-label='Move Beta']"
+
+    page.driver.browser.keyboard.type(:space)
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Alpha/, visible: :all
+    assert_selector "button[aria-label='Move Alpha']"
+    page.driver.browser.keyboard.type(:escape)
+  end
+
   test "Escape puts a picked page back without saving" do
     sign_in_via_form(users(:one))
     visit admin_pages_path
     await_admin_controllers
 
-    find("button[aria-label='Move Alpha']").send_keys(:space, :down, :escape)
+    handle("Alpha").send_keys(:space, :down, :escape)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Cancelled/, visible: :all
     assert_equal %w[Alpha Beta Gamma], tree_order
     assert_no_selector "#toasts .admin-toast"
@@ -104,7 +134,7 @@ class TreeSystemTest < ApplicationSystemTestCase
     visit admin_pages_path
     await_admin_controllers
 
-    find("button[aria-label='Move Beta']").send_keys(:space, :right, :space)
+    handle("Beta").send_keys(:space, :right, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Beta./, wait: 10
     assert_equal @alpha, @beta.reload.parent
   end
@@ -115,7 +145,7 @@ class TreeSystemTest < ApplicationSystemTestCase
     visit admin_pages_path
     await_admin_controllers
 
-    find("button[aria-label='Move Child']").send_keys(:space, :left, :space)
+    handle("Child").send_keys(:space, :left, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Child./, wait: 10
     assert_equal root_page, @child.reload.parent
     assert_equal %w[Alpha Child Beta Gamma], children_titles
@@ -126,9 +156,9 @@ class TreeSystemTest < ApplicationSystemTestCase
     visit admin_pages_path
     await_admin_controllers
 
-    find("button[aria-label='Move Alpha']").send_keys(:space, :down)
+    handle("Alpha").send_keys(:space, :down)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
-    find("button[aria-label='Move Gamma']").send_keys(:space)
+    handle("Gamma").send_keys(:space)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Gamma/, visible: :all
     assert_equal %w[Alpha Beta Gamma], tree_order
     assert_equal %w[Alpha Beta Gamma], children_titles

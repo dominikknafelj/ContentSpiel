@@ -3,8 +3,10 @@ require "application_system_test_case"
 # The notes drawer as a COLUMN (handoff, "Decisions after the build started",
 # decision 1): from 1024px it stands to the right of the content and below
 # the editor's sticky header, takes its room from the content column, and the
-# page tree folds into the "Pages ▾" drawer while it is open. Only a browser
-# can show any of this: every assertion here compares boxes.
+# page tree folds into the "Pages ▾" drawer while it is open -- at every width
+# here: at its default width the tree stays beside the notes only from a
+# 1552px window (`test/system/admin/tree_column_test.rb` has that half). Only
+# a browser can show any of this: every assertion here compares boxes.
 class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
