@@ -22,7 +22,8 @@ import { messages } from "i18n/messages"
 // FROM 1024PX THE DRAWER IS A COLUMN beside the editor and below its sticky
 // header (content-spiel.tailwind.css, "The editors' notes drawer"). Two things
 // of that layout are this controller's: `data-notes-open` on <html>, which is
-// what the stylesheet reads to make the room and fold the page tree (set with
+// what the stylesheet reads to make the room and, where the tree no longer
+// fits beside the column (`data-tree-fits`), to fold the page tree (set with
 // the drawer's own `hidden` in `setOpen`, and before the first paint by the
 // layout's head script from what is remembered here), and the height of the
 // editor's header, under which the column starts (`measure`, kept current by

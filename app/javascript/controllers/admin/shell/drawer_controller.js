@@ -17,10 +17,12 @@ import { Controller } from "@hotwired/stimulus"
 // The editors' notes drawer (`admin--notes--drawer`) is the one other drawer, on the
 // right: opening a panel here says so (`admin--shell--drawer:opened`, with the
 // panel's name) and that one closes; when that one opens, these stand aside
-// (`standAside`). While the notes are a column beside the editor the page
+// (`standAside`). While the notes are a column beside the editor and the page
+// tree, at the width the person chose for it, no longer fits beside both, the
 // tree is folded into its drawer at widths where it otherwise is a column
-// (content-spiel.tailwind.css, "THE PAGE TREE FOLDS"): the same panel, the
-// same `data-open`, nothing here knows.
+// (content-spiel.tailwind.css, "THE PAGE TREE STAYS BESIDE THE EDITOR WHILE
+// IT FITS, AND FOLDS WHEN IT DOES NOT"; `admin--shell--tree-width` says
+// whether it fits): the same panel, the same `data-open`, nothing here knows.
 export default class extends Controller {
   static targets = [ "panel", "scrim", "trigger" ]
 

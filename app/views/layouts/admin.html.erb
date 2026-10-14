@@ -9,6 +9,9 @@
     <%# Says on <html>, before anything is painted, whether this browser
         left the notes drawer open (`admin/shared/_notes_head`). %>
     <%= render "admin/shared/notes_head" %>
+    <%# And the width this browser chose for the page tree's column, with
+        whether it fits beside the notes (`admin/shared/_tree_head`). %>
+    <%= render "admin/shared/tree_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags "admin" %>
     <%# Per-screen head tags: `turbo-cache-control: no-cache` on the API
@@ -107,6 +110,11 @@
       <% if content_for?(:tree) %>
         <aside id="tree-column" class="admin-shell__tree" data-admin--shell--drawer-target="panel" data-drawer="tree" tabindex="-1">
           <%= yield :tree %>
+          <%# The divider the column is resized by, on its right edge
+              (`Admin::Shell::TreeDividerComponent`): last, after the tree's
+              own frame, which a move replaces. Not shown where the tree is a
+              drawer. %>
+          <%= render Admin::Shell::TreeDividerComponent.new %>
         </aside>
       <% end %>
 

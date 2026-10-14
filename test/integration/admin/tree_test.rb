@@ -29,6 +29,37 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Claude Design, 2026-10-13, T1. The divider is the tree column's last
+  # child, outside the frame a move replaces, on a screen with a tree only;
+  # the head script that lays the column out at the remembered width before
+  # the first paint is on every CS Studio screen, since a Turbo visit keeps
+  # <html> as the first screen's head left it.
+  test "a screen with a tree draws the divider once, last in the column and outside the tree's frame, and a screen without a tree draws none" do
+    get "/cs-studio/pages/#{@b.id}"
+    assert_select "aside#tree-column > [role=separator].admin-tree-divider[aria-orientation=vertical][tabindex='0'][aria-valuenow='272'][aria-valuemin='220'][aria-valuemax='480']", count: 1
+    assert_select "aside#tree-column > :last-child[role=separator]"
+    assert_select "turbo-frame#tree [role=separator]", count: 0
+    assert_select "[role=separator][aria-label=?]", "Page tree width"
+
+    get "/cs-studio/posts"
+    assert_select "#tree-column", count: 0
+    assert_select ".admin-tree-divider", count: 0
+  end
+
+  test "the head script applies the remembered width and says whether the tree fits beside the notes, on every screen, guarded, before the stylesheet" do
+    [ "/cs-studio/pages/#{@b.id}", "/cs-studio/posts" ].each do |path|
+      get path
+      script = css_select("head script").map(&:text).find { |text| text.include?("--admin-tree-width") }
+      assert script, "#{path} has no head script for the tree's width"
+      assert_includes script, %(try { stored = parseInt(localStorage.getItem("cs-tree-width"), 10); } catch (e) {})
+      assert_includes script, "stored >= 220 && stored <= 480"
+      assert_includes script, %(root.setAttribute("data-tree-fits", ""))
+      assert_includes script, "sidebar + width + 400 + 640"
+      head = response.body[/<head>.*<\/head>/m]
+      assert_operator head.index("--admin-tree-width"), :<, head.index('rel="stylesheet"'), "the width is said before the stylesheet is linked"
+    end
+  end
+
   # Handoff §10 C34.
   test "/pages opens Home's editor for someone who can open it" do
     get "/cs-studio/pages"

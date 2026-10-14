@@ -1,0 +1,37 @@
+<%# The page tree's column as this browser left it (`admin--shell--tree-width`
+    remembers the chosen width in `localStorage`), said on <html> before
+    anything is painted, the way the notes drawer's "open" is
+    (`admin/shared/_notes_head`): the shell's grid reads
+    `--admin-tree-width` (content-spiel.tailwind.css, 17rem without it), so
+    the page is laid out at the chosen width from the first paint and the
+    editor does not change width when the script connects. A value that is no
+    number, or outside the two limits, is nobody's choice and sets nothing.
+
+    `data-tree-fits` is the other thing the stylesheet cannot work out for
+    itself: whether the tree, at that width, still fits BESIDE the notes
+    column with 640px left for the editor (T3; a media query cannot read a
+    custom property). It is said here for every screen, whether or not the
+    notes are open or the screen has a tree: the stylesheet asks it only
+    where both are so, and `admin--shell--tree-width` keeps it current from
+    then on (a resized window, another width).
+
+    Both stay on <html> for the life of the document: Turbo replaces <body>
+    and merges <head>, never the root element, so a visit and Back find them
+    as they were. Guarded like the theme's (`shared/_theme_head`):
+    `localStorage` can throw, and the page is then laid out at the default.
+    The numbers are the divider's (`Admin::Shell::TreeDividerComponent`). %>
+<% divider = Admin::Shell::TreeDividerComponent %>
+<%= javascript_tag nonce: true do %>
+  (function () {
+    var root = document.documentElement;
+    var width = <%= divider::DEFAULT %>;
+    var stored = NaN;
+    try { stored = parseInt(localStorage.getItem("<%= divider::STORAGE_KEY %>"), 10); } catch (e) {}
+    if (stored >= <%= divider::MIN %> && stored <= <%= divider::MAX %>) {
+      width = stored;
+      root.style.setProperty("--admin-tree-width", stored + "px");
+    }
+    var sidebar = window.matchMedia("(min-width: 1280px)").matches ? <%= divider::SIDEBAR %> : 0;
+    if (window.innerWidth >= sidebar + width + <%= divider::NOTES %> + <%= divider::EDITOR %>) root.setAttribute("data-tree-fits", "");
+  })();
+<% end %>
