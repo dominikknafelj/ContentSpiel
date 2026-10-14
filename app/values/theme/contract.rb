@@ -90,8 +90,6 @@ class Theme
     # the methods its template may call. A method not listed is the CMS's to
     # change.
     WRITTEN_BLOCK_LINES = {
-      "blocks/rich_text_component" => %w[block page],
-      "blocks/image_component" => %w[block page asset alt caption sizes],
       # `lines` is one array per line of [role, text] pairs, the role nil or
       # one of the seven a `syn-` token exists for; `string(key)` is one of
       # the copy button's four words (:copy, :copy_code, :copied, :failed) in

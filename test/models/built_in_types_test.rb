@@ -103,4 +103,20 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_nil block.reload.definition
     assert_empty page.content_blocks.listing
   end
+
+  test "rich text and image declare their contract lines and a sample, and need no summary, token, stylesheet or action of their own" do
+    rich_text = BlockTypes.fetch(:rich_text)
+    image = BlockTypes.fetch(:image)
+
+    assert_equal %w[block page], rich_text.theme_methods
+    assert_equal %w[block page asset alt caption sizes], image.theme_methods
+    [ rich_text, image ].each do |definition|
+      assert_nil definition.summary
+      assert_empty definition.themed_tokens + definition.fixed_tokens + definition.read_only_actions
+      assert_nil definition.stylesheet
+    end
+    assert rich_text.sample.body.present?
+    assert image.sample.image
+    assert_equal %w[alt caption], image.sample.translations.fetch("en").keys.map(&:to_s).sort
+  end
 end
