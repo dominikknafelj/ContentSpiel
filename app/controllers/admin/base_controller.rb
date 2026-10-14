@@ -58,7 +58,11 @@ module Admin
       { label: "Translations", icon: :translations, path: :admin_translations_path, permission: %w[pages.read posts.read],
         if: -> { Locales.enabled.size > 1 }, group: :content },
       { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage", group: :content },
-      { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: "posts.read", group: :content },
+      # Either read right (pages in the mind graph, spec §2): the screen opens
+      # for someone who may read a page or a post, as its own gate says
+      # (`Admin::MindGraphController#require_graph_access`), so someone with
+      # `pages.read` alone has the link to it.
+      { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: %w[pages.read posts.read], group: :content },
       { label: "Trash", icon: :trash, path: :admin_trash_path, permission: TRASH_PERMISSIONS, group: :content },
       { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage", group: :people },
       { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage", group: :people },

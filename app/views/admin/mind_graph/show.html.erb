@@ -14,27 +14,28 @@
     (`--admin-top-offset`), so the page does not scroll and the canvas and the
     list each take what is left. Below that width the list stands under the
     canvas, the box is as tall as its content and the page scrolls. %>
-<div class="<%= "flex min-h-[560px] flex-col min-[1100px]:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if @content_types.any? %>">
+<div class="<%= "flex min-h-[560px] flex-col min-[1100px]:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if @content_types.any? || @pages %>">
 <div class="mb-4">
   <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
   <p class="mt-1 text-meta"><%= t(".intro") %></p>
 </div>
 
-<% if @content_types.empty? %>
-  <%# For THIS viewer: a viewer who can read no post sees this, whatever the site holds. %>
-  <div class="rounded-cs border border-line bg-surface p-6 text-meta" data-mind-graph-empty="no-posts"><%= t(".no_posts") %></div>
+<% if @content_types.empty? && !@pages %>
+  <%# For THIS viewer: a viewer who can read no post and no page sees this, whatever the site holds. %>
+  <div class="rounded-cs border border-line bg-surface p-6 text-meta" data-mind-graph-empty="no-content"><%= t(".no_content") %></div>
 <% else %>
   <%# One box, three parts: the SEARCH, the GRAPH (a local view's focus bar,
-      the legend and filter row, the canvas) and the LIST. In the document
+      the legend's row, the canvas) and the LIST. In the document
       they come in that order, because the Tab key follows the document (spec
-      §5.7: search, focus bar, filter, zoom buttons, canvas, card, list -- the
-      list last, since it can hold two thousand rows). On screen, from
+      §5.7: search, focus bar, the legend's toggles and its "Status" link,
+      zoom buttons, canvas, card, list -- the list last, since it can hold
+      two thousand rows). On screen, from
       1,100px, the graph is the left column over the box's whole height and
       the search and the list are a 300px column on its right, the search on
       top: a grid places each part, so the order of the document is free.
       Below that width they stack with the graph FIRST (`order-first`), the
-      search and the list under it. The filter is three radios (arrow keys
-      move between them), applied client-side.
+      search and the list under it. The filter is the legend (pages spec §6):
+      checkboxes, each a Tab stop that Space switches, applied client-side.
 
       `data-state="loading"` is what the server says; the script takes it from
       there (`mind_graph/app.js` lists the attributes it writes). The notice is
@@ -55,36 +56,86 @@
       id 0 and that one segment swapped. The message
       keys are written out one by one: `test/lib/script_messages_test.rb`
       reads the literals to check that every key the script asks for is
-      served. %>
+      served.
+
+      THE LIST'S TWO READS (pages spec §3, §7): `data-unlisted-url` is where
+      "Not listed on any page" reads its rows, and it is there ONLY FOR A
+      VIEWER WHO READS A PAGE: to someone who reads none, every post they
+      read is one no page (they read) lists, so the filter would say nothing,
+      and the script draws its checkbox only when it has the address.
+      `data-listed-url` is the rows behind one of a page's "+N more" pills,
+      a template with `__ID__` (the page's id) and `__TARGET__` (the pill's
+      target, URL-encoded).
+
+      A PAGE'S CARD (pages spec §7) has two templates of its own beside a
+      post's: `data-page-focus-url` (its local view) and `data-page-notes-url`
+      (its open notes as JSON, and where the card posts a new one; built for
+      id 0 like the post's).
+
+      THE GRAPH THAT OPENS AROUND HOME (pages spec, decision 6). A site with
+      too many lines for one picture is answered by `data-url` with where to
+      open instead, and the script then reads `data-open-url` (the data of a
+      page's local view, `__ID__` the page's id) and shows the bar below
+      (`data-mind-graph-opened`), which stands where a focused view has its
+      bar. "Show everything" there is a BUTTON, not a link: it changes what
+      this page shows and leads nowhere. It reads `data-everything-url`, the
+      whole graph's data. So the choice is in no address, and a reload opens
+      around Home again (the third design answers: not remembered). How many
+      lines the site has is the script's to write (`data-opened-lines` on
+      the element, the bar's sentence, the button's name), and the
+      controller's `reset` takes all of it back. %>
   <div data-controller="admin--mind-graph--graph"
-       data-url="<%= data_admin_mind_graph_path(**admin_url_options, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
+       data-url="<%= data_admin_mind_graph_path(**admin_url_options, page: params[:page].presence, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
        data-d3-url="<%= asset_path("d3-force.js") %>"
        data-messages="<%= messages_data("mind_graph.script.loading", "mind_graph.script.load_failed", "mind_graph.script.retry", "mind_graph.script.worker_failed",
                                      "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.capped_local", "mind_graph.script.isolated", "mind_graph.script.isolated_only",
-                                     "mind_graph.script.summary", "mind_graph.script.release_pinned",
+                                     "mind_graph.script.release_pinned", "mind_graph.script.all_posts", "mind_graph.script.more", "mind_graph.script.retired_type",
                                      "mind_graph.script.card.related", "mind_graph.script.card.tags", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
                                      "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag", "mind_graph.script.card.pin", "mind_graph.script.card.unpin",
                                      "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
-                                     "mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.sending", "mind_graph.script.card.notes.replies",
+                                     "mind_graph.script.card.status.unpublished_changes", "mind_graph.script.card.status.change_scheduled",
+                                     "mind_graph.script.card.status.live_with_changes", "mind_graph.script.card.status.live_change_scheduled",
+                                     "mind_graph.script.card.open_page", "mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts", "mind_graph.script.card.post_type",
+                                     "mind_graph.script.opened.line", "mind_graph.script.opened.everything_name",
+                                     "mind_graph.script.list.more_heading", "mind_graph.script.list.more_row", "mind_graph.script.list.back",
+                                     "mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.label_page", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.sending", "mind_graph.script.card.notes.replies",
                                      "mind_graph.script.card.notes.more", "mind_graph.script.card.notes.deleted_user", "mind_graph.script.card.notes.unread", "mind_graph.script.card.notes.failed",
-                                     "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag",
-                                     "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.empty", "mind_graph.script.list.select_post", "mind_graph.script.list.select_tag") %>"
+                                     "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed",
+                                     "mind_graph.script.search.groups.page", "mind_graph.script.search.groups.post", "mind_graph.script.search.groups.tag",
+                                     "mind_graph.script.list.pages", "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.types", "mind_graph.script.list.empty",
+                                     "mind_graph.script.list.unlisted", "mind_graph.script.list.not_in_view", "mind_graph.script.list.open_in_posts", "mind_graph.script.list.failed", "mind_graph.script.list.try_again",
+                                     "mind_graph.script.list.select_page", "mind_graph.script.list.select_post", "mind_graph.script.list.select_tag", "mind_graph.script.list.select_type",
+                                     "mind_graph.script.list.add_post", "mind_graph.script.list.add_retired_post", "mind_graph.script.list.absent_post", "mind_graph.script.list.absent_retired_post",
+                                     "mind_graph.script.legend.toggle",
+                                     "mind_graph.script.summary.whole", "mind_graph.script.summary.local", "mind_graph.script.summary.everything", "mind_graph.script.summary.nothing",
+                                     "mind_graph.script.summary.all_hidden", "mind_graph.script.summary.none_yet", "mind_graph.script.summary.around_home", "mind_graph.script.summary.site",
+                                     "mind_graph.script.summary.more", "mind_graph.script.summary.pages", "mind_graph.script.summary.types", "mind_graph.script.summary.posts", "mind_graph.script.summary.posts_of",
+                                     "mind_graph.script.summary.tags", "mind_graph.script.summary.connections", "mind_graph.script.summary.pair", "mind_graph.script.summary.series",
+                                     "mind_graph.script.summary.hidden.page", "mind_graph.script.summary.hidden.post", "mind_graph.script.summary.hidden.tag", "mind_graph.script.summary.hidden.type",
+                                     "mind_graph.script.summary.hidden_lines.tree", "mind_graph.script.summary.hidden_lines.lists", "mind_graph.script.summary.hidden_lines.related",
+                                     "mind_graph.script.summary.hidden_lines.tag") %>"
        data-post-focus-url="<%= admin_mind_graph_path(**admin_url_options, post: "__ID__") %>"
        data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
        data-post-notes-url="<%= admin_record_note_threads_data_path("post", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
+       <% if @pages %>data-unlisted-url="<%= unlisted_admin_mind_graph_path(**admin_url_options) %>"<% end %>
+       data-listed-url="<%= listed_admin_mind_graph_path(**admin_url_options, page: "__ID__", target: "__TARGET__") %>"
+       data-page-focus-url="<%= admin_mind_graph_path(**admin_url_options, page: "__ID__") %>"
+       data-page-notes-url="<%= admin_record_note_threads_data_path("page", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"
+       data-open-url="<%= data_admin_mind_graph_path(**admin_url_options, page: "__ID__") %>"
+       data-everything-url="<%= data_admin_mind_graph_path(**admin_url_options, everything: 1) %>"
        data-type-labels="<%= @type_labels.to_json %>"
        data-button-classes="<%= { primary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
        data-dot-classes="<%= (Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS).to_json %>"
        data-state="loading"
        class="grid min-h-0 flex-1 overflow-hidden rounded-cs border border-line bg-surface min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
-    <%# The search field: how a post or tag the graph doesn't draw is reached.
+    <%# The search field: how a page, post or tag the graph doesn't draw is reached.
         Its rows are links to that row's local view, filled in by
         `mind_graph/search_box.js` with text and `href` only. The results are
         ordinary links after the field in the document, so Tab reaches them.
         The status line is the live region the results' wording goes through
-        (a count, "No post or tag matches.", the failure): it stays in the DOM,
+        (a count, "No page, post or tag matches.", the failure): it stays in the DOM,
         so the list itself can stay a plain list of links. %>
     <div class="border-t border-line p-2.5 min-[1100px]:col-start-2 min-[1100px]:row-start-1 min-[1100px]:border-l min-[1100px]:border-t-0">
       <div class="relative" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
@@ -117,23 +168,28 @@
           </span>
           <%= link_to t(".focus.whole"), admin_mind_graph_path(**admin_url_options), class: "text-accent underline" %>
         </p>
+      <% else %>
+        <%# The bar of the view the 3,000-line rule opened (pages spec,
+            decision 6): hidden, and empty of any figure, until the script
+            has been told where to open. Then it says why the whole graph is
+            not what is drawn (its sentence, written with `textContent`) and
+            offers "Show everything", whose name the script completes with
+            how many lines that is. %>
+        <p data-mind-graph-opened hidden class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3.5 py-2 text-sm text-dim">
+          <span data-mind-graph-opened-line id="mind-graph-opened-line"></span>
+          <%= tag.button t(".opened.everything"), type: "button", aria: { describedby: "mind-graph-opened-line" },
+                class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                data: { mind_graph_everything: true, action: "admin--mind-graph--graph#showEverything" } %>
+        </p>
       <% end %>
-      <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-line px-3.5 py-2.5">
-        <%= render Admin::MindGraphScreen::LegendComponent.new(content_types: @content_types) %>
-        <fieldset class="m-0 min-w-0 border-0 p-0">
-          <legend class="sr-only"><%= t(".filter.legend") %></legend>
-          <div class="inline-flex overflow-hidden rounded-cs border border-line-strong bg-surface">
-            <% %w[all related tag].each do |value| %>
-              <label for="mind-graph-filter-<%= value %>" class="flex cursor-pointer items-center border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken has-[:checked]:bg-accent-tint has-[:checked]:font-semibold has-[:checked]:text-ink has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent">
-                <%= radio_button_tag "mind_graph_filter", value, value == "all", id: "mind-graph-filter-#{value}", class: "sr-only", data: { action: "change->admin--mind-graph--graph#filter" } %>
-                <span><%= t(".filter.#{value}") %></span>
-              </label>
-            <% end %>
-          </div>
-        </fieldset>
+      <%# The legend, which is the filter (pages spec §6). Its counts and each
+          toggle's name with its count are the script's, and the controller's
+          `reset` takes them back; the checkboxes' own state is kept. %>
+      <div class="border-b border-line px-3.5 py-2.5">
+        <%= render Admin::MindGraphScreen::LegendComponent.new(content_types: @content_types, pages: @pages) %>
       </div>
       <%# In the document the zoom buttons come BEFORE the canvas, because the
-          Tab key follows the document (spec §5.7: filter, zoom buttons, canvas);
+          Tab key follows the document (spec §5.7: legend, zoom buttons, canvas);
           on screen they sit in the canvas's bottom-right corner, positioned, so
           they are painted over it whatever the order. "Release N pinned" is
           beside them only while a node is pinned: the script writes its label
@@ -156,8 +212,11 @@
         <canvas data-admin--mind-graph--graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>" data-label="<%= t(".canvas_label") %>"></canvas>
         <div data-admin--mind-graph--graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
         <%# (The canvas's `data-label` is its name as the server wrote it: the
-            script puts the counts into `aria-label`, and the controller's
-            `reset` puts this back on a page Turbo restored.) %>
+            script puts its summary of what is in view into `aria-label`
+            (`mind_graph/summary.js`), and the controller's `reset` puts this
+            back on a page Turbo restored. After a toggle of the legend the
+            same summary is put into the notice, for a screen reader only:
+            that is how the change is announced.) %>
         <%# The selection card and the hover tooltip (spec §5.3): HTML over the
             canvas, filled by `mind_graph/card.js` and `app.js` with `textContent`
             and `href` only. Both are empty and `hidden` until the script shows
@@ -172,9 +231,11 @@
         <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs border border-line bg-surface px-2 py-1 text-sm text-ink shadow-menu"></div>
       </div>
     </div>
-    <%# The list (mind graph canvas spec §5.7): every node the graph draws, as
-        a row, filled by `mind_graph/node_list.js` from the same data and
-        following the filter. A canvas's nodes can't take focus, so this is
+    <%# The list (mind graph canvas spec §5.7; pages spec §7): every node the
+        graph draws, as a row, in four groups (Pages, Posts, Tags, Post
+        types), filled by `mind_graph/node_list.js` from the same data and
+        following the filter; or, while "Not listed on any page" is on or
+        after a press on "+N more", the rows of that read in their place. A canvas's nodes can't take focus, so this is
         the keyboard and screen-reader path to them: a row is a button that
         selects its node, and the card it opens holds the links. It comes last
         in the document and scrolls on its own beside the canvas. Under the
@@ -182,5 +243,11 @@
         over it, inside the box) are not cut off by a list of two rows. %>
     <div data-mind-graph-list aria-label="<%= t(".list_label") %>" role="region" class="min-h-80 border-t border-line pb-3 min-[1100px]:col-start-2 min-[1100px]:row-start-2 min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l"></div>
   </div>
+  <%# The status key (pages spec §6; design answer H6): the dialog the
+      legend's "Status" link opens. OUTSIDE the graph's element on purpose:
+      the Tab order of the box is the search, the graph and the list, a
+      closed dialog is no part of it, and the graph's script and its `reset`
+      write nothing here. %>
+  <%= render Admin::MindGraphScreen::StatusKeyComponent.new %>
 <% end %>
 </div>

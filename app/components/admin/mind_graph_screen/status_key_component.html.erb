@@ -1,0 +1,10 @@
+<%= render Admin::Ui::DialogComponent.new(id: Admin::MindGraphScreen::StatusKeyComponent::ID, title: t(".title")) do %>
+  <ul class="m-0 flex list-none flex-col gap-2 p-0" data-controller="admin--mind-graph--swatches">
+    <% Admin::MindGraphScreen::StatusKeyComponent::STATES.each do |state| %>
+      <li class="flex items-center gap-2 text-sm text-ink" data-legend-state="<%= state %>">
+        <%= render Admin::MindGraphScreen::SwatchComponent.new("state-#{state.to_s.dasherize}") %>
+        <%= t(".states.#{state}") %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

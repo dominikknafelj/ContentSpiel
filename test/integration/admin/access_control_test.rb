@@ -50,13 +50,39 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a branch editor without post permissions sees no Posts or Mind graph" do
+  # Pages in the mind graph, spec §2: the screen opens for someone who may
+  # read a page OR a post, and the sidebar's link is shown to the same
+  # people (the ruling on Task 3's review): either right alone is enough.
+  test "a branch editor without post permissions sees no Posts, and the Mind graph, which opens for pages alone" do
     grant_branch("pages.edit")
     sign_in_as(users(:editor_branch))
 
     get "/cs-studio/api_tokens"
 
-    assert_equal [ "Dashboard", "Pages", "Translations", "AI assistant" ], sidebar_labels
+    assert_equal [ "Dashboard", "Pages", "Translations", "Mind graph", "AI assistant" ], sidebar_labels
+    get "/cs-studio/mind_graph"
+    assert_response :success
+  end
+
+  test "the Mind graph's link is shown for posts.read alone and for pages.read alone, and to someone who holds neither it is not, and the screen is a 403" do
+    sign_in_as(users(:editor_branch))
+    get "/cs-studio/api_tokens"
+    assert_not_includes sidebar_labels, "Mind graph", "the group holds no grant yet"
+    get "/cs-studio/mind_graph"
+    assert_response :forbidden
+
+    posts = AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
+    get "/cs-studio/api_tokens"
+    assert_equal [ "Dashboard", "Posts", "Translations", "Mind graph", "AI assistant" ], sidebar_labels, "posts.read alone"
+    get "/cs-studio/mind_graph"
+    assert_response :success
+
+    posts.destroy!
+    grant_branch("pages.read")
+    get "/cs-studio/api_tokens"
+    assert_equal [ "Dashboard", "Pages", "Translations", "Mind graph", "AI assistant" ], sidebar_labels, "pages.read alone"
+    get "/cs-studio/mind_graph"
+    assert_response :success
   end
 
   # `AccessControl.holds?` doesn't count a grant whose named content types are
@@ -294,8 +320,13 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph/data"
 
     data = response.parsed_body
-    assert_equal [ @own_post.id, second_own.id ].sort, data["nodes"].map { |node| node["id"] }.sort
-    assert_equal [ { "source" => @own_post.id, "target" => second_own.id, "kind" => "related" } ], data["edges"]
+    assert_equal [ "post-#{@own_post.id}", "post-#{second_own.id}" ].sort, data["nodes"].map { |node| node["id"] }.sort
+    # The author reads every page, so the tree's lines are theirs to see
+    # (pages in the mind graph); what must not be there is an end at the post
+    # they cannot read.
+    assert_equal [ { "source" => "post-#{@own_post.id}", "target" => "post-#{second_own.id}", "kind" => "related" } ], data["edges"].reject { |edge| edge["kind"] == "tree" }
+    assert_equal 3, data["edges"].count { |edge| edge["kind"] == "tree" }
+    assert_no_match(/post-#{@other_post.id}\b|Other post/, response.body)
   end
 
   test "the post editor names no related post the actor can't read" do

@@ -2,8 +2,8 @@
 // on the canvas. A plain object `{ k, tx, ty }` -- screen = graph * k + t --
 // and pure functions that answer a new one, so a zoom or a pan is a value the
 // redraw compares, and all of it can be checked without a canvas.
-export const MIN_ZOOM = 0.05
-export const MAX_ZOOM = 4
+const MIN_ZOOM = 0.05
+const MAX_ZOOM = 4
 // "Fit all" never zooms a small graph in further than this: three nodes
 // stretched over the whole box would be drawn as three huge gaps.
 const MAX_FIT_ZOOM = 1.5
