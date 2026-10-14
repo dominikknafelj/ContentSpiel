@@ -143,6 +143,8 @@ The theme's four boots in `test/lib/production_boot_test.rb`: "production under 
 
 ### How a site's image is built
 
+**Where the CMS image comes from.** `.github/workflows/image.yml` builds it on every push to `main` (and by hand for any branch) and pushes it to the GitHub container registry as `ghcr.io/<owner>/content_spiel:<the full commit id>`, with `:main` for the newest build of main. A site pins the commit id; there is no `latest`, which would change a site under its owner at the next deploy. Before 2026-10-13 the image was built by hand on a laptop, under emulation, from a second folder, and the first deploys' mistakes were all in that step. While the repository is private the package is private too: a site's build needs a token that may read it.
+
 A theme reaches a container as an image layer on the CMS image, never as a mounted volume: changing the theme of a running site is a build and a deploy. A site's `Dockerfile`, as built and run by hand on 2026-10-12 (the comment above `assets:precompile` in the CMS's own `Dockerfile` prints the same lines):
 
 ```dockerfile

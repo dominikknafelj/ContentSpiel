@@ -1,0 +1,73 @@
+name: Image
+
+# Builds the CMS's production image and pushes it to the GitHub container
+# registry, so that a site built on ContentSpiel names a revision and builds
+# nothing of the CMS itself (`docs/reference/hosting.md`, "How a site's image
+# is built"). Until this existed the image was built by hand on a laptop,
+# under emulation, from a second folder: every mistake of the first deploys
+# was in that step.
+#
+# When: on every push to main (a merge), and by hand for any branch or tag
+# ("Run workflow", or `gh workflow run Image --ref <branch>`). A merge to main
+# is not tested again (see ci.yml), so this builds what the pull request's run
+# tested. One build is about five billed minutes while the repository is
+# private.
+#
+# The tags: the full commit id, which is what a site pins
+# (`ghcr.io/<owner>/content_spiel:<40 characters>`), and `main` for the newest
+# build of main. No `latest`: a site that followed it would change under its
+# owner at the next deploy.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Two merges close together: the older build is of no use once the newer one
+# has started, but a build that is already pushing is left to finish.
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # The job's own token pushes the package: no personal access token, and
+    # nothing to keep in the repository's secrets.
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The image's name is lower case whatever the owner's name is.
+      - name: Name the image
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/content_spiel" >> "$GITHUB_OUTPUT"
+
+      # linux/amd64 is what a runner is, so nothing is emulated. The build's
+      # layers are kept in the Actions cache: a merge that changes no gem
+      # skips `bundle install`.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.name.outputs.image }}:${{ github.sha }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}:main', steps.name.outputs.image) || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
