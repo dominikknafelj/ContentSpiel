@@ -29,12 +29,14 @@ module BlockTypes
   # What the public stylesheet's build needs of the registered types, as
   # data for lib/theme_css.rb (block types spec, decision 7): each type's
   # stylesheet, and its component's folder where that is not
-  # app/components/blocks.
+  # app/components/blocks, with or without a template file beside the
+  # component (`component_folder`), and the type's name for a message.
   def self.theme_css_blocks(root: Rails.root)
     scanned = Pathname(root).join("app/components/blocks")
     all.map do |definition|
-      folder = definition.component_template&.dirname
-      ThemeCss::Block.new(stylesheet: definition.stylesheet_path(root: root), source: (folder unless folder.nil? || folder == scanned))
+      folder = definition.component_folder
+      ThemeCss::Block.new(stylesheet: definition.stylesheet_path(root: root), source: (folder unless folder.nil? || folder == scanned),
+                          type: definition.name)
     end
   end
 

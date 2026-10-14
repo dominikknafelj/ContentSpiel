@@ -77,8 +77,20 @@ module ThemeCss
   # app/components/blocks (which the default theme's own `@source` line
   # scans), so utilities in an engine's template are built. Handed in by the
   # caller (lib/tasks/theme_css.rake, from `BlockTypes.theme_css_blocks`):
-  # this file loads before the application and reads no registry.
-  Block = Data.define(:stylesheet, :source)
+  # this file loads before the application and reads no registry. `type` is
+  # the type's name, for a message about its stylesheet.
+  #
+  # Both paths are written into the entry by where they REALLY are
+  # (`realpath`), as the theme's are, for the reason the header gives: a gem
+  # is often reached through a link (a bundle path under a linked folder).
+  Block = Data.define(:stylesheet, :source, :type) do
+    def initialize(stylesheet:, source:, type: nil) = super
+  end
+
+  # A registered type's stylesheet that is not there when the entry is
+  # written: a gem's file deleted or moved since it was registered (its
+  # registration reads it once, `BlockTypeDefinition#refuse_outside!`).
+  class MissingStylesheet < StandardError; end
 
   module_function
 
@@ -92,10 +104,11 @@ module ThemeCss
     blocks.each do |block|
       next unless block.stylesheet
 
-      imports << Pathname(block.stylesheet)
-      sources << Pathname(block.stylesheet).dirname
+      sheet = real_stylesheet(block)
+      imports << sheet
+      sources << sheet.dirname
     end
-    sources.concat(blocks.filter_map { |block| block.source && Pathname(block.source) })
+    sources.concat(blocks.filter_map { |block| block.source && real(block.source) })
     if folder.configured?
       theme = folder.path.realpath
       if (stylesheet = folder.stylesheet&.relative_path_from(folder.path))
@@ -110,6 +123,23 @@ module ThemeCss
 
     lines = imports.uniq.map { |path| %(@import "#{relative.(path)}";) } + sources.uniq.map { |path| %(@source "#{relative.(path)}";) }
     lines.join("\n") + "\n"
+  end
+
+  # A type's stylesheet by its real path; one that is not there is that
+  # type's, by name (`MissingStylesheet`).
+  def real_stylesheet(block)
+    Pathname(block.stylesheet).realpath
+  rescue SystemCallError => error
+    whose = block.type ? " of the block type #{block.type}" : ""
+    raise MissingStylesheet, "the stylesheet#{whose} cannot be read (#{error.class}): #{block.stylesheet}"
+  end
+
+  # A folder by its real path, or as it was given when it cannot be
+  # resolved: a component's folder exists while its class is loaded.
+  def real(path)
+    Pathname(path).realpath
+  rescue SystemCallError
+    Pathname(path)
   end
 
   def write_entry(folder, root:, blocks: [])
@@ -305,9 +335,10 @@ module ThemeCss
     loop do
       seen = sources_glance(folder, root: root, blocks: blocks)
       if seen.first == UNREADABLE
+        _, why, type = seen
         unless unreadable == seen
-          log.call("theme_css:watch: the theme folder cannot be read (#{seen.last}). The watch goes on, and looks again " \
-                   "until it can be.")
+          what = type ? "the stylesheet of the block type #{type}" : "the theme folder"
+          log.call("theme_css:watch: #{what} cannot be read (#{why}). The watch goes on, and looks again until it can be.")
         end
         unreadable = seen
         sleep every
@@ -340,26 +371,37 @@ module ThemeCss
   def build_for_watch(folder, root:, executable:, blocks: [])
     build(folder, root: root, executable: executable, blocks: blocks)
     true
-  rescue RuntimeError, SystemCallError, ThemeFolder::Invalid
+  rescue RuntimeError, SystemCallError, ThemeFolder::Invalid, MissingStylesheet
     false
   end
 
   # What the build reads, without reading a file: the theme's folder
   # (`ThemeFolder#glance`), the default theme's stylesheets and each type's, by name,
   # size and time. A folder that cannot be listed is `[UNREADABLE, the
-  # error's class]`: the same answer for as long as the same thing is wrong,
-  # so two looks at it are equal and a wait on it waits.
+  # error's class, nil]`, and a type's stylesheet that cannot be read
+  # `[UNREADABLE, the error's class, the type's name]`: the same answer for
+  # as long as the same thing is wrong, so two looks at it are equal and a
+  # wait on it waits, and the watch says whose file it is.
   UNREADABLE = :unreadable
 
   def sources_glance(folder, root:, blocks: [])
-    files = Dir.glob(Pathname(root).join(DEFAULT).dirname.join("**/*").to_s) + blocks.filter_map { |block| block.stylesheet&.to_s }
+    sheets = blocks.filter_map do |block|
+      next unless block.stylesheet
+
+      sheet = Pathname(block.stylesheet).realpath
+      status = File.stat(sheet)
+      [ sheet.to_s, status.size, status.mtime.to_f ]
+    rescue SystemCallError => error
+      return [ UNREADABLE, error.class, block.type || block.stylesheet.to_s ]
+    end
+    files = Dir.glob(Pathname(root).join(DEFAULT).dirname.join("**/*").to_s)
     styles = files.uniq.sort.filter_map do |file|
       status = File.stat(file)
       [ file, status.size, status.mtime.to_f ] if status.file?
     end
-    [ folder.glance, styles ]
+    [ folder.glance, (styles + sheets).uniq.sort ]
   rescue SystemCallError, ThemeFolder::Invalid => error
-    [ UNREADABLE, error.class ]
+    [ UNREADABLE, error.class, nil ]
   end
 
   def current_entry?(folder, root:, blocks: [])

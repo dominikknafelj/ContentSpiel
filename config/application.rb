@@ -18,6 +18,11 @@ require "action_cable/engine"
 require "action_mailbox/engine"
 require "rails/test_unit/railtie"
 
+# Before the gems (block types spec, decision 11): an engine may name
+# `ContentSpiel::Plugins.block_types` whenever its own files are loaded. Plain
+# Ruby, and not reloaded although lib/ is autoloaded (lib/content_spiel/plugins.rb).
+require_relative "../lib/content_spiel/plugins"
+
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)

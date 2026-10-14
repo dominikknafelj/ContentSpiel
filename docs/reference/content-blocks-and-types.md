@@ -164,6 +164,37 @@ The `<section>` has no accessible name and no heading, so it is a grouping eleme
 
 **Caching and preview** are unchanged: a block write that changes something touches the page (its `updated_at`, not the settings form's `settings_changed_at`): a delete, a duplicate and a changed order always, a save when the block itself changed or a section's column was folded, and a save that wrote nothing not at all (`test/services/no_change_save_test.rb`), a live page's `after_commit` moves the public content version, and `/preview` renders a section as the public page does (`test/integration/preview_test.rb`).
 
+## Block types from outside
+
+A gem (a Rails engine) registers its block types through one hook, `ContentSpiel::Plugins.block_types` (`lib/content_spiel/plugins.rb`, block types spec, decision 11), called from an `initializer` of its own:
+
+```ruby
+ContentSpiel::Plugins.block_types do |types|
+  types.register "gallery/album" do |t|
+    t.label "Album"
+    t.field :title, :string, translated: true
+    t.component Gallery::AlbumComponent
+    t.theme_methods :block, :page, :title
+    t.tokens themed: %w[gallery-frame]
+    t.stylesheet Gallery::Engine.root.join("app/assets/stylesheets/gallery/album.css")
+    t.sample translations: { "en" => { title: "Holiday pictures" } }, shows: [ "Holiday pictures" ]
+  end
+end
+```
+
+The hook keeps the block for the life of the process, and `config/initializers/types.rb` calls every kept block after the built-ins on every `to_prepare`: an engine's own `to_prepare` runs before the application's, whose first line is `reset!`, so a type registered there was wiped on every prepare. The file is required from `config/application.rb` before `Bundler.require`, so a gem may name the hook whenever its files load; it is plain Ruby and is not reloaded. The rules, each refused at registration with the type's name and, for the hook's own, the place the hook was called (`file:line`, so a site's log names the gem):
+
+- **Order:** the built-ins in their written order, then the outside types in the order their hooks were called (the `Gemfile`'s). That is the picker's order.
+- **Names:** `owner/name`; a bare name is a built-in's, and one call of the hook registers the types of one owner. A name taken twice is `ContentModel::DuplicateType`.
+- **No capability:** `:container` is bound to the section classes and `BlockOutline`, `:lists_posts` to `BlockTypes::PostList`'s criteria, which decide posts' addresses; neither has a seam for an outside type yet (decision 12).
+- **The four columns:** `uses` names `body`, `caption`, `alt` and `image` and no other, as for every block type; fields of every type and option are open.
+- **Tokens from base tokens:** the type's token names start with its owner (`gallery-frame`), its stylesheet is an absolute path under the gem's root, and its colours are `var()` or `color-mix()` of the theme's base tokens: a colour literal in it is refused (`BlockTypeDefinition::COLOUR_LITERAL`; decision 3). Its tokens, its template and its stylesheet join the theme contract and the build as a built-in's do (`docs/reference/theming.md`, "An outside type's lines").
+- **The tile:** a `summary` that raises, or answers a part of no known kind, draws the type's label on the tile and is logged once per registration, by the type's name and the error's class, never the block's content (`Admin::EditorScreen::TileSummaryComponent#own_summary`); a built-in's raises.
+
+**A block of a type that is no longer registered is dormant** (decision 13): the public page skips it with a log line (a dormant section's inner blocks are drawn), the editor shows its card as "Unavailable type — gallery/album" with only Delete and the tile marks it, the picker does not offer it, saving it is refused, and removing a gem moves no published copy. A theme that still replaces its template is refused by the check (the owner's answer 3).
+
+The test fixture is `gallery/album` (`test/fixtures/block_types/gallery/`, registered through the hook by `with_gallery_album`, `test/support/gallery_album.rb`); `test/lib/content_spiel/plugins_test.rb` holds the hook. **Not built (step 2):** installing a gem into a site's image (the `Dockerfile` freezes the bundle), an engine's public and editor scripts (its import map and controllers), the stylesheet stamp covering the registered types' stylesheets, and a fixture engine loaded in a child process that proves the hook, the build, the check and `theme:new` from outside.
+
 ## Adding a block type: what the Code block touched
 
 The Code block is the first block type added after the registries were opened and the first to join the theme contract after it was written. This is what it touched, in the order a person would do it, with the test each step needs and the guard that is red until the step is done. It describes steps that were taken, so where the Code block did not need something (a column, a service, a migration) it says so and names what would have been needed. The Image block (`app/models/block_types/image.rb`, `app/components/blocks/image_component.rb`) is the other example to read beside it.

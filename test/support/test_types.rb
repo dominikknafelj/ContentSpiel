@@ -54,6 +54,13 @@ end
 # failure (an assertion, an unhandled error) still restores the registries
 # rather than leaking `test/*` types into every later test in this process.
 module TestTypes
+  # The two lines every block type declares (block types spec, decision 2),
+  # for a type a test registers to look at one other thing.
+  def self.declare(t)
+    t.theme_methods :block, :page
+    t.sample shows: [ "content-block" ]
+  end
+
   def with_test_types
     BlockTypes.register "test/quote" do |t|
       t.label "Quote"

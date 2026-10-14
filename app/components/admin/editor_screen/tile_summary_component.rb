@@ -94,12 +94,36 @@ module Admin
 
       def content
         if definition.nil? then t(".unavailable", type: block.block_type)
-        elsif definition.summary then drawn(definition.summary.call(block, locale: locale))
+        elsif definition.summary then own_summary
         elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
         elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
         elsif definition.capability?(:code) then code_line
         elsif definition.capability?(:lists_posts) then listing
         end
+      end
+
+      # The definitions whose faulty summary has been logged, so a page of
+      # twenty such tiles says it once (per registration: a reload makes new
+      # definitions, and says it again).
+      FAULTY = ObjectSpace::WeakMap.new
+
+      # A type's own line. An OUTSIDE type's summary is a gem's code: one that
+      # raises, or answers a part of no known kind, was a 500 on every editor
+      # page holding a block of the type, so its tile shows the type's label
+      # instead and the log says it once, naming the type and the error's
+      # class and never its message, which can quote the block's content. A
+      # built-in's is the CMS's own and raises, in the tests first.
+      def own_summary
+        drawn(definition.summary.call(block, locale: locale))
+      rescue StandardError => error
+        raise unless definition.owner
+
+        unless FAULTY.key?(definition)
+          FAULTY[definition] = true
+          said = "[ContentSpiel] the block type #{definition.name}'s summary could not be drawn (#{error.class}); its tiles show the type's label" # i18n-ok: a log line for whoever runs the site, not a word of CS Studio
+          Rails.logger.error(said)
+        end
+        definition.label
       end
 
       # A type's parts as `[text, class]`, its words looked up under the

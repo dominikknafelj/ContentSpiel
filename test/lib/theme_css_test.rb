@@ -32,7 +32,7 @@ class ThemeCssTest < ActiveSupport::TestCase
         ThemeCss::Block.new(stylesheet: gem.join("album.css"), source: gem),
         ThemeCss::Block.new(stylesheet: default.join("code.css"), source: nil)
       ]
-      relative = ->(path) { Pathname(path).relative_path_from(ROOT.join("tmp/theme")).to_s }
+      relative = ->(path) { Pathname(path).realpath.relative_path_from(ROOT.join("tmp/theme")).to_s }
 
       assert_equal <<~CSS, ThemeCss.entry(ThemeFolder.new(PLAIN), root: ROOT, blocks: blocks)
         @import "../../app/assets/tailwind/themes/default/theme.css";
@@ -56,6 +56,64 @@ class ThemeCssTest < ActiveSupport::TestCase
 
     assert_equal "../../test/fixtures/themes/plain/assets/stylesheets/theme.css", imports.last
     assert_equal "../../app/assets/tailwind/themes/default/theme.css", imports.first
+  end
+
+  # Task 3 review M3: Tailwind's watcher reports a changed file by its real
+  # path and compares it with the path it was told, so a gem reached
+  # through a link (a bundle path under a linked home, every temporary
+  # folder on macOS) is written by where it really is, as a theme is.
+  test "an outside type's stylesheet and folder are written by their real paths" do
+    Dir.mktmpdir("gem") do |dir|
+      real = Pathname(dir).realpath
+      real.join("gem").mkpath
+      real.join("gem/album.css").write("")
+      File.symlink(real.join("gem"), real.join("linked"))
+      linked = real.join("linked")
+      blocks = [ ThemeCss::Block.new(stylesheet: linked.join("album.css"), source: linked, type: "gallery/album") ]
+      relative = ->(path) { path.relative_path_from(ROOT.join("tmp/theme")).to_s }
+      entry = ThemeCss.entry(ThemeFolder.new(nil), root: ROOT, blocks: blocks)
+
+      assert_includes entry, %(@import "#{relative.(real.join("gem/album.css"))}";)
+      assert_includes entry, %(@source "#{relative.(real.join("gem"))}";)
+      assert_not_includes entry, "linked"
+    end
+  end
+
+  # Task 3 review M4: a gem's stylesheet that is gone (an engine being
+  # edited, a gem uninstalled under a running watch) is that type's, not
+  # "the theme folder cannot be read".
+  test "a type's stylesheet that is gone is named as that type's: by the glance, by the entry, and by the watch, which waits for it" do
+    Dir.mktmpdir("root") do |root|
+      sheet = Pathname(root).join("gem/album.css")
+      blocks = [ ThemeCss::Block.new(stylesheet: sheet, source: nil, type: "gallery/album") ]
+
+      assert_equal [ ThemeCss::UNREADABLE, Errno::ENOENT, "gallery/album" ], ThemeCss.sources_glance(ThemeFolder.new(nil), root: ROOT, blocks: blocks)
+      error = assert_raises(ThemeCss::MissingStylesheet) { ThemeCss.entry(ThemeFolder.new(nil), root: ROOT, blocks: blocks) }
+      assert_includes error.message, "gallery/album"
+      assert_includes error.message, sheet.to_s
+
+      script = File.join(root, "tailwind")
+      File.write(script, "#!/bin/sh\nexit 0\n")
+      File.chmod(0o755, script)
+      said = []
+      watch = Thread.new { ThemeCss.watch(ThemeFolder.new(nil), root: root, executable: script, blocks: blocks, every: 0.05, log: ->(line) { said << line }) }
+      begin
+        await { said.any? }
+        sleep 0.3 # sleep: six turns of the watch with the stylesheet gone
+        assert watch.alive?
+        assert_equal 1, said.size, said.inspect
+        assert_includes said.first, "theme_css:watch: the stylesheet of the block type gallery/album cannot be read (Errno::ENOENT)"
+        assert_not_includes said.first, "theme folder"
+
+        sheet.dirname.mkpath
+        sheet.write("")
+        await { !watch.alive? }
+        assert_not watch.alive?, "the watch builds once the stylesheet is back"
+      ensure
+        watch.kill
+        watch.join
+      end
+    end
   end
 
   test "a stylesheet the entry imports is watched: a change to it is a change of the sources" do

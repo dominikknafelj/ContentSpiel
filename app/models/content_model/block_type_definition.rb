@@ -32,6 +32,12 @@ module ContentModel
     TOKEN_NAME = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
     ACTION = /\A[a-z0-9]+(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)*#[a-zA-Z]\w*\z/
 
+    # A colour written as a value in an outside type's stylesheet (decision
+    # 3): a hex colour, or one of the functions that take numbers. Not
+    # `color-mix()`, which an outside type mixes its colours with, from the
+    # theme's base tokens.
+    COLOUR_LITERAL = /#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/
+
     # One filled block of the type (decision 14): `settings` (string keys),
     # `translations` (locale => values: translated schema fields and the
     # `caption` / `alt` columns), `body` (Markdown, written in the default
@@ -169,6 +175,18 @@ module ContentModel
       template if template&.file?
     end
 
+    # The folder of the component's source file, template or not: what the
+    # public stylesheet's build scans for an engine's utilities
+    # (`BlockTypes.theme_css_blocks`), and what the public readers' guard
+    # reads (test/lib/public_readers_test.rb). A component whose template is
+    # inline (`erb_template`) has no file beside it and still has a folder.
+    def component_folder
+      return nil unless component&.name
+
+      file, = Object.const_source_location(component.name)
+      file && Pathname(file).dirname
+    end
+
     # The tile calls `summary.call(block, locale:)`.
     def takes_block_and_locale?(callable)
       params = callable.respond_to?(:parameters) ? callable.parameters : callable.method(:call).parameters
@@ -196,7 +214,12 @@ module ContentModel
     # (`Admin::EditorScreen::TileSummaryComponent#code_line`), so a type that
     # claims the capability without all three was a `NoMethodError` in the
     # page editor the first time a block of it sat in a section.
+    #
+    # An outside type's own refusals come first (`refuse_outside!`): one
+    # that claims `:lists_posts` is told it may not, rather than which
+    # fields the claim would need.
     def finalize!
+      refuse_outside! if owner
       raise ArgumentError, "a container block type needs `columns`" if capability?(:container) && columns.nil?
 
       if capability?(:lists_posts)
@@ -208,6 +231,38 @@ module ContentModel
         missing = %w[language filename code] - fields.map(&:name)
         raise ArgumentError, "a code block type needs #{missing.join(' and ')} field(s)" if missing.any?
       end
+    end
+
+    private
+
+    # An outside type (a name with an owner) reaches only what has a seam
+    # (block types spec, decisions 3 and 12): neither `:container`, which is
+    # bound to the section classes and `BlockOutline`, nor `:lists_posts`,
+    # bound to `BlockTypes::PostList`'s criteria, which decide posts'
+    # addresses; tokens named after its owner, so two gems cannot claim one
+    # name and none a built-in's; a stylesheet of its own, given as an
+    # absolute path, whose colours are the theme's base tokens. The
+    # stylesheet is read here, once, at registration: one that is not there
+    # stops the boot as this type's, not as a bare system error.
+    def refuse_outside!
+      %i[container lists_posts].each do |capability|
+        refuse "a block type from outside may not claim :#{capability} (it has no seam for one yet)" if capability?(capability)
+      end
+      foreign = (themed_tokens + fixed_tokens).reject { |token| token.start_with?("#{owner}-") }
+      refuse "its tokens are named after its owner (#{owner}-…): #{foreign.inspect}" if foreign.any?
+      return if stylesheet.nil?
+
+      path = Pathname(stylesheet)
+      refuse "a stylesheet from outside is an absolute path under its own root (Engine.root.join(...)): #{stylesheet}" unless path.absolute?
+      source = begin
+        path.read
+      rescue SystemCallError => error
+        refuse "its stylesheet #{path} cannot be read (#{error.class})"
+      end
+      return unless source.match?(COLOUR_LITERAL)
+
+      refuse "its stylesheet holds a colour literal; an outside type's colours are defined from the theme's " \
+             "base tokens, as var() or color-mix() of them, so a theme that re-colours its base re-colours the block"
     end
   end
 end

@@ -39,6 +39,8 @@ require "tmpdir"
 # lines whose rows are right (an address, the tree, whether a record is
 # visible at all, the preview).
 class PublicReadersTest < ActiveSupport::TestCase
+  include GalleryAlbum
+
   # Controllers that are not public readers, each with why.
   NOT_PUBLIC_CONTROLLERS = {
     "application_controller.rb" => "the base of CS Studio and setup",
@@ -64,8 +66,17 @@ class PublicReadersTest < ActiveSupport::TestCase
   ].freeze
 
   # Folders of components that are public readers whether or not a template
-  # names them yet.
+  # names them yet: these four, and the folder of every registered block
+  # type's component (`block_type_folders`), so an engine's component is in
+  # the guard's reach wherever the engine keeps it.
   COMPONENT_FOLDERS = %w[blocks posts public rich_text].freeze
+
+  # Relative to the root where the folder is inside it; an engine's, outside
+  # it, as its absolute path. The four above are left to their own line.
+  def self.block_type_folders
+    own = COMPONENT_FOLDERS.map { |folder| root.join("app/components", folder) }
+    BlockTypes.all.filter_map(&:component_folder).uniq.reject { |folder| own.include?(folder) }
+  end
 
   # Files that name the components the public draws without a template doing so.
   REGISTRIES = %w[app/models/block_types app/models/content_types config/initializers/rich_text.rb].freeze
@@ -101,7 +112,8 @@ class PublicReadersTest < ActiveSupport::TestCase
     included = controllers.flat_map { |path| root.join(path).read.scan(/^\s*include\s+([A-Z]\w*)/).flatten.map { |name| "app/controllers/concerns/#{name.underscore}.rb" } }
     views = controllers.flat_map { |path| glob("app/views/#{File.basename(path, '_controller.rb')}/**/*.{erb,rb}") }
     layouts = glob("app/views/layouts/application.html.erb") + glob("app/views/layouts/public/**/*.erb") + glob("app/views/shared/**/*.erb")
-    components = COMPONENT_FOLDERS.flat_map { |folder| glob("app/components/#{folder}/**/*.rb") }
+    components = COMPONENT_FOLDERS.flat_map { |folder| glob("app/components/#{folder}/**/*.rb") } +
+                 block_type_folders.flat_map { |folder| folder.glob("**/*.rb").map { |path| relative(path) }.sort }
     (controllers + included.select { |path| File.exist?(root.join(path)) } + views + layouts + public_helpers + components + EXTRA).uniq
   end
 
@@ -156,6 +168,13 @@ class PublicReadersTest < ActiveSupport::TestCase
     end
     assert_empty files.grep(%r{\Aapp/components/admin/|\Aapp/controllers/admin/|\Aapp/views/admin/})
     assert_not_includes files, "app/controllers/preview_controller.rb"
+  end
+
+  test "an outside type's component is in the scanned set while the type is registered" do
+    with_gallery_album do
+      assert_includes self.class.files, "test/fixtures/block_types/gallery/album_component.rb"
+    end
+    assert_not_includes self.class.files, "test/fixtures/block_types/gallery/album_component.rb"
   end
 
   test "every public reader reaches a published record through its copy, or says on the line why the rows are right" do

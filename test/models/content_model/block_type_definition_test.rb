@@ -121,4 +121,54 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     d.component ContentModel::BlockTypeDefinition::Sample
     assert_nil d.component_template
   end
+
+  test "an outside type's token names start with its owner, and its stylesheet is an absolute path that holds no colour literal" do
+    saved = BlockTypes.all.dup
+    error = assert_raises(ArgumentError) { BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.tokens themed: %w[frame] } }
+    assert_includes error.message, "gallery-"
+
+    error = assert_raises(ArgumentError) { BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.stylesheet "album.css" } }
+    assert_includes error.message, "absolute"
+
+    Dir.mktmpdir do |dir|
+      sheet = Pathname(dir).join("album.css")
+      sheet.write(%(:root { --th-gallery-frame: #ff0000; }))
+      error = assert_raises(ArgumentError) { BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.tokens themed: %w[gallery-frame]; t.stylesheet sheet } }
+      assert_includes error.message, "colour"
+      assert_includes error.message, "var()"
+
+      [ "rgb(0,0,0)", "rgba(0,0,0,1)", "hsl(0 0% 0%)", "oklch(0.5 0 0)", "#fff" ].each do |literal|
+        sheet.write(%(.content-block--gallery-album { color: #{literal}; }))
+        assert_raises(ArgumentError, literal) { BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.stylesheet sheet } }
+      end
+      sheet.write(%(.content-block--gallery-album { color: color-mix(in oklab, var(--th-ink) 60%, var(--th-page)); }))
+      assert BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.stylesheet sheet }, "a mix of base tokens is no literal"
+    end
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # Task 3 review M4: a gem's missing stylesheet stops the boot as that
+  # type's, not as a bare Errno::ENOENT.
+  test "an outside type's stylesheet that is not there is refused with the type's name" do
+    saved = BlockTypes.all.dup
+    error = assert_raises(ArgumentError) { BlockTypes.register("gallery/album") { |t| TestTypes.declare(t); t.stylesheet Pathname("/nowhere/gallery/album.css") } }
+    assert_includes error.message, "gallery/album: "
+    assert_includes error.message, "/nowhere/gallery/album.css"
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # Task 3 review M5: an engine's component with no template of its own
+  # (an inline `erb_template`) still has a folder the build scans.
+  test "a component's folder is the folder of its source, with or without a template beside it" do
+    assert_equal Rails.root.join("app/components/blocks"), BlockTypes.fetch(:code).component_folder
+    d = definition
+    d.component TestQuoteComponent
+    assert_nil d.component_template
+    assert_equal Rails.root.join("test/support"), d.component_folder
+    assert_nil definition.component_folder
+  end
 end

@@ -5,6 +5,7 @@ require "test_helper"
 class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
   include ContentHelper
   include TestTypes
+  include LogCapture
 
   # `@site_page`, not `@page`: `render_inline` keeps its Capybara node in `@page`.
   setup do
@@ -44,11 +45,48 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     I18n.reload!
   end
 
-  test "a summary that answers a part of no known kind raises and names the kinds" do
+  # A built-in's summary is the CMS's own code: a fault in it fails loudly,
+  # in the tests first.
+  test "a built-in's summary that answers a part of no known kind raises and names the kinds" do
+    BlockTypes.fetch("code").summary(->(block, locale:) { [ [ :bold, "x" ] ] })
+    error = assert_raises(ArgumentError) { render_summary block("code") }
+    assert_includes error.message, "text, word, mono, hint"
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  # Task 4 review M2: an outside type's summary is a gem's code, and a fault
+  # in it was a 500 on every editor page that holds a block of the type. Its
+  # tile shows the type's label instead, and the log says it once per
+  # registration, naming the type and the error's class, never the block's
+  # content or the error's message, which can quote it.
+  test "an outside type's summary that raises or answers an unknown kind draws the type's label, and is logged once without the content" do
     with_test_types do
-      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :bold, "x" ] ] })
-      error = assert_raises(ArgumentError) { render_summary block("test/quote", settings: { "text" => "Q" }) }
-      assert_includes error.message, "text, word, mono, hint"
+      quote = block("test/quote", settings: { "text" => "Private words" })
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { raise "no #{block.settings_object.text}" })
+      log = capture_log([ Rails ]) do
+        2.times do
+          render_summary quote
+          assert_equal "Quote", page.find(line).text
+        end
+      end
+      assert_equal 1, log.scan("test/quote").size, log
+      assert_includes log, "RuntimeError"
+      assert_not_includes log, "Private words"
+
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :bold, block.settings_object.text ] ] })
+      log = capture_log([ Rails ]) { render_summary quote }
+      assert_equal "Quote", page.find(line).text
+      assert_empty log, "said once for the type's registration"
+    end
+
+    with_test_types do
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :bold, block.settings_object.text ] ] })
+      log = capture_log([ Rails ]) { render_summary block("test/quote", settings: { "text" => "Private words" }) }
+      assert_equal "Quote", page.find(line).text
+      assert_includes log, "test/quote"
+      assert_includes log, "ArgumentError"
+      assert_not_includes log, "Private words"
     end
   end
 

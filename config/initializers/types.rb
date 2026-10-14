@@ -3,7 +3,10 @@
 # a code reload in development re-registers against the freshly loaded
 # classes; the registries are reset first, so nothing is registered twice
 # (`register` itself raises `ContentModel::DuplicateType` on a name that's
-# already taken -- see `ContentModel::Registry#register`).
+# already taken -- see `ContentModel::Registry#register`). The block types
+# from outside the CMS, which a gem hands to `ContentSpiel::Plugins.block_types`
+# once, are replayed here after the built-ins on every run, and the theme is
+# prepared last, because its check reads the types registered above it.
 Rails.application.config.to_prepare do
   # On a development reload (`ThemeFolder.booted?`), a registration that
   # raises (a definition being edited) is kept for the theme below, which
@@ -22,6 +25,11 @@ Rails.application.config.to_prepare do
     BlockTypes::Code.register
     BlockTypes::PostList.register
     BlockTypes::Section.register
+
+    # Block types from outside the CMS, after every built-in, in the order
+    # their hooks were called (lib/content_spiel/plugins.rb). That is the
+    # picker's order too.
+    ContentSpiel::Plugins.register_block_types(BlockTypes)
 
     # Registration order matters: it defines `names` order and
     # `ContentTypes.default` (the first one registered -- `blog`).
