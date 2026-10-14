@@ -23,6 +23,35 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
   # The line itself, without the mark and the thumbnail beside it.
   def line = ".admin-block-tile__summary > span:last-child"
 
+  # Block types spec, decision 8: a type's tile line is data its definition
+  # answers, drawn here; its words are CS Studio's, under the type's own
+  # scope (a slash in the name read as a dot). Parts of one look stand as
+  # one: the line's markup is what it was when the tile wrote them itself.
+  test "a type's summary is drawn part by part: text and words plain, code in the monospace face, a hint in the meta colour" do
+    I18n.backend.store_translations(:en, admin: { components: { editor_screen: { tile_summary: { types: { test: { quote: { by: "by %{who}", none: "Nothing yet" } } } } } } })
+    with_test_types do
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :word, :by, { who: "Ada" } ], [ :text, " · " ], [ :mono, "q = 1" ] ] })
+      render_summary block("test/quote", settings: { "text" => "Q" })
+      assert_equal "by Ada · q = 1", page.find(line).text
+      assert_selector "#{line} > span.font-cs-mono", exact_text: "q = 1", count: 1
+      assert_equal "by Ada · ", Nokogiri::HTML5.fragment(rendered_content).at_css(line).children.first.text, "the plain parts are one text, as before"
+
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :hint, :none ] ] })
+      render_summary block("test/quote", settings: { "text" => "Q" })
+      assert_selector "#{line} > span.text-meta", exact_text: "Nothing yet"
+    end
+  ensure
+    I18n.reload!
+  end
+
+  test "a summary that answers a part of no known kind raises and names the kinds" do
+    with_test_types do
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :bold, "x" ] ] })
+      error = assert_raises(ArgumentError) { render_summary block("test/quote", settings: { "text" => "Q" }) }
+      assert_includes error.message, "text, word, mono, hint"
+    end
+  end
+
   test "it is the element the save answer replaces" do
     text = block("rich_text")
     render_summary(text)

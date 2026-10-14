@@ -16,6 +16,10 @@ module Admin
     # that matches. A type with neither, no code and no listing has no line
     # at all; its tile is its label.
     #
+    # A type that declares `summary` answers its own line as parts (block
+    # types spec, decision 8) and that is drawn first; a type without one
+    # keeps the rules above, from the columns it uses.
+    #
     # THE LINE IS PARTS (`parts`: text and, where it has a look of its own,
     # a class), because a code block's is two (design answer C7): its
     # language in the tile's own face and its first line of code in the
@@ -41,6 +45,12 @@ module Admin
     class TileSummaryComponent < AdminComponent
       LENGTH = 80
       SEPARATOR = " · ".freeze
+
+      # A summary part's kind => the class it is drawn in (nil: plain). The
+      # set is closed; a type's summary answers nothing else (block types
+      # spec, decision 8; `:hint` is the meta colour the Code block's "Empty"
+      # was drawn in before the line moved into the type).
+      LOOKS = { text: nil, word: nil, mono: "font-cs-mono", hint: "text-meta" }.freeze
 
       def self.dom_id(block) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-tile-summary"
 
@@ -84,11 +94,28 @@ module Admin
 
       def content
         if definition.nil? then t(".unavailable", type: block.block_type)
+        elsif definition.summary then drawn(definition.summary.call(block, locale: locale))
         elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
         elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
         elsif definition.capability?(:code) then code_line
         elsif definition.capability?(:lists_posts) then listing
         end
+      end
+
+      # A type's parts as `[text, class]`, its words looked up under the
+      # type's own scope, and parts of one look joined, so the markup is what
+      # the tile drew when it wrote the line itself.
+      def drawn(parts)
+        Array(parts).map do |kind, value, values = {}|
+          raise ArgumentError, "#{block.block_type}'s summary answered a part of kind #{kind.inspect}: a part is one of #{LOOKS.keys.join(", ")}" unless LOOKS.key?(kind)
+
+          look = LOOKS.fetch(kind)
+          [ %i[word hint].include?(kind) ? word(value, **values) : value.to_s, look ]
+        end.slice_when { |a, b| a.last != b.last }.map { |run| [ run.map(&:first).join, run.first.last ] }
+      end
+
+      def word(key, **values)
+        t("admin.components.editor_screen.tile_summary.types.#{block.block_type.tr("/", ".")}.#{key}", **values)
       end
 
       # A listing's filter: the content type it lists (or "All posts"), then

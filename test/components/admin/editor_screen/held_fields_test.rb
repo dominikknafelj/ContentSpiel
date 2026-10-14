@@ -9,6 +9,17 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
   include ContentHelper
   include TestTypes
 
+  # The CMS's own four, decided HERE (the file's rule: a new survivor fails
+  # until someone classifies it). A type's own read-only actions are its
+  # definition's (block types spec, decision 10), checked against its
+  # controller file below.
+  CMS = %w[
+    admin--editor--slug-preview#update
+    admin--rich-text--editor#containFocus
+    admin--ui--menu#select
+    admin--ui--menu#close
+  ].freeze
+
   def held(html, **options) = Admin::EditorScreen::HeldFields.call(html, **options)
 
   test "text controls are readonly, the rest is disabled, hidden fields and values are untouched" do
@@ -114,7 +125,7 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     "focusout->admin--rich-text--editor#containFocus",
     "click->admin--ui--menu#select",
     "click->admin--ui--menu#close",
-    "input->admin--editor--code-limit#update"
+    "input->admin--editor--code-limit#update" # the Code type's, until it declares it (block types plan, Task 8)
   ].freeze
 
   def assert_survives(html)
@@ -213,9 +224,32 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     rules = Admin::EditorScreen::HeldFields.rules
 
     assert_equal %i[allowed_actions hidden_types readonly_types], rules.keys.sort
-    assert_same Admin::EditorScreen::HeldFields::ALLOWED_ACTIONS, rules[:allowed_actions]
+    assert_equal Admin::EditorScreen::HeldFields.allowed_actions, rules[:allowed_actions]
     assert_same Admin::EditorScreen::HeldFields::READONLY_TYPES, rules[:readonly_types]
     assert_same Admin::EditorScreen::HeldFields::HIDDEN_TYPES, rules[:hidden_types]
+  end
+
+  test "the allow-list is the CMS's four and every type's declared read-only actions, each a method of a controller file" do
+    assert_equal CMS, Admin::EditorScreen::HeldFields::CMS_ACTIONS
+    declared = BlockTypes.all.flat_map(&:read_only_actions)
+    assert_equal (CMS + Admin::EditorScreen::HeldFields::WRITTEN_TYPE_ACTIONS + declared).uniq, Admin::EditorScreen::HeldFields.allowed_actions
+
+    (declared + Admin::EditorScreen::HeldFields::WRITTEN_TYPE_ACTIONS).each do |action|
+      identifier, method = action.split("#")
+      file = Rails.root.join("app/javascript/controllers", "#{identifier.split("--").join("/").tr("-", "_")}_controller.js")
+      assert file.file?, "#{action} names no controller file (#{file.relative_path_from(Rails.root)})"
+      assert_match(/^\s*(?:async\s+)?#{Regexp.escape(method)}\s*\(/, file.read, "#{action}: the controller defines no #{method}")
+    end
+  end
+
+  test "an action a type declares survives in a held form, and only while the type declares it" do
+    html = %(<input type="text" name="block[settings][text]" data-action="input->admin--ui--char-count#update">)
+    assert_empty Nokogiri::HTML5.fragment(held(html)).css("[data-action]")
+
+    with_test_types do
+      BlockTypes.fetch("test/quote").read_only_actions("admin--ui--char-count#update")
+      assert_equal "input->admin--ui--char-count#update", Nokogiri::HTML5.fragment(held(html)).at_css("input")["data-action"]
+    end
   end
 
   test "a code block's card, rewritten; held by someone else its code is read-only with its indentation, its select disabled, and no save is wired" do

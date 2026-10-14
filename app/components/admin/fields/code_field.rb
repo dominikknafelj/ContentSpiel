@@ -81,7 +81,7 @@ module Admin
         }
       end
 
-      # The script only reads the field (`HeldFields::ALLOWED_ACTIONS`).
+      # The script only reads the field (`HeldFields.allowed_actions`, from the type's `read_only_actions`).
       def input_data = counter? ? { "admin--editor--code-limit-target": "input", action: "input->admin--editor--code-limit#update" } : {}
 
       private
