@@ -6,6 +6,7 @@ require "securerandom"
 # an entry file this module writes:
 #
 #   @import "<default theme>/theme.css";              tokens, base, prose, sections, the default templates' utilities
+#   @import "<a type's stylesheet>";                  each registered block type's, in registration order (block types spec, decision 7)
 #   @import "<theme>/assets/stylesheets/theme.css";   the theme's own styles
 #   @source "<default theme>";                        for the watch alone, see below
 #   @source "<theme>/assets/stylesheets";             for the watch alone
@@ -20,7 +21,13 @@ require "securerandom"
 #   fallback real, and why the preview bar keeps its look under any theme;
 # - a theme may write plain CSS or Tailwind utilities, through the same
 #   executable.
-# Both imports come before the `@source` lines: an `@import` after another
+# The default theme's own stylesheets (tokens, base, prose, sections) come
+# first by this fixed rule whatever the registration order (the owner's answer
+# 4), then each registered type's stylesheet once, then the theme's, so a
+# theme still re-colours a block by declaring its token again.
+# `theme_css:watch` reads the types once when it starts, so a new type's
+# stylesheet needs the watch restarted.
+# All the imports come before the `@source` lines: an `@import` after another
 # rule is not an import.
 #
 # THE TWO `@source` LINES THAT NAME A FOLDER OF STYLESHEETS add nothing to
@@ -64,15 +71,31 @@ module ThemeCss
   ENTRY = "tmp/theme/entry.css".freeze
   OUTPUT = "app/assets/builds/theme.css".freeze
 
+  # A registered block type's part of the build (block types spec, decision
+  # 7): its stylesheet, imported after the default theme's own and before the
+  # theme's, and the folder of its component when that is not
+  # app/components/blocks (which the default theme's own `@source` line
+  # scans), so utilities in an engine's template are built. Handed in by the
+  # caller (lib/tasks/theme_css.rake, from `BlockTypes.theme_css_blocks`):
+  # this file loads before the application and reads no registry.
+  Block = Data.define(:stylesheet, :source)
+
   module_function
 
-  def entry(folder, root:)
+  def entry(folder, root:, blocks: [])
     from = Pathname(root).join(ENTRY).dirname
     relative = ->(path) { Pathname(path).relative_path_from(from).to_s }
     default = Pathname(root).join(DEFAULT)
 
     imports = [ default ]
     sources = [ default.dirname ]
+    blocks.each do |block|
+      next unless block.stylesheet
+
+      imports << Pathname(block.stylesheet)
+      sources << Pathname(block.stylesheet).dirname
+    end
+    sources.concat(blocks.filter_map { |block| block.source && Pathname(block.source) })
     if folder.configured?
       theme = folder.path.realpath
       if (stylesheet = folder.stylesheet&.relative_path_from(folder.path))
@@ -85,14 +108,14 @@ module ThemeCss
       sources.concat(%w[views components javascript].map { |name| theme.join(name) }.select(&:directory?))
     end
 
-    lines = imports.map { |path| %(@import "#{relative.(path)}";) } + sources.map { |path| %(@source "#{relative.(path)}";) }
+    lines = imports.uniq.map { |path| %(@import "#{relative.(path)}";) } + sources.uniq.map { |path| %(@source "#{relative.(path)}";) }
     lines.join("\n") + "\n"
   end
 
-  def write_entry(folder, root:)
+  def write_entry(folder, root:, blocks: [])
     path = Pathname(root).join(ENTRY)
     FileUtils.mkdir_p(path.dirname)
-    path.write(entry(folder, root: root))
+    path.write(entry(folder, root: root, blocks: blocks))
     path
   end
 
@@ -138,10 +161,10 @@ module ThemeCss
   # build's included. And it is the fingerprint read BEFORE the build: a
   # file of the theme changed while the executable ran may or may not be in
   # the output, so the folder then no longer matches its stamp.
-  def build(folder, root:, executable:)
+  def build(folder, root:, executable:, blocks: [])
     fingerprint = folder.fingerprint
     unstamp!(root: root)
-    write_entry(folder, root: root)
+    write_entry(folder, root: root, blocks: blocks)
     system(*command(root: root, executable: executable), exception: true)
     stamp!(folder, root: root, fingerprint: fingerprint)
   end
@@ -200,7 +223,7 @@ module ThemeCss
   # keeper has looked since something happened, which is the tests: they
   # waited a third of a second for that instead, and a keeper that had not
   # had its turn by then failed them as the defect above did.
-  def keep_stamped(folder, root:, build:, every: 1, log: ->(line) { warn line })
+  def keep_stamped(folder, root:, build:, blocks: [], every: 1, log: ->(line) { warn line })
     return nil unless folder.configured?
 
     mine = ThemeFolder.stamp(root)
@@ -220,7 +243,7 @@ module ThemeCss
           if stamp == fingerprint
             mine = stamp
           elsif stamp == mine
-            write_entry(folder, root: root) unless current_entry?(folder, root: root)
+            write_entry(folder, root: root, blocks: blocks) unless current_entry?(folder, root: root, blocks: blocks)
             if build.call
               stamp!(folder, root: root, fingerprint: fingerprint)
               mine = fingerprint
@@ -275,12 +298,12 @@ module ThemeCss
   # The stamp's keeper runs only beside the watcher, where nobody else hears
   # whether a build succeeded. While this loop builds and waits it is the
   # only builder and the only voice.
-  def watch(folder, root:, executable:, every: 1, log: ->(line) { warn line })
+  def watch(folder, root:, executable:, blocks: [], every: 1, log: ->(line) { warn line })
     command = command(root: root, executable: executable)
     unreadable = nil
 
     loop do
-      seen = sources_glance(folder, root: root)
+      seen = sources_glance(folder, root: root, blocks: blocks)
       if seen.first == UNREADABLE
         unless unreadable == seen
           log.call("theme_css:watch: the theme folder cannot be read (#{seen.last}). The watch goes on, and looks again " \
@@ -292,21 +315,21 @@ module ThemeCss
       end
       unreadable = nil
 
-      break if build_for_watch(folder, root: root, executable: executable) && watched(folder, command, root: root, every: every, log: log)
+      break if build_for_watch(folder, root: root, executable: executable, blocks: blocks) && watched(folder, command, root: root, blocks: blocks, every: every, log: log)
 
       log.call("theme_css:watch: the public stylesheet did not build; what Tailwind said of it is above. The watch goes on, " \
                "and builds again when a file of the theme or of the default theme's styles changes.")
       loop do
         sleep every
-        break unless sources_glance(folder, root: root) == seen
+        break unless sources_glance(folder, root: root, blocks: blocks) == seen
       end
     end
   end
 
   # Tailwind's watcher, with the stamp kept true beside it for as long as it
   # runs. Answers how the watcher ended, as `system` does.
-  def watched(folder, command, root:, every:, log:)
-    keeper = keep_stamped(folder, root: root, every: every, log: log, build: -> { system(*command, out: File::NULL, err: File::NULL) })
+  def watched(folder, command, root:, every:, log:, blocks: [])
+    keeper = keep_stamped(folder, root: root, blocks: blocks, every: every, log: log, build: -> { system(*command, out: File::NULL, err: File::NULL) })
     system(*command, "-w")
   ensure
     keeper&.kill
@@ -314,22 +337,23 @@ module ThemeCss
 
   # `build`, answering whether it succeeded: a failed executable is the
   # watch's to say and to wait out, not an exception's.
-  def build_for_watch(folder, root:, executable:)
-    build(folder, root: root, executable: executable)
+  def build_for_watch(folder, root:, executable:, blocks: [])
+    build(folder, root: root, executable: executable, blocks: blocks)
     true
   rescue RuntimeError, SystemCallError, ThemeFolder::Invalid
     false
   end
 
   # What the build reads, without reading a file: the theme's folder
-  # (`ThemeFolder#glance`) and the default theme's stylesheets, by name,
+  # (`ThemeFolder#glance`), the default theme's stylesheets and each type's, by name,
   # size and time. A folder that cannot be listed is `[UNREADABLE, the
   # error's class]`: the same answer for as long as the same thing is wrong,
   # so two looks at it are equal and a wait on it waits.
   UNREADABLE = :unreadable
 
-  def sources_glance(folder, root:)
-    styles = Dir.glob(Pathname(root).join(DEFAULT).dirname.join("**/*").to_s).sort.filter_map do |file|
+  def sources_glance(folder, root:, blocks: [])
+    files = Dir.glob(Pathname(root).join(DEFAULT).dirname.join("**/*").to_s) + blocks.filter_map { |block| block.stylesheet&.to_s }
+    styles = files.uniq.sort.filter_map do |file|
       status = File.stat(file)
       [ file, status.size, status.mtime.to_f ] if status.file?
     end
@@ -338,8 +362,8 @@ module ThemeCss
     [ UNREADABLE, error.class ]
   end
 
-  def current_entry?(folder, root:)
+  def current_entry?(folder, root:, blocks: [])
     path = Pathname(root).join(ENTRY)
-    path.file? && path.read == entry(folder, root: root)
+    path.file? && path.read == entry(folder, root: root, blocks: blocks)
   end
 end

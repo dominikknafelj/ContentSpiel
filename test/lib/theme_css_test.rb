@@ -16,6 +16,60 @@ class ThemeCssTest < ActiveSupport::TestCase
     CSS
   end
 
+  # Block types spec, decision 7, and the owner's answer 4: the default
+  # theme's own file first (its tokens, prose and sections), then each
+  # registered type's stylesheet once, in registration order, then the
+  # theme's; a component outside app/components/blocks (an engine's) has its
+  # folder scanned, and an outside stylesheet's folder is watched.
+  test "the entry imports the default theme, each registered stylesheet once in registration order, then the theme's, and scans an outside component's folder" do
+    Dir.mktmpdir("gem") do |dir|
+      gem = Pathname(dir)
+      gem.join("album.css").write("")
+      default = ROOT.join("app/assets/tailwind/themes/default")
+      blocks = [
+        ThemeCss::Block.new(stylesheet: default.join("code.css"), source: nil),
+        ThemeCss::Block.new(stylesheet: nil, source: nil),
+        ThemeCss::Block.new(stylesheet: gem.join("album.css"), source: gem),
+        ThemeCss::Block.new(stylesheet: default.join("code.css"), source: nil)
+      ]
+      relative = ->(path) { Pathname(path).relative_path_from(ROOT.join("tmp/theme")).to_s }
+
+      assert_equal <<~CSS, ThemeCss.entry(ThemeFolder.new(PLAIN), root: ROOT, blocks: blocks)
+        @import "../../app/assets/tailwind/themes/default/theme.css";
+        @import "../../app/assets/tailwind/themes/default/code.css";
+        @import "#{relative.(gem.join("album.css"))}";
+        @import "../../test/fixtures/themes/plain/assets/stylesheets/theme.css";
+        @source "../../app/assets/tailwind/themes/default";
+        @source "#{relative.(gem)}";
+        @source "../../test/fixtures/themes/plain/assets/stylesheets";
+        @source "../../test/fixtures/themes/plain/views";
+        @source "../../test/fixtures/themes/plain/components";
+        @source "../../test/fixtures/themes/plain/javascript";
+      CSS
+    end
+  end
+
+  # Review focus 4: a theme re-colours a block by declaring its token again,
+  # which works only while the theme's stylesheet comes last.
+  test "a theme's stylesheet is imported after every type's, so a block token it declares again wins" do
+    imports = ThemeCss.entry(ThemeFolder.new(PLAIN), root: ROOT, blocks: BlockTypes.theme_css_blocks).scan(/^@import "([^"]+)";$/).flatten
+
+    assert_equal "../../test/fixtures/themes/plain/assets/stylesheets/theme.css", imports.last
+    assert_equal "../../app/assets/tailwind/themes/default/theme.css", imports.first
+  end
+
+  test "a stylesheet the entry imports is watched: a change to it is a change of the sources" do
+    Dir.mktmpdir("gem") do |dir|
+      sheet = Pathname(dir).join("album.css")
+      sheet.write("a {}")
+      blocks = [ ThemeCss::Block.new(stylesheet: sheet, source: Pathname(dir)) ]
+      before = ThemeCss.sources_glance(ThemeFolder.new(nil), root: ROOT, blocks: blocks)
+      sheet.write("a { color: red; }")
+
+      assert_not_equal before, ThemeCss.sources_glance(ThemeFolder.new(nil), root: ROOT, blocks: blocks)
+    end
+  end
+
   # The scripts too: a utility a controller adds (`classList.add("hidden")`)
   # and no template writes would otherwise be built for nobody, in silence.
   test "with a theme the entry imports the default first, then the theme's stylesheet, and scans the theme's templates and scripts" do

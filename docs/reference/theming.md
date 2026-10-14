@@ -118,15 +118,19 @@ So the replaceable components are exactly those the type registries hand out, ea
 
 ```
 @import "<default theme>/theme.css";              tokens, base, prose, sections, the default templates' utilities
+@import "<a type's stylesheet>";                  each registered block type's, in registration order
 @import "<theme>/assets/stylesheets/theme.css";   the theme's own styles
 @source "<default theme>";                        for the watch alone
+@source "<a type's component folder>";            only for a component outside app/components/blocks
 @source "<theme>/assets/stylesheets";             for the watch alone
 @source "<theme>/views";                          so utilities in the theme's templates are built
 @source "<theme>/components";
 @source "<theme>/javascript";                     so a utility only a controller writes is built too
 ```
 
-Without a theme only the first and the third line are there. A line is left out for what the theme does not have. Both imports come before the `@source` lines: an `@import` after another rule is not an import. What follows from the order:
+Without a theme only the first and the fourth line are there (a type's own lines are there for each type that declares a stylesheet). A line is left out for what the theme does not have.
+
+**The types' stylesheets, and their order.** The default theme's own stylesheets (`theme.css` with the tokens, base, prose and sections it imports) come FIRST by a fixed rule of the entry, whatever the registration order (the owner's answer 4); then each registered type's stylesheet once, in registration order; then the theme's, so a theme still re-colours a block by declaring its token again. `lib/theme_css.rb` loads before the application and reads no registry: `BlockTypes.theme_css_blocks` hands it a list of `ThemeCss::Block` (`stylesheet:`, an absolute path or nil, and `source:`, the folder of the type's component when that is not `app/components/blocks`, which the default theme's own `@source` line scans, so utilities in an engine's template are built). `ThemeCss.build`, `watch`, `sources_glance` and `entry` take it as `blocks:`; the watch reads the types once when it starts, so a new type's stylesheet needs it restarted. A stylesheet a type declares is watched like the default theme's (its folder is a `@source`, and `sources_glance` lists its file). **The `@theme inline` mapping stays hand-written for the shared tokens**: a type's tokens are not utilities, and one that wants a utility writes its own `@theme inline` in its stylesheet. Both imports come before the `@source` lines: an `@import` after another rule is not an import. What follows from the order:
 
 - **A theme changes a token by declaring it again, and copies nothing.**
 - **A template the theme does not replace is still styled**, because the default theme's styles are always in the build. That is what makes the fallback real, and why the preview bar keeps its look under any theme. A build that left them out would unstyle every template a theme does not replace.

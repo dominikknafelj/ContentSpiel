@@ -179,7 +179,28 @@ class Theme::ContractTest < ActiveSupport::TestCase
     Theme::Contract::HELPERS.each { |name| assert_includes available, name.to_sym }
   end
 
-  test "every token is defined, a themed one for light and for dark, and no other --th- name is" do
+  # A type with an owner's own stylesheet (one outside the default theme's
+  # folder) defines its tokens there, in the same three blocks; every other
+  # type's are in tokens.css (block types spec, decision 7). Today no type
+  # has an owner, so the second half runs from Task 6 on (its gallery).
+  test "every declared token is defined, a themed one for light and for dark, and no --th- name is undeclared" do
+    default_folder = Rails.root.join("app/assets/tailwind/themes/default")
+    owned = BlockTypes.all.select { |definition| (path = definition.stylesheet_path) && path.dirname != default_folder }
+    owned.each do |definition|
+      sheet = definition.stylesheet_path.read
+      light = sheet[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1].to_s.scan(/(--th-[\w-]+):/).flatten.sort
+      dark = sheet[/^\[data-theme="dark"\]\s*\{(.*?)\}/m, 1].to_s.scan(/(--th-[\w-]+):/).flatten.sort
+      fixed = sheet[/^:root \{(.*?)\}/m, 1].to_s.scan(/(--th-[\w-]+):/).flatten.sort
+      themed = definition.themed_tokens.map { |name| "--th-#{name}" }.sort
+      assert_equal themed, light, "#{definition.name}: the light block of its stylesheet defines its themed tokens"
+      assert_equal themed, dark, "#{definition.name}: the dark block of its stylesheet defines its themed tokens"
+      assert_equal definition.fixed_tokens.map { |name| "--th-#{name}" }.sort, fixed, "#{definition.name}: its :root block defines its fixed tokens"
+    end
+    owned_themed = owned.flat_map(&:themed_tokens)
+    owned_fixed = owned.flat_map(&:fixed_tokens)
+    contract_themed = Theme::Contract.themed_tokens - owned_themed
+    contract_fixed = Theme::Contract.fixed_tokens - owned_fixed
+
     css = TOKENS_CSS.read
     names = ->(block) { block.to_s.scan(/(--th-[\w-]+):/).flatten }
     light = names.(css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1])
@@ -201,9 +222,9 @@ class Theme::ContractTest < ActiveSupport::TestCase
     assert_not_empty light
     assert_not_empty dark
     assert_not_empty fixed
-    differ.(Theme::Contract.themed_tokens, light, "THEMED_TOKENS", "the light block")
-    differ.(Theme::Contract.themed_tokens, dark, "THEMED_TOKENS", "the dark block")
-    differ.(Theme::Contract.fixed_tokens, fixed, "FIXED_TOKENS", "the fixed block")
+    differ.(contract_themed, light, "THEMED_TOKENS", "the light block")
+    differ.(contract_themed, dark, "THEMED_TOKENS", "the dark block")
+    differ.(contract_fixed, fixed, "FIXED_TOKENS", "the fixed block")
     assert_equal Theme::Contract.tokens.sort, (prefixed.(Theme::Contract.themed_tokens) + prefixed.(Theme::Contract.fixed_tokens)).sort
     assert_equal %w[--th-ph-a --th-ph-b --th-preview-bg --th-preview-ink], own.(light + fixed).sort, "the CMS's own tokens"
     assert_empty Theme::Contract.tokens.grep(Theme::Contract::OWN_TOKENS)
@@ -211,7 +232,7 @@ class Theme::ContractTest < ActiveSupport::TestCase
   end
 
   test "the default theme's styles and templates hold no colour literal: tokens.css is the one place" do
-    styles = %w[theme.css prose.css sections.css code.css].map { |name| Rails.root.join("app/assets/tailwind/themes/default", name) }
+    styles = (Rails.root.glob("app/assets/tailwind/themes/default/*.css") - [ TOKENS_CSS ] + BlockTypes.all.filter_map(&:stylesheet_path)).uniq
     styles.each { |path| assert_no_match COLOUR, path.read, "#{path.basename} holds a colour" }
 
     templates = Theme::Contract::TEMPLATES.keys.map { |path| Rails.root.join("app/views", path) } +
