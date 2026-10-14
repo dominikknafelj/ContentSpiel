@@ -10,5 +10,20 @@ Description:
     sample, and two tests. An owner/name type is an engine's, and its
     generator is not built yet (block types spec, step 2).
 
+    A name is refused when it is no lowercase words joined by underscores,
+    does not come back from its class name, is read by YAML as true, false
+    or nil, is a constant of the application (Post, Tag, Blocks: the
+    type's module would shadow it inside module BlockTypes), is a block
+    type already, is a stylesheet of the default theme (tokens, prose), or
+    when any file it would write exists.
+
+    destroy removes the files and the three lines, and only for a type whose
+    definition (and stylesheet) still carry the line "Written by bin/rails
+    generate block_type": a built-in, a stylesheet of the default theme or
+    a type whose line was taken out is refused, and nothing is removed. A
+    scope that has been filled is not "<name>: {}" any more and stays in its
+    locale file.
+
 Example:
     bin/rails generate block_type callout
+    bin/rails destroy block_type callout

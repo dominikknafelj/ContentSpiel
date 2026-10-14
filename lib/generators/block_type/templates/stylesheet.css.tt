@@ -1,5 +1,12 @@
 /* The <%= human_name.downcase %> block's public styles. Every colour is a --th- token:
    a built-in's token values are written in tokens.css, light and dark, and
-   declared in the type's `tokens` (block types spec, decision 3). */
+   declared in the type's `tokens` (block types spec, decision 3). A block's
+   token is defined from the theme's base tokens (var(--th-ink),
+   color-mix() of --th-accent and --th-surface, ...) wherever one is right,
+   so a theme that re-colours its base re-colours the block, and holds a
+   literal only where no base token is.
+   Written by bin/rails generate block_type: while this line stands, bin/rails
+   destroy block_type <%= file_name %> removes this file. Take it out once the
+   stylesheet is yours. */
 .content-block--<%= file_name %> {
 }

@@ -2,6 +2,9 @@ module BlockTypes
   # A <%= human_name.downcase %> block. Say here what it is for, where each of
   # its values is stored and why (docs/reference/content-blocks-and-types.md,
   # "Adding a block type").
+  #
+  # Written by bin/rails generate block_type: while this line stands, bin/rails
+  # destroy block_type <%= file_name %> removes the type. Take it out once the type is yours.
   module <%= class_name %>
     def self.register
       BlockTypes.register :<%= file_name %> do |t|

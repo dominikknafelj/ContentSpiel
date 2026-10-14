@@ -27,12 +27,16 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
   end
 
   test "the ledger can fail: a method dropped from a built-in's line, and a token renamed, are each named" do
-    dropped = built_in_components.merge("blocks/image_component" => %w[block page asset alt caption])
+    # The ledger's own components, so a built-in added since (the moment the
+    # test above goes red) does not make this one red too, with a message
+    # that says nothing about why.
+    ledgered = built_in_components.slice(*COMPONENTS.keys)
+    dropped = ledgered.merge("blocks/image_component" => %w[block page asset alt caption])
     error = assert_raises(Minitest::Assertion) { assert_ledger(components: dropped) }
     assert_includes error.message, "the methods of blocks/image_component"
 
     renamed = built_in(Theme::Contract.themed_tokens, :themed_tokens).map { |name| name == "syn-attribute" ? "syn-attr" : name }
-    error = assert_raises(Minitest::Assertion) { assert_ledger(themed: renamed) }
+    error = assert_raises(Minitest::Assertion) { assert_ledger(components: ledgered, themed: renamed) }
     assert_includes error.message, "the themed tokens, in order"
   end
 end
