@@ -48,11 +48,23 @@ module ContentModel
 
     attr_reader :themed_tokens, :fixed_tokens
 
-    dsl_attribute :stylesheet
+    # Every refusal of a declaration starts with the type's name, so a boot
+    # that stops on a gem's block type says whose it is.
+    def refuse(message) = raise(ArgumentError, "#{name}: #{message}")
+    private :refuse
+
+    # The stylesheet the type brings: a String (or a Pathname, for an outside
+    # type's absolute path) naming a .css file.
+    def stylesheet(path = nil)
+      return @stylesheet if path.nil?
+      refuse "stylesheet is a path to a .css file, written as a String: #{path.inspect}" unless (path.is_a?(String) || path.is_a?(Pathname)) && path.to_s.strip != "" && path.to_s.end_with?(".css")
+
+      @stylesheet = path
+    end
 
     def uses(*columns)
       unknown = columns.map(&:to_s) - COLUMNS
-      raise ArgumentError, "a block type uses #{COLUMNS.join(", ")} and no other column; #{unknown.join(", ")} is drawn and saved by nothing" if unknown.any?
+      refuse "a block type uses #{COLUMNS.join(", ")} and no other column; #{unknown.join(", ")} is drawn and saved by nothing" if unknown.any?
 
       super
     end
@@ -64,7 +76,7 @@ module ContentModel
 
       names = names.map(&:to_s)
       bad = names.grep_v(METHOD_NAME)
-      raise ArgumentError, "theme_methods takes a method's name, lowercase: #{bad.inspect}" if bad.any?
+      refuse "theme_methods takes a method's name, lowercase: #{bad.inspect}" if bad.any?
 
       @theme_methods = names.freeze
     end
@@ -72,10 +84,14 @@ module ContentModel
     # The `--th-` tokens the type brings, without the prefix: `themed` have a
     # value for light and one for dark, `fixed` have one.
     def tokens(themed: [], fixed: [])
+      refuse "tokens are given as arrays of names (themed: [...], fixed: [...])" unless themed.is_a?(Array) && fixed.is_a?(Array)
+
       themed = themed.map(&:to_s)
       fixed = fixed.map(&:to_s)
+      dups = (themed + fixed).tally.select { |_, n| n > 1 }.keys
+      refuse "a token is declared once, as themed or as fixed: #{dups.inspect}" if dups.any?
       bad = (themed + fixed).grep_v(TOKEN_NAME)
-      raise ArgumentError, "a token is named without the --th- prefix, in lowercase words joined by dashes: #{bad.inspect}" if bad.any?
+      refuse "a token is named without the --th- prefix, in lowercase words joined by dashes: #{bad.inspect}" if bad.any?
 
       @themed_tokens = themed.freeze
       @fixed_tokens = fixed.freeze
@@ -86,7 +102,7 @@ module ContentModel
     # `Admin::EditorScreen::TileSummaryComponent::LOOKS`).
     def summary(callable = nil)
       return @summary if callable.nil?
-      raise ArgumentError, "`summary` is a callable taking the block and `locale:`" unless callable.respond_to?(:call)
+      refuse "`summary` is a callable taking the block and `locale:`" unless callable.respond_to?(:call) && takes_block_and_locale?(callable)
 
       @summary = callable
     end
@@ -97,8 +113,9 @@ module ContentModel
       return @read_only_actions if ids.empty?
 
       ids = ids.map(&:to_s)
+      refuse "a read-only action is declared once: #{ids.tally.select { |_, n| n > 1 }.keys.inspect}" if ids.uniq.size != ids.size
       bad = ids.grep_v(ACTION)
-      raise ArgumentError, "a read-only action is written identifier#method (admin--editor--code-limit#update): #{bad.inspect}" if bad.any?
+      refuse "a read-only action is written identifier#method (admin--editor--code-limit#update): #{bad.inspect}" if bad.any?
 
       @read_only_actions = ids.freeze
     end
@@ -107,16 +124,22 @@ module ContentModel
       return @sample if values.empty?
 
       unknown = values.keys - Sample.members
-      raise ArgumentError, "a sample holds settings, translations, body, image, shows; not #{unknown.join(", ")}" if unknown.any?
+      refuse "a sample holds settings, translations, body, image, shows; not #{unknown.join(", ")}" if unknown.any?
 
       shows = Array(values[:shows])
-      raise ArgumentError, "a sample's `shows:` names at least one text the public page holds for it" if shows.empty? || !shows.all?(String)
+      refuse "a sample's `shows:` names at least one text the public page holds for it, none of them blank" if shows.empty? || !shows.all?(String) || shows.any? { |text| text.strip.empty? }
 
-      translations = (values[:translations] || {}).transform_keys(&:to_s)
-      raise ArgumentError, "a sample's translations are written for \"en\" at least" if translations.any? && !translations.key?("en")
+      settings = values[:settings] || {}
+      refuse "a sample's settings are a Hash" unless settings.is_a?(Hash)
+      refuse "a sample's body is a Markdown String" unless values[:body].nil? || values[:body].is_a?(String)
+      refuse "a sample's image is true or false" unless [ nil, true, false ].include?(values[:image])
+      translations = values[:translations] || {}
+      refuse "a sample's translations are a Hash of locale => Hash of values" unless translations.is_a?(Hash) && translations.values.all?(Hash)
+      translations = translations.transform_keys(&:to_s)
+      refuse "a sample's translations are written for \"en\" at least" if translations.any? && !translations.key?("en")
 
       @sample = Sample.new(
-        settings: (values[:settings] || {}).transform_keys(&:to_s).freeze,
+        settings: settings.transform_keys(&:to_s).freeze,
         translations: translations.freeze,
         body: values[:body],
         image: values[:image] == true,
@@ -139,9 +162,21 @@ module ContentModel
     # one place that names that, `CLAUDE.md`). `theme:new` copies it and the
     # build scans its folder when it is outside app/components/blocks.
     def component_template
-      file, = component && Object.const_source_location(component.name)
-      file && Pathname(file).sub_ext(".html.erb")
+      return nil unless component&.name
+
+      file, = Object.const_source_location(component.name)
+      template = file && Pathname(file).sub_ext(".html.erb")
+      template if template&.file?
     end
+
+    # The tile calls `summary.call(block, locale:)`.
+    def takes_block_and_locale?(callable)
+      params = callable.respond_to?(:parameters) ? callable.parameters : callable.method(:call).parameters
+      positional = params.any? { |kind, _| %i[req opt rest].include?(kind) }
+      locale = params.any? { |kind, key| kind == :keyrest || (%i[key keyreq].include?(kind) && key == :locale) }
+      positional && locale
+    end
+    private :takes_block_and_locale?
 
     # The `lists_posts` capability is a promise that `BlockTypes::PostList`
     # (today's only holder of it) can actually keep: `.listed_posts`/`.lists?`

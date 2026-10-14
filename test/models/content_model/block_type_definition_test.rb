@@ -51,6 +51,39 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_match(/"en" at least/, assert_raises(ArgumentError) { definition.sample translations: { "de" => { caption: "x" } }, shows: [ "x" ] }.message)
   end
 
+  test "every refusal starts with the type's name, also when the type is registered" do
+    messages = [
+      -> { definition.theme_methods "Block" }, -> { definition.tokens themed: %w[--th-x] },
+      -> { definition.read_only_actions "update" }, -> { definition.summary "words" },
+      -> { definition.sample shows: [], settings: {} }, -> { definition.stylesheet "" },
+      -> { definition.uses :subtitle }
+    ].map { |call| assert_raises(ArgumentError, &call).message }
+    messages.each { |message| assert_match(/\Atest_shape: /, message) }
+
+    error = assert_raises(ArgumentError) { BlockTypes.register("gem_owner/cta") { |t| t.tokens themed: %w[Frame] } }
+    assert_match(/\Agem_owner\/cta: /, error.message)
+    assert_not_includes BlockTypes.all.map(&:name), "gem_owner/cta"
+  end
+
+  test "shapes the first test did not reach are refused too" do
+    assert_match(/none of them blank/, assert_raises(ArgumentError) { definition.sample shows: [ " " ] }.message)
+    assert_match(/image is true or false/, assert_raises(ArgumentError) { definition.sample image: "yes", shows: [ "x" ] }.message)
+    assert_match(/settings are a Hash/, assert_raises(ArgumentError) { definition.sample settings: [], shows: [ "x" ] }.message)
+    assert_match(/body is a Markdown String/, assert_raises(ArgumentError) { definition.sample body: 1, shows: [ "x" ] }.message)
+    assert_match(/Hash of locale/, assert_raises(ArgumentError) { definition.sample translations: { "en" => "x" }, shows: [ "x" ] }.message)
+    assert_match(/declared once/, assert_raises(ArgumentError) { definition.tokens themed: %w[a], fixed: %w[a] }.message)
+    assert_match(/declared once/, assert_raises(ArgumentError) { definition.tokens themed: %w[a a] }.message)
+    assert_match(/arrays/, assert_raises(ArgumentError) { definition.tokens themed: "a" }.message)
+    assert_match(/declared once/, assert_raises(ArgumentError) { definition.read_only_actions "a--b#c", "a--b#c" }.message)
+    assert_match(/\.css file/, assert_raises(ArgumentError) { definition.stylesheet :code }.message)
+    assert_match(/\.css file/, assert_raises(ArgumentError) { definition.stylesheet "code.scss" }.message)
+    assert_match(/callable/, assert_raises(ArgumentError) { definition.summary ->(block) { block } }.message)
+    assert_match(/callable/, assert_raises(ArgumentError) { definition.summary ->(locale:) { locale } }.message)
+    d = definition
+    d.summary ->(block, **) { block }
+    d.summary ->(block, locale: "en") { block }
+  end
+
   test "uses outside body, caption, alt and image is refused" do
     d = definition
     d.uses :caption, :alt
@@ -78,5 +111,14 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
   test "a component's template is the file beside its source" do
     assert_equal Rails.root.join("app/components/blocks/code_component.html.erb"), BlockTypes.fetch(:code).component_template
     assert_nil definition.component_template
+    d = definition
+    d.component Class.new(ViewComponent::Base)
+    assert_nil d.component_template, "an anonymous component has no source file to look beside"
+  end
+
+  test "a component without a template file answers nil" do
+    d = definition
+    d.component ContentModel::BlockTypeDefinition::Sample
+    assert_nil d.component_template
   end
 end
