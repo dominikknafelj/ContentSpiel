@@ -16,9 +16,8 @@ module BlockTypes
   # reader was the tile's branch, and the tile asks the type's `summary` now
   # (decision 9).
   module Code
-    # The first line of code is cut at this many characters, as the tile cuts
-    # every line (`Admin::EditorScreen::TileSummaryComponent::LENGTH`, 80).
-    SUMMARY_LENGTH = 80
+    # The first line of code is cut at the length the tile cuts every line at.
+    SUMMARY_LENGTH = ContentModel::BlockTypeDefinition::SUMMARY_LENGTH
 
     def self.register
       BlockTypes.register :code do |t|

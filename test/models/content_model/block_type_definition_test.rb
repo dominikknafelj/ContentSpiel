@@ -213,4 +213,37 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal Rails.root.join("test/support"), d.component_folder
     assert_nil definition.component_folder
   end
+
+  test "a block type without theme methods or a sample is refused, and the message says what to declare" do
+    saved = BlockTypes.all.dup
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_bare) { |t| t.label "Bare"; t.sample shows: [ "x" ] } }
+    assert_includes error.message, "theme_methods"
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_bare) { |t| t.label "Bare"; t.theme_methods :block, :page } }
+    assert_includes error.message, "sample"
+    assert_nil BlockTypes.find(:test_bare)
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # Task 8 review M3: no reader asks for a capability the CMS does not know,
+  # so claiming one (`:code` was one until the Code block's conversion) would
+  # be a promise nothing keeps.
+  test "a capability the CMS does not know is refused at registration, naming the type and the capability" do
+    saved = BlockTypes.all.dup
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_coded) { |t| TestTypes.declare(t); t.capability :code } }
+    assert_includes error.message, "test_coded"
+    assert_includes error.message, ":code"
+    assert_nil BlockTypes.find(:test_coded)
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # Task 8 review M2: the tile's cut and the Code block's summary's are one
+  # figure, held by the definition (a model may not name a component).
+  test "the tile and the Code block's summary cut a line at one length" do
+    assert_equal ContentModel::BlockTypeDefinition::SUMMARY_LENGTH, Admin::EditorScreen::TileSummaryComponent::LENGTH
+    assert_equal ContentModel::BlockTypeDefinition::SUMMARY_LENGTH, BlockTypes::Code::SUMMARY_LENGTH
+  end
 end

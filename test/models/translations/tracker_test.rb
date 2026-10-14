@@ -174,6 +174,7 @@ class Translations::TrackerTest < ActiveSupport::TestCase
       t.label "Call to action"
       t.field :link, :group, of: "test/link", translated: true
       t.component TestQuoteComponent
+      TestTypes.declare(t)
     end
 
     with_locales(%w[en de], default: "en") do

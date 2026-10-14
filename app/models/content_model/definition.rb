@@ -83,6 +83,7 @@ module ContentModel
     def uses(*columns) = @uses_columns.concat(columns.map(&:to_s))
     def capability(*names) = @capabilities.concat(names)
     def capability?(name) = @capabilities.include?(name)
+    def capabilities = @capabilities.dup
 
     def field_set = FieldSet.for(self)
 

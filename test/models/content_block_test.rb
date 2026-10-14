@@ -163,7 +163,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   # is what exercises this, since none of the built-ins have one.
   test "normalize_settings moves a translated key found in raw settings into translated_settings, in the default locale" do
     saved = BlockTypes.all.dup
-    BlockTypes.register(:test_translated) { |t| t.label "Test translated"; t.field :headline, :string, translated: true }
+    BlockTypes.register(:test_translated) { |t| TestTypes.declare(t); t.label "Test translated"; t.field :headline, :string, translated: true }
 
     block = ContentBlock.new(owner: @page, block_type: :test_translated, position: 0,
       settings: { "headline" => "Hello" })

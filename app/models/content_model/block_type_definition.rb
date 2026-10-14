@@ -26,6 +26,16 @@ module ContentModel
     # the save services write these four and no other (`BlockCardComponent`'s
     # template, `Admin::ContentBlocksController::TRANSLATED_COLUMNS`), so a
     # fifth name was silently drawn as nothing (decision 12).
+    # The capabilities something in the CMS asks for (`capability?`): a type
+    # claiming another is refused at registration, since nothing would read it.
+    CAPABILITIES = %i[container lists_posts].freeze
+
+    # The count every tile's text, and a type's own tile line (`summary`), is
+    # cut at. It lives here because a model may not name a component: the
+    # tile (`Admin::EditorScreen::TileSummaryComponent::LENGTH`) and
+    # `BlockTypes::Code`'s summary both read it.
+    SUMMARY_LENGTH = 80
+
     COLUMNS = %w[body caption alt image].freeze
 
     METHOD_NAME = /\A[a-z_][a-z0-9_]*\??\z/
@@ -244,12 +254,21 @@ module ContentModel
     # fields the claim would need.
     def finalize!
       refuse_outside! if owner
+      unknown = capabilities - CAPABILITIES
+      refuse "no reader of the CMS asks for the capability #{unknown.map(&:inspect).to_sentence}; a block type claims #{CAPABILITIES.map(&:inspect).to_sentence} and no other" if unknown.any?
       raise ArgumentError, "a container block type needs `columns`" if capability?(:container) && columns.nil?
 
       if capability?(:lists_posts)
         missing = %w[content_type tag] - fields.map(&:name)
         raise ArgumentError, "a lists_posts block type needs #{missing.join(' and ')} field(s)" if missing.any?
       end
+
+      # Required of every block type (block types spec, decision 2): a theme
+      # must be able to replace the public template, which needs its line in
+      # the contract; and the sample is what puts the type into every shared
+      # test, the canary above all.
+      raise ArgumentError, "#{name}: a block type declares `theme_methods`, the methods its public template may call" if theme_methods.nil?
+      raise ArgumentError, "#{name}: a block type declares a `sample`, one filled block of itself, for the shared tests" if sample.nil?
     end
 
     private

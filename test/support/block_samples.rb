@@ -14,9 +14,8 @@
 # that forgot the helper, and not whether the block sat at the top level or
 # in a column (the smoke test checks that by what the page draws).
 module BlockSamples
-  # THE TRANSITION (block types plan, Task 10 makes this BlockTypes.all): the
-  # types that declare a sample yet.
-  def sampled_types = BlockTypes.all.select(&:sample)
+  # Every type declares a sample (block types spec, decision 2).
+  def sampled_types = BlockTypes.all
 
   def sample_block(page, type, section: nil)
     definition = BlockTypes.fetch(type)
@@ -54,7 +53,7 @@ module BlockSamples
     end
   end
 
-  def assert_every_type_built(names = sampled_types.map(&:name))
+  def assert_every_type_built(names = BlockTypes.names)
     missing = names - Array(@built_block_types).uniq
     assert_empty missing, "this shared test built no block of #{missing.join(", ")}: build every type with sample_block or sample_every_type"
   end

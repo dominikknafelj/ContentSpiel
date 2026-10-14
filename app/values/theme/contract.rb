@@ -78,19 +78,6 @@ class Theme
     # rendered as `render "theme/anything"`.
     OWN_PARTIALS = "theme/".freeze
 
-    # THE TRANSITION (block types plan, Tasks 2 to 10): today's lines of a
-    # built-in that declares none yet. Read only for a type that declares no
-    # `theme_methods`. Each type's conversion deletes its entry, and Task 10
-    # deletes the constant. (Its sibling for tokens went with the Code
-    # block's conversion, the one built-in with tokens of its own: every
-    # type's tokens are its declaration's now, so a conversion that forgets
-    # them loses them at once and the ledger says so.)
-    #
-    # A component's line is its path (where a theme puts its template) with
-    # the methods its template may call. A method not listed is the CMS's to
-    # change.
-    WRITTEN_BLOCK_LINES = {}.freeze
-
     # The content types' components, written here: a content type declares
     # no line of its own (block types spec, "not part of this").
     POST_COMPONENTS = {
@@ -112,8 +99,7 @@ class Theme
         next unless definition.component
 
         path = path_of(definition.component)
-        methods = definition.theme_methods || WRITTEN_BLOCK_LINES[path]
-        [ path, methods ] if methods
+        [ path, definition.theme_methods ]
       end
       blocks.to_h.merge(POST_COMPONENTS).freeze
     end

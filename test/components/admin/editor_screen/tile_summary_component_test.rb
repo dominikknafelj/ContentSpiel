@@ -45,6 +45,20 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     I18n.reload!
   end
 
+  # Task 8 review M1: a part is text. A run of one part is not joined, so
+  # an `html_safe` string a type hands over would reach the template still
+  # marked safe and be drawn as markup, unless the tile makes it plain.
+  test "a part marked html_safe is drawn as text, alone in its run and joined with others" do
+    with_test_types do
+      [ [ [ :text, "<b>bold</b>".html_safe ] ], [ [ :text, "<b>a</b>".html_safe ], [ :text, "<i>b</i>".html_safe ], [ :mono, "<u>c</u>".html_safe ] ] ].each do |answer|
+        BlockTypes.fetch("test/quote").summary(->(_block, locale:) { answer })
+        render_summary block("test/quote", settings: { "text" => "Q" })
+        assert_no_selector "#{line} b, #{line} i, #{line} u"
+        assert_includes page.find(line).text, "<"
+      end
+    end
+  end
+
   # A built-in's summary is the CMS's own code: a fault in it fails loudly,
   # in the tests first.
   test "a built-in's summary that answers a part of no known kind raises and names the kinds" do

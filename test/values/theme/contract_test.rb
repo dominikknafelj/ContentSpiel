@@ -52,21 +52,14 @@ class Theme::ContractTest < ActiveSupport::TestCase
     assert_empty left_over, "Theme::Contract.components lists #{left_over.inspect}, which no block or content type hands out"
   end
 
-  # The type is one nobody will build. It was "code" with
-  # `Blocks::CodeComponent` while the Code block was the next thing to join;
-  # the day that block was registered this test raised `DuplicateType`, and
-  # with its line in the contract the assertion would no longer have failed.
-  test "a block type registered with a component the list does not hold fails, and the message names the missing entry" do
-    component = unlisted_component("Blocks::MarqueeComponent")
-    BlockTypes.register("marquee") do |t|
-      t.label "Marquee"
-      t.component component
+  # Departure 6 (block types plan): with `theme_methods` required, a type
+  # whose template a theme could not replace is refused when it is
+  # registered, before any list is asked.
+  test "a block type registered without theme methods is refused at registration, and the message says what to declare" do
+    error = assert_raises(ArgumentError) do
+      BlockTypes.register("marquee") { |t| t.label "Marquee"; t.component unlisted_component("Blocks::MarqueeComponent"); t.sample shows: [ "x" ] }
     end
-
-    error = assert_raises(Minitest::Assertion) { assert_every_registered_component_is_listed }
-
-    assert_includes error.message, %(Theme::Contract.components has no entry for "blocks/marquee_component")
-    assert_includes error.message, "Declare `t.theme_methods` in its definition"
+    assert_includes error.message, "theme_methods"
   ensure
     Rails.application.reloader.prepare!
   end

@@ -45,7 +45,7 @@ class BuiltInTypesTest < ActiveSupport::TestCase
   test "a container type registered without columns is refused" do
     saved = BlockTypes.all.dup
 
-    error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| t.label "Band"; t.capability :container } }
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| TestTypes.declare(t); t.label "Band"; t.capability :container } }
     assert_equal "a container block type needs `columns`", error.message
   ensure
     BlockTypes.reset!
