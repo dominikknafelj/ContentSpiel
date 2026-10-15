@@ -1,6 +1,6 @@
 # The Note block
 
-Status: for the owner's review (2026-10-13; corrected 2026-10-15 for the block types build: declarations instead of a `:note` capability, `--th-ink` for the body text, tokens defined from the base). The design is Claude Design's, 2026-10-13 (B1 to B3). The owner agreed to the block and to the order "Note, then Table" the same day. The Table block is a spec of its own.
+Status: approved (2026-10-13; corrected 2026-10-15 with Claude Design's D4 answers: hues, strong band, the hidden kind word; and for the block types build: declarations instead of a `:note` capability, `--th-ink` for the body text, tokens defined from the base). The design is Claude Design's, 2026-10-13 (B1 to B3). The owner agreed to the block and to the order "Note, then Table" the same day. The Table block is a spec of its own.
 
 ## Why
 
@@ -19,7 +19,9 @@ The guide has callouts ("Tip", "Warning", "To confirm") and the CMS has no block
 3. **The heading is the CMS's word unless the editor types a title.** The word is translated by the CMS into the visitor's language (`public.blocks.note.kinds.*` in `config/locales/public.en.yml`, English as the fallback, as the Code block's four words are). An editor's title replaces the word; the icon and the kind stay.
 4. **The text is the block's ordinary rich text** (`body`): bold, italic, code, links, lists. Nothing is switched off in the editor for a note. A heading or an image inside a note is possible and is the editor's to avoid.
 5. **An empty note draws nothing** on the site (no text in the visitor's language and none in the default one).
-6. **It is an `aside` named by its heading**, never `role="alert"`: a note is part of the page, not an event.
+6. **It is an `aside` named by its heading**, never `role="alert"`: a note is part of the page, not an event. When an editor's title replaces the kind word, a visually hidden kind word stands before the title inside the heading ("Tip: Before you publish"), so a screen reader hears the kind, also in a list of headings; it is added only then, so "Tip" is never read twice (Claude Design D4c, 2026-10-15).
+9. **The kinds' hues (Claude Design D4a, 2026-10-15):** Note is neutral (a 4% tint of the text colour with a `--th-line-strong` rule), Tip the ok green, Important the accent blue, Warning the warn amber. The danger red is kept for errors and destructive actions: a red Important read like an error next to Warning.
+10. **On a strong band (D4b):** a note shares the band's ground, as the Code block does, but each kind keeps its colour on the left rule and the icon: the dark scheme's kind inks on a dark band, the light scheme's on a light band, each at 3:1 against the band; the body text is the band's text colour.
 7. **The kind is chosen with a segmented control**, a new look for a `:select` field (`control: :segmented` in a type's schema), available to any type. It is a group of radio buttons underneath, so it works from the keyboard and without a script.
 8. **A theme may restyle and replace the template**, through the contract: the component's line, sixteen tokens and the reference's section.
 
@@ -53,7 +55,7 @@ The contract's line and the sixteen tokens are also written into the ledger (`te
 - The icon is inline SVG written in the default template (four small paths), `aria-hidden`. A theme's template draws its own.
 - `app/assets/tailwind/themes/default/note.css`, tokens only.
 - **Tokens, four per kind, themed (light and dark):** `--th-note-{kind}-ground`, `--th-note-{kind}-line`, `--th-note-{kind}-ink`, `--th-note-{kind}-border`, for `note`, `tip`, `important`, `warning`. As a built-in type, their defaults are in `tokens.css`, and each is DEFINED from the theme's base tokens (`color-mix()` of `--th-accent`, `--th-ink`, `--th-surface` and a hue of the kind's), so a theme that re-colours its base re-colours the notes (owner's answer 1 of the block types spec). Body text stays `--th-ink`.
-- **Contrast, computed in the tokens test for each kind, on the page and inside a tinted and a strong band, in both schemes:** the body text (`--th-ink`), the link colour (`--th-accent`) and the kind's ink each at 4.5:1 against the kind's ground.
+- **Contrast, computed in the tokens test for each kind, on the page and inside a tinted band, in both schemes:** the body text (`--th-ink`), the link colour (`--th-accent`) and the kind's ink each at 4.5:1 against the kind's ground. Inside a strong band: the kind's rule and icon at 3:1 against the band (decision 10).
 - Inline code inside a note has the `--th-surface` ground with a 1px `--th-line` border, so it is told from the tint.
 
 ## CS Studio
