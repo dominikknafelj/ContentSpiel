@@ -2,25 +2,27 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A sixth built-in block type, "Note": a highlighted `aside` of one of four kinds (Note, Tip, Important, Warning) with the kind's icon and word (or the editor's translated title) above a short rich text, themable through sixteen tokens and a replaceable template, and chosen in CS Studio with a segmented control.
+**Goal:** A sixth built-in block type, "Note": a highlighted `aside` of one of four kinds (Note, Tip, Important, Warning) with the kind's icon and word (or the editor's translated title, after the kind's word hidden for a screen reader) above a short rich text, themable through sixteen tokens and a replaceable template, and chosen in CS Studio with a segmented control.
 
-**Architecture:** The first block built entirely by the recipe (`docs/reference/content-blocks-and-types.md`, "Adding a block type"): `bin/rails generate block_type note`, then one definition (`app/models/block_types/note.rb`) that declares everything it brings. Its values are a `settings` field (`kind`), a translated schema field (`title`, in `translated_settings`) and the existing `body` column: no column, no migration, no service. Four generic pieces are built first, each usable by any type: `control: :segmented` for a `:select`, `max:` / `help:` / `placeholder_from:` for a `:string`, and an `[:icon, name]` part for a type's tile summary.
+**Architecture:** The first block built entirely by the recipe (`docs/reference/content-blocks-and-types.md`, "Adding a block type"): `bin/rails generate block_type note`, then one definition (`app/models/block_types/note.rb`) that declares everything it brings. Its values are a `settings` field (`kind`), a translated schema field (`title`, in `translated_settings`) and the existing `body` column: no column, no migration, no service. Four generic pieces are built first, each usable by any type: `control: :segmented` for a `:select`, `max:` / `help:` / `placeholder_from:` for a `:string`, and `icon … for_block:`, a type's CS Studio icon that follows a value of each block on its card and its tile (the contrast branch's block icons, plan ruling 12).
 
 **Tech Stack:** Rails 8.1, ViewComponent, Minitest + fixtures, Capybara on Cuprite, Stimulus over import maps, Tailwind (product build) and plain token CSS (public build), Postgres jsonb via Mobility.
 
-**Spec:** `docs/superpowers/specs/2026-10-13-note-block-design.md` (design answers B1 to B3 behind it: `/Users/dknafelj/src/ContentSpiel/.superpowers/design-answers/2026-10-13-note-and-table-blocks.md`). Read both before Task 1, and `CLAUDE.md`'s "Rules a change can break silently" for the theming, Code block and held-form rules.
+**Spec:** `docs/superpowers/specs/2026-10-13-note-block-design.md`, corrected 2026-10-15 with Claude Design's D4 answers (decisions 6, 9 and 10). Design answers behind it: B1 to B3 (`/Users/dknafelj/src/ContentSpiel/.superpowers/design-answers/2026-10-13-note-and-table-blocks.md`) and C2 and D4 (`/Users/dknafelj/src/ContentSpiel/.superpowers/design-answers/2026-10-15-contrast-and-icons.md`). Read them before Task 1, with `docs/superpowers/specs/2026-10-15-contrast-and-buttons-design.md` (Rulings 6 and 7: block icons; the dark strong band) and `CLAUDE.md`'s "Rules a change can break silently" for the theming, Code block and held-form rules.
 
 ## Global Constraints
 
+- **This plan assumes the `contrast` branch (contrast and buttons, part 1) is merged into `main` and `note-block` is rebased onto it before Task 1 starts.** Every step below is written against that code: `ContentModel::BlockTypeDefinition::ICONS` and `t.icon`, `Admin::EditorScreen::BlockIconComponent` in the picker, the card's head and the tile, `test/support/contrast_measure.rb`, the dark strong band (`--th-band-strong: #34353a`), `border-field-line` for controls. If the branch is not merged yet, stop and say so; do not port pieces of it.
 - Four kinds, stored as `note`, `tip`, `important`, `warning`; a new block is a `note`; an unknown stored kind is drawn as a Note.
-- Each kind has its own word and its own Lucide icon: `info`, `lightbulb`, `circle-alert`, `triangle-alert`; 16px on the site, 12px in `text-meta` on the tile; always `aria-hidden`.
-- The heading is the CMS's word (`public.blocks.note.kinds.*` in `config/locales/public.en.yml`, read in the visitor's language with English as the explicit fallback) unless the editor typed a title; a title replaces the word, the icon and the kind stay.
+- Each kind has its own word and its own Lucide icon: `info`, `lightbulb`, `circle-alert`, `triangle-alert` (CS Studio's icon partial spells them `info`, `lightbulb`, `circle_alert`, `triangle_alert`); 16px on the site; in CS Studio the contrast branch's block icon: the type's `info` in the picker (16px dim), the block's kind on the card's head (14px dim) and on the tile (12px meta); always `aria-hidden`.
+- The heading is the CMS's word (`public.blocks.note.kinds.*` in `config/locales/public.en.yml`, read in the visitor's language with English as the explicit fallback) unless the editor typed a title; a title replaces the word, the icon and the kind stay. A title that is only the kind's word is no title.
 - The text is the block's ordinary rich text (`body`); nothing is switched off in the editor.
 - An empty note (no text in the visitor's language and none in the default one) draws nothing on the site, whatever its title.
-- The block is an `aside` named by its heading (`aria-labelledby`), never `role="alert"`.
-- `theme_methods` are exactly `:block, :page, :kind, :heading, :titled?, :icon, :body`; `read_only_actions`: none; no capability.
-- Sixteen themed tokens, `--th-note-{kind}-ground`, `-line`, `-ink`, `-border` for the four kinds, light and dark, each DEFINED in `tokens.css` from the theme's base tokens (`var()` and `color-mix(in srgb, …)` of them); body text stays `--th-ink`.
-- Contrast, computed in `test/integration/design_tokens_test.rb`: `--th-ink`, `--th-accent` and the kind's ink each at 4.5:1 or better against the kind's ground, on the page, in a tinted band and in a strong band, in both schemes: 72 pairs.
+- The block is an `aside` named by its heading (`aria-labelledby`), never `role="alert"`; the heading is an `h3` (plan ruling 14). Under an editor's title the heading starts with the kind's word and a colon, visually hidden ("Tip: Before you publish"); without a title there is no hidden word, so the kind is never said twice (spec decision 6).
+- `theme_methods` are exactly `:block, :page, :kind, :heading, :titled?, :word, :icon, :body` (plan ruling 13: `word` is the eighth); `read_only_actions`: none; no capability.
+- Sixteen themed tokens, `--th-note-{kind}-ground`, `-line`, `-ink`, `-border` for the four kinds, light and dark, each DEFINED in `tokens.css` from the theme's base tokens (`var()` and `color-mix(in srgb, …)` of them); body text stays `--th-ink`. The hues (spec decision 9): Note neutral (a 4% tint of `--th-ink` with a `--th-line-strong` rule), Tip `--th-ok`, Important `--th-accent`, Warning `--th-warn`. **No note token names `--th-danger`**: red is kept for errors and destructive actions.
+- On a strong band (spec decision 10) a note shares the band's ground, its text is the band's, and each kind keeps its colour on the rule and the icon: the band is a dark ground in both schemes since the contrast branch, so the dark-scheme kind inks are used in both (plan ruling 8).
+- Contrast, computed in `test/integration/design_tokens_test.rb`: `--th-ink`, `--th-accent` and the kind's ink each at 4.5:1 or better against the kind's ground, on the page, in a tinted band and in a strong band, in both schemes: 72 pairs. And on a strong band each kind's rule and ink (the icon's colour) at 3:1 or better against the band, in both schemes: 16 pairs.
 - Inline code inside a note: `--th-surface` ground with a 1px `--th-line` border.
 - `title` is `:string`, translated, at most 80 characters; the kind is the same in every language (`settings`).
 - No column, no migration, no service; the writes are `ContentBlocks::Save`, `Duplicate`, `Destroy`, `Reorder`.
@@ -43,28 +45,33 @@ Where the spec assumes something the code does differently, the plan takes the d
 3. **The title's placeholder and help line need two schema options.** The card draws every type's fields generically, and the schema had no placeholder and no help line. Task 2 adds `help:` (a literal line under a string field, its `aria-describedby`) and `placeholder_from:` (names an earlier `:select`; the card shows the label of the choice stored, and a small reading script, `admin--ui--placeholder-from`, follows a new choice before it is saved). A placeholder drawn from the stored kind alone would say "Note" while "Tip" is pressed. A post type's field with `placeholder_from:` gets the help line but no placeholder: only the block card hands one over (a roadmap row in Task 10).
 4. **The sample's body is `body:`, not a key of `translations`.** `BlockTypeDefinition::Sample` takes the body as Markdown in the default language (`body:`); `translations` holds translated schema fields and the `caption`/`alt` columns. The spec's `translations: { "en" => { title:, body: } }` would be refused at registration.
 5. **No block's text makes a page "missing".** `Translations::Status.missing_count` counts the page's title and REQUIRED translated schema fields; a rich-text body left blank in a language is never "missing" for any block type. The spec's "missing in a language only for the body" is therefore not what the code does: a Note never makes its page missing (its title is optional and its text is a body), and both its title and its text are tracked for "outdated". Task 6's test pins that.
-6. **The tile only.** A collapsed card of the page's own list shows its type's label for every type (`TileSummaryComponent`'s class comment; a roadmap row from the Code block). The Note's line is on the tile, as the Code block's is.
-7. **The kinds' hues are base tokens.** Note is the accent, Tip `--th-ok`, Important `--th-danger`, Warning `--th-warn`; the word and icon are the matching ink (`--th-accent`, `--th-ok-ink`, `--th-danger-ink`, `--th-warn-ink`). The ground is the hue at 8% (light) or 12% (dark) over `--th-paper`, the frame at 24%. All mixes are `color-mix(in srgb, var(a) N%, var(b))`, the form the contrast test resolves; computed beforehand, the lowest of the 72 pairs is 4.81:1 (the accent on the light Important ground).
-8. **On a strong band the four kinds are the band's one look.** A custom property is computed where it is declared, so a note's ground stays the page's light tint inside the strong band while `--th-ink` turns to the band's light text: unreadable. As for the Code block (code block spec, decision 8), `sections.css` re-values the sixteen tokens inside `.content-section--strong`: ground the band's text at 12%, rule its dim, word its text, frame `--th-line`. The kinds are told apart there by word and icon only (decision 2 still holds).
+6. **The tile's line only.** A collapsed card of the page's own list shows its type's label for every type (`TileSummaryComponent`'s class comment; a roadmap row from the Code block). The Note's line ("Tip · first words") is on the tile, as the Code block's is; the kind's ICON is on the card's head and on the tile (ruling 12).
+7. **The kinds' hues are base tokens, as Claude Design's D4a names them (spec decision 9).** Note is neutral: its ground `--th-ink` at 4% over `--th-paper`, its rule `--th-line-strong`, its word and icon `--th-ink`, its frame `--th-line`. Tip is `--th-ok` (word and icon `--th-ok-ink`), Important `--th-accent` (word and icon `--th-accent`), Warning `--th-warn` (word and icon `--th-warn-ink`); for these three the ground is the hue at 8% (light) or 12% (dark) over `--th-paper` and the frame the hue at 24%. No token names `--th-danger`. All mixes are `color-mix(in srgb, var(a) N%, var(b))`, the form the contrast test resolves. Computed beforehand with the contrast branch's values and its arithmetic (`test/support/contrast_measure.rb`): the lowest of the 72 pairs is 4.88:1, the accent (the link, and Important's word) on the light Important ground; the lowest in the dark scheme is 6.64:1 (Tip's word on the strong band).
+8. **On a strong band a note shares the band's ground and each kind keeps its colour (spec decision 10, D4b).** A custom property is computed where it is declared, so without a rule a note's ground would stay the page's light tint inside the strong band while `--th-ink` turns to the band's light text. `sections.css` re-values the sixteen inside `.content-section--strong`: every ground `var(--th-band-strong)`, every frame `var(--th-line)` (the band's), the body text the band's through `--th-ink`, and per kind a rule and an ink (word and icon) that keep its colour: Note the band's dim (rule) and the band's text (ink), Important the band's accent (`--th-on-band-strong-accent`, the light blue the band already carries), Tip and Warning their hue mixed 60% with the band's text (`color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong))`). Why not the dark-scheme inks themselves: since the contrast branch the strong band is a dark ground in BOTH schemes (the page's ink in light, the raised `#34353a` in dark), so D4b's "dark-scheme inks on a dark band" applies in both, and a light-scheme page cannot read a dark-scheme token's value; a mix with the band's text is the dark-scheme ink derived from the base, no literal and no new token. Measured: rule and ink at 6.64:1 or better against the band (3:1 asked; the ink is text too, so it is held at 4.5:1 among the 72). Cost if wrong: a theme that colours its strong band light gets light inks on it; the reference says a theme that changes the band answers for these sixteen there, as it does for code.
 9. **Note stands after Code in the picker.** The generator writes the line above its marker, after Section; Task 4 moves it after `BlockTypes::Code.register`, so the picker reads Rich text, Image, Code, Note, Post list, Section and the containers stay last. The ledger's component and token order follows registration order.
-10. **On a translation tab the segmented control is not drawn.** An untranslated field is listed read-only under "Shared fields" on a translation tab (`BlockCardComponent#shared_fields`, `SharedFieldsComponent.select_label`), which already reads a Hash's label ("Tip"). "Read-only on a translation tab as a select is" holds with nothing new; in a held form `HeldFields` disables every radio.
-11. **CS Studio draws the tile's icons with `admin/shared/_icon`.** Four branches (`:info`, `:lightbulb`, `:circle_alert`, `:triangle_alert`) join the existing partial; the tile's `ICONS` list is the closed set of names an `[:icon, name]` part may take.
+10. **On a translation tab the segmented control is not drawn.** An untranslated field is listed read-only under "Shared fields" on a translation tab (`BlockCardComponent#shared_fields`, `SharedFieldsComponent.select_label`), which already reads a Hash's label ("Tip"). "Read-only on a translation tab as a select is" holds with nothing new; in a held form `HeldFields` disables every radio. The control's look is the posts list's scope toggle as the contrast branch left it (field-line outline, inverted when chosen).
+11. **The four kind icons join CS Studio's closed list.** `ContentModel::BlockTypeDefinition::ICONS` gains `info`, `lightbulb`, `circle_alert`, `triangle_alert`, each a branch of `app/views/admin/shared/_icon.html.erb` (Lucide, 1.5px); `block_icon_component_test.rb`'s "every icon a block type may name is drawn by the icon partial" then draws them. The list spells a Lucide name as the partial's symbol (`circle_alert`, as it has `code_xml`); the public template's `icon` keeps Lucide's own spelling (`circle-alert`), which is the theme contract's (spec decision 2). `BlockTypes::Note::ICONS` holds the Lucide names, and `BlockTypes::Note.studio_icon` turns one into the partial's.
+12. **A type's icon may follow its block (`t.icon "info", for_block: ->(block) { … }`); the spec's `[:icon, name]` summary part is not built.** The spec was written before the contrast branch, which draws ONE icon per type in the picker, on the card's head and on the tile (where it stands in for the type's name, kept as `sr-only` text). A summary part would draw a second icon on the tile beside the type's and none on the card's head, which C2 asks for ("Note: its kind icon"). So the Note declares its type icon, `info` (the default kind's, drawn in the picker, which has no block), and a callable that answers the block's kind's icon from the same closed list; `BlockTypeDefinition#icon_for(block)` asks it, and `BlockIconComponent` takes the block on the card and the tile. One icon in each place, a name from `ICONS` and never markup, a built-in's wrong answer raises naming the list, the tile's accessible name still says "Note". Neither the card's head nor the tile's face is re-rendered by a save, so for a type whose icon follows its block the icon carries an id (`block-<id>-icon-card`, `-icon-tile`) and `Admin::ContentBlocksController#update` replaces both with every save that went through, as it replaces the tile's line. An outside type may not declare `for_block:` yet (refused at registration): its callable would run on every card and tile, where a raise is a 500 of the editor, and the tile's rescue for a gem's `summary` is not repeated for an icon until a gem asks. `TileSummaryComponent` and its `LOOKS` do not change. Cost if wrong: a kind changed in another tab shows its new icon on this tab's card only after the live refresh redraws the card or a reload (the live refresh replaces a clean card whole, so it does follow); and a fourth declaration keyword is one more thing the generator's commented `t.icon` line does not mention.
+13. **The theme contract's Note line has eight names: `word` joins the spec's seven.** Spec decision 6 asks the template to say the kind's word, hidden, before an editor's title; `heading` is then the title, so the template needs the word by another name, and a template may call only the names its line promises ("a default component template calls no method of its component that its line does not name"). A template that looked the key up itself (`I18n.t("public.blocks.note.kinds.…")`) would make a locale key a silent promise and leave a theme's template, written from the reference alone, no promised way to say the kind. So `word` is promised: the CMS's word for the kind in the language shown, English where that language has none, titled or not. This departs from the spec's list of seven ("The data", "The public side"); the owner confirms it (open questions).
+14. **The heading is an `h3`.** D4c asks for the kind to be heard "in a heading list too", so the heading is a heading element, not the first draft's `p`. `h3` because a note stands inside a page's or a section's `h2` part far more often than directly under the page's `h1`; note.css sets its size, weight and spacing, so it looks the same whatever the theme's `h3`. Cost if wrong: a note at the very top of a page skips a level in the outline (an accessibility checker's warning, not an error); a theme's template chooses its own element.
 
-## Open questions for the owner (the plan builds the spec as written; each is a roadmap row in Task 10)
+## Open questions for the owner (the plan builds its rulings; each is named in the spec's "As built" in Task 10)
 
-- **A screen reader hears no kind under an editor's title.** The icon is `aria-hidden` (decision 2) and the title replaces the word (decision 3), so "Before you publish" is announced without "Tip". The smallest fix is an eighth promised name, `word` (the CMS's word for the kind, always), and a visually hidden word in the default template; that is a contract change, so it is not made here.
-- **Important is red (`--th-danger`), Warning amber (`--th-warn`).** The designer named no hues; with the base tokens there is no fourth hue. A question for Claude Design.
-- **On a strong band the four kinds look alike** (ruling 8). A question for Claude Design.
+- **The Note's theme line is eight names, not the spec's seven** (ruling 13): `word` is promised so a template can say the kind before an editor's title (decision 6). The alternative, a template that looks up `public.blocks.note.kinds.<kind>` itself, keeps seven names and makes a locale key a promise nobody tests.
+- **The spec's `[:icon, name]` part of a tile summary is replaced by `icon for_block:`** (ruling 12), because the contrast branch already draws one icon per type on the tile, the card and the picker.
+
+The three questions the first draft carried (no kind heard under a title, a red Important, four look-alike kinds on a strong band) were answered by Claude Design's D4 and are spec decisions 6, 9 and 10.
 
 ## Review Focus
 
-The five inputs the spec implies and no task would otherwise exercise, most likely first. Each has its test in the task named.
+The six inputs the spec implies and no task would otherwise exercise, most likely first. Each has its test in the task named.
 
-1. **A title of only spaces** (pasted, or typed and erased to spaces): it is no title; the site heads the note with the kind's word and the tile says the word. Test: Task 4, "a title of only white space is no title".
+1. **A title of only spaces** (pasted, or typed and erased to spaces): it is no title; the site heads the note with the kind's word, with no hidden word before it, and the tile says the word. Test: Task 4, "a title of only white space is no title: the heading is the kind's word, said once".
 2. **A stored kind that is not on the list** (written around the services, a canary, a kind removed later): the site draws a Note (word "Note", `info`); the card checks no button and a save that picks a kind is accepted. Tests: Task 4 (component), Task 8 (card and save).
 3. **A title with no text** (the editor typed a title, no body yet): nothing is drawn on the site; the tile still shows the title and "Empty". Tests: Task 4 (component and tile).
 4. **Text only in the default language, read in another** (a German visitor, English body, German title or none): the English text is drawn under the German title, or under the German word (English where German has no file). Test: Task 4, "a visitor of another language reads the text with the site's fallback, the title in their language where there is one, and the word in English where their language has no words".
 5. **A title over 80 characters typed on a translation tab**: refused with the message in the title's slot, nothing written; 80 exactly is saved. Test: Task 8, "a note's title over 80 characters is refused on the German tab too, and nothing is written".
+6. **A title that is only the kind's word** ("Tip" typed as a Tip's title, in any case): it is no title, so the hidden word is not added and a screen reader hears "Tip" once, not "Tip: Tip" (decision 6: "so 'Tip' is never read twice"). Test: Task 4, "a title that is only the kind's word is no title: the word is said once".
 
 ---
 
@@ -80,16 +87,20 @@ The five inputs the spec implies and no task would otherwise exercise, most like
 | `app/components/admin/ui/field_component.rb`, `.html.erb` | 1, 2 | no `<label>` over a segmented control; the help line; forwards `placeholder:` |
 | `app/components/admin/editor_screen/block_card_component.rb`, `.html.erb` | 2 | `placeholder_for(field)` handed to each schema field |
 | `app/javascript/controllers/admin/ui/placeholder_from_controller.js` | 2 | follows the chosen option's label into the placeholder |
-| `app/components/admin/editor_screen/tile_summary_component.rb`, `.html.erb` | 3 | the `[:icon, name]` part |
+| `app/models/content_model/block_type_definition.rb` | 3 | four names join `ICONS`; `icon … for_block:`, `#icon_for`, `#icon_follows_block?`; an outside type may not declare `for_block:` |
 | `app/views/admin/shared/_icon.html.erb` | 3 | four Lucide icons for CS Studio |
-| `app/models/block_types/note.rb` | 4 | the type: fields, declarations, `KINDS`, `ICONS`, `kind_of`, `summary` |
+| `app/components/admin/editor_screen/block_icon_component.rb` | 3 | `block:`, the block's own icon, `.dom_id` |
+| `app/components/admin/editor_screen/block_card_component.html.erb`, `block_tile_component.rb` | 3 | hand their block to the icon |
+| `app/controllers/admin/content_blocks_controller.rb` | 3 | `#block_icon_streams`: a save redraws an icon that follows its block |
+| `app/models/block_types/note.rb` | 4 | the type: fields, declarations, `KINDS`, `ICONS`, `kind_of`, `studio_icon`, `summary` |
 | `config/initializers/types.rb` | 4 | `BlockTypes::Note.register` after Code |
 | `app/components/blocks/note_component.rb`, `.html.erb` | 4 | the public block |
 | `app/assets/tailwind/themes/default/note.css` | 5 | the public rules, tokens only |
 | `app/assets/tailwind/themes/default/tokens.css` | 5 | the sixteen tokens, light and dark |
-| `app/assets/tailwind/themes/default/sections.css` | 7 | the strong band's sixteen re-values |
+| `test/support/contrast_measure.rb` | 7 | reads `color-mix(in srgb, var(a) N%, var(b))` |
+| `app/assets/tailwind/themes/default/sections.css` | 7 | the strong band's sixteen re-values: the band's ground, each kind's colour |
 | `config/locales/public.en.yml`, `config/locales/admin/editor_screen.en.yml` | 4 | the four words; the tile's "Empty" |
-| `test/support/contract_ledger.rb` | 4, 5 | the component's line; the sixteen tokens |
+| `test/support/contract_ledger.rb` | 4, 5 | the component's line (eight names); the sixteen tokens |
 | `docs/reference/theming.md` | 4, 5, 10 | tables, "The Note block", "In tests" |
 | `test/fixtures/themes/note/…` | 5 | a theme that replaces the template from the reference alone |
 | `test/support/theme_test_helper.rb` | 5 | `with_note_theme` |
@@ -158,6 +169,7 @@ Add to `test/components/admin/fields/select_field_test.rb`, before the final `en
     assert_no_selector "select"
     assert_selector "fieldset#block-7-kind > legend", exact_text: "Kind"
     assert_selector "fieldset#block-7-kind input[type=radio]", count: 2
+    assert_selector "fieldset#block-7-kind > div[class~='border-field-line']", count: 1
     assert_selector "label[for='block-7-kind-note'] input#block-7-kind-note[type=radio][name='block[settings][kind]'][value='note']:not([checked])"
     assert_selector "label[for='block-7-kind-tip'] input#block-7-kind-tip[type=radio][value='tip'][checked]"
     assert_selector "label[for='block-7-kind-tip']", text: "Tip"
@@ -259,11 +271,16 @@ module Admin
     # draws it, since the value is the same in every language.
     class SelectField < Base
       # The posts list's scope toggle's look (`PostsScreen::ToolbarComponent::
-      # SEGMENT_CLASS`), with a disabled state for a held or view-only form.
+      # SEGMENT_CLASS`, as the contrast branch left it: the chosen segment
+      # inverted, ink on paper, with a paper focus ring), with a disabled
+      # state for a held or view-only form. The group around the segments is
+      # outlined in `border-field-line`, as every control is (contrast and
+      # buttons spec, C1).
       SEGMENT_CLASS = "flex cursor-pointer items-center border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken " \
-                      "has-[:checked]:bg-accent-tint has-[:checked]:font-semibold has-[:checked]:text-ink " \
+                      "has-[:checked]:bg-ink has-[:checked]:font-semibold has-[:checked]:text-paper has-[:checked]:hover:bg-ink " \
                       "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent " \
-                      "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:disabled]:hover:bg-transparent".freeze
+                      "has-[:checked]:has-[:focus-visible]:outline-paper has-[:checked]:has-[:focus-visible]:-outline-offset-4 " \
+                      "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:disabled]:not-has-[:checked]:hover:bg-transparent".freeze
 
       def option_pairs
         options = field.options[:options]
@@ -292,7 +309,7 @@ Replace `app/components/admin/fields/select_field.html.erb`:
       error slot and its legend are named after; each segment is a label around its radio. %>
   <%= tag.fieldset id: input_id, class: "m-0 min-w-0 border-0 p-0" do %>
     <legend class="<%= setup_label_class %> mb-1"><%= field.label %></legend>
-    <div class="inline-flex overflow-hidden rounded-cs border border-line-strong bg-surface">
+    <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
       <% option_pairs.each do |label, option| %>
         <label for="<%= segment_id(option) %>" class="<%= SEGMENT_CLASS %>">
           <%= radio_button_tag input_name, option, checked?(option), id: segment_id(option), class: "sr-only", required: field.required? %>
@@ -735,74 +752,236 @@ EOF
 
 ---
 
-### Task 3: the `[:icon, name]` part of a tile summary
+### Task 3: a block type's icon may follow its block (`icon … for_block:`)
 
 **Files:**
-- Modify: `app/components/admin/editor_screen/tile_summary_component.rb`, `app/components/admin/editor_screen/tile_summary_component.html.erb`
+- Modify: `app/models/content_model/block_type_definition.rb` (`ICONS`, `#icon`, `#icon_follows_block?`, `#icon_for`, `#refuse_outside!`)
 - Modify: `app/views/admin/shared/_icon.html.erb`
-- Test: `test/components/admin/editor_screen/tile_summary_component_test.rb`
+- Modify: `app/components/admin/editor_screen/block_icon_component.rb`
+- Modify: `app/components/admin/editor_screen/block_card_component.html.erb` (the icon's line), `app/components/admin/editor_screen/block_tile_component.rb` (`block_icon`)
+- Modify: `app/controllers/admin/content_blocks_controller.rb` (`#update`, `#block_icon_streams`)
+- Test: `test/models/content_model/block_type_definition_test.rb`, `test/components/admin/editor_screen/block_icon_component_test.rb`, `test/integration/admin/content_blocks_test.rb`
 
 **Interfaces:**
-- Consumes: nothing from earlier tasks.
-- Produces: a summary part `[:icon, "lightbulb"]` (a String from `TileSummaryComponent::ICONS = %w[info lightbulb circle-alert triangle-alert]`), drawn before the line as a 12px icon in `text-meta`, `aria-hidden`; `TileSummaryComponent#icons` (Array of names); `#parts` and `#line` unchanged in meaning (text parts only). Icon names `:info`, `:lightbulb`, `:circle_alert`, `:triangle_alert` in `admin/shared/_icon`.
+- Consumes: the contrast branch's block icons (`BlockTypeDefinition::ICONS`, `t.icon`, `BlockIconComponent` with `PLACES` `picker`, `card`, `tile`), merged before Task 1.
+- Produces: `ContentModel::BlockTypeDefinition::ICONS` ending `… columns_2 info lightbulb circle_alert triangle_alert`; `#icon(name = nil, for_block: nil)` (`for_block:` a callable taking one block, answering a name from `ICONS`); `#icon_follows_block?` (Boolean); `#icon_for(block)` (the block's name where the type's icon follows it and a block is handed in, else the type's; a name off the list raises `ArgumentError` naming the list); `Admin::EditorScreen::BlockIconComponent.new(definition:, place:, block: nil)` and `.dom_id(block, place)` (`"block-<id>-icon-<place>"`), the span carrying that id only for a type whose icon follows its block; the card's head and the tile hand their block; `Admin::ContentBlocksController#block_icon_streams(block)`, replacing `block-<id>-icon-card` and `block-<id>-icon-tile` in every answer to a save that went through, for such a type only. Icon names `:info`, `:lightbulb`, `:circle_alert`, `:triangle_alert` in `admin/shared/_icon`. `TileSummaryComponent` is unchanged (plan ruling 12).
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `test/components/admin/editor_screen/tile_summary_component_test.rb`, after the test "a type's summary is drawn part by part…":
+In `test/models/content_model/block_type_definition_test.rb`, in "a block type's icon is one CS Studio draws, or none", replace the message assertion:
 
 ```ruby
-  # Note block spec, "CS Studio": the fifth kind of part is an icon, by a
-  # name from a closed list, drawn before the line at 12px in the meta
-  # colour and hidden from a screen reader; it is never text and never markup.
-  test "an icon part is drawn before the line, small, in the meta colour and hidden, and the line is the text parts alone" do
-    with_test_types do
-      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :icon, "lightbulb" ], [ :text, "Tip · " ], [ :text, "words" ] ] })
-      render_summary block("test/quote", settings: { "text" => "Q" })
+    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
+```
 
-      assert_selector ".admin-block-tile__summary > span.text-meta svg.size-3[aria-hidden='true']", count: 1
-      assert_equal "Tip · words", page.find(line).text
-      assert_no_selector "#{line} svg"
-      component = Admin::EditorScreen::TileSummaryComponent.new(block: block("test/quote", settings: { "text" => "Q" }), locale: "en")
-      assert_equal [ "lightbulb" ], component.icons
-      assert_equal "Tip · words", component.line
-    end
+and add after that test:
+
+```ruby
+  # Note block plan, ruling 12: the Note's icon in the picker is its type's
+  # (`info`), and on a block's card and tile its kind's. A callable answers
+  # it for each block, from the same closed list.
+  test "a block type's icon may follow its block: the callable answers one of the list for each block, and the type's own stands where there is no block" do
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    definition.icon :info, for_block: ->(block) { block.settings["tone"] == "loud" ? "triangle_alert" : "info" }
+
+    assert_equal "info", definition.icon
+    assert definition.icon_follows_block?
+    assert_equal "triangle_alert", definition.icon_for(ContentBlock.new(settings: { "tone" => "loud" }))
+    assert_equal "info", definition.icon_for(ContentBlock.new(settings: {}))
+    assert_equal "info", definition.icon_for(nil), "the picker has no block"
+
+    plain = ContentModel::BlockTypeDefinition.new("y").tap { |type| type.icon :pilcrow }
+    assert_not plain.icon_follows_block?
+    assert_equal "pilcrow", plain.icon_for(ContentBlock.new(settings: { "tone" => "loud" }))
+    assert_nil ContentModel::BlockTypeDefinition.new("z").icon_for(ContentBlock.new), "a type with no icon has none for its blocks"
+
+    error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").icon :info, for_block: "triangle_alert" }
+    assert_includes error.message, "callable"
   end
 
-  test "a built-in's icon part names one of the closed list or raises, naming the list" do
-    BlockTypes.fetch("code").summary(->(block, locale:) { [ [ :icon, "<svg onload=x>" ] ] })
-    error = assert_raises(ArgumentError) { render_summary block("code") }
-    assert_includes error.message, "info, lightbulb, circle-alert, triangle-alert"
+  test "a block's icon off the list raises, naming the list, and never reaches the page as markup" do
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    definition.icon :info, for_block: ->(_block) { "<svg onload=x>" }
+
+    error = assert_raises(ArgumentError) { definition.icon_for(ContentBlock.new) }
+    assert_match(/\Ax: its icon for a block is one of pilcrow, .*, triangle_alert/, error.message)
+  end
+
+  # An outside type's callable would be asked on every card and tile of the
+  # editor, where a raise is a 500: not yet (plan ruling 12).
+  test "a block type from outside names one icon for all its blocks: for_block is refused at registration" do
+    definition = ContentModel::BlockTypeDefinition.new("gallery/flag")
+    definition.icon :info, for_block: ->(_block) { "info" }
+
+    error = assert_raises(ArgumentError) { definition.finalize! }
+    assert_match(/\Agallery\/flag: a block type from outside names one icon/, error.message)
+  end
+```
+
+Add to `test/components/admin/editor_screen/block_icon_component_test.rb`, before the final `end`:
+
+```ruby
+  # Note block plan, ruling 12: a type whose icon follows its block.
+  def with_flag_type
+    BlockTypes.register(:test_flag) do |t|
+      TestTypes.declare(t)
+      t.label "Flag"
+      t.field :tone, :select, options: %w[calm loud], default: "calm"
+      t.icon "info", for_block: ->(block) { block.settings["tone"] == "loud" ? "triangle_alert" : "info" }
+    end
+    yield BlockTypes.fetch(:test_flag)
   ensure
     Rails.application.reloader.prepare!
   end
 
-  test "an outside type's icon part of no known name draws the type's label" do
-    with_test_types do
-      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :icon, "skull" ], [ :text, "x" ] ] })
-      capture_log([ Rails ]) { render_summary block("test/quote", settings: { "text" => "Q" }) }
-      assert_equal "Quote", page.find(line).text
-      assert_no_selector "svg"
+  test "a type whose icon follows its block draws the block's own on its card and its tile, under an id a save's answer replaces, and the type's in the picker" do
+    with_flag_type do |flag|
+      block = root_page.content_blocks.create!(block_type: "test_flag", position: 0, settings: { "tone" => "loud" })
+
+      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :card, block: block)
+      assert_selector "span#block-#{block.id}-icon-card[data-block-icon=triangle_alert][aria-hidden=true][class~='text-dim'] svg[class~='size-3.5']"
+
+      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :tile, block: block)
+      assert_selector "span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='text-meta'] svg[class~='size-3']"
+
+      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :picker)
+      assert_selector "span[data-block-icon=info]:not([id])"
+      assert_equal "block-#{block.id}-icon-tile", Admin::EditorScreen::BlockIconComponent.dom_id(block, :tile)
+    end
+  end
+
+  test "a type whose icon does not follow its block draws it with no id, also when it is handed a block" do
+    block = root_page.content_blocks.create!(block_type: "code", position: 0)
+    render_inline Admin::EditorScreen::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: :card, block: block)
+
+    assert_selector "span[data-block-icon=code_xml]:not([id])", count: 1
+  end
+
+  test "a built-in's icon for a block that is not on the list raises, naming the list" do
+    with_flag_type do |flag|
+      flag.icon "info", for_block: ->(_block) { "<svg onload=x>" }
+      block = root_page.content_blocks.create!(block_type: "test_flag", position: 0)
+
+      error = assert_raises(ArgumentError) { render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :card, block: block) }
+      assert_includes error.message, "info, lightbulb, circle_alert, triangle_alert"
     end
   end
 ```
 
-and amend the existing kinds test's assertion (it still holds, and now says the fifth kind too):
+Add to `test/integration/admin/content_blocks_test.rb`, before the final `end`:
 
 ```ruby
-    assert_includes error.message, "text, word, mono, hint, icon"
+  # Note block plan, ruling 12: neither a card's head nor a tile's face is
+  # re-rendered by a save, so an icon that follows its block is replaced by
+  # id in the save's answer; any other type's answer carries no icon.
+  test "a save of a block whose icon follows it redraws the icon on its card and its tile; another type's save redraws none" do
+    BlockTypes.register(:test_flag) do |t|
+      TestTypes.declare(t)
+      t.label "Flag"
+      t.field :tone, :select, options: %w[calm loud], default: "calm"
+      t.icon "info", for_block: ->(block) { block.settings["tone"] == "loud" ? "triangle_alert" : "info" }
+    end
+    flag = @page.content_blocks.create!(block_type: "test_flag", position: 0)
+
+    patch "#{blocks_path}/#{flag.id}", params: { block: { settings: { tone: "loud" } }, base_updated_at: flag.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action='replace'][target='block-#{flag.id}-icon-card'] template span#block-#{flag.id}-icon-card[data-block-icon='triangle_alert']"
+    assert_select "turbo-stream[action='replace'][target='block-#{flag.id}-icon-tile'] template span#block-#{flag.id}-icon-tile[data-block-icon='triangle_alert']"
+
+    code = @page.content_blocks.create!(block_type: "code", position: 1)
+    patch "#{blocks_path}/#{code.id}", params: { block: { settings: { filename: "a.rb" } }, base_updated_at: code.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[target^='block-#{code.id}-icon-']", count: 0
+  ensure
+    Rails.application.reloader.prepare!
+  end
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `PGGSSENCMODE=disable bin/rails test test/components/admin/editor_screen/tile_summary_component_test.rb`
-Expected: FAIL: "test/quote's summary answered a part of kind :icon".
+Run: `PGGSSENCMODE=disable bin/rails test test/models/content_model/block_type_definition_test.rb test/components/admin/editor_screen/block_icon_component_test.rb test/integration/admin/content_blocks_test.rb`
+Expected: FAIL: "unknown keyword: :for_block", `NoMethodError: undefined method 'icon_for'`, "unknown keyword: :block", the message without the four new names, and no icon stream in the answer.
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 3: Implement the declaration**
 
-In `app/views/admin/shared/_icon.html.erb`, before the `<% else` branch:
+In `app/models/content_model/block_type_definition.rb`, replace the `ICONS` comment and constant:
+
+```ruby
+    # The icons a block type may name (contrast and buttons spec, C2 and
+    # Ruling 6): each is a branch of CS Studio's icon partial
+    # (`app/views/admin/shared/_icon.html.erb`, Lucide, spelt as the
+    # partial's symbol: `code_xml` for Lucide's `code-xml`), which a model
+    # may not name; `block_icon_component_test.rb` draws every one. A type
+    # names one or none; an outside type picks from the same list. The last
+    # four are the Note block's kinds (note block plan, rulings 11 and 12),
+    # which its blocks' cards and tiles draw through `for_block:`.
+    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert].freeze
+```
+
+Replace `#icon` and add the two readers after it:
+
+```ruby
+    # The icon CS Studio draws for the type in the picker, on a card's head
+    # and on a section's tile: one of `ICONS`, or none. `for_block:` is a
+    # callable taking one block and answering one of `ICONS`: a block's card
+    # and tile draw what it answers for that block, in place of the type's
+    # (the Note block's kind; note block plan, ruling 12). The picker, which
+    # has no block, draws the type's, so the type's should be the icon of
+    # the value a new block starts with.
+    def icon(name = nil, for_block: nil)
+      return @icon if name.nil?
+      refuse "icon is one of #{ICONS.join(", ")} (the icons CS Studio draws for a block type): #{name.inspect}" unless ICONS.include?(name.to_s)
+      refuse "`icon for_block:` is a callable taking the block and answering one of #{ICONS.join(", ")}" unless for_block.nil? || for_block.respond_to?(:call)
+
+      @icon_for_block = for_block
+      @icon = name.to_s
+    end
+
+    # Whether a block's card and tile draw an icon of the block's own
+    # (`for_block:`), which a save then has to redraw
+    # (`Admin::ContentBlocksController#block_icon_streams`).
+    def icon_follows_block? = !@icon_for_block.nil?
+
+    # The icon one block of the type is drawn with: what `for_block:`
+    # answers for it, else the type's own (nil for a type with none). A name
+    # off the list raises, naming the list: only a built-in may declare
+    # `for_block:` (`refuse_outside!`), so a wrong answer is this
+    # repository's fault, and the name reaches the icon partial as a symbol,
+    # never as markup.
+    def icon_for(block)
+      return @icon unless icon_follows_block? && block
+
+      name = @icon_for_block.call(block).to_s
+      refuse "its icon for a block is one of #{ICONS.join(", ")}: #{name.truncate(40).inspect}" unless ICONS.include?(name)
+
+      name
+    end
+```
+
+In `#refuse_outside!`, directly after the `read_only_actions` refusal:
+
+```ruby
+      # A gem's callable would be asked on every card and tile of the editor,
+      # where one that raised is a 500; the tile's rescue for a gem's
+      # `summary` is not repeated for an icon until a gem asks for one.
+      if icon_follows_block?
+        refuse "a block type from outside names one icon for all its blocks: `icon for_block:` is the CMS's own yet, " \
+               "because a callable that raised would fail every editor page holding a block of the type"
+      end
+```
+
+and add to the class comment on `refuse_outside!`, after "so any action it named would be one of the CMS's, kept alive in every held form.": "Nor `icon … for_block:`, for the reason written at its refusal."
+
+- [ ] **Step 4: Implement the drawing and the save's answer**
+
+In `app/views/admin/shared/_icon.html.erb`, after the `:columns_2` branch and before `<% else`:
 
 ```erb
-<%# The Note block's four kinds (note block spec, "CS Studio"), Lucide, on a tile at 12px. %>
+<%# The Note block's four kinds (note block spec, decision 2; plan ruling 11), Lucide, drawn by
+    `Admin::EditorScreen::BlockIconComponent` on a note's card and tile (`icon for_block:`), and
+    `info` in the picker as the Note type's own. %>
 <% when :info %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 16v-4M12 8h.01" /></svg>
 <% when :lightbulb %>
@@ -813,108 +992,107 @@ In `app/views/admin/shared/_icon.html.erb`, before the `<% else` branch:
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3M12 9v4M12 17h.01" /></svg>
 ```
 
-In `app/components/admin/editor_screen/tile_summary_component.rb`:
-
-Replace the `LOOKS` comment and add the icon constants:
+Replace `app/components/admin/editor_screen/block_icon_component.rb`:
 
 ```ruby
-      # A summary part's kind => the class it is drawn in (nil: plain). The
-      # set is closed; a type's summary answers nothing else (block types
-      # spec, decision 8; `:hint` is the meta colour the Code block's "Empty"
-      # was drawn in before the line moved into the type). The fifth kind,
-      # `[:icon, name]`, is no text: it is drawn before the line (note block
-      # spec, "CS Studio").
-      LOOKS = { text: nil, word: nil, mono: "font-cs-mono", hint: "text-meta" }.freeze
-      KINDS = (LOOKS.keys + [ :icon ]).freeze
+module Admin
+  module EditorScreen
+    # A block type's icon where the editor names the type (contrast and
+    # buttons spec, C2): 16px dim before the name in the picker, 14px dim
+    # between a card's handle and its name, 12px meta before a tile's
+    # summary, where it stands in for the name. Decoration: the name is
+    # always beside it, on the tile as `sr-only` text. A type that names no
+    # icon draws nothing (Ruling 7).
+    #
+    # A TYPE WHOSE ICON FOLLOWS ITS BLOCK (`icon … for_block:`, the Note
+    # block's kind; note block plan, ruling 12) is drawn with the block's own
+    # on its card and its tile, which hand their block in, and with the
+    # type's in the picker, which has none. Only such an icon carries an id
+    # (`dom_id`): a save's answer replaces it
+    # (`Admin::ContentBlocksController#block_icon_streams`), because neither
+    # the card's head nor the tile's face is re-rendered by a save.
+    class BlockIconComponent < AdminComponent
+      PLACES = { picker: %w[size-4 text-dim], card: %w[size-3.5 text-dim], tile: %w[size-3 text-meta] }.freeze
 
-      # The names an icon part may take, and nothing else: a name, never
-      # markup (`admin/shared/_icon` draws each). Today the Note block's four.
-      ICONS = %w[info lightbulb circle-alert triangle-alert].freeze
+      def self.dom_id(block, place) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-icon-#{place}"
 
-      # The look an icon part carries through `drawn`, so it never joins a run of text.
-      ICON = :icon
+      def initialize(definition:, place:, block: nil)
+        raise ArgumentError, "unknown place #{place.inspect}" unless PLACES.key?(place)
+
+        @definition = definition
+        @place = place
+        @block = block
+      end
+
+      def render? = icon_name.present?
+
+      def call
+        size, colour = PLACES.fetch(@place)
+        # `strip`: the partial's own line breaks would land in a button's text.
+        tag.span(helpers.render("admin/shared/icon", name: icon_name.to_sym, size: size).strip.html_safe,
+          id: (self.class.dom_id(@block, @place) if @block && @definition.icon_follows_block?),
+          class: "inline-flex shrink-0 #{colour}", aria: { hidden: true }, data: { block_icon: icon_name })
+      end
+
+      private
+
+      # The block's own where the type's icon follows it, else the type's;
+      # always a name from `BlockTypeDefinition::ICONS` (`icon_for` raises
+      # for any other).
+      def icon_name = @icon_name ||= @definition&.icon_for(@block)
+    end
+  end
+end
 ```
 
-Replace `line` and `parts`, and add `icons`:
-
-```ruby
-      # The line as text, whatever its parts look like.
-      def line = parts.map(&:first).join
-
-      # `[text, class or nil]` in reading order; "Needs fixing" is the last.
-      # An icon is not a part of the line (`icons`).
-      def parts
-        found = content
-        drawn = (found.is_a?(Array) ? found : [ [ found, nil ] ]).reject { |text, look| look == ICON || text.blank? }
-        return drawn unless invalid
-
-        drawn + [ [ [ (SEPARATOR if drawn.any?), t(".needs_fixing") ].join, nil ] ]
-      end
-
-      # The names of the icons a type's summary put before its line.
-      def icons
-        found = content
-        found.is_a?(Array) ? found.select { |_, look| look == ICON }.map(&:first) : []
-      end
-```
-
-Memoise `content` (it is read by both):
-
-```ruby
-      def content
-        return @content if defined?(@content)
-
-        @content =
-          if definition.nil? then t(".unavailable", type: block.block_type)
-          elsif definition.summary then own_summary
-          elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
-          elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
-          end
-      end
-```
-
-Replace `drawn`:
-
-```ruby
-      def drawn(parts)
-        Array(parts).map do |kind, value, values = {}|
-          raise ArgumentError, "#{block.block_type}'s summary answered a part of kind #{kind.inspect}: a part is one of #{KINDS.join(", ")}" unless KINDS.include?(kind)
-          next icon(value) if kind == :icon
-
-          look = LOOKS.fetch(kind)
-          [ %i[word hint].include?(kind) ? word(value, **values) : value.to_s, look ]
-        end.slice_when { |a, b| a.last != b.last || a.last == ICON }.map { |run| [ run.map(&:first).join, run.first.last ] }
-      end
-
-      def icon(name)
-        raise ArgumentError, "#{block.block_type}'s summary answered the icon #{name.to_s.truncate(40).inspect}: an icon is one of #{ICONS.join(", ")}" unless ICONS.include?(name.to_s)
-
-        [ name.to_s, ICON ]
-      end
-```
-
-In `tile_summary_component.html.erb`, between the thumbnail and the line:
+In `app/components/admin/editor_screen/block_card_component.html.erb`, the icon's line hands over the block:
 
 ```erb
-  <%# A type's icon parts (`[:icon, name]`): decoration before the line, the line says the rest. %>
-  <% icons.each do |name| %>
-    <span class="inline-flex shrink-0 text-meta" data-tile-icon="<%= name %>"><%= helpers.render "admin/shared/icon", name: name.tr("-", "_").to_sym, size: "size-3" %></span>
-  <% end %>
+    <%= render Admin::EditorScreen::BlockIconComponent.new(definition: definition, place: :card, block: block) unless unavailable? %>
 ```
 
-Add a sentence to the class comment's "THE LINE IS PARTS" paragraph: "An `[:icon, name]` part is drawn before the line (`icons`), never inside it."
+In `app/components/admin/editor_screen/block_tile_component.rb`, `block_icon` hands over the block (and its comment gains one sentence: "A type whose icon follows its block (the Note's kind) shows the block's own."):
 
-- [ ] **Step 4: Run the tests to verify they pass**
+```ruby
+      def block_icon = @block_icon ||= Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: :tile, block: block)
+```
 
-Run: `PGGSSENCMODE=disable bin/rails test test/components/admin/editor_screen/tile_summary_component_test.rb test/components/admin/editor_screen test/lib/admin_design_rules_test.rb`
-Expected: PASS.
+In `app/controllers/admin/content_blocks_controller.rb`, `#update`, directly after `streams << tile_summary_stream(result) if block.section_id`:
 
-- [ ] **Step 5: Commit**
+```ruby
+      streams.concat(block_icon_streams(result.record)) if result.ok? && block.definition&.icon_follows_block?
+```
+
+and, as a private method directly after `#tile_summary_stream`:
+
+```ruby
+    # A type whose icon follows its block (`icon … for_block:`, the Note
+    # block's kind; note block plan, ruling 12) has the icon redrawn on the
+    # card's head and on the tile with every answer to a save that went
+    # through, as the tile's line is: neither is re-rendered by a save
+    # otherwise, and a kind chosen and saved would keep the old kind's icon
+    # until a reload. Only the icon's span is replaced, never the head or the
+    # face around it (the face may hold the focus). Replacing an id that is
+    # not on the page (a block at the top level has no tile) does nothing.
+    def block_icon_streams(block)
+      %i[card tile].map do |place|
+        turbo_stream.replace(Admin::EditorScreen::BlockIconComponent.dom_id(block, place),
+          Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: place, block: block))
+      end
+    end
+```
+
+- [ ] **Step 5: Run the tests to verify they pass**
+
+Run: `PGGSSENCMODE=disable bin/rails test test/models/content_model/block_type_definition_test.rb test/components/admin/editor_screen test/integration/admin/content_blocks_test.rb test/lib/admin_design_rules_test.rb test/lib/dependency_direction_test.rb test/lib/content_spiel/plugins_test.rb`
+Expected: PASS ("every icon a block type may name is drawn by the icon partial" now draws the four new names too).
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add app/components/admin/editor_screen/tile_summary_component.rb app/components/admin/editor_screen/tile_summary_component.html.erb app/views/admin/shared/_icon.html.erb test/components/admin/editor_screen/tile_summary_component_test.rb
+git add app/models/content_model/block_type_definition.rb app/views/admin/shared/_icon.html.erb app/components/admin/editor_screen/block_icon_component.rb app/components/admin/editor_screen/block_card_component.html.erb app/components/admin/editor_screen/block_tile_component.rb app/controllers/admin/content_blocks_controller.rb test/models/content_model/block_type_definition_test.rb test/components/admin/editor_screen/block_icon_component_test.rb test/integration/admin/content_blocks_test.rb
 git commit -m "$(cat <<'EOF'
-feat: a block type's tile summary may start with an icon from a closed list
+feat: a block type's icon may follow its block on the card and the tile (icon for_block:)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT
@@ -929,11 +1107,11 @@ EOF
 **Files:**
 - Generate, then modify: `app/models/block_types/note.rb`, `config/initializers/types.rb`, `app/components/blocks/note_component.rb`, `app/components/blocks/note_component.html.erb`, `app/assets/tailwind/themes/default/note.css` (generated, left as is until Task 5 except its GENERATED line), `config/locales/public.en.yml`, `config/locales/admin/editor_screen.en.yml`, `test/components/previews/blocks/note_component_preview.rb`, `test/models/block_types/note_test.rb`, `test/components/blocks/note_component_test.rb`
 - Modify: `test/support/contract_ledger.rb` (`COMPONENTS`), `docs/reference/theming.md` (the Components table)
-- Modify: `test/values/theme/contract_test.rb`, `test/components/admin/editor_screen/tile_summary_component_test.rb`
+- Modify: `test/values/theme/contract_test.rb`, `test/components/admin/editor_screen/tile_summary_component_test.rb`, `test/components/admin/editor_screen/block_tile_component_test.rb`, `test/components/admin/editor_screen/block_icon_component_test.rb` ("every built-in block type declares its icon")
 
 **Interfaces:**
-- Consumes: `control: :segmented` (Task 1); `max:`, `help:`, `placeholder_from:` (Task 2); `[:icon, name]` and `TileSummaryComponent::ICONS` (Task 3).
-- Produces: `BlockTypes::Note::KINDS` (`{ "note" => "Note", "tip" => "Tip", "important" => "Important", "warning" => "Warning" }`), `BlockTypes::Note::ICONS` (`{ "note" => "info", "tip" => "lightbulb", "important" => "circle-alert", "warning" => "triangle-alert" }`), `BlockTypes::Note::DEFAULT = "note"`, `BlockTypes::Note::TITLE_LENGTH = 80`, `BlockTypes::Note.kind_of(value) -> String`, `BlockTypes::Note.summary(block, locale:) -> Array`; `Blocks::NoteComponent` (private `kind`, `heading`, `titled?`, `icon`, `body`); markup `aside.content-block.content-block--note.content-block--note-<kind>[aria-labelledby=note-<id>-heading]` > `p.note-head#note-<id>-heading` (`svg.note-icon[data-icon]` + `span`) + `div.note-body.cs-prose`; keys `public.blocks.note.kinds.<kind>` and `admin.components.editor_screen.tile_summary.types.note.empty`.
+- Consumes: `control: :segmented` (Task 1); `max:`, `help:`, `placeholder_from:` (Task 2); `icon … for_block:`, `#icon_for`, `BlockIconComponent.new(…, block:)` and `.dom_id` (Task 3).
+- Produces: `BlockTypes::Note::KINDS` (`{ "note" => "Note", "tip" => "Tip", "important" => "Important", "warning" => "Warning" }`), `BlockTypes::Note::ICONS` (Lucide's names: `{ "note" => "info", "tip" => "lightbulb", "important" => "circle-alert", "warning" => "triangle-alert" }`), `BlockTypes::Note::DEFAULT = "note"`, `BlockTypes::Note::TITLE_LENGTH = 80`, `BlockTypes::Note.kind_of(value) -> String`, `BlockTypes::Note.studio_icon(block) -> String` (the partial's spelling: `info`, `lightbulb`, `circle_alert`, `triangle_alert`), `BlockTypes::Note.summary(block, locale:) -> Array` (text parts only); the type's icon `info`, following the block's kind on its card and tile; `Blocks::NoteComponent` (private `kind`, `heading`, `titled?`, `word`, `icon`, `body`); markup `aside.content-block.content-block--note.content-block--note-<kind>[aria-labelledby=note-<id>-heading]` > `h3.note-head#note-<id>-heading` (`svg.note-icon[data-icon]` + `span`, which holds `span.note-kind` with "<word>: " only when `titled?`, then `heading`) + `div.note-body.cs-prose`; keys `public.blocks.note.kinds.<kind>` and `admin.components.editor_screen.tile_summary.types.note.empty`.
 
 - [ ] **Step 1: Generate the skeleton**
 
@@ -960,8 +1138,9 @@ Replace `test/models/block_types/note_test.rb`:
 require "test_helper"
 
 # The Note block's declaration (note block spec, "The data"): a kind in the
-# settings, a translated title, the body column; the seven names of its
-# template, its sixteen tokens and its stylesheet are the theme contract's.
+# settings, a translated title, the body column; the eight names of its
+# template, its sixteen tokens and its stylesheet are the theme contract's;
+# its icon in CS Studio is `info`, and its kind's on a card and a tile.
 class BlockTypes::NoteTest < ActiveSupport::TestCase
   test "a note is a kind, a translated title and a text, nothing required, the kind a segmented choice of four that starts as a Note" do
     note = BlockTypes.fetch(:note)
@@ -982,11 +1161,24 @@ class BlockTypes::NoteTest < ActiveSupport::TestCase
     assert_equal %w[body], note.uses_columns
     assert_empty note.capabilities
     assert_empty note.read_only_actions
-    assert_equal %w[block page kind heading titled? icon body], note.theme_methods
+    assert_equal %w[block page kind heading titled? word icon body], note.theme_methods
     assert_equal "note.css", note.stylesheet
     assert_equal Blocks::NoteComponent, note.component
     assert_equal({ "note" => "info", "tip" => "lightbulb", "important" => "circle-alert", "warning" => "triangle-alert" }, BlockTypes::Note::ICONS)
-    assert_equal BlockTypes::Note::ICONS.values.sort, Admin::EditorScreen::TileSummaryComponent::ICONS.sort, "the tile draws every kind's icon and no other"
+    assert_equal "info", note.icon, "the picker's icon is the Note's, the kind a new block starts with"
+    assert note.icon_follows_block?
+  end
+
+  # Plan rulings 11 and 12: a note's card and tile show its kind's icon, in
+  # the icon partial's spelling, from CS Studio's closed list.
+  test "CS Studio draws a note's card and tile with its kind's icon, an unknown kind's as a Note's, each on the closed list" do
+    note = BlockTypes.fetch(:note)
+    { "note" => "info", "tip" => "lightbulb", "important" => "circle_alert", "warning" => "triangle_alert", "gone" => "info" }.each do |kind, icon|
+      block = ContentBlock.new(block_type: "note", settings: { "kind" => kind })
+      assert_equal icon, BlockTypes::Note.studio_icon(block), kind
+      assert_equal icon, note.icon_for(block), kind
+    end
+    BlockTypes::Note::ICONS.each_value { |name| assert_includes ContentModel::BlockTypeDefinition::ICONS, name.tr("-", "_") }
   end
 
   test "Note stands after Code in the picker, and the containers stay last" do
@@ -1021,7 +1213,8 @@ Replace `test/components/blocks/note_component_test.rb`:
 require "test_helper"
 
 # `Blocks::NoteComponent` (note block spec, "The public side"): an aside
-# named by its heading, the kind's icon and word or the editor's title, and
+# named by its heading (an h3), the kind's icon and word or the editor's
+# title after the kind's word hidden for a screen reader (decision 6), and
 # the text; nothing for a note without text.
 class Blocks::NoteComponentTest < ActiveSupport::TestCase
   include ComponentTestHelper
@@ -1039,34 +1232,62 @@ class Blocks::NoteComponentTest < ActiveSupport::TestCase
 
   def heading(block) = page.find("#note-#{block.id}-heading")
 
+  # What a screen reader reads of the heading: every text in it, the hidden
+  # word included, with its white space collapsed.
+  def said(block) = heading(block).text(:all).squish
+
   test "each kind is an aside named by its heading, with its own word, icon and class, and never an alert" do
     { "note" => %w[Note info], "tip" => %w[Tip lightbulb], "important" => %w[Important circle-alert], "warning" => %w[Warning triangle-alert] }.each do |kind, (word, icon)|
       block = note_block(kind: kind)
       draw(block)
 
       assert_selector "aside.content-block.content-block--note.content-block--note-#{kind}[aria-labelledby='note-#{block.id}-heading']", count: 1
-      assert_equal word, heading(block).text.strip
+      assert_selector "aside > h3.note-head#note-#{block.id}-heading", count: 1
+      assert_equal word, said(block)
       assert_selector "#note-#{block.id}-heading svg.note-icon[data-icon='#{icon}'][aria-hidden='true'][width='16'][height='16']", visible: :all
       assert_selector "aside .note-body.cs-prose strong", text: "gap"
       assert_no_selector "[role='alert'], [aria-live]"
     end
   end
 
-  test "an editor's title replaces the word; the icon and the kind stay" do
+  # Spec decision 6 (Claude Design D4c): under an editor's title the kind is
+  # still heard, once, before the title and inside the heading, so it is in
+  # a list of headings too; it is not seen.
+  test "an editor's title replaces the word on screen, the word is heard once before it, hidden, and the icon and the kind stay" do
     block = note_block(kind: "warning", title: "Before you publish")
     draw(block)
 
-    assert_equal "Before you publish", heading(block).text.strip
+    assert_equal "Warning: Before you publish", said(block)
+    assert_selector "#note-#{block.id}-heading .note-kind", count: 1, text: /\AWarning:\s*\z/, visible: :all
+    assert_equal 1, said(block).scan("Warning").size, "the kind is said once"
     assert_selector "aside.content-block--note-warning svg[data-icon='triangle-alert']", visible: :all
   end
 
+  test "without a title the heading is the kind's word alone, said once, and there is no hidden word" do
+    block = note_block(kind: "tip")
+    draw(block)
+
+    assert_equal "Tip", said(block)
+    assert_no_selector ".note-kind", visible: :all
+  end
+
   # Review focus 1.
-  test "a title of only white space is no title: the heading is the kind's word" do
+  test "a title of only white space is no title: the heading is the kind's word, said once" do
     block = note_block(kind: "tip", title: "   ")
     draw(block)
 
-    assert_equal "Tip", heading(block).text.strip
+    assert_equal "Tip", said(block)
+    assert_no_selector ".note-kind", visible: :all
     assert_empty block.reload.translated_settings, "nothing is stored for it"
+  end
+
+  # Review focus 6: "Tip: Tip" would say the kind twice.
+  test "a title that is only the kind's word is no title: the word is said once" do
+    block = note_block(kind: "tip", title: "tip")
+    draw(block)
+
+    assert_equal "Tip", said(block)
+    assert_no_selector ".note-kind", visible: :all
   end
 
   # Review focus 2.
@@ -1076,7 +1297,7 @@ class Blocks::NoteComponentTest < ActiveSupport::TestCase
     draw(block.reload)
 
     assert_selector "aside.content-block--note-note"
-    assert_equal "Note", heading(block).text.strip
+    assert_equal "Note", said(block)
     assert_selector "svg[data-icon='info']", visible: :all
     assert_no_selector ".content-block--note-danger"
   end
@@ -1098,14 +1319,14 @@ class Blocks::NoteComponentTest < ActiveSupport::TestCase
 
       I18n.with_locale(:de) do
         draw(titled)
-        assert_equal "Vor dem Veröffentlichen", heading(titled).text.strip
+        assert_equal "Tip: Vor dem Veröffentlichen", said(titled), "German has no words file: the hidden word is English"
         assert_selector ".note-body strong", text: "gap"
         draw(plain)
-        assert_equal "Tip", heading(plain).text.strip
+        assert_equal "Tip", said(plain)
       end
       I18n.with_locale(:es) do
         draw(titled)
-        assert_equal "Before you publish", heading(titled).text.strip, "no Spanish title: the default language's"
+        assert_equal "Tip: Before you publish", said(titled), "no Spanish title: the default language's"
       end
     end
   end
@@ -1117,7 +1338,7 @@ class Blocks::NoteComponentTest < ActiveSupport::TestCase
     draw(block)
 
     assert_no_selector "script, b", visible: :all
-    assert_includes heading(block).text, "<script>alert(1)</script><b>x</b>"
+    assert_includes said(block), "<script>alert(1)</script><b>x</b>"
   end
 end
 ```
@@ -1125,7 +1346,7 @@ end
 Add to `test/values/theme/contract_test.rb`, after "each method the Code block's template may call answers…":
 
 ```ruby
-  # What the reference promises of the Note block's seven names: each
+  # What the reference promises of the Note block's eight names: each
   # answers for a block with nothing in it, so a theme's template needs no
   # guard; and the component draws nothing without text.
   test "each method the Note block's template may call answers for an empty block" do
@@ -1133,7 +1354,7 @@ Add to `test/values/theme/contract_test.rb`, after "each method the Code block's
     component = Blocks::NoteComponent.new(block: ContentBlock.new(owner: page, block_type: "note"), page: page)
     render_inline(component)
 
-    assert_equal [ "note", "Note", false, "info" ], %i[kind heading titled? icon].map { |name| component.send(name) }
+    assert_equal [ "note", "Note", false, "Note", "info" ], %i[kind heading titled? word icon].map { |name| component.send(name) }
     assert_equal "", component.send(:body).to_s.strip
     assert_equal false, component.render?
   end
@@ -1142,22 +1363,24 @@ Add to `test/values/theme/contract_test.rb`, after "each method the Code block's
 and, in "a default component template calls no method of its component that its line does not name", after the Code assertion:
 
 ```ruby
-    assert_equal %w[block body heading icon kind], component_methods_called("blocks/note_component").sort,
+    assert_equal %w[block body heading icon kind titled? word], component_methods_called("blocks/note_component").sort,
       "the reading sees what the Note block's template calls (and so could fail)"
 ```
 
 Add to `test/components/admin/editor_screen/tile_summary_component_test.rb`, after the Code block's tests:
 
 ```ruby
-  # Note block spec, "CS Studio": the kind's icon, then the kind's word or
-  # the editor's title, " · " and the start of the text; an empty text says
-  # "Empty" in the meta colour. Plan ruling 6: the tile only.
-  test "a note is its kind's icon, then its word or its title and the start of its text; one without text says Empty" do
+  # Note block spec, "CS Studio": the kind's word or the editor's title,
+  # " · " and the start of the text; an empty text says "Empty" in the meta
+  # colour. Plan ruling 6: the tile only. The kind's icon is not a part of
+  # the line: the tile draws it before the line (plan ruling 12,
+  # block_tile_component_test.rb), and the summary draws none.
+  test "a note is its word or its title and the start of its text; one without text says Empty" do
     note = block("note", settings: { "kind" => "tip" })
     note.assign_body(rich_doc("First words of the note.\n\nA second paragraph."), locale: :en)
     note.save!
     render_summary note
-    assert_selector ".admin-block-tile__summary > span[data-tile-icon='lightbulb'].text-meta svg.size-3[aria-hidden='true']", count: 1
+    assert_no_selector ".admin-block-tile__summary svg", visible: :all
     assert_equal "Tip · First words of the note.", page.find(line).text
 
     note.assign_settings({ "title" => "Before you publish" }, locale: "en")
@@ -1167,7 +1390,6 @@ Add to `test/components/admin/editor_screen/tile_summary_component_test.rb`, aft
 
     empty = block("note")
     render_summary empty
-    assert_selector "[data-tile-icon='info']"
     assert_equal "Note · Empty", page.find(line).text
     assert_selector "#{line} > span.text-meta", exact_text: "Empty"
   end
@@ -1181,14 +1403,44 @@ Add to `test/components/admin/editor_screen/tile_summary_component_test.rb`, aft
 
     assert_equal "<i>x</i> & <script>y</script> · Empty", page.find(line).text
     assert_no_selector "#{line} i, #{line} script", visible: :all
-    assert_selector "[data-tile-icon='info']"
   end
+
+  test "a note whose kind is not on the list says Note on its tile" do
+    note = block("note", settings: { "kind" => "tip" })
+    note.update_columns(settings: { "kind" => "gone" }) # version: none (a test writes a kind around the services)
+    render_summary note.reload
+
+    assert_equal "Note · Empty", page.find(line).text
+  end
+```
+
+Add to `test/components/admin/editor_screen/block_tile_component_test.rb`, after "the tile shows the type's icon in place of its name, and the face is still named by the type":
+
+```ruby
+  # Plan ruling 12: a note's tile shows its kind's icon, under the id a
+  # save's answer replaces, one icon only, and the face still says "Note".
+  test "a note's tile shows its kind's icon in place of the type's name, once, and the face is still named Note" do
+    block = @editor_page.content_blocks.create!(block_type: "note", section: @section, section_column: 2, position: 0, settings: { "kind" => "warning" })
+    render_tile(block)
+
+    assert_selector ".admin-block-tile__face span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='text-meta'] svg[class~='size-3']"
+    assert_selector ".admin-block-tile__face [data-block-icon]", count: 1
+    assert_selector ".admin-block-tile__face .sr-only", text: "Note"
+    assert_selector ".admin-block-tile__face", text: /Warning · Empty/
+  end
+```
+
+In `test/components/admin/editor_screen/block_icon_component_test.rb`, "every built-in block type declares its icon" names the Note's:
+
+```ruby
+    assert_equal({ "rich_text" => "pilcrow", "image" => "image", "code" => "code_xml", "note" => "info", "post_list" => "posts", "section" => "columns_2" },
+      BlockTypes.all.to_h { |type| [ type.name, type.icon ] }.slice(*BuiltInBlockTypes.names))
 ```
 
 - [ ] **Step 3: Run the tests to verify they fail**
 
-Run: `PGGSSENCMODE=disable bin/rails test test/models/block_types/note_test.rb test/components/blocks/note_component_test.rb test/values/theme/contract_test.rb test/components/admin/editor_screen/tile_summary_component_test.rb test/values/theme/contract_ledger_test.rb`
-Expected: FAIL: the generated definition has one `text` field; `Blocks::NoteComponent` has no `kind`; the ledger test names `blocks/note_component`.
+Run: `PGGSSENCMODE=disable bin/rails test test/models/block_types/note_test.rb test/components/blocks/note_component_test.rb test/values/theme/contract_test.rb test/components/admin/editor_screen/tile_summary_component_test.rb test/components/admin/editor_screen/block_tile_component_test.rb test/components/admin/editor_screen/block_icon_component_test.rb test/values/theme/contract_ledger_test.rb`
+Expected: FAIL: the generated definition has one `text` field and no icon; `Blocks::NoteComponent` has no `kind`; the ledger test names `blocks/note_component`.
 
 - [ ] **Step 4: Write the definition**
 
@@ -1210,11 +1462,13 @@ module BlockTypes
   # THE KINDS are four and closed. `KINDS` is what CS Studio's segmented
   # control says (a literal, as a select's choices are); the visitor's word
   # is the public site's key `public.blocks.note.kinds.<kind>`; `ICONS` are
-  # the Lucide names the default template and the tile draw. They live here,
-  # not on the component, because the tile's line (`summary`) needs them and
-  # a model names a component only to register it (note block plan, ruling
-  # 1). A kind that is stored and not on the list reads as a Note
-  # (`kind_of`), everywhere.
+  # the Lucide names the default template draws, which CS Studio draws on a
+  # note's card and tile in its icon partial's spelling (`studio_icon`,
+  # `t.icon … for_block:`; note block plan, rulings 11 and 12). They live
+  # here, not on the component, because the tile's line (`summary`) and the
+  # icon need them and a model names a component only to register it (note
+  # block plan, ruling 1). A kind that is stored and not on the list reads as
+  # a Note (`kind_of`), everywhere.
   module Note
     KINDS = { "note" => "Note", "tip" => "Tip", "important" => "Important", "warning" => "Warning" }.freeze
     ICONS = { "note" => "info", "tip" => "lightbulb", "important" => "circle-alert", "warning" => "triangle-alert" }.freeze
@@ -1226,9 +1480,18 @@ module BlockTypes
 
     def self.kind_of(value) = KINDS.key?(value.to_s) ? value.to_s : DEFAULT
 
+    # CS Studio's icon of one note, on its card's head and its tile: its
+    # kind's, spelt as `BlockTypeDefinition::ICONS` and the icon partial
+    # spell it (`circle_alert` for Lucide's `circle-alert`). Read from the
+    # rows' settings: CS Studio draws the rows, never a published copy.
+    def self.studio_icon(block) = ICONS.fetch(kind_of(block.settings.to_h["kind"])).tr("-", "_")
+
     def self.register
       BlockTypes.register :note do |t|
         t.label "Note"
+        # The picker's icon is the Note's own, the kind a new block starts
+        # with; a block's card and tile show its kind's (plan ruling 12).
+        t.icon "info", for_block: ->(block) { Note.studio_icon(block) }
         t.field :kind, :select, options: KINDS, default: DEFAULT, control: :segmented
         t.field :title, :string, translated: true, max: TITLE_LENGTH, placeholder_from: :kind,
                 help: "Leave it empty to head the note with its kind."
@@ -1237,8 +1500,10 @@ module BlockTypes
         # `kind` is one of the four (an unknown stored kind is "note");
         # `heading` the editor's title in the language shown, else the
         # CMS's word for the kind in it; `titled?` whether the heading is the
-        # editor's; `icon` the kind's Lucide name; `body` the text, rendered.
-        t.theme_methods :block, :page, :kind, :heading, :titled?, :icon, :body
+        # editor's; `word` the CMS's word for the kind, titled or not (the
+        # hidden word before a title, spec decision 6; plan ruling 13);
+        # `icon` the kind's Lucide name; `body` the text, rendered.
+        t.theme_methods :block, :page, :kind, :heading, :titled?, :word, :icon, :body
         t.stylesheet "note.css"
         t.summary ->(block, locale:) { Note.summary(block, locale: locale) }
         # The guide's own example (a Tip with a title of its own), with the
@@ -1251,16 +1516,18 @@ module BlockTypes
     end
 
     # The tile's line of a closed Note, as parts (note block spec, "CS
-    # Studio"): the kind's icon, the editor's title or the kind's label as
-    # CS Studio says it, " · ", and the start of the text, or "Empty" in the
-    # meta colour for a note with no text in this language.
+    # Studio"): the editor's title or the kind's label as CS Studio says it,
+    # " · ", and the start of the text, or "Empty" in the meta colour for a
+    # note with no text in this language. The kind's icon is not a part: the
+    # tile draws it before the line, in place of the type's (`t.icon …
+    # for_block:`; plan ruling 12).
     def self.summary(block, locale:)
       settings = block.settings_object(locale: locale)
       kind = kind_of(settings&.kind)
       word = settings&.title.presence || KINDS.fetch(kind)
       first = block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(SUMMARY_LENGTH).presence
 
-      [ [ :icon, ICONS.fetch(kind) ], [ :text, "#{word} · " ], (first ? [ :text, first ] : [ :hint, :empty ]) ]
+      [ [ :text, "#{word} · " ], (first ? [ :text, first ] : [ :hint, :empty ]) ]
     end
   end
 end
@@ -1279,10 +1546,12 @@ module Blocks
   # block it is handed (a published view on the site, the rows in a preview)
   # and nothing else.
   #
-  # Its template is promised seven names and no other (`theme_methods`):
-  # `block`, `page`, `kind`, `heading`, `titled?`, `icon`, `body`. Every
-  # other method here is private help for those and no promise: `title` and
-  # `word` are what `heading` is made of.
+  # Its template is promised eight names and no other (`theme_methods`):
+  # `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body`.
+  # `word` is promised beside `heading` because under an editor's title the
+  # template still says the kind, visually hidden, before the title (spec
+  # decision 6; note block plan, ruling 13). `settings` and `title` are
+  # private help for those and no promise.
   #
   # AN EMPTY NOTE DRAWS NOTHING (decision 5): no text in the visitor's
   # language and none along the site's fallback, whatever its title.
@@ -1305,7 +1574,14 @@ module Blocks
     # One of the four; a kind stored and not on the list is a Note.
     def kind = ::BlockTypes::Note.kind_of(settings&.kind)
 
-    def title = settings&.title.presence
+    # The editor's title, stripped; nil for none, and for one that is only
+    # the kind's word in the language shown ("Tip" on a Tip), which would
+    # otherwise be heard twice after the hidden word ("Tip: Tip"; review
+    # focus 6).
+    def title
+      text = settings&.title.to_s.strip
+      text.empty? || text.casecmp?(word) ? nil : text
+    end
 
     def titled? = !title.nil?
 
@@ -1319,7 +1595,8 @@ module Blocks
     def body = rich_text(block)
 
     # The kind's word in the visitor's language where
-    # `config/locales/public.<locale>.yml` has it, in English otherwise.
+    # `config/locales/public.<locale>.yml` has it, in English otherwise;
+    # titled or not.
     def word
       key = "public.blocks.note.kinds.#{kind}"
       I18n.t(key, locale: I18n.exists?(key, I18n.locale) ? I18n.locale : :en)
@@ -1332,13 +1609,16 @@ Replace `app/components/blocks/note_component.html.erb`:
 
 ```erb
 <%# The Note block (note block spec, "The public side"): an `aside` named by its heading, never an
-    alert, since a note is part of the page and not an event. The heading is the kind's icon, which is
-    decoration (`aria-hidden`: the word or the title says it), and `heading`, the editor's title or the
-    CMS's word. The icon is drawn here inline by its Lucide name (`icon`); a theme's template draws its
-    own. The class names are the default theme's own (note.css), not a promise; the heading's id is
-    written from `block`. Everything printed goes through ERB's own escaping. %>
+    alert, since a note is part of the page and not an event. The heading is an h3 (plan ruling 14), so
+    it is in a list of headings too. It holds the kind's icon, which is decoration (`aria-hidden`: the
+    word says the kind), and `heading`, the editor's title or the CMS's word. Under an editor's title
+    (`titled?`) the kind's `word` and a colon stand first, visually hidden (`note-kind`, note.css), so a
+    screen reader hears "Tip: Before you publish"; without a title there is none, and "Tip" is never
+    said twice (decision 6). The icon is drawn here inline by its Lucide name (`icon`); a theme's template
+    draws its own. The class names are the default theme's own (note.css), not a promise; the heading's
+    id is written from `block`. Everything printed goes through ERB's own escaping. %>
 <aside class="content-block content-block--note content-block--note-<%= kind %>" aria-labelledby="note-<%= block.id %>-heading">
-  <p class="note-head" id="note-<%= block.id %>-heading">
+  <h3 class="note-head" id="note-<%= block.id %>-heading">
     <svg class="note-icon" data-icon="<%= icon %>" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
       <% if icon == "lightbulb" %>
         <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>
@@ -1350,8 +1630,8 @@ Replace `app/components/blocks/note_component.html.erb`:
         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
       <% end %>
     </svg>
-    <span><%= heading %></span>
-  </p>
+    <span><% if titled? %><span class="note-kind"><%= word %>: </span><% end %><%= heading %></span>
+  </h3>
   <div class="note-body cs-prose"><%= body %></div>
 </aside>
 ```
@@ -1416,30 +1696,30 @@ In `app/assets/tailwind/themes/default/note.css`, take out the two lines of the 
 In `test/support/contract_ledger.rb`, `COMPONENTS`, after the Code line (registration order):
 
 ```ruby
-    "blocks/note_component" => %w[block page kind heading titled? icon body],
+    "blocks/note_component" => %w[block page kind heading titled? word icon body],
 ```
 
 In `docs/reference/theming.md`, "### Components", after the `blocks/code_component` row:
 
 ```markdown
-| `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `icon`, `body` |
+| `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body` |
 ```
 
 - [ ] **Step 7: Run the tests to verify they pass**
 
 Run first (the public integration tests read the built stylesheet, and the entry now imports `note.css`): `bin/rails tailwindcss:build && bin/rails theme_css:build`
-Then: `PGGSSENCMODE=disable bin/rails test test/models/block_types/note_test.rb test/models/built_in_types_test.rb test/components/blocks/note_component_test.rb test/values/theme/contract_test.rb test/values/theme/contract_ledger_test.rb test/lib/theming_reference_test.rb test/components/admin/editor_screen/tile_summary_component_test.rb test/integration/block_samples_test.rb test/components/admin/editor_screen/block_samples_card_test.rb test/lib/generators/block_type_generator_test.rb test/lib/dependency_direction_test.rb test/lib/source_layout_test.rb test/lib/admin_i18n_test.rb test/lib/admin_namespace_shadow_test.rb`
+Then: `PGGSSENCMODE=disable bin/rails test test/models/block_types/note_test.rb test/models/built_in_types_test.rb test/components/blocks/note_component_test.rb test/values/theme/contract_test.rb test/values/theme/contract_ledger_test.rb test/lib/theming_reference_test.rb test/components/admin/editor_screen/tile_summary_component_test.rb test/components/admin/editor_screen/block_tile_component_test.rb test/components/admin/editor_screen/block_icon_component_test.rb test/components/admin/editor_screen/block_picker_component_test.rb test/integration/block_samples_test.rb test/components/admin/editor_screen/block_samples_card_test.rb test/lib/generators/block_type_generator_test.rb test/lib/dependency_direction_test.rb test/lib/source_layout_test.rb test/lib/admin_i18n_test.rb test/lib/admin_namespace_shadow_test.rb`
 Expected: PASS. (`test/values/theme/scaffold_test.rb` and the canary are run in Task 5, after the stylesheet.)
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add app/models/block_types/note.rb config/initializers/types.rb app/components/blocks/note_component.rb app/components/blocks/note_component.html.erb app/assets/tailwind/themes/default/note.css config/locales/public.en.yml config/locales/admin/editor_screen.en.yml test/components/previews/blocks/note_component_preview.rb test/models/block_types/note_test.rb test/components/blocks/note_component_test.rb test/support/contract_ledger.rb docs/reference/theming.md test/values/theme/contract_test.rb test/components/admin/editor_screen/tile_summary_component_test.rb
+git add app/models/block_types/note.rb config/initializers/types.rb app/components/blocks/note_component.rb app/components/blocks/note_component.html.erb app/assets/tailwind/themes/default/note.css config/locales/public.en.yml config/locales/admin/editor_screen.en.yml test/components/previews/blocks/note_component_preview.rb test/models/block_types/note_test.rb test/components/blocks/note_component_test.rb test/support/contract_ledger.rb docs/reference/theming.md test/values/theme/contract_test.rb test/components/admin/editor_screen/tile_summary_component_test.rb test/components/admin/editor_screen/block_tile_component_test.rb test/components/admin/editor_screen/block_icon_component_test.rb
 git commit -m "$(cat <<'EOF'
 feat: the Note block type, its public component and its tile
 
 Release note: the theme contract gains blocks/note_component (block, page,
-kind, heading, titled?, icon, body).
+kind, heading, titled?, word, icon, body).
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT
@@ -1504,21 +1784,31 @@ Add to `test/integration/design_tokens_test.rb`, after the Code block's styleshe
     assert_match(/background:\s*var\(--note-ground\);/, box)
     assert_match(/border:\s*1px solid var\(--note-border\);/, box)
     assert_match(/border-left:\s*3px solid var\(--note-line\);/, box)
-    assert_match(/color:\s*var\(--note-ink\);/, rule.(".content-block--note .note-head"))
+    head = rule.(".content-block--note .note-head")
+    assert_match(/color:\s*var\(--note-ink\);/, head)
+    assert_match(/font-size:\s*inherit;/, head, "the h3 is the body's size, whatever the theme's h3 is (plan ruling 14)")
+    assert_match(/clip-path:\s*inset\(50%\);/, rule.(".content-block--note .note-kind"), "the kind's word before a title is heard, not seen (decision 6)")
     assert_no_match(/color:/, rule.(".content-block--note .note-body"), "the text is the theme's ink, from .cs-prose")
     code = rule.(".content-block--note .note-body :not(pre) > code")
     assert_match(/background:\s*var\(--th-surface\);/, code)
     assert_match(/border:\s*1px solid var\(--th-line\);/, code)
   end
 
-  test "the sixteen note tokens are defined from the theme's base tokens in both schemes, never a literal" do
+  # Spec decision 9 (Claude Design D4a): Note neutral, Tip the ok green,
+  # Important the accent blue, Warning the warn amber; red is for errors.
+  NOTE_HUES = { "note" => "--th-line-strong", "tip" => "--th-ok", "important" => "--th-accent", "warning" => "--th-warn" }.freeze
+
+  test "the sixteen note tokens are defined from the theme's base tokens in both schemes, never a literal, each kind in its hue and none in red" do
     theme_tokens.each do |theme, tokens|
       NOTE_KINDS.each do |kind|
         %w[ground line ink border].each do |part|
           value = tokens.fetch("--th-note-#{kind}-#{part}") { flunk("--th-note-#{kind}-#{part} is not defined for #{theme}") }
           assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/, value, "#{theme} --th-note-#{kind}-#{part} is #{value}")
+          assert_no_match(/danger/, value, "#{theme} --th-note-#{kind}-#{part}: red is kept for errors and destructive actions")
         end
+        assert_equal "var(#{NOTE_HUES.fetch(kind)})", tokens.fetch("--th-note-#{kind}-line"), "#{theme}: the #{kind}'s rule is its hue"
       end
+      assert_equal "color-mix(in srgb, var(--th-ink) 4%, var(--th-paper))", tokens.fetch("--th-note-note-ground"), "#{theme}: a Note is a 4% tint of the text colour"
     end
   end
 ```
@@ -1565,7 +1855,8 @@ Add to `test/integration/theme_pages_test.rb`, after "the third theme is sound�
 
     assert_response :success
     assert_select "section.plain-note[data-kind='warning'][data-icon='triangle-alert'][data-titled='true'][data-block='#{block.id}'][data-page='#{guide.id}'][aria-labelledby='plain-note-#{block.id}']" do
-      assert_select "h2#plain-note-#{block.id}", text: "<b>Mind</b>"
+      assert_select "h2#plain-note-#{block.id}", text: "Warning: <b>Mind</b>"
+      assert_select "h2#plain-note-#{block.id} .plain-note__kind", text: "Warning:"
       assert_select "div.plain-note__text strong", text: "address"
     end
     assert_select "aside.content-block--note", count: 0
@@ -1574,7 +1865,7 @@ Add to `test/integration/theme_pages_test.rb`, after "the third theme is sound�
     with_plain_theme { get "/guide" }
 
     assert_response :success
-    assert_select "div.plain-frame aside.content-block--note-warning #note-#{block.id}-heading", text: "<b>Mind</b>"
+    assert_select "div.plain-frame aside.content-block--note-warning h3#note-#{block.id}-heading", text: "Warning: <b>Mind</b>"
     assert_select "section.plain-note", count: 0
   end
 
@@ -1585,7 +1876,7 @@ Add to `test/integration/theme_pages_test.rb`, after "the third theme is sound�
     assert_equal %w[assets/stylesheets/theme.css components/blocks/note_component.html.erb], folder.files
     template = folder.read("components/blocks/note_component.html.erb")
     Theme::Contract.components.fetch("blocks/note_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
-    assert_no_match(/settings|title\b|word\b|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
+    assert_no_match(/settings|title\b|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name (the kind's word is `word`, not a key looked up), and no string marked safe")
   end
 ```
 
@@ -1599,29 +1890,32 @@ Expected: FAIL: the tokens are declared and not defined ("Listed but not defined
 In `app/assets/tailwind/themes/default/tokens.css`, in `:root, [data-theme="light"]`, after `--th-syn-embed`:
 
 ```css
-  /* The Note block's four kinds (note block spec, "The public side"), four
-     tokens each, every one DEFINED from the base tokens above, so a theme
-     that re-colours its base re-colours the notes: a kind's hue is a base
-     colour (note: the accent, tip: ok, important: danger, warning: warn),
-     its ground that hue at 8% over the page, its rule the hue, its word and
-     icon the hue's ink, its frame the hue at 24%. The text stays --th-ink.
-     A strong band gives all four its own look (sections.css).
+  /* The Note block's four kinds (note block spec, decision 9: Claude
+     Design's D4a), four tokens each, every one DEFINED from the base tokens
+     above, so a theme that re-colours its base re-colours the notes. Note is
+     neutral: a 4% tint of the text colour, a --th-line-strong rule, its word
+     and icon in the text colour, a --th-line frame. Tip is --th-ok, Important
+     the accent, Warning --th-warn: the ground the hue at 8% over the page,
+     the rule the hue, the word and icon the hue's ink (the accent is its own
+     ink), the frame the hue at 24%. No kind is red: --th-danger is kept for
+     errors and destructive actions. The text stays --th-ink. A strong band
+     re-values all sixteen (sections.css).
      test/integration/design_tokens_test.rb holds the 72 pairs: the ink, the
      accent and the kind's ink on each kind's ground, on the page, in a
      tinted band and in a strong band, in both themes; the lowest here is
-     the accent on the Important ground, 4.8:1. */
-  --th-note-note-ground: color-mix(in srgb, var(--th-accent) 8%, var(--th-paper));
-  --th-note-note-line: var(--th-accent);
-  --th-note-note-ink: var(--th-accent);
-  --th-note-note-border: color-mix(in srgb, var(--th-accent) 24%, var(--th-paper));
+     the accent on the Important ground, 4.88:1. */
+  --th-note-note-ground: color-mix(in srgb, var(--th-ink) 4%, var(--th-paper));
+  --th-note-note-line: var(--th-line-strong);
+  --th-note-note-ink: var(--th-ink);
+  --th-note-note-border: var(--th-line);
   --th-note-tip-ground: color-mix(in srgb, var(--th-ok) 8%, var(--th-paper));
   --th-note-tip-line: var(--th-ok);
   --th-note-tip-ink: var(--th-ok-ink);
   --th-note-tip-border: color-mix(in srgb, var(--th-ok) 24%, var(--th-paper));
-  --th-note-important-ground: color-mix(in srgb, var(--th-danger) 8%, var(--th-paper));
-  --th-note-important-line: var(--th-danger);
-  --th-note-important-ink: var(--th-danger-ink);
-  --th-note-important-border: color-mix(in srgb, var(--th-danger) 24%, var(--th-paper));
+  --th-note-important-ground: color-mix(in srgb, var(--th-accent) 8%, var(--th-paper));
+  --th-note-important-line: var(--th-accent);
+  --th-note-important-ink: var(--th-accent);
+  --th-note-important-border: color-mix(in srgb, var(--th-accent) 24%, var(--th-paper));
   --th-note-warning-ground: color-mix(in srgb, var(--th-warn) 8%, var(--th-paper));
   --th-note-warning-line: var(--th-warn);
   --th-note-warning-ink: var(--th-warn-ink);
@@ -1631,19 +1925,21 @@ In `app/assets/tailwind/themes/default/tokens.css`, in `:root, [data-theme="ligh
 In `[data-theme="dark"]`, after `--th-syn-embed`:
 
 ```css
-  /* The notes again: a low-chroma tint, 12% of the hue over the dark page. */
-  --th-note-note-ground: color-mix(in srgb, var(--th-accent) 12%, var(--th-paper));
-  --th-note-note-line: var(--th-accent);
-  --th-note-note-ink: var(--th-accent);
-  --th-note-note-border: color-mix(in srgb, var(--th-accent) 24%, var(--th-paper));
+  /* The notes again: Note's 4% tint of the text colour, and 12% of the hue
+     over the dark page for the other three. The lowest here is the accent
+     on the Important ground, 6.9:1. */
+  --th-note-note-ground: color-mix(in srgb, var(--th-ink) 4%, var(--th-paper));
+  --th-note-note-line: var(--th-line-strong);
+  --th-note-note-ink: var(--th-ink);
+  --th-note-note-border: var(--th-line);
   --th-note-tip-ground: color-mix(in srgb, var(--th-ok) 12%, var(--th-paper));
   --th-note-tip-line: var(--th-ok);
   --th-note-tip-ink: var(--th-ok-ink);
   --th-note-tip-border: color-mix(in srgb, var(--th-ok) 24%, var(--th-paper));
-  --th-note-important-ground: color-mix(in srgb, var(--th-danger) 12%, var(--th-paper));
-  --th-note-important-line: var(--th-danger);
-  --th-note-important-ink: var(--th-danger-ink);
-  --th-note-important-border: color-mix(in srgb, var(--th-danger) 24%, var(--th-paper));
+  --th-note-important-ground: color-mix(in srgb, var(--th-accent) 12%, var(--th-paper));
+  --th-note-important-line: var(--th-accent);
+  --th-note-important-ink: var(--th-accent);
+  --th-note-important-border: color-mix(in srgb, var(--th-accent) 24%, var(--th-paper));
   --th-note-warning-ground: color-mix(in srgb, var(--th-warn) 12%, var(--th-paper));
   --th-note-warning-line: var(--th-warn);
   --th-note-warning-ink: var(--th-warn-ink);
@@ -1689,10 +1985,13 @@ Replace `app/assets/tailwind/themes/default/note.css`:
 ```css
 /* The Note block (note block spec, "The public side"; `Blocks::NoteComponent`).
    Plain rules on tokens, not utilities. A tinted box with a 3px rule on the
-   left in the kind's colour, a 1px frame, and a heading line of the kind's
-   icon and word (or the editor's title) in the kind's ink at weight 600.
-   The text is the theme's own: `.cs-prose` draws it in --th-ink with links
-   in --th-accent, and a band re-values those for what is inside it.
+   left in the kind's colour, a 1px frame, and a heading line (an h3, at the
+   body's size whatever the theme's h3 is) of the kind's icon and word (or
+   the editor's title) in the kind's ink at weight 600. Under an editor's
+   title the kind's word stands first in `.note-kind`, visually hidden: it
+   is heard and not seen (decision 6). The text is the theme's own:
+   `.cs-prose` draws it in --th-ink with links in --th-accent, and a band
+   re-values those for what is inside it.
 
    Each kind hands its four tokens to four local names, so the box's rules
    are written once. The tokens are the theme's (`tokens.css`, defined from
@@ -1717,10 +2016,26 @@ Replace `app/assets/tailwind/themes/default/note.css`:
   align-items: center;
   gap: var(--th-sp-2);
   margin: 0 0 var(--th-sp-2);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: normal;
+  text-transform: none;
   font-weight: 600;
   color: var(--note-ink);
 }
 .content-block--note .note-icon { width: 1rem; height: 1rem; flex: none; }
+.content-block--note .note-kind {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 .content-block--note .note-body > :first-child { margin-top: 0; }
 .content-block--note .note-body :not(pre) > code {
   background: var(--th-surface);
@@ -1739,8 +2054,8 @@ In `docs/reference/theming.md`, after the Code block's section (before `## What 
 
 A highlighted note in the flow of a page: a kind (Note, Tip, Important, Warning), an optional title of the editor's own and a short rich text (note block spec; the block itself is in `docs/reference/content-blocks-and-types.md`, "The Note block"). What a theme can do with it, from the least work to the most:
 
-1. **Re-colour it: re-colour the base tokens**, or declare the sixteen `--th-note-*` again under both selectors. Each is defined from the base in the default theme (a kind's hue is `--th-accent`, `--th-ok`, `--th-danger` or `--th-warn`), so a theme that changes its base changes its notes. The text is `--th-ink`, its links `--th-accent`, inline code `--th-surface` with a `--th-line` frame. `--th-note-note-ground`, `--th-note-note-line`, `--th-note-note-ink`, `--th-note-note-border`, and the same four for `tip`, `important` and `warning`.
-2. **Restyle it: rules of its own** under `.content-block--note`. The default template's class names (`content-block--note-<kind>`, `note-head`, `note-icon`, `note-body`) are the default theme's own, not on a list.
+1. **Re-colour it: re-colour the base tokens**, or declare the sixteen `--th-note-*` again under both selectors. Each is defined from the base in the default theme (Note is neutral, a 4% tint of `--th-ink` with a `--th-line-strong` rule; Tip is `--th-ok`, Important `--th-accent`, Warning `--th-warn`; none is `--th-danger`, which is kept for errors), so a theme that changes its base changes its notes. The text is `--th-ink`, its links `--th-accent`, inline code `--th-surface` with a `--th-line` frame. `--th-note-note-ground`, `--th-note-note-line`, `--th-note-note-ink`, `--th-note-note-border`, and the same four for `tip`, `important` and `warning`.
+2. **Restyle it: rules of its own** under `.content-block--note`. The default template's class names (`content-block--note-<kind>`, `note-head`, `note-icon`, `note-kind`, `note-body`) are the default theme's own, not on a list.
 3. **Replace its template**: `components/blocks/note_component.html.erb`.
 
 **What the template is handed** (`Theme::Contract.components`). The component draws nothing for a note without text in the language shown or along the site's fallback (`render?`), so a template never meets one, and each method answers for an empty block all the same.
@@ -1750,16 +2065,17 @@ A highlighted note in the flow of a page: a kind (Note, Tip, Important, Warning)
 | `block` | the block: a published view on the site, the rows in a preview. `block.id` tells two notes of a page apart (an `id` for `aria-labelledby`) |
 | `page` | the page the block is drawn on |
 | `kind` | `"note"`, `"tip"`, `"important"` or `"warning"`; a kind stored and not on the list is `"note"` |
-| `heading` | the editor's title in the language shown, with the site's fallback; without one, the CMS's word for the kind ("Tip"), in the language shown where `config/locales/public.<locale>.yml` has it and in English otherwise |
+| `heading` | the editor's title in the language shown, with the site's fallback; without one (or with one that is only the kind's word), the CMS's word for the kind ("Tip") |
 | `titled?` | whether `heading` is the editor's title |
+| `word` | the CMS's word for the kind ("Tip"), titled or not, in the language shown where `config/locales/public.<locale>.yml` has it and in English otherwise |
 | `icon` | the kind's Lucide name: `info`, `lightbulb`, `circle-alert` or `triangle-alert` |
 | `body` | the text, rendered (the same HTML `rich_text(block)` answers) |
 
-**What a template should keep.** The default draws an `aside` named by its heading (`aria-labelledby`) and never `role="alert"`: a note is part of the page, not an event. The icon is decoration (`aria-hidden`), since the heading says the kind; a template that writes the editor's title as the heading has no word for the kind left, so a screen reader is told the kind only where the template says it (the default does not: the spec's open question, roadmap). Print `heading` through ERB's escaping (`<%= heading %>`) and never mark it safe: it is what an editor typed.
+**What a template should keep.** The default draws an `aside` named by its heading (`aria-labelledby`), an `h3`, and never `role="alert"`: a note is part of the page, not an event. The icon is decoration (`aria-hidden`), since the heading says the kind. **Under an editor's title the kind is still said**: when `titled?`, the default puts `word` and a colon first inside the heading, visually hidden, so a screen reader hears "Tip: Before you publish", in a list of headings too; without a title it adds nothing, because `heading` is then the word and "Tip" would be heard twice. A theme's template should do the same. Print `heading` and `word` through ERB's escaping (`<%= heading %>`) and never mark them safe: the title is what an editor typed.
 
-**On a section's bands** (`sections.css`): a tinted band changes nothing of a note. **A strong band gives the four kinds the band's one look**: the ground the band's text at 12%, the rule its dim, the word its text, the frame `--th-line`. The page's tints would be unreadable under the band's light text, and the kinds are told apart there by word and icon. A theme's own `--th-note-*` therefore do not reach a note in a strong band; a theme that wants colours there declares them in a rule of its own for `.content-section--strong`, for both schemes, and answers for their contrast.
+**On a section's bands** (`sections.css`): a tinted band changes nothing of a note. **On a strong band a note shares the band's ground and each kind keeps its colour** (spec decision 10): every ground is `--th-band-strong`, every frame the band's `--th-line`, the text the band's text, and each kind's rule and ink (its word and icon) a colour of its own that reads on the band: Note the band's dim and text, Important the band's accent (`--th-on-band-strong-accent`), Tip and Warning their hue mixed 60% with the band's text (`color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong))`). The band is a dark ground in both schemes, so these are light inks in both. A theme's own `--th-note-*` therefore do not reach a note in a strong band; a theme that wants other colours there, or that draws its strong band light, declares them in a rule of its own for `.content-section--strong` and answers for their contrast.
 
-**Contrast is computed, for the default theme's values only.** `test/integration/design_tokens_test.rb` holds 72 pairs at 4.5:1 or better: `--th-ink`, `--th-accent` and the kind's ink on each kind's ground, on the page, in a tinted band and in a strong band, in both schemes ("every note's text, link and word are readable on its ground…"). Nothing measures a theme's values.
+**Contrast is computed, for the default theme's values only.** `test/integration/design_tokens_test.rb` holds 72 pairs at 4.5:1 or better: `--th-ink`, `--th-accent` and the kind's ink on each kind's ground, on the page, in a tinted band and in a strong band, in both schemes ("every note's text, link and word are readable on its ground…"); and 16 at 3:1 or better: each kind's rule and ink against a strong band, in both schemes ("on a strong band a note shares the band's ground and each kind keeps its colour…"). Nothing measures a theme's values.
 
 The fourth theme (`test/fixtures/themes/note`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one", "the fourth theme is sound, checked deeply too: a Note template of the contract's names").
 ````
@@ -1770,10 +2086,11 @@ Create `test/fixtures/themes/note/components/blocks/note_component.html.erb` (wr
 
 ```erb
 <%# A theme's own Note block, written from what `Theme::Contract` gives the template (`block`, `page`,
-    `kind`, `heading`, `titled?`, `icon`, `body`; docs/reference/theming.md, "The Note block"): a section
-    named by its heading, the heading printed through ERB's own escaping, the text as handed over. %>
+    `kind`, `heading`, `titled?`, `word`, `icon`, `body`; docs/reference/theming.md, "The Note block"): a
+    section named by its heading, the kind's word said first, hidden, under an editor's title only, the
+    heading printed through ERB's own escaping, the text as handed over. %>
 <section class="plain-note" data-kind="<%= kind %>" data-icon="<%= icon %>" data-titled="<%= titled? %>" data-block="<%= block.id %>" data-page="<%= page.id %>" aria-labelledby="plain-note-<%= block.id %>">
-  <h2 id="plain-note-<%= block.id %>"><%= heading %></h2>
+  <h2 id="plain-note-<%= block.id %>"><% if titled? %><span class="plain-note__kind"><%= word %>:</span> <% end %><%= heading %></h2>
   <div class="plain-note__text"><%= body %></div>
 </section>
 ```
@@ -1787,6 +2104,7 @@ Create `test/fixtures/themes/note/assets/stylesheets/theme.css`:
 .plain-note[data-kind="tip"] { border-left-color: var(--th-note-tip-line); background: var(--th-note-tip-ground); }
 .plain-note[data-kind="important"] { border-left-color: var(--th-note-important-line); background: var(--th-note-important-ground); }
 .plain-note[data-kind="warning"] { border-left-color: var(--th-note-warning-line); background: var(--th-note-warning-ground); }
+.plain-note__kind { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 ```
 
 - [ ] **Step 6: Build and run the tests to verify they pass**
@@ -1820,7 +2138,7 @@ EOF
 - Modify: production code only if a test shows a gap (none is expected; the mechanism exists and `test/quote` walks it from outside)
 
 **Interfaces:**
-- Consumes: the Note type (Tasks 4, 5); `ContentBlocks::Save.call(block, attributes: { settings: … }, translations: { locale => { settings: { "title" => … }, body: … } })`.
+- Consumes: the Note type (Tasks 4, 5) and its card's icon (Task 3); `ContentBlocks::Save.call(block, attributes: { settings: … }, translations: { locale => { settings: { "title" => … }, body: … } })`.
 - Produces: tests only.
 
 - [ ] **Step 1: Write the tests**
@@ -1883,7 +2201,9 @@ Add to `test/integration/public_blocks_test.rb`, before the final `end`:
 ```ruby
   # Drafts of live content: a visitor reads a live page's note from its
   # published copy, its title in each language included, until the page's
-  # changes are published.
+  # changes are published. Under a title the heading starts with the kind's
+  # hidden word, from the copy's kind; German has no words file, so it is
+  # English there.
   test "a note on a live page is read from its published copy: its kind, its title in each language and its text change only when published" do
     with_locales(%w[en de es], default: "en") do
       page = create_page(title: "Guide")
@@ -1895,17 +2215,17 @@ Add to `test/integration/public_blocks_test.rb`, before the final `end`:
         translations: { "en" => { body: rich_doc("New words.") }, "de" => { settings: { "title" => "Geändert" } } }).ok?
 
       get PublicSite::Urls.new.path_for(page, "en")
-      assert_select "aside.content-block--note-tip #note-#{block.id}-heading", text: "Before you publish"
+      assert_select "aside.content-block--note-tip #note-#{block.id}-heading", text: "Tip: Before you publish"
       assert_select "aside .note-body", text: /Mind the address/
       get PublicSite::Urls.new.path_for(page, "de")
-      assert_select "#note-#{block.id}-heading", text: "Vor dem Veröffentlichen"
+      assert_select "#note-#{block.id}-heading", text: "Tip: Vor dem Veröffentlichen"
 
       publish_changes(page)
       get PublicSite::Urls.new.path_for(page, "en")
-      assert_select "aside.content-block--note-warning #note-#{block.id}-heading", text: "Changed"
+      assert_select "aside.content-block--note-warning #note-#{block.id}-heading", text: "Warning: Changed"
       assert_select "aside .note-body", text: /New words/
       get PublicSite::Urls.new.path_for(page, "de")
-      assert_select "#note-#{block.id}-heading", text: "Geändert"
+      assert_select "#note-#{block.id}-heading", text: "Warning: Geändert"
     end
   end
 
@@ -1957,14 +2277,17 @@ Add to `test/components/admin/editor_screen/block_card_component_test.rb`, befor
     block
   end
 
-  # Note block spec, "CS Studio": the kind's four buttons, the title with the
-  # kind's word as its placeholder and its help line, then the text.
-  test "a note's card: the kind's four buttons, the stored one checked, then the title with the kind's word as placeholder and its help, then the text" do
+  # Note block spec, "CS Studio": the kind's icon in the head (plan ruling
+  # 12), the kind's four buttons, the title with the kind's word as its
+  # placeholder and its help line, then the text.
+  test "a note's card: its kind's icon in the head, the kind's four buttons, the stored one checked, then the title with the kind's word as placeholder and its help, then the text" do
     page = create_page(title: "Note card")
     block = note_block(page)
 
     render_card(block, page: page)
 
+    assert_selector ".admin-block-card__head span#block-#{block.id}-icon-card[data-block-icon=lightbulb]", count: 1
+    assert_selector ".admin-block-card__head [data-block-icon]", count: 1
     assert_selector "fieldset#block-#{block.id}-kind legend", exact_text: "Kind"
     assert_equal %w[Note Tip Important Warning], self.page.all("fieldset#block-#{block.id}-kind label").map { |label| label.text.strip }
     assert_selector "input#block-#{block.id}-kind-tip[type=radio][checked]"
@@ -2014,36 +2337,37 @@ EOF
 
 ---
 
-### Task 7: contrast, 72 pairs, and the strong band
+### Task 7: contrast, 72 pairs and 16 on the strong band, and the strong band's look
 
 **Files:**
-- Modify: `app/assets/tailwind/themes/default/sections.css`
+- Modify: `app/assets/tailwind/themes/default/sections.css`, `test/support/contrast_measure.rb`
 - Test: `test/integration/design_tokens_test.rb`
 
 **Interfaces:**
-- Consumes: the sixteen tokens (Task 5); `theme_tokens`, `band_values`, `resolve_colour`, `mix`, `contrast` of `DesignTokensTest`.
-- Produces: `resolve_colour` reads `color-mix(in srgb, var(a) N%, var(b))`; the strong band's sixteen re-values.
+- Consumes: the sixteen tokens (Task 5); `ContrastMeasure#resolve_colour`, `#mix`, `#contrast` (`test/support/contrast_measure.rb`, the contrast branch's shared measuring) and `DesignTokensTest#theme_tokens`, `#band_values`.
+- Produces: `ContrastMeasure#resolve_colour` reads `color-mix(in srgb, var(a) N%, var(b))`; the strong band's sixteen re-values (every ground `var(--th-band-strong)`, every frame `var(--th-line)`, each kind's rule and ink its own colour).
 
 - [ ] **Step 1: Write the failing tests**
 
-In `test/integration/design_tokens_test.rb`, add a branch to `resolve_colour`, before the `else`:
+In `test/support/contrast_measure.rb`, add a branch to `resolve_colour`, directly after the `color-mix(… transparent)` branch:
 
 ```ruby
-      when /\Acolor-mix\(in srgb, var\((--th-[\w-]+)\) ([\d.]+)%, var\((--th-[\w-]+)\)\)\z/
-        top, share, bottom = $1, $2.to_f / 100, $3
-        mix(resolve_colour(tokens, top, inside: inside), resolve_colour(tokens, bottom, inside: inside), share)
+    when /\Acolor-mix\(in srgb, var\((#{TOKEN})\) ([\d.]+)%, var\((#{TOKEN})\)\)\z/o
+      top, share, bottom = $1, $2.to_f / 100, $3
+      mix(resolve_colour(tokens, top, under: under, inside: inside), resolve_colour(tokens, bottom, under: under, inside: inside), share)
 ```
 
-(and amend its comment: "…and a colour mixed of two tokens with `color-mix(in srgb, a N%, b)`, the note tokens' form, is the two mixed".)
+and amend the method's comment, after "…which a caller that expects one hands in.": "A colour mixed of two tokens with `color-mix(in srgb, var(a) N%, var(b))` (the Note block's tokens) is the two mixed, each read where the mix is."
 
-Add the tests, after the Note stylesheet tests of Task 5:
+Add to `test/integration/design_tokens_test.rb`, after the Note stylesheet tests of Task 5:
 
 ```ruby
   # Note block spec, "Contrast": the text, the link colour and the kind's
   # ink, each at 4.5:1 on the kind's ground, on the page, in a tinted band
   # and in a strong band, in both schemes. 4 kinds x 3 x 3 grounds x 2 = 72.
   # A note's ground is computed where it is declared: on the page and in a
-  # tinted band it is the page's tint; a strong band re-values it.
+  # tinted band it is the page's tint; a strong band re-values it to the
+  # band's own ground.
   test "every note's text, link and word are readable on its ground, on the page, in a tinted band and in a strong band, in both themes" do
     pairs = 0
     theme_tokens.each do |theme, tokens|
@@ -2063,16 +2387,44 @@ Add the tests, after the Note stylesheet tests of Task 5:
     assert_equal 72, pairs
   end
 
-  # Plan ruling 8: in a strong band the four kinds are the band's one look.
-  test "on a strong band a note is the band's look: the ground its text at 12%, the rule its dim, the word its text, the frame its line; a tinted band leaves the notes alone" do
+  # Spec decision 10 (Claude Design D4b), plan ruling 8: on a strong band a
+  # note shares the band's ground and its text is the band's, but each kind
+  # keeps its colour on its rule and its icon (the ink, which colours the
+  # word too): Note the band's dim and text, Important the band's accent,
+  # Tip and Warning their hue mixed with the band's text. The band is a dark
+  # ground in both schemes, so these are light inks in both, each at 3:1 or
+  # better against the band (the ink is held at 4.5:1 above, as text).
+  test "on a strong band a note shares the band's ground and each kind keeps its colour: its rule and its icon at 3:1 against the band in both themes; a tinted band leaves the notes alone" do
     strong = band_values("strong")
-    NOTE_KINDS.each do |kind|
-      assert_equal "color-mix(in srgb, var(--th-on-band-strong) 12%, transparent)", strong["--th-note-#{kind}-ground"], kind
-      assert_equal "var(--th-on-band-strong-dim)", strong["--th-note-#{kind}-line"], kind
-      assert_equal "var(--th-on-band-strong)", strong["--th-note-#{kind}-ink"], kind
-      assert_equal "var(--th-line)", strong["--th-note-#{kind}-border"], kind
+    expected = {
+      "note" => %w[var(--th-on-band-strong-dim) var(--th-on-band-strong)],
+      "tip" => [ "color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong))" ] * 2,
+      "important" => %w[var(--th-on-band-strong-accent)] * 2,
+      "warning" => [ "color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong))" ] * 2
+    }
+    expected.each do |kind, (line, ink)|
+      assert_equal "var(--th-band-strong)", strong["--th-note-#{kind}-ground"], "#{kind}: the band's ground"
+      assert_equal line, strong["--th-note-#{kind}-line"], "#{kind}'s rule"
+      assert_equal ink, strong["--th-note-#{kind}-ink"], "#{kind}'s word and icon"
+      assert_equal "var(--th-line)", strong["--th-note-#{kind}-border"], "#{kind}: the band's line"
     end
+    assert_no_match(/danger/, strong.select { |name, _| name.start_with?("--th-note-") }.values.join(" "), "no kind is red on the band either")
     assert_empty band_values("tinted").keys.grep(/--th-note-/)
+
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      band = resolve_colour(tokens, "--th-band-strong")
+      inks = NOTE_KINDS.map { |kind| resolve_colour(tokens, "--th-note-#{kind}-ink", inside: strong) }
+      assert_equal 4, inks.uniq.size, "#{theme}: four kinds, four colours on the band"
+      NOTE_KINDS.each do |kind|
+        %w[line ink].each do |part|
+          ratio = contrast(band, resolve_colour(tokens, "--th-note-#{kind}-#{part}", inside: strong))
+          assert_operator ratio, :>=, 3.0, "the #{kind}'s #{part} against a strong band (#{theme}) is #{ratio.round(2)}:1"
+          pairs += 1
+        end
+      end
+    end
+    assert_equal 16, pairs
   end
 
   test "the measuring reads a colour mixed of two tokens as the two mixed" do
@@ -2085,47 +2437,52 @@ Add the tests, after the Note stylesheet tests of Task 5:
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `PGGSSENCMODE=disable bin/rails test test/integration/design_tokens_test.rb`
-Expected: FAIL: the strong band's pairs ("--th-ink on the tip ground in a strong band (light) is 1.0x:1") and the band test (no `--th-note-*` in `sections.css`).
+Run: `PGGSSENCMODE=disable bin/rails test test/integration/design_tokens_test.rb test/lib/admin_contrast_test.rb`
+Expected: FAIL: the strong band's pairs ("--th-ink on the tip ground in a strong band (light) is 1.0x:1": the page's light tint under the band's light text) and the band test (no `--th-note-*` in `sections.css`). `admin_contrast_test.rb` passes: the new branch only adds a notation.
 
 - [ ] **Step 3: Implement**
 
 In `app/assets/tailwind/themes/default/sections.css`, inside `.content-section--strong { … }`, after the seven `--th-syn-*` lines:
 
 ```css
-  /* A note on this band is the band's one look (note block plan, ruling 8),
-     as code is: its ground was computed on the page and would stay the
-     page's light tint under the band's light text. The four kinds are told
-     apart by their word and icon here. */
-  --th-note-note-ground: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
+  /* A note on this band (note block spec, decision 10; plan ruling 8)
+     shares the band's ground and its text is the band's, as code's is; left
+     alone its ground would stay the page's light tint, computed on the page,
+     under the band's light text. Each kind keeps its colour on its rule and
+     its icon (the ink, which colours the word too): the band is a dark
+     ground in both schemes, so the inks are light in both, a kind's hue
+     mixed with the band's text, and Important the band's own accent. The
+     lowest is Tip's ink in dark, 6.6:1 against the band
+     (test/integration/design_tokens_test.rb). */
+  --th-note-note-ground: var(--th-band-strong);
   --th-note-note-line: var(--th-on-band-strong-dim);
   --th-note-note-ink: var(--th-on-band-strong);
   --th-note-note-border: var(--th-line);
-  --th-note-tip-ground: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
-  --th-note-tip-line: var(--th-on-band-strong-dim);
-  --th-note-tip-ink: var(--th-on-band-strong);
+  --th-note-tip-ground: var(--th-band-strong);
+  --th-note-tip-line: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
+  --th-note-tip-ink: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
   --th-note-tip-border: var(--th-line);
-  --th-note-important-ground: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
-  --th-note-important-line: var(--th-on-band-strong-dim);
-  --th-note-important-ink: var(--th-on-band-strong);
+  --th-note-important-ground: var(--th-band-strong);
+  --th-note-important-line: var(--th-on-band-strong-accent);
+  --th-note-important-ink: var(--th-on-band-strong-accent);
   --th-note-important-border: var(--th-line);
-  --th-note-warning-ground: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
-  --th-note-warning-line: var(--th-on-band-strong-dim);
-  --th-note-warning-ink: var(--th-on-band-strong);
+  --th-note-warning-ground: var(--th-band-strong);
+  --th-note-warning-line: color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong));
+  --th-note-warning-ink: color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong));
   --th-note-warning-border: var(--th-line);
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `bin/rails theme_css:build && PGGSSENCMODE=disable bin/rails test test/integration/design_tokens_test.rb test/values/theme/contract_test.rb`
-Expected: PASS; the lowest pair is about 4.81:1 (the accent on the light Important ground) and 4.95:1 in the dark strong band. If a pair falls under 4.5, lower that scheme's ground share in `tokens.css` (12% to 10% in the dark block, 8% to 6% in the light) and say the new lowest figure in the tokens comment.
+Run: `bin/rails theme_css:build && PGGSSENCMODE=disable bin/rails test test/integration/design_tokens_test.rb test/lib/admin_contrast_test.rb test/values/theme/contract_test.rb`
+Expected: PASS. Computed beforehand with the contrast branch's values: the lowest of the 72 is 4.88:1 (the accent on the light Important ground); on the strong band the lowest is Tip's ink and rule in dark, 6.64:1 (light: 7.06:1), and Important's 7.05:1 in dark. If a pair falls under its floor, lower that scheme's ground share in `tokens.css` (12% to 10% in the dark block, 8% to 6% in the light) or the band's mix share (60% to 50% of the hue), and say the new lowest figure in the comment beside it.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/assets/tailwind/themes/default/sections.css test/integration/design_tokens_test.rb
+git add app/assets/tailwind/themes/default/sections.css test/support/contrast_measure.rb test/integration/design_tokens_test.rb
 git commit -m "$(cat <<'EOF'
-feat: a note on a strong band takes the band's look, and its 72 contrast pairs are held
+feat: a note on a strong band shares its ground and keeps its kind's colour, and its 72 and 16 contrast pairs are held
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT
@@ -2159,19 +2516,21 @@ Add to `test/integration/admin/content_blocks_test.rb`, before the final `end`:
     patch path, params: { block: { settings: settings, **more }, base_updated_at: base }, as: :turbo_stream, headers: { "X-Notes-Tab" => tab }.compact
   end
 
-  test "adding a Note streams its card with the kind's four buttons, Note checked, and its kind and title are saved" do
+  test "adding a Note streams its card with the kind's four buttons, Note checked, and its kind and title are saved, the card's icon following the kind" do
     post blocks_path, params: { block: { block_type: "note" } }, as: :turbo_stream
     assert_response :success
     block = @page.content_blocks.last
     assert_equal({ "kind" => "note" }, block.settings)
     assert_select "turbo-stream template input[type=radio][name='block[settings][kind]']", count: 4
     assert_select "turbo-stream template input[type=radio][value='note'][checked]"
+    assert_select "turbo-stream template .admin-block-card__head span#block-#{block.id}-icon-card[data-block-icon='info']"
 
     save_note(block, { kind: "tip", title: "  Before you publish  " })
 
     assert_response :success
     assert_equal({ "kind" => "tip" }, block.reload.settings)
     assert_equal({ "en" => { "title" => "Before you publish" } }, block.translated_settings)
+    assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-card'] template span[data-block-icon='lightbulb']"
   end
 
   # Review focus 2: a kind stored around the services checks no button and
@@ -2239,8 +2598,10 @@ Add to `test/integration/admin/content_blocks_test.rb`, before the final `end`:
 
     save_note(block, { kind: "important", title: "Read this" })
     assert_response :success
-    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template [data-tile-icon='circle-alert']"
     assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template", text: /Read this · Empty/
+    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template svg", count: 0
+    assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-tile'] template span[data-block-icon='circle_alert']"
+    assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-card'] template span[data-block-icon='circle_alert']"
 
     post "#{blocks_path}/#{block.id}/duplicate", as: :turbo_stream
     assert_response :success
@@ -2296,7 +2657,8 @@ require "application_system_test_case"
 
 # The Note block's card in the page editor, in a browser (note block spec,
 # "CS Studio"): the kind chosen from the keyboard on a segmented control,
-# the title's placeholder following the kind before the save, the title and
+# the title's placeholder following the kind before the save, the card's
+# icon following it after the save (plan ruling 12), the title and
 # the text typed and saved by themselves and back after a reload; and a
 # second person's card read-only while the first holds it.
 class Admin::NoteBlockSystemTest < ApplicationSystemTestCase
@@ -2328,10 +2690,13 @@ class Admin::NoteBlockSystemTest < ApplicationSystemTestCase
     assert kind(block, "note").checked?
     assert_equal "Note", title_field(block)[:placeholder]
 
+    assert_selector "#block-#{block.id}-icon-card[data-block-icon=info]"
     find("label[for='block-#{block.id}-kind-note']").click
     kind(block, "note").send_keys(:right)
     assert_selector "#block-#{block.id}-kind-tip:checked", visible: :all
     assert_equal "Tip", title_field(block)[:placeholder], "the placeholder follows the kind before the save"
+    # Plan ruling 12: the card's icon follows the kind once the save's answer is here.
+    assert_selector "#block-#{block.id}-icon-card[data-block-icon=lightbulb]"
 
     title_field(block).set("Before you publish")
     find("#content_block_#{block.id} .ProseMirror").send_keys("Mind the address.")
@@ -2345,6 +2710,7 @@ class Admin::NoteBlockSystemTest < ApplicationSystemTestCase
     assert kind(block, "tip").checked?
     assert_equal "Before you publish", title_field(block).value
     assert_equal "Tip", title_field(block)[:placeholder]
+    assert_selector "#block-#{block.id}-icon-card[data-block-icon=lightbulb]", count: 1
   end
 
   test "while one person types a note's title, a second person's card is read-only: every kind's button disabled, the title read-only with the same text" do
@@ -2407,8 +2773,10 @@ require "application_system_test_case"
 
 # The Note block on the public site, as the browser computes it (note block
 # spec, "The public side"): each kind in its own four tokens in both schemes,
-# the text, links and inline code in the theme's; and on a strong band the
-# band's one look.
+# the text, links and inline code in the theme's; on a strong band the
+# band's ground with the kind's own colour on its rule and word (decision
+# 10); and an editor's title seen alone and heard after the kind's word
+# (decision 6).
 class NoteBlockSystemTest < ApplicationSystemTestCase
   KINDS = BlockTypes::Note::KINDS.keys.freeze
   TEXT = "Read [the guide](https://example.com/guide) and run `bin/setup` first.".freeze
@@ -2418,8 +2786,9 @@ class NoteBlockSystemTest < ApplicationSystemTestCase
     @page = create_page(title: "Guide")
   end
 
-  def add_note(kind, **attributes)
-    result = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "note", settings: { "kind" => kind } }.merge(attributes),
+  def add_note(kind, title: nil, **attributes)
+    settings = { "kind" => kind, "title" => title }.compact
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "note", settings: settings }.merge(attributes),
       translations: { "en" => { body: rich_doc(TEXT) } })
     assert result.ok?, result.errors.to_sentence
     result.record
@@ -2458,7 +2827,8 @@ class NoteBlockSystemTest < ApplicationSystemTestCase
           link: getComputedStyle(note.querySelector(".note-body a")).color, accent: token("--th-accent"),
           code: [getComputedStyle(code).backgroundColor, getComputedStyle(code).borderTopWidth], surface: token("--th-surface", "backgroundColor"),
           icon: [head.querySelector("svg").getBoundingClientRect().width, head.querySelector("svg").getAttribute("aria-hidden")],
-          named: note.getAttribute("aria-labelledby") === head.id, heading: head.textContent.trim(), bandInk: token("--th-on-band-strong")
+          named: note.getAttribute("aria-labelledby") === head.id, heading: head.textContent.trim(), bandInk: token("--th-on-band-strong"),
+          band: token("--th-band-strong", "backgroundColor"), element: head.tagName
         }
       })()
     JS
@@ -2482,6 +2852,7 @@ class NoteBlockSystemTest < ApplicationSystemTestCase
           assert_equal [ found["surface"], "1px" ], found["code"], "#{where}: inline code"
           assert_equal [ 16, "true" ], found["icon"], "#{where}: icon"
           assert found["named"], "#{where}: the aside is named by its heading"
+          assert_equal "H3", found["element"], "#{where}: the heading is a heading"
           assert_equal BlockTypes::Note::KINDS.fetch(kind), found["heading"]
         end
         assert_equal 4, seen.map { |found| found["ground"] }.uniq.size, "#{theme}: four kinds, four grounds"
@@ -2489,7 +2860,7 @@ class NoteBlockSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "in a strong band a note takes the band's look in both schemes: its word and text the band's ink, its ground the band's" do
+  test "in a strong band a note shares the band's ground in both schemes, its text the band's, its rule and word its kind's own colour" do
     section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "one", "background" => "strong" } }).record
     inside = add_note("tip", section_id: section.id, section_column: 1)
     outside = add_note("tip")
@@ -2500,10 +2871,35 @@ class NoteBlockSystemTest < ApplicationSystemTestCase
       with_theme(theme) do
         banded = probe(inside)
         plain = probe(outside)
-        assert_equal banded["groundToken"], banded["ground"], "#{theme}: the band's ground"
-        assert_equal banded["bandInk"], banded["word"], "#{theme}: the word is the band's ink"
+        assert_equal banded["band"], banded["ground"], "#{theme}: the band's ground"
+        assert_equal banded["groundToken"], banded["ground"], "#{theme}: the note's ground token is the band's there"
         assert_equal banded["bandInk"], banded["text"], "#{theme}: the text is the band's ink"
+        assert_equal banded["ink"], banded["word"], "#{theme}: the word is the kind's ink there"
+        assert_equal [ "3px", banded["line"] ], banded["rule"], "#{theme}: the rule is the kind's line there"
+        assert_not_equal banded["bandInk"], banded["word"], "#{theme}: the kind keeps a colour of its own on the band"
         assert_not_equal plain["ground"], banded["ground"], "#{theme}: not the page's tint"
+      end
+    end
+  end
+
+  # Spec decision 6: the kind's word before an editor's title is in the
+  # heading's text, so a screen reader reads it, and takes no room on screen.
+  test "an editor's title is seen alone and heard after the kind's word, in both schemes" do
+    block = add_note("tip", title: "Before you publish")
+    open_page
+
+    %w[light dark].each do |theme|
+      with_theme(theme) do
+        found = page.evaluate_script(<<~JS, "note-#{block.id}-heading")
+          (() => {
+            const head = document.getElementById(arguments[0])
+            const box = head.querySelector(".note-kind").getBoundingClientRect()
+            return { said: head.textContent.replace(/\s+/g, " ").trim(), width: box.width, height: box.height }
+          })()
+        JS
+        assert_equal "Tip: Before you publish", found["said"], theme
+        assert_operator found["width"], :<=, 1, "#{theme}: the word takes no room"
+        assert_operator found["height"], :<=, 1, "#{theme}: the word takes no room"
       end
     end
   end
@@ -2562,8 +2958,8 @@ EOF
 
 - The "Describes:" line: add "and for the Note block `app/models/block_types/note.rb`, `app/components/blocks/note_component.rb` and its template, `app/assets/tailwind/themes/default/note.css`, `app/javascript/controllers/admin/ui/placeholder_from_controller.js`".
 - "## Content blocks": the type list reads `rich_text` / `image` / `code` / `note` / `post_list` / `section`.
-- A section "## The Note block" after "## The Code block", in the file's own voice: what it is (spec, design answers B1 to B3); where each value is stored (kind in `settings`, title in `translated_settings`, the first translated schema field of a built-in type, text in `body`; no column, no migration, no service); "Four things the schema learned for it": `control: :segmented` (Task 1, its refusals, `HeldFields`, never on a translation tab), `max:` on a string in every language (ruling 2), `help:` and `placeholder_from:` with `admin--ui--placeholder-from` (ruling 3, and its limit: only the block card hands a placeholder over); the public component (the seven names, `render?`, the aside, the icon inline, `kind_of`); the stylesheet and the strong band (ruling 8); the card, the tile (`[:icon, name]`, ruling 6), the translation tab (ruling 10); the translation state (ruling 5); limits as built (each a roadmap row: a screen reader hears no kind under an editor's title; the four words are English until the public site is translated; a post type's field with `placeholder_from:` has no placeholder; on a strong band the kinds share one look). Name each test by its title in quotes, as the Code block's section does.
-- "## Adding a block type": in step 2's first bullet, the options list reads `required`, `default`, `min`, `max`, `translated`, `options`, `of`, `blank`, `label`, `control`, `help` and `placeholder_from`; in step 8's tile bullet, add "`[:icon, name]` (a name from `TileSummaryComponent::ICONS`, drawn before the line at 12px in `text-meta`)"; in step 3's last paragraph, after `blank:`, `label:`, add `control:`, `help:`, `placeholder_from:` as the Note block's options.
+- A section "## The Note block" after "## The Code block", in the file's own voice: what it is (spec, design answers B1 to B3); where each value is stored (kind in `settings`, title in `translated_settings`, the first translated schema field of a built-in type, text in `body`; no column, no migration, no service); "Four things the schema learned for it": `control: :segmented` (Task 1, its refusals, `HeldFields`, never on a translation tab), `max:` on a string in every language (ruling 2), `help:` and `placeholder_from:` with `admin--ui--placeholder-from` (ruling 3, and its limit: only the block card hands a placeholder over); the public component (the eight names and why `word` is one, ruling 13; `render?`; the aside and its `h3`, ruling 14; the hidden kind word under a title and a title that is only the word; the icon inline; `kind_of`); the stylesheet, the hues (ruling 7) and the strong band (ruling 8); the card, the tile and the icon that follows the kind (`t.icon "info", for_block:`, rulings 6, 11 and 12, and why the spec's `[:icon, name]` part was not built), the translation tab (ruling 10); the translation state (ruling 5); limits as built (each a roadmap row: the four words are English until the public site is translated; a post type's field with `placeholder_from:` has no placeholder; an outside type's icon cannot follow its block). Name each test by its title in quotes, as the Code block's section does.
+- "## Adding a block type": in step 2's first bullet, the options list reads `required`, `default`, `min`, `max`, `translated`, `options`, `of`, `blank`, `label`, `control`, `help` and `placeholder_from`; in step 2's declarations table, the `icon "<name>"` row names the four new icons in its list and adds "`, for_block: ->(block) { … }` (a built-in's only): the icon of each block on its card and tile, one of the same list; the picker draws the type's"; in step 8's icon bullet, add "A type whose icon follows a value of its block declares `for_block:` (the Note block's kind); its icon then carries an id and every save's answer redraws it (`Admin::ContentBlocksController#block_icon_streams`); an outside type may not, yet"; in step 3's last paragraph, after `blank:`, `label:`, add `control:`, `help:`, `placeholder_from:` as the Note block's options.
 
 - [ ] **Step 2: the other reference files**
 
@@ -2574,17 +2970,17 @@ EOF
 
 - [ ] **Step 3: `CLAUDE.md`**
 
-- In the reference index's content-blocks bullet, after the Code block's files: "or the Note block, a schema field's `control:`, `help:` or `placeholder_from:`, or a tile summary's `[:icon, name]` (`app/models/block_types/note.rb`, `app/components/blocks/note_component.*`, `app/assets/tailwind/themes/default/note.css`, `app/components/admin/fields/select_field.*`, `string_field.*`, `app/javascript/controllers/admin/ui/placeholder_from_controller.js`)".
+- In the reference index's content-blocks bullet, after the Code block's files: "or the Note block, a schema field's `control:`, `help:` or `placeholder_from:`, or a block type's icon that follows its block (`icon … for_block:`) (`app/models/block_types/note.rb`, `app/components/blocks/note_component.*`, `app/assets/tailwind/themes/default/note.css`, `app/components/admin/fields/select_field.*`, `string_field.*`, `app/javascript/controllers/admin/ui/placeholder_from_controller.js`, `app/models/content_model/block_type_definition.rb`, `app/components/admin/editor_screen/block_icon_component.rb`)".
 - One rule under "Rules a change can break silently", after the Code block's rules:
 
-  "- The Note block's sixteen `--th-note-*` tokens are defined in `tokens.css` from the base tokens (`var()` and `color-mix(in srgb, …)` of them, never a literal), and a strong band re-values all sixteen to its one look in `sections.css`, because a note's ground is computed on the page and would stay a light tint under the band's light text; a new kind, or a new ground a note can stand on, is four tokens, a ledger line with its release note and its pairs in the contrast test (`test/integration/design_tokens_test.rb`: \"every note's text, link and word are readable on its ground, on the page, in a tinted band and in a strong band, in both themes\", 72 pairs; \"on a strong band a note is the band's look…\"; \"the sixteen note tokens are defined from the theme's base tokens in both schemes, never a literal\"). A note's heading is text and its icon `aria-hidden` (`test/components/blocks/note_component_test.rb`: \"a title that looks like markup is text\"). **No guard** that a theme's own Note template says the kind to a screen reader under an editor's title."
+  "- The Note block's sixteen `--th-note-*` tokens are defined in `tokens.css` from the base tokens (`var()` and `color-mix(in srgb, …)` of them, never a literal; Note neutral, Tip `--th-ok`, Important `--th-accent`, Warning `--th-warn`, none `--th-danger`), and a strong band re-values all sixteen in `sections.css`, because a note's ground is computed on the page and would stay a light tint under the band's light text: the band's ground, the band's text, and each kind's rule and ink a light colour of its own, since the band is dark in both schemes; a new kind, or a new ground a note can stand on, is four tokens, a ledger line with its release note and its pairs in the contrast test (`test/integration/design_tokens_test.rb`: \"every note's text, link and word are readable on its ground, on the page, in a tinted band and in a strong band, in both themes\", 72 pairs; \"on a strong band a note shares the band's ground and each kind keeps its colour…\", 16 pairs at 3:1; \"the sixteen note tokens are defined from the theme's base tokens in both schemes, never a literal, each kind in its hue and none in red\"). A note's heading is an `h3` and text, its icon `aria-hidden`, and under an editor's title it starts with the kind's `word`, visually hidden, which it never has without one (`test/components/blocks/note_component_test.rb`: \"a title that looks like markup is text\", \"an editor's title replaces the word on screen, the word is heard once before it, hidden, and the icon and the kind stay\", \"without a title the heading is the kind's word alone, said once, and there is no hidden word\"). A block type's icon that follows its block (`icon … for_block:`) answers a name from `BlockTypeDefinition::ICONS` and is redrawn by id with every save (`test/components/admin/editor_screen/block_icon_component_test.rb`: \"a type whose icon follows its block draws the block's own on its card and its tile, under an id a save's answer replaces, and the type's in the picker\"; `test/integration/admin/content_blocks_test.rb`: \"a save of a block whose icon follows it redraws the icon on its card and its tile; another type's save redraws none\"). **No guard** that a theme's own Note template says the kind to a screen reader under an editor's title."
 
 - [ ] **Step 4: `docs/roadmap.md` and the spec**
 
 - "## Shipped": a row "The Note block: a sixth block type … (four kinds by word and icon, an optional translated title, a rich text; a segmented control for the kind; sixteen tokens from the theme's base; 72 contrast pairs)" | `2026-10-13-note-block-design.md`.
 - "## Next, in order", item 2: "6 block types (rich text, image, code, note, post list, section)"; item 9's Note sentences say it shipped and that the documentation theme's `--th-note-line` gives way to `--th-note-note-line` in its own repository; the "Note and Table block types" entry: Note shipped (date), Table next.
-- New rows where the file keeps gaps (under the Code block's or "Content model and extension"): a screen reader hears no kind under an editor's title (the open question, with the one-line fix of promising `word`); a post type's field with `placeholder_from:` shows no placeholder; on a strong band the four kinds share one look (a design question for Claude Design); the four words are English until the public site's strings are translated (item 7).
-- The spec: an "## As built" section listing plan rulings 1 to 11 in one line each, the files, and any fix Task 6 needed.
+- New rows where the file keeps gaps (under the Code block's or "Content model and extension"): a post type's field with `placeholder_from:` shows no placeholder; the four words are English until the public site's strings are translated (item 7); an outside type's icon cannot follow its block (`for_block:` is a built-in's, ruling 12); nothing checks that a theme's own Note template says the kind under an editor's title.
+- The spec: an "## As built" section listing plan rulings 1 to 14 in one line each (13, `word` as an eighth name, and 12, `icon … for_block:` in place of the `[:icon, name]` part, are departures from "The data", "The public side" and "CS Studio" and say so), the files, and any fix Task 6 needed.
 
 - [ ] **Step 5: The whole check**
 
@@ -2624,15 +3020,16 @@ The body's "Documentation" and release-note parts, for whoever opens the pull re
 ```markdown
 ## Release note (theme contract)
 
-- New component line `blocks/note_component`: `block`, `page`, `kind`, `heading`, `titled?`, `icon`, `body`.
-- Sixteen new themed tokens: `--th-note-{note,tip,important,warning}-{ground,line,ink,border}`, defined in the default theme from the base tokens; a strong band gives notes its own one look.
+- New component line `blocks/note_component`: `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body`.
+- Sixteen new themed tokens: `--th-note-{note,tip,important,warning}-{ground,line,ink,border}`, defined in the default theme from the base tokens (Note neutral, Tip ok, Important accent, Warning warn); on a strong band a note takes the band's ground and keeps each kind's colour on its rule and icon.
 
 ## Documentation
 
 In `contentspiel-docs`, before this is released:
 
-- `editors/pages/build-a-page-with-blocks.md`: the Note block (the four kinds, the optional title and that an empty one uses the kind's word, the text, and that a note without text is not shown).
-- `integrators/theming/the-theme-contract.md`: the Note block's line and its sixteen tokens, with what a strong band does to them; the documentation theme renames its own `--th-note-line` to `--th-note-note-line` when it adopts the block.
+- `editors/pages/build-a-page-with-blocks.md`: the Note block (the four kinds, the optional title and that an empty one uses the kind's word, the text, that a note without text is not shown, and the kind's icon on the card and the tile).
+- `integrators/theming/the-theme-contract.md`: the Note block's line (and that `word` is said, hidden, before an editor's title) and its sixteen tokens, with what a strong band does to them; the documentation theme renames its own `--th-note-line` to `--th-note-note-line` when it adopts the block.
+- `integrators/how-it-works/adding-a-block-type.md`: `t.icon … for_block:`.
 - The loader (`bin/load`): writes a real Note block in place of bold text in a paragraph; "To confirm" becomes a Warning with that title.
 ```
 
@@ -2640,7 +3037,7 @@ In `contentspiel-docs`, before this is released:
 
 ## Self-review
 
-1. **Spec coverage.** Four kinds and default (Task 4); word and icon per kind (Tasks 3, 4); heading rule and translated words (Task 4); rich text body (Task 4); empty note draws nothing (Task 4); aside named by its heading, no alert (Tasks 4, 9); segmented control, radios, keyboard, no script needed (Tasks 1, 8); theme can restyle and replace (Task 5); generator and declarations, no capability (Task 4); ledger (Tasks 4, 5); unknown kind as Note (Tasks 4, 8); translated title through pair, state, AI, copy, snapshot (Task 6); component's seven names (Task 4); inline SVG `aria-hidden` (Task 4); `note.css` tokens only (Task 5); sixteen tokens from the base, light and dark (Task 5); contrast 72 pairs (Task 7); inline code on surface with a line (Tasks 5, 9); card order, placeholder following the kind and help line (Tasks 2, 6, 8); segmented control read-only on a translation tab and held (Tasks 1, 6, 8); tile with the 12px icon (Tasks 3, 4); `[:icon, name]` part from a fixed list (Task 3); strings as keys (Task 4); recipe's shared tests from `sample`, at the top level and in a column (Tasks 4, 5, 6); one browser file for the editor and one for the site in both schemes (Tasks 8, 9); fixture theme from the reference alone (Task 5); documentation text (Task 10).
-2. **Placeholders.** None: every code step carries its code; the two "if the file does it another way" notes in Task 8 and Task 9 name the file to copy from and keep the assertions.
-3. **Type consistency.** `BlockTypes::Note::KINDS`, `ICONS`, `DEFAULT`, `TITLE_LENGTH`, `kind_of`, `summary`; `TileSummaryComponent::ICONS`, `KINDS`, `ICON`, `#icons`; `Field#segmented?`, `#help`; `Base#placeholder`, `#help_id`; `BlockCardComponent#placeholder_for`; `admin--ui--placeholder-from` with `source` and `labels`; ids `block-<id>-kind`, `block-<id>-kind-<value>`, `block-<id>-title`, `block-<id>-title-help`, `note-<id>-heading` are used the same way in every task.
-4. **Review Focus.** Each of the five lines has its test in Task 4 or Task 8, named there.
+1. **Spec coverage.** Four kinds and default (Task 4); word and icon per kind (Tasks 3, 4); heading rule and translated words (Task 4); rich text body (Task 4); empty note draws nothing (Task 4); aside named by its heading, an `h3`, no alert (Tasks 4, 9; ruling 14); the hidden kind word before an editor's title only, never twice, a title that is only the word (decision 6: Tasks 4, 5, 6, 9; review focus 6); hues Note neutral, Tip ok, Important accent, Warning warn, none red (decision 9: Tasks 5, 7); on a strong band the band's ground, the band's text, each kind's colour on its rule and icon at 3:1 (decision 10: Tasks 7, 9; ruling 8); segmented control, radios, keyboard, no script needed (Tasks 1, 8); theme can restyle and replace (Task 5); generator and declarations, no capability (Task 4); ledger (Tasks 4, 5); unknown kind as Note (Tasks 4, 8); translated title through pair, state, AI, copy, snapshot (Task 6); component's names (Task 4: eight, ruling 13); inline SVG `aria-hidden` (Task 4); `note.css` tokens only (Task 5); sixteen tokens from the base, light and dark (Task 5); contrast 72 pairs, and 16 rule-and-icon pairs on the strong band (Task 7); inline code on surface with a line (Tasks 5, 9); card order, placeholder following the kind and help line (Tasks 2, 6, 8); segmented control read-only on a translation tab and held (Tasks 1, 6, 8); the kind's icon at 12px in `text-meta` on the tile and on the card's head, from a closed list, never markup, the tile's type name kept for a screen reader, one icon per place (Tasks 3, 4, 6, 8; rulings 11, 12); strings as keys (Task 4); recipe's shared tests from `sample`, at the top level and in a column (Tasks 4, 5, 6); one browser file for the editor and one for the site in both schemes (Tasks 8, 9); fixture theme from the reference alone (Task 5); documentation text (Task 10). **Two spec points are built differently, each a ruling and an open question for the owner:** the theme line's seven names become eight (`word`, ruling 13), and the `[:icon, name]` summary part becomes `icon … for_block:` (ruling 12). Decision 10's "dark-scheme kind inks" are derived as the kind's hue mixed with the band's text, because the strong band is dark in both schemes and a light-scheme page cannot read a dark-scheme token (ruling 8).
+2. **Placeholders.** None: every code step carries its code; the two "if the file does it another way" notes in Task 8 and Task 9 name the file to copy from and keep the assertions. The contrast figures (4.88:1 lowest of the 72, 6.64:1 lowest on the strong band) were computed with the contrast branch's token values and `contrast_measure.rb`'s arithmetic before writing them.
+3. **Type consistency.** `BlockTypes::Note::KINDS`, `ICONS` (Lucide spelling), `DEFAULT`, `TITLE_LENGTH`, `kind_of`, `studio_icon` (partial spelling), `summary` (text parts only); `BlockTypeDefinition::ICONS` (nine names), `#icon(name, for_block:)`, `#icon_follows_block?`, `#icon_for`; `BlockIconComponent.new(definition:, place:, block:)`, `.dom_id(block, place)`, ids `block-<id>-icon-card` and `block-<id>-icon-tile`; `ContentBlocksController#block_icon_streams`; `Field#segmented?`, `#help`; `Base#placeholder`, `#help_id`; `BlockCardComponent#placeholder_for`; `admin--ui--placeholder-from` with `source` and `labels`; theme names `block page kind heading titled? word icon body` in the definition, the ledger, the reference table, the contract test and the fixture theme; ids `block-<id>-kind`, `block-<id>-kind-<value>`, `block-<id>-title`, `block-<id>-title-help`, `note-<id>-heading` and class `note-kind` are used the same way in every task. No task names `TileSummaryComponent::ICONS`, `data-tile-icon`, an `[:icon, …]` part or a `--th-danger` note token any more.
+4. **Review Focus.** Each of the six lines has its test in Task 4 or Task 8, named there.
