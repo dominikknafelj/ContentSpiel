@@ -452,4 +452,9 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     post "/cs-studio/trash/restore_many", params: { type: "post", ids: (1..201).map(&:to_s) }
     assert_response :unprocessable_entity
   end
+
+  test "the split button's divider is the on-accent colour at 40 percent" do
+    get "/cs-studio/posts"
+    assert_select "button[aria-label='Choose another type of post'][class~='border-on-accent/40']"
+  end
 end

@@ -448,6 +448,18 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     def call = tag.b("actions", data: { slot_probe: "actions" })
   end
 
+  test "a live record's Discard changes… is a ghost beside the one primary, and View on site is a plain link" do
+    record = create_page(title: "About", published: true)
+    render_header(record)
+
+    assert_selector "header button.text-dim", text: "Discard changes…", visible: :all
+    assert_no_selector "header button[class~='border-field-line']", text: "Discard changes…", visible: :all
+    link = page.find("a[href='/about']", text: "View on site")
+    assert_includes link["class"].split, "text-accent"
+    assert_includes link["class"].split, "hover:underline"
+    assert_not_includes link["class"].split, "underline"
+  end
+
   test "the people slot is the first thing of the action row and the actions slot stands between the save status and Preview" do
     page = create_page(title: "About", published: false)
 

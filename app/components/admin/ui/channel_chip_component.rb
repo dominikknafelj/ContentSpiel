@@ -24,7 +24,7 @@ module Admin
       def aria_label = "Channel: #{channel == "mcp" ? "MCP" : channel.downcase}"
 
       def tone_class
-        channel == "mcp" ? "border-accent bg-accent-tint text-accent" : "border-line-strong text-meta"
+        channel == "mcp" ? "bg-accent-tint text-accent" : "bg-sunken text-meta"
       end
 
       private

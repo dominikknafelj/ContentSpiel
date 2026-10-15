@@ -20,7 +20,7 @@ const LABEL_CLASS = "block font-cs-mono text-label uppercase tracking-mono text-
 const BUTTON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-3 py-1.5 text-sm font-semibold transition-colors"
 const BUTTON_VARIANTS = {
   primary: "bg-accent text-on-accent hover:bg-accent-hover",
-  secondary: "border border-field-line bg-surface text-ink hover:bg-sunken",
+  secondary: "border border-field-line bg-surface text-ink hover:border-ink",
   danger: "border border-danger bg-danger-tint text-danger-ink hover:bg-danger hover:text-on-accent"
 }
 

@@ -10,7 +10,7 @@
             <%= link_to group.name, helpers.edit_admin_group_path(group, **url_options), data: { turbo_frame: "content" },
                   class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" %>
             <% if group.built_in? %>
-              <span class="rounded-cs border border-line-strong px-1.5 font-cs-mono text-label uppercase tracking-mono text-meta">Built-in</span>
+              <%= render Admin::Ui::BadgeComponent.new(label: "Built-in") %>
             <% end %>
           </span>
           <% if group.description.present? %><span class="text-sm text-dim"><%= group.description %></span><% end %>

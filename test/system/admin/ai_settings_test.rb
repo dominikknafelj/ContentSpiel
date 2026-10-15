@@ -275,4 +275,23 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     within("#settings-ai-remove-key-dialog") { click_on "Remove key" }
     assert_selector "#settings-ai-key", text: "No key yet"
   end
+
+  # Contrast and buttons spec, Ruling 11: a busy button is disabled but not
+  # drawn as a disabled one; it keeps its variant's colours beside its spinner.
+  test "Test connection keeps its look while it is busy" do
+    site_settings(:default).update!(ai_api_key: KEY)
+    GatedProvider.hold!
+    visit "/cs-studio/settings"
+    await_admin_controllers
+    button = "button[form='settings-ai-test-form']"
+    look = "(() => { const s = getComputedStyle(document.querySelector(#{button.to_json})); return [s.backgroundColor, s.color] })()"
+    at_rest = page.evaluate_script(look)
+
+    press "Test connection"
+    assert_selector "#{button}[disabled][aria-busy='true']"
+    assert_equal at_rest, page.evaluate_script(look)
+
+    GatedProvider.release
+    assert_selector "#{button}:not([aria-busy])", wait: 10
+  end
 end

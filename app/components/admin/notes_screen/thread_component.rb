@@ -146,11 +146,10 @@ module Admin
         t(".written_on", language: ::Locales.name(origin)) if origin.present? && origin != locale
       end
 
-      # Drawn like the translation chip (`Admin::Ui::TranslationChipComponent`),
-      # which itself always says a translation state and so can't be reused.
+      # A badge (`Admin::Ui::BadgeComponent`): it says the language the thread
+      # was written in and cannot be pressed.
       def origin_chip
-        tag.span(written_on, data: { note_badge: "origin" },
-          class: "inline-flex items-center rounded-cs border border-line-strong px-[5px] font-cs-mono text-label uppercase text-dim")
+        render(Admin::Ui::BadgeComponent.new(label: written_on, data: { note_badge: "origin" }))
       end
 
       def resolver = listing.users[thread.resolved_by_id]

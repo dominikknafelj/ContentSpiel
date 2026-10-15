@@ -4,7 +4,7 @@ class Admin::Ui::UnpublishedChipComponentTest < ViewComponent::TestCase
   test "full: the label in the chip, with a warn dot a screen reader skips" do
     render_inline(Admin::Ui::UnpublishedChipComponent.new)
 
-    assert_selector "span[data-unpublished-changes].border-line-strong", text: "Unpublished changes"
+    assert_selector "span[data-unpublished-changes].bg-sunken:not([class*=border])", text: "Unpublished changes"
     assert_selector "span[data-unpublished-changes] span.bg-warn[aria-hidden=true]"
   end
 

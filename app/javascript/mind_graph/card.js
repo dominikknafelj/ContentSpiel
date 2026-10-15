@@ -158,7 +158,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
   function statusChip(node) {
     if (!Object.hasOwn(STATUS_DOTS, node.status)) return []
 
-    const chip = element("span", "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5 text-xs text-ink")
+    const chip = element("span", "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs bg-sunken px-2 py-0.5 text-xs text-ink")
     const state = stateOf(node)
     chip.dataset.status = state
     chip.append(mark(`${DOT} ${STATUS_DOTS[node.status]}`))

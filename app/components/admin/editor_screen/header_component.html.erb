@@ -113,7 +113,8 @@
             same app, so a same-origin link opens the live page wherever CS
             Studio runs -- on a local checkout too, where the configured
             public domain doesn't point here. %>
-        <%= link_to "View on site ↗", public_path, target: "_blank", rel: "noopener", class: "shrink-0 underline hover:text-ink" %>
+        <%# A link like any other (design answer D1): sans, the accent, underlined under the pointer. %>
+        <%= link_to "View on site ↗", public_path, target: "_blank", rel: "noopener", class: "shrink-0 font-cs text-[13px] text-accent hover:text-accent-hover hover:underline" %>
       <% end %>
     </div>
   <% elsif !page? && waiting_lister %>

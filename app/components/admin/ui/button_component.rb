@@ -4,7 +4,7 @@ module Admin
     # dialog, "+ Add block", a block card's "Duplicate"/"Delete" menu items,
     # the tree's "+", and so on (spec §4.3). Five variants only: `:primary`
     # (the one emphasized action per screen), `:secondary` (everything else),
-    # `:ghost` (a dialog's Cancel), `:danger_text` (the trigger for a
+    # `:ghost` (a dialog's Cancel, the editors' Discard changes…), `:danger_text` (the trigger for a
     # destructive action: a secondary button whose label alone is
     # danger-coloured) and `:danger` (solid red, only for the confirm button
     # inside a `Ui::ConfirmDialogComponent`). Anything else a caller needs on the tag --
@@ -12,22 +12,33 @@ module Admin
     # for a `button_to`-style submit -- passes straight through via `**html`
     # rather than this component growing a bespoke keyword per use site.
     class ButtonComponent < AdminComponent
+      # Every hover is `not-disabled:hover:` (contrast and buttons spec, D1): a
+      # disabled button never answers the pointer.
       VARIANT_CLASSES = {
-        primary: "bg-accent text-on-accent hover:bg-accent-hover",
-        secondary: "border border-field-line bg-surface text-ink hover:bg-sunken",
+        primary: "bg-accent text-on-accent not-disabled:hover:bg-accent-hover",
+        # Outlined in the field line (3:1 on every ground); the pointer turns
+        # the outline ink, and nothing else.
+        secondary: "border border-field-line bg-surface text-ink not-disabled:hover:border-ink",
         # The trigger for a destructive action (spec §7): a secondary button --
         # same border, fill and hover -- whose label alone is red, so the one
         # solid red on screen is the confirm button inside the dialog it opens.
-        danger_text: "border border-field-line bg-surface text-danger-ink hover:bg-sunken",
+        danger_text: "border border-field-line bg-surface text-danger-ink not-disabled:hover:border-ink",
         # Solid red: a dialog's destructive confirm only. `text-white` is the
         # one literal colour the design allows (handoff §9 A1) -- on the red
         # fill white is right in both themes, unlike `on-accent`.
-        danger: "bg-danger text-white hover:opacity-90",
-        # Dialog Cancel and other low-emphasis actions: no border, no fill.
-        ghost: "text-dim hover:bg-sunken hover:text-ink"
+        danger: "bg-danger text-white not-disabled:hover:opacity-90",
+        # Dialog Cancel, "Discard changes…" and other low-emphasis actions: no border, no fill.
+        ghost: "text-dim not-disabled:hover:bg-sunken not-disabled:hover:text-ink"
       }.freeze
 
-      COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50".freeze
+      # DISABLED is one look for every variant (D1): sunken, meta words, a
+      # hairline, no accent and no opacity, so it can't read as a weak
+      # primary (disabled is exempt from WCAG 1.4.11; the save bar's line says
+      # why it is off). A BUSY button (`admin--ui--busy` sets `aria-busy`) is
+      # disabled too but keeps its variant's look beside its spinner.
+      COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs font-semibold transition-colors " \
+                     "disabled:cursor-not-allowed disabled:not-aria-busy:border disabled:not-aria-busy:border-line " \
+                     "disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta aria-busy:cursor-progress".freeze
 
       BASE_CLASS = "#{COMMON_CLASS} px-4 py-2".freeze
 

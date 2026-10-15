@@ -40,6 +40,36 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     assert_raises(ArgumentError) { Admin::Ui::ButtonComponent.new(label: "x", variant: :danger_outline) }
   end
 
+  test "a secondary button is outlined in the field line and answers the pointer with an ink border, only while enabled" do
+    render_inline Admin::Ui::ButtonComponent.new(label: "Preview", variant: :secondary)
+    classes = page.find("button")["class"].split
+
+    assert_includes classes, "border-field-line"
+    assert_includes classes, "not-disabled:hover:border-ink"
+    assert_not_includes classes, "hover:bg-sunken"
+  end
+
+  test "no variant answers the pointer while disabled: every hover is not-disabled:hover:" do
+    Admin::Ui::ButtonComponent::VARIANT_CLASSES.each do |variant, classes|
+      assert_empty classes.split.grep(/\Ahover:/), variant
+    end
+  end
+
+  # Contrast and buttons spec (D1, Ruling 11): one disabled look for every
+  # variant, sunken with meta words and a hairline, no accent and no opacity;
+  # a busy button (`aria-busy`) keeps its variant's look.
+  test "every variant is drawn disabled the same way, and a busy one is not" do
+    Admin::Ui::ButtonComponent::VARIANT_CLASSES.each_key do |variant|
+      render_inline Admin::Ui::ButtonComponent.new(label: "Save", variant: variant, disabled: true)
+      classes = page.find("button[disabled]")["class"].split
+
+      %w[disabled:not-aria-busy:border disabled:not-aria-busy:border-line disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta aria-busy:cursor-progress].each do |name|
+        assert_includes classes, name, variant
+      end
+      assert_empty classes.grep(/opacity-50/), variant
+    end
+  end
+
   test "solid danger stays the dialog confirm" do
     render_inline Admin::Ui::ButtonComponent.new(label: "Delete", variant: :danger)
     assert_selector "button.bg-danger", text: "Delete"

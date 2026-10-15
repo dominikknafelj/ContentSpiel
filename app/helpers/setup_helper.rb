@@ -20,7 +20,7 @@ module SetupHelper
   end
 
   def setup_secondary_link_class
-    "inline-block cursor-pointer rounded-cs border border-field-line px-4 py-2 text-ink hover:bg-sunken"
+    "inline-block cursor-pointer rounded-cs border border-field-line px-4 py-2 text-ink hover:border-ink"
   end
 
   # "Skip" on an optional step: no border, no fill, so Continue stays the one

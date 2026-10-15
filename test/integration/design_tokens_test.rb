@@ -313,6 +313,15 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_raises(Minitest::Assertion) { resolve_colour(tokens, "--th-sunken", inside: strong[:inside]) }
   end
 
+  # The Tailwind 4 features the button system rests on are in the build.
+  test "the product build carries the not-disabled hovers, the busy exception, the ink tint and the labels' weight" do
+    css = stylesheet("tailwind.css")
+
+    assert_match(/:not\(:disabled\)/, css)
+    assert_match(/:not\(\[aria-busy=["']?true["']?\]\)/, css)
+    assert_match(/\.text-label\s*\{[^}]*500/, css)
+  end
+
   private
     def helpers = ActionController::Base.helpers
 

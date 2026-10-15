@@ -23,7 +23,7 @@
             data: new_post_trigger.call(default_type), class: "#{setup_primary_button_class} rounded-r-none" %>
       <% if other_types.any? %>
         <%= render Admin::Ui::MenuComponent.new(label: "▾", aria_label: "Choose another type of post", close_on_select: true,
-              button_class: "inline-flex h-full cursor-pointer items-center rounded-cs rounded-l-none border-l border-on-accent bg-accent px-2.5 text-on-accent hover:bg-accent-hover") do |menu| %>
+              button_class: "inline-flex h-full cursor-pointer items-center rounded-cs rounded-l-none border-l border-on-accent/40 bg-accent px-2.5 text-on-accent hover:bg-accent-hover") do |menu| %>
           <% other_types.each do |type| %>
             <% menu.with_item { link_to new_label.call(type), new_admin_post_path(type: type.name, **admin_url_options), data: new_post_trigger.call(type) } %>
           <% end %>

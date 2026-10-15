@@ -38,7 +38,7 @@
             column width so the rows line up. %>
         <div class="flex w-28 justify-start">
           <% if default?(code) %>
-            <span class="rounded-cs border border-line-strong px-1.5 py-0.5 font-cs-mono text-label uppercase text-dim" data-default-tag>Default</span>
+            <%= render Admin::Ui::BadgeComponent.new(label: "Default", data: { default_tag: true }) %>
           <% else %>
             <%= render Admin::Ui::ButtonComponent.new(label: "Make default", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
                   data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>

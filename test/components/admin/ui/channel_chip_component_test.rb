@@ -13,6 +13,7 @@ class Admin::Ui::ChannelChipComponentTest < ViewComponent::TestCase
     assert_selector ".admin-channel-chip.text-accent"
     render_inline(Admin::Ui::ChannelChipComponent.new(channel: "admin"))
     assert_selector ".admin-channel-chip.text-meta"
+    assert_selector ".admin-channel-chip.bg-sunken:not([class*=border])"
     assert_no_selector ".admin-channel-chip.text-accent"
   end
 
