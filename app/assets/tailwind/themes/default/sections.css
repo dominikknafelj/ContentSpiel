@@ -81,17 +81,17 @@
   --th-meta: var(--th-dim);
   --th-sunken: var(--th-surface);
 }
-/* Strong is the page inverted, with its own three text colours. `color` is
+/* Strong is the strongest step of its scheme -- the page inverted in light, a raised dark ground in dark -- with its own three text colours. `color` is
    set as well as the ink token because the text colour a block inherits was
    computed on <body>, before the token changed. Lines and the code block's
    background are the band's text colour thinned out, as the page's own are
    its ink thinned out. The accent is re-valued, so the ink that is written
    ON it is too: the band's own colour, which is to the band's accent what
    the band is to it (9.9:1 light, 6.4:1 dark). A code block's selected text
-   is that pair. And the band is the other scheme: a code block's
+   is that pair. And the band is a dark ground in both schemes: a code block's
    scrollbar is drawn for the scheme the layout declares on <body>, which
-   on this ground is the wrong one, so the block is told the opposite here
-   (the only `color-scheme` a code block is given). */
+   on the light page is the wrong one, so the block is told `dark` here (the
+   only `color-scheme` a code block is given). */
 .content-section--strong {
   background: var(--th-band-strong);
   color: var(--th-on-band-strong);
@@ -117,7 +117,6 @@
   --th-syn-embed: var(--th-on-band-strong);
 }
 .content-section--strong .content-block--code { color-scheme: dark; }
-[data-theme="dark"] .content-section--strong .content-block--code { color-scheme: light; }
 
 /* `content` keeps the band inside the content column; `full` runs it edge to
    edge and puts the content back on the page's content width. The content

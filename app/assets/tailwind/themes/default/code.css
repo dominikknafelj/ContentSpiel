@@ -69,12 +69,18 @@
   letter-spacing: var(--th-track-mono);
   text-transform: uppercase;
 }
+/* Copy (design answer D1): 12px, a 28px target that does not make the
+   strip taller (the block padding is taken back by the margin, Ruling 18),
+   underlined under the pointer, the theme's focus ring below. */
 .content-block--code .code-head button {
   margin-inline-start: auto;
-  padding: 0 var(--th-sp-1);
+  margin-block: -0.3125rem;
+  padding-block: 0.3125rem;
+  padding-inline: var(--th-sp-1);
   border: 0;
   background: none;
   font: inherit;
+  font-size: 0.75rem;
   color: var(--th-accent);
   cursor: pointer;
 }
@@ -97,6 +103,8 @@
 }
 .content-block--code .code-head button:hover {
   color: var(--th-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .content-block--code .code-head button:focus-visible,
 .content-block--code pre:focus-visible {

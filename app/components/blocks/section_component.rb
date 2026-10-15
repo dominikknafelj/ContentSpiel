@@ -36,12 +36,19 @@ module Blocks
       @page = page
     end
 
-    # A section with no block renders nothing (sections spec §5.5): an empty
-    # band would be a stripe of background with nothing in it. An empty
-    # COLUMN keeps its place, so a two-column band with one text stays a
-    # half-width text. A block whose type is no longer registered is drawn as
-    # nothing (`ThemeHelper#render_block`), so it doesn't count as one.
-    def render? = columns.any? { |blocks| blocks.any?(&:definition) }
+    # A section draws nothing when none of its blocks draws anything
+    # (sections spec §5.5; contrast and buttons spec, Ruling 19): an empty
+    # band would be a stripe of background with nothing in it. A section
+    # with no block, a block whose type is no longer registered (drawn as
+    # nothing by `ThemeHelper#render_block`), and a block that is empty (a
+    # Code block with no code) are all no content. The blocks are asked in
+    # reading order and the first that draws something ends the question,
+    # so a band with content draws its first block twice and an empty one
+    # draws nothing. An empty COLUMN keeps its place, so a two-column band
+    # with one text stays a half-width text.
+    def render?
+      columns.any? { |blocks| blocks.any? { |inner| inner.definition && render_block(inner).to_s.strip.present? } }
+    end
 
     # The page's one outline (`ThemeHelper#block_outline`), not one built
     # here: a page of ten sections would otherwise sort and group all its

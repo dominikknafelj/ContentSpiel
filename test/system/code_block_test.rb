@@ -94,6 +94,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
 
     assert_selector "#{FIGURE} .code-head:not([data-code-copy-target])", text: "greet.rb"
     button = find("#{FIGURE} button", text: "Copy")
+    assert_operator button.evaluate_script("this.getBoundingClientRect().height"), :>=, 28, "Copy's target"
     button.click
 
     assert_selector "#{FIGURE} button", exact_text: "Copied"
@@ -488,7 +489,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
   end
 
   # Design answer C8, as the browser computes it: the scrollbar's scheme
-  # follows the theme and is the opposite one in a strong band, selected
+  # follows the theme and is dark in a strong band in both schemes (D2), selected
   # code is the accent with its own ink for plain text and for a coloured
   # token alike, and the focus ring is the accent.
   test "the block's scheme follows the theme and a strong band, selected code is the accent pair, and the button's focus ring is the accent" do
@@ -512,7 +513,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
       JS
     end
 
-    { "light" => %w[light dark], "dark" => %w[dark light] }.each do |theme, (plain_scheme, band_scheme)|
+    { "light" => %w[light dark], "dark" => %w[dark dark] }.each do |theme, (plain_scheme, band_scheme)|
       with_theme(theme) do
         [ [ 0, plain_scheme ], [ 1, band_scheme ] ].each do |index, scheme|
           seen = probe.call(index)

@@ -8,7 +8,7 @@
         <li>
           <%= link_to link.code, link.path, hreflang: link.code, lang: link.code,
                 aria: { current: ("true" if link.current) },
-                class: link.current ? "rounded-cs bg-ink px-1.5 py-0.5 text-paper" : "rounded-cs px-1.5 py-0.5 text-dim hover:text-ink" %>
+                class: link.current ? "inline-flex min-h-6 items-center rounded-cs bg-ink px-1.5 text-paper" : "inline-flex min-h-6 items-center rounded-cs px-1.5 text-dim hover:text-ink hover:underline" %>
         </li>
       <% end %>
     </ul>

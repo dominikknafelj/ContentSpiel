@@ -191,18 +191,66 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   # The strong band is the page inverted: what is written on its accent is
   # the band's own colour, and a code block in it is the other scheme.
-  test "in a strong band the ink on the accent is the band's colour, readable on the band's accent, and a code block's scheme is the opposite one" do
+  # Design answer D2: a strong band is the strongest step of its OWN scheme,
+  # the inverted page in light and a raised dark ground in dark, so a code
+  # block in it is dark in both.
+  test "in a strong band the ink on the accent is the band's colour, readable on the band's accent, and a code block is dark in both schemes" do
     css = Rails.root.join("app/assets/tailwind/themes/default/sections.css").read
 
     assert_match(/\.content-section--strong\s*\{[^}]*--th-on-accent:\s*var\(--th-band-strong\);/m, css)
     assert_match(/^\.content-section--strong \.content-block--code\s*\{\s*color-scheme:\s*dark;/, css)
-    assert_match(/^\[data-theme="dark"\] \.content-section--strong \.content-block--code\s*\{\s*color-scheme:\s*light;/, css)
+    assert_no_match(/\[data-theme="dark"\] \.content-section--strong \.content-block--code/, css)
     theme_tokens.each do |theme, tokens|
       ratio = contrast(resolve_colour(tokens, "--th-band-strong"), resolve_colour(tokens, "--th-on-band-strong-accent"))
       assert_operator ratio, :>=, 4.5, "selected code in a strong band (#{theme}) is #{ratio.round(2)}:1"
       ratio = contrast(resolve_colour(tokens, "--th-accent"), resolve_colour(tokens, "--th-on-accent"))
       assert_operator ratio, :>=, 4.5, "selected code on the page (#{theme}) is #{ratio.round(2)}:1"
     end
+  end
+
+  # Contrast and buttons spec (C1): what the contract now says of
+  # `--th-meta` and `--th-line`, held for the default theme.
+  test "faint text is 4.5:1 on the page and on the tinted band, an outline in it is 3:1, and a line stays a hairline, in both themes" do
+    theme_tokens.each do |theme, tokens|
+      page = resolve_colour(tokens, "--th-paper")
+      meta = resolve_colour(tokens, "--th-meta")
+      band = resolve_colour(tokens, "--th-band-tinted")
+      in_band = resolve_colour(tokens, "--th-meta", inside: band_values("tinted"))
+      line = contrast(resolve_colour(tokens, "--th-line", under: page), page)
+
+      assert_operator contrast(meta, page), :>=, 4.5, "faint text on the page (#{theme})"
+      assert_operator contrast(in_band, band), :>=, 4.5, "faint text on the tinted band (#{theme})"
+      assert_operator contrast(meta, page), :>=, 3.0, "a control's outline (#{theme})"
+      assert_operator line, :>=, 1.3, "--th-line (#{theme}) is #{line.round(2)}:1"
+      assert_operator line, :<, 3.0, "--th-line (#{theme}) would be an outline"
+    end
+  end
+
+  test "the bands step from the page: tinted at 1.15:1 or more, the light strong band the inverted page, the dark one a raised ground" do
+    theme_tokens.each do |theme, tokens|
+      page = resolve_colour(tokens, "--th-paper")
+      assert_operator contrast(resolve_colour(tokens, "--th-band-tinted"), page), :>=, 1.15, "the tinted band (#{theme})"
+    end
+    light, dark = theme_tokens.values_at(:light, :dark)
+    assert_equal "var(--th-ink)", light["--th-band-strong"]
+    strong = contrast(resolve_colour(dark, "--th-band-strong"), resolve_colour(dark, "--th-paper"))
+    assert_operator strong, :>=, 1.4, "the dark strong band is a step up from the page"
+    assert_operator strong, :<, 2.0, "the dark strong band does not glare"
+  end
+
+  test "the site's controls: the theme button is outlined in the faint text colour and 28px high, a language code has a 24px target and an underline under the pointer, Copy is 12px with a 28px target" do
+    toggle = Rails.root.join("app/views/layouts/public/_theme_toggle.html.erb").read
+    switcher = Rails.root.join("app/views/layouts/public/_language_switcher.html.erb").read
+    code = Rails.root.join("app/assets/tailwind/themes/default/code.css").read.gsub(%r{/\*.*?\*/}m, "")
+
+    %w[border-meta h-7 inline-flex].each { |name| assert_match(/class="[^"]*\b#{Regexp.escape(name)}\b/, toggle, name) }
+    assert_no_match(/border-line-strong/, toggle)
+    %w[min-h-6 hover:underline].each { |name| assert_includes switcher, name }
+    button = code[/\.content-block--code \.code-head button\s*\{([^}]*)\}/m, 1].to_s
+    assert_match(/font-size:\s*0\.75rem;/, button)
+    assert_match(/padding-block:\s*0\.3125rem;/, button)
+    assert_match(/margin-block:\s*-0\.3125rem;/, button)
+    assert_match(/text-decoration:\s*underline;/, code[/\.content-block--code \.code-head button:hover\s*\{([^}]*)\}/m, 1].to_s)
   end
 
   # Code block spec §5: one token per role the highlighter names, each with

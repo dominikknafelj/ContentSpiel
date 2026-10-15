@@ -193,6 +193,21 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     section
   end
 
+  # Design answer, first reply: Home drew an empty tinted band. A section
+  # whose blocks draw nothing is no band (Ruling 19); one that draws
+  # anything is.
+  test "a section whose blocks draw nothing renders nothing, and one block that draws something brings the band back" do
+    section = @root.content_blocks.create!(block_type: :section, position: 5, settings: { "layout" => "two", "background" => "tinted", "width" => "content" })
+    @root.content_blocks.create!(block_type: :code, section: section, section_column: 1, position: 0, settings: {})
+    get "/"
+    assert_select "section.content-section", 0
+
+    @root.content_blocks.create!(block_type: :rich_text, section: section, section_column: 2, position: 0, body: rich_doc("Now there is text"))
+    get "/"
+    assert_select "section.content-section--tinted", 1
+    assert_select "section.content-section--tinted", text: /Now there is text/
+  end
+
   test "a section renders its blocks once, inside it, column by column" do
     @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Before the band"))
     section_with_texts([ 2, "Right text" ], [ 1, "Left text" ])
