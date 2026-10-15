@@ -15,7 +15,7 @@
         <label for="posts-scope-<%= name %>" class="<%= SEGMENT_CLASS %>">
           <%= radio_button_tag :scope, name, scope == name, id: "posts-scope-#{name}", class: "sr-only" %>
           <span><%= label %></span>
-          <span class="font-cs-mono text-label opacity-70"><%= count_for(name) %></span>
+          <span class="font-cs-mono text-label"><%= count_for(name) %></span>
         </label>
       <% end %>
     </div>

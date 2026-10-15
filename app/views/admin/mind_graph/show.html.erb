@@ -201,8 +201,8 @@
       <div class="relative min-h-0 flex-1">
         <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
           <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph--graph#releasePinned" }) %>
-          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-field-line bg-surface text-sm text-ink">
-            <% zoom_button = "cursor-pointer px-2.5 py-0.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
+          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-field-line bg-surface text-[13px] text-ink">
+            <% zoom_button = "inline-flex h-7 cursor-pointer items-center px-2.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
             <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph--graph#zoomOut" } %>
             <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 font-cs-mono text-label text-meta"></span>
             <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph--graph#zoomIn" } %>

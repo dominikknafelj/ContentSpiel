@@ -22,7 +22,7 @@
         <label for="<%= filter_id(key) %>" class="<%= SEGMENT_CLASS %>">
           <%= radio_button_tag :filter, value, checked?(value), id: filter_id(key), class: "sr-only" %>
           <span><%= label %></span>
-          <span id="<%= count_dom_id(key) %>" class="font-cs-mono text-label opacity-70"><%= count_for(key) %></span>
+          <span id="<%= count_dom_id(key) %>" class="font-cs-mono text-label"><%= count_for(key) %></span>
         </label>
       <% end %>
     </div>

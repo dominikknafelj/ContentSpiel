@@ -33,7 +33,7 @@ module Admin
       end
 
       def link_class(current)
-        "#{LINK_CLASS} #{current ? "bg-sunken font-semibold text-ink" : "text-meta hover:bg-sunken"}"
+        "#{LINK_CLASS} #{current ? "bg-ink font-semibold text-paper" : "text-meta hover:bg-sunken"}"
       end
     end
   end

@@ -24,7 +24,7 @@
           <label for="translations-type-<%= value.presence || "all" %>" class="<%= Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS %>">
             <%= radio_button_tag :type, value, @type.to_s == value, id: "translations-type-#{value.presence || "all"}", class: "sr-only" %>
             <span><%= label %></span>
-            <span class="font-cs-mono text-label opacity-70"><%= count %></span>
+            <span class="font-cs-mono text-label"><%= count %></span>
           </label>
         <% end %>
       </div>

@@ -320,6 +320,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/:not\(:disabled\)/, css)
     assert_match(/:not\(\[aria-busy=["']?true["']?\]\)/, css)
     assert_match(/\.text-label\s*\{[^}]*500/, css)
+    assert_includes css, "bg-ink\\/6"
   end
 
   private

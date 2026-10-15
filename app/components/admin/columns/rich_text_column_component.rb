@@ -141,7 +141,11 @@ module Admin
       def tool_button(action, label, text, toggle, extra_class: nil, extra_action: nil)
         tag.button text, type: "button", title: label, "aria-label": label, "aria-pressed": (toggle ? "false" : nil),
           "aria-haspopup": (DIALOG_ACTIONS.include?(action) ? "dialog" : nil),
-          class: [ "admin-rich-text-button cursor-pointer whitespace-nowrap rounded-cs px-1.5 py-1 font-cs-mono text-sm text-ink hover:bg-surface aria-pressed:bg-accent-tint aria-pressed:text-accent data-active:bg-accent-tint data-active:text-accent", extra_class ].compact.join(" "),
+          # Sans like every button (design answer D1). Active is a surface
+          # with a field-line border and ink words (3:1 against the sunken
+          # toolbar); the transparent border at rest keeps the size. The
+          # pointer darkens the toolbar's ground by 6% of the ink.
+          class: [ "admin-rich-text-button cursor-pointer whitespace-nowrap rounded-cs border border-transparent px-1.5 py-[3px] text-sm text-ink hover:bg-ink/6 aria-pressed:border-field-line aria-pressed:bg-surface data-active:border-field-line data-active:bg-surface", extra_class ].compact.join(" "),
           data: { action: [ "admin--rich-text--editor##{action}", extra_action ].compact.join(" "), "admin--rich-text--editor-command": action }
       end
 

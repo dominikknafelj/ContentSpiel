@@ -48,4 +48,16 @@ class Admin::PostsScreen::ToolbarComponentTest < ViewComponent::TestCase
     render_toolbar(filters: { tag: "rails" })
     assert_selector "a", text: "Clear"
   end
+
+  # Contrast and buttons spec (D1): a selected pill is inverted, ink with
+  # paper words (the accent tint was 1.13:1 against the others), and its
+  # keyboard ring is paper, since the accent on dark ink is 1.96:1.
+  test "a selected pill is inverted, its count with it, and its focus ring is paper" do
+    classes = Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS.split
+
+    %w[has-[:checked]:bg-ink has-[:checked]:text-paper has-[:checked]:has-[:focus-visible]:outline-paper has-[:checked]:has-[:focus-visible]:-outline-offset-4].each do |name|
+      assert_includes classes, name
+    end
+    assert_empty classes.grep(/accent-tint/)
+  end
 end

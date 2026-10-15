@@ -198,4 +198,15 @@ class Admin::Columns::RichTextColumnComponentTranslationTest < ViewComponent::Te
 
     refute_text "changed since this was translated"
   end
+
+  test "the toolbar is sans; an active tool is a surface with a field-line border, and the pointer darkens the toolbar" do
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
+    heading = page.find("[role=toolbar] button[aria-label='Heading 2']")["class"].split
+
+    assert_not_includes heading, "font-cs-mono"
+    %w[border border-transparent hover:bg-ink/6 aria-pressed:border-field-line aria-pressed:bg-surface data-active:border-field-line data-active:bg-surface].each do |name|
+      assert_includes heading, name
+    end
+    assert_empty heading.grep(/accent-tint/)
+  end
 end
