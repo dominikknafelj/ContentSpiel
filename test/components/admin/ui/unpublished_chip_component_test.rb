@@ -8,10 +8,7 @@ class Admin::Ui::UnpublishedChipComponentTest < ViewComponent::TestCase
     assert_selector "span[data-unpublished-changes] span.bg-warn[aria-hidden=true]"
   end
 
-  test "compact: a dot named for a screen reader and in a tooltip" do
-    render_inline(Admin::Ui::UnpublishedChipComponent.new(compact: true))
-
-    assert_selector "span[data-unpublished-changes][role=img][aria-label='Unpublished changes'][title='Unpublished changes'].bg-warn"
-    assert_no_text "Unpublished changes"
+  test "there is no compact mode any more: the tree draws its own mark" do
+    assert_raises(ArgumentError) { Admin::Ui::UnpublishedChipComponent.new(compact: true) }
   end
 end

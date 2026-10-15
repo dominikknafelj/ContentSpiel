@@ -7,7 +7,7 @@
     </div>
   <% else %>
     <%# `relative`: the handle is placed against the row, outside its box. %>
-    <div class="group/node relative flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken">
+    <div class="group/node relative flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken <%= row_class %>">
       <%# The homepage can't be moved (Pages::Move) -- no handle, nothing to
           grab; nor can a page the actor may not move. Every other node's
           handle is the only part of the row that starts a drag (admin--pages--tree's
@@ -48,13 +48,8 @@
             aria: (selected? ? { current: "page" } : {}),
             class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
 
-      <%# The chip carries `data-status` itself and renders nothing for Live. %>
-      <%= render Admin::Ui::StatusChipComponent.new(status: status, at: page.published_at, hide_live: true) %>
-
-      <%# The rows moved on from what the site shows (`Publishing::State#changes?`,
-          a column already loaded: no statement per row): the warn dot alone, the
-          column is narrow. %>
-      <%= render Admin::Ui::UnpublishedChipComponent.new(compact: true) if page.unpublished_changes? %>
+      <%# Draft, Scheduled or Live with changes, one small named mark (see the component). %>
+      <%= render Admin::PagesScreen::TreeStateMarkComponent.new(page: page) %>
 
       <%# Outdated and missing translated fields (handoff §10 B24), summed over
           the target languages: plain text in a warn / meta ink, nothing at
