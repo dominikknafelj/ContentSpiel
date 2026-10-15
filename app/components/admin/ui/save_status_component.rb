@@ -95,7 +95,7 @@ module Admin
       # site (see the class comment). The refusals keep the warn colour.
       def css_class
         colour = %i[stale held saved_over].include?(state) ? "text-warn-ink" : "text-meta"
-        "min-h-[1lh] font-cs-mono text-[11px] tracking-mono #{colour}"
+        "min-h-[1lh] font-cs-mono text-label tracking-mono #{colour}"
       end
 
       private

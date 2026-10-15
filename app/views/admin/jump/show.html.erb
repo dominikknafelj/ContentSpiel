@@ -32,7 +32,7 @@
               <%# Right-hand end: a non-Live status, then -- on the selected row
                   only (`group-aria-selected`) -- the "↵" that says Enter opens it. %>
               <% if row[:status] %><%= render Admin::Ui::StatusChipComponent.new(status: row[:status], hide_live: true) %><% end %>
-              <span aria-hidden="true" class="admin-palette__enter hidden font-cs-mono text-[10px] text-meta group-aria-selected:inline">↵</span>
+              <span aria-hidden="true" class="admin-palette__enter hidden font-cs-mono text-label text-meta group-aria-selected:inline">↵</span>
             <% end %>
           </li>
         <% end %>

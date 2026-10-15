@@ -15,12 +15,12 @@
 //   have no `name` and never reach the server, so letting them bubble would
 //   only make `admin--saving--autosave` save an unchanged form on every keystroke.
 
-const INPUT_CLASS = "mt-1 block w-full rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
+const INPUT_CLASS = "mt-1 block w-full rounded-cs border border-field-line bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
 const LABEL_CLASS = "block font-cs-mono text-label uppercase tracking-mono text-meta"
 const BUTTON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-3 py-1.5 text-sm font-semibold transition-colors"
 const BUTTON_VARIANTS = {
   primary: "bg-accent text-on-accent hover:bg-accent-hover",
-  secondary: "border border-line-strong bg-surface text-ink hover:bg-sunken",
+  secondary: "border border-field-line bg-surface text-ink hover:bg-sunken",
   danger: "border border-danger bg-danger-tint text-danger-ink hover:bg-danger hover:text-on-accent"
 }
 

@@ -2,7 +2,7 @@
 # steps stay visually consistent. Product UI -- uses the Content·Spiel tokens.
 module SetupHelper
   def setup_input_class
-    "mt-1 block w-full rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
+    "mt-1 block w-full rounded-cs border border-field-line bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
   end
 
   # A native `<select>`: `.cs-select` draws the border, chevron and focus ring
@@ -20,7 +20,7 @@ module SetupHelper
   end
 
   def setup_secondary_link_class
-    "inline-block cursor-pointer rounded-cs border border-line-strong px-4 py-2 text-ink hover:bg-sunken"
+    "inline-block cursor-pointer rounded-cs border border-field-line px-4 py-2 text-ink hover:bg-sunken"
   end
 
   # "Skip" on an optional step: no border, no fill, so Continue stays the one

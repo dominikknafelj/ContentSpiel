@@ -576,7 +576,8 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select "tr#post_#{post_record.id}" do
       assert_select "[data-translation-state][data-locale='en']", count: 0
       assert_select "[data-locale='de'][data-translation-state='complete'][title='Translated'][aria-label='Deutsch: translated']", text: "de"
-      assert_select "[data-locale='es'][data-translation-state='missing'][title='Not translated'][aria-label='Español: not translated']", text: /○/
+      assert_select "[data-locale='es'][data-translation-state='missing'][title='Not translated'][aria-label='Español: not translated']", text: "es"
+      assert_select "[data-locale='es'] [data-translation-mark='missing']"
     end
     assert_select "tr#post_#{stale.id}" do
       assert_select "[data-locale='de'][data-translation-state='outdated'][aria-label='Deutsch: outdated'][title='English changed since translation']", text: /↻/

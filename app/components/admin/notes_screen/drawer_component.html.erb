@@ -18,14 +18,14 @@
               src: src, path: path, key: key, open_on_load: open?, thread: thread, action: "keydown.esc->admin--notes--drawer#close" } do %>
   <header class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-4 py-3 lg:py-3.5">
     <%# The sheet's way back, below 1024px only (handoff "Full-screen sheet"). %>
-    <%= tag.button type: "button", class: "mr-1 inline-flex cursor-pointer items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[13px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent lg:hidden",
+    <%= tag.button type: "button", class: "mr-1 inline-flex cursor-pointer items-center gap-1.5 rounded-cs border border-field-line bg-surface px-2.5 py-[5px] text-[13px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent lg:hidden",
           data: { action: "admin--notes--drawer#close" } do %>
       <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %><span class="max-w-[40vw] truncate"><%= t(".back", title: title) %></span>
     <% end %>
     <h2 class="text-[15px] font-semibold text-ink"><%= t(".title") %></h2>
     <%# Nothing at zero (the system's rule for a count): the number hides
         itself, and the line with it. %>
-    <p class="font-cs-mono text-[11px] uppercase text-meta has-[[hidden]]:hidden"><%= open_count %></p>
+    <p class="font-cs-mono text-label uppercase text-meta has-[[hidden]]:hidden"><%= open_count %></p>
     <div class="ml-auto flex items-center gap-1">
       <%= render Admin::Ui::ButtonComponent.new(label: t(".new"), variant: :secondary, size: :small, type: "button", data: { action: "admin--notes--drawer#compose" }) %>
       <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { action: "admin--notes--drawer#close" },

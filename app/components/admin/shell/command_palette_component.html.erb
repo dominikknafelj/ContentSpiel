@@ -12,7 +12,7 @@
            data-action="input->admin--shell--command-palette#search keydown->admin--shell--command-palette#move"
            class="min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-meta focus:outline-none">
     <%# Esc closes a native <dialog> on its own; the chip only says so. %>
-    <kbd aria-hidden="true" class="shrink-0 rounded-cs border border-line-strong px-1.5 py-0.5 font-cs-mono text-[10px] uppercase tracking-mono text-meta">ESC</kbd>
+    <kbd aria-hidden="true" class="shrink-0 rounded-cs border border-line-strong px-1.5 py-0.5 font-cs-mono text-label uppercase tracking-mono text-meta">ESC</kbd>
   </div>
   <div class="admin-dialog__body min-h-0 overflow-y-auto pb-2">
     <turbo-frame id="jump-results" data-action="turbo:frame-load->admin--shell--command-palette#loaded"><div id="jump-listbox" role="listbox" aria-label="Results"></div></turbo-frame>
@@ -20,5 +20,5 @@
   <%# The key hints (handoff Studio Modals, ⌘K tab). Decoration for sighted
       keyboard users: the combobox's own roles carry the same information for a
       screen reader, so it is hidden from the accessibility tree. %>
-  <div aria-hidden="true" class="admin-palette__hints shrink-0 border-t border-line px-4 py-2 font-cs-mono text-[10px] uppercase tracking-mono text-meta">↑↓ MOVE · ↵ OPEN · ⌘↵ NEW TAB</div>
+  <div aria-hidden="true" class="admin-palette__hints shrink-0 border-t border-line px-4 py-2 font-cs-mono text-label uppercase tracking-mono text-meta">↑↓ MOVE · ↵ OPEN · ⌘↵ NEW TAB</div>
 </dialog>

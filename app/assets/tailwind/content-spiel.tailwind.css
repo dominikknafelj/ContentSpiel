@@ -345,7 +345,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    setup's "other languages" -- with nothing to drop down: it keeps the
    border and colours and its native list. */
 .cs-select {
-  border: 1px solid var(--cs-line-strong);
+  border: 1px solid var(--cs-field-line);
   border-radius: var(--cs-radius);
   background-color: var(--cs-surface);
   color: var(--cs-ink);
@@ -381,7 +381,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   width: 2.25rem;
   height: 1.25rem;
   border-radius: 999px;
-  border: 1px solid var(--cs-line-strong);
+  border: 1px solid var(--cs-field-line);
   background: var(--cs-sunken);
   cursor: pointer;
   transition: background-color 150ms var(--cs-ease), border-color 150ms var(--cs-ease);
@@ -433,7 +433,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
 .admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
 :is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"]), textarea, select, .admin-rich-text-editor, [role="toolbar"]) {
-  border-color: var(--cs-field-invalid-border, var(--cs-line-strong));
+  border-color: var(--cs-field-invalid-border, var(--cs-field-line));
 }
 /* The prefix input's wrapper is the one surface with its own focus border
    (`focus-within:border-accent`), which an invalid field must still override,
@@ -441,7 +441,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    (slug columns never nest) and, once the slot is empty, reset to the normal
    border only while unfocused. */
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
-.admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
+.admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-field-line); }
 /* The Media panel's Alt field while the default-language alt is empty (handoff
    §4.6: "warn border when empty"): the warn colour, drawn only while the input
    is empty (it carries a placeholder) so it clears as soon as the editor types,
@@ -575,7 +575,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-notes-marker[data-has-notes] > .admin-notes-marker__add { display: none; }
 .admin-notes-marker[data-has-notes] { width: auto; height: 20px; padding: 0 7px; border-color: var(--cs-line-strong); border-radius: var(--cs-radius-pill); }
 .admin-notes-marker[data-has-notes][data-unread] { border-color: var(--cs-accent-tint); background: var(--cs-accent-tint); color: var(--cs-accent); }
-.admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: 10px; }
+.admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: var(--cs-t-label); }
 .admin-block-tile .admin-notes-marker[data-has-notes] { width: auto; height: 18px; padding: 0 6px; }
 .admin-block-tile .admin-notes-marker__add > svg { width: 12px; height: 12px; }
 /* The same pill where a LIST shows a record's open notes (notes spec §4.4):
@@ -590,7 +590,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    over a photo, and unread keeps the border for the same reason. */
 .admin-notes-marker--readonly { cursor: inherit; }
 .admin-notes-marker--readonly:hover { background: transparent; color: var(--cs-meta); }
-.admin-notes-marker--small[data-has-notes] { height: 18px; padding: 0 6px; font-size: 10px; }
+.admin-notes-marker--small[data-has-notes] { height: 18px; padding: 0 6px; font-size: var(--cs-t-label); }
 .admin-notes-marker--on-image { position: absolute; top: 6px; right: 6px; }
 .admin-notes-marker--on-image[data-has-notes],
 .admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }

@@ -60,7 +60,7 @@
 
       <% if menu_items? %>
         <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More actions", close_on_select: true,
-              button_class: "inline-flex cursor-pointer items-center rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:bg-sunken") do |menu| %>
+              button_class: "inline-flex cursor-pointer items-center rounded-cs border border-field-line bg-surface px-3 py-2 text-ink hover:bg-sunken") do |menu| %>
           <% if can?("audit.view") %>
             <% menu.with_item do %><%= link_to "Activity", activity_url %><% end %>
           <% end %>
@@ -107,7 +107,7 @@
     <div class="mt-1 flex items-center gap-2 font-cs-mono text-[12px] text-dim">
       <span class="truncate"><%= public_path %></span>
       <button type="button" data-controller="admin--ui--clipboard" data-admin--ui--clipboard-url-value="<%= public_url %>"
-        data-action="click->admin--ui--clipboard#copy" class="shrink-0 cursor-pointer rounded-cs border border-line-strong px-2 py-0.5 hover:bg-sunken">Copy</button>
+        data-action="click->admin--ui--clipboard#copy" class="shrink-0 cursor-pointer rounded-cs border border-field-line px-2 py-0.5 hover:bg-sunken">Copy</button>
       <% if live? %>
         <%# The path, not the absolute URL: the public site is served by this
             same app, so a same-origin link opens the live page wherever CS

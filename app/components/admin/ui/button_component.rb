@@ -14,11 +14,11 @@ module Admin
     class ButtonComponent < AdminComponent
       VARIANT_CLASSES = {
         primary: "bg-accent text-on-accent hover:bg-accent-hover",
-        secondary: "border border-line-strong bg-surface text-ink hover:bg-sunken",
+        secondary: "border border-field-line bg-surface text-ink hover:bg-sunken",
         # The trigger for a destructive action (spec §7): a secondary button --
         # same border, fill and hover -- whose label alone is red, so the one
         # solid red on screen is the confirm button inside the dialog it opens.
-        danger_text: "border border-line-strong bg-surface text-danger-ink hover:bg-sunken",
+        danger_text: "border border-field-line bg-surface text-danger-ink hover:bg-sunken",
         # Solid red: a dialog's destructive confirm only. `text-white` is the
         # one literal colour the design allows (handoff §9 A1) -- on the red
         # fill white is right in both themes, unlike `on-accent`.

@@ -1,6 +1,6 @@
 <%= tag.span hidden: count.zero?, class: "#{Admin::Ui::TooltipComponent::HOST} inline-flex flex-none items-center gap-1 text-meta", data: marker_data do %>
   <%= helpers.render "admin/shared/icon", name: :user, size: "size-3" %>
-  <%= tag.span (count if count > 1), hidden: count < 2, aria: { hidden: true }, class: "font-cs-mono text-[10px] leading-none", data: { presence_marker_count: true } %>
+  <%= tag.span (count if count > 1), hidden: count < 2, aria: { hidden: true }, class: "font-cs-mono text-label leading-none", data: { presence_marker_count: true } %>
   <%= tag.span said, class: "sr-only", data: { presence_marker_label: true, presence_lead: lead } %>
   <%= render Admin::Ui::TooltipComponent.new(text: words.fetch(:label)) %>
 <% end %>

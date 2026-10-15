@@ -17,7 +17,7 @@
   <%= tag.input type: "hidden", name: name, value: "", autocomplete: "off", data: { "admin--ui--chip-input-target": "sentinel", **track_data } %>
 
   <%# One border around the chips and the text input; clicking the empty part focuses the input. %>
-  <div class="admin-chip-field relative flex flex-wrap items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2 py-1.5 focus-within:border-accent focus-within:outline-2 focus-within:outline-accent"
+  <div class="admin-chip-field relative flex flex-wrap items-center gap-1.5 rounded-cs border border-field-line bg-surface px-2 py-1.5 focus-within:border-accent focus-within:outline-2 focus-within:outline-accent"
        data-action="click->admin--ui--chip-input#focusInput">
     <ul class="flex flex-wrap gap-1.5" aria-label="<%= label %>" data-admin--ui--chip-input-target="list">
       <% chips.each do |chip| %>

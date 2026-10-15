@@ -35,7 +35,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
 
   test "danger_text is a secondary button with danger-coloured text; danger_outline is gone" do
     render_inline(Admin::Ui::ButtonComponent.new(label: "Move to trash", variant: :danger_text))
-    assert_selector "button.border-line-strong.text-danger-ink", text: "Move to trash"
+    assert_selector "button.border-field-line.text-danger-ink", text: "Move to trash"
     assert_no_selector "button.bg-danger-tint"
     assert_raises(ArgumentError) { Admin::Ui::ButtonComponent.new(label: "x", variant: :danger_outline) }
   end

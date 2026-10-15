@@ -42,7 +42,7 @@
           command runs; the command then moves focus (editor or popover). %>
       <% if editable? %>
       <div role="toolbar" aria-label="<%= name.to_s.humanize %> formatting" aria-controls="<%= editor_id %>"
-           class="flex flex-wrap items-stretch gap-0.5 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
+           class="flex flex-wrap items-stretch gap-0.5 rounded-t-cs border border-b-0 border-field-line bg-sunken p-1"
            data-action="mousedown->admin--rich-text--editor#keepFocus">
         <% toolbar_groups.each do |group| %>
           <div role="group" class="flex shrink-0 items-center gap-0.5">
@@ -67,7 +67,7 @@
           textbox; the controller gives *it* `aria-labelledby` from
           `data-labelledby`. %>
       <%= tag.div id: editor_id,
-            class: "admin-rich-text-editor #{editable? ? "rounded-b-cs" : "rounded-cs"} border border-line-strong bg-surface text-ink",
+            class: "admin-rich-text-editor #{editable? ? "rounded-b-cs" : "rounded-cs"} border border-field-line bg-surface text-ink",
             data: { "admin--rich-text--editor-target": "editor", labelledby: label_id } %>
 
       <p class="mt-1 text-sm text-danger-ink" role="alert" data-admin--rich-text--editor-target="message"></p>

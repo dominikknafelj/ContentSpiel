@@ -31,7 +31,7 @@
               data: { note_back: true, turbo_frame: "notes", turbo_prefetch: false } do %>
           <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %>
           <span><%= t(".back") %></span>
-          <% if listing.open_count.positive? %><span class="font-cs-mono text-[11px] text-meta"><%= listing.open_count %></span><% end %>
+          <% if listing.open_count.positive? %><span class="font-cs-mono text-label text-meta"><%= listing.open_count %></span><% end %>
         <% end %>
       </div>
       <div class="contents" data-note-actions>
@@ -97,7 +97,7 @@
     <%# What the thread's state is, in words; no line at all for a thread that
         is neither pinned nor resolved. %>
     <% if thread.pinned || thread.resolved? %>
-      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
+      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 font-cs-mono text-label uppercase tracking-mono text-meta">
         <% if thread.pinned %><span data-note-badge="pinned"><%= t(".pinned") %></span><% end %>
         <% if thread.resolved? %>
           <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::NotesScreen::PersonNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>

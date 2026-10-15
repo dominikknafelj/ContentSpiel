@@ -35,7 +35,7 @@ module Admin
       # same row with a remove button for the download.
       ROW_CLASS = "grid grid-cols-[16px_minmax(0,1fr)_28px] items-center gap-2.5 rounded-cs border border-line py-1.5 pl-2.5 pr-1.5 text-dim".freeze
       NAME_CLASS = "truncate text-[13px] text-ink".freeze
-      FACTS_CLASS = "truncate font-cs-mono text-[10px] text-meta".freeze
+      FACTS_CLASS = "truncate font-cs-mono text-label text-meta".freeze
       ROW_BUTTON_CLASS = "flex size-7 items-center justify-center rounded-cs".freeze
       PICTURE_BOX_CLASS = "admin-note-picture relative flex min-h-[90px] w-fit min-w-[120px] max-w-full items-center justify-center self-start overflow-hidden border border-line".freeze
       PICTURE_CLASS = "block h-auto w-auto min-w-0 max-w-full".freeze

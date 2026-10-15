@@ -14,7 +14,7 @@ class Admin::Ui::LanguageTabsComponentTest < ViewComponent::TestCase
 
   test "missing is a hollow ring, outdated a solid warn dot, each with screen-reader text and no red" do
     render_inline(Admin::Ui::LanguageTabsComponent.new(current: "en", missing: %w[de], outdated: %w[es], url: @url))
-    assert_selector "span.border-meta[data-language-state=missing]"
+    assert_selector "span[data-language-state=missing][class~='border-field-line'][class~='border-[1.5px]']"
     assert_selector "span.bg-warn[data-language-state=outdated]##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')}"
     assert_selector ".sr-only", text: "Deutsch: not translated"
     assert_selector ".sr-only", text: "Español: original changed"

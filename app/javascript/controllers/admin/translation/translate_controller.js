@@ -637,7 +637,7 @@ function showError(box, message) {
   actions.className = "mt-2"
   const dismiss = document.createElement("button")
   dismiss.type = "button"
-  dismiss.className = "cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-ink hover:bg-sunken"
+  dismiss.className = "cursor-pointer rounded-cs border border-field-line bg-surface px-2 py-0.5 text-ink hover:bg-sunken"
   dismiss.dataset.action = "admin--translation--translate#discard"
   dismiss.textContent = "Dismiss"
   actions.append(dismiss)

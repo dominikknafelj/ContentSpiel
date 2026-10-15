@@ -56,7 +56,7 @@
                 <span class="min-w-0 truncate font-medium group-hover/title:underline"><%= title_of(post) %></span>
                 <%= render Admin::Ui::SlotComponent.new(name: "posts.row.title", record: post, viewer: Current.actor, loaded: title_loaded, locale: locale, url_options: url_options) %>
               </span>
-              <span class="truncate font-cs-mono text-[11px] text-meta group-hover/title:underline"><%= path_of(post) || "Not listed" %></span>
+              <span class="truncate font-cs-mono text-label text-meta group-hover/title:underline"><%= path_of(post) || "Not listed" %></span>
             <% end %>
           </th>
           <td class="py-2.5 pr-4 text-dim"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: post.content_type) %></td>

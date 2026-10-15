@@ -150,7 +150,7 @@ module Admin
       # which itself always says a translation state and so can't be reused.
       def origin_chip
         tag.span(written_on, data: { note_badge: "origin" },
-          class: "inline-flex items-center rounded-cs border border-line-strong px-[5px] font-cs-mono text-[10px] uppercase text-dim")
+          class: "inline-flex items-center rounded-cs border border-line-strong px-[5px] font-cs-mono text-label uppercase text-dim")
       end
 
       def resolver = listing.users[thread.resolved_by_id]

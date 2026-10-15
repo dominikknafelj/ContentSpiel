@@ -16,7 +16,7 @@
         <code class="min-w-0 flex-1 break-words font-cs-mono text-[13px] text-ink" <% if copyable? %>data-admin--ui--clipboard-target="source"<% end %>><%= result.command %></code>
         <% if copyable? %>
           <button type="button" data-admin--ui--clipboard-target="button" data-action="click->admin--ui--clipboard#copy" aria-label="Copy command for <%= result.label %>"
-                  class="shrink-0 cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-sm text-ink hover:bg-sunken">Copy</button>
+                  class="shrink-0 cursor-pointer rounded-cs border border-field-line bg-surface px-2 py-0.5 text-sm text-ink hover:bg-sunken">Copy</button>
           <span data-admin--ui--clipboard-target="status" role="status" aria-live="polite" class="sr-only"></span>
         <% end %>
       </div>

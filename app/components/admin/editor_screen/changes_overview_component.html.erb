@@ -13,7 +13,7 @@
       <ul class="mt-1 divide-y divide-line border-y border-line">
         <% blocks.each do |entry| %>
           <%= tag.li class: "flex min-w-0 items-baseline gap-3 py-2 text-sm", data: { change: entry.kind } do %>
-            <span class="w-20 shrink-0 font-cs-mono text-[11px] uppercase tracking-mono text-meta"><%= kind_label(entry) %></span>
+            <span class="w-20 shrink-0 font-cs-mono text-label uppercase tracking-mono text-meta"><%= kind_label(entry) %></span>
             <span class="shrink-0 font-medium text-ink"><%= type_label(entry) %></span>
             <% if (line = summary(entry)) %>
               <span class="min-w-0 truncate text-dim"><%= line %></span>

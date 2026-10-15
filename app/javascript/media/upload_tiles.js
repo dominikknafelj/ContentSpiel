@@ -233,7 +233,7 @@ export class UploadTiles {
     const status = element("span", "text-xs text-meta")
     status.dataset.uploadStatus = ""
     status.textContent = TEXTS.uploading
-    const dismiss = element("button", "self-start rounded-cs border border-line-strong px-2 py-0.5 text-xs text-ink hover:bg-sunken focus:outline-2 focus:outline-accent")
+    const dismiss = element("button", "self-start rounded-cs border border-field-line px-2 py-0.5 text-xs text-ink hover:bg-sunken focus:outline-2 focus:outline-accent")
     dismiss.type = "button"
     dismiss.hidden = true
     dismiss.dataset.uploadDismiss = ""

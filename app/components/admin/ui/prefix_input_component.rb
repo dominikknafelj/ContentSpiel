@@ -28,7 +28,7 @@ module Admin
       def errors_id = "#{id}-errors"
 
       def wrapper_class
-        border = errors.any? ? "border-danger" : "border-line-strong focus-within:border-accent"
+        border = errors.any? ? "border-danger" : "border-field-line focus-within:border-accent"
         "admin-prefix-input flex rounded-cs border #{border} bg-surface"
       end
 

@@ -93,7 +93,7 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_selector "#{line} > span.min-w-0.truncate.font-medium:first-child", text: "Translating Everything With Mobility", exact_text: true
     assert_selector "#{line} > span.truncate + span[data-presence-marker='post-#{busy.id}'].flex-none.text-meta:not([hidden])[data-presence-count='2']"
     assert_selector "#{line} > [data-presence-marker] > span.sr-only", text: ", 2 people here: Dana Weiss, reader", exact_text: true
-    assert_selector "#{link} > span.truncate.font-cs-mono.text-\\[11px\\].text-meta:last-child", text: "/blog/translating", exact_text: true
+    assert_selector "#{link} > span.truncate.font-cs-mono.text-label.text-meta:last-child", text: "/blog/translating", exact_text: true
     # The hover underline is the title's and the path's own (review finding
     # 4): on the link it was drawn through everything in it, the marker's
     # count included, and a child cannot refuse a parent's underline.

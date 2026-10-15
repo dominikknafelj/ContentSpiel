@@ -33,11 +33,11 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
 
   test "Take over and Copy my text are the outlined secondary small button, Discard and Remove the small ghost one (handoff 2, 14; the design system's default button)" do
     strip
-    assert_selector "button.border.border-line-strong.bg-surface.text-ink.px-2.py-0\\.5", text: "Take over"
+    assert_selector "button.border.border-field-line.bg-surface.text-ink.px-2.py-0\\.5", text: "Take over"
     assert_no_selector "button.bg-accent"
 
     strip(kind: :lost)
-    assert_selector "button.border-line-strong.bg-surface", text: "Copy my text"
+    assert_selector "button.border-field-line.bg-surface", text: "Copy my text"
     assert_selector "button.text-dim", text: "Discard"
     assert_no_selector "button.bg-accent"
 

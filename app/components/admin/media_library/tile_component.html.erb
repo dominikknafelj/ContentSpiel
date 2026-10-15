@@ -15,9 +15,9 @@
   <span class="flex flex-col gap-1 px-2.5 py-2">
     <span class="truncate text-sm font-medium text-ink"><%= asset.title %></span>
     <span class="flex flex-wrap items-center gap-1.5">
-      <% if dimensions %><span class="font-cs-mono text-[10px] text-meta"><%= dimensions %></span><% end %>
-      <% if no_alt? %><span class="rounded-cs border border-warn px-1 font-cs-mono text-[10px] text-warn-ink">NO ALT</span><% end %>
-      <% if unused? %><span class="rounded-cs border border-line-strong px-1 font-cs-mono text-[10px] text-meta">UNUSED</span><% end %>
+      <% if dimensions %><span class="font-cs-mono text-label text-meta"><%= dimensions %></span><% end %>
+      <% if no_alt? %><span class="rounded-cs border border-warn px-1 font-cs-mono text-label text-warn-ink">NO ALT</span><% end %>
+      <% if unused? %><span class="rounded-cs border border-line-strong px-1 font-cs-mono text-label text-meta">UNUSED</span><% end %>
     </span>
   </span>
 <% end %>

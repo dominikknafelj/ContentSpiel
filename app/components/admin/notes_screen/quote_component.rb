@@ -21,7 +21,7 @@ module Admin
       def call
         tag.figure(class: "flex flex-col gap-1 rounded-cs border border-line bg-sunken px-2.5 py-2", data: { note_quote: true }) do
           safe_join([
-            tag.figcaption(t(".quoted"), class: "font-cs-mono text-[10px] uppercase tracking-mono text-meta"),
+            tag.figcaption(t(".quoted"), class: "font-cs-mono text-label uppercase tracking-mono text-meta"),
             tag.blockquote(@quote, class: "whitespace-pre-wrap break-words text-[13px] leading-normal text-ink")
           ])
         end
