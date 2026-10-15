@@ -26,7 +26,12 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "block_type is a string checked against the BlockTypes registry" do
-    assert_equal %w[rich_text image code post_list section], BlockTypes.names
+    assert_equal BuiltInBlockTypes.names, BlockTypes.names
+    block = ContentBlock.new(owner: @page, position: 0, block_type: :rich_text)
+    assert_equal "rich_text", block.block_type, "a symbol is kept as the registry's string"
+    block.block_type = "no_such_type"
+    assert_not block.valid?
+    assert block.errors[:block_type].any?, "a name the registry does not hold is refused"
   end
 
   test "a block belongs to an owner" do
@@ -163,7 +168,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   # is what exercises this, since none of the built-ins have one.
   test "normalize_settings moves a translated key found in raw settings into translated_settings, in the default locale" do
     saved = BlockTypes.all.dup
-    BlockTypes.register(:test_translated) { |t| t.label "Test translated"; t.field :headline, :string, translated: true }
+    BlockTypes.register(:test_translated) { |t| TestTypes.declare(t); t.label "Test translated"; t.field :headline, :string, translated: true }
 
     block = ContentBlock.new(owner: @page, block_type: :test_translated, position: 0,
       settings: { "headline" => "Hello" })

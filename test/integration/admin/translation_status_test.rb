@@ -103,6 +103,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
       t.label "Call to action"
       t.field :link, :group, of: "test/link", translated: true
       t.component TestQuoteComponent
+      TestTypes.declare(t)
     end
     page = create_page(title: "Links")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "test/cta" },

@@ -46,8 +46,9 @@ require "digest"
 # and is in it. Whether every file under `views` and `components` is one the
 # contract names, whether an asset is named like one of the CMS's own, and
 # what a template's source says, is `Theme::Check`'s, run by `Theme.load` when the
-# application is prepared (`config/initializers/theme.rb`), because the
-# contract is application code. Both stop the boot.
+# application is prepared (the last lines of the `to_prepare` in
+# `config/initializers/types.rb`, after the types the contract is read
+# from), because the contract is application code. Both stop the boot.
 #
 # THE TEST ENVIRONMENT IGNORES THE VARIABLE, so a developer's shell never
 # changes a test run; a test hands a folder in (`ThemeFolder.new(path)`,
@@ -99,8 +100,8 @@ class ThemeFolder
 
   # For `bin/rails theme:check` alone (lib/tasks/theme.rake): the length of
   # a block in which the application is started TO SAY what is wrong with a
-  # folder. A folder the contract refuses stops the boot
-  # (`config/initializers/theme.rb`), which is right for a server and wrong
+  # folder. A folder the contract refuses stops the boot (the theme's
+  # prepare, last in `config/initializers/types.rb`), which is right for a server and wrong
   # for the one command whose work is to list the problems: it would never
   # be reached, and its reader would get an exception's trace and the
   # boot's half of the list. Inside the block the initializer keeps the
@@ -115,6 +116,22 @@ class ThemeFolder
   end
 
   def self.checking? = @checking == true
+
+  # Whether the application's boot is over, so that a prepare is a
+  # development reload's (`Theme.prepare` says why the two differ). The
+  # state is this class's alone, and this file is not reloaded: only the
+  # hook `follow_boot` registers sets it, after the boot's own prepare
+  # (`after_initialize` runs once, after it), so it is false for exactly
+  # that first run. There is no writer; `follow_boot` is called once, by
+  # config/initializers/theme.rb, and refuses a second call.
+  def self.booted? = @booted == true
+
+  def self.follow_boot(config)
+    raise ArgumentError, "the boot is followed once, by config/initializers/theme.rb" if defined?(@booted)
+
+    @booted = false
+    config.after_initialize { @booted = true }
+  end
 
   # `base` is what a relative value is relative to: the directory the
   # process was started in.

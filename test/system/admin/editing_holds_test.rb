@@ -748,7 +748,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     kept = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{card(list)} form [data-action]".to_json})).flatMap((each) => each.dataset.action.split(/\\s+/))")
     kept.each do |token|
       action = Admin::EditorScreen::HeldFields.action_of(token)
-      assert_includes Admin::EditorScreen::HeldFields::ALLOWED_ACTIONS, action, "the frozen form kept #{token}, which the server's allow-list refuses"
+      assert_includes Admin::EditorScreen::HeldFields.allowed_actions, action, "the frozen form kept #{token}, which the server's allow-list refuses"
     end
   end
 

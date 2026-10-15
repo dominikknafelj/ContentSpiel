@@ -9,6 +9,8 @@ module BlockTypes
         t.label "Rich text"
         t.uses :body
         t.component Blocks::RichTextComponent
+        t.theme_methods :block, :page
+        t.sample body: "Sample paragraph with **strong words**.", shows: [ "Sample paragraph with", "<strong>strong words</strong>" ]
       end
     end
   end

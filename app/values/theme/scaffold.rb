@@ -6,7 +6,7 @@ class Theme
   # them (app/views, beside each component); this copy is how they are "the
   # example to copy". WHAT IS COPIED IS THE CONTRACT: every template of
   # `Contract::TEMPLATES` and every component template of
-  # `Contract::COMPONENTS`, so a line added to either is copied from that
+  # `Contract.components`, so a line added to either is copied from that
   # day on, and nothing the contract does not name can be. A site under the
   # written folder is drawn byte for byte as before
   # (`test/values/theme/scaffold_test.rb`); its author then deletes what
@@ -30,7 +30,7 @@ class Theme
       own_readme = target.directory? && target.children.any? { |entry| entry.basename.to_s.match?(README) }
 
       written = Contract::TEMPLATES.keys.map { |path| copy(Pathname(root).join("app/views", path), target, "views/#{path}") }
-      written += Contract::COMPONENTS.keys.map { |path| copy(Pathname(root).join("app/components/#{path}.html.erb"), target, "components/#{path}.html.erb") }
+      written += Contract.components.keys.map { |path| copy(Contract.template_for(path, root: root), target, "components/#{path}.html.erb") }
       written << put(target, "assets/stylesheets/theme.css", stylesheet)
       EMPTY.each { |folder| put(target, "#{folder}/.keep", "") }
       written << put(target, "README.md", readme) unless own_readme
@@ -61,7 +61,7 @@ class Theme
     # A comment and nothing else, so the site looks as before; it names
     # every token, because the list is what a theme's author came for.
     def stylesheet
-      tokens = Contract::TOKENS.each_slice(4).map { |names| "     #{names.join("  ")}" }.join("\n")
+      tokens = Contract.tokens.each_slice(4).map { |names| "     #{names.join("  ")}" }.join("\n")
       <<~CSS
         /* This theme's one stylesheet. The build imports it AFTER the default
            theme's styles, so whatever is declared here wins and nothing has to

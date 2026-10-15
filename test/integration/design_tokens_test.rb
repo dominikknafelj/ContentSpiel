@@ -135,10 +135,27 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   # Code block spec §4: plain rules on tokens, because the span classes are
   # built from role names and no utility scan would find them.
-  test "the code block's stylesheet is imported by the theme, holds no colour of its own, colours each role by its token and keeps a long line inside" do
+  # Block types spec, "Tests": derived from the registry, so a type's
+  # stylesheet is in the build because it declared it, and in it once.
+  test "the public stylesheet's entry imports every registered type's stylesheet once, and the default theme's file imports none that a type declares" do
+    blocks = BlockTypes.theme_css_blocks
+    entry = ThemeCss.entry(ThemeFolder.new(nil), root: Rails.root, blocks: blocks)
+    theme_css = Rails.root.join(ThemeCss::DEFAULT).read
+
+    assert_equal BlockTypes.all.size, blocks.size, "one entry for each registered type, whether or not it declares a stylesheet"
+    assert_not_empty blocks.filter_map(&:stylesheet), "no type declares a stylesheet: the loop below would check nothing"
+    blocks.filter_map(&:stylesheet).each do |path|
+      relative = path.relative_path_from(Rails.root.join(ThemeCss::ENTRY).dirname).to_s
+      assert_equal 1, entry.scan(%(@import "#{relative}";)).size, "#{path.basename} is imported once by the entry"
+      assert_not_includes theme_css, %(@import "./#{path.basename}";), "#{path.basename} is a type's: the entry imports it, not theme.css"
+    end
+  end
+
+  test "the code block's stylesheet is declared by the type and imported by the entry, holds no colour of its own, colours each role by its token and keeps a long line inside" do
     css = Rails.root.join("app/assets/tailwind/themes/default/code.css").read
 
-    assert_includes Rails.root.join("app/assets/tailwind/themes/default/theme.css").read, %(@import "./code.css";)
+    assert_not_includes Rails.root.join(ThemeCss::DEFAULT).read, "code.css", "the Code type's stylesheet is imported by the entry, as the type declares it"
+    assert_equal Rails.root.join("app/assets/tailwind/themes/default/code.css"), BlockTypes.fetch(:code).stylesheet_path
     refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, css)
     CodeHighlight::ROLES.each { |role| assert_match(/\.syn-#{role}\s*\{\s*color:\s*var\(--th-syn-#{role}\);/, css) }
     assert_no_match(/\.content-block--code\s*\{[^}]*min-width/, css, "the figure is a block wherever it is drawn and needs no min-width of its own; in a column the tracks' minmax(0, …) keep the line in")

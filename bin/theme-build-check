@@ -66,6 +66,13 @@ env -u DATABASE_URL THEME_PATH="$theme" RAILS_ENV=production SECRET_KEY_BASE_DUM
 need '--th-paper' "the default theme's tokens"
 need 'max-w-3xl' "a utility of the default theme's templates"
 need 'cs-prose' "the default theme's rich-text rules"
+# The one block type that declares a stylesheet today (code.css), which
+# reaches the build only through the rake task's `blocks:`, never through
+# the default theme's own theme.css. Its SELECTOR, `.syn-keyword`, which
+# only code.css writes: the bare word is also in `--th-syn-keyword`, which
+# tokens.css and sections.css put in every build, and a check of it could
+# not fail. A type that declares another adds its own line here.
+need '\.syn-keyword' "a block type's declared stylesheet (code.css)"
 need '#123456' "the theme's accent"
 need 'plain-frame' "the theme's own rule"
 need 'mt-\\\[7px\\\]' "a utility used only in the theme's templates"

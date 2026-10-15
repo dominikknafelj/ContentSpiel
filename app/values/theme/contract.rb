@@ -10,16 +10,19 @@ class Theme
   # the reference file (`docs/reference/theming.md`, which a test holds to
   # this file).
   #
-  # ADDING A BLOCK TYPE (decision 18) is one entry here per thing it brings:
-  # its component's line in COMPONENTS, which makes its template replaceable
-  # and `theme:new` copy it, and its tokens' lines in THEMED_TOKENS or
-  # FIXED_TOKENS. Nothing else in the mechanism names a block, and the type
-  # cannot be added without them: `test/values/theme/contract_test.rb` fails
-  # for a component a type registry hands out that COMPONENTS does not hold
-  # ("a block type registered with a component the list does not hold fails,
-  # and the message names the missing entry") and for a `--th-` token that
-  # tokens.css defines and no list names, each with the missing entry in its
-  # message.
+  # ADDING A BLOCK TYPE (decision 18; block types spec, decisions 4 and 5)
+  # is its declarations, not an entry here: `theme_methods` (its component's
+  # line, which makes its template replaceable and `theme:new` copy it) and
+  # `tokens` (its themed and fixed tokens), which `components`,
+  # `themed_tokens` and `fixed_tokens` below read from `BlockTypes` on every
+  # call. A derived list makes removing a name as easy as adding one, so the
+  # built-in types' part is held by the ledger
+  # (`test/values/theme/contract_ledger_test.rb`), the one hand list kept on
+  # purpose. Content types are not part of this: their three components stay
+  # written in POST_COMPONENTS. `test/values/theme/contract_test.rb` fails for
+  # a component a type registry hands out that `components` does not hold,
+  # and for a `--th-` token that tokens.css defines and no list names, each
+  # with the missing entry in its message.
   #
   # The lists are data and name no class: a component is written as its path
   # (`blocks/image_component`), which is also where a theme puts its
@@ -31,28 +34,25 @@ class Theme
     # blocks), without the `--th-` prefix. A theme changes one by declaring
     # it again in its own stylesheet, under the same selectors.
     #
-    # The last seven are the Code block's syntax colours, one per role of
-    # `CodeHighlight::ROLES` and in its order (the highlighter is not named
-    # here: `test/values/theme/contract_test.rb` holds the two together).
-    THEMED_TOKENS = %w[
+    # The shared ones, which no block type brings; a type's own follow them
+    # in `themed_tokens`.
+    SHARED_THEMED_TOKENS = %w[
       paper surface sunken ink dim meta line line-strong
       accent accent-hover accent-tint on-accent
       ok ok-ink ok-tint warn warn-ink warn-tint danger danger-ink danger-tint
       shadow-menu
       band-tinted band-strong on-band-strong on-band-strong-dim on-band-strong-accent
-      syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed
     ].freeze
 
     # Tokens with one value (the last block): type, tracking, spacing, shape.
-    FIXED_TOKENS = %w[
+    # The shared ones; a type's own follow them in `fixed_tokens`.
+    SHARED_FIXED_TOKENS = %w[
       font mono
       t-display t-h1 t-h2 t-h3 t-body t-small t-label
       track-mono track-wide
       sp-1 sp-2 sp-3 sp-4 sp-5 sp-6 sp-7
       radius radius-pill ease
     ].freeze
-
-    TOKENS = (THEMED_TOKENS + FIXED_TOKENS).map { |name| "--th-#{name}" }.freeze
 
     # The CMS's own under the same prefix, and not a theme's to rely on: the
     # preview bar's two colours and the image placeholder's two.
@@ -78,28 +78,48 @@ class Theme
     # rendered as `render "theme/anything"`.
     OWN_PARTIALS = "theme/".freeze
 
-    # The components whose template a theme may replace through its
-    # `components/` folder, by the component's path, with the methods its
-    # template may call. A method not listed is the CMS's to change.
-    COMPONENTS = {
-      "blocks/rich_text_component" => %w[block page],
-      "blocks/image_component" => %w[block page asset alt caption sizes],
-      # `lines` is one array per line of [role, text] pairs, the role nil or
-      # one of the seven a `syn-` token exists for; `string(key)` is one of
-      # the copy button's four words (:copy, :copy_code, :copied, :failed) in
-      # the visitor's language, and of nothing else. When the bar around the
-      # copy button is the script's to show, and the id of the file name's
-      # element, are a template's own layout and no method: the default
-      # template writes both out from these names. The markup the copy script
-      # asks of any template is in docs/reference/theming.md, "The Code block".
-      "blocks/code_component" => %w[block page lines code language language_label filename caption string],
-      "blocks/post_list_component" => %w[block page list_component],
-      "blocks/section_component" => %w[block page columns layout background width],
+    # The content types' components, written here: a content type declares
+    # no line of its own (block types spec, "not part of this").
+    POST_COMPONENTS = {
       "posts/blog_list_component" => %w[posts page],
       "posts/resume_list_component" => %w[posts page],
       "posts/now_list_component" => %w[posts page],
       "posts/detail_component" => %w[post]
     }.freeze
+
+    def self.path_of(component) = component.name.underscore
+
+    # Every component whose template a theme may replace, with the methods
+    # it may call: each registered block type's line (its `theme_methods`),
+    # in registration order, then the post components. Read on every call,
+    # never kept in a constant: a constant is read when this file loads,
+    # before `to_prepare` has registered anything.
+    def self.components
+      blocks = ::BlockTypes.all.filter_map do |definition|
+        next unless definition.component
+
+        path = path_of(definition.component)
+        [ path, definition.theme_methods ]
+      end
+      blocks.to_h.merge(POST_COMPONENTS).freeze
+    end
+
+    def self.themed_tokens = SHARED_THEMED_TOKENS + ::BlockTypes.all.flat_map(&:themed_tokens)
+
+    def self.fixed_tokens = SHARED_FIXED_TOKENS + ::BlockTypes.all.flat_map(&:fixed_tokens)
+
+    def self.tokens = (themed_tokens + fixed_tokens).map { |name| "--th-#{name}" }
+
+    # The default template a theme's `components/<path>.html.erb` replaces:
+    # the CMS's own under `root`, else the registered type's component's
+    # template (an engine's, beside its source).
+    def self.template_for(path, root: Rails.root)
+      file = Pathname(root).join("app/components/#{path}.html.erb")
+      return file if file.file?
+
+      definition = ::BlockTypes.all.find { |each| each.component && path_of(each.component) == path }
+      definition&.component_template || file
+    end
 
     # What every component's template may call beside its own methods
     # (`ApplicationComponent` delegates them to the view), and `helpers`,
@@ -118,7 +138,7 @@ class Theme
     # things a text embeds with their class names. How each looks is the
     # theme's; that it is this element is the CMS's (decision 12: a theme
     # styles a text and does not replace the HTML it is rendered to, so
-    # `RichText::ImageComponent` and `YoutubeComponent` are not in COMPONENTS).
+    # `RichText::ImageComponent` and `YoutubeComponent` are not in `components`).
     RICH_TEXT = [
       "h2", "h3", "h4", "p", "ul", "ol", "li", "blockquote", "a", "strong", "em", "s", "code", "pre", "pre code", "hr", "br",
       "figure.content-block--image", "figure", "img", "figcaption",

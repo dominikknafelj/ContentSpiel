@@ -1,0 +1,6 @@
+/* The test album's tokens, defined from the theme's base tokens only
+   (block types spec, decision 3): a theme that re-colours its base
+   re-colours this block. */
+:root, [data-theme="light"] { --th-gallery-frame: var(--th-line); }
+[data-theme="dark"] { --th-gallery-frame: var(--th-line-strong); }
+.content-block--gallery-album { border: 1px solid var(--th-gallery-frame); }

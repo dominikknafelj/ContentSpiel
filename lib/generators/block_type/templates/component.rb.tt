@@ -1,0 +1,16 @@
+module Blocks
+  # The <%= human_name.downcase %> block on the public site. A theme may replace
+  # its template and call only what the type's `theme_methods` names.
+  class <%= class_name %>Component < ApplicationComponent
+    def initialize(block:, page:)
+      @block = block
+      @page = page
+    end
+
+    def render? = block.settings_object(fallback: true)&.text.present?
+
+    private
+
+    attr_reader :block, :page
+  end
+end

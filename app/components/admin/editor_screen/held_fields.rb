@@ -29,7 +29,8 @@ module Admin
     # of a held form (a `div` or a `ul` as much as a control, with a
     # `@window` or `@document` target, with `:stop` or `:once` options or a
     # key filter on the event) is removed unless the controller action it
-    # names is in `ALLOWED_ACTIONS`: the ones that only read or only move
+    # names is in `allowed_actions` (the CMS's four and each block type's
+    # declared `read_only_actions`): the ones that only read or only move
     # focus. A writing action added to a field next year is therefore dead in
     # a held form from the day it is written, and `held_fields_test.rb`
     # keeps its OWN list of what may survive, so a new survivor fails it until
@@ -44,19 +45,25 @@ module Admin
       # Input types `readonly` applies to (HTML's list), and a missing type, which is text.
       READONLY_TYPES = %w[text search tel url email password number date datetime-local month week time].freeze
       HIDDEN_TYPES = %w[hidden].freeze
-      # `identifier#method` of the actions that survive: reading, or moving focus.
-      ALLOWED_ACTIONS = %w[
+      # `identifier#method` of the CMS's own actions that survive: reading, or
+      # moving focus. A block type's own are its definition's
+      # `read_only_actions` (block types spec, decision 10), reviewed with
+      # the type.
+      CMS_ACTIONS = %w[
         admin--editor--slug-preview#update
         admin--rich-text--editor#containFocus
         admin--ui--menu#select
         admin--ui--menu#close
-        admin--editor--code-limit#update
       ].freeze
+      # Every action that survives in a held form: the CMS's, and each
+      # registered block type's declared ones.
+      def self.allowed_actions = (CMS_ACTIONS + ::BlockTypes.all.flat_map(&:read_only_actions)).uniq.freeze
+
       # The rules as data, for the browser's counterpart (`editing/freeze`),
       # which turns ONE form read-only in place: the region renders this into
       # the page (`LiveRegionComponent`), so the script and this module read
       # one source and the lists are written once.
-      def self.rules = { allowed_actions: ALLOWED_ACTIONS, readonly_types: READONLY_TYPES, hidden_types: HIDDEN_TYPES }
+      def self.rules = { allowed_actions: allowed_actions, readonly_types: READONLY_TYPES, hidden_types: HIDDEN_TYPES }
 
       GUARD = '<button type="submit" disabled hidden tabindex="-1" data-held-guard></button>'.freeze
       NEWLINE_FIRST = "textarea, pre, listing".freeze
@@ -72,7 +79,8 @@ module Admin
         fragment.css("textarea").each { |field| field["readonly"] = "readonly" }
         fragment.css("input").each { |field| restrict_input(field) }
         fragment.css("select, button").each { |field| field["disabled"] = "disabled" }
-        fragment.css("[data-action]").each { |element| keep_allowed_actions(element) }
+        allowed = allowed_actions
+        fragment.css("[data-action]").each { |element| keep_allowed_actions(element, allowed) }
         fragment.css(NEWLINE_FIRST).each { |element| keep_first_newline(element) }
         fragment.to_html.html_safe # rubocop:disable Rails/OutputSafety -- markup this app has just rendered, parsed and written out again
       end
@@ -93,8 +101,8 @@ module Admin
         body.sub(/@\w+\z/, "").sub(/(?::!?\w+)+\z/, "")
       end
 
-      def keep_allowed_actions(element)
-        kept = element["data-action"].split.select { |token| ALLOWED_ACTIONS.include?(action_of(token)) }
+      def keep_allowed_actions(element, allowed)
+        kept = element["data-action"].split.select { |token| allowed.include?(action_of(token)) }
         kept.empty? ? element.remove_attribute("data-action") : element["data-action"] = kept.join(" ")
       end
 

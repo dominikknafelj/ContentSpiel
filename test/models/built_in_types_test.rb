@@ -1,8 +1,16 @@
 require "test_helper"
 
 class BuiltInTypesTest < ActiveSupport::TestCase
+  # The built-ins are what config/initializers/types.rb calls, in the order
+  # of its lines (`BuiltInBlockTypes`, read from its source), and that order
+  # is the picker's: no list of names is written here, so a new built-in
+  # (the generator's line) touches no list but the contract's ledger.
   test "built-ins are registered" do
-    assert_equal %w[rich_text image code post_list section], BlockTypes.names
+    built_ins = BuiltInBlockTypes.names
+    files = Dir.children(Rails.root.join("app/models/block_types")).grep(/\.rb\z/).map { |file| File.basename(file, ".rb") }
+    assert_equal files.sort, built_ins.sort, "every module of app/models/block_types is registered by one line of the initializer"
+    assert_equal built_ins, BlockTypes.built_in_names, "the built-ins are registered in the order of the initializer's lines"
+    assert_equal built_ins, BlockTypes.names, "the CMS registers its built-ins and nothing else"
     assert_equal %w[blog resume_entry now_update], ContentTypes.names
     assert BlockTypes.fetch(:post_list).capability?(:lists_posts)
     assert_equal %w[image caption alt], BlockTypes.fetch(:image).uses_columns
@@ -14,7 +22,17 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_equal "Code", code.label
     assert_equal [ %w[language select], %w[filename string], %w[code code] ], code.fields.map { |field| [ field.name, field.type.to_s ] }
     assert_equal %w[caption], code.uses_columns
-    assert code.capability?(:code)
+    assert_not code.capability?(:code), "the capability's one reader was the tile's branch, which is the type's summary now"
+    assert_equal %w[block page lines code language language_label filename caption string], code.theme_methods
+    assert_equal CodeHighlight::ROLES.map { |role| "syn-#{role}" }, code.themed_tokens
+    assert_equal "code.css", code.stylesheet
+    assert_equal %w[admin--editor--code-limit#update], code.read_only_actions
+    # The values of the hand-written rows the sample replaced (the scaffold's
+    # /wide and the canary's Alpha, block types review I2): markup-looking ERB
+    # coloured as ERB, and a caption in each of the three languages.
+    assert_equal [ "show.html.erb", %(<span class="syn-embed">), "A template" ], code.sample.shows
+    assert_equal({ "language" => "erb", "filename" => "show.html.erb", "code" => "<p class=\"a\"><%= 1 %></p>\n<%# note %>" }, code.sample.settings)
+    assert_equal %w[en de es], code.sample.translations.keys
     assert_equal Blocks::CodeComponent, code.component
     assert code.fields.none? { |field| field.required? || field.translated? }
     assert_equal CodeHighlight::LANGUAGES, code.fields.first.options[:options]
@@ -29,39 +47,29 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_equal [ 1, 1 ], BlockTypes::Section.weights("no such layout")
   end
 
-  # `ContentBlock#column_count` calls the type's `columns` without a guard, so
-  # a container type that doesn't say how many it has is refused when it is
-  # registered, not when a page renders.
-  test "a container type registered without columns is refused" do
+  test "a type with an owner, and a bare name a test registers with no module of its own, are no built-in" do
     saved = BlockTypes.all.dup
+    BlockTypes.register("gallery/band") { |t| TestTypes.declare(t); t.label "Band" }
+    BlockTypes.register(:test_band) { |t| TestTypes.declare(t); t.label "Band" }
 
-    error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| t.label "Band"; t.capability :container } }
-    assert_equal "a container block type needs `columns`", error.message
+    assert_equal BuiltInBlockTypes.names + %w[gallery/band test_band], BlockTypes.names
+    assert_equal BuiltInBlockTypes.names, BlockTypes.built_in_names
   ensure
     BlockTypes.reset!
     saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
-  # The editor's tile asks a `:code` type's settings for three fields by name
-  # (`TileSummaryComponent#code_line`), without a guard.
-  test "a type with the code capability and without its three fields is refused, and the message names what is missing" do
+  # `ContentBlock#column_count` calls the type's `columns` without a guard, so
+  # a container type that doesn't say how many it has is refused when it is
+  # registered, not when a page renders.
+  test "a container type registered without columns, and a listing type without its two fields, are refused with the type's name first" do
     saved = BlockTypes.all.dup
 
-    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.field :code, :code; t.capability :code } }
-    assert_equal "a code block type needs language and filename field(s)", error.message
-    error = assert_raises(ArgumentError) { BlockTypes.register(:test_listing) { |t| t.label "Listing"; t.capability :code } }
-    assert_equal "a code block type needs language and filename and code field(s)", error.message
-    assert_nil BlockTypes.find(:test_listing), "a refused type is not registered"
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| TestTypes.declare(t); t.label "Band"; t.capability :container } }
+    assert_equal "test_band: a container block type needs `columns`", error.message
 
-    BlockTypes.register(:test_listing) do |t|
-      t.label "Listing"
-      t.field :language, :string
-      t.field :filename, :string
-      t.field :code, :code
-      t.capability :code
-      t.component Blocks::CodeComponent
-    end
-    assert BlockTypes.find(:test_listing).capability?(:code)
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_list) { |t| TestTypes.declare(t); t.label "List"; t.capability :lists_posts } }
+    assert_equal "test_list: a lists_posts block type needs content_type and tag field(s)", error.message
   ensure
     BlockTypes.reset!
     saved.each { |definition| BlockTypes.registry_put(definition) }
@@ -102,5 +110,34 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_nil post.reload.full_path("en")
     assert_nil block.reload.definition
     assert_empty page.content_blocks.listing
+  end
+
+  test "rich text and image declare their contract lines and a sample, and need no summary, token, stylesheet or action of their own" do
+    rich_text = BlockTypes.fetch(:rich_text)
+    image = BlockTypes.fetch(:image)
+
+    assert_equal %w[block page], rich_text.theme_methods
+    assert_equal %w[block page asset alt caption sizes], image.theme_methods
+    [ rich_text, image ].each do |definition|
+      assert_nil definition.summary
+      assert_empty definition.themed_tokens + definition.fixed_tokens + definition.read_only_actions
+      assert_nil definition.stylesheet
+    end
+    assert rich_text.sample.body.present?
+    assert image.sample.image
+    assert_equal %w[alt caption], image.sample.translations.fetch("en").keys.map(&:to_s).sort
+  end
+
+  test "post list and section declare their contract lines and a sample; the list's tile line is its own, the section brings no stylesheet" do
+    list = BlockTypes.fetch(:post_list)
+    section = BlockTypes.fetch(:section)
+
+    assert_equal %w[block page list_component], list.theme_methods
+    assert_equal %w[block page columns layout background width], section.theme_methods
+    assert list.summary
+    assert_nil section.summary, "a section's tile is its lanes"
+    assert_nil section.stylesheet, "sections.css is the default theme's own stylesheet, imported by theme.css before every type's"
+    assert_equal({ "content_type" => "blog", "limit" => 5 }, list.sample.settings, "the tag is left out on purpose (UNFILLED_FIELDS); the limit is filled so the canary compares it")
+    assert_equal "tinted", section.sample.settings.fetch("background")
   end
 end

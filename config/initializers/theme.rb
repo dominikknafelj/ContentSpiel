@@ -5,8 +5,10 @@ folder = ThemeFolder.current
 
 # A changed template, stylesheet or script of the theme reloads the
 # application in development, as a change under app/ does: the reload runs
-# `to_prepare` below, which builds a new Theme with the folder's new
-# fingerprint and new subclasses for the components it replaces. (Templates
+# `to_prepare` (the theme's prepare is the last lines of
+# config/initializers/types.rb's), which builds a new Theme with the
+# folder's new fingerprint and new subclasses for the components it
+# replaces. (Templates
 # under <theme>/views alone would need none of this: Action View watches
 # every view path.)
 Rails.application.config.watchable_dirs[folder.path.to_s] = %w[erb css js] if folder.configured?
@@ -18,24 +20,13 @@ Rails.application.config.watchable_dirs[folder.path.to_s] = %w[erb css js] if fo
 # CMS's own stops the boot before the order could matter (`Theme::Check`).
 folder.asset_paths.each { |directory| Rails.application.config.assets.paths << directory.to_s }
 
-# Inside `to_prepare`, as every registry is (config/initializers/types.rb):
-# its first run is the boot, so a folder that is not a theme stops the boot;
-# and after a code reload the Theme is built again, against the freshly
-# loaded component classes.
-#
-# The first run raises and every later one does not (`Theme.prepare` says
-# why: a raise in a reload's prepare chain leaves the registries of the
-# blocks after this one unprepared). `after_initialize` runs once, after the
-# boot's own prepare, so `booted` is false for exactly that first run.
-#
-# `bin/rails theme:check` is the one boot that does not raise either
-# (`ThemeFolder.checking`): it starts the application to say what is wrong
-# with the folder, the whole list and no trace.
-booted = false
-Rails.application.config.after_initialize { booted = true }
-
-Rails.application.config.to_prepare do
-  Theme.current = Theme.prepare(ThemeFolder.current, reload: booted || ThemeFolder.checking?)
-  # Not under `theme:check`, which says the list itself, once and whole.
-  Rails.logger.error("[ContentSpiel] #{Theme.current.refusal.message}") if Theme.current.refusal && !ThemeFolder.checking?
-end
+# Prepared at the END of the registration block in config/initializers/types.rb,
+# not here (block types spec, decision 6): the check reads the theme contract,
+# and the contract's block lines are read from the registered types. An order
+# written in one block is read; one that depended on these two files' names
+# was not. What stays here is what is done once at boot (the watched folder,
+# the asset paths above) and the hook that tells the boot's prepare from a
+# reload's (`ThemeFolder.booted?`, false for exactly the boot's own prepare;
+# `Theme.prepare` says why the two differ). The state is ThemeFolder's own,
+# with no writer, so nothing else can turn the boot's refusal into a kept one.
+ThemeFolder.follow_boot(Rails.application.config)

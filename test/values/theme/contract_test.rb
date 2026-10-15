@@ -6,35 +6,37 @@ require "test_helper"
 # to the code, both ways: a name on the list that the code no longer has
 # fails, and so does something a theme can reach that the list forgot.
 #
-# A BLOCK TYPE ADDED LATER joins by one entry per thing it brings
-# (decision 18): its component's line in COMPONENTS and its tokens' lines in
-# THEMED_TOKENS or FIXED_TOKENS. The first test below fails until the first
-# is there and the token test until the second is, each naming the missing
-# entry; the two tests after the first show that it can fail.
+# A BLOCK TYPE ADDED LATER joins by its declarations (block types spec,
+# decisions 4 and 5): `t.theme_methods`, its component's line in
+# `Theme::Contract.components`, and `t.tokens`, its lines in `themed_tokens`
+# or `fixed_tokens`. The first test below fails until the first is there and
+# the token test until the second is, each naming the missing entry; the two
+# tests after the first show that it can fail. The built-in types' part is
+# held by the ledger (test/values/theme/contract_ledger_test.rb).
 class Theme::ContractTest < ActiveSupport::TestCase
   include ComponentTestHelper
+  include GalleryAlbum
 
   TOKENS_CSS = Rails.root.join("app/assets/tailwind/themes/default/tokens.css")
   COLOUR = /#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/
 
-  # The built-in types' components, by the path the contract names them
-  # under. A name with a slash in it is a plugin's or a test's (`test/quote`,
-  # test/support/test_types.rb, which another test of this process may have
-  # registered): bare names are the built-ins'.
+  # Every registered type's components, by the path the contract names them
+  # under: derived over every registered type, outside ones included (block
+  # types spec, "Tests"), since an outside type's line is read from its own
+  # declaration as a built-in's is.
   def registry_components
-    built_in = ->(definition) { !definition.name.to_s.include?("/") }
-    blocks = BlockTypes.all.select(&built_in).map(&:component)
-    posts = ContentTypes.all.select(&built_in).flat_map { |definition| [ definition.list_component, definition.detail_component ] }
+    blocks = BlockTypes.all.map(&:component)
+    posts = ContentTypes.all.flat_map { |definition| [ definition.list_component, definition.detail_component ] }
     (blocks + posts).compact.uniq.map { |component| component.name.underscore }.sort
   end
 
   # The one comparison of the registries with the list, as an assertion of
   # its own so that the tests below can show it failing.
   def assert_every_registered_component_is_listed
-    missing = registry_components - Theme::Contract::COMPONENTS.keys
+    missing = registry_components - Theme::Contract.components.keys
     assert_empty missing,
-      "Theme::Contract::COMPONENTS has no entry for #{missing.map(&:inspect).join(", ")}: a block or content type hands that " \
-      "component out, so its template is a theme's to replace. Add its line to COMPONENTS in app/values/theme/contract.rb, " \
+      "Theme::Contract.components has no entry for #{missing.map(&:inspect).join(", ")}: a block type hands that component out " \
+      "without `theme_methods`, so a theme cannot replace its template. Declare `t.theme_methods` in its definition, " \
       "with the methods its template may call"
   end
 
@@ -46,25 +48,18 @@ class Theme::ContractTest < ActiveSupport::TestCase
   test "every component a type registry hands out is on the list, and the list holds nothing else" do
     assert_every_registered_component_is_listed
 
-    left_over = Theme::Contract::COMPONENTS.keys - registry_components
-    assert_empty left_over, "Theme::Contract::COMPONENTS lists #{left_over.inspect}, which no block or content type hands out"
+    left_over = Theme::Contract.components.keys - registry_components
+    assert_empty left_over, "Theme::Contract.components lists #{left_over.inspect}, which no block or content type hands out"
   end
 
-  # The type is one nobody will build. It was "code" with
-  # `Blocks::CodeComponent` while the Code block was the next thing to join;
-  # the day that block was registered this test raised `DuplicateType`, and
-  # with its line in COMPONENTS the assertion would no longer have failed.
-  test "a block type registered with a component the list does not hold fails, and the message names the missing entry" do
-    component = unlisted_component("Blocks::MarqueeComponent")
-    BlockTypes.register("marquee") do |t|
-      t.label "Marquee"
-      t.component component
+  # Departure 6 (block types plan): with `theme_methods` required, a type
+  # whose template a theme could not replace is refused when it is
+  # registered, before any list is asked.
+  test "a block type registered without theme methods is refused at registration, and the message says what to declare" do
+    error = assert_raises(ArgumentError) do
+      BlockTypes.register("marquee") { |t| t.label "Marquee"; t.component unlisted_component("Blocks::MarqueeComponent"); t.sample shows: [ "x" ] }
     end
-
-    error = assert_raises(Minitest::Assertion) { assert_every_registered_component_is_listed }
-
-    assert_includes error.message, %(Theme::Contract::COMPONENTS has no entry for "blocks/marquee_component")
-    assert_includes error.message, "Add its line to COMPONENTS in app/values/theme/contract.rb"
+    assert_includes error.message, "theme_methods"
   ensure
     Rails.application.reloader.prepare!
   end
@@ -79,14 +74,14 @@ class Theme::ContractTest < ActiveSupport::TestCase
 
     error = assert_raises(Minitest::Assertion) { assert_every_registered_component_is_listed }
 
-    assert_includes error.message, %(Theme::Contract::COMPONENTS has no entry for "posts/gallery_list_component")
+    assert_includes error.message, %(Theme::Contract.components has no entry for "posts/gallery_list_component")
   ensure
     Rails.application.reloader.prepare!
   end
 
   test "every listed component has its default template and every method its template may call" do
-    Theme::Contract::COMPONENTS.each do |path, methods|
-      assert Rails.root.join("app/components/#{path}.html.erb").file?, "#{path} has no default template"
+    Theme::Contract.components.each do |path, methods|
+      assert Theme::Contract.template_for(path).file?, "#{path} has no default template"
       component = path.camelize.constantize
       methods.each do |name|
         assert component.method_defined?(name) || component.private_method_defined?(name), "#{component} has no #{name}"
@@ -107,11 +102,11 @@ class Theme::ContractTest < ActiveSupport::TestCase
   # thing a replaced template changes; the default template writes both
   # out from promised names, so `theme:new`'s copy shows an author how.
   test "the Code block is in the contract: its template is replaceable with the methods it may call, and its seven syntax tokens are themed tokens in the highlighter's order" do
-    assert_equal %w[block page lines code language language_label filename caption string], Theme::Contract::COMPONENTS.fetch("blocks/code_component")
-    assert_equal CodeHighlight::ROLES.map { |role| "syn-#{role}" }, Theme::Contract::THEMED_TOKENS.grep(/\Asyn-/)
-    CodeHighlight::ROLES.each { |role| assert_includes Theme::Contract::TOKENS, "--th-syn-#{role}" }
-    assert_empty Theme::Contract::FIXED_TOKENS.grep(/\Asyn-/), "a syntax colour has a light and a dark value"
-    assert_empty Theme::Contract::COMPONENTS.fetch("blocks/code_component") & %w[head_attributes file_id bare? settings]
+    assert_equal %w[block page lines code language language_label filename caption string], Theme::Contract.components.fetch("blocks/code_component")
+    assert_equal CodeHighlight::ROLES.map { |role| "syn-#{role}" }, Theme::Contract.themed_tokens.grep(/\Asyn-/)
+    CodeHighlight::ROLES.each { |role| assert_includes Theme::Contract.tokens, "--th-syn-#{role}" }
+    assert_empty Theme::Contract.fixed_tokens.grep(/\Asyn-/), "a syntax colour has a light and a dark value"
+    assert_empty Theme::Contract.components.fetch("blocks/code_component") & %w[head_attributes file_id bare? settings]
     %i[head_attributes file_id bare?].each do |name|
       assert_not Blocks::CodeComponent.method_defined?(name) || Blocks::CodeComponent.private_method_defined?(name), "#{name} is the default template's own layout, written out in the template"
     end
@@ -133,8 +128,8 @@ class Theme::ContractTest < ActiveSupport::TestCase
   end
 
   test "a default component template calls no method of its component that its line does not name" do
-    Theme::Contract::COMPONENTS.each do |path, methods|
-      assert_empty component_methods_called(path) - methods, "#{path}.html.erb calls a method of its component that Theme::Contract::COMPONENTS does not list for it"
+    Theme::Contract.components.each do |path, methods|
+      assert_empty component_methods_called(path) - methods, "#{path}.html.erb calls a method of its component that Theme::Contract.components does not list for it"
     end
     assert_equal %w[caption filename language_label lines string], component_methods_called("blocks/code_component").sort,
       "the reading sees what the Code block's template calls (and so could fail)"
@@ -178,7 +173,34 @@ class Theme::ContractTest < ActiveSupport::TestCase
     Theme::Contract::HELPERS.each { |name| assert_includes available, name.to_sym }
   end
 
-  test "every token is defined, a themed one for light and for dark, and no other --th- name is" do
+  # A type with an owner's own stylesheet (one outside the default theme's
+  # folder) defines its tokens there, in the same three blocks; every other
+  # type's are in tokens.css (block types spec, decision 7). No built-in has
+  # such a stylesheet: the first half runs with the outside type registered
+  # (test/support/gallery_album.rb), and says that it ran.
+  test "every declared token is defined, a themed one for light and for dark, and no --th- name is undeclared" do
+    with_gallery_album { every_declared_token_is_defined }
+  end
+
+  def every_declared_token_is_defined
+    default_folder = Rails.root.join("app/assets/tailwind/themes/default")
+    owned = BlockTypes.all.select { |definition| (path = definition.stylesheet_path) && path.dirname != default_folder }
+    assert_equal [ "gallery/album" ], owned.map(&:name), "no type has a stylesheet of its own: the half below would check nothing"
+    owned.each do |definition|
+      sheet = definition.stylesheet_path.read
+      light = sheet[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1].to_s.scan(/(--th-[\w-]+):/).flatten.sort
+      dark = sheet[/^\[data-theme="dark"\]\s*\{(.*?)\}/m, 1].to_s.scan(/(--th-[\w-]+):/).flatten.sort
+      fixed = sheet[/^:root \{(.*?)\}/m, 1].to_s.scan(/(--th-[\w-]+):/).flatten.sort
+      themed = definition.themed_tokens.map { |name| "--th-#{name}" }.sort
+      assert_equal themed, light, "#{definition.name}: the light block of its stylesheet defines its themed tokens"
+      assert_equal themed, dark, "#{definition.name}: the dark block of its stylesheet defines its themed tokens"
+      assert_equal definition.fixed_tokens.map { |name| "--th-#{name}" }.sort, fixed, "#{definition.name}: its :root block defines its fixed tokens"
+    end
+    owned_themed = owned.flat_map(&:themed_tokens)
+    owned_fixed = owned.flat_map(&:fixed_tokens)
+    contract_themed = Theme::Contract.themed_tokens - owned_themed
+    contract_fixed = Theme::Contract.fixed_tokens - owned_fixed
+
     css = TOKENS_CSS.read
     names = ->(block) { block.to_s.scan(/(--th-[\w-]+):/).flatten }
     light = names.(css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1])
@@ -192,28 +214,29 @@ class Theme::ContractTest < ActiveSupport::TestCase
       listed = prefixed.(list)
       defined = (block - own.(block)).sort
       assert_equal listed, defined,
-        "Theme::Contract::#{constant} and #{where} of tokens.css differ. Defined but not listed (add each to #{constant} in " \
-        "app/values/theme/contract.rb, without the --th- prefix): #{(defined - listed).inspect}. Listed but not defined: #{(listed - defined).inspect}"
+        "Theme::Contract.#{constant.downcase} and #{where} of tokens.css differ. Defined but not listed (add each to SHARED_#{constant} in " \
+        "app/values/theme/contract.rb, or to the `t.tokens` of the type it belongs to, without the --th- prefix): #{(defined - listed).inspect}. " \
+        "Listed but not defined: #{(listed - defined).inspect}"
     end
 
     assert_not_empty light
     assert_not_empty dark
     assert_not_empty fixed
-    differ.(Theme::Contract::THEMED_TOKENS, light, "THEMED_TOKENS", "the light block")
-    differ.(Theme::Contract::THEMED_TOKENS, dark, "THEMED_TOKENS", "the dark block")
-    differ.(Theme::Contract::FIXED_TOKENS, fixed, "FIXED_TOKENS", "the fixed block")
-    assert_equal Theme::Contract::TOKENS.sort, (prefixed.(Theme::Contract::THEMED_TOKENS) + prefixed.(Theme::Contract::FIXED_TOKENS)).sort
+    differ.(contract_themed, light, "THEMED_TOKENS", "the light block")
+    differ.(contract_themed, dark, "THEMED_TOKENS", "the dark block")
+    differ.(contract_fixed, fixed, "FIXED_TOKENS", "the fixed block")
+    assert_equal Theme::Contract.tokens.sort, (prefixed.(Theme::Contract.themed_tokens) + prefixed.(Theme::Contract.fixed_tokens)).sort
     assert_equal %w[--th-ph-a --th-ph-b --th-preview-bg --th-preview-ink], own.(light + fixed).sort, "the CMS's own tokens"
-    assert_empty Theme::Contract::TOKENS.grep(Theme::Contract::OWN_TOKENS)
+    assert_empty Theme::Contract.tokens.grep(Theme::Contract::OWN_TOKENS)
     assert_equal names.(css).uniq.sort, (light + dark + fixed).uniq.sort, "a --th- token is defined outside the three blocks"
   end
 
   test "the default theme's styles and templates hold no colour literal: tokens.css is the one place" do
-    styles = %w[theme.css prose.css sections.css code.css].map { |name| Rails.root.join("app/assets/tailwind/themes/default", name) }
+    styles = (Rails.root.glob("app/assets/tailwind/themes/default/*.css") - [ TOKENS_CSS ] + BlockTypes.all.filter_map(&:stylesheet_path)).uniq
     styles.each { |path| assert_no_match COLOUR, path.read, "#{path.basename} holds a colour" }
 
     templates = Theme::Contract::TEMPLATES.keys.map { |path| Rails.root.join("app/views", path) } +
-      Theme::Contract::COMPONENTS.keys.map { |path| Rails.root.join("app/components/#{path}.html.erb") }
+      Theme::Contract.components.keys.map { |path| Rails.root.join("app/components/#{path}.html.erb") }
     templates.each do |path|
       assert_no_match(/\[#\h{3,8}\]|\brgba?\(|\bhsla?\(|\boklch\(|style=/, path.read, "#{path} holds a colour or an inline style")
     end

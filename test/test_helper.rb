@@ -39,6 +39,10 @@ require_relative "test_helpers/turbo_stream_test_helper"
 require_relative "support/content_helper"
 require_relative "support/component_test_helper"
 require_relative "support/test_types"
+require_relative "support/gallery_album"
+require_relative "support/block_samples"
+require_relative "support/built_in_block_types"
+require_relative "support/contract_ledger"
 require_relative "support/site_address_helper"
 require_relative "support/log_capture"
 require_relative "support/theme_test_helper"
@@ -90,6 +94,11 @@ module ActiveSupport
     # Builds pages/posts through the write-path services (spec §11) instead
     # of fixtures -- see test/support/content_helper.rb.
     include ContentHelper
+
+    # `sample_block`, `sample_every_type`, `assert_every_type_built`: one
+    # block of a type from its declared sample -- see
+    # test/support/block_samples.rb.
+    include BlockSamples
 
     # `with_site_address(value) { ... }`: PUBLIC_HOST for a block, with
     # `SiteAddress`'s memo dropped on both sides -- see

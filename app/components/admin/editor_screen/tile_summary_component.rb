@@ -1,8 +1,9 @@
 module Admin
   module EditorScreen
     # One line of a block's content on its tile (sections spec §4.2): the
-    # start of a text, an image's file name with a small thumbnail, a code
-    # block's file name or its language and first line, a post list's filter.
+    # start of a text, an image's file name with a small thumbnail, or the
+    # line a type with a `summary` answers itself (the Code block's file
+    # name, or its language and first line; a post list's filter).
     # A block in a section's column is a tile until it is opened, so this
     # line is all that says which block it is -- and what marks the ones that
     # need attention, as a card would: an image block without an image, a
@@ -10,11 +11,15 @@ module Admin
     # (`invalid:`).
     #
     # WHAT THE LINE IS comes from the type's definition, never from its name:
-    # the columns it uses (`uses_columns`) and its capabilities, so a type a
+    # the columns it uses (`uses_columns`) or its own `summary`, so a type a
     # plugin registers gets a sensible tile without being known here. A type
     # that uses an image AND a body is summarised by its image, the first rule
-    # that matches. A type with neither, no code and no listing has no line
-    # at all; its tile is its label.
+    # that matches. A type with neither and no summary has no
+    # line at all; its tile is its label.
+    #
+    # A type that declares `summary` answers its own line as parts (block
+    # types spec, decision 8) and that is drawn first; a type without one
+    # keeps the rules above, from the columns it uses.
     #
     # THE LINE IS PARTS (`parts`: text and, where it has a look of its own,
     # a class), because a code block's is two (design answer C7): its
@@ -39,8 +44,14 @@ module Admin
     # `invalid:` is only ever true in such an answer. A block's stored state
     # is always valid, so a tile drawn with the page has nothing to say here.
     class TileSummaryComponent < AdminComponent
-      LENGTH = 80
+      LENGTH = ContentModel::BlockTypeDefinition::SUMMARY_LENGTH
       SEPARATOR = " · ".freeze
+
+      # A summary part's kind => the class it is drawn in (nil: plain). The
+      # set is closed; a type's summary answers nothing else (block types
+      # spec, decision 8; `:hint` is the meta colour the Code block's "Empty"
+      # was drawn in before the line moved into the type).
+      LOOKS = { text: nil, word: nil, mono: "font-cs-mono", hint: "text-meta" }.freeze
 
       def self.dom_id(block) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-tile-summary"
 
@@ -84,42 +95,50 @@ module Admin
 
       def content
         if definition.nil? then t(".unavailable", type: block.block_type)
+        elsif definition.summary then own_summary
         elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
         elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
-        elsif definition.capability?(:code) then code_line
-        elsif definition.capability?(:lists_posts) then listing
         end
       end
 
-      # A listing's filter: the content type it lists (or "All posts"), then
-      # its tag. A content type that is no longer registered reads as its
-      # stored name, as the block card's own field shows it.
-      def listing
-        settings = block.settings_object(locale: locale)
-        type = settings&.content_type.presence
-        tag = settings&.tag.presence
+      # The definitions whose faulty summary has been logged, so a page of
+      # twenty such tiles says it once (per registration: a reload makes new
+      # definitions, and says it again).
+      FAULTY = ObjectSpace::WeakMap.new
 
-        [ type ? (::ContentTypes.find(type)&.label || type) : t(".any_type"), (t(".tag", name: tag) if tag) ].compact.join(" · ")
+      # A type's own line. An OUTSIDE type's summary is a gem's code: one that
+      # raises, or answers a part of no known kind, was a 500 on every editor
+      # page holding a block of the type, so its tile shows the type's label
+      # instead and the log says it once, naming the type and the error's
+      # class and never its message, which can quote the block's content. A
+      # built-in's is the CMS's own and raises, in the tests first.
+      def own_summary
+        drawn(definition.summary.call(block, locale: locale))
+      rescue StandardError => error
+        raise unless definition.owner
+
+        unless FAULTY.key?(definition)
+          FAULTY[definition] = true
+          said = "[ContentSpiel] the block type #{definition.name}'s summary could not be drawn (#{error.class}); its tiles show the type's label" # i18n-ok: a log line for whoever runs the site, not a word of CS Studio
+          Rails.logger.error(said)
+        end
+        definition.label
       end
 
-      # What tells one code block from another at a glance (design answer
-      # C7): its file name if it has one; otherwise its language as an editor
-      # reads it, " · ", and the first line of its code, or that line alone
-      # for plain text. The line of code is in the monospace face, without
-      # the indentation it starts with. A block with no file name and no
-      # code says "Empty", whatever language is chosen for the code to come,
-      # and is not marked: an empty block is the state the picker leaves it
-      # in.
-      def code_line
-        settings = block.settings_object(locale: locale)
-        name = settings&.filename.presence
-        return name if name
+      # A type's parts as `[text, class]`, its words looked up under the
+      # type's own scope, and parts of one look joined, so the markup is what
+      # the tile drew when it wrote the line itself.
+      def drawn(parts)
+        Array(parts).map do |kind, value, values = {}|
+          raise ArgumentError, "#{block.block_type}'s summary answered a part of kind #{kind.inspect}: a part is one of #{LOOKS.keys.join(", ")}" unless LOOKS.key?(kind)
 
-        first = settings&.code.to_s.lines.first.to_s.strip.truncate(LENGTH).presence
-        return [ [ t(".empty_code"), "text-meta" ] ] unless first
+          look = LOOKS.fetch(kind)
+          [ %i[word hint].include?(kind) ? word(value, **values) : value.to_s, look ]
+        end.slice_when { |a, b| a.last != b.last }.map { |run| [ run.map(&:first).join, run.first.last ] }
+      end
 
-        language = ::CodeHighlight.label(settings&.language)
-        [ ([ "#{language}#{SEPARATOR}", nil ] if language), [ first, "font-cs-mono" ] ].compact
+      def word(key, **values)
+        t("admin.components.editor_screen.tile_summary.types.#{block.block_type.tr("/", ".")}.#{key}", **values)
       end
     end
   end

@@ -48,7 +48,7 @@ module Blocks
     # resolving them first through `translated` (the fallback chain) did.
     # Each answers nil for a block with no image: a theme's template may call
     # them without the default template's guard around them (theming spec §3,
-    # `Theme::Contract::COMPONENTS`).
+    # `Theme::Contract.components`).
     def alt = asset&.alt_text(override: block.read_attribute(:alt))
 
     def caption = asset&.caption_text(override: block.read_attribute(:caption))

@@ -5,6 +5,8 @@ require "test_helper"
 # contract's lists, so a template added to the contract is copied the day it
 # is added, and a theme made this way draws the site exactly as before.
 class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
+  include GalleryAlbum
+
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     SiteSetting.instance.update!(title: "Dana's Notes")
@@ -26,8 +28,9 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
   # not what the default theme draws. An image, a section of three columns
   # (tinted, full width) holding a text, an image and a blog list, a resume
   # list, a "now" list, an image block with no image, a struck text, a code
-  # block with a file name, a language and a caption and one with none; and
-  # a post of each type, whose own page is the detail component.
+  # block with nothing but its code (a bare head strip; the Code sample on
+  # "/samples" is the one with a file name, a language and a caption); and a
+  # post of each type, whose own page is the detail component.
   def wide_page
     wide = create_page(title: "Wide", translations: { "es" => { title: "Ancho", slug: "ancho" } })
     asset = create_media_asset
@@ -45,7 +48,6 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     add.("post_list", { settings: { "content_type" => "now_update" } })
     add.("image")
     add.("rich_text", {}, { "en" => { body: rich_doc("Kept and ~~struck~~ words, a [link](https://example.com)\n\n- one\n- two\n\n> quoted") } })
-    add.("code", { settings: { "language" => "erb", "filename" => "show.html.erb", "code" => "<p class=\"a\"><%= 1 %></p>\n<%# note %>" } }, { "en" => { caption: "A template" } })
     add.("code", { settings: { "code" => "plain words" } })
     publish_changes(wide)
 
@@ -72,7 +74,7 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       Theme::Contract::TEMPLATES.each_key do |path|
         assert_equal Rails.root.join("app/views", path).read, target.join("views", path).read, path
       end
-      Theme::Contract::COMPONENTS.each_key do |path|
+      Theme::Contract.components.each_key do |path|
         assert_equal Rails.root.join("app/components/#{path}.html.erb").read, target.join("components/#{path}.html.erb").read, path
       end
       assert target.join("assets/stylesheets/theme.css").file?
@@ -80,14 +82,14 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       assert target.join("README.md").file?
 
       assert_equal ThemeFolder.new(target).files.sort, (written - [ "README.md" ]).sort, "it says what it wrote, and wrote nothing the folder does not count"
-      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract::COMPONENTS.size + 1, ThemeFolder.new(target).files.size
+      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size + 1, ThemeFolder.new(target).files.size
     end
   end
 
   test "the folder it writes has no problem, checked deeply, and loads" do
     scaffolded do |target, _written|
       assert_empty Theme::Check.problems(ThemeFolder.new(target), deep: true)
-      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract::COMPONENTS.size, Theme.load(ThemeFolder.new(target)).template_count
+      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size, Theme.load(ThemeFolder.new(target)).template_count
     end
   end
 
@@ -107,33 +109,44 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       css = target.join("assets/stylesheets/theme.css").read
 
       assert_empty css.gsub(%r{/\*.*?\*/}m, "").strip, "the stylesheet is a comment and nothing else: the site looks as before"
-      Theme::Contract::TOKENS.each { |token| assert_includes css, token }
+      Theme::Contract.tokens.each { |token| assert_includes css, token }
     end
   end
 
-  test "a site under the folder it writes is drawn byte for byte as under the default theme: every block type, a section, the three lists, a post of each type, a 404 and two more languages" do
-    paths = [ "/", "/blog", "/blog/first-post", "/wide", "/wide/engineer", "/wide/doing-now", "/de/", "/es/ancho", "/no-such-page" ]
-    default = paths.index_with { |path| body_of(path) }
-    # What the comparison is ON: each of these is on a compared page.
-    { "/wide" => [ "content-block--image", "<s>struck</s>", "Engineer", "Updated ", "First post", "In a column", "<figcaption",
-                   "content-block--code", "show.html.erb", %(<span class="syn-embed">), "A template", %(data-code-copy-target="strip"), "plain words" ],
-      "/wide/engineer" => [ "Engineer" ], "/wide/doing-now" => [ "Doing now" ], "/blog/first-post" => [ "First post" ],
-      "/es/ancho" => [ "Ancho" ] }.each do |path, words|
-      get path
-      assert_response :success, path
-      words.each { |word| assert_includes default.fetch(path), word, "#{path} does not draw #{word}: the comparison would be on less than it says" }
-    end
-
-    scaffolded do |target, _written|
-      theme = Theme.load(ThemeFolder.new(target))
-      definitions = BlockTypes.all.map { |definition| [ definition, :component ] } +
-        ContentTypes.all.flat_map { |definition| [ [ definition, :list_component ], [ definition, :detail_component ] ] }
-      own = definitions.map { |definition, role| theme.component_for(definition, role) }.select { |component| component.sidecar_files([ "erb" ]).first.to_s.start_with?(target.to_s) }
-      assert_equal Theme::Contract::COMPONENTS.keys.sort, own.map { |component| component.name.underscore }.uniq.sort, "every component is drawn by the copy's template"
-
-      Theme.with(theme) do
-        paths.each { |path| assert_equal default.fetch(path), body_of(path), "#{path} differs under the copied theme" }
+  test "a site under the folder it writes is drawn byte for byte as under the default theme: every block type, a section, the three lists, a post of each type, a 404, two more languages and a sample of every type" do
+    # One block of every type that declares a sample, at the top level and
+    # in a column of each container (test/support/block_samples.rb), with an
+    # outside type registered (test/support/gallery_album.rb): a type's
+    # template is compared byte for byte the day the type is registered.
+    with_gallery_album do
+      samples = create_page(title: "Samples")
+      sample_every_type(samples)
+      publish_changes(samples)
+      paths = [ "/", "/blog", "/blog/first-post", "/wide", "/wide/engineer", "/wide/doing-now", "/de/", "/es/ancho", "/no-such-page", "/samples" ]
+      default = paths.index_with { |path| body_of(path) }
+      # What the comparison is ON: each of these is on a compared page.
+      { "/wide" => [ "content-block--image", "<s>struck</s>", "Engineer", "Updated ", "First post", "In a column", "<figcaption",
+                     %(data-code-copy-target="strip"), "plain words" ],
+        "/wide/engineer" => [ "Engineer" ], "/wide/doing-now" => [ "Doing now" ], "/blog/first-post" => [ "First post" ],
+        "/es/ancho" => [ "Ancho" ], "/samples" => sampled_types.flat_map { |definition| definition.sample.shows } }.each do |path, words|
+        get path
+        assert_response :success, path
+        words.each { |word| assert_includes default.fetch(path), word, "#{path} does not draw #{word}: the comparison would be on less than it says" }
       end
+
+      scaffolded do |target, _written|
+        theme = Theme.load(ThemeFolder.new(target))
+        definitions = BlockTypes.all.map { |definition| [ definition, :component ] } +
+          ContentTypes.all.flat_map { |definition| [ [ definition, :list_component ], [ definition, :detail_component ] ] }
+        own = definitions.map { |definition, role| theme.component_for(definition, role) }.select { |component| component.sidecar_files([ "erb" ]).first.to_s.start_with?(target.to_s) }
+        assert_equal Theme::Contract.components.keys.sort, own.map { |component| component.name.underscore }.uniq.sort, "every component is drawn by the copy's template"
+
+        Theme.with(theme) do
+          paths.each { |path| assert_equal default.fetch(path), body_of(path), "#{path} differs under the copied theme" }
+        end
+      end
+
+      assert_every_type_built
     end
   end
 

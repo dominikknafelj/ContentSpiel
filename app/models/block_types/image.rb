@@ -16,6 +16,9 @@ module BlockTypes
         t.label "Image"
         t.uses :image, :caption, :alt
         t.component Blocks::ImageComponent
+        t.theme_methods :block, :page, :asset, :alt, :caption, :sizes
+        t.sample image: true, translations: { "en" => { caption: "Sample caption words", alt: "Sample alt words" } },
+                 shows: [ "Sample caption words", %(alt="Sample alt words") ]
       end
     end
   end

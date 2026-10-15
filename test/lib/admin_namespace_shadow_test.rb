@@ -67,7 +67,7 @@ class AdminNamespaceShadowTest < ActiveSupport::TestCase
     names = self.class.domain_names
     # The four the retired guards named, plus the ones that were guarded by
     # convention only; if a rename drops one of these the derivation is broken.
-    %w[Media Trash Translations AI Ai Audit Dashboard Settings Groups Users ApiTokens Tags Locales Posts Pages AccessControl Pagination Theme LocaleRouteConstraint].each do |name|
+    %w[Media Trash Translations AI Ai Audit Dashboard Settings Groups Users ApiTokens Tags Locales Posts Pages AccessControl Pagination Theme LocaleRouteConstraint ContentSpiel].each do |name|
       assert_includes names, name
     end
     assert_operator names.size, :>=, 40

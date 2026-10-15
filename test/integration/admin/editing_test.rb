@@ -434,7 +434,7 @@ class Admin::EditingTest < ActionDispatch::IntegrationTest
       "[data-admin--editing--hold-pass-over-value='#{Editing::PASS_OVER.in_milliseconds}']" \
       "[data-admin--editing--hold-notice-value='#{Editing::NOTICE.in_milliseconds}']"
     rules = JSON.parse(css_select("#editing").first["data-admin--editing--hold-rules-value"])
-    assert_equal Admin::EditorScreen::HeldFields::ALLOWED_ACTIONS, rules["allowed_actions"], "freeze.js reads the server's own lists"
+    assert_equal Admin::EditorScreen::HeldFields.allowed_actions, rules["allowed_actions"], "freeze.js reads the server's own lists"
     assert_equal Admin::EditorScreen::HeldFields::READONLY_TYPES, rules["readonly_types"]
     assert_select "#editing #page-settings"
     assert_select "#editing #content-blocks-list"

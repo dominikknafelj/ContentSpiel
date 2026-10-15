@@ -24,6 +24,7 @@ require "tmpdir"
 # pass. If you add a route to a public controller this test fails for not
 # knowing it (`LISTED_ROUTES`): say how it is requested here.
 class PublicCanaryTest < ActionDispatch::IntegrationTest
+  include GalleryAlbum
   CANARY = "CANARY-LEAK-9c1e57".freeze
   LOCALES = %w[en de es].freeze
 
@@ -77,8 +78,6 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
       assert Pages::Save.call(page, attributes: { hero_media_asset_id: @picture.id }).ok?
       text(page, "Alpha opening")
       block(page, "image", media_asset_id: @picture.id, translations: LOCALES.index_with { |locale| { alt: "Alt #{locale}", caption: "Caption #{locale}" } })
-      block(page, "code", settings: { "language" => "ruby", "filename" => "app/models/sample.rb", "code" => "sample = 1" },
-        translations: LOCALES.index_with { |locale| { caption: "Code caption #{locale}" } })
       section = block(page, "section", settings: { "layout" => "two" })
       text(page, "Left of the section", section_id: section.id, section_column: 1)
       block(page, "image", media_asset_id: @picture.id, section_id: section.id, section_column: 2)
@@ -90,6 +89,11 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     @blog = live_page("Blog") { |page| block(page, "post_list", settings: { "content_type" => "blog" }) }
     @now = live_page("Now") { |page| block(page, "post_list", settings: { "content_type" => "now_update" }) }
     @resume = live_page("Resume") { |page| block(page, "post_list", settings: { "content_type" => "resume_entry" }) }
+    # One block of every type that declares a sample, at the top level and
+    # in a column of each container (test/support/block_samples.rb): a type
+    # is in the canary the day it is registered. `overwrite_rows!` overwrites
+    # every live block's rows, so nothing more is written for it.
+    @samples = live_page("Samples") { |page| sample_every_type(page) }
     @posts = [
       live_post("Ruby post", "blog", tags: %w[ruby rails], body: rich_doc(%(::image{asset="#{@picture.id}"}\n\nRuby words))),
       live_post("Plain post", "blog", tags: %w[misc]),
@@ -195,12 +199,31 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
   end
 
   test "rows overwritten without publishing change nothing a visitor sees, in any language, and publishing brings them" do
+    # With an outside type registered (test/support/gallery_album.rb), so
+    # the samples page holds a type no row of this file was written for.
+    with_gallery_album { rows_overwritten_without_publishing }
+  end
+
+  def rows_overwritten_without_publishing
     build_site
     before = every_look
     sitemap_before = sitemap
     assert_operator before.size, :>=, 20, "the site is too small to mean anything"
     assert_includes before.values.flatten.join, "Deletable words en"
-    assert_includes before.values.flatten.join, "Code caption de", "the site has a Code block on it"
+    # The samples page draws every sample before anything is overwritten, so
+    # an equal look afterwards is a comparison of something.
+    samples_path = PublicSite::Urls.new.path_for(@samples, "en")
+    sampled_types.each do |definition|
+      definition.sample.shows.each { |text| assert_includes before.fetch(samples_path).join, text, "the samples page draws #{definition.name}'s #{text.inspect}" }
+    end
+    # And in the two other languages, a sample's own words in that language
+    # (the Code block's caption, written in all three; block types review
+    # I2), so the comparison of those pages is of something too.
+    (LOCALES - [ "en" ]).each do |locale|
+      words = sampled_types.flat_map { |definition| definition.sample.translations.fetch(locale, {}).values.grep(String) }
+      assert_includes words, "Code caption #{locale}", "the Code block's sample carries its caption in #{locale}"
+      words.each { |text| assert_includes before.fetch(PublicSite::Urls.new.path_for(@samples, locale)).join, text, "the #{locale} samples page draws #{text.inspect}" }
+    end
     deleted_text = "Deletable words"
 
     overwrite_rows!
@@ -231,7 +254,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     reset! # the rest asks as a visitor
 
     # Publishing brings the rows: the test cannot pass by being empty.
-    [ @alpha, @child, @blog, @now, @resume, *@posts ].each { |record| publish_changes(record) }
+    [ @alpha, @child, @blog, @now, @resume, @samples, *@posts ].each { |record| publish_changes(record) }
     get PublicSite::Urls.new.path_for(@alpha, "en")
     assert_includes response.body, CANARY
     assert_includes response.body, "Added block"
@@ -241,6 +264,21 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     @posts.each do |post|
       assert_includes Publishing.current(post.reload).snapshot.to_json, CANARY, "#{post.title} was not published"
     end
+    # And each sample's words that are its own values (a setting, a
+    # translation, the body) are the canary's now: the overwrite reached
+    # what each type draws, and publishing brought it.
+    get samples_path
+    samples_main = Nokogiri::HTML5(response.body).at_css("main").to_html
+    sampled_types.each do |definition|
+      sample = definition.sample
+      written = [ *sample.settings.values, *sample.translations.values.flat_map(&:values), sample.body ].grep(String)
+      sample.shows.select { |text| written.any? { |value| value.include?(text) } }.each do |text|
+        assert_not_includes samples_main, text, "#{definition.name}'s #{text.inspect} is still drawn after its rows were overwritten and published"
+      end
+    end
+    assert_includes samples_main, CANARY
+
+    assert_every_type_built
   end
 
   # Theming spec §7: a theme's templates may ask for a branch of the page

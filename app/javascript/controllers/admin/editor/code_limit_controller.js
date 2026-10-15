@@ -9,7 +9,8 @@ import { messages } from "i18n/messages"
 //
 // It only READS the field's text. It sets no value, has nothing to tell
 // autosave, and is one of the actions that survive in a form someone else
-// holds (`Admin::EditorScreen::HeldFields::ALLOWED_ACTIONS`). The limit itself
+// holds (`Admin::EditorScreen::HeldFields.allowed_actions`, from the type's
+// `read_only_actions`). The limit itself
 // is the server's: a save over it is the form's ordinary 422, with the text
 // left in the field.
 //

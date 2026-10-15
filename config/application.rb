@@ -18,6 +18,11 @@ require "action_cable/engine"
 require "action_mailbox/engine"
 require "rails/test_unit/railtie"
 
+# Before the gems (block types spec, decision 11): an engine may name
+# `ContentSpiel::Plugins.block_types` whenever its own files are loaded. Plain
+# Ruby, and not reloaded although lib/ is autoloaded (lib/content_spiel/plugins.rb).
+require_relative "../lib/content_spiel/plugins"
+
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
@@ -46,7 +51,7 @@ module ContentSpiel
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks])
+    config.autoload_lib(ignore: %w[assets tasks generators])
 
     # The locales Mobility and I18n will accept reads and writes for. Mobility
     # reads these back out of this config (not out of I18n directly), and
@@ -125,8 +130,8 @@ module ContentSpiel
       # variable, `ThemeFolder.from_env`), so a THEME_PATH that names no
       # folder stops the boot at once with a message that names the variable
       # and the path, as a PUBLIC_HOST that is no address does. The checks
-      # against the contract follow when the application is prepared
-      # (config/initializers/theme.rb).
+      # against the contract follow when the application is prepared (the
+      # last lines of the to_prepare in config/initializers/types.rb).
       theme_folder = ThemeFolder.current
 
       if Rails.env.production?

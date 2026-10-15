@@ -3,8 +3,9 @@
 # (spec §9), built with the same Tailwind executable and chained onto
 # `tailwindcss:build` -- so assets:precompile, test:prepare, CI and the Docker
 # build all produce both stylesheets. What the entry holds, and why, is
-# `ThemeCss` (lib/theme_css.rb): the default theme's styles, then the styles
-# of the theme THEME_PATH names.
+# `ThemeCss` (lib/theme_css.rb): the default theme's styles, then each
+# registered block type's stylesheet (`BlockTypes.theme_css_blocks`), then the
+# styles of the theme THEME_PATH names.
 require "tailwindcss/ruby"
 
 namespace :theme_css do
@@ -14,7 +15,8 @@ namespace :theme_css do
     # place development uses (lib/theme_css.rb). Said here, in the terminal
     # of whoever ran the tests, when it replaces a theme's.
     replaced = ThemeFolder.stamp(Rails.root)
-    ThemeCss.build(ThemeFolder.current, root: Rails.root, executable: Tailwindcss::Ruby.executable)
+    ThemeCss.build(ThemeFolder.current, root: Rails.root, executable: Tailwindcss::Ruby.executable,
+                    blocks: BlockTypes.theme_css_blocks)
     if Rails.env.test? && replaced && replaced != ThemeFolder::DEFAULT_FINGERPRINT
       warn "[ContentSpiel] The public stylesheet was built for a theme and is now the default theme's (the tests build it). " \
            "For development under the theme, run bin/rails tailwindcss:build with THEME_PATH set, or start bin/dev again."
@@ -26,7 +28,8 @@ namespace :theme_css do
   # waited out, never the end of bin/dev (`ThemeCss.watch`).
   desc "Watch and rebuild the public stylesheet"
   task watch: :environment do
-    ThemeCss.watch(ThemeFolder.current, root: Rails.root, executable: Tailwindcss::Ruby.executable)
+    ThemeCss.watch(ThemeFolder.current, root: Rails.root, executable: Tailwindcss::Ruby.executable,
+                    blocks: BlockTypes.theme_css_blocks)
   end
 end
 

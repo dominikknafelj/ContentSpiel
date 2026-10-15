@@ -38,7 +38,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
   test "a folder of every default template the contract names has no problem, checked deeply too" do
     Dir.mktmpdir("theme") do |dir|
       copies = Theme::Contract::TEMPLATES.keys.map { |path| [ "app/views/#{path}", "views/#{path}" ] } +
-        Theme::Contract::COMPONENTS.keys.map { |path| [ "app/components/#{path}.html.erb", "components/#{path}.html.erb" ] }
+        Theme::Contract.components.keys.map { |path| [ "app/components/#{path}.html.erb", "components/#{path}.html.erb" ] }
       copies.each do |from, to|
         FileUtils.mkdir_p(File.dirname(File.join(dir, to)))
         FileUtils.cp(Rails.root.join(from), File.join(dir, to))
@@ -58,8 +58,6 @@ class Theme::CheckTest < ActiveSupport::TestCase
       "views/layouts/public/_preview_banner.html.erb" => "the preview bar",
       "views/layouts/admin.html.erb" => "CS Studio's layout",
       "views/admin/dashboard/show.html.erb" => "a CS Studio view",
-      "components/media/picture_component.html.erb" => "a component that is called, not replaced",
-      "components/rich_text/image_component.html.erb" => "rich text's own component",
       "components/blocks/image_component.rb" => "Ruby",
       "components/blocks/image_component.html.haml" => "another template language",
       "assets/stylesheets/other.css" => "a second stylesheet",
@@ -73,6 +71,48 @@ class Theme::CheckTest < ActiveSupport::TestCase
       assert_includes problems.first, file
       assert_includes problems.first, "not part of the theme contract"
       assert_includes problems.first, "Rename it to a name the contract has, or take it out of the folder."
+    end
+  end
+
+  # The CMS's own components that a theme may not replace (a component that
+  # is called, rich text's own) are not a missing type: they keep the
+  # sentence that says the file is not part of the contract.
+  test "a template of one of the CMS's own components that is not replaceable is not part of the contract, and no type is said to be missing" do
+    %w[components/media/picture_component.html.erb components/rich_text/image_component.html.erb].each do |file|
+      problems = problems_with(file => "x")
+
+      assert_equal 1, problems.size, "#{file}: #{problems.inspect}"
+      assert_includes problems.first, "#{file} is not part of the theme contract"
+      assert_includes problems.first, "Rename it to a name the contract has, or take it out of the folder."
+      assert_not_includes problems.first, "not installed"
+    end
+  end
+
+  # The owner's answer 3 (block types spec): a gem removed from a site leaves
+  # its theme's template of the gem's block behind, and the check refuses it
+  # by name, at the image's build, and says what to do. The message names
+  # the missing type where the component's path says it (a built-in's
+  # `blocks/<type>_component`, an outside type's `<owner>/<name>_component`),
+  # and the path alone otherwise.
+  test "a template of a component no registered type hands out is refused by name, and the message names the type and says to remove it or install the type" do
+    with_theme_copy do |dir|
+      dir.join("components/blocks").mkpath
+      dir.join("components/blocks/marquee_component.html.erb").write("<p>marquee</p>")
+      dir.join("components/gallery").mkpath
+      dir.join("components/gallery/album_component.html.erb").write("<p>album</p>")
+      dir.join("components/posts/gallery_list_component.html.erb").write("<p>list</p>")
+
+      problems = Theme::Check.problems(ThemeFolder.new(dir))
+
+      assert_includes problems, "components/blocks/marquee_component.html.erb replaces the template of blocks/marquee_component, " \
+                                "which no registered type hands out: the block type \"marquee\" it is named for is not installed. " \
+                                "Remove the template from the theme, or install the type."
+      assert_includes problems, "components/gallery/album_component.html.erb replaces the template of gallery/album_component, " \
+                                "which no registered type hands out: the block type \"gallery/album\" it is named for is not installed. " \
+                                "Remove the template from the theme, or install the type."
+      assert_includes problems, "components/posts/gallery_list_component.html.erb replaces the template of posts/gallery_list_component, " \
+                                "which no registered block or content type hands out: the type it belongs to is not installed. " \
+                                "Remove the template from the theme, or install the type."
     end
   end
 
