@@ -2,7 +2,7 @@ module Admin
   module PresenceScreen
     # The marker of a row in a list (presence handoff 9 to 12 and 27): a
     # Lucide `user` icon at 12px in `text-meta` where someone ELSE is working
-    # on that record, and from two people the count after it in 10px mono
+    # on that record, and from two people the count after it in 11px mono
     # with a 4px gap. Someone who is only away does not count. Registered in
     # `config/initializers/admin_slots.rb`:
     # - LAST in `tree.row.markers`, after the notes pill, in the row's own
