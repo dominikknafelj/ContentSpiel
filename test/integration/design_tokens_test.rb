@@ -285,8 +285,8 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   # WCAG 1.4.3 for code (design answer C8: "check all seven, comments are
   # usually the one that fails"): every role on every ground a code block
-  # has, in both themes. 42 pairs; the lowest is the comment on the dark
-  # sunken ground, 5.5:1.
+  # has, in both themes. 42 pairs; the lowest is the comment in a dark
+  # strong band, 4.84:1.
   test "every syntax colour is readable on every ground a code block has: the page, a tinted band and a strong band, in both themes" do
     pairs = 0
     theme_tokens.each do |theme, tokens|

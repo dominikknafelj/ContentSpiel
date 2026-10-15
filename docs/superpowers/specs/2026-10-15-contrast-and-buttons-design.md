@@ -136,3 +136,15 @@ PR 2: form widths at 760px; the Translations table's words and row click; the Me
 ## Documentation (the PR's "Documentation" section; pages in `contentspiel-docs`)
 
 Editors (screenshots and words): `editors/getting-started/signing-in-and-finding-your-way.md` (the look, dark mode), `editors/pages/the-page-tree.md` (state marks, the selected row, "+ New page"), `editors/pages/build-a-page-with-blocks.md` (icons in the picker and on cards, the save line in the card's header, Discard changes as a plain button), `editors/pages/arrange-blocks-in-sections.md` (the tile's icon), `editors/pages/the-rich-text-editor.md` (the toolbar's active state), `editors/pages/page-settings-and-search-appearance.md` (the Page settings disclosure), `editors/posts/work-with-many-posts.md` (filter pills, the split button), `editors/posts/publish-schedule-and-preview.md` (Discard changes, the chips), `editors/posts/tags-related-posts-and-the-mind-graph.md` (page marks and tree lines in dark, zoom buttons), `editors/translating/keep-translations-up-to-date.md` (● and ○), `editors/media/the-media-library.md` (filter pills, UNUSED and NO ALT), `editors/trash/the-trash.md` (type tabs), `editors/working-together/notes-on-content.md` (New note). Administrators: `administrators/site/languages.md` (DEFAULT). Integrators: `integrators/theming/the-theme-contract.md` (the changed values, the strong band in dark, `--th-meta` as the faint-text and outline token and its 4.5:1 / 3:1 rule, `--th-line-strong`'s narrower role), `integrators/how-it-works/adding-a-block-type.md` and `integrators/how-it-works/block-types-from-outside.md` (`t.icon` and its names).
+
+## As built
+
+Part 1 was built as designed, with these departures:
+
+- **cat-5 in dark is `oklch(0.74 0.07 260)`** (Ruling 5 names hue 260 and `#91acd8`; the token is written as the oklch it is derived from).
+- **`BlockIconComponent` strips its partial's output** (the partial's line breaks landed in a button's text and broke the label assertions), and **the section tile's screen-reader name is the face's first span**, with the icon and summary after it, because `blocks_controller.js`'s `titleOf` reads the face's first span for the move announcement.
+- **The zoom buttons' 13px is on their group**, not on each button.
+- **The dark strong band is a raised ground** (`--th-band-strong: #34353a`), so `test/system/code_block_test.rb`'s expectation for a code block in a strong band changed with it (dark in both schemes, D2), and the lowest of the 42 syntax pairs is now the comment in a dark strong band at 4.84:1 (it was 5.5:1 on the dark sunken ground).
+- **A collapsed block card keeps its save status**, because the status line is in the header now and only the body is hidden.
+- **Known loose ends, deferred to review or to part 2:** a disabled button adds a 1px border its variants lack at rest (it grows 2px, so a save bar can jump); the MCP channel chip's `text-accent` on `bg-accent-tint` is not measured; the status wrapper in a block card's header has no width cap.
+
