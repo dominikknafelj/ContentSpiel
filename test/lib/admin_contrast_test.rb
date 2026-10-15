@@ -102,6 +102,18 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_equal "oklch(0.74 0.07 260)", schemes[:dark]["--cs-cat-5"]
   end
 
+  # Design answer D2: in dark, ink-white page marks glared and the tree's
+  # lines vanished.
+  test "the Mind graph's page mark and tree line are 3:1 or better on the surface, the dark page mark no glare" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-graph-page"), colour.("--cs-surface"), "a page's mark (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-graph-tree", under: "--cs-surface"), colour.("--cs-surface"), "a tree line (#{scheme})")
+    end
+    assert_equal "#d9d9dc", schemes[:dark]["--cs-graph-page"]
+    assert_equal "var(--cs-ink)", schemes[:light]["--cs-graph-page"]
+    assert_equal "var(--cs-dim)", schemes[:light]["--cs-graph-tree"]
+  end
+
   test "the measuring can fail: the grouping line is no outline, a translucent colour needs a ground, and an unread notation is refused" do
     tokens = { "--cs-surface" => "#ffffff", "--cs-line" => "rgba(20,20,23,0.14)", "--cs-odd" => "hsl(0 0% 50%)" }
     surface = resolve_colour(tokens, "--cs-surface")

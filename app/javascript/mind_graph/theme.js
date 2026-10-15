@@ -6,12 +6,13 @@
 // `watchTheme` answers a function that stops watching. The theme changes when
 // `<html data-theme>` does (`theme_controller.js`) or, with no explicit
 // choice, when the system's scheme does.
-// `line` is the border of the notes badge and of the "+N more" pill, and the
-// tree's lines; `faint` a hub's lines to what it brings in; `dim` the lists
+// `line` is the border of the notes badge and of the "+N more" pill; `tree`
+// the tree's lines; `page` a page's mark (in dark not the ink, which glared);
+// `faint` a hub's lines to what it brings in; `dim` the lists
 // lines, a scheduled record's outline, a post's label and the dot of a live
 // record with unpublished changes; `warn` means "scheduled", as on the
 // status chip: a scheduled record's centre dot and a scheduled change's.
-const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", dim: "--cs-dim", warn: "--cs-warn", surface: "--cs-surface", sunken: "--cs-sunken", accent: "--cs-accent", line: "--cs-line-strong", faint: "--cs-line" }
+const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", dim: "--cs-dim", warn: "--cs-warn", surface: "--cs-surface", sunken: "--cs-sunken", accent: "--cs-accent", line: "--cs-line-strong", faint: "--cs-line", page: "--cs-graph-page", tree: "--cs-graph-tree" }
 const CATEGORIES = 6
 
 export function readTheme(element) {

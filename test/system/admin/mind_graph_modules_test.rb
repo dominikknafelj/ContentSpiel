@@ -706,12 +706,12 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       { kind: "page", changes: "unpublished" }, { kind: "page", changes: "scheduled" }, { kind: "page", home: true }
     ])
 
-    assert_equal [ [ "fill", "box", 14, 10, 4, "ink" ] ], live
+    assert_equal [ [ "fill", "box", 14, 10, 4, "page" ] ], live
     assert_equal [ [ "fill", "box", 14, 10, 4, "surface" ], [ "stroke", "box", 14, 10, 4, "meta", 1.5, DASHED ] ], draft
     assert_equal [ [ "fill", "box", 14, 10, 4, "surface" ], [ "stroke", "box", 14, 10, 4, "dim", 1.5, SOLID ], [ "fill", "circle", 2, "warn" ] ], scheduled
     assert_equal live + CORNER.call("dim"), changed, "unpublished changes: a dim corner dot"
     assert_equal live + CORNER.call("warn"), pending, "a change scheduled: a warn corner dot"
-    assert_equal [ [ "fill", "box", 18, 13, 4, "ink" ] ], home
+    assert_equal [ [ "fill", "box", 18, 13, 4, "page" ] ], home
   end
 
   test "marks: a filled post in each of the five looks, a draft dashed in meta" do
@@ -768,8 +768,8 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   # its outer edge. Every other outline is INSIDE its mark: an outlined mark
   # is as large as a filled one (the ruling on Task 5's review).
   STATED_MARKS = {
-    "page" => { node: { kind: "page" }, shape: [ "box", 14, 10, 4 ], own: "ink" },
-    "Home" => { node: { kind: "page", home: true }, shape: [ "box", 18, 13, 4 ], own: "ink" },
+    "page" => { node: { kind: "page" }, shape: [ "box", 14, 10, 4 ], own: "page" },
+    "Home" => { node: { kind: "page", home: true }, shape: [ "box", 18, 13, 4 ], own: "page" },
     "filled post" => { node: { colour_index: 3 }, shape: [ "circle", 7 ], own: "cat-3", edged: [ "circle", 7.75 ] },
     "ring post" => { node: { colour_index: 9 }, shape: [ "circle", 4 ], own: "cat-3", ring: [ "circle", 7 ] },
     "retired post" => { node: { colour_index: nil }, shape: [ "circle", 4 ], own: "meta", ring: [ "circle", 7 ], struck: true }
@@ -898,7 +898,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   # 0.1 / 3.5, which is what makes its dots round. A hub's line to what it
   # brings in is the faint 1px line of G2.
   LINES = { "tag" => [ "meta", 1, [ 4, 3 ], 0.8, "butt" ], "related" => [ "ink", 1.5, [], 0.35, "butt" ], "brings" => [ "faint", 1, [], 1, "butt" ],
-            "lists" => [ "dim", 1.5, [ 0.1, 3.5 ], 1, "round" ], "tree" => [ "line", 1, [], 1, "butt" ] }.freeze
+            "lists" => [ "dim", 1.5, [ 0.1, 3.5 ], 1, "round" ], "tree" => [ "tree", 1, [], 1, "butt" ] }.freeze
 
   test "renderer: each kind of line has its style, one path per style, and below 40 percent zoom a shared tag's is not drawn" do
     kinds = %w[tree lists related tag brings]
@@ -1101,7 +1101,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       const done = arguments[arguments.length - 1]
       import("mind_graph/theme").then(({ readTheme }) => {
         const element = document.createElement("div")
-        const tokens = [ "ink", "meta", "dim", "warn", "surface", "sunken", "accent", "line", "line-strong", "cat-1", "cat-2", "cat-3", "cat-4", "cat-5", "cat-6" ]
+        const tokens = [ "ink", "meta", "dim", "warn", "surface", "sunken", "accent", "line", "line-strong", "cat-1", "cat-2", "cat-3", "cat-4", "cat-5", "cat-6", "graph-page", "graph-tree" ]
         tokens.forEach((token) => element.style.setProperty(`--cs-${token}`, `the-${token}`))
         element.style.setProperty("--cs-mono", "MonoFace")
         element.style.setProperty("--cs-radius", "7px")
@@ -1115,7 +1115,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     assert_equal({
       "ink" => "the-ink", "meta" => "the-meta", "dim" => "the-dim", "warn" => "the-warn", "surface" => "the-surface", "sunken" => "the-sunken", "accent" => "the-accent",
-      "line" => "the-line-strong", "faint" => "the-line", "categories" => (1..6).map { |slot| "the-cat-#{slot}" },
+      "line" => "the-line-strong", "faint" => "the-line", "page" => "the-graph-page", "tree" => "the-graph-tree", "categories" => (1..6).map { |slot| "the-cat-#{slot}" },
       "font" => "12px SansFace", "strongFont" => "600 12px SansFace", "countFont" => "10px MonoFace", "monoFont" => "12px MonoFace", "strongMonoFont" => "600 12px MonoFace",
       "radius" => 7
     }, theme)
@@ -2496,7 +2496,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const radii = nodes.map(radiusFor)
         draw(surface, {
           width: 100 * nodes.length, height: 100, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
-          theme: { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", radius: 4,
+          theme: { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", page: "page", tree: "tree", radius: 4,
                    categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count" },
           nodes, edges: [], positions,
           radii, widths: nodes.map(() => 0), visibleNodes: nodes.map((_, index) => index), visibleEdges: [],
@@ -2550,7 +2550,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         const nodes = [0, 1, 2].map((id) => ({ id, kind: "tag", degree: 1, label: "" }))
         draw(context, {
           width: 400, height: 100, ratio: 1, camera: { k, tx: 0, ty: 0 },
-          theme: { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", radius: 4, categories: Array(6).fill("hue"), font: "", strongFont: "", monoFont: "" },
+          theme: { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", page: "page", tree: "tree", radius: 4, categories: Array(6).fill("hue"), font: "", strongFont: "", monoFont: "" },
           nodes, edges: kinds.map((kind) => ({ source: 0, target: 1, kind })), positions: Float32Array.from([ 10 / k, 10 / k, 60 / k, 10 / k, 300 / k, 80 / k ]),
           radii: nodes.map(radiusFor), widths: [0, 0, 0], visibleNodes: [0, 1, 2], visibleEdges: kinds.map((_, index) => index),
           labels: [], selected, neighbours: new Set(selected === 0 ? [1] : []), focusIndex: -1, hovered: -1, pinned: new Set()
@@ -2571,7 +2571,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       const [name, width, height, done] = arguments
       import("mind_graph/swatches").then(({ drawSwatch }) => {
         #{RECORDING_CONTEXT}
-        drawSwatch(context, { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", radius: 4,
+        drawSwatch(context, { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", page: "page", tree: "tree", radius: 4,
                               categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count" },
           name, { width, height })
         done(log)
@@ -2590,7 +2590,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       const [kind, of, done] = arguments
       import("mind_graph/swatches").then(({ drawRowMark, ROW_MARKS }) => {
         #{RECORDING_CONTEXT}
-        drawRowMark(context, { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", radius: 4,
+        drawRowMark(context, { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", page: "page", tree: "tree", radius: 4,
                                categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count" },
           { kind, of })
         done({ parts: log, scale: set.scale, width: ROW_MARKS[kind].width, height: ROW_MARKS[kind].height })
