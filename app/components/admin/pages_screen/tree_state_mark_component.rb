@@ -33,13 +33,6 @@ module Admin
           data: { status: (status unless status == "live"), unpublished_changes: ("" if changes?) })
       end
 
-      def kind
-        return :draft if status == "draft"
-        return :scheduled if status == "scheduled"
-
-        :changes if changes?
-      end
-
       def label = words.join(" · ")
 
       # A scheduled page's tooltip also says when, as the status chip's does.
@@ -52,6 +45,15 @@ module Admin
       private
 
       attr_reader :page
+
+      def kind
+        return @kind if defined?(@kind)
+
+        @kind = if status == "draft" then :draft
+        elsif status == "scheduled" then :scheduled
+        elsif changes? then :changes
+        end
+      end
 
       def status = page.status
 

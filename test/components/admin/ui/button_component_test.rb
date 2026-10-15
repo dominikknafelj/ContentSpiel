@@ -63,10 +63,20 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
       render_inline Admin::Ui::ButtonComponent.new(label: "Save", variant: variant, disabled: true)
       classes = page.find("button[disabled]")["class"].split
 
-      %w[disabled:not-aria-busy:border disabled:not-aria-busy:border-line disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta aria-busy:cursor-progress].each do |name|
+      %w[disabled:not-aria-busy:border-line disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta aria-busy:cursor-progress].each do |name|
         assert_includes classes, name, variant
       end
       assert_empty classes.grep(/opacity-50/), variant
+    end
+  end
+
+  # A disabled button must not change size: the save bar's Save is toggled by
+  # script, so every variant has its 1px border at rest and the disabled look
+  # only recolours it.
+  test "every variant has a border at rest, so disabling one changes no size" do
+    Admin::Ui::ButtonComponent::VARIANT_CLASSES.each do |variant, classes|
+      assert_includes classes.split, "border", variant
+      assert_not_includes Admin::Ui::ButtonComponent::COMMON_CLASS.split, "disabled:not-aria-busy:border"
     end
   end
 

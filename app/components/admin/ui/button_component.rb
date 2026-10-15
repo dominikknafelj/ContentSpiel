@@ -15,7 +15,7 @@ module Admin
       # Every hover is `not-disabled:hover:` (contrast and buttons spec, D1): a
       # disabled button never answers the pointer.
       VARIANT_CLASSES = {
-        primary: "bg-accent text-on-accent not-disabled:hover:bg-accent-hover",
+        primary: "border border-transparent bg-accent text-on-accent not-disabled:hover:bg-accent-hover",
         # Outlined in the field line (3:1 on every ground); the pointer turns
         # the outline ink, and nothing else.
         secondary: "border border-field-line bg-surface text-ink not-disabled:hover:border-ink",
@@ -26,9 +26,12 @@ module Admin
         # Solid red: a dialog's destructive confirm only. `text-white` is the
         # one literal colour the design allows (handoff §9 A1) -- on the red
         # fill white is right in both themes, unlike `on-accent`.
-        danger: "bg-danger text-white not-disabled:hover:opacity-90",
-        # Dialog Cancel, "Discard changes…" and other low-emphasis actions: no border, no fill.
-        ghost: "text-dim not-disabled:hover:bg-sunken not-disabled:hover:text-ink"
+        danger: "border border-transparent bg-danger text-white not-disabled:hover:opacity-90",
+        # Dialog Cancel, "Discard changes…" and other low-emphasis actions: no visible border, no fill.
+        # Primary, danger and ghost carry a transparent 1px border at rest so the
+        # disabled look's hairline only recolours it: a button script-toggled
+        # disabled (the save bar's Save) never changes size.
+        ghost: "border border-transparent text-dim not-disabled:hover:bg-sunken not-disabled:hover:text-ink"
       }.freeze
 
       # DISABLED is one look for every variant (D1): sunken, meta words, a
@@ -37,7 +40,7 @@ module Admin
       # why it is off). A BUSY button (`admin--ui--busy` sets `aria-busy`) is
       # disabled too but keeps its variant's look beside its spinner.
       COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs font-semibold transition-colors " \
-                     "disabled:cursor-not-allowed disabled:not-aria-busy:border disabled:not-aria-busy:border-line " \
+                     "disabled:cursor-not-allowed disabled:not-aria-busy:border-line " \
                      "disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta aria-busy:cursor-progress".freeze
 
       BASE_CLASS = "#{COMMON_CLASS} px-4 py-2".freeze

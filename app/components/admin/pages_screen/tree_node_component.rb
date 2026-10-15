@@ -108,8 +108,6 @@ module Admin
 
       def new_child_path = helpers.new_admin_page_path(parent_id: page.id, **url_options)
 
-      def status = page.status
-
       # "outdated" / "missing" -> the number of such fields over every target
       # language; always 0 for a context-only row (it shows nothing but its title).
       def translation_total(kind) = (@translation_totals ||= {})[kind] ||= translation_breakdown(kind).values.sum

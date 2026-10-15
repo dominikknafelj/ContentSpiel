@@ -30,7 +30,7 @@
 
    No `color-scheme` here: the `pre`'s scrollbar is drawn for the scheme the
    layout declares on <body> and the block inherits, and only a strong band,
-   which is the page inverted, says the other one for the block
+   a dark ground in both schemes, says `dark` for the block
    (`sections.css`). Selected text is the accent with its own ink, the one
    pair of tokens that is a background and a text colour made for each
    other, for every token inside the code: a browser's default selection

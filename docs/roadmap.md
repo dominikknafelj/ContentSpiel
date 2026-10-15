@@ -335,7 +335,6 @@ All Could (trash spec §10).
 | Mind graph, pages, step two, the next piece of the graph now that step one is shipped (2026-10-13): links in the text as lines (read out of every rich-text document and kept as derived rows), the legend toggle "Links in text" (off by default), the list filter "Not linked from anywhere", and "the pages and posts that link to it" in a page's local view. Step one left it three seams: a kind of line is a row of `PostGraph::Kinds`, a style of `LINE_STYLES` and a toggle of the legend; a list filter is a read of `PostGraph::Rows`; and the module is renamed with this step or not at all (spec decision 11) | Should | `2026-10-12-pages-in-the-mind-graph-design.md`, "What this does not do"; the owner's split of 2026-10-12 |
 | Mind graph: saved positions, so a large graph opens at rest. Step one's measurement (2026-10-13) crossed the bar the spec set for it: with everything shown, 204 pages and 2,005 posts (2,202 nodes, 6,204 lines) take 3.36 s from navigation to rest (3.31 to 3.42 over four loads, in the headless test browser with the endpoint's answer replayed, so its own 0.14 s comes on top), against three seconds. Nothing is built: a site of that size opens around Home, where the wait occurs only after "Show everything". Needs a store (per person or per site, invalidated by every change to the graph, in step with rights) | Should | Same spec, decision 7 and "As built" |
 
-
 **Contrast and buttons, part 2** (the rest of Claude Design's 2026-10-15 answers; `docs/superpowers/specs/2026-10-15-contrast-and-buttons-design.md`, "What is not in this pull request"): form widths at 760px; the Translations table's words and row click; the Media drop zone; Settings' nav, social links, logo square and save bar; the post editor's duplicated slug line; two-letter note avatars; the Mind graph's legend split, fit and count badges over page cards; the site's captions in sentence case; the "Related" heading; tags as links; the dashboard grid; collapsed activity; Notes for you's unread state; the empty states' wording. Separately, the Note block (D4). Not planned anywhere: the Media thumbnails in dark (D2 asks to verify; they were not yet loaded at capture).
 
 ### Found while writing the guides
@@ -503,6 +502,15 @@ Should. Asked for by the owner on 2026-10-11, while live editing was being built
 ## Known gaps (interim states)
 
 Knowingly shipped incomplete, and fine while tracked here. Grouped by what closes them.
+
+### Contrast and buttons (part 1)
+
+Left by the final review of the branch (`docs/superpowers/specs/2026-10-15-contrast-and-buttons-design.md`, "As built"); each is small and none changes a ratio.
+
+- **The reference card's summary has no `admin-disclosure` triangle** (`reference_card_component.html.erb`): it is a flex row with `justify-between`, so it has never had one; a `::before` would join the spacing. Needs its own small design call in part 2.
+- **The Trash tabs have no focus classes** (`trash_screen/tabs_component.rb`): the selected (ink) tab shows the browser's default ring, not the pills' paper ring. Align them when the tabs become the shared segmented control.
+- **The public language switcher's dropdown branch** (many languages; `_language_switcher.html.erb`) has no 24px target and no hover underline, which the inline list got.
+- **Chips and badges on a sunken or hovered ground lose their fill** (⌘K's selected row, the posts table's hover): decoration only, the words still read.
 
 ### Closed by versioning
 

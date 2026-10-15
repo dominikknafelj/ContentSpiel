@@ -114,6 +114,15 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_equal "var(--cs-dim)", schemes[:light]["--cs-graph-tree"]
   end
 
+  # The MCP channel chip (`text-accent` on `bg-accent-tint`) and the NO ALT
+  # badge (`text-warn-ink` on `bg-warn-tint`) are words on a tint.
+  test "the MCP chip's and the NO ALT badge's words are 4.5:1 or better on their tints, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the MCP chip (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-warn-ink"), colour.("--cs-warn-tint"), "the NO ALT badge (#{scheme})")
+    end
+  end
+
   test "the measuring can fail: the grouping line is no outline, a translucent colour needs a ground, and an unread notation is refused" do
     tokens = { "--cs-surface" => "#ffffff", "--cs-line" => "rgba(20,20,23,0.14)", "--cs-odd" => "hsl(0 0% 50%)" }
     surface = resolve_colour(tokens, "--cs-surface")

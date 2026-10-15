@@ -189,8 +189,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_no_match(/danger|warn/, css, "no answer of the button has a colour of its own: Not copied is as neutral as Copied")
   end
 
-  # The strong band is the page inverted: what is written on its accent is
-  # the band's own colour, and a code block in it is the other scheme.
+  # What is written on a strong band's accent is the band's own colour.
   # Design answer D2: a strong band is the strongest step of its OWN scheme,
   # the inverted page in light and a raised dark ground in dark, so a code
   # block in it is dark in both.

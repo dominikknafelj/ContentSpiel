@@ -472,6 +472,16 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
       })()
     JS
     assert inside, "the Block actions button left the card"
+    slack = page.evaluate_script(<<~JS)
+      (() => {
+        const head = document.querySelector(#{card.to_json} + " .admin-block-card__head")
+        const name = [...head.querySelectorAll("*")].find((el) => el.classList.contains("truncate"))
+        return name ? name.clientWidth - name.scrollWidth : -1
+      })()
+    JS
+    # Uncapped, the status took its whole width first and the name was cut to
+    # about 19px; capped, "Rich text" fits (clientWidth >= scrollWidth).
+    assert_operator slack, :>=, 0, "the block's name is cut short by the status line (#{-slack}px of it hidden)"
   ensure
     page.execute_script("document.querySelector(#{card.to_json})?.style.removeProperty('width')") if card
   end

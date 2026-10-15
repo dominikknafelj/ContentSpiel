@@ -24,6 +24,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     assert_selector ".admin-block-tile__face [data-block-icon=image][class~='text-meta'] svg[class~='size-3']"
     assert_selector ".admin-block-tile__face .sr-only", text: "Image"
+    assert_selector ".admin-block-tile__face > span:first-child.sr-only", text: "Image"
     assert_no_selector ".admin-block-tile__face span.font-semibold", text: "Image"
   end
 
