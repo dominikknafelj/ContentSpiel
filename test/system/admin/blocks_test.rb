@@ -433,4 +433,46 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_operator rects["errorWidth"], :>, 120
     assert_in_delta rects["inputRight"], rects["errorRight"], 2
   end
+
+  # Design answer, first reply: a tall empty gap between a card's header and
+  # its first label (the reserved save line, Ruling 20).
+  test "a card's first label stands just under its header" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    gap = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.getElementById(#{ActionView::RecordIdentifier.dom_id(block).to_json})
+        const head = card.querySelector(".admin-block-card__head").getBoundingClientRect()
+        const label = card.querySelector("[data-field-name='body'] p").getBoundingClientRect()
+        return label.top - head.bottom
+      })()
+    JS
+    assert_operator gap, :<=, 16
+  end
+
+  # Review focus 2.
+  test "a long save message wraps in the header and leaves the menu inside the card" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    card = "##{ActionView::RecordIdentifier.dom_id(block)}"
+    status = "##{Admin::EditorScreen::BlockCardComponent.status_id(block)}"
+
+    page.execute_script(<<~JS)
+      document.querySelector(#{card.to_json}).style.width = "360px"
+      document.querySelector(#{status.to_json}).textContent = "SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST"
+    JS
+    inside = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.querySelector(#{card.to_json}).getBoundingClientRect()
+        const menu = document.querySelector(#{card.to_json} + " .admin-block-card__head button[aria-label='Block actions']").getBoundingClientRect()
+        return menu.width > 0 && menu.right <= card.right + 0.5
+      })()
+    JS
+    assert inside, "the Block actions button left the card"
+  ensure
+    page.execute_script("document.querySelector(#{card.to_json})?.style.removeProperty('width')") if card
+  end
 end

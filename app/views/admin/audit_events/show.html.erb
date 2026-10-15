@@ -9,7 +9,7 @@
 
 <% if @event.snapshot.present? %>
   <details class="mt-4 rounded-cs border border-line bg-surface">
-    <summary class="cursor-pointer px-4 py-3 font-cs-mono text-label uppercase tracking-mono text-meta">Snapshot</summary>
+    <summary class="admin-disclosure cursor-pointer px-4 py-3 font-cs-mono text-label uppercase tracking-mono text-meta">Snapshot</summary>
     <%# `JSON.pretty_generate` returns a plain (not `html_safe`) String -- ERB's own
         output-tag escaping is what keeps a stored value that looks like markup (a
         title of literal `<script>`) rendering as text. The translation bookkeeping

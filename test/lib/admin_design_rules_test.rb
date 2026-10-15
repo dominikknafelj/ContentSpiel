@@ -202,4 +202,17 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty design_offences(/text-\[10px\]/)
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
   end
+
+  # Design answer, first reply: "▾PAGE SETTINGS" had no space. A mono-label
+  # summary draws its own triangle, 6px from the words, that a screen reader skips.
+  test "a disclosure's triangle is the stylesheet's, apart from its words, turned when open" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-disclosure\s*\{[^}]*list-style:\s*none;[^}]*gap:\s*0\.375rem;/m, css)
+    assert_match(/\.admin-disclosure::before\s*\{[^}]*content:\s*"▸"\s*\/\s*"";/m, css)
+    assert_match(/details\[open\]\s*>\s*\.admin-disclosure::before\s*\{[^}]*rotate\(90deg\)/m, css)
+    %w[app/components/admin/editor_screen/page_settings_form_component.html.erb app/components/admin/editor_screen/shared_fields_component.html.erb
+       app/views/admin/audit_events/show.html.erb].each do |path|
+      Rails.root.join(path).read.scan(/<summary[^>]*>/).each { |summary| assert_includes summary, "admin-disclosure", path }
+    end
+  end
 end

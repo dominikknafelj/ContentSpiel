@@ -608,4 +608,21 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
       assert_selector "details[data-shared-fields] p[data-code-note] a[href='/cs-studio/pages/#{page.id}'][data-turbo-frame='_top']", exact_text: "English", visible: :all
     end
   end
+
+  test "the Post list's Content type says All types for its empty choice" do
+    page = create_page(title: "All types")
+    block = page.content_blocks.create!(block_type: "post_list", position: 0, settings: {})
+    render_card(block, page: page)
+    assert_selector "select[name='block[settings][content_type]'] option[value='']", text: "All types"
+  end
+
+  test "the save line stands in the card's header row, before the menu, and not in the body" do
+    page = create_page(title: "Status")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    render_card(block, page: page)
+    status = Admin::EditorScreen::BlockCardComponent.status_id(block)
+
+    assert_selector ".admin-block-card > .admin-block-card__head .admin-block-card__status ##{status}[role=status]"
+    assert_no_selector "[data-block-body] ##{status}"
+  end
 end

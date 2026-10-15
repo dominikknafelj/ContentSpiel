@@ -362,6 +362,18 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
 
+/* A disclosure whose summary is a mono label ("▸ PAGE SETTINGS", the SEO
+   and Shared fields boxes, an audit event's Snapshot). The browser's own
+   marker stood against the first letter; this triangle is the
+   stylesheet's, 6px from the words, turned when open, and skipped by a
+   screen reader (the empty alternative text after the slash), so the words
+   are the summary's only content. */
+.admin-disclosure { list-style: none; display: flex; align-items: center; gap: 0.375rem; }
+.admin-disclosure::-webkit-details-marker { display: none; }
+.admin-disclosure::before { content: "▸"; content: "▸" / ""; display: inline-block; transition: transform 150ms var(--cs-ease); }
+details[open] > .admin-disclosure::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .admin-disclosure::before { transition: none; } }
+
 /* Styled native checkbox (Admin::Ui::CheckboxComponent, round 1 departure). The
    browser draws the tick; `accent-color` gives it the token fill in both
    themes, and the radius and focus ring come from tokens too. */
