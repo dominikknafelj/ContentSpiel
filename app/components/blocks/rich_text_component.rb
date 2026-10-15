@@ -9,6 +9,15 @@ module Blocks
       @page = page
     end
 
+    # Nothing to draw when the body is blank in the visitor's language and in
+    # every fallback (`Locales.read` walks the chain, as `ThemeHelper#rich_text`
+    # does; `Document#blank?` counts a lone empty paragraph as blank): the
+    # wrapper would be an empty box, and a section decides whether it has a
+    # band by what its blocks draw (`Blocks::SectionComponent#render?`,
+    # contrast and buttons spec, Ruling 19). Asked of the document, so the
+    # body is not rendered twice.
+    def render? = !::Locales.read(block, :body).blank?
+
     private
 
     attr_reader :block, :page

@@ -208,6 +208,14 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section--tinted", text: /Now there is text/
   end
 
+  test "a section holding only an empty Rich text block and an Image block with no image renders nothing" do
+    section = @root.content_blocks.create!(block_type: :section, position: 5, settings: { "layout" => "two", "background" => "tinted", "width" => "content" })
+    @root.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 0)
+    @root.content_blocks.create!(block_type: :image, section: section, section_column: 2, position: 0)
+    get "/"
+    assert_select "section.content-section", 0
+  end
+
   test "a section renders its blocks once, inside it, column by column" do
     @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Before the band"))
     section_with_texts([ 2, "Right text" ], [ 1, "Left text" ])
