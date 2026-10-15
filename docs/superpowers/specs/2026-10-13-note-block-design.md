@@ -1,6 +1,6 @@
 # The Note block
 
-Status: for the owner's review (2026-10-13). The design is Claude Design's, 2026-10-13 (B1 to B3). The owner agreed to the block and to the order "Note, then Table" the same day. The Table block is a spec of its own.
+Status: for the owner's review (2026-10-13; corrected 2026-10-15 for the block types build: declarations instead of a `:note` capability, `--th-ink` for the body text, tokens defined from the base). The design is Claude Design's, 2026-10-13 (B1 to B3). The owner agreed to the block and to the order "Note, then Table" the same day. The Table block is a spec of its own.
 
 ## Why
 
@@ -25,7 +25,7 @@ The guide has callouts ("Tip", "Warning", "To confirm") and the CMS has no block
 
 ## The data
 
-No column, no migration, no service (the recipe's step 0, `docs/reference/content-blocks-and-types.md`).
+No column, no migration, no service (the recipe's step 0, `docs/reference/content-blocks-and-types.md`). The block is the first built the new way (block types spec, 2026-10-13): `bin/rails generate block_type note` writes its skeleton, and the type declares what it brings in its own definition. It has no capability (owner's answer 2 of that spec): the tile asks its `summary`.
 
 ```ruby
 BlockTypes.register :note do |t|
@@ -33,29 +33,35 @@ BlockTypes.register :note do |t|
   t.field :kind, :select, options: Blocks::NoteComponent::KINDS, default: "note", control: :segmented
   t.field :title, :string, translated: true, max: 80
   t.uses :body
-  t.capability :note
   t.component Blocks::NoteComponent
+  t.theme_methods :block, :page, :kind, :heading, :titled?, :icon, :body
+  t.tokens themed: %w[note tip important warning].flat_map { |k| %W[note-#{k}-ground note-#{k}-line note-#{k}-ink note-#{k}-border] }
+  t.stylesheet "note.css"
+  t.summary ->(block, locale:) { Note.summary(block, locale: locale) }
+  t.sample settings: { "kind" => "tip" }, translations: { "en" => { title: "Before you publish", body: "…" }, "de" => { … }, "es" => { … } }, shows: [ "Before you publish", … ]
 end
 ```
 
+The contract's line and the sixteen tokens are also written into the ledger (`test/support/contract_ledger.rb`), the deliberate act a new promise to themes takes. `read_only_actions`: none (the segmented control is radios and writes through the form).
+
 - `kind` is the same in every language and lives in `settings`. An unknown stored kind is drawn as a Note.
 - `title` is the first translated schema field of a built-in type (`translated_settings`). The mechanism exists and no built-in type has used it, so this build proves it: the translation pair, the translation state ("missing" in a language only for the body, never for an empty title), the AI translation, the published copy and the audit snapshot each get a test with a translated title.
-- `:note` is the capability the tile asks.
 
 ## The public side
 
 - `Blocks::NoteComponent` with `initialize(block:, page:)`; its template is promised these names and no other: `block`, `page`, `kind`, `heading` (the editor's title, else the CMS's word), `titled?` (whether the heading is the editor's), `icon` (the kind's icon name), `body`.
 - The icon is inline SVG written in the default template (four small paths), `aria-hidden`. A theme's template draws its own.
 - `app/assets/tailwind/themes/default/note.css`, tokens only.
-- **Tokens, four per kind, themed (light and dark):** `--th-note-{kind}-ground`, `--th-note-{kind}-line`, `--th-note-{kind}-ink`, `--th-note-{kind}-border`, for `note`, `tip`, `important`, `warning`. Body text stays `--th-fg`.
-- **Contrast, computed in the tokens test for each kind, on the page and inside a tinted and a strong band, in both schemes:** the body text, the link colour and the kind's ink each at 4.5:1 against the kind's ground.
+- **Tokens, four per kind, themed (light and dark):** `--th-note-{kind}-ground`, `--th-note-{kind}-line`, `--th-note-{kind}-ink`, `--th-note-{kind}-border`, for `note`, `tip`, `important`, `warning`. As a built-in type, their defaults are in `tokens.css`, and each is DEFINED from the theme's base tokens (`color-mix()` of `--th-accent`, `--th-ink`, `--th-surface` and a hue of the kind's), so a theme that re-colours its base re-colours the notes (owner's answer 1 of the block types spec). Body text stays `--th-ink`.
+- **Contrast, computed in the tokens test for each kind, on the page and inside a tinted and a strong band, in both schemes:** the body text (`--th-ink`), the link colour (`--th-accent`) and the kind's ink each at 4.5:1 against the kind's ground.
 - Inline code inside a note has the `--th-surface` ground with a 1px `--th-line` border, so it is told from the tint.
 
 ## CS Studio
 
 - **The card:** the kind's four buttons, then "Title" (placeholder: the kind's word, which follows the kind; a help line says an empty title uses the word), then the text. The fields are the schema's, drawn by the card as every type's are.
 - **The segmented control** is `Admin::Fields::SelectField` drawing radios when the field says `control: :segmented`: a new schema option (`OPTIONS`, refused on any type but `:select` and on a select with `blank:`), read-only on a translation tab as a select is.
-- **The tile and the collapsed card:** the kind's icon at 12px in `text-meta`, then "Tip · first words of the text…", or the editor's title in place of the word.
+- **The tile and the collapsed card** (the type's `summary`, as parts): the kind's icon at 12px in `text-meta`, then "Tip · first words of the text…", or the editor's title in place of the word.
+- **The icon is a new part kind of a summary,** `[:icon, name]`, drawn by `TileSummaryComponent` as the 12px icon in `text-meta`, `aria-hidden`. `LOOKS` is a closed set today (`text`, `word`, `mono`, `hint`), so this is the one change to the tile's own code, and `:icon` takes only a name from a fixed list (the four kinds' icons), never markup.
 - Strings are keys (`config/locales/admin/fields.en.yml`, `editor_screen.en.yml`).
 
 ## What this does not do
@@ -73,7 +79,7 @@ end
 
 ## Testing
 
-By the recipe's steps 1 to 10, with what is this block's own: the declaration; `control: :segmented` (the option, its refusals, the markup, the keyboard); the component (each kind's word and icon, an editor's title, an unknown kind, an empty note, text that looks like markup); the public page at the top level and in a section's column, from the published copy; the canary; the 72 contrast pairs; the card, the tile, a translation tab with a title; the translated title through the translation state, the AI translation's field list, the copy and the audit snapshot; one browser file for the editor (choose a kind by keyboard, type, autosave, reload; a second person's read-only card) and one for the site in both schemes; a fixture theme that replaces the template from the reference alone.
+By the recipe ("Adding a block type", steps 0 to 11). The canary, the theme scaffold, the public smoke test, the editor card smoke test and the translation parity test build the Note from its `sample`, also inside a section's column; no hand-written row is added to them. What is this block's own: the declaration; `control: :segmented` (the option, its refusals, the markup, the keyboard); the component (each kind's word and icon, an editor's title, an unknown kind, an empty note, text that looks like markup); the public page at the top level and in a section's column, from the published copy; the canary; the 72 contrast pairs; the card, the tile, a translation tab with a title; the translated title through the translation state, the AI translation's field list, the copy and the audit snapshot; one browser file for the editor (choose a kind by keyboard, type, autosave, reload; a second person's read-only card) and one for the site in both schemes; a fixture theme that replaces the template from the reference alone.
 
 ## Documentation
 
