@@ -28,10 +28,11 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
     assert @exporter.finished_spans.any?, "expected at least one span to be recorded for the request"
   end
 
-  # ActiveRecord instrumentation only emits a span when there's already an
-  # active trace to nest it under -- a bare model call from a script (no
-  # request, no parent span) produces none at all, so this has to run inside
-  # a real request rather than just calling `Page.count` directly.
+  # A query is recorded only inside a trace that is kept: the ActiveRecord
+  # instrumentation makes a span for a bare model call too, but with no
+  # request or job around it that span is a root of its own and
+  # `Telemetry::WorkSampler` drops it (the tests after this one show both
+  # sides), so this has to run inside a real request.
   #
   # PG instrumentation (opentelemetry-instrumentation-pg) is deliberately
   # disabled (config/initializers/opentelemetry.rb) -- it segfaulted
@@ -46,6 +47,59 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
     assert_response :success
     query_spans = @exporter.finished_spans.select { |span| span.name.start_with?("Page ", "Page.") }
     assert query_spans.any?, "expected a span for the query against Page, got: #{@exporter.finished_spans.map(&:name)}"
+  end
+
+  # What is sent is the work a request or a job caused, and nothing of the
+  # background's polling (lib/telemetry/work_sampler.rb). In production Solid
+  # Cable's listener and Solid Queue's worker query their tables several
+  # times a second from threads of their own, each query the root of a
+  # trace; that was about 820,000 spans a day on an idle site. The test
+  # environment has neither (its cable adapter is `test` and its jobs are
+  # not polled for), so a poll is stood for by what it is to the sampler: a
+  # query with no request and no job around it, on the test's thread and on
+  # a thread of its own.
+  test "a request is recorded with its database spans, in one trace under the request's server span" do
+    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @exporter.reset
+
+    get "/"
+
+    assert_response :success
+    spans = @exporter.finished_spans
+    roots = spans.select { |span| root?(span) }
+    assert_equal [ :server ], roots.map(&:kind), "one root, the request's: #{spans.map(&:name)}"
+    assert_equal [ roots.first.trace_id ], spans.map(&:trace_id).uniq, "every span of the request is in its trace"
+    assert spans.any? { |span| span.name == "Page query" }, "the request's query against Page is recorded: #{spans.map(&:name)}"
+  end
+
+  class ProbeJob < ApplicationJob
+    def perform
+      Page.order(:id).to_a
+      Page.transaction { Page.where(id: 0).to_a }
+    end
+  end
+
+  test "a job's perform is recorded with its database spans, in one trace under the job's consumer span" do
+    ProbeJob.perform_now
+
+    spans = @exporter.finished_spans
+    roots = spans.select { |span| root?(span) }
+    assert_equal [ [ "default process", :consumer ] ], roots.map { |span| [ span.name, span.kind ] }, spans.map(&:name).inspect
+    assert_equal [ roots.first.trace_id ], spans.map(&:trace_id).uniq, "every span of the job is in its trace"
+    assert_operator spans.count { |span| span.name == "Page query" }, :>=, 2, spans.map(&:name).inspect
+    assert_includes spans.map(&:name), "ActiveRecord.transaction"
+  end
+
+  test "a query outside any request or job, as a poll's is, records nothing" do
+    poll = -> do
+      Page.order(:id).to_a
+      Page.transaction { Page.where(id: 0).to_a }
+    end
+
+    poll.call
+    Thread.new { ActiveRecord::Base.connection_pool.with_connection { poll.call } }.join
+
+    assert_empty @exporter.finished_spans.map(&:name)
   end
 
   # The two routes that carried a password-reset token in their path. The
@@ -91,4 +145,7 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
       assert_not_includes written, quote, "span #{span.name.inspect} carries the query"
     end
   end
+
+  private
+    def root?(span) = span.parent_span_id == OpenTelemetry::Trace::INVALID_SPAN_ID
 end

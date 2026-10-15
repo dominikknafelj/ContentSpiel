@@ -73,7 +73,7 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
 
   test "an attribute a span starts with is scrubbed, on the span itself and in what is exported" do
     seen = nil
-    tracer.in_span("request", attributes: { "url.path" => "/#{ADMIN}/password/abc123/edit", "other" => "/#{ADMIN}/password/abc123/edit" }) do |span|
+    tracer.in_span("request", kind: :server, attributes: { "url.path" => "/#{ADMIN}/password/abc123/edit", "other" => "/#{ADMIN}/password/abc123/edit" }) do |span|
       seen = span.attributes["url.path"]
     end
 
@@ -122,7 +122,7 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
       "url.query" => "note_quote=some+private+words",
       "http.target" => "/#{ADMIN}/pages/12?note_quote=some+private+words"
     }
-    tracer.in_span("request", attributes: started_with) { |span| seen = span.attributes }
+    tracer.in_span("request", kind: :server, attributes: started_with) { |span| seen = span.attributes }
 
     scrubbed = { "url.path" => "/#{ADMIN}/pages/12", "url.query" => FILTERED, "http.target" => "/#{ADMIN}/pages/12" }
     assert_equal scrubbed, seen
@@ -130,7 +130,7 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
   end
 
   test "an attribute set after the start is scrubbed in what is exported, each of the five" do
-    tracer.in_span("request") do |span|
+    tracer.in_span("request", kind: :server) do |span|
       span.set_attribute("url.path", "/#{ADMIN}/password/abc123")
       span.set_attribute("url.query", "note_quote=some+private+words")
       span.set_attribute("http.target", "/#{ADMIN}/password/abc123/edit?x=1")
@@ -154,8 +154,8 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
   end
 
   test "a span with nothing to scrub is exported as it is" do
-    tracer.in_span("request", attributes: { "url.path" => "/#{ADMIN}/pages" }) { }
-    tracer.in_span("bare") { }
+    tracer.in_span("request", kind: :server, attributes: { "url.path" => "/#{ADMIN}/pages" }) { }
+    tracer.in_span("bare", kind: :server) { }
 
     paths, bare = @exporter.finished_spans
     assert_equal({ "url.path" => "/#{ADMIN}/pages" }, paths.attributes)
@@ -172,6 +172,9 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
   end
 
   private
+    # Every span here is started as a request's (`kind: :server`): a root of
+    # any other kind is dropped by `Telemetry::WorkSampler` and would never
+    # reach the scrubber or the exporter.
     def tracer = OpenTelemetry.tracer_provider.tracer("path-scrubber-test")
 
     def exported
