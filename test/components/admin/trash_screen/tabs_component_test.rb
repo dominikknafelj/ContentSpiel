@@ -19,6 +19,18 @@ class Admin::TrashScreen::TabsComponentTest < ViewComponent::TestCase
     assert_selector "a[aria-current=page]", text: "Posts"
   end
 
+  # Contrast and buttons spec (Ruling 14): the current tab is the same
+  # control as a selected pill, ink with paper words, its count undimmed.
+  test "the current tab is ink with paper words and its count carries no opacity" do
+    render_inline tabs(current: "posts")
+
+    classes = page.find("a[aria-current=page]")["class"].split
+    assert_includes classes, "bg-ink"
+    assert_includes classes, "text-paper"
+    assert_not_includes classes, "bg-sunken"
+    assert_empty page.all("nav a span").flat_map { |span| span["class"].to_s.split }.grep(/opacity/)
+  end
+
   private
 
   def tabs(current:)

@@ -1,7 +1,7 @@
 <nav aria-label="Filter by type" class="inline-flex self-start overflow-hidden rounded-cs border border-field-line bg-surface">
   <% tabs.each do |tab| %>
     <%= link_to tab[:href], class: link_class(tab[:current]), aria: { current: (tab[:current] ? "page" : nil) } do %>
-      <%= tab[:label] %> <span class="font-cs-mono text-label opacity-70"><%= tab[:count] %></span>
+      <%= tab[:label] %> <span class="font-cs-mono text-label"><%= tab[:count] %></span>
     <% end %>
   <% end %>
 </nav>
