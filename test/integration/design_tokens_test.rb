@@ -3,6 +3,8 @@ require "test_helper"
 # Backend (product UI) and frontend (public theme) CSS are two separate builds
 # (spec §9): each carries its own tokens and only the classes its own views use.
 class DesignTokensTest < ActionDispatch::IntegrationTest
+  include ContrastMeasure
+
   test "the product build carries product tokens and no theme tokens" do
     css = stylesheet("tailwind.css")
 
@@ -327,57 +329,6 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
       css = Rails.root.join("app/assets/tailwind/themes/default/sections.css").read.gsub(%r{/\*.*?\*/}m, "")
       rule = css[/^\.content-section--#{name}\s*\{(.*?)\}/m, 1] or flunk("sections.css has no rule for the #{name} band")
       rule.scan(/(--th-[\w-]+):\s*([^;]+);/).to_h
-    end
-
-    # A token's colour as linear-light sRGB, following `var()` to its value.
-    # Hex and `oklch()` are the two notations the opaque tokens use; a
-    # colour thinned out with `color-mix(… <share>%, transparent)` is
-    # painted over `under`, which a caller that expects one hands in.
-    #
-    # `inside` is what a band declares for everything in it. A name it
-    # declares is the band's value, whose own `var()`s are read inside the
-    # band too; any other name is the page's, computed on the page with the
-    # page's values, as a custom property is inherited: computed.
-    def resolve_colour(tokens, name, under: nil, inside: {})
-      return resolve_colour(tokens, name, under: under) if inside.any? && !inside.key?(name)
-
-      case inside.fetch(name) { tokens.fetch(name) }
-      when /\Avar\((--th-[\w-]+)\)\z/ then resolve_colour(tokens, $1, under: under, inside: inside)
-      when /\A#(\h{6})\z/
-        $1.scan(/../).map { |pair| (channel = pair.hex / 255.0) <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055)**2.4 }
-      when /\Aoklch\(([\d.]+) ([\d.]+) ([\d.]+)\)\z/ then oklch_to_linear_srgb($1.to_f, $2.to_f, $3.to_f)
-      when /\Acolor-mix\(in srgb, var\((--th-[\w-]+)\) ([\d.]+)%, transparent\)\z/
-        under or flunk("#{name} is a thinned colour and nothing was named for it to be painted over")
-        mix(resolve_colour(tokens, $1, inside: inside), under, $2.to_f / 100)
-      else flunk("#{name} is neither a hex colour, oklch() nor a colour thinned with color-mix(): #{inside.fetch(name) { tokens[name] }}")
-      end
-    end
-
-    # `color-mix(in srgb, top <share>, transparent)` painted over `under`:
-    # mixed in the encoded values, as a browser does, from and to linear light.
-    def mix(top, under, share)
-      encode = ->(value) { value <= 0.0031308 ? value * 12.92 : 1.055 * value**(1 / 2.4) - 0.055 }
-      decode = ->(value) { value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055)**2.4 }
-      top.zip(under).map { |one, other| decode.(encode.(one) * share + encode.(other) * (1 - share)) }
-    end
-
-    # Björn Ottosson's OKLab to linear sRGB matrices; out-of-gamut channels
-    # are clipped, as a browser does when it paints the colour on an sRGB
-    # screen.
-    def oklch_to_linear_srgb(lightness, chroma, hue)
-      a = chroma * Math.cos(hue * Math::PI / 180)
-      b = chroma * Math.sin(hue * Math::PI / 180)
-      l = (lightness + 0.3963377774 * a + 0.2158037573 * b)**3
-      m = (lightness - 0.1055613458 * a - 0.0638541728 * b)**3
-      s = (lightness - 0.0894841775 * a - 1.2914855480 * b)**3
-      [ 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s ].map { |channel| channel.clamp(0.0, 1.0) }
-    end
-
-    def contrast(one, other)
-      light, dark = [ one, other ].map { |rgb| rgb.zip([ 0.2126, 0.7152, 0.0722 ]).sum { |value, weight| value * weight } }.minmax.reverse
-      (light + 0.05) / (dark + 0.05)
     end
 
     def stylesheet(name)

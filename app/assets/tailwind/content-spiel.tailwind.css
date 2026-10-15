@@ -14,6 +14,7 @@
   --color-meta: var(--cs-meta);
   --color-line: var(--cs-line);
   --color-line-strong: var(--cs-line-strong);
+  --color-field-line: var(--cs-field-line);
   --color-accent: var(--cs-accent);
   --color-accent-hover: var(--cs-accent-hover);
   --color-accent-tint: var(--cs-accent-tint);
@@ -44,6 +45,9 @@
   --text-h1: var(--cs-t-h1);
   --text-h2: var(--cs-t-h2);
   --text-label: var(--cs-t-label);
+  /* Every mono label is 11px at weight 500 (design answer C1: 10px thin
+     read faint); an explicit `font-*` class beside it still wins. */
+  --text-label--font-weight: 500;
   --tracking-mono: var(--cs-track-mono);
   --tracking-wide: var(--cs-track-wide);
   --radius-cs: var(--cs-radius);

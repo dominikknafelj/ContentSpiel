@@ -23,12 +23,19 @@
 :root, [data-theme="light"] {
   --cs-paper: #f5f4f0;
   --cs-surface: #ffffff;
-  --cs-sunken: #ecebe6;
+  --cs-sunken: #e6e4dd;
   --cs-ink: #141417;
-  --cs-dim: #55565b;
-  --cs-meta: #6c6d72;
-  --cs-line: rgba(20,20,23,0.10);
-  --cs-line-strong: rgba(20,20,23,0.20);
+  --cs-dim: #46474c;
+  --cs-meta: #5f6065;
+  /* A line that only groups (a card, a table's rows) and a stronger one (a
+     panel, a table's header rule, a chip that is no control): decoration,
+     below 3:1 on purpose. Everything pressed or typed into is outlined in
+     `--cs-field-line`, 3:1 or better on paper, surface and sunken in both
+     schemes (contrast and buttons spec, C1 and Ruling 1;
+     `test/lib/admin_contrast_test.rb`). */
+  --cs-line: rgba(20,20,23,0.14);
+  --cs-line-strong: rgba(20,20,23,0.28);
+  --cs-field-line: #808186;
   --cs-accent: oklch(0.50 0.12 250);
   --cs-accent-hover: oklch(0.45 0.12 250);
   --cs-accent-tint: oklch(0.95 0.025 250);
@@ -55,14 +62,15 @@
 }
 
 [data-theme="dark"] {
-  --cs-paper: #0f1012;
-  --cs-surface: #17181b;
-  --cs-sunken: #212226;
+  --cs-paper: #0c0d0f;
+  --cs-surface: #1b1c20;
+  --cs-sunken: #28292e;
   --cs-ink: #ededee;
   --cs-dim: #a9aaaf;
-  --cs-meta: #8e8f95;
-  --cs-line: rgba(237,237,238,0.09);
-  --cs-line-strong: rgba(237,237,238,0.18);
+  --cs-meta: #9c9da3;
+  --cs-line: rgba(237,237,238,0.13);
+  --cs-line-strong: rgba(237,237,238,0.26);
+  --cs-field-line: #74757b;
   --cs-accent: oklch(0.74 0.10 250);
   --cs-accent-hover: oklch(0.80 0.09 250);
   --cs-accent-tint: oklch(0.28 0.05 250);
@@ -78,12 +86,12 @@
   --cs-danger-tint: oklch(0.29 0.06 25);
   --cs-ph-a: #2a2b2f;
   --cs-ph-b: #1c1d20;
-  --cs-chrome: #131416;
+  --cs-chrome: #111214;
   --cs-cat-1: oklch(0.74 0.08 200);
   --cs-cat-2: oklch(0.74 0.10 300);
   --cs-cat-3: oklch(0.74 0.09 120);
   --cs-cat-4: oklch(0.74 0.09 0);
-  --cs-cat-5: oklch(0.74 0.07 230);
+  --cs-cat-5: oklch(0.74 0.07 260);   /* away from cat-1's teal (design answer D2) */
   --cs-cat-6: oklch(0.78 0.08 95);
   --cs-shadow-menu: 0 12px 32px rgba(0,0,0,0.5);
 }
