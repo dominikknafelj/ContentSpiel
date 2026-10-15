@@ -8,6 +8,7 @@ class Admin::EditorScreen::BlockPickerComponentTest < ViewComponent::TestCase
     render_inline Admin::EditorScreen::BlockPickerComponent.new(page: page, locale: "en")
 
     assert_selector "#block-picker-end.border-dashed", text: "+ Add block"
+    assert_equal BlockTypes.all.map(&:icon), Capybara.string(rendered_content).all("#block-picker-end button").map { |button| button.first("[data-block-icon]", minimum: 0)&.[]("data-block-icon") }
     assert_equal BlockTypes.all.map(&:label), Capybara.string(rendered_content).all("#block-picker-end button").map(&:text)
     assert_selector "#block-picker-end form[action$='/content_blocks'] input[name='block[block_type]'][value='post_list']", visible: :all
   end
@@ -40,6 +41,7 @@ class Admin::EditorScreen::BlockPickerComponentTest < ViewComponent::TestCase
     assert_equal offered.map(&:label), Capybara.string(rendered_content).all("#{picker} [role=menu] form button", visible: :all).map { |button| button.text(:all) }
     assert_no_selector "#{picker} input[name='block[block_type]'][value='section']", visible: :all
     assert_selector "#{picker} form[action$='/content_blocks'][method=post]", count: offered.size, visible: :all
+    assert_selector "#{picker} [role=menu] form button [data-block-icon]", count: offered.size, visible: :all
     assert_selector "#{picker} input[name='section_id'][value='#{section.id}']", count: offered.size, visible: :all
     assert_selector "#{picker} input[name='column'][value='2']", count: offered.size, visible: :all
     assert_selector "#{picker} [role=menu][data-action~='click->admin--ui--menu#select']", visible: :all

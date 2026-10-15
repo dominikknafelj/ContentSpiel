@@ -5,6 +5,7 @@ require "test_helper"
 # menu that is every move's keyboard path, and the block's delete dialog.
 class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   include ContentHelper
+  include GalleryAlbum
 
   setup do
     @editor_page = create_page(title: "Tile")
@@ -17,6 +18,27 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   end
 
   def menu_items = Capybara.string(rendered_content).all("[role=menu] [role=none]", visible: :all).map { |item| item.text(:all).strip }
+
+  test "the tile shows the type's icon in place of its name, and the face is still named by the type" do
+    render_tile
+
+    assert_selector ".admin-block-tile__face [data-block-icon=image][class~='text-meta'] svg[class~='size-3']"
+    assert_selector ".admin-block-tile__face .sr-only", text: "Image"
+    assert_no_selector ".admin-block-tile__face span.font-semibold", text: "Image"
+  end
+
+  # Review focus 3.
+  test "a type that names no icon keeps its name on the tile and draws no icon anywhere" do
+    with_gallery_album do
+      block = @editor_page.content_blocks.create!(block_type: "gallery/album", section: @section, section_column: 2, position: 0)
+      render_tile(block)
+
+      assert_selector ".admin-block-tile__face span.font-semibold", text: "Album"
+      assert_no_selector "[data-block-icon]"
+      render_inline Admin::EditorScreen::BlockPickerComponent.new(page: @editor_page, locale: "en")
+      assert_selector "#block-picker-end button", text: "Album"
+    end
+  end
 
   test "an editable tile's menu lists every move, Duplicate, a divider, then Delete block…, in that order" do
     render_tile

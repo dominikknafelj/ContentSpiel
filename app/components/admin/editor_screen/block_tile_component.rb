@@ -119,6 +119,14 @@ module Admin
 
       def note_key = ::Notes.key(block)
 
+      # The type's icon stands in for its name on the face (contrast and
+      # buttons spec, C2), which then keeps the name as `sr-only` text so the
+      # face's accessible name still says the type. A type with no icon
+      # keeps its visible name (Ruling 7).
+      def block_icon = @block_icon ||= Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: :tile)
+
+      def icon? = block_icon.render?
+
       # "Add note": first in an editor's menu, and the only item of the menu
       # a view-only tile has (see `Admin::EditorScreen::BlockCardComponent#add_note_item`).
       def add_note_item

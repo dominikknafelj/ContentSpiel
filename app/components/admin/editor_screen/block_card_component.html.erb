@@ -12,6 +12,7 @@
               aria-label="Move <%= label %>" aria-describedby="block-drag-help"
               data-action="keydown->admin--editor--blocks#key focusout->admin--editor--blocks#blur">⠿</button>
     <% end %>
+    <%= render Admin::EditorScreen::BlockIconComponent.new(definition: definition, place: :card) unless unavailable? %>
 
     <% if unavailable? %>
       <span class="flex-1 truncate text-sm font-semibold text-danger-ink"><%= unavailable_label %></span>

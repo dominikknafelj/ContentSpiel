@@ -7,8 +7,14 @@
   <% end %>
   <button type="button" class="admin-block-tile__face flex w-full min-w-0 cursor-pointer flex-col gap-0.5 rounded-cs px-3 py-2 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent"
           aria-expanded="<%= open? %>" aria-controls="<%= panel_id %>" data-action="admin--editor--section#toggle">
-    <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
-    <%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %>
+    <% if icon? %>
+      <%# The name is the face's first span child: the move announcement reads it (`blocks_controller.js`, `titleOf`). %>
+      <span class="sr-only"><%= label %></span>
+      <span class="flex min-w-0 items-center gap-1.5"><%= render block_icon %><%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %></span>
+    <% else %>
+      <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
+      <%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %>
+    <% end %>
   </button>
   <%# The notes marker (notes spec §4.3): beside the face, since a button cannot hold
       a button, and outside the `editable?` block below, because a viewer who can only

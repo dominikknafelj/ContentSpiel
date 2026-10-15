@@ -240,6 +240,16 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
+  test "a block type's icon is one CS Studio draws, or none" do
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    assert_nil definition.icon
+
+    definition.icon :pilcrow
+    assert_equal "pilcrow", definition.icon
+    error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").icon "rocket" }
+    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, posts, columns_2/, error.message)
+  end
+
   # Task 8 review M2: the tile's cut and the Code block's summary's are one
   # figure, held by the definition (a model may not name a component).
   test "the tile and the Code block's summary cut a line at one length" do

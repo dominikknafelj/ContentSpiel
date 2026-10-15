@@ -31,6 +31,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_card(block, page: page)
 
     assert_selector ".admin-block-card__handle[aria-label='Move Rich text']"
+    assert_selector ".admin-block-card > div:first-child .admin-block-card__handle + [data-block-icon=pilcrow][class~='text-dim'] svg[class~='size-3.5']"
     assert_selector "button[aria-expanded='true'][data-action$='admin--editor--blocks#toggle']", text: "Rich text"
     assert_selector "button[aria-haspopup='menu'][aria-label='Block actions']", text: "⋯"
     assert_no_selector "summary", visible: :all
