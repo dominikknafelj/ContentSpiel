@@ -23,6 +23,13 @@ module Blocks
       @page = page
     end
 
+    # Nothing at all without an image (the template's own condition): a
+    # template that draws nothing still leaves ViewComponent's annotation
+    # comments in development, which `Blocks::SectionComponent#render?` reads
+    # as something drawn and so draws an empty band (Ruling 19). Not drawing
+    # the component leaves no markup, comments included.
+    def render? = asset&.file&.attached? || false
+
     private
 
     attr_reader :block, :page
