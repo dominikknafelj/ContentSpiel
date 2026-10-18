@@ -61,7 +61,7 @@ jobs:
       # layers are kept in the Actions cache: a merge that changes no gem
       # skips `bundle install`.
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
