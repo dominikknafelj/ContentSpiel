@@ -17,7 +17,7 @@ module ContentModel
     # it either).
     SCALAR_TYPES = %i[string text code integer boolean date url select content_type tag].freeze
     GROUP_TYPES = %i[group groups].freeze
-    # `blank:` is the label of a select's empty choice ("Plain text"); without
+    # `blank:` is the label of a select's (or a content type field's) empty choice ("Plain text", "All types"); without
     # it the choice has no label. `max:` counts characters for a `:code` field
     # and is a number's upper bound for an `:integer`.
     #
@@ -75,7 +75,7 @@ module ContentModel
       raise ArgumentError, "select fields need `options:`" if type == :select && options[:options].blank?
       raise ArgumentError, "code fields can't be translated (the code is the same in every language)" if type == :code && options[:translated]
       raise ArgumentError, "`label:` is the field's name as a person reads it, a string" if options.key?(:label) && !(options[:label].is_a?(String) && options[:label].present?)
-      raise ArgumentError, "`blank:` names the empty choice of a select that isn't required" if options.key?(:blank) && (type != :select || options[:required])
+      raise ArgumentError, "`blank:` names the empty choice of a select that isn't required" if options.key?(:blank) && (!%i[select content_type].include?(type) || options[:required])
 
       @fields << Field.new(name: name.to_s, type: type, options: options)
     end

@@ -7,7 +7,7 @@
 
   <% if composing? %>
     <section id="notes-new" aria-labelledby="notes-new-title" class="flex flex-col gap-2 border-b border-line px-4 pb-4 pt-3">
-      <h3 id="notes-new-title" class="font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= compose_title %></h3>
+      <h3 id="notes-new-title" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= compose_title %></h3>
       <%= render Admin::NotesScreen::QuoteComponent.new(quote: quote) %>
       <%= render Admin::NotesScreen::ComposerComponent.new(url: threads_path, key: "new-#{key}-#{compose_key}", label: t(".new_label"), submit: t(".add"),
             mentions_url: mentions_path, rows: 3, hidden: { subject: compose_key, quote: quote.to_s },
@@ -30,7 +30,7 @@
 
   <% if listing.pinned.any? %>
     <section id="notes-pinned" aria-labelledby="notes-pinned-title" class="flex flex-col">
-      <h3 id="notes-pinned-title" class="px-4 pb-1.5 pt-4 font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= t(".pinned") %></h3>
+      <h3 id="notes-pinned-title" class="px-4 pb-1.5 pt-4 font-cs-mono text-label uppercase tracking-mono text-meta"><%= t(".pinned") %></h3>
       <% listing.pinned.each do |record| %><%= render row(record, show_subject: true) %><% end %>
     </section>
   <% end %>

@@ -4,6 +4,8 @@ import { Controller } from "@hotwired/stimulus"
 // submit is in flight the button is disabled, keeps the width it had (so the
 // row doesn't jump when the label gets longer), and shows an 11px spinner
 // with its `data-busy-label`; `turbo:submit-end` puts everything back.
+// It also says `aria-busy`, which keeps the button in its own colours: CS Studio's
+// disabled look is for a button that is off, not one that is working.
 export default class extends Controller {
   static targets = [ "button" ]
 
@@ -38,10 +40,12 @@ export default class extends Controller {
       button.style.width = width
       button.innerHTML = innerHTML
       button.disabled = false
+      button.removeAttribute("aria-busy")
       this.restore = null
     }
     button.style.width = `${button.offsetWidth}px`
     button.disabled = true
+    button.setAttribute("aria-busy", "true")
     button.replaceChildren()
     const spinner = document.createElement("span")
     spinner.className = "admin-spinner"

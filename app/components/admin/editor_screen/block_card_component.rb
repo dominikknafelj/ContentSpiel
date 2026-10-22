@@ -207,6 +207,18 @@ module Admin
 
       def status_id = self.class.status_id(block)
 
+      # The card's save line, in the header row before the "⋯" menu, as the
+      # section card's is (contrast and buttons spec, Ruling 20). In the body
+      # it reserved a line of its own above the first field, the gap the
+      # design answer saw; the header's height is its buttons', so the line
+      # costs nothing there and still never moves what is under a press. A
+      # long message (stale, saved over) wraps inside the status's cap (40% of the head) and never
+      # takes the block's name down to nothing.
+      def status_line
+        tag.div(render(Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.published_at.present?)),
+          class: "admin-block-card__status min-w-0 max-w-[40%] shrink text-right")
+      end
+
       def base_updated_at_id = self.class.base_updated_at_id(block)
 
       def base_updated_at_value = block.updated_at.iso8601(6)

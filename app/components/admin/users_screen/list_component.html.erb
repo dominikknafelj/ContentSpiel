@@ -12,7 +12,7 @@
               <%= link_to helpers.edit_admin_user_path(user, **url_options), data: { turbo_frame: "content" },
                     class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" do %><%= render Admin::Ui::UserNameComponent.new(user: user) %><% end %>
               <% if you?(user) %><span class="text-sm text-meta">(you)</span><% end %>
-              <% if user.owner? %><span class="rounded-cs border border-line-strong px-1.5 font-cs-mono text-label uppercase tracking-mono text-meta">Owner</span><% end %>
+              <% if user.owner? %><%= render Admin::Ui::BadgeComponent.new(label: "Owner") %><% end %>
             </span>
             <% if user.name.present? %><span class="truncate text-sm text-meta"><%= user.email_address %></span><% end %>
           </span>

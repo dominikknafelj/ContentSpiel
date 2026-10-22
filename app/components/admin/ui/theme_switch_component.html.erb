@@ -1,5 +1,5 @@
 <div role="radiogroup" aria-label="Theme" data-controller="theme"
-     class="admin-theme-switch inline-flex rounded-cs border border-line-strong p-0.5">
+     class="admin-theme-switch inline-flex rounded-cs border border-field-line p-0.5">
   <% Admin::Ui::ThemeSwitchComponent::CHOICES.each do |choice, label| %>
     <%= tag.button label, type: "button", role: "radio", aria: { checked: "false" },
           data: { action: "theme#choose", theme_choice_param: choice, theme_target: "choice" },

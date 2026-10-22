@@ -161,10 +161,10 @@ module Admin
       def more? = more_wide.positive? || more_narrow.positive?
 
       # "+N": a circle of the avatar's size with no fill, 4px after the last
-      # person and not overlapped, the count in 10px mono. Shown below 1024px
+      # person and not overlapped, the count in 11px mono. Shown below 1024px
       # only when the wide row has room for everyone.
       def more_class
-        class_names("ml-1 flex flex-none items-center justify-center rounded-full border border-line-strong font-cs-mono text-[10px] leading-none text-dim",
+        class_names("ml-1 flex flex-none items-center justify-center rounded-full border border-line-strong font-cs-mono text-label leading-none text-dim",
           @size.more, GROUNDS.fetch(ground), "lg:hidden": !more_wide.positive?)
       end
 

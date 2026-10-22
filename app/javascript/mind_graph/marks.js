@@ -9,7 +9,7 @@
 //   the hue; a post of a type that is no longer registered is a ring type
 //   in `meta` with a stroke through it;
 // - a PAGE is a small card, 14 by 10 with the card's corner radius, Home 18
-//   by 13, in neutral ink (the hues mean post types). Fixed: a page's size
+//   by 13, in the page colour (`theme.page`: the ink in light, a softer light grey in dark; the hues mean post types). Fixed: a page's size
 //   does not follow its connections;
 // - a POST TYPE a page lists is a hub: a 12px circle in the type's hue with a
 //   surface ring inside it, so it is not one more post. "All posts" is the
@@ -217,7 +217,7 @@ function state(context, theme, look, own, shape, x, y, { edged = false } = {}) {
 }
 
 function drawPage(context, theme, node, look, x, y) {
-  state(context, theme, look, theme.ink, { ...boxOf(node), corner: theme.radius ?? 0 }, x, y)
+  state(context, theme, look, theme.page, { ...boxOf(node), corner: theme.radius ?? 0 }, x, y)
 }
 
 function drawPost(context, theme, node, look, x, y, radius) {

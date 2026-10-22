@@ -1,6 +1,6 @@
 <%= tag.details id: "page-settings", open: true, class: "admin-page-settings rounded-cs border border-line bg-surface p-4",
       data: { editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks } do %>
-  <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
+  <summary class="admin-disclosure cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
   <%# Always there, empty unless the settings are held (`HoldStripComponent.slot_id`). %>
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
   <span class="sr-only" aria-live="polite" data-editing-announcer></span>
@@ -85,7 +85,7 @@
     <% end %>
 
     <details class="admin-page-settings__seo">
-      <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">SEO · META TITLE, META DESCRIPTION</summary>
+      <summary class="admin-disclosure cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">SEO · META TITLE, META DESCRIPTION</summary>
 
       <div class="mt-3 flex flex-col gap-4">
         <%= render Admin::Columns::PlainColumnComponent.new(

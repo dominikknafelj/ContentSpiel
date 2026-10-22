@@ -670,4 +670,13 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
       assert_select "button[type=button][data-action='admin--mind-graph--graph##{action}'][aria-label='#{label}']"
     end
   end
+
+  test "the zoom buttons are 28px high with 13px labels, the figure 11px mono, in a group outlined in the field line" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+    get "/cs-studio/mind_graph"
+
+    assert_select "[role=group][class~='border-field-line'][class~='text-[13px]'] button[data-action='admin--mind-graph--graph#zoomIn'][class~='h-7']"
+    assert_select "[data-mind-graph-zoom][class~='text-label'][class~='font-cs-mono']"
+  end
 end

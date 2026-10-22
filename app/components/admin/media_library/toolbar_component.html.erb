@@ -12,17 +12,17 @@
   <div>
     <%= label_tag search_id, "Search images", class: "sr-only" %>
     <%= search_field_tag :q, q.is_a?(String) ? q : nil, id: search_id, placeholder: "Search title, alt text or filename", autocomplete: "off",
-          class: "block w-72 max-w-full rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
+          class: "block w-72 max-w-full rounded-cs border border-field-line bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
   </div>
 
   <fieldset class="m-0 min-w-0 border-0 p-0">
     <legend class="sr-only">Show</legend>
-    <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-line-strong bg-surface">
+    <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-field-line bg-surface">
       <% segments.each do |value, key, label| %>
         <label for="<%= filter_id(key) %>" class="<%= SEGMENT_CLASS %>">
           <%= radio_button_tag :filter, value, checked?(value), id: filter_id(key), class: "sr-only" %>
           <span><%= label %></span>
-          <span id="<%= count_dom_id(key) %>" class="font-cs-mono text-[10px] opacity-70"><%= count_for(key) %></span>
+          <span id="<%= count_dom_id(key) %>" class="font-cs-mono text-label"><%= count_for(key) %></span>
         </label>
       <% end %>
     </div>

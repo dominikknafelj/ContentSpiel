@@ -92,7 +92,7 @@ export function cardNotes(node, { text, type = "post", url, recordUrl, onChange 
   status.hidden = true
 
   const form = element("form", "flex flex-col items-start gap-1.5")
-  const field = element("textarea", "block w-full rounded-cs border border-line-strong bg-surface px-[9px] py-[7px] text-[13px] text-ink placeholder:text-meta focus:outline-2 focus:outline-accent")
+  const field = element("textarea", "block w-full rounded-cs border border-field-line bg-surface px-[9px] py-[7px] text-[13px] text-ink placeholder:text-meta focus:outline-2 focus:outline-accent")
   field.name = "body"
   field.rows = 2
   field.maxLength = 4000
@@ -102,7 +102,7 @@ export function cardNotes(node, { text, type = "post", url, recordUrl, onChange 
   const fieldLabel = type === "page" ? text.t("mind_graph.script.card.notes.label_page") : text.t("mind_graph.script.card.notes.label")
   field.setAttribute("aria-label", fieldLabel)
   field.placeholder = fieldLabel
-  const submit = element("button", "cursor-pointer rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50", text.t("mind_graph.script.card.notes.add"))
+  const submit = element("button", "cursor-pointer rounded-cs border border-field-line bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50", text.t("mind_graph.script.card.notes.add"))
   submit.type = "submit"
   form.append(field, submit)
 

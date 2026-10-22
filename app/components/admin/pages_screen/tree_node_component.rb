@@ -1,7 +1,7 @@
 module Admin
   module PagesScreen
     # One page's row within `Admin::PagesScreen::TreeComponent` (cs-studio spec §4.2): the
-    # title (admin-locale, falling back per `Locales.read`), a status dot,
+    # title (admin-locale, falling back per `Locales.read`), a state mark (`TreeStateMarkComponent`),
     # child count, an inline "+" to add a child, a drag handle, and this
     # page's own children rendered the same way -- recursively, so an N-deep
     # branch is just N nested renders of this one component.
@@ -88,6 +88,12 @@ module Admin
 
       def selected? = page == selected
 
+      # The selected row (contrast and buttons spec, C1): bold, on the sunken
+      # ground, with a 2px ink bar on its left edge (14:1 light, 12:1 dark),
+      # as the documentation site's navigation marks where you are. An inset
+      # shadow and not a border, so the title does not move by 2px.
+      def row_class = selected? ? "bg-sunken shadow-[inset_2px_0_0_var(--cs-ink)]" : nil
+
       def root? = @root
 
       def context_only? = context_only_ids.include?(page.id)
@@ -101,8 +107,6 @@ module Admin
       def path = helpers.admin_page_path(page, **url_options)
 
       def new_child_path = helpers.new_admin_page_path(parent_id: page.id, **url_options)
-
-      def status = page.status
 
       # "outdated" / "missing" -> the number of such fields over every target
       # language; always 0 for a context-only row (it shows nothing but its title).

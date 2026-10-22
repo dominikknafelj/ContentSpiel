@@ -10,7 +10,7 @@
         The class names are written out: Tailwind reads them from this file. %>
     <% if may_discard? %>
       <span class="hidden group-has-[[data-discard-changes-offered]]/publishing:contents">
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".discard_changes"), variant: :secondary, type: "button", data: helpers.dialog_trigger(discard_dialog_id)) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".discard_changes"), variant: :ghost, type: "button", data: helpers.dialog_trigger(discard_dialog_id)) %>
       </span>
     <% end %>
     <% if may_publish? %>

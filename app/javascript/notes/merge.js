@@ -344,7 +344,7 @@ function divider(t) {
   const line = document.createElement("span")
   line.className = "h-px flex-1 bg-accent"
   const label = document.createElement("span")
-  label.className = "font-cs-mono text-[10px] uppercase tracking-mono text-accent"
+  label.className = "font-cs-mono text-label uppercase tracking-mono text-accent"
   label.textContent = t("notes.script.live.new_divider")
   divider.append(line, label)
   return divider
@@ -368,7 +368,7 @@ function jump(view, reply, count, t) {
     button = document.createElement("button")
     button.type = "button"
     button.dataset.noteJump = ""
-    button.className = "absolute bottom-full left-1/2 mb-[13px] -translate-x-1/2 cursor-pointer whitespace-nowrap rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink shadow-menu focus-visible:outline-2 focus-visible:outline-accent"
+    button.className = "absolute bottom-full left-1/2 mb-[13px] -translate-x-1/2 cursor-pointer whitespace-nowrap rounded-cs border border-field-line bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink shadow-menu focus-visible:outline-2 focus-visible:outline-accent"
     const watch = () => { if (!button.isConnected || !view.isConnected || nearBottom(scrollerOf(view))) dismiss() }
     const dismiss = () => {
       document.removeEventListener("scroll", watch, { capture: true })

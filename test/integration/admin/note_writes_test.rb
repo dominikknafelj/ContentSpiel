@@ -129,7 +129,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
       # An empty form of its own, beside the reply's; the button names it.
       assert_select "form#note-thread-#{@thread.id}-state[action$='/resolve'][data-turbo-frame=notes]"
       assert_select "form#note-thread-#{@thread.id}-state button", count: 0
-      assert_select "form[data-note-composer] button[type=submit][form='note-thread-#{@thread.id}-state'][data-note-state=resolve][class~='border-line-strong']", text: "Resolve"
+      assert_select "form[data-note-composer] button[type=submit][form='note-thread-#{@thread.id}-state'][data-note-state=resolve][class~='border-field-line']", text: "Resolve"
       assert_select "form[data-note-composer] button[form] + button[type=submit]:not([form])", text: "Reply"
     end
 

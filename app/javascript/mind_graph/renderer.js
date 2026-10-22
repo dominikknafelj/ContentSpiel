@@ -53,7 +53,7 @@ export { radiusFor }
 const DIM = 0.28
 // One path per style (pages spec §4): Shares a tag dashed `meta`, Related
 // solid ink, a hub's line to what it brings in faint, Lists dotted `dim`,
-// Tree solid in the strong line colour. Drawn in this order, so a tree line
+// Tree solid in `tree` (dim; in dark dim at 60%). Drawn in this order, so a tree line
 // is on top of a tag's. A value of `colour` is a theme key.
 //
 // LISTS (design answer G3): 1.5px with ROUND caps and a dash of 0.1 / 3.5.
@@ -66,7 +66,7 @@ export const LINE_STYLES = {
   related: { colour: "ink", width: 1.5, dash: [], alpha: 0.35, cap: "butt" },
   brings: { colour: "faint", width: 1, dash: [], alpha: 1, cap: "butt" },
   lists: { colour: "dim", width: 1.5, dash: [ 0.1, 3.5 ], alpha: 1, cap: "round" },
-  tree: { colour: "line", width: 1, dash: [], alpha: 1, cap: "butt" }
+  tree: { colour: "tree", width: 1, dash: [], alpha: 1, cap: "butt" }
 }
 // Below this zoom the lines of shared tags are not drawn (design answer,
 // part one §6): zoomed out they are most of the ink and say the least. A

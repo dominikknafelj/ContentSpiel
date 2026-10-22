@@ -21,7 +21,7 @@ class Admin::NotesScreen::HeaderButtonComponentTest < ViewComponent::TestCase
     assert_selector "button#notes-open #notes-open-count[data-admin--notes--drawer-target=total]", text: "2"
     # The header's shared secondary style, as Preview beside it (the handoff's
     # decision 2): 16px text, `px-4 py-2`, a 16px icon, the count in 12px mono.
-    assert_selector "button#notes-open[class~='px-4'][class~='py-2'][class~='border-line-strong'][class~='rounded-cs'][class~='inline-flex'] svg[class~='size-4']"
+    assert_selector "button#notes-open[class~='px-4'][class~='py-2'][class~='border-field-line'][class~='rounded-cs'][class~='inline-flex'] svg[class~='size-4']"
     assert_no_selector "button#notes-open[class~='inline-block']"
     assert_no_selector "button#notes-open[class*='text-[13px]'], button#notes-open[class~='text-sm']"
     assert_selector "button#notes-open[class~='aria-pressed:bg-sunken'][class~='aria-pressed:border-ink']"

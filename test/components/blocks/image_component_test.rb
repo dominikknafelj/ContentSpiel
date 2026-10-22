@@ -73,4 +73,14 @@ class Blocks::ImageComponentTest < ActiveSupport::TestCase
     assert_nil component.send(:caption)
     assert_equal Blocks::ImageComponent::SIZES, component.send(:sizes)
   end
+
+  # Not drawn at all, so not even the view annotations of development remain
+  # for a section to take for content.
+  test "a block with no image renders the empty string" do
+    block = root_page.content_blocks.create!(block_type: :image, position: 0)
+
+    render_inline(Blocks::ImageComponent.new(block: block, page: root_page))
+
+    assert_equal "", rendered_content
+  end
 end

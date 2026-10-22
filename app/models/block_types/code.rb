@@ -22,6 +22,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :code do |t|
         t.label "Code"
+        t.icon "code_xml"
         t.field :language, :select, options: CodeHighlight::LANGUAGES, blank: "Plain text"
         t.field :filename, :string, label: "File name"
         t.field :code, :code, max: CodeHighlight::MAX_CHARACTERS

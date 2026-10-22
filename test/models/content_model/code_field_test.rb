@@ -93,4 +93,11 @@ class ContentModel::CodeFieldTest < ActiveSupport::TestCase
 
     assert_equal [ [ "code", "filename", "File name" ] ], labelled
   end
+
+  test "a content type field may name its empty choice too" do
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    definition.field(:content_type, :content_type, blank: "All types")
+    assert_equal "All types", definition.fields.last.options[:blank]
+    assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").field(:content_type, :content_type, required: true, blank: "All types") }
+  end
 end

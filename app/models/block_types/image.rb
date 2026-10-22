@@ -14,6 +14,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :image do |t|
         t.label "Image"
+        t.icon "image"
         t.uses :image, :caption, :alt
         t.component Blocks::ImageComponent
         t.theme_methods :block, :page, :asset, :alt, :caption, :sizes

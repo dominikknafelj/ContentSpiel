@@ -22,7 +22,7 @@ module Admin
       def call
         content_tag(@level, **@html, class: [ "flex min-w-0 items-baseline gap-2", @html[:class] ]) do
           safe_join([
-            tag.span(helpers.note_subject_label(@name, @type), class: "shrink-0 font-cs-mono text-[10px] uppercase tracking-mono text-meta", data: { note_subject_type: true }),
+            tag.span(helpers.note_subject_label(@name, @type), class: "shrink-0 font-cs-mono text-label uppercase tracking-mono text-meta", data: { note_subject_type: true }),
             (tag.span(detail, class: "min-w-0 truncate text-xs text-dim", data: { note_subject_words: true }) if detail)
           ].compact)
         end

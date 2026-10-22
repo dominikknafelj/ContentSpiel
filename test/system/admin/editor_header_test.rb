@@ -21,7 +21,7 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     assert_selector "#{header} button.bg-accent", text: "Publish"
 
     # The tree shows the draft's chip before publishing.
-    assert_selector "li[data-page-id='#{@draft.id}'] .admin-status-chip[data-status=draft]", wait: 5
+    assert_selector "li[data-page-id='#{@draft.id}'] .admin-tree-mark[data-status=draft]", wait: 5
 
     # Keyboard: focus the ⋯ button, Enter opens the menu on its first item,
     # ArrowDown reaches "Schedule…" (after Activity), Escape closes it and
@@ -42,7 +42,7 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     assert_selector "#{header} .admin-status-chip[data-status=live]", wait: 10
     assert_no_selector "#{header} button.bg-accent"
     assert_selector "#{header} [role=status]", text: "This page is live. Changes are published with “Publish changes…”."
-    assert_no_selector "li[data-page-id='#{@draft.id}'] .admin-status-chip[data-status=draft]"
+    assert_no_selector "li[data-page-id='#{@draft.id}'] .admin-tree-mark[data-status=draft]"
     assert @draft.reload.live?
 
     await_admin_controllers

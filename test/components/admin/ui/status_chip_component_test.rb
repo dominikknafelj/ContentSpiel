@@ -4,7 +4,7 @@ class Admin::Ui::StatusChipComponentTest < ViewComponent::TestCase
   test "each status is an outlined chip with a dot and its name" do
     { "live" => "bg-ok", "draft" => "bg-meta", "scheduled" => "bg-warn" }.each do |status, dot|
       render_inline(Admin::Ui::StatusChipComponent.new(status: status))
-      assert_selector ".admin-status-chip.border-line-strong[data-status='#{status}']", text: status.humanize
+      assert_selector ".admin-status-chip.bg-sunken:not([class*=border])[data-status='#{status}']", text: status.humanize
       assert_selector ".admin-status-chip span.#{dot}[aria-hidden=true]"
     end
   end

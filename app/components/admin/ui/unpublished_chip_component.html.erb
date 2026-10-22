@@ -1,8 +1,4 @@
-<% if compact %>
-  <%= tag.span "", class: "h-1.5 w-1.5 shrink-0 rounded-full bg-warn", role: "img", title: t(".label"), aria: { label: t(".label") }, data: { unpublished_changes: "" } %>
-<% else %>
-  <%= tag.span class: "inline-flex shrink-0 items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5 text-xs text-ink", data: { unpublished_changes: "" } do %>
-    <%= tag.span "", class: "h-1.5 w-1.5 rounded-full bg-warn", aria: { hidden: true } %>
-    <%= t(".label") %>
-  <% end %>
+<%= tag.span class: "inline-flex shrink-0 items-center gap-1.5 rounded-cs bg-sunken px-2 py-0.5 text-xs text-ink", data: { unpublished_changes: "" } do %>
+  <%= tag.span "", class: "h-1.5 w-1.5 rounded-full bg-warn", aria: { hidden: true } %>
+  <%= t(".label") %>
 <% end %>

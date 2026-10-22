@@ -20,7 +20,7 @@
   <div class="mb-2 flex items-center gap-2 px-1">
     <h2 class="flex-1 text-sm font-semibold text-ink">Pages</h2>
     <% if can_add_page? %>
-      <%= link_to "+ New page", new_page_path, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: "rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken" %>
+      <%= link_to "+ New page", new_page_path, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" %>
     <% end %>
     <% if offer_starter_pages? %>
       <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More page actions") do |menu| %>

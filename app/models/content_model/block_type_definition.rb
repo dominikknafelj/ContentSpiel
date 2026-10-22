@@ -32,6 +32,13 @@ module ContentModel
     # `BlockTypes::Code`'s summary both read it.
     SUMMARY_LENGTH = 80
 
+    # The icons a block type may name (contrast and buttons spec, C2 and
+    # Ruling 6): each is a branch of CS Studio's icon partial
+    # (`app/views/admin/shared/_icon.html.erb`, Lucide), which a model may
+    # not name; `block_icon_component_test.rb` draws every one. A type names
+    # one or none; an outside type picks from the same list.
+    ICONS = %w[pilcrow image code_xml posts columns_2].freeze
+
     # The columns a block type may name with `uses`: the block card draws and
     # the save services write these four and no other (`BlockCardComponent`'s
     # template, `Admin::ContentBlocksController::TRANSLATED_COLUMNS`), so a
@@ -106,6 +113,15 @@ module ContentModel
       refuse "stylesheet is a path to a .css file, written as a String: #{path.inspect}" unless (path.is_a?(String) || path.is_a?(Pathname)) && path.to_s.strip != "" && path.to_s.end_with?(".css")
 
       @stylesheet = path
+    end
+
+    # The icon CS Studio draws for the type in the picker, on a card's head
+    # and on a section's tile: one of `ICONS`, or none.
+    def icon(name = nil)
+      return @icon if name.nil?
+      refuse "icon is one of #{ICONS.join(", ")} (the icons CS Studio draws for a block type): #{name.inspect}" unless ICONS.include?(name.to_s)
+
+      @icon = name.to_s
     end
 
     def uses(*columns)

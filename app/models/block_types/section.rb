@@ -18,6 +18,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :section do |t|
         t.label "Section"
+        t.icon "columns_2"
         t.field :layout, :select, options: LAYOUTS.keys, default: "two", required: true
         t.field :background, :select, options: BACKGROUNDS, default: "none", required: true
         t.field :width, :select, options: WIDTHS, default: "content", required: true

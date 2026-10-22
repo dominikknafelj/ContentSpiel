@@ -191,4 +191,28 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog[open]"
     assert_selector "button[aria-label='Choose another type of post']:focus"
   end
+
+  # Review focus 5: the accent ring would be 1.96:1 on a dark selected pill.
+  test "a selected pill reached with the keyboard is ringed in paper, in both schemes" do
+    visit "/cs-studio/posts"
+    await_admin_controllers
+    %w[light dark].each do |scheme|
+      page.execute_script("document.documentElement.dataset.theme = #{scheme.to_json}")
+      find_field("Search titles").send_keys(:tab)
+      ring, paper = page.evaluate_script(<<~JS)
+        (() => {
+          const label = document.querySelector("label:has(#posts-scope-all)")
+          const probe = document.createElement("span")
+          probe.style.color = "var(--cs-paper)"
+          document.body.append(probe)
+          const colours = [ getComputedStyle(label).outlineColor, getComputedStyle(probe).color ]
+          probe.remove()
+          return colours
+        })()
+      JS
+      assert_equal paper, ring, scheme
+    end
+  ensure
+    page.execute_script("document.documentElement.dataset.theme = 'light'")
+  end
 end

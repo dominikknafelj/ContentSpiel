@@ -144,7 +144,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_selector "#{group}[aria-label='Also open by 4 people: Ann One, here; Bob Two, here; Cy Three, here; Dana Weiss, away over an hour']"
     assert_equal others.map { |user| user.id.to_s }, page.all("#{group} > [data-presence-user]").map { |each| each["data-presence-user"] }
     more = page.find("#{group} > span:last-child")
-    assert_equal %w[bg-paper border border-line-strong flex flex-none font-cs-mono items-center justify-center leading-none ml-1 rounded-full size-6 text-[10px] text-dim], more[:class].split.sort
+    assert_equal %w[bg-paper border border-line-strong flex flex-none font-cs-mono items-center justify-center leading-none ml-1 rounded-full size-6 text-dim text-label], more[:class].split.sort
     more.assert_selector "[data-presence-more=wide]", text: "+1", exact_text: true, visible: :all
     # A summary for the eye inside the one control: the name has everyone (29).
     assert_equal "true", more["aria-hidden"]

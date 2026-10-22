@@ -21,7 +21,7 @@ module Admin
     class ToolbarComponent < Admin::AdminComponent
       DATES = [ [ "Today", "today" ], [ "Last 7 days", "7" ], [ "Last 30 days", "30" ], [ "Last 90 days", "90" ], [ "Custom…", "custom" ] ].freeze
       CHANNELS = [ [ "Admin", "admin" ], [ "MCP", "mcp" ], [ "Other", "other" ] ].freeze
-      DATE_CLASS = "block rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent".freeze
+      DATE_CLASS = "block rounded-cs border border-field-line bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent".freeze
       GROUPS = {
         "page" => "Pages", "post" => "Posts", "block" => "Blocks", "media" => "Media", "tag" => "Tags", "user" => "Users",
         "group" => "Groups", "token" => "API tokens", "language" => "Languages", "settings" => "Settings",

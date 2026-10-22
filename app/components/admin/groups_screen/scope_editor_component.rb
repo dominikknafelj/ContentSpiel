@@ -103,7 +103,7 @@ module Admin
               end
             else
               tag.span(class: "flex min-w-0 items-center gap-2.5 text-dim", title: "You can't open this page") do
-                tag.span(mark_for(state), class: "admin-tri-mark inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-cs border border-line-strong text-xs", aria: { hidden: true }, data: { admin__groups__branch_picker_target: "mark" }) + node.title
+                tag.span(mark_for(state), class: "admin-tri-mark inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-cs border border-field-line text-xs", aria: { hidden: true }, data: { admin__groups__branch_picker_target: "mark" }) + node.title
               end
             end
             # A root that is chosen AND below another chosen root (a stored state the

@@ -27,7 +27,7 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
     assert_operator response.body.index('id="notes-open"'), :<, response.body.index(">Preview<")
     # The header's shared secondary style, as Preview beside it (the handoff's
     # decision 2): 16px text, `px-4 py-2`, a 16px icon, the count in 12px mono.
-    assert_select "button#notes-open[class~='px-4'][class~='py-2'][class~='border-line-strong'][class~='rounded-cs'] svg[class~='size-4']"
+    assert_select "button#notes-open[class~='px-4'][class~='py-2'][class~='border-field-line'][class~='rounded-cs'] svg[class~='size-4']"
     assert_select "button#notes-open[class*='text-[13px]'], button#notes-open[class~='text-sm']", count: 0
     assert_select "button#notes-open[class~='aria-pressed:bg-sunken'][class~='aria-pressed:border-ink']"
     assert_select "#notes-open-count[class~='font-cs-mono'][class~='text-xs'][class~='text-dim'][class~='data-[unread]:bg-accent']"

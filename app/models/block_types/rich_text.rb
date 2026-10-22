@@ -7,6 +7,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :rich_text do |t|
         t.label "Rich text"
+        t.icon "pilcrow"
         t.uses :body
         t.component Blocks::RichTextComponent
         t.theme_methods :block, :page

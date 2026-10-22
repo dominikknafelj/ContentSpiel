@@ -47,11 +47,11 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
     assert_no_selector "#{marker}[tabindex], #{marker} [tabindex], [title], [aria-live], [role=status], a, button", visible: :all
   end
 
-  test "two people here: the count follows in 10px mono, 4px after the icon, and the names are said in order (9)" do
+  test "two people here: the count follows in 11px mono, 4px after the icon, and the names are said in order (9)" do
     render_marker(here(@reader, @dana))
 
     assert_selector "#{marker}.gap-1[data-presence-count='2']"
-    assert_selector "#{marker} > [data-presence-marker-count]:not([hidden]).font-cs-mono.text-\\[10px\\][aria-hidden=true]", text: "2", exact_text: true
+    assert_selector "#{marker} > [data-presence-marker-count]:not([hidden]).font-cs-mono.text-label[aria-hidden=true]", text: "2", exact_text: true
     assert_selector "#{marker} [data-presence-marker-label]", text: "2 people here: reader, Dana Weiss", exact_text: true
     assert_selector "#{marker} > [data-tooltip]", text: "2 people here: reader, Dana Weiss", exact_text: true, visible: :all
   end

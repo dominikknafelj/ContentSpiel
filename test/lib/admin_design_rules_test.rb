@@ -15,7 +15,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
     views/admin views/layouts views/setup components/admin components/media components/public
-    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph
+    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 
@@ -152,5 +152,67 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       .select { |f| File.read(f).match?(/\bmx-auto\b/) }
       .map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
     assert_equal %w[app/views/admin/errors/forbidden.html.erb app/views/admin/errors/not_found.html.erb], centred.sort
+  end
+
+  # Contrast and buttons spec (C1): a boundary that identifies a control is
+  # `--cs-field-line`, 3:1 on every ground; `--cs-line-strong` only groups.
+  # Read line by line: a line whose classes make it pressable or typed into
+  # (a hover, a focus, a checked state, a placeholder, a pointer cursor)
+  # draws no strong line. A control whose line says none of those (a
+  # segmented group's frame, the drop zone) is not seen here: the spec lists
+  # them and review holds them. The public layouts are the theme's, whose
+  # outline token is `--th-meta` (`design_tokens_test.rb`).
+  CONTROL_SOURCES = (ADMIN_SOURCES + [ Rails.root.join("app/helpers/setup_helper.rb").to_s ])
+    .reject { |path| path.start_with?(Rails.root.join("app/views/layouts/public").to_s) }
+  CONTROL_STATE = /(?<![\w-])(?:hover|focus|focus-within|focus-visible|has-checked|has-\[:checked\]|placeholder):|\bcursor-pointer\b/
+  STRONG_LINE_ALLOWED = {
+    "data-mind-graph-card" => "the graph's card is a panel that takes the focus; its outline is the focus ring",
+    'CARD = "group block w-full overflow-hidden' => "a media tile is told by its picture; its hover line only groups"
+  }.freeze
+
+  test "a pressable or typed-into element is outlined in border-field-line, never border-line-strong" do
+    offences = CONTROL_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        next unless line.include?("line-strong") && line.match?(CONTROL_STATE)
+        next if STRONG_LINE_ALLOWED.keys.any? { |marker| line.include?(marker) }
+
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}"
+      end
+    end
+    assert_empty offences
+  end
+
+  test "every allowed strong line is still there" do
+    STRONG_LINE_ALLOWED.each_key { |marker| assert CONTROL_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
+  end
+
+  test "the stylesheet's controls draw their outline in --cs-field-line, and no count is under 11px" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    rule = ->(selector) { css[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
+
+    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, rule.(".cs-select"))
+    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, rule.(".cs-toggle"))
+    assert_includes css, "var(--cs-field-invalid-border, var(--cs-field-line))"
+    assert_match(/\.admin-prefix-input:not\(:focus-within\)\s*\{\s*border-color:\s*var\(--cs-field-line\);/, css)
+    assert_no_match(/font-size:\s*10px/, css)
+  end
+
+  # Design answer C1: "10px thin looks faint: 11px at weight 500 everywhere".
+  test "no text under 11px in CS Studio's markup, and a mono label is text-label" do
+    assert_empty design_offences(/text-\[10px\]/)
+    assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
+  end
+
+  # Design answer, first reply: "▾PAGE SETTINGS" had no space. A mono-label
+  # summary draws its own triangle, 6px from the words, that a screen reader skips.
+  test "a disclosure's triangle is the stylesheet's, apart from its words, turned when open" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-disclosure\s*\{[^}]*list-style:\s*none;[^}]*gap:\s*0\.375rem;/m, css)
+    assert_match(/\.admin-disclosure::before\s*\{[^}]*content:\s*"▸"\s*\/\s*"";/m, css)
+    assert_match(/details\[open\]\s*>\s*\.admin-disclosure::before\s*\{[^}]*rotate\(90deg\)/m, css)
+    %w[app/components/admin/editor_screen/page_settings_form_component.html.erb app/components/admin/editor_screen/shared_fields_component.html.erb
+       app/views/admin/audit_events/show.html.erb].each do |path|
+      Rails.root.join(path).read.scan(/<summary[^>]*>/).each { |summary| assert_includes summary, "admin-disclosure", path }
+    end
   end
 end

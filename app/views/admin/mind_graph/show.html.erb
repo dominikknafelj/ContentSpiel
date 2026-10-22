@@ -141,7 +141,7 @@
       <div class="relative" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
         <%= label_tag "mind-graph-search", t(".search.label"), class: "sr-only" %>
         <%= search_field_tag :mind_graph_search, nil, id: "mind-graph-search", autocomplete: "off", placeholder: t(".search.placeholder"),
-              class: "block w-full rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink focus:outline-2 focus:outline-accent" %>
+              class: "block w-full rounded-cs border border-field-line bg-surface px-3 py-1.5 text-sm text-ink focus:outline-2 focus:outline-accent" %>
         <p data-mind-graph-status role="status" class="sr-only"></p>
         <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-20 m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-cs border border-line-strong bg-surface p-1 shadow-menu"></ul>
       </div>
@@ -201,8 +201,8 @@
       <div class="relative min-h-0 flex-1">
         <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
           <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph--graph#releasePinned" }) %>
-          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-line-strong bg-surface text-sm text-ink">
-            <% zoom_button = "cursor-pointer px-2.5 py-0.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
+          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-field-line bg-surface text-[13px] text-ink">
+            <% zoom_button = "inline-flex h-7 cursor-pointer items-center px-2.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
             <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph--graph#zoomOut" } %>
             <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 font-cs-mono text-label text-meta"></span>
             <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph--graph#zoomIn" } %>

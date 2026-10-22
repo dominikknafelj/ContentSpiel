@@ -17,8 +17,15 @@ module Admin
       SCOPES = [ [ "all", "All" ], [ "live", "Live" ], [ "drafts", "Drafts" ], [ "scheduled", "Scheduled" ] ].freeze
       TRANSLATIONS = [ [ "Needs translation", "needs" ], [ "Outdated", "outdated" ], [ "Complete", "complete" ] ].freeze
 
+      # Selected is INVERTED (contrast and buttons spec, D1): ink with paper
+      # words and count, the system's segmented look; the group around the
+      # pills is outlined in the field line. The keyboard's ring is the
+      # accent on a pill at rest and PAPER, 4px inside, on the selected one:
+      # the accent on dark ink is 1.96:1 (`test/lib/admin_contrast_test.rb`).
       SEGMENT_CLASS = "flex cursor-pointer items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken " \
-                      "has-[:checked]:bg-accent-tint has-[:checked]:font-semibold has-[:checked]:text-ink has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent".freeze
+                      "has-[:checked]:bg-ink has-[:checked]:font-semibold has-[:checked]:text-paper has-[:checked]:hover:bg-ink " \
+                      "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent " \
+                      "has-[:checked]:has-[:focus-visible]:outline-paper has-[:checked]:has-[:focus-visible]:-outline-offset-4".freeze
 
       # `filters` is a Hash of the active values (`q`, `type`, `tag`,
       # `translation`; blank when unset), `counts` the four scope numbers.

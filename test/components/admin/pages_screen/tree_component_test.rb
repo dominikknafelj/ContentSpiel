@@ -174,12 +174,45 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "a live page shows no status chip; a draft does" do
-    live = create_page(title: "Live one")
+  # Contrast and buttons spec (C2, Rulings 8 and 9): a mark after the title
+  # only when a page is not simply live, named for a screen reader in the
+  # status chip's and the unpublished chip's own words.
+  test "a draft is a hollow meta ring, a scheduled page a warn dot, a live page with changes a dim dot, and a live page nothing" do
     draft = create_page(title: "Draft one", published: false)
+    soon = create_page(title: "Soon")
+    soon.update_columns(published_at: 2.days.from_now) # version: none (a test schedules a page) # changes: none (a test schedules a page)
+    changed = create_page(title: "Changed")
+    assert Pages::Save.call(changed, translations: { "en" => { title: "Changed typed" } }).ok?
+    plain = create_page(title: "Plain")
+
     render_tree
-    assert_no_selector "li[data-page-id='#{live.id}'] > div .admin-status-chip"
-    assert_selector "li[data-page-id='#{draft.id}'] > div .admin-status-chip", text: "Draft"
+
+    assert_selector "li[data-page-id='#{draft.id}'] > div .admin-tree-mark[data-status=draft][role=img][aria-label='Draft'][title='Draft'][class~='border-meta'][class~='border-[1.5px]'][class~='size-1.5']"
+    assert_selector "li[data-page-id='#{soon.id}'] > div .admin-tree-mark[data-status=scheduled][aria-label='Scheduled'][class~='bg-warn']"
+    assert_selector "li[data-page-id='#{soon.id}'] > div .admin-tree-mark[title^='Scheduled · ']"
+    assert_selector "li[data-page-id='#{changed.id}'] > div .admin-tree-mark[data-unpublished-changes][aria-label='Unpublished changes'][class~='bg-dim']"
+    assert_no_selector "li[data-page-id='#{plain.id}'] > div .admin-tree-mark"
+    assert_no_selector ".admin-status-chip"
+  end
+
+  # Review focus 4.
+  test "a scheduled page with unpublished changes has one mark that names both" do
+    soon = create_page(title: "Soon")
+    soon.update_columns(published_at: 2.days.from_now, unpublished_changes_at: Time.current) # version: none (a test schedules a page) # changes: none (a test marks a scheduled page)
+
+    render_tree
+
+    assert_selector "li[data-page-id='#{soon.id}'] > div .admin-tree-mark", count: 1
+    assert_selector "li[data-page-id='#{soon.id}'] > div .admin-tree-mark[data-status=scheduled][data-unpublished-changes][aria-label='Scheduled · Unpublished changes'][class~='bg-warn']"
+  end
+
+  test "the selected row has the sunken ground and a 2px ink bar on its left edge" do
+    chosen = create_page(title: "Chosen")
+    other = create_page(title: "Other")
+    render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: chosen, locale: "en"))
+
+    assert_selector "li[data-page-id='#{chosen.id}'] > div[class~='bg-sunken'][class~='shadow-[inset_2px_0_0_var(--cs-ink)]']"
+    assert_no_selector "li[data-page-id='#{other.id}'] > div[class~='bg-sunken']"
   end
 
   # A row can be without a position (a half-written one; the column takes

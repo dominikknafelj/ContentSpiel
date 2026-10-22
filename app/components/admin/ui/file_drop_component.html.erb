@@ -1,9 +1,9 @@
-<div class="admin-file-drop rounded-cs border border-dashed border-line-strong px-4 py-6 text-center data-[dragging]:border-accent data-[dragging]:bg-accent-tint"
+<div class="admin-file-drop rounded-cs border border-dashed border-field-line px-4 py-6 text-center data-[dragging]:border-accent data-[dragging]:bg-accent-tint"
      data-controller="file-drop"
      data-action="dragover->file-drop#dragOver dragleave->file-drop#dragLeave drop->file-drop#drop change->file-drop#changed">
   <%= tag.input(**input_attrs) %>
   <p class="text-ink">Drop an image here or</p>
-  <label for="<%= id %>" class="mt-2 inline-flex cursor-pointer items-center justify-center rounded-cs border border-line-strong bg-surface px-4 py-2 font-semibold text-ink transition-colors hover:bg-sunken peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-accent">Choose file</label>
+  <label for="<%= id %>" class="mt-2 inline-flex cursor-pointer items-center justify-center rounded-cs border border-field-line bg-surface px-4 py-2 font-semibold text-ink transition-colors hover:bg-sunken peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-accent">Choose file</label>
   <% if hint %>
     <p id="<%= hint_id %>" class="mt-2 text-sm text-meta"><%= hint %></p>
   <% end %>

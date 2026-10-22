@@ -45,6 +45,7 @@ require_relative "support/built_in_block_types"
 require_relative "support/contract_ledger"
 require_relative "support/site_address_helper"
 require_relative "support/log_capture"
+require_relative "support/contrast_measure"
 require_relative "support/theme_test_helper"
 
 # What tests themselves print -- the statements a migration test runs

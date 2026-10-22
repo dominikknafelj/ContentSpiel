@@ -52,7 +52,7 @@
                     reader's list of fields nothing. %>
                 <%= label_tag "tag-#{row.id}-name", t(".name_label", name: row.name), class: "sr-only" %>
                 <%= text_field_tag "tag[name]", row.name, id: "tag-#{row.id}-name", maxlength: Tag::MAX_NAME_LENGTH, autocomplete: "off",
-                      class: "block w-full rounded-cs border border-transparent bg-transparent px-2 py-1 text-ink hover:border-line-strong focus:border-accent focus:bg-surface focus:outline-2 focus:outline-accent" %>
+                      class: "block w-full rounded-cs border border-transparent bg-transparent px-2 py-1 text-ink hover:border-field-line focus:border-accent focus:bg-surface focus:outline-2 focus:outline-accent" %>
                 <div id="tag-<%= row.id %>-name-errors" class="mt-1 text-sm text-danger-ink"></div>
               <% end %>
             </td>

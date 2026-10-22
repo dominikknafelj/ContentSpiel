@@ -23,11 +23,11 @@
 :root, [data-theme="light"] {
   --th-paper: #f5f4f0;
   --th-surface: #ffffff;
-  --th-sunken: #ecebe6;
+  --th-sunken: #e6e4dd;
   --th-ink: #141417;
   --th-dim: #55565b;
   --th-meta: #6c6d72;
-  --th-line: rgba(20,20,23,0.10);
+  --th-line: rgba(20,20,23,0.14);
   --th-line-strong: rgba(20,20,23,0.20);
   --th-accent: oklch(0.50 0.12 250);
   --th-accent-hover: oklch(0.45 0.12 250);
@@ -46,10 +46,11 @@
   --th-ph-b: #c9c7bd;
   --th-shadow-menu: 0 12px 32px rgba(20,20,23,0.12);
   /* A section's bands (sections spec §5.3, `sections.css`). `tinted` is the
-     sunken surface; `strong` is the page inverted, so it carries its own
-     three text colours: body, dimmed, and link. Against the strong band they
-     are 16.7:1, 11.0:1 and 9.9:1 here (16.3:1, 8.1:1 and 6.4:1 in the dark
-     block below); `test/integration/design_tokens_test.rb` holds every one
+     sunken surface, 1.16:1 against the page (Ruling 3: 1.2 would put the
+     accent link on it under 4.5:1); `strong` is the page inverted here, so it
+     carries its own three text colours: body, dimmed, and link. Against the
+     strong band they are 16.7:1, 11.0:1 and 9.9:1 here (the dark block below
+     says what it is there); `test/integration/design_tokens_test.rb` holds every one
      at 4.5:1 or better. */
   --th-band-tinted: var(--th-sunken);
   --th-band-strong: var(--th-ink);
@@ -80,7 +81,7 @@
   --th-ink: #ededee;
   --th-dim: #a9aaaf;
   --th-meta: #8e8f95;
-  --th-line: rgba(237,237,238,0.09);
+  --th-line: rgba(237,237,238,0.13);
   --th-line-strong: rgba(237,237,238,0.18);
   --th-accent: oklch(0.74 0.10 250);
   --th-accent-hover: oklch(0.80 0.09 250);
@@ -98,13 +99,16 @@
   --th-ph-a: #2a2b2f;
   --th-ph-b: #1c1d20;
   --th-shadow-menu: 0 12px 32px rgba(0,0,0,0.5);
-  /* The bands again: the dark page inverted is this block's ink as the band
-     and its paper as the text. */
+  /* The bands again. A strong band is the strongest step of ITS scheme
+     (design answer D2): in dark a raised dark ground, 1.56:1 against the
+     page, not the light page inverted, which glared. Its text, dim and
+     accent are 10.5:1, 6.8:1 and 7.1:1 on it, and 7.4:1, 4.8:1 and 5.0:1 on
+     its sunken ground, where code stands. */
   --th-band-tinted: var(--th-sunken);
-  --th-band-strong: #ededee;
-  --th-on-band-strong: #0f1012;
-  --th-on-band-strong-dim: #45464b;
-  --th-on-band-strong-accent: oklch(0.45 0.12 250);
+  --th-band-strong: #34353a;
+  --th-on-band-strong: #ededee;
+  --th-on-band-strong-dim: #c0c1c6;
+  --th-on-band-strong-accent: oklch(0.82 0.09 250);
   /* The syntax colours again. */
   --th-syn-comment: oklch(0.68 0.01 270);
   --th-syn-keyword: oklch(0.76 0.10 250);

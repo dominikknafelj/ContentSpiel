@@ -1,7 +1,7 @@
 <%# `data-notes-active` is set by `admin--notes--drawer#markActive` while a thread on this
     block is the one open in the drawer (notes handoff, "Block card marker"). %>
 <%= tag.div id: wrapper_id, class: [ "admin-block-card rounded-cs border bg-surface data-[notes-active]:border-accent", (unavailable? ? "border-danger" : (read_only_hold? ? "border-line-strong" : "border-line")) ], **wrapper_attributes do %>
-  <div class="flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">
+  <div class="admin-block-card__head flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">
     <%# Not for an unavailable card: it has no body, no menu with Move up / Move
         down, and a handle that only moves a card nobody can read would be the one
         move a keyboard user couldn't undo with the menu. %>
@@ -12,6 +12,7 @@
               aria-label="Move <%= label %>" aria-describedby="block-drag-help"
               data-action="keydown->admin--editor--blocks#key focusout->admin--editor--blocks#blur">⠿</button>
     <% end %>
+    <%= render Admin::EditorScreen::BlockIconComponent.new(definition: definition, place: :card) unless unavailable? %>
 
     <% if unavailable? %>
       <span class="flex-1 truncate text-sm font-semibold text-danger-ink"><%= unavailable_label %></span>
@@ -24,6 +25,7 @@
           collapse button -- the tile is what opens and closes it. %>
       <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= render panel_title %></h3>
       <span data-editing-mark-slot><%= render updated_mark %></span>
+      <%= status_line %>
     <% elsif !list? %>
       <%# `:group`: nothing to collapse, move or delete from here, only the type's name. %>
       <%# The notes marker stands directly after the name, on the left, where the notes
@@ -32,6 +34,7 @@
       <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, label: label, placement: :card, holds: holds) %>
       <span data-editing-mark-slot><%= render updated_mark %></span>
       <span class="flex-1"></span>
+      <%= status_line %>
       <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
       <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
         <% menu.with_item { add_note_item } %>
@@ -51,6 +54,7 @@
         <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, label: label, placement: :card, holds: holds) %>
         <span data-editing-mark-slot><%= render updated_mark %></span>
       </div>
+      <%= status_line %>
 
       <%# Move up / Move down keep calling `admin--editor--blocks#moveUp|moveDown`; their `data-move` is how
           `refreshMoveState` finds them to enable or disable them after a reorder, add or delete. %>
@@ -115,8 +119,6 @@
 
   <% unless unavailable? %>
     <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 p-3">
-      <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.published_at.present?) %>
-
       <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4", data: form_data do %>
       <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
       <%= fields do %>

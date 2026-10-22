@@ -154,9 +154,9 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     join(:reader, @reader)
     assert_selector "#{shown(tree_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
-    # From two the count, in 10px mono, 4px after the icon; the names in
+    # From two the count, in 11px mono, 4px after the icon; the names in
     # order of arrival.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => { "text" => "2", "size" => "10px", "mono" => true, "gap" => 4 },
+    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => { "text" => "2", "size" => "11px", "mono" => true, "gap" => 4 },
                    "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker))
 
     leave(:dana)
@@ -200,7 +200,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     join(:reader, @reader, path: "/cs-studio/posts/#{@post.id}")
     assert_selector "#{shown(post_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
-    assert_equal({ "text" => "2", "size" => "10px", "mono" => true, "gap" => 4 }, look(post_marker)["count"])
+    assert_equal({ "text" => "2", "size" => "11px", "mono" => true, "gap" => 4 }, look(post_marker)["count"])
 
     # A long title is cut with an ellipsis before the marker is: the marker
     # keeps its size and stays inside the cell.
