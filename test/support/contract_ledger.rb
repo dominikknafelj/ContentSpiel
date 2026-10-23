@@ -32,6 +32,10 @@ module ContractLedger
     shadow-menu
     band-tinted band-strong on-band-strong on-band-strong-dim on-band-strong-accent
     syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed
+    note-note-ground note-note-line note-note-ink note-note-border
+    note-tip-ground note-tip-line note-tip-ink note-tip-border
+    note-important-ground note-important-line note-important-ink note-important-border
+    note-warning-ground note-warning-line note-warning-ink note-warning-border
   ].freeze
 
   FIXED_TOKENS = %w[

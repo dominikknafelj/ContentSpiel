@@ -252,6 +252,55 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/text-decoration:\s*underline;/, code[/\.content-block--code \.code-head button:hover\s*\{([^}]*)\}/m, 1].to_s)
   end
 
+  NOTE_KINDS = BlockTypes::Note::KINDS.keys.freeze
+
+  # Note block spec, "The public side": plain rules on tokens; each kind's
+  # four tokens drawn in one place; the text, links and inline code the
+  # theme's own.
+  test "the note's stylesheet is declared by the type, holds no colour of its own, and draws each kind by its four tokens" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/note.css").read
+    bare = css.gsub(%r{/\*.*?\*/}m, "")
+    rule = ->(selector) { bare[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
+
+    assert_equal Rails.root.join("app/assets/tailwind/themes/default/note.css"), BlockTypes.fetch(:note).stylesheet_path
+    refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, bare)
+    NOTE_KINDS.each do |kind|
+      %w[ground line ink border].each do |part|
+        assert_match(/--note-#{part}:\s*var\(--th-note-#{kind}-#{part}\);/, rule.(".content-block--note-#{kind}"), "#{kind}'s #{part}")
+      end
+    end
+    box = rule.(".content-block--note")
+    assert_match(/background:\s*var\(--note-ground\);/, box)
+    assert_match(/border:\s*1px solid var\(--note-border\);/, box)
+    assert_match(/border-left:\s*3px solid var\(--note-line\);/, box)
+    head = rule.(".content-block--note .note-head")
+    assert_match(/color:\s*var\(--note-ink\);/, head)
+    assert_match(/font-size:\s*inherit;/, head, "the h3 is the body's size, whatever the theme's h3 is (plan ruling 14)")
+    assert_match(/clip-path:\s*inset\(50%\);/, rule.(".content-block--note .note-kind"), "the kind's word before a title is heard, not seen (decision 6)")
+    assert_no_match(/color:/, rule.(".content-block--note .note-body"), "the text is the theme's ink, from .cs-prose")
+    code = rule.(".content-block--note .note-body :not(pre) > code")
+    assert_match(/background:\s*var\(--th-surface\);/, code)
+    assert_match(/border:\s*1px solid var\(--th-line\);/, code)
+  end
+
+  # Spec decision 9 (Claude Design D4a): Note neutral, Tip the ok green,
+  # Important the accent blue, Warning the warn amber; red is for errors.
+  NOTE_HUES = { "note" => "--th-line-strong", "tip" => "--th-ok", "important" => "--th-accent", "warning" => "--th-warn" }.freeze
+
+  test "the sixteen note tokens are defined from the theme's base tokens in both schemes, never a literal, each kind in its hue and none in red" do
+    theme_tokens.each do |theme, tokens|
+      NOTE_KINDS.each do |kind|
+        %w[ground line ink border].each do |part|
+          value = tokens.fetch("--th-note-#{kind}-#{part}") { flunk("--th-note-#{kind}-#{part} is not defined for #{theme}") }
+          assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/, value, "#{theme} --th-note-#{kind}-#{part} is #{value}")
+          assert_no_match(/danger/, value, "#{theme} --th-note-#{kind}-#{part}: red is kept for errors and destructive actions")
+        end
+        assert_equal "var(#{NOTE_HUES.fetch(kind)})", tokens.fetch("--th-note-#{kind}-line"), "#{theme}: the #{kind}'s rule is its hue"
+      end
+      assert_equal "color-mix(in srgb, var(--th-ink) 4%, var(--th-paper))", tokens.fetch("--th-note-note-ground"), "#{theme}: a Note is a 4% tint of the text colour"
+    end
+  end
+
   # Code block spec §5: one token per role the highlighter names, each with
   # its dark value.
   SYNTAX_TOKENS = %w[comment keyword string constant tag attribute embed].map { |role| "--th-syn-#{role}" }.freeze

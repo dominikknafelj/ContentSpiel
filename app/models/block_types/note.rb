@@ -55,6 +55,10 @@ module BlockTypes
         # hidden word before a title, spec decision 6; plan ruling 13);
         # `icon` the kind's Lucide name; `body` the text, rendered.
         t.theme_methods :block, :page, :kind, :heading, :titled?, :word, :icon, :body
+        # Four per kind, in the order of `KINDS`; their values are the default
+        # theme's (`tokens.css`, defined from the base tokens), and a strong
+        # band re-values them (`sections.css`).
+        t.tokens themed: KINDS.keys.flat_map { |kind| %W[note-#{kind}-ground note-#{kind}-line note-#{kind}-ink note-#{kind}-border] }
         t.stylesheet "note.css"
         t.summary ->(block, locale:) { Note.summary(block, locale: locale) }
         # The guide's own example (a Tip with a title of its own), with the

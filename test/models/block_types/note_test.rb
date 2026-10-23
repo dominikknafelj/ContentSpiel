@@ -26,6 +26,8 @@ class BlockTypes::NoteTest < ActiveSupport::TestCase
     assert_empty note.read_only_actions
     assert_equal %w[block page kind heading titled? word icon body], note.theme_methods
     assert_equal "note.css", note.stylesheet
+    assert_equal %w[note tip important warning].flat_map { |kind| %W[note-#{kind}-ground note-#{kind}-line note-#{kind}-ink note-#{kind}-border] }, note.themed_tokens
+    assert_empty note.fixed_tokens
     assert_equal Blocks::NoteComponent, note.component
     assert_equal({ "note" => "info", "tip" => "lightbulb", "important" => "circle-alert", "warning" => "triangle-alert" }, BlockTypes::Note::ICONS)
     assert_equal "info", note.icon, "the picker's icon is the Note's, the kind a new block starts with"

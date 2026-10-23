@@ -1,0 +1,7 @@
+/* The fourth theme's stylesheet: its own Note template's rules, on the
+   default theme's note tokens, which this theme does not change. */
+.plain-note { border-left: 3px solid var(--th-note-note-line); background: var(--th-note-note-ground); padding: var(--th-sp-3); }
+.plain-note[data-kind="tip"] { border-left-color: var(--th-note-tip-line); background: var(--th-note-tip-ground); }
+.plain-note[data-kind="important"] { border-left-color: var(--th-note-important-line); background: var(--th-note-important-ground); }
+.plain-note[data-kind="warning"] { border-left-color: var(--th-note-warning-line); background: var(--th-note-warning-ground); }
+.plain-note__kind { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

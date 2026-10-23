@@ -264,7 +264,7 @@ The overrides and the callback are private, so none is an action. Nothing public
 
 ### Tokens
 
-Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothing and names no block. A theme changes one by declaring it again in its own stylesheet. The first group (`Theme::Contract.themed_tokens`, `--th-paper` to `--th-syn-embed`) has a value for the light scheme and one for the dark, and is declared again under both `:root, [data-theme="light"]` and `[data-theme="dark"]`; the rest (`.fixed_tokens`) have one value.
+Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothing and names no block. A theme changes one by declaring it again in its own stylesheet. The first group (`Theme::Contract.themed_tokens`, `--th-paper` to `--th-note-warning-border`) has a value for the light scheme and one for the dark, and is declared again under both `:root, [data-theme="light"]` and `[data-theme="dark"]`; the rest (`.fixed_tokens`) have one value.
 
 | Token | What it is |
 |---|---|
@@ -302,6 +302,22 @@ Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothi
 | `--th-syn-tag` | code: markup tags |
 | `--th-syn-attribute` | code: markup attributes, keys |
 | `--th-syn-embed` | code: template delimiters (`<%`, `%>`) |
+| `--th-note-note-ground` | a Note's ground |
+| `--th-note-note-line` | a Note's rule on the left |
+| `--th-note-note-ink` | a Note's word and icon |
+| `--th-note-note-border` | a Note's frame |
+| `--th-note-tip-ground` | a Tip's ground |
+| `--th-note-tip-line` | a Tip's rule on the left |
+| `--th-note-tip-ink` | a Tip's word and icon |
+| `--th-note-tip-border` | a Tip's frame |
+| `--th-note-important-ground` | an Important note's ground |
+| `--th-note-important-line` | an Important note's rule on the left |
+| `--th-note-important-ink` | an Important note's word and icon |
+| `--th-note-important-border` | an Important note's frame |
+| `--th-note-warning-ground` | a Warning's ground |
+| `--th-note-warning-line` | a Warning's rule on the left |
+| `--th-note-warning-ink` | a Warning's word and icon |
+| `--th-note-warning-border` | a Warning's frame |
 | `--th-font` | the text face |
 | `--th-mono` | the monospaced face |
 | `--th-t-display` | the homepage's title size |
@@ -496,6 +512,35 @@ What the script writes into the page it takes back itself, and a template does n
 
 The third theme (`test/fixtures/themes/code`, "In tests") is a template written from this section alone, and its tests are what holds the section to the code: `test/integration/theme_pages_test.rb` ("a theme replaces the Code block's template from the contract's names alone, and a theme that does not is drawn the default one", "the third theme is sound, checked deeply too: a Code template of the contract's names and a stylesheet of the seven tokens for both schemes"), `test/system/code_block_test.rb` ("under a theme's own template the Copy button is shown, copies the stored code and says so, with nothing but the documented markup", "a theme's stylesheet that declares the seven tokens again re-colours the code in both schemes, and in a strong band the code stays the band's one colour"), `test/values/theme/contract_test.rb` ("the Code block is in the contract: its template is replaceable with the methods it may call, and its seven syntax tokens are themed tokens in the highlighter's order", "each method the Code block's template may call answers for a block with no settings, and its four words are never missing"), `test/components/blocks/code_component_test.rb` ("string answers the four words and nothing else: another key raises with the four where a theme is written, and in production is empty and logged once", "lines is read once however often a template asks") and `test/lib/theming_reference_test.rb` ("the Code block's tables name exactly the methods of its entry, the four words and what the copy script reads").
 
+### The Note block
+
+A highlighted note in the flow of a page: a kind (Note, Tip, Important, Warning), an optional title of the editor's own and a short rich text (note block spec; the block itself is in `docs/reference/content-blocks-and-types.md`, "The Note block"). What a theme can do with it, from the least work to the most:
+
+1. **Re-colour it: re-colour the base tokens**, or declare the sixteen `--th-note-*` again under both selectors. Each is defined from the base in the default theme (Note is neutral, a 4% tint of `--th-ink` with a `--th-line-strong` rule; Tip is `--th-ok`, Important `--th-accent`, Warning `--th-warn`; none is `--th-danger`, which is kept for errors), so a theme that changes its base changes its notes. The text is `--th-ink`, its links `--th-accent`, inline code `--th-surface` with a `--th-line` frame. Each of the four kinds (`note`, `tip`, `important`, `warning`) has a ground, a rule, an ink and a border: `--th-note-note-ground`, `--th-note-note-line`, `--th-note-note-ink`, `--th-note-note-border`, `--th-note-tip-ground`, `--th-note-tip-line`, `--th-note-tip-ink`, `--th-note-tip-border`, `--th-note-important-ground`, `--th-note-important-line`, `--th-note-important-ink`, `--th-note-important-border`, `--th-note-warning-ground`, `--th-note-warning-line`, `--th-note-warning-ink`, `--th-note-warning-border`.
+2. **Restyle it: rules of its own** under `.content-block--note`. The default template's class names (`content-block--note-<kind>`, `note-head`, `note-icon`, `note-kind`, `note-body`) are the default theme's own, not on a list.
+3. **Replace its template**: `components/blocks/note_component.html.erb`.
+
+**What the template is handed** (`Theme::Contract.components`). The component draws nothing for a note without text in the language shown or along the site's fallback (`render?`), so a template never meets one, and each method answers for an empty block all the same.
+
+| Method | What it answers |
+|---|---|
+| `block` | the block: a published view on the site, the rows in a preview. `block.id` tells two notes of a page apart (an `id` for `aria-labelledby`) |
+| `page` | the page the block is drawn on |
+| `kind` | `"note"`, `"tip"`, `"important"` or `"warning"`; a kind stored and not on the list is `"note"` |
+| `heading` | the editor's title in the language shown, with the site's fallback; without one (or with one that is only the kind's word), the CMS's word for the kind ("Tip") |
+| `titled?` | whether `heading` is the editor's title |
+| `word` | the CMS's word for the kind ("Tip"), titled or not, in the language shown where `config/locales/public.<locale>.yml` has it and in English otherwise |
+| `icon` | the kind's Lucide name: `info`, `lightbulb`, `circle-alert` or `triangle-alert` |
+| `body` | the text, rendered (the same HTML `rich_text(block)` answers) |
+
+**What a template should keep.** The default draws an `aside` named by its heading (`aria-labelledby`), an `h3`, and never `role="alert"`: a note is part of the page, not an event. The icon is decoration (`aria-hidden`), since the heading says the kind. **Under an editor's title the kind is still said**: when `titled?`, the default puts `word` and a colon first inside the heading, visually hidden, so a screen reader hears "Tip: Before you publish", in a list of headings too; without a title it adds nothing, because `heading` is then the word and "Tip" would be heard twice. A theme's template should do the same. Print `heading` and `word` through ERB's escaping (`<%= heading %>`) and never mark them safe: the title is what an editor typed.
+
+**On a section's bands** (`sections.css`): a tinted band changes nothing of a note. **On a strong band a note shares the band's ground and each kind keeps its colour** (spec decision 10): every ground is `--th-band-strong`, every frame the band's `--th-line`, the text the band's text, and each kind's rule and ink (its word and icon) a colour of its own that reads on the band: Note the band's dim and text, Important the band's accent (`--th-on-band-strong-accent`), Tip and Warning their hue mixed 60% with the band's text (`color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong))`). The band is a dark ground in both schemes, so these are light inks in both. A theme's own `--th-note-*` therefore do not reach a note in a strong band; a theme that wants other colours there, or that draws its strong band light, declares them in a rule of its own for `.content-section--strong` and answers for their contrast.
+
+**Contrast is computed, for the default theme's values only.** `test/integration/design_tokens_test.rb` holds 72 pairs at 4.5:1 or better: `--th-ink`, `--th-accent` and the kind's ink on each kind's ground, on the page, in a tinted band and in a strong band, in both schemes ("every note's text, link and word are readable on its ground..."); and 16 at 3:1 or better: each kind's rule and ink against a strong band, in both schemes ("on a strong band a note shares the band's ground and each kind keeps its colour..."). Nothing measures a theme's values.
+
+The fourth theme (`test/fixtures/themes/note`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one", "the fourth theme is sound, checked deeply too: a Note template of the contract's names").
+
 ## What a template may ask
 
 The helpers of the page tree and the article (`ThemeHelper`, theming spec §7). Each is read-only and memoised for the render, answers only what the public sees, and reads none of `params`, `request`, `cookies` or `session`: "the shown page" is the page the controller resolved (`@page`), never the request's path.
@@ -689,6 +734,7 @@ A change to a file of the theme reloads the application at the next request, as 
 - **`with_plain_theme { … }`** (`test/support/theme_test_helper.rb`, included in every test case) is the one way a test is drawn by a theme: `Theme.with(plain_theme, &block)`, where `plain_theme` is `Theme.load(ThemeFolder.new(PLAIN))`. A system test's server runs in the test's process, so the swap reaches it. `Theme.with` is process-wide: two tests in one process must not run under different themes at once (the suite's parallelism is by process).
 - **`with_theme_copy { |dir| … }`** yields a copy of the second theme in a directory of its own, for a test that adds, changes or removes a file. Load it with `Theme.load(ThemeFolder.new(dir))`: a theme made with `Theme.new(path:)` is unchecked and has the fingerprint `default`, so the ETag does not tell it from the default theme. **One `Theme` does not re-read a changed template in the test environment** (ViewComponent compiles once, and Action View caches a template by its path): a test that edits a file builds a new theme, in a copy of its own.
 - **The third theme, `test/fixtures/themes/code`**, and `with_code_theme { … }`: two files, a template for the Code block written from the contract's nine names and the copy script's markup (it draws a `div.plain-code`, never the default's `figure`), and a stylesheet that declares the seven syntax tokens again for both schemes. Neither its assets nor a controller are on the test environment's paths: it has no image, font or script, and the suite's built stylesheet is the default theme's, so the browser test that shows its tokens at work puts the file's text into the page after the built stylesheet, which is where the build puts a theme's.
+- **A fourth theme, `test/fixtures/themes/note`** (`with_note_theme`), is a Note template written from "The Note block" alone and a stylesheet for it.
 - **The second theme, `test/fixtures/themes/plain`**: plain CSS, no utilities but one. It replaces `_frame`, `_title`, `_icons`, `_head`, `pages/show`, the Rich text block's template and one post list (`posts/blog_list_component`); it changes `--th-accent` for both schemes; it brings two partials under `views/theme/`, one controller (`hello_controller.js`) and one image. Its frame and page draw the section's tree, the crumbs, a table of contents and previous and next on every page, which is why the canary and the trash test can ask it. **It deliberately does not replace the header, the footer, the Image block, the Code block or the 404**, so every test of it is also a test of the fallback. Any file added to it changes its fingerprint; no test pins the value.
 - **The second theme's assets and controller are on the test environment's paths from the start** (`config/environments/test.rb`, `test/fixtures/themes/importmap.rb`): Propshaft's load path and the import map are fixed when the application starts and the suite swaps themes in-process. So `image_path("plain-mark.svg")` resolves under the default theme too, and "the default theme has no theme controller in its map" cannot be shown in the suite; the browser test shows the other half, that it is not REGISTERED off the public site.
 - **The suite's stylesheet is the default theme's.** System status' Theme row therefore WARNS under `with_plain_theme` (the stamp is `default`): a test that wants the OK row under a theme hands `stylesheet_probe: -> { true }` to `Setup::SystemCheck`.
