@@ -28,6 +28,18 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-block-tile__face span.font-semibold", text: "Image"
   end
 
+  # Plan ruling 12: a note's tile shows its kind's icon, under the id a
+  # save's answer replaces, one icon only, and the face still says "Note".
+  test "a note's tile shows its kind's icon in place of the type's name, once, and the face is still named Note" do
+    block = @editor_page.content_blocks.create!(block_type: "note", section: @section, section_column: 2, position: 0, settings: { "kind" => "warning" })
+    render_tile(block)
+
+    assert_selector ".admin-block-tile__face span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='text-meta'] svg[class~='size-3']"
+    assert_selector ".admin-block-tile__face [data-block-icon]", count: 1
+    assert_selector ".admin-block-tile__face .sr-only", text: "Note"
+    assert_selector ".admin-block-tile__face", text: /Warning · Empty/
+  end
+
   # Review focus 3.
   test "a type that names no icon keeps its name on the tile and draws no icon anywhere" do
     with_gallery_album do

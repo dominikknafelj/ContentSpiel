@@ -15,7 +15,7 @@ class Admin::EditorScreen::BlockIconComponentTest < ViewComponent::TestCase
   end
 
   test "every built-in block type declares its icon" do
-    assert_equal({ "rich_text" => "pilcrow", "image" => "image", "code" => "code_xml", "post_list" => "posts", "section" => "columns_2" },
+    assert_equal({ "rich_text" => "pilcrow", "image" => "image", "code" => "code_xml", "note" => "info", "post_list" => "posts", "section" => "columns_2" },
       BlockTypes.all.to_h { |type| [ type.name, type.icon ] }.slice(*BuiltInBlockTypes.names))
   end
 

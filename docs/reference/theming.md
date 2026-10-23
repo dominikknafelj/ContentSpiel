@@ -354,6 +354,7 @@ Under the theme's `components/`, as `<path>.html.erb`. The methods are what the 
 | `blocks/rich_text_component` | `block`, `page` |
 | `blocks/image_component` | `block`, `page`, `asset`, `alt`, `caption`, `sizes` |
 | `blocks/code_component` | `block`, `page`, `lines`, `code`, `language`, `language_label`, `filename`, `caption`, `string` |
+| `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body` |
 | `blocks/post_list_component` | `block`, `page`, `list_component` |
 | `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width` |
 | `posts/blog_list_component` | `posts`, `page` |

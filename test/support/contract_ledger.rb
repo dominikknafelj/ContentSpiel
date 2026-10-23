@@ -16,6 +16,7 @@ module ContractLedger
     "blocks/rich_text_component" => %w[block page],
     "blocks/image_component" => %w[block page asset alt caption sizes],
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
+    "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width],
     "posts/blog_list_component" => %w[posts page],

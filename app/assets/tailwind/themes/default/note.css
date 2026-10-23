@@ -1,0 +1,10 @@
+/* The note block's public styles. Every colour is a --th- token:
+   a built-in's token values are written in tokens.css, light and dark, and
+   declared in the type's `tokens` (block types spec, decision 3). A block's
+   token is defined from the theme's base tokens (var(--th-ink),
+   color-mix() of --th-accent and --th-surface, ...) wherever one is right,
+   so a theme that re-colours its base re-colours the block, and holds a
+   literal only where no base token is.
+*/
+.content-block--note {
+}

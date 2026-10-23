@@ -37,6 +37,8 @@ en:
           # answers (block types spec, decision 8).
           types:
             # bin/rails generate block_type adds a type's scope below this line.
+            note:
+              empty: "Empty"
             code:
               empty: "Empty"
             post_list:
