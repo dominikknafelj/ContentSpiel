@@ -151,7 +151,7 @@
           <%= render Admin::Ui::FieldComponent.new(
                 field: field, form_name: "block[settings]",
                 value: value_for(field), original: original_for(field), locale: locale,
-                errors: field_errors(field), id_prefix: error_prefix, **translation(field.name)
+                errors: field_errors(field), id_prefix: error_prefix, placeholder: placeholder_for(field), **translation(field.name)
               ) %>
         <% end %>
 

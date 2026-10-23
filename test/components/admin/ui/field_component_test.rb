@@ -108,4 +108,19 @@ class Admin::Ui::FieldComponentTranslationTest < ViewComponent::TestCase
     assert_selector "fieldset#block-7-kind legend", exact_text: "Kind"
     assert_selector "#block-7-kind-errors", text: "is not included in the list"
   end
+
+  test "a help line stands under the input and describes it" do
+    field = Field.new(name: "title", type: :string, options: { help: "Empty: the kind's word." })
+    render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en", id_prefix: "block-7")
+
+    assert_selector "input#block-7-title[aria-describedby='block-7-title-help']"
+    assert_selector "p#block-7-title-help.text-meta", exact_text: "Empty: the kind's word."
+  end
+
+  test "a placeholder handed to the field reaches its input" do
+    field = Field.new(name: "title", type: :string, options: {})
+    render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en", placeholder: { text: "Note" })
+
+    assert_selector "input[placeholder='Note']"
+  end
 end

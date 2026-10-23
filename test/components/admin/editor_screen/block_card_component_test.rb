@@ -625,4 +625,40 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector ".admin-block-card > .admin-block-card__head .admin-block-card__status ##{status}[role=status]"
     assert_no_selector "[data-block-body] ##{status}"
   end
+
+  # Plan ruling 3: a field that takes its placeholder from a select shows the
+  # label of the choice stored, read from the default language, and carries
+  # what the browser needs to follow a new choice before it is saved.
+  def with_hint_type
+    BlockTypes.register(:test_hint) do |t|
+      TestTypes.declare(t)
+      t.label "Hint"
+      t.field :tone, :select, options: { "calm" => "Calm", "loud" => "Loud" }, default: "calm", control: :segmented
+      t.field :headline, :string, translated: true, placeholder_from: :tone, help: "Empty: the tone's word heads it."
+    end
+    yield
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "a field that takes its placeholder from a select shows the stored choice's label, on the default tab and on a translation tab" do
+    with_locales(%w[en de], default: "en") do
+      with_hint_type do
+        page = create_page(title: "Hints")
+        block = page.content_blocks.create!(block_type: "test_hint", position: 0, settings: { "tone" => "loud" })
+
+        render_card(block, page: page)
+        input = self.page.find("input[name='block[settings][headline]']")
+        assert_equal "Loud", input[:placeholder]
+        assert_equal "block[settings][tone]", input["data-admin--ui--placeholder-from-source-value"]
+        assert_equal({ "calm" => "Calm", "loud" => "Loud" }, JSON.parse(input["data-admin--ui--placeholder-from-labels-value"]))
+        assert_selector "p#block-#{block.id}-headline-help", exact_text: "Empty: the tone's word heads it."
+        assert_selector "fieldset#block-#{block.id}-tone input#block-#{block.id}-tone-loud[checked]"
+
+        render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
+        assert_equal "Loud", self.page.find("input[name='block[settings][headline]']")[:placeholder]
+        assert_no_selector "input[type=radio]", visible: :all
+      end
+    end
+  end
 end

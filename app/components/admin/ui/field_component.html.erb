@@ -12,6 +12,9 @@
       <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
     <% end %>
     <%= render input_component %>
+    <% if field.help %>
+      <p id="<%= help_id %>" class="mt-1 text-sm text-meta"><%= field.help %></p>
+    <% end %>
     <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
     <%= render "admin/shared/translation_box", button: box_button %>
   <% end %>
