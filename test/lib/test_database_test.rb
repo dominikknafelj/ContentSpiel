@@ -13,6 +13,6 @@ class TestDatabaseTest < ActiveSupport::TestCase
   test "this run uses the database named after its own folder, or a worker's copy of it" do
     expected = ContentSpiel::TestDatabase.name_for(Rails.root)
     actual = ActiveRecord::Base.connection_db_config.database
-    assert actual == expected || actual.start_with?("#{expected}-"), "#{actual} is not #{expected}"
+    assert actual.match?(/\A#{Regexp.escape(expected)}(_\d+)?\z/), "#{actual} is not #{expected}"
   end
 end
