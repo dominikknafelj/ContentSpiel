@@ -122,6 +122,8 @@ Also left for part 2 by part 1, but **not on the approved list**: the Mind graph
 - **O10.** Collapse uploads too? Twelve images uploaded in a row are twelve records, so the rule above (one record) keeps twelve rows. Recommendation: yes, "You uploaded 12 images", linking to the library; it is the same flood.
 - **O11.** Add the two left-overs of part 1 (count badges over page cards in the Mind graph; the reference card's summary triangle)?
 
+**Owner's answers (2026-10-23):** O1: narrow Settings to 760px. O7: related posts on the site are a spec of their own later; this work changes the post editor's help text so it stops promising them. O9: yes, two letters in the dashboard's activity too. O10: yes, collapse uploads ("You uploaded 12 images"). O11: yes, both left-overs of part 1 are in this work.
+
 ## What this does not do
 
 - No related posts on the public site (O7), no tag pages, no navigation block type.
