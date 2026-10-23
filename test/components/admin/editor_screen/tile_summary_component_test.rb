@@ -244,4 +244,47 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_selector "#{line} > span.font-cs-mono", exact_text: "x = 1"
     assert_no_selector attention
   end
+
+  # Note block spec, "CS Studio": the kind's word or the editor's title,
+  # " · " and the start of the text; an empty text says "Empty" in the meta
+  # colour. Plan ruling 6: the tile only. The kind's icon is not a part of
+  # the line: the tile draws it before the line (plan ruling 12,
+  # block_tile_component_test.rb), and the summary draws none.
+  test "a note is its word or its title and the start of its text; one without text says Empty" do
+    note = block("note", settings: { "kind" => "tip" })
+    note.assign_body(rich_doc("First words of the note.\n\nA second paragraph."), locale: :en)
+    note.save!
+    render_summary note
+    assert_no_selector ".admin-block-tile__summary svg", visible: :all
+    assert_equal "Tip · First words of the note.", page.find(line).text
+
+    note.assign_settings({ "title" => "Before you publish" }, locale: "en")
+    note.save!
+    render_summary note
+    assert_equal "Before you publish · First words of the note.", page.find(line).text
+
+    empty = block("note")
+    render_summary empty
+    assert_equal "Note · Empty", page.find(line).text
+    assert_selector "#{line} > span.text-meta", exact_text: "Empty"
+  end
+
+  test "a note's title that looks like markup is text on its tile, and an unknown kind reads as a Note" do
+    note = block("note", settings: { "kind" => "tip" })
+    note.assign_settings({ "title" => "<i>x</i> & <script>y</script>" }, locale: "en")
+    note.save!
+    note.update_columns(settings: { "kind" => "gone" }) # version: none (a test writes a kind around the services)
+    render_summary note.reload
+
+    assert_equal "<i>x</i> & <script>y</script> · Empty", page.find(line).text
+    assert_no_selector "#{line} i, #{line} script", visible: :all
+  end
+
+  test "a note whose kind is not on the list says Note on its tile" do
+    note = block("note", settings: { "kind" => "tip" })
+    note.update_columns(settings: { "kind" => "gone" }) # version: none (a test writes a kind around the services)
+    render_summary note.reload
+
+    assert_equal "Note · Empty", page.find(line).text
+  end
 end
