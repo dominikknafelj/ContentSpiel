@@ -97,4 +97,15 @@ class Admin::Ui::FieldComponentTranslationTest < ViewComponent::TestCase
     render_inline Admin::Ui::FieldComponent.new(field: Field.new(name: "role_type", type: :string, options: {}), form_name: "block[settings]", value: nil, locale: "en")
     assert_selector "label[for='block_settings-role_type']", exact_text: "Role type"
   end
+
+  # The segmented control names itself with its legend; a <label for> above
+  # it would point at no control (the radios have ids of their own).
+  test "a segmented select has its legend and no label of the field's above it, and its error slot is where it always is" do
+    field = Field.new(name: "kind", type: :select, options: { options: { "note" => "Note" }, control: :segmented })
+    render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: "note", locale: "en", id_prefix: "block-7", errors: [ "is not included in the list" ])
+
+    assert_no_selector "label[for='block-7-kind']"
+    assert_selector "fieldset#block-7-kind legend", exact_text: "Kind"
+    assert_selector "#block-7-kind-errors", text: "is not included in the list"
+  end
 end

@@ -40,4 +40,38 @@ class Admin::Fields::SelectFieldTest < ViewComponent::TestCase
     render_inline Admin::Fields::SelectField.new(field: required, form_name: "block[settings]", value: "small", locale: "en")
     assert_no_selector "option[value='']"
   end
+
+  # Note block spec, decision 7: a select may be drawn as a segmented control,
+  # a group of radio buttons underneath, so it works from the keyboard and
+  # without a script. The group is a fieldset named by its legend.
+  test "a segmented select is a fieldset of radios named by its legend, the stored choice checked" do
+    field = Field.new(name: "kind", type: :select, options: { options: { "note" => "Note", "tip" => "Tip" }, control: :segmented })
+    render_inline Admin::Fields::SelectField.new(field:, form_name: "block[settings]", value: "tip", locale: "en", id_prefix: "block-7")
+
+    assert_no_selector "select"
+    assert_selector "fieldset#block-7-kind > legend", exact_text: "Kind"
+    assert_selector "fieldset#block-7-kind input[type=radio]", count: 2
+    assert_selector "fieldset#block-7-kind > div[class~='border-field-line']", count: 1
+    assert_selector "label[for='block-7-kind-note'] input#block-7-kind-note[type=radio][name='block[settings][kind]'][value='note']:not([checked])"
+    assert_selector "label[for='block-7-kind-tip'] input#block-7-kind-tip[type=radio][value='tip'][checked]"
+    assert_selector "label[for='block-7-kind-tip']", text: "Tip"
+  end
+
+  test "a segmented select whose stored value is not on its list checks no button" do
+    field = Field.new(name: "kind", type: :select, options: { options: { "note" => "Note" }, control: :segmented })
+    render_inline Admin::Fields::SelectField.new(field:, form_name: "block[settings]", value: "gone", locale: "en")
+
+    assert_no_selector "input[type=radio][checked]"
+  end
+
+  # A form someone else holds is rewritten by `HeldFields`: every radio is
+  # disabled, and which one is checked stays.
+  test "held by someone else, a segmented select keeps its checked button and disables every one" do
+    field = Field.new(name: "kind", type: :select, options: { options: { "note" => "Note", "tip" => "Tip" }, control: :segmented })
+    render_inline Admin::Fields::SelectField.new(field:, form_name: "block[settings]", value: "tip", locale: "en", id_prefix: "block-7")
+    held = Nokogiri::HTML5.fragment(Admin::EditorScreen::HeldFields.call(rendered_content))
+
+    assert_equal %w[disabled disabled], held.css("input[type=radio]").map { |radio| radio["disabled"] }
+    assert_equal [ "tip" ], held.css("input[type=radio][checked]").map { |radio| radio["value"] }
+  end
 end
