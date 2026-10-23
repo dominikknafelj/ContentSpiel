@@ -1,6 +1,6 @@
 # The layout points (Claude Design's review, part 2)
 
-Status: draft, for the owner's review.
+Status: for the owner's review (Claude Design's answers and the owner's answers to O1, O7, O9–O11 are in).
 
 Source: Claude Design's answers of 2026-10-15 (`.superpowers/design-answers/2026-10-15-contrast-and-icons.md` in the main checkout): D3 items 2 and 4 to 11, and the "First reply" (the dashboard's grid, Notes for you, empty states, recent activity, the footer links). Part 1 (contrast, buttons, block icons, tree marks, the site's bands) shipped as PR #77 (`2026-10-15-contrast-and-buttons-design.md`). The owner approved the scope of part 2 on 2026-10-15. Every point below was checked against the code at `33284754`, and where the code differs from what the design answer saw, this spec says so.
 
@@ -113,6 +113,15 @@ Also left for part 2 by part 1, but **not on the approved list**: the Mind graph
 - **O6. The dashboard's empty lines and actions.** Recommendation: Your drafts "No drafts." + "Start one" (moves the focus to the quick-create field; no link when there is no quick-create row); Going live next "Nothing scheduled." + "Your drafts →" (the posts list, drafts); Unpublished changes "Nothing waiting to be published."; Needs translation "Nothing to translate."; Notes for you "No notes for you."; Open threads "No open threads."; Recent activity "No recent activity.". Left-aligned or centred?
 - **O7. The subpages list.** It is what the review saw as "Resume under a rule" and as "footer links under Test". What should its label say ("Pages", "In this section", "More")? Recommendation: "In this section", mono, as the date above a post's title. And should it show on a post's own page at all? Recommendation: no: on a post page the listing page's subpages are not about the post.
 - **O8. Tags on the post page.** Today they are mono capitals, no border, no link. There is no tag page on the public site (no route; a post's address comes from the list blocks that list it), so a link would have to go to a page whose list block filters by that tag, which may not exist or may be several. Recommendation: plain text in this PR, in the small sans size, lower case as stored, after a mono label "Tagged" (`rails, ruby`); links when the site has tag pages.
+
+**Claude Design's answers (2026-10-23, in words; saved in `.superpowers/design-answers/2026-10-23-layout-points.md`):**
+- O2: the screenshot was mid-scroll. While the bar is stuck over content: a 1px `--cs-line-strong` top border and a shadow `0 -6px 16px` of ink at 6% (12% in dark); nothing at rest.
+- O3: the drawer stays 400px, the margin takes the rest, the form column is left-aligned. A translation tab: two columns of up to 560px with a 24px gap (1,144px); stacked, source above, when two columns of at least 400px do not fit.
+- O4: one vocabulary in CS Studio: ○ Missing, ↻ Outdated, ● Translated; the chip's "Not translated" becomes "Missing".
+- O5: the Status link is LAST in Key, after the marks, as the text link "Status key…".
+- O6: the proposed lines, except "No unpublished changes." and "Start a draft"; left-aligned under the card's title, where the first row would be.
+- O7: "In this section", mono; hidden on a post's own page; nothing drawn (no label, no rule) without subpages.
+- O8: a mono "Tagged" label, then the tags in the small sans size, lower case as stored, joined by commas, plain text; links once tag pages exist.
 
 ## Open questions for the owner
 
