@@ -1511,4 +1511,31 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "##{ActionView::RecordIdentifier.dom_id(block)} textarea", count: 0
     assert_select "##{ActionView::RecordIdentifier.dom_id(block)} details[data-shared-fields] dd pre", text: /a = 1/
   end
+
+  # Note block plan, ruling 12: neither a card's head nor a tile's face is
+  # re-rendered by a save, so an icon that follows its block is replaced by
+  # id in the save's answer; any other type's answer carries no icon.
+  test "a save of a block whose icon follows it redraws the icon on its card and its tile; another type's save redraws none" do
+    BlockTypes.register(:test_flag) do |t|
+      TestTypes.declare(t)
+      t.label "Flag"
+      t.field :tone, :select, options: %w[calm loud], default: "calm"
+      t.icon "info", for_block: ->(block) { block.settings["tone"] == "loud" ? "triangle_alert" : "info" }
+    end
+    flag = @page.content_blocks.create!(block_type: "test_flag", position: 0)
+
+    patch "#{blocks_path}/#{flag.id}", params: { block: { settings: { tone: "loud" } }, base_updated_at: flag.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action='replace'][target='block-#{flag.id}-icon-card'] template span#block-#{flag.id}-icon-card[data-block-icon='triangle_alert']"
+    assert_select "turbo-stream[action='replace'][target='block-#{flag.id}-icon-tile'] template span#block-#{flag.id}-icon-tile[data-block-icon='triangle_alert']"
+
+    code = @page.content_blocks.create!(block_type: "code", position: 1)
+    patch "#{blocks_path}/#{code.id}", params: { block: { settings: { filename: "a.rb" } }, base_updated_at: code.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[target^='block-#{code.id}-icon-']", count: 0
+  ensure
+    Rails.application.reloader.prepare!
+  end
 end
