@@ -134,14 +134,16 @@ module Audit
       #
       # `count` above 1 tells a run of `COUNTED` actions as one sentence and
       # needs a `target` (a block's page, or the library for uploads);
-      # `mixed` says the run's blocks are of several types.
-      def build(event, viewer:, target:, fallback_scheduled_at: nil, count: 1, mixed: false)
+      # `mixed` says the run's blocks are of several types; `at_least` says
+      # the count is a floor ("60 or more"), for a run the read cut off.
+      def build(event, viewer:, target:, fallback_scheduled_at: nil, count: 1, mixed: false, at_least: false)
         action = effective_action(event)
         if count > 1 && (!COUNTED.include?(action) || target.nil?)
           raise ArgumentError, "a counted sentence needs a counted action (#{COUNTED.join(", ")}) and a target"
         end
+        raise ArgumentError, "at_least is for a counted sentence (count above 1)" if at_least && count <= 1
         actor = actor_for(event, viewer, none: action == "session.failed")
-        parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you, count:, mixed:).parts
+        parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you, count:, mixed:, at_least:).parts
         new(
           actor:,
           parts:,
@@ -197,8 +199,9 @@ module Audit
         nil
       end
 
-      def initialize(event, action, target, fallback_scheduled_at, you: false, count: 1, mixed: false)
+      def initialize(event, action, target, fallback_scheduled_at, you: false, count: 1, mixed: false, at_least: false)
         @you = you
+        @number = at_least ? "#{count} or more" : count.to_s
         @count = count
         @mixed = mixed
         @event = event
@@ -245,7 +248,7 @@ module Audit
       end
 
       def content_parts(verb)
-        return [ text("uploaded "), Part.new(:collection, "#{@count} images") ] if @count > 1 && @action == "media.uploaded"
+        return [ text("uploaded "), Part.new(:collection, "#{@number} images") ] if @count > 1 && @action == "media.uploaded"
 
         before, after = CONTENT_VERBS.fetch(verb)
         if verb == "scheduled" && (date = scheduled_date)
@@ -307,7 +310,7 @@ module Audit
       def block_parts(verb)
         noun = (type = block_type) ? "#{type} block" : "block"
         if @count > 1
-          counted = @mixed || !type ? "#{@count} blocks" : "#{@count} #{type} blocks"
+          counted = @mixed || !type ? "#{@number} blocks" : "#{@number} #{type} blocks"
           return subject_parts(verb == "created" ? "added #{counted} to " : "edited #{counted} on ")
         end
         # An owner the viewer can't open (or one that is gone) isn't named:

@@ -187,10 +187,29 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     60.times { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } }
 
     assert_equal [ readable ], activity(blog_reader).rows.map(&:record)
+    # Sixty uploads fill the read (15 * 4) exactly, so the read cannot tell
+    # that the run ends there: it is the only run, kept, and counted as a
+    # floor ("60 or more"), never as a number it may not be.
     # The owner's sixty uploads are now one run (the owner's O10), read in
     # one LIMIT of sixty events, so the older post is past the read (Decision
     # 11's cost: a feed whose newest events collapse shows fewer rows).
-    assert_equal [ [ "media.uploaded", 60 ] ], activity(@me).rows.map { |row| [ row.event.action, row.count ] }
+    rows = activity(@me).rows
+    assert_equal [ [ "media.uploaded", 60 ] ], rows.map { |row| [ row.event.action, row.count ] }
+    assert_equal "uploaded 60 or more images", rows.first.sentence.parts.map(&:text).join
+  end
+
+  test "a run the read cut off says N or more and claims no start" do
+    61.times { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } }
+    row = activity.rows.sole
+    assert_equal 60, row.count
+    assert_equal "uploaded 60 or more images", row.sentence.parts.map(&:text).join
+    assert_equal row.event.occurred_at, row.at, "the start is the newest event's own, not the run's"
+  end
+
+  test "a run the read cut off beside another run is not shown" do
+    kept = as(@me) { create_post(title: "Kept", published: false) }
+    61.times { travel_to(1.hour.ago) { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } } }
+    assert_equal [ kept ], activity.rows.map(&:record), "the last run is cut by the read: dropped, not shown with a false number"
   end
 
   # --- layout points spec, decision 11: runs ---------------------------------
@@ -277,10 +296,10 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
 
     rows = activity.rows
     assert_equal 15, rows.size
-    assert_equal 2, rows.first.count
+    assert rows.all? { _1.count == 2 }
   end
 
-  test "the same number of statements for a run of 5 blocks and one of 60, and for 60 runs of one" do
+  test "the same number of statements for a run of 5 blocks and one of 60 (the second read also holds the first's)" do
     counts = [ 5, 60 ].map do |n|
       page = as(@me) { create_page(title: "N#{n}") }
       n.times { as(@me) { Audit.record("block.created", subject: page.content_blocks.create!(block_type: "rich_text", position: 0)) } }
@@ -317,16 +336,14 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     kept = create_media_asset
     gone = create_media_asset
     legacy = create_media_asset
-    as(@me) { Audit.record("media.uploaded", subject: kept) }
-    as(@me) { Audit.record("media.uploaded", subject: gone) }
+    # More than the coalesce window apart, so they are three rows, not a run.
+    travel_to(30.minutes.ago) { as(@me) { Audit.record("media.uploaded", subject: kept) } }
+    travel_to(15.minutes.ago) { as(@me) { Audit.record("media.uploaded", subject: gone) } }
     Audit::Event.create!(action: "media.uploaded", actor: @me, user_id: @me.id, subject_type: "MediaAsset", subject_id: legacy.id,
       subject_label: "legacy", occurred_at: Time.current, last_occurred_at: Time.current)
     gone.update!(trashed_at: Time.current)
 
-    # The two uploads that remain are one run (the trashed image is no event
-    # here, so it is not counted): the newest is the row's record.
-    rows = activity.rows
-    assert_equal [ [ legacy, 2 ] ], rows.map { |row| [ row.record, row.count ] }
+    assert_equal [ kept, legacy ].sort_by(&:id), activity.rows.map(&:record).sort_by(&:id)
   end
 
   test "an update that only set a future published_at reads as scheduled for that date" do

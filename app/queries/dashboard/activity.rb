@@ -119,7 +119,13 @@ module Dashboard
 
       records = readable_records(events)
       ActiveRecord::Associations::Preloader.new(records: events, associations: :user).call
-      runs(events, records).first(@limit).map { |run| row_for(run) }
+      found = runs(events, records)
+      # A full read may have cut its last run short: its count and start would
+      # be false. With other runs it is dropped (the feed shows fewer rows);
+      # alone it is kept and said to be "N or more".
+      cut = events.size == @limit * READ_FACTOR
+      found.pop if cut && found.size > 1
+      found.first(@limit).map { |run| row_for(run, floor: cut && found.size == 1) }
     end
 
     # The events whose subject the viewer may read (see the class comment), as
@@ -173,7 +179,7 @@ module Dashboard
 
     def actor_key(event) = [ event.user_id, event.actor_type, event.actor_id ]
 
-    def row_for(run)
+    def row_for(run, floor: false)
       event, record = run.first
       oldest = run.last.first
       count = run.map { |(e, _)| e.subject_id }.uniq.size
@@ -185,9 +191,12 @@ module Dashboard
         else
           Audit::Sentence::Target.new(record.title.presence || "(untitled)", Audit::Sentence.route_for(record))
         end
-      sentence = Audit::Sentence.build(event, viewer: @actor, target:, fallback_scheduled_at: fallback, count:, mixed:)
-      Row.new(event:, record:, sentence:, at: oldest.occurred_at, count:,
-        span_end: (event.last_occurred_at if event.last_occurred_at > oldest.occurred_at))
+      sentence = Audit::Sentence.build(event, viewer: @actor, target:, fallback_scheduled_at: fallback, count:, mixed:, at_least: floor && count > 1)
+      # A floor row does not claim the run's start (the read stopped before
+      # it): it shows the newest event's own times.
+      start = floor ? event : oldest
+      Row.new(event:, record:, sentence:, at: start.occurred_at, count:,
+        span_end: (event.last_occurred_at if event.last_occurred_at > start.occurred_at))
     end
 
     # Where an event's sentence points: `[class name, id]` of the page, post

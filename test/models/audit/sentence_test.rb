@@ -495,6 +495,16 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal Audit::Sentence::Route.new(:admin_media_path, [], {}), sentence.subject_route
   end
 
+  test "a floor count reads N or more, for blocks, mixed blocks and uploads, and only a counted sentence takes it" do
+    target = Audit::Sentence::Target.new("Demo", Audit::Sentence::Route.new(:admin_page_path, [ 1 ], {}))
+    created = event("block.created", subject_type: "ContentBlock", subject_id: 1, snapshot: { "block_type" => "code" })
+    upload = event("media.uploaded", subject_type: "Media::Asset", subject_id: 5)
+    assert_equal "You added 60 or more Code blocks to “Demo”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 60, at_least: true))
+    assert_equal "You added 60 or more blocks to “Demo”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 60, mixed: true, at_least: true))
+    assert_equal "You uploaded 60 or more images", read(Audit::Sentence.build(upload, viewer: @me, target: Audit::Sentence::Target.new(nil, Audit::Sentence.library_route), count: 60, at_least: true))
+    assert_raises(ArgumentError) { Audit::Sentence.build(created, viewer: @me, target:, count: 1, at_least: true) }
+  end
+
   test "a count is for the counted actions only, and needs a target" do
     published = event("post.published", subject_type: "Post", subject_id: 1, subject_label: "Hello")
     block = event("block.created", subject_type: "ContentBlock", subject_id: 1)
