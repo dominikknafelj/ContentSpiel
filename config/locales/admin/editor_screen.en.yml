@@ -397,3 +397,7 @@ en:
           own_address:
             page: "This page would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
             post: "This post would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
+        # The help under the related-posts chips (O7): the public post page
+        # shows no related posts yet, so the help says only where they show.
+        related_posts:
+          help: "Related posts are linked to this one in the Mind graph. The site does not show them yet."
