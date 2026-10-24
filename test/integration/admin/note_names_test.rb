@@ -24,7 +24,7 @@ class Admin::NoteNamesTest < ActionDispatch::IntegrationTest
       assert_select "strong .admin-user-name", text: "two"
       assert_select "[data-note-mention=viewer]", text: "@reader"
       assert_select "[data-note-mention=other]", text: "@one"
-      assert_select "span[aria-hidden=true][class~='rounded-full']", text: "t"
+      assert_select "span[aria-hidden=true][class~='rounded-full']", text: "tw"
     end
     assert_no_match(/two@example\.com|reader@example\.com|one@example\.com/, response.body)
   end
@@ -95,7 +95,7 @@ class Admin::NoteNamesTest < ActionDispatch::IntegrationTest
   test "the mention picker shows the short name and still the whole address on its second line" do
     get "#{@base}/mentions", params: { q: "two@" }
 
-    assert_equal [ { "id" => users(:two).id, "label" => "two", "hint" => "two@example.com" } ], response.parsed_body
+    assert_equal [ { "id" => users(:two).id, "label" => "two", "hint" => "two@example.com", "initials" => "tw" } ], response.parsed_body
   end
 
   test "the rest of CS Studio names a nameless user by the whole address, as before" do

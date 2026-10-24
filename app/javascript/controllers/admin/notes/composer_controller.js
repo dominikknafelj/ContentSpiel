@@ -440,11 +440,11 @@ export default class extends Controller {
       option.dataset.action = "mousedown->admin--notes--composer#choose"
       option.className = "flex cursor-pointer items-center gap-2 rounded-cs px-2 py-1.5 hover:bg-sunken aria-selected:bg-sunken"
       // The avatar is decoration, as everywhere (`Admin::NotesScreen::AvatarComponent`):
-      // the first letters of the first two words of the name beside it.
+      // the server writes the letters (`PersonName.initials`), none is computed here.
       const avatar = document.createElement("span")
       avatar.setAttribute("aria-hidden", "true")
       avatar.className = "flex size-[22px] shrink-0 items-center justify-center rounded-full border border-line-strong bg-sunken font-cs-mono text-[8px] font-medium uppercase leading-none text-ink"
-      avatar.textContent = String(person.label).split(/\s+/).filter(Boolean).slice(0, 2).map((word) => [ ...word ][0]).join("")
+      avatar.textContent = person.initials
       const name = document.createElement("span")
       name.className = "truncate text-[13px] text-ink"
       name.textContent = person.label

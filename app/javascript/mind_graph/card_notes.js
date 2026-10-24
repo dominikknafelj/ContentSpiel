@@ -64,13 +64,12 @@ const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
 const ROWS = 3
 // The person as a round mark with their initials, as the drawer draws one
 // (`Admin::NotesScreen::AvatarComponent`, whose classes and rule these are:
-// the first letters of the first two words of the name; the viewer's own is
+// the letters the server sends as `initials`; the viewer's own is
 // filled ink, everyone else's sunken with a line). Decoration: the name is
 // written beside it.
 const AVATAR = "flex size-5 shrink-0 items-center justify-center rounded-full font-cs-mono text-[8px] font-medium uppercase leading-none"
 const AVATAR_OWN = "bg-ink text-paper"
 const AVATAR_OTHER = "border border-line-strong bg-sunken text-ink"
-const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => Array.from(word)[0]).join("")
 
 function element(tag, className, content) {
   const node = document.createElement(tag)
@@ -152,7 +151,7 @@ export function cardNotes(node, { text, type = "post", url, recordUrl, onChange 
     const item = element("li", "grid grid-cols-[20px_1fr_7px] items-start gap-2 text-[13px]")
     item.dataset.noteRow = ""
     const who = thread.author ?? text.t("mind_graph.script.card.notes.deleted_user")
-    const avatar = element("span", `${AVATAR} ${thread.mine ? AVATAR_OWN : AVATAR_OTHER}`, initials(who))
+    const avatar = element("span", `${AVATAR} ${thread.mine ? AVATAR_OWN : AVATAR_OTHER}`, thread.initials)
     avatar.setAttribute("aria-hidden", "true")
 
     const lines = element("span", "flex min-w-0 flex-col gap-0.5")

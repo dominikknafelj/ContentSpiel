@@ -12,28 +12,35 @@ module PersonName
   class << self
     def of(user) = user.name.presence || user.email_address.to_s.split("@").first.presence || user.email_address
 
-    # The letters in a person's circle: the first character of each of the
-    # first two words of what they are called -- "Dana van Weiss" is "Dv",
-    # "dana" is "d" -- in the case they were written: the avatar's style
-    # draws them upper-case (`Admin::Ui::AvatarComponent`). It is the rule
-    # notes' avatar always had, taken as it was: ONE word gives ONE letter.
-    # Asked with the text and not the user, because notes also draws a circle
-    # for "a deleted user".
+    # The letters in a person's circle: two words give the first character of
+    # each of the first two ("Dana van Weiss" is "Dv"); ONE word gives its
+    # first two letters, digits or emoji ("dana" is "da", "o'neil" is "on");
+    # in the case they were written: the avatar's style draws them
+    # upper-case (`Admin::Ui::AvatarComponent`). The only copy of the rule
+    # (layout points spec, decision 10): the scripts that draw a circle
+    # (the mind graph's card, the mention picker) are handed these letters
+    # by the server and compute none. Asked with the text and not the user,
+    # because notes also draws a circle for "a deleted user".
     #
     # The odd cases, decided here: a character is a grapheme (an emoji with
     # its joiners and a letter with a combining accent stay whole); a digit
     # is as good as a letter ("7 of 9" is "7o"); a word's leading at sign or
     # other punctuation is skipped when a letter or digit follows it ("@dana"
-    # is "d") and kept when nothing does ("@" is "@"); nothing at all is "".
+    # is "da") and kept when nothing does ("@" is "@"); nothing at all is "".
     def initials(text)
-      text.to_s.split.first(2).map { |word| first_character(word) }.join
+      words = text.to_s.split
+      return words.first(2).map { |word| (significant(word).first || word.grapheme_clusters.first) }.join if words.size > 1
+      return "" if words.empty?
+
+      letters = significant(words.first)
+      letters.empty? ? words.first.grapheme_clusters.first : letters.first(2).join
     end
 
     private
 
-    def first_character(word)
-      characters = word.grapheme_clusters
-      characters.find { |character| character.match?(/[\p{L}\p{N}\p{Emoji_Presentation}]/) } || characters.first
+    # The graphemes of a word that are a letter, a digit or an emoji.
+    def significant(word)
+      word.grapheme_clusters.select { |character| character.match?(/[\p{L}\p{N}\p{Emoji_Presentation}]/) }
     end
   end
 end
