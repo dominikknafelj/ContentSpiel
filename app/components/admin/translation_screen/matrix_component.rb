@@ -19,9 +19,6 @@ module Admin
     # with the item, language and state, so colour (and the glyph) is never the
     # only cue.
     class MatrixComponent < Admin::AdminComponent
-      CTA_REVIEW = "Review changes →".freeze
-      CTA_TRANSLATE = "Translate →".freeze
-
       def initialize(items:, locales:)
         @items = items
         @locales = locales.map(&:to_s)
@@ -47,7 +44,11 @@ module Admin
         locales.find { |locale| item.states[locale] == :outdated } || locales.find { |locale| item.states[locale] == :missing } || locales.first
       end
 
-      def cta(item) = item.states.values.include?(:outdated) ? CTA_REVIEW : CTA_TRANSLATE
+      def action_kind(item) = item.states.values.include?(:outdated) ? :review : :translate
+
+      def action(item) = t(".action.#{action_kind(item)}")
+
+      def open_label(item) = t(".open_label.#{action_kind(item)}", title: title(item))
 
       def editor_path(item, locale)
         case item.type

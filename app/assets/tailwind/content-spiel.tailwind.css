@@ -154,6 +154,11 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    `__tip` is where the shared tooltip hangs: a sticky box of no height near
    the top of the window, because "under the host" would be below the last
    row of a page-high divider. */
+/* The Translations row's action word sits under the row's stretched link, so it
+   is shown by opacity, never visibility (layout points spec, B). */
+.admin-translation-row__action { opacity: 0; }
+.admin-translation-row:hover .admin-translation-row__action,
+.admin-translation-row:has(th a:focus-visible) .admin-translation-row__action { opacity: 1; }
 .admin-tree-divider { position: absolute; z-index: 15; top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
 .admin-tree-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
 .admin-tree-divider[data-hover] { cursor: col-resize; }

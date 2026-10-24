@@ -106,6 +106,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/status_chip_component.rb
     app/components/admin/ui/status_chip_component.html.erb
     app/components/admin/ui/translation_chip_component.rb
+    app/components/admin/translation_screen/state_cell_component.rb
     app/components/admin/ui/language_tabs_component.rb
     app/components/admin/ui/language_tabs_component.html.erb
     app/components/admin/ui/pagination_component.rb

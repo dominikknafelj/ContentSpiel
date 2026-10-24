@@ -483,6 +483,26 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_selector "[data-original-for='title']", text: "Only in English"
   end
 
+  test "a click on an empty part of a row opens the row's language, and a cell's link still opens its own" do
+    post = create_post(title: "Only in English")
+
+    visit "/cs-studio/translations"
+    row = "#translation-item-post-#{post.id}"
+    assert_selector "#{row} .admin-translation-row__action", text: "Translate →", visible: :all
+    # A person's click on the Type cell lands on the row's stretched link (a native click on
+    # the cell itself is refused by Cuprite for exactly that reason).
+    assert page.evaluate_script(<<~JS), "the point inside the Type cell is the row's link"
+      (() => { const r = document.querySelector("#{row} td[data-column=type]").getBoundingClientRect();
+      return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).hasAttribute("data-translation-row-link") })()
+    JS
+    find("#{row} a[data-translation-row-link]", visible: :all).click
+    assert_current_path "/cs-studio/posts/#{post.id}?locale=de"
+
+    visit "/cs-studio/translations"
+    find("#{row} a[aria-label$='Español, missing']").click
+    assert_current_path "/cs-studio/posts/#{post.id}?locale=es"
+  end
+
   test "the matrix lists an outdated post first; its DE chip opens the outdated card; marking it up to date clears the row and raises the card" do
     missing = create_post(title: "Never translated")
     missing.update_columns(updated_at: 1.minute.from_now)
@@ -496,7 +516,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     rows = all("tbody tr[id^='translation-item-post-']").map { |row| row[:id] }
     assert_equal [ stale_row.delete("#"), "translation-item-post-#{missing.id}" ], rows
-    assert_selector "#{stale_row} td a", text: "Review changes →"
+    assert_selector "#{stale_row} .admin-translation-row__action", text: "Review changes →", visible: :all
     before = find("[data-translation-summary] [data-locale=de] [role=progressbar]")["aria-valuenow"].to_i
 
     find("#{stale_row} a[aria-label$='Deutsch, outdated']").click

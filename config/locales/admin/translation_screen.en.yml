@@ -12,3 +12,16 @@ en:
             complete: "%{title}: %{language}, translated"
             missing: "%{title}: %{language}, missing"
             outdated: "%{title}: %{language}, outdated"
+          # The row's action (layout points spec, B): a word shown while the row is
+          # hovered or its title link has the focus, and the title link's name.
+          action:
+            review: "Review changes →"
+            translate: "Translate →"
+          open_label:
+            review: "Review changes: %{title}"
+            translate: "Translate: %{title}"
+        # `Admin::TranslationScreen::StateCellComponent`, a cell's word (O4).
+        state_cell:
+          complete: "Translated"
+          missing: "Missing"
+          outdated: "Outdated"
