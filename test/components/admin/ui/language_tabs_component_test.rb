@@ -16,14 +16,14 @@ class Admin::Ui::LanguageTabsComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::LanguageTabsComponent.new(current: "en", missing: %w[de], outdated: %w[es], url: @url))
     assert_selector "span[data-language-state=missing][class~='border-field-line'][class~='border-[1.5px]']"
     assert_selector "span.bg-warn[data-language-state=outdated]##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')}"
-    assert_selector ".sr-only", text: "Deutsch: not translated"
-    assert_selector ".sr-only", text: "Español: original changed"
+    assert_selector ".sr-only", text: "Deutsch: missing"
+    assert_selector ".sr-only", text: "Español: outdated"
     assert_no_selector "[class*=danger]"
     # The sentences sit inside the marks, so removing the marker by id
     # (Still correct — mark up to date) removes the announcement too.
-    assert_selector "##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')} .sr-only", text: "Español: original changed"
-    assert_selector "[data-language-state=missing] .sr-only", text: "Deutsch: not translated"
-    assert_selector "[title='Original changed']", count: 1
+    assert_selector "##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')} .sr-only", text: "Español: outdated"
+    assert_selector "[data-language-state=missing] .sr-only", text: "Deutsch: missing"
+    assert_selector "[title='Outdated']", count: 1
     assert_selector "[title='Missing required fields']", count: 1
   end
 

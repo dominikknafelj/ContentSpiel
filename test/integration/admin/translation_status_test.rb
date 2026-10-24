@@ -47,7 +47,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
       assert_equal "/cs-studio/translations/confirm", URI(action).path
       assert_equal confirm_params(record, "title").transform_keys(&:to_s).transform_values(&:to_s), Rack::Utils.parse_query(URI(action).query)
     end
-    assert_select "#language-switcher-outdated-de[title='Original changed']"
+    assert_select "#language-switcher-outdated-de[title='Outdated']"
     assert_select "#language-switcher-outdated-es", count: 0
     # A field translated in step reads nothing.
     assert_select "##{note_id("post", record, "excerpt")}", count: 0

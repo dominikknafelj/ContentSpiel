@@ -44,13 +44,17 @@ class Admin::TranslationScreen::MatrixComponentTest < ViewComponent::TestCase
   end
 
   test "each cell says its state in words, headers are real th elements" do
-    matrix(Item.new(type: "post", record: @post, states: { "de" => :complete, "es" => :outdated }))
+    matrix(Item.new(type: "post", record: @post, states: { "de" => :complete, "es" => :missing }))
 
     assert_selector "#{row} a[aria-label='Welcome: Deutsch, translated']"
-    assert_selector "#{row} a[aria-label='Welcome: Español, outdated']"
+    assert_selector "#{row} a[aria-label='Welcome: Español, missing']"
     assert_selector "thead th[scope=col]", text: "Deutsch"
     assert_selector "thead th[scope=col]", text: "Español"
     assert_selector "[data-translation-matrix-scroll].overflow-x-auto"
+
+    matrix(Item.new(type: "post", record: @post, states: { "de" => :complete, "es" => :outdated }))
+
+    assert_selector "#{row} a[aria-label='Welcome: Español, outdated']"
   end
 
   test "the site settings row links to Settings in that language" do

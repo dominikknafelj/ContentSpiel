@@ -10,5 +10,5 @@ en:
         matrix:
           cell_label:
             complete: "%{title}: %{language}, translated"
-            missing: "%{title}: %{language}, not translated"
+            missing: "%{title}: %{language}, missing"
             outdated: "%{title}: %{language}, outdated"

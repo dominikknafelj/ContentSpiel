@@ -83,22 +83,25 @@ en:
         unpublished_chip:
           label: "Unpublished changes"
 
+        # One translation vocabulary in CS Studio (Claude Design's O4):
+        # Missing, Outdated, Translated. Plan ruling 5: the outdated tooltip
+        # keeps its sentence, since it names the language to compare with.
         translation_chip:
           aria_label:
             complete: "%{language}: translated"
-            missing: "%{language}: not translated"
+            missing: "%{language}: missing"
             outdated: "%{language}: outdated"
           tooltip:
             complete: "Translated"
-            missing: "Not translated"
+            missing: "Missing"
             outdated: "%{language} changed since translation"
 
         language_tabs:
           nav_label: "Languages"
           missing_title: "Missing required fields"
-          missing: "%{language}: not translated"
-          outdated_title: "Original changed"
-          outdated: "%{language}: original changed"
+          missing: "%{language}: missing"
+          outdated_title: "Outdated"
+          outdated: "%{language}: outdated"
           more: "+%{count} ▾"
 
         pagination:

@@ -12,7 +12,7 @@ class Admin::Ui::TranslationChipComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::TranslationChipComponent.new(state: :missing, locale: "de"))
     assert_selector ".admin-translation-chip.border-dashed.text-meta", exact_text: "de"
     assert_selector ".admin-translation-chip [data-translation-mark=missing][class~='border-field-line'][class~='border-[1.5px]'][aria-hidden=true]"
-    assert_selector "[aria-label='Deutsch: not translated'][title='Not translated']"
+    assert_selector "[aria-label='Deutsch: missing'][title='Missing']"
     assert_no_selector "[class*=danger]"
   end
 
