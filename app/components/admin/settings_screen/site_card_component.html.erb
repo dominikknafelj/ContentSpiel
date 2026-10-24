@@ -36,7 +36,7 @@
       <% end %>
     <% end %>
 
-    <%# Logo: the stored one (or a NONE tile), the shared drop zone, and an
+    <%# Logo: the stored one, if any, the shared drop zone, and an
         explicit remove box -- a blank file input never detaches it. %>
     <div class="admin-column" data-field-name="logo">
       <p class="<%= setup_label_class %> mb-1" id="settings-logo-label">Logo</p>
@@ -44,8 +44,6 @@
         <% logo = values.logo %>
         <% if logo.attached? %>
           <%= image_tag logo, alt: "Current logo", class: "size-11 shrink-0 rounded-cs border border-line bg-sunken object-contain" %>
-        <% else %>
-          <span class="grid size-11 shrink-0 place-items-center bg-sunken font-cs-mono text-[9px] text-meta">NONE</span>
         <% end %>
         <div class="min-w-0 flex-1">
           <%= render Admin::Ui::FileDropComponent.new(name: "site_setting[logo]", id: "settings-logo", accept: "image/*", label: "Logo file",

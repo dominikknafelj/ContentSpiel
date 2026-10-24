@@ -41,10 +41,11 @@ class Admin::SettingsScreen::SiteCardComponentTest < ViewComponent::TestCase
     assert_selector "[data-language-panel='en'] [data-original-for]", visible: :all, count: 0
   end
 
-  test "logo shows a NONE tile without one, and the drop zone with its help" do
+  test "without a logo only the drop zone and its hint are drawn: no NONE square" do
     render_card
 
-    assert_text "NONE"
+    assert_no_text "NONE"
+    assert_no_selector "[data-field-name=logo] img, [data-field-name=logo] .bg-sunken"
     assert_selector "input[type=file][name='site_setting[logo]']", visible: :all
     assert_text "PNG, JPEG, GIF or WebP. Without a logo the site title is shown."
     assert_no_selector "input[name='site_setting[remove_logo]']", visible: :all

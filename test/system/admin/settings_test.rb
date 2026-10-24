@@ -15,6 +15,21 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
   def footer = ".admin-save-bar"
 
+  test "at 1600px every card is 760px wide, a text field fills it and Time zone keeps its own width" do
+    page.driver.resize(1600, 1000)
+    visit admin_settings_path
+    await_admin_controllers
+
+    width = ->(selector) { page.evaluate_script("document.querySelector(#{selector.to_json}).getBoundingClientRect().width") }
+    %w[#settings-site-card [aria-labelledby=languages] [aria-labelledby=publishing] [aria-labelledby=ai]].each do |card|
+      assert_in_delta 760, width.(card), 1, card
+    end
+    assert_operator width.("#settings-en-title"), :>, 700
+    assert_operator width.("#settings-time_zone"), :<=, 384
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   test "tabs switch without asking or counting, a sidebar link asks, and Save persists both languages" do
     visit admin_settings_path
     await_admin_controllers

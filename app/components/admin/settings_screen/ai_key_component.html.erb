@@ -20,7 +20,7 @@
     <%= password_field_tag "site_setting[ai_api_key]", nil, id: "settings-ai_api_key", form: KEY_FORM, autocomplete: "off", spellcheck: false,
           placeholder: key_set? ? "Paste a new key to replace it" : "Paste the provider's API key",
           aria: { describedby: ("settings-ai-key-errors" if error.present?), invalid: (true if error.present?) },
-          class: "#{setup_input_class} !mt-0 max-w-md",
+          class: "#{setup_input_class} !mt-0 min-w-0 flex-1",
           data: LOCK.merge("admin--settings--ai-target": "input", action: "keydown.esc->admin--settings--ai#cancel input->admin--settings--ai#holdKey") %>
     <%= render Admin::Ui::ButtonComponent.new(label: "Save key", variant: :primary, type: "submit", form: KEY_FORM, data: LOCK) %>
     <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--settings--ai#cancel" }) %>
