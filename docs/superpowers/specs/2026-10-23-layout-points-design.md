@@ -1,6 +1,6 @@
 # The layout points (Claude Design's review, part 2)
 
-Status: for the owner's review (Claude Design's answers and the owner's answers to O1, O7, O9–O11 are in).
+Status: approved by the owner 2026-10-24 ("looks good"); Claude Design's answers and the owner's answers to O1, O7, O9–O11 are in.
 
 Source: Claude Design's answers of 2026-10-15 (`.superpowers/design-answers/2026-10-15-contrast-and-icons.md` in the main checkout): D3 items 2 and 4 to 11, and the "First reply" (the dashboard's grid, Notes for you, empty states, recent activity, the footer links). Part 1 (contrast, buttons, block icons, tree marks, the site's bands) shipped as PR #77 (`2026-10-15-contrast-and-buttons-design.md`). The owner approved the scope of part 2 on 2026-10-15. Every point below was checked against the code at `33284754`, and where the code differs from what the design answer saw, this spec says so.
 
