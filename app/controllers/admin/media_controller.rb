@@ -74,6 +74,8 @@ module Admin
       @counts = @search.counts
       return render :picker, layout: false if params[:picker].present?
 
+      @library_has_images = @search.any_images?(counts: @counts)
+
       @selected = selected_asset
       @link_params = list_query
     end

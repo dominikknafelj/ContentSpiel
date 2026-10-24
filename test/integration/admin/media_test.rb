@@ -8,6 +8,26 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     site_settings(:default).update!(setup_completed_at: Time.current)
   end
 
+  test "the drop zone is drawn for an empty library" do
+    create_media_asset.update!(trashed_at: Time.current)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/media"
+
+    assert_select "[data-media-drop-zone]:not([hidden]) .admin-file-drop input#media-upload-input"
+  end
+
+  test "once the library holds an image the zone is hidden, under a search that finds nothing too, and the file input stays" do
+    create_media_asset
+    sign_in_as(users(:one))
+
+    [ "/cs-studio/media", "/cs-studio/media?q=no+such+image" ].each do |path|
+      get path
+      assert_select "[data-media-drop-zone][hidden] input#media-upload-input[data-admin--media--upload-target=input]"
+      assert_select "button", text: "Upload images"
+    end
+  end
+
   test "the grid needs media.upload" do
     sign_in_as(users(:reader))
 

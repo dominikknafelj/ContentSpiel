@@ -56,6 +56,19 @@ class Media::Search
     { all: all, unused: unused, missing_alt: missing_alt, untranslated: untranslated, mine: mine }
   end
 
+  # Whether the library holds a kept image at all, search and segment aside
+  # (the Media screen draws its drop zone only while this is false). Without
+  # search text the `counts` already hold the answer; under a search they are
+  # the search's, and a search that finds nothing would read as an empty
+  # library, so that path asks the scope itself, one `SELECT 1 ... LIMIT 1`
+  # (`unscope(:includes)`: the default scope preloads variants). The scope is
+  # kept images only, so a library whose images are all in the trash is empty.
+  def any_images?(counts:)
+    return counts[:all].positive? if @query.blank?
+
+    @scope.unscope(:includes).exists?
+  end
+
   # The title/alt/filename match (`#call`'s old body), on the scope.
   def matching
     return @scope if @query.blank?
