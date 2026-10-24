@@ -102,13 +102,12 @@ module Admin
         post.public_send(column, locale: ::Locales.default)
       end
 
-      # The parent the slug preview line appends to: this post's own canonical
+      # The parent the slug field's prefix shows: this post's own canonical
       # listing page, resolved through `PublicSite::Paths.canonical_page`
       # (spec §5.3's own ranking) rather than anything this component would
       # have to re-derive -- blank when there isn't one yet (an unlisted post,
       # or a listed one whose own page currently has no path mid-move), which
-      # just leaves the preview line showing the bare slug with nothing in
-      # front of it.
+      # just leaves the prefix with nothing in front of the slug.
       def slug_base_url
         page = PublicSite::Paths.canonical_page(post)
         # No trailing slash: the listing page at "/" (or "/de/") would otherwise

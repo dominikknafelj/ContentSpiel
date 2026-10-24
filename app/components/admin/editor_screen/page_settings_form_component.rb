@@ -109,9 +109,8 @@ module Admin
 
       def change_address_data = dialog_trigger(SlugDialogComponent.dialog_id_for(page))
 
-      # The slug preview stands on the title and the slug field together and
-      # throws without its output span, so only a form that has the field
-      # carries it.
+      # The slug preview stands on the title and the slug field together, so
+      # only a form that has the field carries it.
       def title_data = slug_field? ? { "admin--editor--slug-preview-target": "title" } : {}
 
       def slug_preview_data = slug_field? ? { controller: "admin--editor--slug-preview", action: "input->admin--editor--slug-preview#update" } : {}

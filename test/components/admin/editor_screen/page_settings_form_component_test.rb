@@ -40,6 +40,7 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
 
     assert_selector "input[name='page[slug]'][value='drafty']"
     assert_selector "[data-controller='admin--editor--slug-preview'] [data-admin--editor--slug-preview-target='slug']", visible: :all
+    assert_no_selector "[data-admin--editor--slug-preview-target=output]", visible: :all
     assert_no_selector "[data-page-address]"
     assert_no_selector "button", text: "Change address…", visible: :all
   end
