@@ -1,7 +1,7 @@
 module Admin
   module EditorScreen
     # The page editor's "Page settings" panel (cs-studio spec §5.1): title,
-    # slug + a live URL preview, page type, subtitle, hero image (a library
+    # slug, page type, subtitle, hero image (a library
     # image, chosen through `Media::PickerComponent`) + alt
     # (landing pages only), and meta title/description under "SEO" -- one
     # autosaving `<form>` (spec §6.1), PATCHing `Admin::PagesController#update`
@@ -87,7 +87,7 @@ module Admin
         page.public_send(field, locale: ::Locales.default)
       end
 
-      # The "Original changed" note's options for a translated field
+      # The reference card's state, confirm and record options for a translated field
       # (translation helpers spec §4) -- see `Admin::EditorScreen
       # ::ReferenceCardComponent.options_for`.
       def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(page, field, locale: locale, confirmable: editable? && !read_only_hold?)

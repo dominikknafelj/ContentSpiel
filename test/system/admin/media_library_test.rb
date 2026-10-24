@@ -47,6 +47,18 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_predicate asset.reload.alt(locale: :en), :blank?
   end
 
+  test "uploading by the file input into a library that already has an image, whose drop zone is hidden, adds the tile" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    assert_selector "#media-asset-#{existing.id}"
+
+    attach_file("media-upload-input", file_fixture("tiny.png").to_s, visible: :all)
+    assert_selector "#media-count-all", text: "2"
+  end
+
   test "choosing a tile opens the panel and advances the URL; typing an alt text takes NO ALT off the tile and drops the Missing alt count" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de], default: "en")

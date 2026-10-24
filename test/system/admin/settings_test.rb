@@ -148,8 +148,32 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     page.execute_script("document.getElementById('publishing').scrollIntoView({ block: 'start' })")
     assert_selector "#{nav} a[aria-current=true]", text: "Publishing", count: 1
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
+  test "at the end of a page that scrolls the last section is current, though its heading is not above the 40% line" do
+    # A window tall enough that the AI card's heading is still below the 40% line at the page's end:
+    # only the nav's at-end rule can make it current.
+    page.driver.resize(1400, 1000)
+    visit admin_settings_path
+    await_admin_controllers
     page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
-    assert_selector "#{nav} a[aria-current=true]", text: "AI translation", count: 1
+
+    assert page.evaluate_script("document.getElementById('ai').getBoundingClientRect().top > window.innerHeight * 0.4"), "the premise: the AI heading is below the 40% line at the end"
+    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "AI translation", count: 1
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
+  test "below 1024px the cards are no wider than the form maximum" do
+    page.driver.resize(900, 1000)
+    visit admin_settings_path
+    await_admin_controllers
+    width = page.evaluate_script("document.getElementById('ai').closest('.flex.min-w-0.flex-col').getBoundingClientRect().width")
+    max = page.evaluate_script("parseFloat(getComputedStyle(document.body).getPropertyValue('--cs-form-max'))")
+    assert_operator max, :>, 0
+    assert_operator width, :<=, max + 0.5
   ensure
     page.driver.resize(1400, 1400)
   end

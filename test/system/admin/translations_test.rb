@@ -516,7 +516,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
         return bar.contains(el) && !el.closest("th[scope=row]") })()
       JS
     ensure
-      page.driver.resize(1400, 900)
+      page.driver.resize(1400, 1400)
     end
   end
 
