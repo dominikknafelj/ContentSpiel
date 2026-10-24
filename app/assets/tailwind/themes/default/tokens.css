@@ -80,8 +80,8 @@
      and icon in the text colour, a --th-line frame. Tip is --th-ok, Important
      the accent, Warning --th-warn; each has the hue at 8% over the page for
      its ground, the hue for its rule, the hue's ink for its word and icon
-     (the accent is its own ink) and the hue at 24% for its frame. No kind is red: --th-danger is kept for
-     errors and destructive actions. The text stays --th-ink. A strong band
+     (the accent is its own ink) and the hue at 24% for its frame. No kind is
+     red: --th-danger is kept for errors and destructive actions. The text stays --th-ink. A strong band
      re-values all sixteen (sections.css).
      test/integration/design_tokens_test.rb holds the 72 pairs: the ink, the
      accent and the kind's ink on each kind's ground, on the page, in a

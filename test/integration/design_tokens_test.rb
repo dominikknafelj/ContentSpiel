@@ -367,10 +367,18 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "the measuring reads a colour mixed of two tokens as the two mixed" do
-    tokens = { "--th-paper" => "#ffffff", "--th-ink" => "#000000", "--th-x" => "color-mix(in srgb, var(--th-ink) 50%, var(--th-paper))" }
+    tokens = { "--th-paper" => "#ffffff", "--th-ink" => "#000000",
+               "--th-quarter" => "color-mix(in srgb, var(--th-ink) 25%, var(--th-paper))",
+               "--th-three-quarters" => "color-mix(in srgb, var(--th-ink) 75%, var(--th-paper))" }
 
-    assert_equal mix(resolve_colour(tokens, "--th-ink"), resolve_colour(tokens, "--th-paper"), 0.5), resolve_colour(tokens, "--th-x")
-    assert_operator contrast(resolve_colour(tokens, "--th-x"), resolve_colour(tokens, "--th-paper")), :<, 4.5, "a half-way grey on white is under 4.5"
+    # Worked by hand, not by `mix`: black at 25% over white is 0.75 in the encoded
+    # values, and ((0.75 + 0.055) / 1.055)^2.4 = 0.5225 in linear light (75% is 0.25
+    # encoded, 0.0508 linear). Swapped operands or an inverted share give the other.
+    quarter = resolve_colour(tokens, "--th-quarter")
+    three_quarters = resolve_colour(tokens, "--th-three-quarters")
+    quarter.each { |channel| assert_in_delta 0.5225, channel, 0.001, "25% black over white" }
+    three_quarters.each { |channel| assert_in_delta 0.0508, channel, 0.001, "75% black over white" }
+    assert_operator contrast(quarter, resolve_colour(tokens, "--th-paper")), :<, contrast(three_quarters, resolve_colour(tokens, "--th-paper"))
   end
 
   # Code block spec §5: one token per role the highlighter names, each with

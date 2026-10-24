@@ -67,9 +67,14 @@ class NoteBlockSystemTest < ApplicationSystemTestCase
     notes = KINDS.map { |kind| add_note(kind) }
     open_page
 
+    grounds = {}
     %w[light dark].each do |theme|
       with_theme(theme) do
         seen = notes.map { |block| probe(block) }
+        grounds[theme] = seen.map { |found| found["ground"] }
+        # An undefined ink token would leave word and token both the inherited
+        # colour and pass the pairwise check below: four inks, four colours.
+        assert_equal 4, seen.map { |found| found["ink"] }.uniq.size, "#{theme}: four kinds, four inks"
         seen.zip(KINDS).each do |found, kind|
           where = "#{theme}, #{kind}"
           assert_equal found["groundToken"], found["ground"], "#{where}: ground"
@@ -86,6 +91,10 @@ class NoteBlockSystemTest < ApplicationSystemTestCase
         end
         assert_equal 4, seen.map { |found| found["ground"] }.uniq.size, "#{theme}: four kinds, four grounds"
       end
+    end
+    # The scheme switch took effect: every kind has another ground in the dark.
+    KINDS.each_with_index do |kind, index|
+      assert_not_equal grounds["light"][index], grounds["dark"][index], "#{kind}: the ground differs between light and dark"
     end
   end
 
