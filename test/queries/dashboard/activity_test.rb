@@ -206,6 +206,20 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal row.event.occurred_at, row.at, "the start is the newest event's own, not the run's"
   end
 
+  test "a complete run beside a cut one reads its exact count and its own start" do
+    page = as(@me) { create_page(title: "Whole") }
+    start = 1.second.from_now.change(usec: 0)
+    add_blocks(page, %w[rich_text] * 3, from: start)
+    61.times { travel_to(1.hour.ago) { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } } }
+
+    rows = activity.rows
+    assert_equal [ [ "block.created", 3 ] ], rows.map { |row| [ row.event.action, row.count ] }.select { |a, _| a == "block.created" }
+    block_row = rows.find { |row| row.event.action == "block.created" }
+    assert_equal "added 3 Rich text blocks to", words(block_row).first
+    assert_equal start, block_row.at
+    assert_empty rows.select { |row| row.event.action == "media.uploaded" }
+  end
+
   test "a run the read cut off beside another run is not shown" do
     kept = as(@me) { create_post(title: "Kept", published: false) }
     61.times { travel_to(1.hour.ago) { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } } }

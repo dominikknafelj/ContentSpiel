@@ -124,8 +124,9 @@ module Dashboard
       # be false. With other runs it is dropped (the feed shows fewer rows);
       # alone it is kept and said to be "N or more".
       cut = events.size == @limit * READ_FACTOR
+      only = cut && found.size == 1
       found.pop if cut && found.size > 1
-      found.first(@limit).map { |run| row_for(run, floor: cut && found.size == 1) }
+      found.first(@limit).map { |run| row_for(run, floor: only) }
     end
 
     # The events whose subject the viewer may read (see the class comment), as
