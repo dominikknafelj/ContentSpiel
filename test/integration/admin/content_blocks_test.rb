@@ -1551,7 +1551,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   test "adding a Note streams its card with the kind's four buttons, Note checked, and its kind and title are saved, the card's icon following the kind" do
     post blocks_path, params: { block: { block_type: "note" } }, as: :turbo_stream
     assert_response :success
-    block = @page.content_blocks.last
+    block = @page.content_blocks.sole
     assert_equal({ "kind" => "note" }, block.settings)
     assert_select "turbo-stream template input[type=radio][name='block[settings][kind]']", count: 4
     assert_select "turbo-stream template input[type=radio][value='note'][checked]"
@@ -1621,7 +1621,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "tip", block.reload.settings["kind"]
   end
 
-  test "a Note in a column says its kind and text on its tile, is duplicated with its title and text, and is deleted" do
+  test "a Note in a column says its kind and text on its tile, is duplicated with its title, and is deleted" do
     section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
     post blocks_path, params: { block: { block_type: "note" }, section_id: section.id, column: 2 }, as: :turbo_stream
     assert_response :success

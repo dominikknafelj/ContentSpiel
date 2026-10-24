@@ -36,8 +36,8 @@ class Admin::NoteBlockSystemTest < ApplicationSystemTestCase
     assert_equal "Note", title_field(block)[:placeholder]
 
     assert_selector "#block-#{block.id}-icon-card[data-block-icon=info]"
-    kind(block, "note").execute_script("this.focus()") # focus: an sr-only radio has no box a click lands on
-    page.driver.browser.keyboard.type(:right) # the focused radio gets the key; a node's own send_keys would click it first
+    find("label[for='block-#{block.id}-kind-note']").click # the segment pressed as a person presses it: the label focuses and checks its radio
+    page.driver.browser.keyboard.type(:right) # the radio the label focused gets the key; send_keys would click a node first
     assert_selector "#block-#{block.id}-kind-tip:checked", visible: :all
     assert_equal "Tip", title_field(block)[:placeholder], "the placeholder follows the kind before the save"
     # Plan ruling 12: the card's icon follows the kind once the save's answer is here.
@@ -83,7 +83,7 @@ class Admin::NoteBlockSystemTest < ApplicationSystemTestCase
     open_editor
     placeholder = page.evaluate_script(<<~JS)
       (() => {
-        document.querySelector("#block-#{block.id}-kind-warning").click()
+        document.querySelector("#block-#{block.id}-kind-warning").click() // press_by_script: a native press would let the save answer before the placeholder is read
         return document.querySelector("#block-#{block.id}-title").placeholder
       })()
     JS
@@ -93,13 +93,13 @@ class Admin::NoteBlockSystemTest < ApplicationSystemTestCase
   end
 
   # The other gap: a save's icon stream replaces the icon span and nothing else.
-  test "a save's icon stream from another block's kind change leaves an open card with unsaved text as it is: the same field, the same text" do
+  test "a save's icon stream from another block's kind change leaves another card's field as it is: the same element, the same text, and both are saved" do
     first = @page.content_blocks.create!(block_type: "note", position: 0, settings: { "kind" => "note" })
     second = @page.content_blocks.create!(block_type: "note", position: 1, settings: { "kind" => "note" })
     open_editor
     page.execute_script("window.firstTitle = document.querySelector('#block-#{first.id}-title')")
     title_field(first).send_keys("Typed, not yet saved")
-    kind(second, "note").execute_script("this.focus()") # focus: an sr-only radio has no box a click lands on
+    find("label[for='block-#{second.id}-kind-note']").click # the segment pressed as a person presses it: the label focuses and checks its radio
     page.driver.browser.keyboard.type(:right)
     assert_selector "#block-#{second.id}-icon-card[data-block-icon=lightbulb]"
     assert page.evaluate_script("window.firstTitle === document.querySelector('#block-#{first.id}-title')"), "the open card's field was replaced"
