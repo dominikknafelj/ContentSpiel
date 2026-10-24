@@ -10,11 +10,9 @@
     layout's grid collapses to its two-column form, same as every other
     module but Pages. %>
 <div class="admin-dashboard">
-<h1 class="mb-4 text-h1 text-ink">Dashboard</h1>
+<h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
 
 <% quick_create = Admin::DashboardScreen::QuickCreateComponent.new(**(@draft || {})) %>
-<%# The empty-state copy points at the quick-create row ("start one above"),
-    so it only says so when that row is there for this viewer. %>
 <%= render quick_create %>
 
 <%# The "→" goes to the posts list, filtered by status -- the only filtered
@@ -23,6 +21,7 @@
     someone who can open the posts list. %>
 <% posts_list = ->(status, label) { [ admin_posts_path(scope: status, **admin_url_options), label ] if can?("posts.read") } %>
 <% going_live = @feed.going_live_next %>
+<% arrow = tag.span("→", aria: { hidden: true }) %>
 
 <div class="admin-dashboard-cards">
   <%# Notes (notes spec §5): what was addressed to the viewer, and where
@@ -32,15 +31,27 @@
   <%= render "admin/note_inbox/card", rows: Dashboard::NotesForYou.new(actor: Current.actor, locale: admin_locale).rows, unread: notes_badge_count %>
   <%= render "admin/note_inbox/open_threads", open_threads: Dashboard::OpenThreads.new(actor: Current.actor) %>
 
-  <%= render Admin::DashboardScreen::CardComponent.new(title: "Your drafts", id: "dashboard-drafts", empty: (quick_create.render? ? "No drafts — start one above." : "No drafts."),
-        link: posts_list.call("drafts", "All drafts")) do |card| %>
+  <%= render Admin::DashboardScreen::CardComponent.new(title: t(".drafts.title"), id: "dashboard-drafts", empty: t(".drafts.empty"),
+        link: posts_list.call("drafts", t(".drafts.all"))) do |card| %>
+    <%# "Start a draft" is there whenever the quick-create row is: it takes the focus to its title. %>
+    <% if quick_create.render? %>
+      <% card.with_empty_action do %>
+        <%= link_to t(".drafts.start"), "#dashboard_draft_title", class: "text-ink underline",
+              data: { controller: "admin--dashboard--start-draft", action: "admin--dashboard--start-draft#start", "admin--dashboard--start-draft-field-value": "dashboard_draft_title" } %>
+      <% end %>
+    <% end %>
     <% @feed.drafts.each do |record| %>
       <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :draft) } %>
     <% end %>
   <% end %>
 
-  <%= render Admin::DashboardScreen::CardComponent.new(title: "Going live next", id: "dashboard-going-live-next", empty: "Nothing scheduled on the site.",
-        link: posts_list.call("scheduled", "All scheduled posts"), hint: ("Schedule a draft to see it here." if going_live.size < 3 && quick_create.render?)) do |card| %>
+  <%= render Admin::DashboardScreen::CardComponent.new(title: t(".going_live.title"), id: "dashboard-going-live-next", empty: t(".going_live.empty"),
+        link: posts_list.call("scheduled", t(".going_live.all"))) do |card| %>
+    <% if can?("posts.read") %>
+      <% card.with_empty_action do %>
+        <%= link_to t(".going_live.drafts_html", arrow:), admin_posts_path(scope: "drafts", **admin_url_options), class: "text-ink underline", data: { turbo_frame: "_top" } %>
+      <% end %>
+    <% end %>
     <% going_live.each do |record| %>
       <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :going_live, mine: @feed.mine?(record)) } %>
     <% end %>
@@ -59,13 +70,13 @@
 </div>
 
 <div class="mt-8 flex flex-col gap-2">
-  <%= render Admin::DashboardScreen::CardComponent.new(title: "Recent activity", id: "dashboard-activity", empty: "No recent activity.", limit: nil) do |card| %>
+  <%= render Admin::DashboardScreen::CardComponent.new(title: t(".activity.title"), id: "dashboard-activity", empty: t(".activity.empty"), limit: nil) do |card| %>
     <% @activity.rows.each do |row| %>
       <% card.with_row { render Admin::DashboardScreen::ActivityRowComponent.new(row:) } %>
     <% end %>
   <% end %>
   <% if can?("audit.view") %>
-    <%= link_to "Full audit log →", admin_audit_events_path(**admin_url_options), class: "self-end text-sm text-ink hover:underline", data: { turbo_frame: "_top" } %>
+    <%= link_to t(".activity.audit_log_html", arrow:), admin_audit_events_path(**admin_url_options), class: "self-end text-sm text-ink hover:underline", data: { turbo_frame: "_top" } %>
   <% end %>
 </div>
 </div>

@@ -110,4 +110,16 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
       page.driver.resize(1400, 1400)
     end
   end
+
+  # O6: "Start a draft" takes the person to the quick-create row: the focus
+  # moves to its title, ready to type (a fragment alone would only scroll).
+  test "Start a draft in an empty Your drafts moves the focus to the quick-create title" do
+    sign_in_via_form(users(:one))
+    visit admin_root_path
+    await_admin_controllers
+
+    within("section[aria-labelledby=dashboard-drafts]") { press "Start a draft" }
+    await_js("document.activeElement?.id === 'dashboard_draft_title'")
+    assert_equal admin_root_path, URI(page.current_url).path
+  end
 end
