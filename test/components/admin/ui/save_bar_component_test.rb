@@ -49,6 +49,7 @@ class Admin::Ui::SaveBarComponentTest < ViewComponent::TestCase
     assert_selector ".admin-save-bar [data-admin--saving--save-bar-target=count][aria-live=polite]", visible: :all
 
     render_inline(Admin::Ui::SaveBarComponent.new(form_id: "f", cancel_url: "/x"))
-    assert_selector ".admin-save-bar.sticky.bottom-0.z-20.mt-6.bg-paper.py-3:not(.admin-save-bar--contained)"
+    assert_no_selector ".admin-save-bar[data-stuck]"
+    assert_selector ".admin-save-bar.sticky.-bottom-px.z-20.mt-6.bg-paper.py-3:not(.admin-save-bar--contained)"
   end
 end

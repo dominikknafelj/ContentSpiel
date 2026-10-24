@@ -84,6 +84,10 @@
    wraps onto two or three lines is taller than any fixed offset), 4rem until
    it has been measured. */
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
+/* Nothing at rest; while the sticky footer is stuck over the content
+   (`data-stuck`, set by `admin--saving--save-bar`), the strong line and a
+   shadow (Claude Design O2). */
+.admin-save-bar[data-stuck] { border-top-color: var(--cs-line-strong); box-shadow: var(--cs-shadow-stuck); }
 /* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT (Claude Design,
    2026-10-13, T1). `--admin-tree-width` on <html> is the CHOSEN width, in
    pixels: the layout's head script puts it there from this browser's memory

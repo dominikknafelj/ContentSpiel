@@ -32,10 +32,14 @@ module Admin
       # A default argument can't ask `t`: nothing is rendering yet at `initialize`.
       def save_label = @save_label || t(".save")
 
+      # `-bottom-px`: the bar sticks one pixel below the window's edge, so a
+      # bar that sticks is never wholly inside the window and the
+      # controller's IntersectionObserver (threshold 1) can tell stuck from
+      # at rest.
       def bar_class
         return "admin-save-bar admin-save-bar--contained flex flex-wrap items-center gap-3 border-t border-line px-[18px] py-3.5" if @contained
 
-        "admin-save-bar sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3"
+        "admin-save-bar sticky -bottom-px z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3"
       end
     end
   end

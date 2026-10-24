@@ -374,12 +374,24 @@ export default class extends Controller {
     if (this.hasBarTarget) {
       this.barObserver = new ResizeObserver(measureBars)
       this.barObserver.observe(this.barTarget)
+      // Stuck over the content (O2): the bar sticks at -1px, so while it is
+      // stuck it is never wholly inside the window (ratio under 1) and its
+      // bottom is at the window's edge or past it; at rest, under the end of
+      // the form, it is whole. The first callback decides at connect, so a
+      // bar Turbo restored from a snapshot with `data-stuck` is decided again.
+      if (!this.barTarget.classList.contains("admin-save-bar--contained")) {
+        this.stuckObserver = new IntersectionObserver(([ entry ]) => {
+          this.barTarget.toggleAttribute("data-stuck", entry.intersectionRatio < 1 && entry.boundingClientRect.bottom > entry.rootBounds.bottom)
+        }, { threshold: [ 1 ] })
+        this.stuckObserver.observe(this.barTarget)
+      }
     }
     this.refresh()
   }
 
   disconnect() {
     this.barObserver?.disconnect()
+    this.stuckObserver?.disconnect()
     instances.delete(this)
     measureBars()
     if (instances.size === 0) {
