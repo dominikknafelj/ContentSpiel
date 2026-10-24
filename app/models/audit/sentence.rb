@@ -14,7 +14,9 @@ module Audit
   #   parts          `[Part(kind, text)]`, kind `:text`, `:strong` (a named
   #                  thing that is never a link: a permission, a language) or
   #                  `:subject` (the record the event is about; the component
-  #                  quotes it and links it when `subject_route` is set)
+  #                  quotes it and links it when `subject_route` is set) or
+  #                  `:collection` (a counted set of records, linked like a
+  #                  subject and never quoted)
   #   subject_label  the subject's name for the log (what the event stored)
   #   subject_route  where the subject opens, as a ROUTE NAME + PARAMS
   #                  (`Route`) for the component to resolve with the URL
@@ -41,6 +43,12 @@ module Audit
     Route = Data.define(:name, :args, :params)
     Actor = Data.define(:you, :user, :user_id, :via_label, :none)
     Target = Data.define(:label, :route)
+
+    # The actions whose sentence has a counted form ("You added 4 Code blocks
+    # to ...", "You uploaded 12 images"). `Dashboard::Activity` collapses a run
+    # of exactly these into one row (layout points spec, decision 11); any
+    # other action told with a count is a mistake and `build` refuses it.
+    COUNTED = %w[block.created block.updated media.uploaded].freeze
 
     # Verb phrase "before <subject> after" for the actions every record kind
     # shares (`page.published`, `media.trashed`, ...).
@@ -123,10 +131,17 @@ module Audit
       # itself). `target` is a `Target` (label + route) or nil; for a block
       # event it is the block's OWNER. `fallback_scheduled_at` is the time a
       # "scheduled" sentence names when the event itself carries none.
-      def build(event, viewer:, target:, fallback_scheduled_at: nil)
+      #
+      # `count` above 1 tells a run of `COUNTED` actions as one sentence and
+      # needs a `target` (a block's page, or the library for uploads);
+      # `mixed` says the run's blocks are of several types.
+      def build(event, viewer:, target:, fallback_scheduled_at: nil, count: 1, mixed: false)
         action = effective_action(event)
+        if count > 1 && (!COUNTED.include?(action) || target.nil?)
+          raise ArgumentError, "a counted sentence needs a counted action (#{COUNTED.join(", ")}) and a target"
+        end
         actor = actor_for(event, viewer, none: action == "session.failed")
-        parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you).parts
+        parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you, count:, mixed:).parts
         new(
           actor:,
           parts:,
@@ -135,6 +150,9 @@ module Audit
           security: SECURITY_ACTIONS.include?(action)
         )
       end
+
+      # Where a run of uploads opens: the library, with nothing selected.
+      def library_route = Route.new(:admin_media_path, [], {})
 
       def route_for(record)
         case record
@@ -179,8 +197,10 @@ module Audit
         nil
       end
 
-      def initialize(event, action, target, fallback_scheduled_at, you: false)
+      def initialize(event, action, target, fallback_scheduled_at, you: false, count: 1, mixed: false)
         @you = you
+        @count = count
+        @mixed = mixed
         @event = event
         @action = action
         @target = target
@@ -225,6 +245,8 @@ module Audit
       end
 
       def content_parts(verb)
+        return [ text("uploaded "), Part.new(:collection, "#{@count} images") ] if @count > 1 && @action == "media.uploaded"
+
         before, after = CONTENT_VERBS.fetch(verb)
         if verb == "scheduled" && (date = scheduled_date)
           after = "#{after} for #{date}"
@@ -284,6 +306,10 @@ module Audit
 
       def block_parts(verb)
         noun = (type = block_type) ? "#{type} block" : "block"
+        if @count > 1
+          counted = @mixed || !type ? "#{@count} blocks" : "#{@count} #{type} blocks"
+          return subject_parts(verb == "created" ? "added #{counted} to " : "edited #{counted} on ")
+        end
         # An owner the viewer can't open (or one that is gone) isn't named:
         # the stored label is the block's own ("Rich text block #5").
         if target

@@ -469,4 +469,38 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You unpinned a note on “Pricing”", read(sentence_for(event("note.unpinned", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
     assert_equal "You removed the notes on “Pricing”", read(sentence_for(event("notes.removed", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
   end
+
+  # Layout points spec, decision 11: the dashboard joins a run of one
+  # person's block edits on one page into one row, and the sentence counts.
+  test "a counted block sentence names the count and the type, or blocks for mixed types" do
+    page = as(@me) { create_page(title: "Code block demo") }
+    target = Audit::Sentence::Target.new("Code block demo", Audit::Sentence.route_for(page))
+    created = event("block.created", subject_type: "ContentBlock", subject_id: 1, snapshot: { "block_type" => "code" })
+    edited = event("block.updated", subject_type: "ContentBlock", subject_id: 2, snapshot: { "block_type" => "rich_text" })
+
+    assert_equal "You added 4 Code blocks to “Code block demo”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 4))
+    assert_equal "You added 2 blocks to “Code block demo”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 2, mixed: true))
+    assert_equal "You edited 3 Rich text blocks on “Code block demo”", read(Audit::Sentence.build(edited, viewer: @me, target:, count: 3))
+    assert_equal "You edited 3 blocks on “Code block demo”", read(Audit::Sentence.build(edited, viewer: @me, target:, count: 3, mixed: true))
+    assert_equal "You added a Code block to “Code block demo”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 1))
+  end
+
+  # The owner's O10: uploads collapse too, and the row links to the library.
+  test "a counted upload reads uploaded 12 images, linked to the library and not quoted" do
+    upload = event("media.uploaded", subject_type: "Media::Asset", subject_id: 5, subject_label: "photo.jpg")
+    sentence = Audit::Sentence.build(upload, viewer: @me, target: Audit::Sentence::Target.new(nil, Audit::Sentence.library_route), count: 12)
+
+    assert_equal "You uploaded 12 images", read(sentence)
+    assert_equal [ Audit::Sentence::Part.new(:text, "uploaded "), Audit::Sentence::Part.new(:collection, "12 images") ], sentence.parts
+    assert_equal Audit::Sentence::Route.new(:admin_media_path, [], {}), sentence.subject_route
+  end
+
+  test "a count is for the counted actions only, and needs a target" do
+    published = event("post.published", subject_type: "Post", subject_id: 1, subject_label: "Hello")
+    block = event("block.created", subject_type: "ContentBlock", subject_id: 1)
+
+    assert_raises(ArgumentError) { Audit::Sentence.build(published, viewer: @me, target: nil, count: 2) }
+    assert_raises(ArgumentError) { Audit::Sentence.build(block, viewer: @me, target: nil, count: 2) }
+    assert_equal %w[block.created block.updated media.uploaded], Audit::Sentence::COUNTED
+  end
 end
