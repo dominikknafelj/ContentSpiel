@@ -97,4 +97,14 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
   ensure
     Rails.application.reloader.prepare!
   end
+
+  test "the form is the editors' form column: 760px on the default tab, the pair's width on a translation tab, and the header is neither" do
+    with_locales(%w[en de], default: "en")
+    as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: @post, locale: "en") }
+    assert_selector "form#post-form.admin-translation-form.admin-form-column:not(.admin-form-column--pair)"
+    assert_no_selector ".admin-editor-header.admin-form-column"
+
+    as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: @post, locale: "de") }
+    assert_selector "form#post-form.admin-form-column.admin-form-column--pair"
+  end
 end

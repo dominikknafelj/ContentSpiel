@@ -16,8 +16,8 @@ class Admin::NoteMentionsTest < ActionDispatch::IntegrationTest
   test "it lists users who may read the record, by name with the email as a hint, owners included" do
     users(:two).update!(name: "Dana Example")
 
-    assert_equal [ { "id" => users(:two).id, "label" => "Dana Example", "hint" => "two@example.com" } ], suggest("dana")
-    assert_equal [ { "id" => users(:one).id, "label" => "one", "hint" => "one@example.com" } ], suggest("one@")
+    assert_equal [ { "id" => users(:two).id, "label" => "Dana Example", "hint" => "two@example.com", "initials" => "DE" } ], suggest("dana")
+    assert_equal [ { "id" => users(:one).id, "label" => "one", "hint" => "one@example.com", "initials" => "on" } ], suggest("one@")
   end
 
   test "someone who may not read the record is never offered" do

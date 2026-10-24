@@ -1,6 +1,6 @@
 <%# The Settings screen (cs-studio spec §6.1; round 3, Task 5, handoff §4.5): a
     nav of anchors at the left (`Admin::SettingsScreen::NavComponent`) and one
-    card per section in a column up to 1100px wide altogether. ONE form
+    card per section in a card column of `--cs-form-max` altogether. ONE form
     (`#settings-form`) wraps the whole column and carries the ONE save footer
     (`Admin::Ui::SaveBarComponent`, at its bottom): the Site and Publishing cards,
     the Languages card's order and fallbacks and the AI card's provider and
@@ -27,13 +27,13 @@
      "trash_retention_days" => "settings-trash_retention_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
      "social_links" => "settings-social-0-name" } %>
 
-<div class="grid max-w-[1100px] grid-cols-1 items-start gap-x-7 gap-y-4 lg:grid-cols-[170px_minmax(0,1fr)]">
+<div class="grid grid-cols-1 items-start gap-x-7 gap-y-4 lg:grid-cols-[170px_minmax(0,var(--cs-form-max))]">
   <div class="lg:sticky lg:top-[calc(var(--admin-top-offset)+1.75rem)]">
     <h1 class="mb-3.5 text-h1 text-ink">Settings</h1>
     <%= render Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent.sections_for { |permission| can?(permission) }) %>
   </div>
 
-  <div class="flex min-w-0 flex-col gap-5">
+  <div class="flex min-w-0 max-w-[var(--cs-form-max)] flex-col gap-5">
     <% if @stale_form %>
       <%= render "admin/shared/stale_banner", message: Admin::SettingsController::STALE_MESSAGE, lead: Admin::SettingsController::STALE_LEAD, change: @stale_change, reload_path: admin_settings_path(**admin_url_options) %>
     <% end %>

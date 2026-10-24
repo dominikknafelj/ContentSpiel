@@ -15,6 +15,21 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
   def footer = ".admin-save-bar"
 
+  test "at 1600px every card is 760px wide, a text field fills it and Time zone keeps its own width" do
+    page.driver.resize(1600, 1000)
+    visit admin_settings_path
+    await_admin_controllers
+
+    width = ->(selector) { page.evaluate_script("document.querySelector(#{selector.to_json}).getBoundingClientRect().width") }
+    %w[#settings-site-card [aria-labelledby=languages] [aria-labelledby=publishing] [aria-labelledby=ai]].each do |card|
+      assert_in_delta 760, width.(card), 1, card
+    end
+    assert_operator width.("#settings-en-title"), :>, 700
+    assert_operator width.("#settings-time_zone"), :<=, 384
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   test "tabs switch without asking or counting, a sidebar link asks, and Save persists both languages" do
     visit admin_settings_path
     await_admin_controllers
@@ -46,13 +61,13 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     # A social link row added is counted, and removed it is not.
     click_on "+ Add link"
-    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 2
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 1
     assert_selector footer, text: /\b1 unsaved change\b/i # a blank row is nothing yet
     page.all("[data-admin--settings--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
     assert_selector footer, text: /\b2 unsaved changes\b/i # typed in, it is one more
     page.all("[data-admin--settings--repeat-rows-target=row]").last.find("button[aria-label='Remove link']").click
     assert_selector footer, text: /\b1 unsaved change\b/i # and gone with its row
-    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 1
+    assert_no_selector "[data-admin--settings--repeat-rows-target=list] input"
 
     click_on "English"
     fill_in "settings-en-tagline", with: "Things I learned lately"
@@ -69,6 +84,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     visit admin_settings_path
     await_admin_controllers
 
+    click_on "+ Add link"
     fill_in "settings-social-0-name", with: "GitHub"
     fill_in "settings-social-0-url", with: "https://github.com/dana"
     click_on "+ Add link"
@@ -117,6 +133,61 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal "Typed, then jump", find_field("settings-en-title").value
   end
 
+  test "the section in view is the nav's current one, in ink with the bar, and follows the scroll" do
+    # Short enough that Publishing's heading can be scrolled to the top without the page's end stopping it.
+    page.driver.resize(1400, 400)
+    visit admin_settings_path
+    await_admin_controllers
+    nav = "nav[aria-label='Settings sections']"
+
+    assert_selector "#{nav} a[aria-current=true]", text: "Site", count: 1
+    look = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector(#{"#{nav} a[aria-current=true]".to_json})); return [ s.color, s.boxShadow ] })()")
+    ink = page.evaluate_script("getComputedStyle(document.body).getPropertyValue('--cs-ink')")
+    assert_match(/inset/, look[1])
+    assert_equal look[0], page.evaluate_script("(() => { const p = document.createElement('p'); p.style.color = #{ink.strip.to_json}; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c })()")
+
+    page.execute_script("document.getElementById('publishing').scrollIntoView({ block: 'start' })")
+    assert_selector "#{nav} a[aria-current=true]", text: "Publishing", count: 1
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
+  test "at the end of a page that scrolls the last section is current, though its heading is not above the 40% line" do
+    # A window tall enough that the AI card's heading is still below the 40% line at the page's end:
+    # only the nav's at-end rule can make it current.
+    page.driver.resize(1400, 1000)
+    visit admin_settings_path
+    await_admin_controllers
+    page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+
+    assert page.evaluate_script("document.getElementById('ai').getBoundingClientRect().top > window.innerHeight * 0.4"), "the premise: the AI heading is below the 40% line at the end"
+    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "AI translation", count: 1
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
+  test "below 1024px the cards are no wider than the form maximum" do
+    page.driver.resize(900, 1000)
+    visit admin_settings_path
+    await_admin_controllers
+    width = page.evaluate_script("document.getElementById('ai').closest('.flex.min-w-0.flex-col').getBoundingClientRect().width")
+    max = page.evaluate_script("parseFloat(getComputedStyle(document.body).getPropertyValue('--cs-form-max'))")
+    assert_operator max, :>, 0
+    assert_operator width, :<=, max + 0.5
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
+  test "on a window where nothing scrolls the first section is current" do
+    page.driver.resize(1400, 4000)
+    visit admin_settings_path
+    await_admin_controllers
+
+    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Site", count: 1
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   test "a blank social row counts nothing, a typed label counts one" do
     visit admin_settings_path
     await_admin_controllers
@@ -127,19 +198,20 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /\b1 unsaved change/i
   end
 
-  test "removing the only social link, then Save, deletes it" do
+  test "removing the only social link removes its row, and Save deletes it" do
     site_settings(:default).update!(social_links: { "GitHub" => "https://github.com/dana" })
     visit admin_settings_path
     await_admin_controllers
 
     find("button[aria-label='Remove link']").click
     assert_selector footer, text: /unsaved change/i
-    assert_field "settings-social-0-name", with: ""
-    click_on "Save"
+    assert_no_selector "[data-admin--settings--repeat-rows-target=row]"
+    assert_selector "button[data-action='admin--settings--repeat-rows#add']:focus"
+    press "Save"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal({}, site_settings(:default).reload.social_links.to_h)
     visit admin_settings_path
-    assert_field "settings-social-0-name", with: ""
+    assert_no_field "settings-social-0-name"
   end
 
   test "the error summary's link reveals the hidden panel and focuses the field" do

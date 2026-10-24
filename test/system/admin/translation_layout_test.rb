@@ -2,7 +2,7 @@ require "application_system_test_case"
 
 # Side-by-side translation (design pass round 2, Task 7; handoff §4.1, §9 A7):
 # in a translation tab a translated field and the primary-language original sit
-# beside each other while the form is at least 880px wide, and stack -- the
+# beside each other while the form is at least 824px wide, and stack -- the
 # original first -- below that. The breakpoint is a CONTAINER query on the
 # form, so this is a real-browser test: only layout can show it.
 class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
@@ -28,7 +28,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
   end
 
   # The page editor sits beside the page tree, so at 1100px a block card's form
-  # is under 880px wide although the window is not.
+  # is under 824px wide although the window is not.
   test "narrow, the original stacks above the field and the toolbar is one row" do
     page.driver.resize(1100, 1000)
     page_record = create_page(title: "About")
@@ -39,7 +39,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     assert_selector "[data-block-id='#{block.id}'] .ProseMirror"
 
     form_width = page.evaluate_script(%(document.querySelector("[data-block-id='#{block.id}'] form.admin-translation-form").clientWidth))
-    assert_operator form_width, :<, 880, "the premise: at 1100px the block form is under 880px (was #{form_width})"
+    assert_operator form_width, :<, 824, "the premise: at 1100px the block form is under 824px (was #{form_width})"
 
     top_of_original, top_of_field = tops_of("[data-block-id='#{block.id}'] [data-original-for='body']", "[data-block-id='#{block.id}'] .admin-rich-text")
     assert_operator top_of_original, :<, top_of_field - 4, "the original should sit above the field when stacked"

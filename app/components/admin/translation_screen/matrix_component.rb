@@ -2,11 +2,19 @@ module Admin
   module TranslationScreen
     # The Translations matrix (design pass round 2, Task 18, handoff §4.4):
     # rows are items that need work in any target language, columns the target
-    # languages. Each cell is that language's `Ui::TranslationChipComponent`
-    # linking to the item's editor in that language (a complete language in an
-    # incomplete row still links); the row title links to the first outdated
-    # language's editor, else the first missing; the call to action reads
-    # "Review changes →" when anything is outdated, "Translate →" otherwise.
+    # languages. Each cell is that language's `StateCellComponent` (a mark and
+    # a word) linking to the item's editor in that language (a complete language
+    # in an incomplete row still links); the row title links to the first
+    # outdated language's editor, else the first missing. The WHOLE row opens
+    # that language (layout points spec, decision 8, plan ruling 6): an empty
+    # stretched link in the action cell, `absolute inset-0` against the row
+    # (not the sticky title cell, which would make it the containing block),
+    # with no tab stop and hidden from a screen reader since the title link is
+    # both; the title cell is z-20 and the cell links z-10, so they win over it,
+    # and the scroll wrapper is `isolate` so those z-indexes stay inside the
+    # table, under the shell's top bar. The action word ("Review changes →"
+    # when anything is outdated, "Translate →" otherwise) is shown by opacity
+    # on hover or title focus.
     #
     # `items` are `Admin::TranslationsController::Item`s, already sorted and
     # already limited to what the viewer may read, so every link here is one
@@ -19,9 +27,6 @@ module Admin
     # with the item, language and state, so colour (and the glyph) is never the
     # only cue.
     class MatrixComponent < Admin::AdminComponent
-      CTA_REVIEW = "Review changes →".freeze
-      CTA_TRANSLATE = "Translate →".freeze
-
       def initialize(items:, locales:)
         @items = items
         @locales = locales.map(&:to_s)
@@ -41,13 +46,17 @@ module Admin
         end
       end
 
-      # The language the row title and the CTA open: the first outdated one,
+      # The language the row title and the stretched link open: the first outdated one,
       # else the first missing one.
       def focus_locale(item)
         locales.find { |locale| item.states[locale] == :outdated } || locales.find { |locale| item.states[locale] == :missing } || locales.first
       end
 
-      def cta(item) = item.states.values.include?(:outdated) ? CTA_REVIEW : CTA_TRANSLATE
+      def action_kind(item) = item.states.values.include?(:outdated) ? :review : :translate
+
+      def action(item) = t(".action.#{action_kind(item)}")
+
+      def open_label(item) = t(".open_label.#{action_kind(item)}", title: title(item))
 
       def editor_path(item, locale)
         case item.type

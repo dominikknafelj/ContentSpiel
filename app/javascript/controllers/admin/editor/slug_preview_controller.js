@@ -1,27 +1,26 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Keeps `Admin::Columns::SlugColumnComponent`'s URL preview live as either
-// the title or the slug field is typed (cs-studio spec §5.1 -- carried in
-// from Task 2's review, where the preview line was still a load-time
-// snapshot with nothing to keep it current). Wraps both fields in
-// `Admin::EditorScreen::PageSettingsFormComponent`'s own markup, so a plain bubbling
-// `input` listener at that shared ancestor is enough; no Stimulus target
-// lives outside it.
+// Makes the slug field's placeholder say the slug the title will give, from
+// the moment the editor opens and as the title is typed. The placeholder carries
+// the one job the line under the field had.
 //
-// The slug shown here is a client-side approximation of
-// `LocalizedSlug#slugify`'s ASCII fast path -- good enough for a preview,
-// but not the value that actually gets saved. The real slug is still
-// whatever `Pages::Save` -> `LocalizedSlug#fill_blank_slugs` computes
-// server-side on save (including its Unicode-preserving fallback for a
-// title with no Latin letters at all), and this controller never writes
-// back into the slug input itself -- only the read-only `output` span
-// beside it.
+// The slug shown is a client-side approximation of `LocalizedSlug#slugify`'s
+// ASCII fast path -- good enough for a hint, but not the value that gets saved.
+// The real slug is still whatever `Pages::Save` -> `LocalizedSlug#fill_blank_slugs`
+// computes server-side on save (including its Unicode-preserving fallback for a
+// title with no Latin letters at all), and this controller writes nothing but the
+// placeholder. `connect` runs again whenever a live refresh replaces the form, so a
+// refreshed form has its placeholder too.
 export default class extends Controller {
-  static targets = ["title", "slug", "output"]
+  static targets = ["title", "slug"]
+
+  connect() {
+    this.update()
+  }
 
   update() {
-    const typed = this.hasSlugTarget ? this.slugTarget.value.trim() : ""
-    this.outputTarget.textContent = typed !== "" ? typed : this.slugify(this.hasTitleTarget ? this.titleTarget.value : "")
+    if (!this.hasTitleTarget || !this.hasSlugTarget) return
+    this.slugTarget.placeholder = this.slugify(this.titleTarget.value)
   }
 
   slugify(value) {

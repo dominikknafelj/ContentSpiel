@@ -646,4 +646,26 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert @owner.reload.authenticate("a-new-long-password")
     assert_equal "Typed Name", find_field("Your name").value
   end
+
+  test "a footer stuck over the fields draws a stronger top edge and a shadow, and at the end of the form neither" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(@owner)
+    page.driver.resize(1400, 600)
+    visit admin_settings_path
+    await_admin_controllers
+    bar = ".admin-save-bar"
+    look = -> { page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector('.admin-save-bar')); return [ s.borderTopColor, s.boxShadow ] })()") }
+
+    assert_selector "#{bar}[data-stuck]"
+    stuck = look.call
+    assert_not_equal "none", stuck[1]
+
+    page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+    assert_no_selector "#{bar}[data-stuck]"
+    at_rest = look.call
+    assert_equal "none", at_rest[1]
+    assert_not_equal stuck[0], at_rest[0], "the top edge is the strong line only while stuck"
+  ensure
+    page.driver.resize(1400, 1400)
+  end
 end

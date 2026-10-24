@@ -11,6 +11,21 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
+  test "an empty slug says the slug the title will give as soon as the editor opens, and follows the title" do
+    post = create_post(title: "Notes on Rails", published: false)
+    post.update_columns(slug: {}) # version: none (a test's own setup: a draft whose slug was never filled)
+    visit "/cs-studio/posts/#{post.id}"
+    await_admin_controllers
+
+    slug = find("[data-admin--editor--slug-preview-target=slug]")
+    assert_equal "", slug.value
+    assert_equal "notes-on-rails", slug[:placeholder]
+
+    find("[data-admin--editor--slug-preview-target=title]").set("Hello, World")
+    assert_eventually(message: "the placeholder never followed the title") { slug[:placeholder] == "hello-world" }
+    assert_writes_settled
+  end
+
   test "a 70-character meta title shows the long counter and still saves" do
     about = create_page(title: "About")
     visit "/cs-studio/pages/#{about.id}"

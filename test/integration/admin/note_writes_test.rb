@@ -577,6 +577,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_equal 1, body["open"]
     row = body["threads"].first
     assert_equal [ thread.id, "Dana", 1, false ], row.values_at("id", "author", "replies", "pinned")
+    assert_equal "Da", row["initials"]
     assert_equal true, row["unread"] # the first message mentions the reader, and reading a list marks nothing read (P10)
     assert_equal false, row["mine"] # Dana wrote it, not the reader
     assert row["text"].start_with?("Ask @reader <b>now</b> x")
@@ -604,6 +605,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_equal [ true, false, false ], body["threads"].map { |row| row["pinned"] }
     assert_equal [ false, true, false ], body["threads"].map { |row| row["mine"] }
     assert_nil body["threads"].last["author"]
+    assert_equal "ad", body["threads"].last["initials"]
   end
 
   test "the card's JSON is not found for a post outside the read scope, a trashed one and an id that names nothing" do

@@ -1,7 +1,7 @@
 <%= render Admin::Ui::ChipInputComponent.new(
       name: html_name, id: search_id, label: "Related posts", chips: chips, search_url: search_url,
       placeholder: "Search posts to link…", exclude: [ post.id ], errors: errors, hidden_note: hidden_note,
-      help: "Related posts show at the end of the article and in the Mind graph."
+      help: t(".help")
     ) do %>
   <% if (from = related_from).any? %>
     <p class="mt-2 text-sm text-meta">

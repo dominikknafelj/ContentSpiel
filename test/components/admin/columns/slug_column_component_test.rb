@@ -1,11 +1,13 @@
 require "test_helper"
 
 class Admin::Columns::SlugColumnComponentTest < ViewComponent::TestCase
-  test "renders the slug input and a live URL preview line" do
+  test "the address is shown once: the prefix and the slug in the field, and no line under it" do
     render_inline Admin::Columns::SlugColumnComponent.new(value: "about-us", base_url: "https://example.com/company")
 
     assert_selector "input[type=text][name=slug][value='about-us']"
-    assert_text "example.com/company/about-us"
+    assert_selector ".admin-prefix-input span", text: "example.com/company/"
+    assert_no_text "example.com/company/about-us"
+    assert_no_selector "[data-admin--editor--slug-preview-target=output], [data-slug-preview-base]"
   end
 
   test "renders errors under the input" do
@@ -37,6 +39,5 @@ class Admin::Columns::SlugColumnComponentTest < ViewComponent::TestCase
     assert_selector ".admin-prefix-input span.bg-sunken", text: "/de/"
     assert_selector "input#page_slug[name='page[slug]'][data-admin--editor--slug-preview-target=slug][aria-invalid=true]"
     assert_selector "#page_slug-errors", text: "is taken"
-    assert_selector "[data-admin--editor--slug-preview-target=output]", text: "x"
   end
 end

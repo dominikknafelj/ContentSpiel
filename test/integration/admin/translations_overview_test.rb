@@ -62,9 +62,9 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "#{row("page", missing_page)} th[scope=row] a[href='/cs-studio/pages/#{missing_page.id}?locale=de']", text: "Untranslated page"
     assert_select "#{row("page", missing_page)} [data-locale=de][data-translation-state=missing]"
     assert_select "#{row("page", missing_page)} [data-locale=es][data-translation-state=missing]"
-    assert_select "#{row("page", missing_page)} td a", text: "Translate →"
+    assert_select "#{row("page", missing_page)} .admin-translation-row__action", text: "Translate →"
     assert_select "#{row("page", outdated_page)} [data-locale=es][data-translation-state=outdated]"
-    assert_select "#{row("page", outdated_page)} td a", text: "Review changes →"
+    assert_select "#{row("page", outdated_page)} .admin-translation-row__action", text: "Review changes →"
     assert_select "#{row("post", stale_post)} a[href='/cs-studio/posts/#{stale_post.id}?locale=de'] [data-translation-state=outdated]"
     assert_select "#{row("media", image)} a[href='/cs-studio/media?locale=es&selected=#{image.id}']"
     # One card per target language, none for the original.

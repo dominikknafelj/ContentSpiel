@@ -1,5 +1,5 @@
-<nav aria-label="Settings sections" class="admin-settings-nav flex flex-col gap-0.5">
+<nav aria-label="Settings sections" class="admin-settings-nav flex flex-col gap-0.5" data-controller="admin--settings--nav" data-action="turbo:before-cache@document->admin--settings--nav#reset">
   <% sections.each do |section| %>
-    <a href="#<%= section[:id] %>" class="rounded-cs px-2 py-1.5 text-sm text-dim hover:bg-sunken hover:text-ink"><%= section[:label] %></a>
+    <a data-admin--settings--nav-target="link" href="#<%= section[:id] %>" class="rounded-cs px-2 py-1.5 text-sm text-dim hover:bg-sunken hover:text-ink"><%= section[:label] %></a>
   <% end %>
 </nav>

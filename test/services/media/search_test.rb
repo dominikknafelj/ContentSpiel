@@ -24,6 +24,20 @@ class Media::SearchTest < ActiveSupport::TestCase
     assert Pages::Save.call(page, attributes: { hero_media_asset_id: @complete.id }).ok?
   end
 
+  test "any_images? is the kept count without search text, and one query with it: a search that finds nothing still knows" do
+    plain = Media::Search.new(actor: @viewer)
+    assert plain.any_images?(counts: plain.counts)
+
+    nothing = Media::Search.new(q: "no such image anywhere", actor: @viewer)
+    assert_equal 0, nothing.counts[:all]
+    assert nothing.any_images?(counts: nothing.counts)
+
+    Media::Asset.update_all(trashed_at: Time.current) # version: none (a test's own setup: the whole library in the trash)
+    [ Media::Search.new(actor: @viewer), Media::Search.new(q: "Beach", actor: @viewer) ].each do |search|
+      assert_not search.any_images?(counts: search.counts)
+    end
+  end
+
   test "each segment lists what its name says" do
     assert_equal [ @bare, @complete, @german_only, @translated_gap ].map(&:id).sort, ids(filter: "all")
     assert_equal [ @bare, @german_only, @translated_gap ].map(&:id).sort, ids(filter: "unused")

@@ -10,8 +10,13 @@ import { Controller } from "@hotwired/stimulus"
 // Adding or removing dispatches a bubbling `change` from the list, which is
 // what the form's save footer (`admin--saving--save-bar`) listens to, so it counts a
 // row added or removed. The new row's first field takes the focus; after a
-// removal focus goes to the next row's field (or "+ Add link" when none is
-// left), never to the page.
+// removal focus goes to the next row's field, else the previous one's, else
+// "+ Add link", never to the page.
+//
+// Removing the last row leaves no row at all: the list starts empty. The form
+// still says it carries the links (the fieldset's hidden
+// `site_setting[social_links_present]`), so the server reads "no rows" as
+// "none" and clears them.
 export default class extends Controller {
   static targets = [ "list", "row", "template" ]
   static values = { next: Number }
@@ -27,15 +32,6 @@ export default class extends Controller {
   remove(event) {
     const row = event.currentTarget.closest("[data-admin--settings--repeat-rows-target='row']")
     if (!row) return
-    // The last row is cleared, not removed: one empty row is the "none" state,
-    // and without it the form would post no rows at all, which the server
-    // reads as "not touched" -- the removed link would stay stored.
-    if (this.rowTargets.length === 1) {
-      row.querySelectorAll("input").forEach((input) => { input.value = "" })
-      row.querySelector("input")?.focus()
-      this.changed()
-      return
-    }
     const following = row.nextElementSibling || row.previousElementSibling
     row.remove()
     ;(following?.querySelector("input") || this.element.querySelector("[data-action~='admin--settings--repeat-rows#add']"))?.focus()

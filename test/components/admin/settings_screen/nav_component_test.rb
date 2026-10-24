@@ -17,6 +17,14 @@ class Admin::SettingsScreen::NavComponentTest < ViewComponent::TestCase
     assert_no_selector "a[data-turbo-frame]"
   end
 
+  test "the nav is the current-section controller's, and the server marks no link current" do
+    render_inline Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent::SECTIONS)
+
+    assert_selector "nav[aria-label='Settings sections'][data-controller='admin--settings--nav'][data-action~='turbo:before-cache@document->admin--settings--nav#reset']"
+    assert_selector "a[data-admin--settings--nav-target=link]", count: 4
+    assert_no_selector "a[aria-current]"
+  end
+
   test "sections_for keeps the sections whose right the viewer holds" do
     only_settings = Admin::SettingsScreen::NavComponent.sections_for { |permission| permission == "settings.manage" }
     only_languages = Admin::SettingsScreen::NavComponent.sections_for { |permission| permission == "languages.manage" }

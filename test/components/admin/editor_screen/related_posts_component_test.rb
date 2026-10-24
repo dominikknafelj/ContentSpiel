@@ -35,6 +35,14 @@ class Admin::EditorScreen::RelatedPostsComponentTest < ViewComponent::TestCase
     assert_no_text "Secret"
   end
 
+  # The owner's O7: the public post page shows no related posts, so the help does not say it does.
+  test "the help says where related posts show: the Mind graph, not yet the site" do
+    render_inline Admin::EditorScreen::RelatedPostsComponent.new(post: create_post(title: "Hub"), locale: "en")
+
+    assert_text "Related posts are linked to this one in the Mind graph. The site does not show them yet."
+    assert_no_text "end of the article"
+  end
+
   test "searches the post link targets in the editing locale" do
     render_inline Admin::EditorScreen::RelatedPostsComponent.new(post: create_post(title: "Hub"), locale: "de")
 

@@ -84,6 +84,10 @@
    wraps onto two or three lines is taller than any fixed offset), 4rem until
    it has been measured. */
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
+/* Nothing at rest; while the sticky footer is stuck over the content
+   (`data-stuck`, set by `admin--saving--save-bar`), the strong line and a
+   shadow (Claude Design O2). */
+.admin-save-bar[data-stuck] { border-top-color: var(--cs-line-strong); box-shadow: var(--cs-shadow-stuck); }
 /* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT (Claude Design,
    2026-10-13, T1). `--admin-tree-width` on <html> is the CHOSEN width, in
    pixels: the layout's head script puts it there from this browser's memory
@@ -129,6 +133,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 /* `position: relative` for the divider on its right edge; the drawer rules
    below make the column `fixed`, which holds the (hidden) divider as well. */
 .admin-shell__tree { position: relative; border-right: 1px solid var(--cs-line); background: var(--cs-chrome); padding: 1rem; }
+/* The Translations row's action word sits under the row's stretched link, so it
+   is shown by opacity, never visibility (layout points spec, B). */
+.admin-translation-row__action { opacity: 0; }
+.admin-translation-row:hover .admin-translation-row__action,
+.admin-translation-row:has(th a:focus-visible) .admin-translation-row__action { opacity: 1; }
+
 /* The divider (`Admin::Shell::TreeDividerComponent`, T1). AT REST it is
    nothing but the column's own 1px line: this element is the 8px HIT AREA,
    centred on that line (the line is the column's last pixel, so the area
@@ -276,6 +286,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-editor-header__tree { display: inline-block; }
 }
 @media (prefers-reduced-motion: reduce) { :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
+
+/* Settings' in-page nav (Admin::SettingsScreen::NavComponent): the link of the
+   section in view is current. The look is read from `aria-current`, so it
+   cannot drift from what a screen reader hears; ink text and a 2px ink bar at
+   the left, as the selected tree row has. */
+.admin-settings-nav a[aria-current="true"] { color: var(--cs-ink); box-shadow: inset 2px 0 0 var(--cs-ink); }
 
 /* Admin::Ui::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::Ui::DialogComponent::WIDTHS). */
@@ -474,8 +490,9 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    breakpoint is the width of the FORM (`container-type: inline-size` on
    `.admin-translation-form`: the page-settings form, the post form and each
    block card's form), not the viewport -- the page editor sits beside the tree,
-   so a 1400px window can still leave a 700px column. From 880px of form width
-   the two sit side by side; below it they stack with the original FIRST (it is
+   so a 1400px window can still leave a 700px column. From 824px of form width
+   (two columns of at most 560px and the 24px gap) the two sit side by side;
+   below it they stack with the original FIRST (it is
    what you read before you type) and foldable (`<details open>`), and the
    rich-text toolbar -- now alone in its row -- has the full width, so it fits
    on one line again (round 1's `flex-wrap` stays as the fallback only). Side
@@ -488,14 +505,23 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    no-op). The error slot is NOT inside the pair (see the invalid-border
    notes above: it must stay a direct child of `.admin-column`/`.admin-field`). */
 .admin-translation-form { container-type: inline-size; }
-.admin-translation-pair { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-@container (min-width: 880px) {
-  .admin-translation-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+/* The editors' form column: left-aligned in the content column, its width a
+   token. The class goes on the elements that are there (the post form, the
+   page settings panel, the block list) and never on a new wrapper: live
+   editing's merge decides by the ids of a unit's ancestors, and a wrapper
+   would be one more. A translation tab's pairs need two columns. */
+.admin-form-column { max-width: var(--cs-form-max); }
+.admin-form-column--pair { max-width: var(--cs-form-max-pair); }
+.admin-translation-pair { display: grid; column-gap: 1.5rem; row-gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 824px) {
+  .admin-translation-pair { grid-template-columns: repeat(2, minmax(0, 560px)); }
   .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
   .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; interactivity: inert; list-style: none; }
   .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
+  /* Ruling 9: side by side the summary is inert, so it shows no disclosure triangle. */
+  .admin-translation-pair > .admin-reference-card > details > summary::before { display: none; }
 }
-@container (max-width: 879.98px) {
+@container (max-width: 823.98px) {
   .admin-translation-pair > .admin-reference-card { order: -1; }
 }
 

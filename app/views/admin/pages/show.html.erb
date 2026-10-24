@@ -61,7 +61,7 @@
     not redrawn over unsaved text), the two choices it writes into the Move
     dialog and what it announces after a move made from a menu. Here and not on
     <body>: only this screen's script asks for them. %>
-<section class="admin-content-blocks mt-6" data-controller="admin--editor--blocks"
+<section class="admin-content-blocks <%= Admin::EditorScreen::FormColumn.classes(admin_locale) %> mt-6" data-controller="admin--editor--blocks"
      data-admin--editor--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>"
      data-messages="<%= messages_data("components.editor_screen.section_card.unsaved_move", "components.editor_screen.section_card.reload_later",
                                       "components.editor_screen.move_dialog.column", "components.editor_screen.move_dialog.section_column",

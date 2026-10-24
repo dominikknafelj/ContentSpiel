@@ -264,7 +264,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
     assert_selector circle(@reader, "here"), wait: LIVE
     assert_selector "#{group}[aria-label='Also open by 1 person: reader, here']"
-    assert_selector circle(@reader) + " > span.bg-sunken", text: "R", exact_text: true
+    assert_selector circle(@reader) + " > span.bg-sunken", text: "RE", exact_text: true
   end
 
   # Handoff 14 and 25: arriving fades in; leaving does not fade.

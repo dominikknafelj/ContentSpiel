@@ -1,9 +1,9 @@
 <%= tag.div id: card_id, class: card_class, data: { original_for: field, translation_state: state } do %>
   <details open>
-    <summary class="flex cursor-pointer items-baseline justify-between gap-2 font-cs-mono text-label uppercase tracking-mono text-meta">
+    <summary class="admin-disclosure cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">
       <span><%= language_name %></span>
       <% if changed_at %>
-        <span class="text-warn-ink">↻ Changed <%= render Admin::Ui::TimeAgoComponent.new(time: changed_at) %></span>
+        <span class="ml-auto text-warn-ink">↻ Changed <%= render Admin::Ui::TimeAgoComponent.new(time: changed_at) %></span>
       <% end %>
     </summary>
 

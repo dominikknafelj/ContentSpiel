@@ -21,10 +21,12 @@ class PersonNameTest < ActiveSupport::TestCase
     assert_equal user.email_address, user.display_name
   end
 
-  test "initials are the first character of the first two words as they were written; one word is one letter" do
+  test "initials: two words give their first characters, one word its first two letters, as written" do
     assert_equal "DW", PersonName.initials("Dana Weiss")
     assert_equal "dv", PersonName.initials("dana van weiss")
-    assert_equal "d", PersonName.initials("dana")
+    assert_equal "da", PersonName.initials("dana")
+    assert_equal "ad", PersonName.initials("admin")
+    assert_equal "au", PersonName.initials("author")
     assert_equal "d", PersonName.initials("d")
   end
 
@@ -32,7 +34,10 @@ class PersonNameTest < ActiveSupport::TestCase
     assert_equal "7o", PersonName.initials("7 of 9")
     assert_equal "👩‍🚀d", PersonName.initials("👩‍🚀 dana")
     assert_equal "e\u0301l", PersonName.initials("e\u0301lodie laurent")
-    assert_equal "d", PersonName.initials("@dana")
+    assert_equal "da", PersonName.initials("@dana")
+    assert_equal "on", PersonName.initials("o'neil")
+    assert_equal "7", PersonName.initials("7")
+    assert_equal "👩‍🚀", PersonName.initials("👩‍🚀")
     assert_equal "@", PersonName.initials("@")
     assert_equal "DW", PersonName.initials("(Dana) \"Weiss\"")
     assert_equal "", PersonName.initials("  ")

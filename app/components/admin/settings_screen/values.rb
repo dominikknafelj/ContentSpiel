@@ -48,18 +48,18 @@ module Admin
         submitted? ? SiteSetting.find(site.id).logo : site.logo
       end
 
-      # `[[name, url], ...]` in the order shown, always at least one (empty)
-      # row. Typed rows come back exactly as typed, half-filled ones included.
+      # `[[name, url], ...]` in the order shown; empty for a site with no
+      # links ("+ Add link" is then all there is). Typed rows come back exactly
+      # as typed, half-filled ones included. A submitted form that carried the
+      # `social_links_present` marker says which rows it HAD, so a save refused
+      # for another reason (a blank title) keeps a list the editor emptied
+      # empty, rather than bringing the stored links back (plan ruling 8).
       def social_rows
-        rows =
-          if submitted&.key?(:social_links)
-            raw = submitted[:social_links]
-            raw = raw.to_h.sort_by { |index, _| index.to_i }.map(&:last) unless raw.is_a?(Array)
-            raw.select { |row| row.respond_to?(:key?) }.map { |row| [ row[:name].to_s, row[:url].to_s ] }
-          else
-            site.social_links.to_a
-          end
-        rows.presence || [ [ "", "" ] ]
+        return site.social_links.to_a unless submitted&.key?(:social_links) || submitted&.key?(:social_links_present)
+
+        raw = submitted[:social_links]
+        raw = raw.to_h.sort_by { |index, _| index.to_i }.map(&:last) if raw.respond_to?(:to_h) && !raw.is_a?(Array)
+        Array(raw).select { |row| row.respond_to?(:key?) }.map { |row| [ row[:name].to_s, row[:url].to_s ] }
       end
 
       # The Languages card's rows, `[{ code:, fallback: }]` in the order shown,

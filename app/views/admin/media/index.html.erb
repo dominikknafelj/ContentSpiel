@@ -31,13 +31,18 @@
     <h1 class="text-h1 text-ink">Media</h1>
     <%= render Admin::Ui::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media--upload#browse" }) %>
   </div>
-  <div>
+  <%# The zone is the empty library's invitation: once the library holds a kept
+      image (whatever the search shows) the wrapper is hidden. The file input
+      stays in the document, the header button's and the full-window drop's
+      target (`admin--media--upload-target="input"`). The status line is
+      outside it, for a screen reader. %>
+  <%= tag.div hidden: @library_has_images, data: { media_drop_zone: "" } do %>
     <%= render Admin::Ui::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
           hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
           data: { "admin--media--upload-target": "input", action: "change->admin--media--upload#filesSelected" }) %>
-    <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
-    <p class="sr-only" role="status" aria-live="polite" data-admin--media--upload-target="status"></p>
-  </div>
+  <% end %>
+  <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
+  <p class="sr-only" role="status" aria-live="polite" data-admin--media--upload-target="status"></p>
   <%# Centred by flex over the whole window, translucent (the page stays
       visible behind it, as in the mock), and never in the way of the drop
       itself (`pointer-events-none`: the drag keeps its real target). %>

@@ -47,8 +47,13 @@ module Admin
         open: listing.open_count,
         threads: threads.map do |thread|
           first = thread.messages.first
+          author = listing.users[first.author_id]&.then { |user| Notes.name_of(user) }
           { id: thread.id, text: Notes::Mentions.display(first.body, listing.users).first.truncate(EXCERPT),
-            author: listing.users[first.author_id]&.then { |user| Notes.name_of(user) }, replies: thread.messages.size - 1, pinned: thread.pinned,
+            author: author,
+            # The letters of the avatar, written here and only here
+            # (`PersonName.initials`); a gone author is "a deleted user".
+            initials: PersonName.initials(author || t("admin.mind_graph.script.card.notes.deleted_user")),
+            replies: thread.messages.size - 1, pinned: thread.pinned,
             # What turns the row's dot accent in the card (spec §4.5): one
             # query for the whole listing (`Notes::Listing#unread?`).
             unread: listing.unread?(thread, Current.user),

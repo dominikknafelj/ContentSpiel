@@ -10,7 +10,7 @@ module Admin
     # The form is the detail page's own, moved: it saves through the write
     # queue (`admin--saving--autosave`) and its answer (`Admin::MediaController#update`)
     # also moves the tile and the segment counts, so nothing reloads under the
-    # typing editor. The panel is narrower than 880px, so the translation pair
+    # typing editor. The panel is narrower than 824px, so the translation pair
     # stacks on its own (`container-type` on the form).
     #
     # Slots (`Admin::Slots`): `media.panel.header` stands at the right end of

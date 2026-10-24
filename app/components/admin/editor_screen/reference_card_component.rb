@@ -16,7 +16,7 @@ module Admin
     # (`Admin::TranslationConfirmationsController`).
     #
     # The body is a `<details open>`: when the pair stacks (narrower than
-    # 880px of container, `.admin-translation-pair` in the stylesheet) the
+    # 824px of container, `.admin-translation-pair` in the stylesheet) the
     # reader can fold the original away to get the field itself under their
     # hands. Side by side the summary is made inert by that same CSS, so the
     # original never folds when there is room for both.

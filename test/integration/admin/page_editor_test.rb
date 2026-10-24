@@ -639,4 +639,12 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "fieldset[disabled] [data-controller='admin--ui--char-count'] textarea[name='page[meta_description]']"
     assert_select "form[data-controller~='admin--saving--autosave']", count: 0
   end
+
+  test "the block list is the editors' form column, the pair's on a translation tab" do
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "section.admin-content-blocks.admin-form-column:not(.admin-form-column--pair)"
+
+    get "/cs-studio/pages/#{@page.id}?locale=de"
+    assert_select "section.admin-content-blocks.admin-form-column.admin-form-column--pair"
+  end
 end

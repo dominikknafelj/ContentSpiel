@@ -40,6 +40,7 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
 
     assert_selector "input[name='page[slug]'][value='drafty']"
     assert_selector "[data-controller='admin--editor--slug-preview'] [data-admin--editor--slug-preview-target='slug']", visible: :all
+    assert_no_selector "[data-admin--editor--slug-preview-target=output]", visible: :all
     assert_no_selector "[data-page-address]"
     assert_no_selector "button", text: "Change address…", visible: :all
   end
@@ -129,5 +130,15 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
 
     assert_selector "#page-hold [data-editing-kind=held]"
     assert_no_selector "button", text: "Take over"
+  end
+
+  test "the settings panel is the editors' form column, the pair's on a translation tab" do
+    with_locales(%w[en de], default: "en")
+    page = create_page(title: "About", published: false)
+
+    render_settings(page)
+    assert_selector "details#page-settings.admin-form-column:not(.admin-form-column--pair)"
+    render_settings(page, locale: "de")
+    assert_selector "details#page-settings.admin-form-column.admin-form-column--pair"
   end
 end
