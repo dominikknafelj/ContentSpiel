@@ -4,7 +4,7 @@
 
 **Goal:** The second of the spec's three pull requests, "the dashboard and the Mind graph" (its sections C and D): the dashboard's cards in at most three columns, one quiet empty line per card in Claude Design's O6 words, Recent activity collapsing a run of the same person's block edits or uploads into one counted row, the activity row's two-letter circle (O9), the Mind graph's legend in two visible groups "Show" and "Key" with "Status key…" last (O5), a first view and "Fit all" that fill about 80% of the canvas, and a page's notes badge drawn outside its card (O11's Mind graph half).
 
-**Architecture:** The grid is one container query on a wrapper of the dashboard's view. The empty line is `Admin::DashboardScreen::CardComponent`'s own markup with an `empty_action` slot; `Admin::Ui::EmptyStateComponent` is not touched. The collapse is `Dashboard::Activity`'s, in Ruby over the events its one event query already read (that query reads four times the row limit), so the statement count does not move; the counted wording is `Audit::Sentence`'s (`count:`, `mixed:`, a new `:collection` part), drawn by `Admin::AuditScreen::SentenceComponent`. The Mind graph's changes are a component's markup, one pure function's numbers (`camera.fit`) and one drawing rule (`renderer.js`'s notes badge on a box); no query, no script-written state, nothing new for `reset()` to take back.
+**Architecture:** The grid is one container query on a wrapper of the dashboard's view. The empty line is `Admin::DashboardScreen::CardComponent`'s own markup with an `empty_action` slot; `Admin::Ui::EmptyStateComponent` is not touched. The collapse is `Dashboard::Activity`'s, in Ruby over the events its one event query already read (that query reads four times the row limit), so the statement count does not move; the counted wording is `Audit::Sentence`'s (`count:`, `mixed:`, a new `:collection` part), drawn by `Admin::AuditScreen::SentenceComponent`. The Mind graph's changes are a component's markup, one pure function's numbers (`camera.fit`) and the notes badge's drawing (outside a page's card, drawn last on a ring of the ground, an obstacle the label rule already knows how to avoid); no query, no script-written state, nothing new for `reset()` to take back.
 
 **Tech Stack:** Rails 8.1, ViewComponent, Tailwind 4 (`tailwindcss-rails`, container queries), Stimulus over import maps, a 2D canvas, Minitest + fixtures, Capybara on Cuprite.
 
@@ -14,7 +14,7 @@
 
 - Read `CLAUDE.md` first; its rules bind. Before a task read the reference its area names: `docs/reference/cs-studio-shell-and-dashboard.md` (every task; its "Mind graph" part for Tasks 6–8: the legend is a filter that moves nothing, swatches are the renderer's drawings, the Tab order is search, graph, list, `reset()` takes back what a script writes, no clock read, the viewer's scope), `docs/reference/access-control-and-audit.md` (Tasks 3, 4), `docs/reference/design-system.md` (Tasks 1, 2, 6), `docs/reference/i18n.md` (any task adding a key; `Audit::Sentence` stays English, "Out of scope, named").
 - Dashboard grid (Decision 13): one column below **40rem** (640px) of the dashboard's width, two from 40rem, **three from 60rem** (960px), never more; no `auto-fit`.
-- The empty lines (O6 as answered): Your drafts **"No drafts."** + **"Start a draft"**; Going live next **"Nothing scheduled."** + **"Your drafts →"**; Unpublished changes **"No unpublished changes."**; Needs translation **"Nothing to translate."** (unchanged); Notes for you **"No notes for you."** (unchanged); Open threads **"No open threads."** (unchanged); Recent activity **"No recent activity."** (unchanged). One line in `text-dim`, left-aligned under the card's title where the first row would be. The hint "Schedule a draft to see it here." goes (spec Ruling 5).
+- The empty lines (O6 as answered): Your drafts **"No drafts."** + **"Start a draft"**; Going live next **"Nothing scheduled."** + **"Drafts →"** (Claude Design, 2026-10-25, in place of O6's "Your drafts →"); Unpublished changes **"No unpublished changes."**; Needs translation **"Nothing to translate."** (unchanged); Notes for you **"No notes for you."** (unchanged); Open threads **"No open threads."** (unchanged); Recent activity **"No recent activity."** (unchanged). One line in `text-dim`, left-aligned under the card's title where the first row would be. The hint "Schedule a draft to see it here." goes (spec Ruling 5).
 - The collapse (Decision 11, O10): a run is adjacent in the feed, the same person (and token), the same counted action, the same page or post (a block's owner; any image for an upload), within `Audit::COALESCE_WINDOW` (10 minutes); `Dashboard::Activity` returns at most **15** rows and reads at most **60** events. The statement count of `Dashboard::Activity#rows` and of the dashboard's page does not change.
 - The words (English; `Audit::Sentence` is not converted): "added 4 Code blocks to “X”", "edited 3 blocks on “X”" (mixed types), "uploaded 12 images" (linked to the library, not quoted).
 - The legend (O5, Decision 14): a visible mono label "Show" before the toggles and "Key" before the marks; "Status key…" (with U+2026) is the last thing in Key; the Tab order (toggles, then "Status key…", then the zoom buttons) does not change.
@@ -46,18 +46,20 @@ Where the spec and the design answers left a choice, this plan decides. Each say
 6. **The read is four times the row limit, collapsed in Ruby.** Sixty newest events that collapse into fewer than fifteen rows show fewer rows, not older ones (Decision 11's cost). `test/queries/dashboard/activity_test.rb`'s "an older readable event is listed after 60 uploads for a viewer without media.upload" changes on purpose: its owner's 60 uploads are now ONE row of 60, not 15 rows.
 7. **The activity row's letters are `PersonName.initials` of the name the row shows** (`Admin::Ui::UserNameComponent#label`: the display name, "a deleted user", "System"), drawn upper-case by the style, as `Admin::Ui::AvatarComponent` draws them. "one@example.com" is "ON", "Ada Lovelace" "AL", a deleted user "AD", System "SY". The row keeps its own 28px circle (the shared avatar has no such size). *If wrong:* odd letters for nobody in particular, nothing else.
 8. **The empty action is a slot, `empty_action`**, not Decision 12's label and URL: "Start a draft" carries a controller and a fragment. The card draws the slot only when it has no rows.
-9. **"Start a draft" is a link to `#dashboard_draft_title`** whose controller, `admin--dashboard--start-draft`, moves the focus to the quick-create title (a fragment alone scrolls and focuses nothing). It is drawn whenever the quick-create row is; without the row, "No drafts." stands alone. "Your drafts →" goes to the posts list's drafts (`scope=drafts`) for whoever holds `posts.read` (see Open question 1).
+9. **"Start a draft" is a link to `#dashboard_draft_title`** whose controller, `admin--dashboard--start-draft`, moves the focus to the quick-create title (a fragment alone scrolls and focuses nothing). It is drawn whenever the quick-create row is; without the row, "No drafts." stands alone. "Drafts →" goes to the posts list's drafts (`scope=drafts`) for whoever holds `posts.read`. The words are Claude Design's answer of 2026-10-25 to this plan's first open question: that list holds every draft the viewer can read, and "Your drafts" would claim a filter it does not have (the link can say "Your drafts →" again once a "mine" filter exists).
 10. **The empty line's link is ink and underlined** (`text-ink underline`): ink on dim text is not 3:1, so the underline is what tells it apart.
 11. **The dashboard's view is converted to keys** (`admin.dashboard.show.*`) and joins `CONVERTED` with the card component, since every card's words change here; `QuickCreateComponent`, `RowComponent` and `TranslationCardComponent` are not converted (their words do not change). The translation card's empty line never shows: the card is hidden when it has nothing (unchanged).
 12. **"About 80%" is 10% of the canvas on each side, on the axis that binds.** The fit takes the smaller of the two zooms, so a wide graph fills 80% of the width and less of the height. The box is the nodes' centres, so a mark at the edge reaches a few pixels beyond it, into the margin. *If wrong:* a wide graph on a tall canvas leaves more room above and below; one constant.
 13. **The legend's "Show" is a visible label hidden from a screen reader** (`aria-hidden`), because the fieldsets keep their legends "Show" and "Lines" for it (Decision 14); **"Key" labels the list** (`aria-labelledby`), which keeps its marks and no control; **"Status key…" follows the list** inside the Key group, so the list stays a list of marks and the button is still the first stop after the toggles (the marks hold no stop).
-14. **K3 moves a page's badge, nothing else**: Home's card too; a post's badge, the pin, the swatch and the hit test are unchanged. The renderer's culling margin grows with it (`NODE_MARGIN` 23 → 29: "99+" now ends 28.5px left of a card's edge).
+14. **K3 moves a page's badge**: Home's card too; a post's badge, the pin and the hit test stay where they are. The renderer's culling margin grows with it (`NODE_MARGIN` 23 → 30: "99+" and its ring now end 30px left of a card's edge).
+15. **A badge outside its card covers what it lands on, cleanly** (Claude Design's answer of 2026-10-25 to this plan's second open question, (a)): every notes badge is drawn after every mark and label, on a 2px ring filled with the theme's `surface` (the canvas's ground, a theme key, never a colour), at its node's strength. The layout makes no room for badges. *If wrong:* a badge hides a sliver of a neighbour's mark; one draw-order change.
+16. **Labels keep clear of badges** (the same answer, (b)): the badges' boxes, ring included, are obstacles `chooseLabels` refuses a label over, by the rule that already keeps labels apart (`obstacles`, `badgeBoxes`, the geometry one function, `notesBadgeBox`, shared with the renderer). A label still only ever sits right of its node, so one blocked by a badge is not shown. *If wrong:* a label that would have fitted beside a badge is hidden; the rule is one list.
 
 ## Review Focus
 
 1. **A run broken by someone else**: Ada adds a block, Ben adds one, Ada adds another, all on one page within ten minutes: three rows, not "Ada added 2" (Task 4: `"a run is broken by another person's event between, by another page and by another action"`).
 2. **A block deleted out of a run**: three blocks added, the middle one deleted: the row says 2, and the deleted block's event neither shows nor splits the run (Task 4: `"a block deleted from a run is not counted and does not split it"`).
-3. **A reader who may not create anything**: "No drafts." with no "Start a draft", and no dead link; "Your drafts →" only with `posts.read` (Task 2: `"someone who may create nothing reads No drafts. alone, and Your drafts → only with posts.read"`).
+3. **A reader who may not create anything**: "No drafts." with no "Start a draft", and no dead link; "Drafts →" only with `posts.read` (Task 2: `"someone who may create nothing reads No drafts. alone, and Drafts → only with posts.read"`).
 4. **A one-word name in another script**: "Δήμητρα" is "ΔΉ" in the circle, two letters, never one (Task 5: `"a one-word name in another script gives its first two letters"`; part 1's deferred minor).
 5. **A keyboard user after the legend moved**: Tab from the last toggle reaches "Status key…" and then the zoom buttons, as before (Task 6: the two tab-order tests in `test/integration/admin/mind_graph_test.rb`, updated only for the button's words).
 
@@ -78,7 +80,7 @@ Where the spec and the design answers left a choice, this plan decides. Each say
 | `app/components/admin/dashboard_screen/activity_row_component.{rb,html.erb}` | `initials` | 5 |
 | `app/components/admin/mind_graph_screen/legend_component.html.erb`, `config/locales/admin/mind_graph_screen.en.yml` | Show and Key; "Status key…" last | 6 |
 | `app/javascript/mind_graph/camera.js` | `FIT_MARGIN`, `MAX_FIT_ZOOM` | 7 |
-| `app/javascript/mind_graph/renderer.js` | a page's badge outside its card; `NODE_MARGIN` | 8 |
+| `app/javascript/mind_graph/marks.js`, `renderer.js`, `labels.js`, `app.js` | `notesBadgeBox`; a page's badge outside its card, badges drawn last on a ring; `NODE_MARGIN`; labels' `obstacles` and `badgeBoxes` | 8 |
 | `CLAUDE.md`, `docs/reference/*.md`, `docs/roadmap.md`, the spec | documents | 9 |
 
 ---
@@ -195,7 +197,7 @@ Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
 
 **Interfaces:**
 - Produces: `Admin::DashboardScreen::CardComponent.new(title:, id:, empty:, link: nil, limit: LIMIT)` with slots `rows`, `badge`, `action`, `footer`, `empty_action`; the empty line is `p[data-card-empty]`. Stimulus `admin--dashboard--start-draft` (value `field`, action `start`).
-- Keys (`admin.dashboard.show`): `title`, `drafts.{title,empty,start,all}`, `going_live.{title,empty,your_drafts_html,all}`, `unpublished_changes.{title,empty}`, `activity.{title,empty,audit_log_html}`.
+- Keys (`admin.dashboard.show`): `title`, `drafts.{title,empty,start,all}`, `going_live.{title,empty,drafts_html,all}`, `unpublished_changes.{title,empty}`, `activity.{title,empty,audit_log_html}`.
 
 - [ ] **Step 1: Write the failing component tests**
 
@@ -240,21 +242,21 @@ In `test/integration/admin/dashboard_test.rb`: in "going live next shows the dat
 
 ```ruby
   # Claude Design's O6: each card's empty line, and the two actions.
-  test "every empty card says its one line, with Start a draft and Your drafts → for someone who may create and read posts" do
+  test "every empty card says its one line, with Start a draft and Drafts → for someone who may create and read posts" do
     with_locales(%w[en], default: "en")
     sign_in_as users(:one)
     get admin_root_path
 
     lines = css_select("p[data-card-empty]").to_h { |line| [ line.ancestors("section").first["aria-labelledby"], line.text.squish ] }
     assert_equal({ "dashboard-notes-for-you" => "No notes for you.", "dashboard-open-threads" => "No open threads.",
-                   "dashboard-drafts" => "No drafts. Start a draft", "dashboard-going-live-next" => "Nothing scheduled. Your drafts →",
+                   "dashboard-drafts" => "No drafts. Start a draft", "dashboard-going-live-next" => "Nothing scheduled. Drafts →",
                    "dashboard-unpublished-changes" => "No unpublished changes.", "dashboard-activity" => "No recent activity." }, lines)
     assert_select "section[aria-labelledby=dashboard-drafts] p[data-card-empty] a[href='#dashboard_draft_title'][data-controller='admin--dashboard--start-draft'][data-action='admin--dashboard--start-draft#start'][data-admin--dashboard--start-draft-field-value='dashboard_draft_title']", text: "Start a draft"
     assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty] a[href='#{admin_posts_path(scope: "drafts")}'][data-turbo-frame=_top] span[aria-hidden=true]", text: "→"
     assert_select ".admin-empty-state", count: 0
   end
 
-  test "someone who may create nothing reads No drafts. alone, and Your drafts → only with posts.read" do
+  test "someone who may create nothing reads No drafts. alone, and Drafts → only with posts.read" do
     sign_in_as users(:reader)
     get admin_root_path
     assert_select "section[aria-labelledby=dashboard-drafts] p[data-card-empty]", text: "No drafts."
@@ -322,7 +324,7 @@ The class comment says why the card no longer uses `Admin::Ui::EmptyStateCompone
         going_live:
           title: "Going live next"
           empty: "Nothing scheduled."
-          your_drafts_html: "Your drafts %{arrow}"
+          drafts_html: "Drafts %{arrow}"
           all: "All scheduled posts"
         unpublished_changes:
           title: "Unpublished changes"
@@ -344,7 +346,7 @@ The file's header comment ("Only what a later change added is here; the rest of 
 <% end %>
 ```
 
-and the going-live card, when `can?("posts.read")`, an `empty_action` linking `t(".going_live.your_drafts_html", arrow: …)` to `admin_posts_path(scope: "drafts", **admin_url_options)` with the same class and `data: { turbo_frame: "_top" }`. Add `app/views/admin/dashboard/show.html.erb`, `app/components/admin/dashboard_screen/card_component.rb` and `card_component.html.erb` to `CONVERTED`; update the preview.
+and the going-live card, when `can?("posts.read")`, an `empty_action` linking `t(".going_live.drafts_html", arrow: …)` to `admin_posts_path(scope: "drafts", **admin_url_options)` with the same class and `data: { turbo_frame: "_top" }`. Add `app/views/admin/dashboard/show.html.erb`, `app/components/admin/dashboard_screen/card_component.rb` and `card_component.html.erb` to `CONVERTED`; update the preview.
 
 - [ ] **Step 8: Run them to see them pass**
 
@@ -355,7 +357,7 @@ Expected: PASS (the notes cards' empty words are theirs and unchanged; `note_inb
 
 ```bash
 git add app/components/admin/dashboard_screen/card_component.rb app/components/admin/dashboard_screen/card_component.html.erb app/views/admin/dashboard/show.html.erb config/locales/admin/dashboard.en.yml app/javascript/controllers/admin/dashboard/start_draft_controller.js test/components test/integration/admin/dashboard_test.rb test/system/admin/dashboard_test.rb test/lib/admin_i18n_test.rb
-git commit -m "feat(dashboard): one quiet empty line per card, with Start a draft and Your drafts (O6)
+git commit -m "feat(dashboard): one quiet empty line per card, with Start a draft and Drafts (O6)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
@@ -826,24 +828,39 @@ Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
 
 ---
 
-### Task 8: A page's notes badge stands outside its card (O11, K3)
+### Task 8: A page's notes badge stands outside its card, over everything, and labels keep clear of it (O11, K3)
 
 **Files:**
-- Modify: `app/javascript/mind_graph/renderer.js` (`drawNotes` takes the node's kind into account; `NOTES_CLEAR = 2`; `NODE_MARGIN` 29; the header's "WITH OPEN NOTES" item and the constants' comments)
-- Test: `test/system/admin/mind_graph_modules_test.rb` (line 920's test, and one new)
+- Modify: `app/javascript/mind_graph/marks.js` (a new `notesBadgeBox`: where a node's badge and its ring stand, the one geometry the renderer and the labels share)
+- Modify: `app/javascript/mind_graph/renderer.js` (`drawNotes` draws from `notesBadgeBox`; a page's badge is outside its card; the badges are drawn after every mark and label, each on a ring; `NOTES_CLEAR = 2`, `NOTES_RING = 2`; `NODE_MARGIN` 30; the header's "WITH OPEN NOTES" item and the draw order in the first lines)
+- Modify: `app/javascript/mind_graph/labels.js` (`chooseLabels` takes `obstacles`; a new `badgeBoxes`), `app/javascript/mind_graph/app.js` (passes `obstacles: badgeBoxes(…)` where it calls `chooseLabels`, line 439)
+- Test: `test/system/admin/mind_graph_modules_test.rb` (lines 920 and 1325–1355, and four new)
 
 **Interfaces:**
-- Produces: nothing new for other tasks; the swatch "notes" (a post) and the hit test are unchanged.
+- Produces: `notesBadgeBox(node, x, y, radius) -> { left, top, right, bottom } | null` in `marks.js`: the badge's box WITH its ring, in screen pixels, for a post or a page whose `open_notes` is above zero, null for anything else. `badgeBoxes({ nodes, indexes, positions, radii, camera }) -> Array<box>` in `labels.js`. `chooseLabels({ …, obstacles = [] })`: a label is not placed where it would overlap an obstacle. The swatch "notes" (a post), the pin and the hit test are unchanged in place; the swatch gains the ring because it is the renderer's own drawing.
 
-- [ ] **Step 1: Write the failing module tests**
+- [ ] **Step 1: Change the module tests that pin the badge, and write the new ones**
 
-In "renderer: a card's and a pill's pin, notes badge and ring are on the box, and a type's ring is a circle", the badge's assertion becomes:
+In "renderer: a card's and a pill's pin, notes badge and ring are on the box, and a type's ring is a circle", the badge's assertion becomes the badge and its ring:
 
 ```ruby
     assert_includes page, [ "box", -16, -5, 14, 14, 7 ], "the badge outside the card: its right edge 2px clear of the card's left edge, its centre on the top edge"
+    assert_includes page, [ "box", -16, -5, 18, 18, 9 ], "its ring, 2px of the canvas's ground all round"
 ```
 
-New, after it:
+In "renderer: a post with open notes carries its count in a neutral badge that grows leftwards from the top-left corner", each badge is now preceded by its ring, a pill 2px larger all round, filled with the ground and stroked with nothing:
+
+```ruby
+    assert_equal [
+      [ "pill", 32.96, 35.96, 18, 18, 9, "surface" ], [ "pill", 34.96, 37.96, 14, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "3", 41.96, 45.46, "ink", "count" ],
+      [ "pill", 126.96, 35.96, 24, 18, 9, "surface" ], [ "pill", 128.96, 37.96, 20, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "12", 138.96, 45.46, "ink", "count" ],
+      [ "pill", 220.96, 35.96, 30, 18, 9, "surface" ], [ "pill", 222.96, 37.96, 26, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "99+", 235.96, 45.46, "ink", "count" ]
+    ], drawn.reject { |entry| entry.first == "pin" }
+```
+
+In "renderer: a pinned node's notes badge never reaches its pin, whatever the count", the pills come in pairs (ring, badge): `rings, pills = drawn.select { |entry| entry.first == "pill" }.each_slice(2).to_a.transpose`, the loop reads each RING's right edge (`left + width`, no line: the ring is a fill) against the pin's left, and the widths are `[ 14, 20, 26 ]` for `pills` and `[ 18, 24, 30 ]` for `rings`: the ring, drawn after the pin now, must not cover it either.
+
+New, after the card test:
 
 ```ruby
   # Claude Design's K3 (2026-10-12), the "count badges overlap the page
@@ -858,29 +875,71 @@ New, after it:
     assert_equal [ "box", -21, -6.5, 20, 14, 7 ], home_badge, "12 on Home's 18 by 13 card: right edge at -11"
     assert_operator post_badge[1] + post_badge[3] / 2, :>, -7 * 0.71, "a post's badge still reaches over its corner"
   end
+
+  # Claude Design's answer of 2026-10-25 (a): a badge that lands on a
+  # neighbour covers it cleanly. Every badge is drawn after every mark and
+  # every label, on a 2px ring of the canvas's ground (the theme's `surface`,
+  # never a colour), at its node's strength.
+  test "renderer: the notes badges are drawn after every mark and label, each on a ring of the canvas's ground" do
+    calls = draw_calls([ { kind: "page", open_notes: 3, label: "About" }, { label: "Neighbour" } ], positions: [ 100, 100, 70, 96 ], labels: [ 0, 1 ])
+    texts = calls.each_index.select { |i| calls[i][0] == "fillText" && calls[i][1] != "3" }
+    marks = calls.each_index.select { |i| calls[i][0] == "fill" && calls[i][1] != "surface" }
+    rings = calls.each_index.select { |i| calls[i][0] == "roundRect" }.first
+
+    assert_equal 2, texts.size
+    assert_operator [ texts.max, marks.max ].max, :<, rings, "a badge is drawn before a label or a mark"
+    assert_equal [ "fill", "surface", 1 ], calls[rings + 1], "the ring is the ground, at the node's strength"
+  end
+
+  # Claude Design's answer of 2026-10-25 (b): the badge's box is one more box
+  # the labels keep clear of, by the rule that keeps labels apart; the layout
+  # makes no room for it.
+  test "labels: a label that would cover a notes badge is not placed, and one clear of it is" do
+    labelled = js_module("mind_graph/labels", <<~JS)
+      m.chooseLabels({ free: new Set(), order: [0, 1], positions: new Float32Array([0, 0, 0, 200]), widths: [80, 80], radii: [8, 8],
+        camera: { k: 1, tx: 100, ty: 50 }, width: 800, height: 600, always: new Set(),
+        obstacles: [ { left: 150, top: 40, right: 180, bottom: 58 } ] }).map((label) => label.index)
+    JS
+
+    assert_equal [ 1 ], labelled
+  end
+
+  test "labels: the badge boxes are a post's and a page's, ring included, and none for a tag, a type or a node without notes" do
+    boxes = js_module("mind_graph/labels", <<~JS)
+      m.badgeBoxes({ nodes: [ { kind: "page", open_notes: 120 }, { kind: "post", degree: 1, open_notes: 3 }, { kind: "tag", open_notes: 4 }, { kind: "type", id: "type-a", open_notes: 2 }, { kind: "post", degree: 1, open_notes: 0 } ],
+        indexes: [ 0, 1, 2, 3, 4 ], positions: new Float32Array([ 100, 100, 200, 100, 300, 100, 400, 100, 500, 100 ]), radii: [ 7, 7, 4.5, 6, 7 ], camera: { k: 1, tx: 0, ty: 0 } })
+    JS
+
+    assert_equal 2, boxes.size
+    assert_equal({ "left" => 63, "top" => 86, "right" => 93, "bottom" => 104 }, boxes.first)
+    { "left" => 182.96, "top" => 85.96, "right" => 200.96, "bottom" => 103.96 }.each { |side, value| assert_in_delta value, boxes.second[side], 0.01, side }
+  end
 ```
 
-(`shapes_drawn` answers `[shape, dx, dy, sizes…]` with the box's centre; check the helper's `home:` key against `marks.js`'s `boxOf` before running, and use the key Home's card is chosen by.)
+with a helper beside `notes_badges`, `draw_calls(nodes, positions:, labels:)`: draws `nodes` (each `{ kind: "post", degree: 1 }` unless it says otherwise) at `positions` through `renderer.js`'s `draw` with a context `Proxy` that records, in order, every `fillText` as `["fillText", text]`, every `roundRect` as `["roundRect"]` and every `fill` as `["fill", fillStyle, globalAlpha]`, with a theme whose values are their own names and `labels` as `{ index, alpha: 1, x, y }` beside each node (`labelAt`'s place).
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `PGGSSENCMODE=disable bin/rails test test/system/admin/mind_graph_modules_test.rb -n "/notes badge|pin, notes badge/"`
-Expected: FAIL — the page's badge is at -10, overlapping the card by 4px.
+Run: `bin/rails tailwindcss:build && bin/rails theme_css:build`, then `PGGSSENCMODE=disable bin/rails test test/system/admin/mind_graph_modules_test.rb -n "/notes badge|pin, notes badge|badge box|cover a notes badge|after every mark/"`
+Expected: FAIL — the page's badge is at -10, overlapping its card by 4px; no ring; a badge is drawn with its node, before the labels; `badgeBoxes` is not a function; the label over the badge is placed.
 
 - [ ] **Step 3: Implement**
 
-In `renderer.js`, `drawNotes(context, theme, node, x, y, corner)`: the badge's right edge is `x - corner.x - NOTES_CLEAR` when `boxOf(node)` is a page's card (`node.kind === "page"`), and `x - corner.x + NOTES_OVERLAP` otherwise, as today; `NOTES_CLEAR = 2` with the K3 sentence as its comment; `NODE_MARGIN = 29` with its comment's figure corrected ("99+" ends 28.5px left of a card's edge). The header's "WITH OPEN NOTES" item says the card's badge stands outside it.
+- `marks.js`, `notesBadgeBox(node, x, y, radius)`: null unless `(node.open_notes ?? 0) > 0` and the node is a post or a page. The badge's right edge is `x - corner.x - NOTES_CLEAR` on a page's card and `x - corner.x + NOTES_OVERLAP` on a post (`corner = topCorner(node, radius)`); its half width `Math.max(NOTES_BADGE, NOTES_CHARACTER * label.length + NOTES_BADGE_PAD)` with the label "99+" above ninety-nine; it is centred on `y - corner.y`; the box answered is that pill grown by `NOTES_RING` (2) on every side. The badge's constants move here from `renderer.js` (they are its geometry), with their comments and the K3 sentence on `NOTES_CLEAR`.
+- `renderer.js`: the node loop draws the mark and the pin only and keeps the indexes of the nodes it drew that have a badge; after the labels' loop and before the rings, each of those is drawn at its node's strength (`globalAlpha` as the node had it): first its ring, the box from `notesBadgeBox` as a pill filled with `theme.surface` and no stroke, then the badge as today inside it. `NODE_MARGIN = 30` with its comment's figure corrected ("99+" and its ring now end 30px left of a card's edge). The header's first lines say the order (edges, marks and pins, labels, notes badges, rings) and the "WITH OPEN NOTES" item says a card's badge stands outside it, over whatever it lands on, on a ring of the ground.
+- `labels.js`: `chooseLabels` takes `obstacles = []` (a default: a caller with no badges has none to give) and `place` refuses a box that overlaps one, by the same test it uses for a label already placed; `badgeBoxes({ nodes, indexes, positions, radii, camera })` answers `notesBadgeBox` of every node of `indexes` at its screen position, the nulls left out. The header's rule 2 says "no label, and no notes badge (Claude Design, 2026-10-25)".
+- `app.js`: the `chooseLabels` call passes `obstacles: badgeBoxes({ nodes: state.nodes, indexes: state.visibleNodes, positions: state.positions, radii: state.radii, camera: state.camera })`. Nothing new is written into the page, so `reset()` is unchanged.
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `PGGSSENCMODE=disable bin/rails test test/system/admin/mind_graph_modules_test.rb`, then `PGGSSENCMODE=disable bin/rails test test/system/admin/mind_graph_test.rb -n "/notes|badge/"`
-Expected: PASS, "renderer: a node outside the canvas is not drawn, one whose mark reaches in is" and "renderer: a pinned node's notes badge never reaches its pin, whatever the count" unchanged.
+Run: `PGGSSENCMODE=disable bin/rails test test/system/admin/mind_graph_modules_test.rb`, then `PGGSSENCMODE=disable bin/rails test test/system/admin/mind_graph_test.rb`
+Expected: PASS, "renderer: a node outside the canvas is not drawn, one whose mark reaches in is", the swatch tests (the notes swatch is the renderer's drawing on both sides of its comparison) and the label tests that pass no `obstacles` unchanged.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/javascript/mind_graph/renderer.js test/system/admin/mind_graph_modules_test.rb
-git commit -m "fix(mind-graph): a page's notes badge stands outside its card (K3)
+git add app/javascript/mind_graph/marks.js app/javascript/mind_graph/renderer.js app/javascript/mind_graph/labels.js app/javascript/mind_graph/app.js test/system/admin/mind_graph_modules_test.rb
+git commit -m "fix(mind-graph): a page's notes badge stands outside its card, over everything on a ring of the ground, and labels keep clear of it
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
@@ -905,16 +964,16 @@ Under "Rules a change can break silently", after the bullet on `Audit.record`, a
 
 - [ ] **Step 2: The references**
 
-- `cs-studio-shell-and-dashboard.md`: the dashboard paragraph ("three cards in an auto-fit grid") says the grid of at most three columns (`.admin-dashboard-cards`, 40rem and 60rem of the dashboard's width) and the empty line (`CardComponent`'s `p[data-card-empty]`, `empty_action`, O6's words, "Start a draft" and `admin--dashboard--start-draft`, "Your drafts →"; no hint); "Recent activity" gains the collapse (Rulings 1–6, `Row#count`, the read of sixty) and the row's two letters (Ruling 7); "The camera" says the fit's margin of a tenth and the cap of 3; "The legend is the FILTER" and "Status is not a filter" say the two groups, "Status key…" last in Key and the unchanged Tab order; the badge sentences ("WITH OPEN NOTES" in "The states", "Hit testing", the marks) say a card's badge stands outside it (K3).
+- `cs-studio-shell-and-dashboard.md`: the dashboard paragraph ("three cards in an auto-fit grid") says the grid of at most three columns (`.admin-dashboard-cards`, 40rem and 60rem of the dashboard's width) and the empty line (`CardComponent`'s `p[data-card-empty]`, `empty_action`, O6's words, "Start a draft" and `admin--dashboard--start-draft`, "Drafts →"; no hint); "Recent activity" gains the collapse (Rulings 1–6, `Row#count`, the read of sixty) and the row's two letters (Ruling 7); "The camera" says the fit's margin of a tenth and the cap of 3; "The legend is the FILTER" and "Status is not a filter" say the two groups, "Status key…" last in Key and the unchanged Tab order; the badge sentences ("WITH OPEN NOTES" in "The states", "Hit testing", the marks) say a card's badge stands outside it (K3), that every badge is drawn after the marks and labels on a ring of `surface`, and "The label rule" that a label is not placed over a badge (`obstacles`, `badgeBoxes`; Claude Design, 2026-10-25).
 - `access-control-and-audit.md`, where `Audit::Sentence` is described (and the audit log paragraph in the shell reference): `COUNTED`, `count:`/`mixed:`, the `:collection` part, and that only the dashboard passes a count.
 - `design-system.md`: the dashboard card's empty line beside `EmptyStateComponent` (which stays for every other list).
 - Then `grep -n "auto-fit\|Schedule a draft\|start one above\|MAX_FIT_ZOOM\|1\.5\b\|40px\|\"Status\" link\|aria-label='Legend'\|Nothing is waiting" docs/reference/*.md` and correct each sentence this PR made untrue.
 
 - [ ] **Step 3: The roadmap and the spec**
 
-`docs/roadmap.md`: a "Shipped" row "Layout points, part 2: the dashboard and the Mind graph (three cards at most in a row, one quiet empty line per card, recent activity collapsing runs of block edits and uploads, two letters in the activity row, the legend's Show and Key with "Status key…", a fit that fills about 80%, a page's notes badge outside its card)" pointing at the spec; in "Contrast and buttons, part 2" strike the Mind graph's legend split, fit and count badges, the dashboard grid, collapsed activity and the empty states' wording, leaving the site's three for plan 3; remove "Layout points (part 1)"'s known gap "The dashboard's activity row still draws one letter by its own rule"; remove "a quieter empty-state line" from the Dashboard polish line; add under a "Layout points (part 2)" heading of known gaps the plan's limits: a feed whose sixty newest events collapse shows fewer than fifteen rows (Ruling 6), the audit log does not collapse, and a page's badge outside its card can stand on a neighbouring card or label in a dense tree (Open question 2, until answered).
+`docs/roadmap.md`: a "Shipped" row "Layout points, part 2: the dashboard and the Mind graph (three cards at most in a row, one quiet empty line per card, recent activity collapsing runs of block edits and uploads, two letters in the activity row, the legend's Show and Key with "Status key…", a fit that fills about 80%, a page's notes badge outside its card, over its neighbours and clear of labels)" pointing at the spec; in "Contrast and buttons, part 2" strike the Mind graph's legend split, fit and count badges, the dashboard grid, collapsed activity and the empty states' wording, leaving the site's three for plan 3; remove "Layout points (part 1)"'s known gap "The dashboard's activity row still draws one letter by its own rule"; remove "a quieter empty-state line" from the Dashboard polish line; add under a "Layout points (part 2)" heading of known gaps the plan's limits: a feed whose sixty newest events collapse shows fewer than fifteen rows (Ruling 6), the audit log does not collapse, and a badge outside its card covers a neighbour's mark in a dense tree by design (Rulings 15, 16: the layout makes no room for it).
 
-The spec: add `## As built (part 2, the dashboard and the Mind graph)` after "As built (part 1…)", listing this plan's fourteen rulings one line each and the departures from the spec's text: Decision 12's "a label and a URL" is a slot (Ruling 8); the counted actions are three, not every action (Ruling 2); the activity row keeps its own 28px circle (Ruling 7); Decision 14's "Status" link moved into Key as "Status key…", last (O5), outside the key list (Ruling 13); the dashboard view was converted to keys (Ruling 11); and the open questions to Claude Design below, if still open.
+The spec: add `## As built (part 2, the dashboard and the Mind graph)` after "As built (part 1…)", listing this plan's sixteen rulings one line each and the departures from the spec's text: Decision 12's "a label and a URL" is a slot (Ruling 8); the counted actions are three, not every action (Ruling 2); the activity row keeps its own 28px circle (Ruling 7); Decision 14's "Status" link moved into Key as "Status key…", last (O5), outside the key list (Ruling 13); the dashboard view was converted to keys (Ruling 11); O6's "Your drafts →" is "Drafts →", and a page's badge is drawn last on a ring of the ground and kept clear of labels, both Claude Design's answers of 2026-10-25 to this plan's two questions (Rulings 9, 15, 16).
 
 - [ ] **Step 4: The full check**
 
@@ -951,12 +1010,12 @@ Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
 Claude Design's review, part 2 (`docs/superpowers/specs/2026-10-23-layout-points-design.md`, sections C and D), with Claude Design's answers O5 and O6 and the owner's O9, O10 and O11.
 
 - **Dashboard: at most three cards in a row**, by the dashboard's own width (two from about 640px, three from about 960px); a wider window makes them wider. With six cards that is a 3×2 grid at 1,400px.
-- **Dashboard: one quiet empty line per card**, left-aligned under the title: "No drafts." with "Start a draft" (which puts the cursor in the quick-create title), "Nothing scheduled." with "Your drafts →", "No unpublished changes.", "No recent activity."; "Schedule a draft to see it here." is gone.
+- **Dashboard: one quiet empty line per card**, left-aligned under the title: "No drafts." with "Start a draft" (which puts the cursor in the quick-create title), "Nothing scheduled." with "Drafts →", "No unpublished changes.", "No recent activity."; "Schedule a draft to see it here." is gone.
 - **Recent activity collapses a run**: "You added 4 Code blocks to “Code block demo”", "You edited 3 blocks on “About”", "You uploaded 12 images" (to the library), when one person does the same within ten minutes; the time is the last one's and its tooltip the span. Same number of database statements as before.
 - **Two letters** in the activity row's circle, by the rule notes and presence use.
 - **Mind graph: the legend in two groups**, "Show" (the toggles) and "Key" (the marks, then "Status key…"); the Tab order is unchanged.
 - **Mind graph: Fit fills about 80%** of the canvas, and a small graph may be zoomed in up to 3.
-- **Mind graph: a page's notes badge stands outside its card**, so it no longer covers it.
+- **Mind graph: a page's notes badge stands outside its card**, so it no longer covers it; badges are drawn over everything else on a thin ring of the background, and labels keep clear of them.
 
 Not in this PR: the site's captions, its subpages list and its tags are part 3.
 
@@ -971,16 +1030,12 @@ https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT
 
 ---
 
-## Open questions for Claude Design
-
-1. **"Your drafts →" opens every draft.** O6's link in an empty "Going live next" goes to the posts list's drafts filter, which lists every readable draft, not only the viewer's (there is no "mine" filter on that list). Recommendation: keep the words for this PR as answered, and say "Drafts →" if the mismatch matters; built as "Your drafts →".
-2. **A page's badge outside its card in a dense tree.** K3 puts the badge outside the card, up to 28.5px to its left. The layout keeps half a card's diagonal clear around a page, not its badge, so in a page's local view with close siblings the badge can stand on a neighbouring card or label. Recommendation: accept (a page with open notes is rare, and the card's notes say the count in words); the alternative is to let the label rule treat a badge as an obstacle (K5 says marks and badges are), which is a change to `labels.js` of its own.
-
 ## Self-review
 
+- **Claude Design's answers of 2026-10-25** are in: "Drafts →" (Task 2, Ruling 9), the badge drawn last on a ring and the labels' obstacles (Task 8, Rulings 15, 16); the plan has no open question left.
 - **Spec coverage.** C: three columns (Task 1), the collapse (Tasks 3, 4; O10's uploads in both), the empty look and O6's words (Task 2), Notes for you unchanged (11c; its empty line follows the card, Task 2), the activity row's letters (O9, Task 5). D: the legend's two groups and O5 (Task 6), Fit (Task 7). O11's Mind graph half (Task 8; the reference card's triangle shipped in part 1). Part 1's deferred minors that touch these screens: the one-word non-Latin name (Task 5); the rest belong to editors, Settings, Translations and Media. E is plan 3's.
 - **Steps.** Every test step carries its assertions and the spec's values (40rem/60rem, the words, 15/60, 10 minutes, 0.1/3, 2px); code appears for the decisions a signature leaves open (the run rule, the stylesheet, the empty line, the start-draft link); the rest is a signature, a file and the values.
-- **Names.** `COUNTED` / `COLLAPSING`, `build(…, count:, mixed:)`, `library_route`, `:collection` (Tasks 3, 4); `Row#count`, `READ_FACTOR` (Task 4, docs); `empty_action`, `p[data-card-empty]`, `admin--dashboard--start-draft` with `field` and `start` (Task 2, docs); `.admin-dashboard`, `.admin-dashboard-cards` (Tasks 1, 2); `initials` (Task 5); `data-legend-section`, `data-legend-keys`, `#mind-graph-legend-key` (Task 6); `FIT_MARGIN`, `MAX_FIT_ZOOM` (Task 7); `NOTES_CLEAR`, `NODE_MARGIN` (Task 8).
+- **Names.** `COUNTED` / `COLLAPSING`, `build(…, count:, mixed:)`, `library_route`, `:collection` (Tasks 3, 4); `Row#count`, `READ_FACTOR` (Task 4, docs); `empty_action`, `p[data-card-empty]`, `admin--dashboard--start-draft` with `field` and `start` (Task 2, docs); `.admin-dashboard`, `.admin-dashboard-cards` (Tasks 1, 2); `initials` (Task 5); `data-legend-section`, `data-legend-keys`, `#mind-graph-legend-key` (Task 6); `FIT_MARGIN`, `MAX_FIT_ZOOM` (Task 7); `notesBadgeBox`, `badgeBoxes`, `obstacles`, `NOTES_CLEAR`, `NOTES_RING`, `NODE_MARGIN` (Task 8, its Interfaces).
 - **Review Focus.** Each of the five has its test in its task (4, 4, 2, 5, 6).
 - **The Mind graph's rules.** No query changes, so no statement test moves; the legend's toggles, counts and swatches are untouched (a filter that moves nothing); the script writes nothing new into the page, so `reset()` has nothing new to take back; no clock is read; the Tab order is held by the existing tests with the button's new words.
 - **Proportion.** Shorter than part 1's plan for fewer tasks; code bodies only for the run rule, a few stylesheet lines and two template lines.
