@@ -201,19 +201,19 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
 
   # (d) The pair's breakpoint is its form's width, so the column narrowing the
   # content is all it takes.
-  test "a translation pair stacks, the original first, when the notes column leaves its form under 880px" do
+  test "a translation pair stacks, the original first, when the notes column leaves its form under 824px" do
     at_width(1500) do
       open_editor("?locale=de")
       assert_selector "[data-block-id='#{@block.id}'] .ProseMirror"
       form = "[data-block-id='#{@block.id}'] form.admin-translation-form"
       original = "[data-block-id='#{@block.id}'] [data-original-for='body']"
       field = "[data-block-id='#{@block.id}'] .admin-rich-text"
-      assert_operator page.evaluate_script("document.querySelector(#{form.to_json}).clientWidth"), :>=, 880, "the premise: side by side without the notes"
+      assert_operator page.evaluate_script("document.querySelector(#{form.to_json}).clientWidth"), :>=, 824, "the premise: side by side without the notes"
       assert_in_delta box(original)[1], box(field)[1], 40
 
       open_notes
 
-      assert_operator page.evaluate_script("document.querySelector(#{form.to_json}).clientWidth"), :<, 880
+      assert_operator page.evaluate_script("document.querySelector(#{form.to_json}).clientWidth"), :<, 824
       assert_operator box(original)[3], :<=, box(field)[1] + 1, "the original should sit above the field when stacked"
       # Still usable: the field takes text.
       find("#{field} .ProseMirror").click
@@ -237,7 +237,8 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
       # Remembered, and not opened by itself below 1024px: no room is kept.
       assert_no_selector "#notes-drawer"
       assert_no_selector "html[data-notes-open]"
-      assert_operator box(".admin-content-blocks")[2], :>, 800
+      blocks = box(".admin-content-blocks")
+      assert_in_delta 760, blocks[2] - blocks[0], 1, "no room is kept for the notes: the list is its own 760px"
     end
   end
 end

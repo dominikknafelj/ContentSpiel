@@ -1,4 +1,4 @@
-<%= tag.details id: "page-settings", open: true, class: "admin-page-settings rounded-cs border border-line bg-surface p-4",
+<%= tag.details id: "page-settings", open: true, class: "admin-page-settings #{Admin::EditorScreen::FormColumn.classes(locale)} rounded-cs border border-line bg-surface p-4",
       data: { editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks } do %>
   <summary class="admin-disclosure cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
   <%# Always there, empty unless the settings are held (`HoldStripComponent.slot_id`). %>

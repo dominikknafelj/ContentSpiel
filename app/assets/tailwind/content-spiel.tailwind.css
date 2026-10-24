@@ -474,8 +474,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    breakpoint is the width of the FORM (`container-type: inline-size` on
    `.admin-translation-form`: the page-settings form, the post form and each
    block card's form), not the viewport -- the page editor sits beside the tree,
-   so a 1400px window can still leave a 700px column. From 880px of form width
-   the two sit side by side; below it they stack with the original FIRST (it is
+   so a 1400px window can still leave a 700px column. From 824px of form width
+   (two columns of at most 560px and the 24px gap) the two sit side by side; below it they stack with the original FIRST (it is
    what you read before you type) and foldable (`<details open>`), and the
    rich-text toolbar -- now alone in its row -- has the full width, so it fits
    on one line again (round 1's `flex-wrap` stays as the fallback only). Side
@@ -488,14 +488,21 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    no-op). The error slot is NOT inside the pair (see the invalid-border
    notes above: it must stay a direct child of `.admin-column`/`.admin-field`). */
 .admin-translation-form { container-type: inline-size; }
-.admin-translation-pair { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-@container (min-width: 880px) {
-  .admin-translation-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+/* The editors' form column: left-aligned in the content column, its width a
+   token. The class goes on the elements that are there (the post form, the
+   page settings panel, the block list) and never on a new wrapper: live
+   editing's merge decides by the ids of a unit's ancestors, and a wrapper
+   would be one more. A translation tab's pairs need two columns. */
+.admin-form-column { max-width: var(--cs-form-max); }
+.admin-form-column--pair { max-width: var(--cs-form-max-pair); }
+.admin-translation-pair { display: grid; column-gap: 1.5rem; row-gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 824px) {
+  .admin-translation-pair { grid-template-columns: repeat(2, minmax(0, 560px)); }
   .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
   .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; interactivity: inert; list-style: none; }
   .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
 }
-@container (max-width: 879.98px) {
+@container (max-width: 823.98px) {
   .admin-translation-pair > .admin-reference-card { order: -1; }
 }
 

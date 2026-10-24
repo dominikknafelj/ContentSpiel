@@ -94,7 +94,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "#media-panel [data-original-for='alt']"
 
     width = page.evaluate_script(%(document.querySelector("#media-panel form.admin-translation-form").clientWidth))
-    assert_operator width, :<, 880, "the premise: the panel's form is narrower than 880px (was #{width})"
+    assert_operator width, :<, 824, "the premise: the panel's form is narrower than 824px (was #{width})"
     original_top = page.evaluate_script(%(document.querySelector("#media-panel [data-original-for='alt']").getBoundingClientRect().top))
     field_top = page.evaluate_script(%(document.querySelector("#media-alt").getBoundingClientRect().top))
     assert_operator original_top, :<, field_top - 4, "the original should sit above the field when stacked"

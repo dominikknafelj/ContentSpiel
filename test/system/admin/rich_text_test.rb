@@ -553,7 +553,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   end
 
   # The page editor sits beside the tree, so at 1100px a block card's form is
-  # under 880px wide: the original (reference card) stacks ABOVE the editor
+  # under 824px wide: the original (reference card) stacks ABOVE the editor
   # (design pass round 2, Task 7), which leaves the toolbar the whole column.
   # It stays inside its own box -- no tool pokes out sideways, and the
   # original is above it, not beside it -- and the Insert menu still opens.

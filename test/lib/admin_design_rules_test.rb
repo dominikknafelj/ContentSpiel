@@ -215,4 +215,18 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       Rails.root.join(path).read.scan(/<summary[^>]*>/).each { |summary| assert_includes summary, "admin-disclosure", path }
     end
   end
+
+  # Layout points spec, decision 1: one cap, one place.
+  test "the form column's width is a token: 760px and 1144px are written once, in content-spiel.css" do
+    tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read
+    assert_equal 1, tokens.scan("--cs-form-max: 760px;").size
+    assert_equal 1, tokens.scan("--cs-form-max-pair: 1144px;").size
+
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-form-column\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, css)
+    assert_match(/\.admin-form-column--pair\s*\{\s*max-width:\s*var\(--cs-form-max-pair\);\s*\}/, css)
+    assert_match(/@container \(min-width: 824px\)\s*\{\s*\.admin-translation-pair\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 560px\)\);/m, css)
+    assert_no_match(/\b(?:760|1144)px/, css)
+    assert_empty design_offences(/\[(?:760|1144)px\]|max-width:\s*(?:760|1144)px/)
+  end
 end

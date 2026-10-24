@@ -22,7 +22,7 @@
     line, so that `:empty` holds without a strip. %>
 <% if form_only? %><div id="editor-notice"><%= render hold_strip if held? %></div><% end %>
 
-<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
+<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form #{Admin::EditorScreen::FormColumn.classes(locale)} flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
 <%= fields do %>
 
