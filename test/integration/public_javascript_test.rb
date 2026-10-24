@@ -267,6 +267,20 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
   # Code block spec §4: the copy button is a controller of the site's own,
   # at the top level of `controllers/` like `theme`, so a public page loads
   # it and still nothing of CS Studio.
+  test "a public page with a Note block needs no script: it carries no controller of its own and no admin script" do
+    page = create_page(title: "Guide")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "note", settings: { "kind" => "tip" } },
+      translations: { "en" => { body: rich_doc("Words.") } }).ok?
+    publish_changes(page)
+
+    get PublicSite::Urls.new.path_for(page, "en")
+
+    assert_select "aside.content-block--note-tip:not([data-controller])"
+    ADMIN_ONLY.each do |name|
+      assert modulepreloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a page with a Note block"
+    end
+  end
+
   test "a public page with a Code block carries the copy controller and no admin script" do
     page = create_page(title: "Docs")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "code", settings: { "code" => "a = 1" } }).ok?
