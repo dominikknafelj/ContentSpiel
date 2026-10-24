@@ -20,6 +20,14 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "the summary is a disclosure: the triangle, the language, and the change time at the far end" do
+    post = create_post(title: "Hello")
+    render_inline Admin::EditorScreen::ReferenceCardComponent.new(field: "title", locale: "de", original: "Hello", record: post)
+
+    assert_selector "summary.admin-disclosure > span:first-child", text: Locales.name(Locales.default, native: true)
+    assert_no_selector "summary.justify-between"
+  end
+
   test "a rich original is rendered HTML, scrubbed" do
     document = RichText::Document.new(
       "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "Hello <script>alert(1)</script>", "marks" => [ { "type" => "bold" } ] } ] } ]

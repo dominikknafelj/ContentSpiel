@@ -501,6 +501,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
   .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; interactivity: inert; list-style: none; }
   .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
+  /* Ruling 9: side by side the summary is inert, so it shows no disclosure triangle. */
+  .admin-translation-pair > .admin-reference-card > details > summary::before { display: none; }
 }
 @container (max-width: 823.98px) {
   .admin-translation-pair > .admin-reference-card { order: -1; }
