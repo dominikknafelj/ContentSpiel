@@ -2,7 +2,7 @@
   <% if items.empty? %>
     <%= render Admin::Ui::EmptyStateComponent.new(title: "Everything is translated.") %>
   <% else %>
-    <div class="overflow-x-auto" data-translation-matrix-scroll>
+    <div class="isolate overflow-x-auto" data-translation-matrix-scroll>
       <table class="w-full min-w-[40rem] border-collapse text-left">
         <thead>
           <tr class="border-b border-line-strong font-cs-mono text-label uppercase tracking-mono text-meta">

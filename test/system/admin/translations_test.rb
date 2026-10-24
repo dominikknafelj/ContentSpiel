@@ -489,18 +489,35 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/translations"
     row = "#translation-item-post-#{post.id}"
     assert_selector "#{row} .admin-translation-row__action", text: "Translate →", visible: :all
-    # A person's click on the Type cell lands on the row's stretched link (a native click on
-    # the cell itself is refused by Cuprite for exactly that reason).
-    assert page.evaluate_script(<<~JS), "the point inside the Type cell is the row's link"
+    x, y = page.evaluate_script(<<~JS)
       (() => { const r = document.querySelector("#{row} td[data-column=type]").getBoundingClientRect();
-      return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).hasAttribute("data-translation-row-link") })()
+      return [r.left + r.width / 2, r.top + r.height / 2] })()
     JS
-    find("#{row} a[data-translation-row-link]", visible: :all).click
+    page.driver.browser.mouse.click(x: x, y: y)
     assert_current_path "/cs-studio/posts/#{post.id}?locale=de"
 
     visit "/cs-studio/translations"
     find("#{row} a[aria-label$='Español, missing']").click
     assert_current_path "/cs-studio/posts/#{post.id}?locale=es"
+  end
+
+  test "below 1280px the top bar stays over the row titles when the page scrolls" do
+    posts = Array.new(25) { |i| create_post(title: "Only in English #{i}") }
+    begin
+      page.driver.resize(1000, 700)
+      visit "/cs-studio/translations"
+      assert_selector "#translation-item-post-#{posts.last.id}"
+      page.execute_script("window.scrollTo(0, 400)")
+      assert page.evaluate_script(<<~JS), "a point inside the top bar is the bar, not a row title"
+        (() => { const bar = document.querySelector(".admin-top-bar");
+        const r = bar.getBoundingClientRect();
+        const th = document.querySelector("th[scope=row]").getBoundingClientRect();
+        const el = document.elementFromPoint(th.left + th.width / 2, r.top + r.height / 2);
+        return bar.contains(el) && !el.closest("th[scope=row]") })()
+      JS
+    ensure
+      page.driver.resize(1400, 900)
+    end
   end
 
   test "the matrix lists an outdated post first; its DE chip opens the outdated card; marking it up to date clears the row and raises the card" do

@@ -35,7 +35,7 @@ class Admin::TranslationScreen::MatrixComponentTest < ViewComponent::TestCase
     assert_selector "#{row} .admin-translation-row__action", text: "Translate →", visible: :all
   end
 
-  test "a complete language in an incomplete row is the solid chip and still links" do
+  test "a complete language in an incomplete row says Translated and still links" do
     matrix(Item.new(type: "post", record: @post, states: { "de" => :complete, "es" => :missing }))
 
     assert_selector "#{row} a[href='/cs-studio/posts/#{@post.id}?locale=de'] [data-locale=de][data-translation-state=complete]"
