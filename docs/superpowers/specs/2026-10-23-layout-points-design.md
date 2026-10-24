@@ -133,6 +133,34 @@ Also left for part 2 by part 1, but **not on the approved list**: the Mind graph
 
 **Owner's answers (2026-10-23):** O1: narrow Settings to 760px. O7: related posts on the site are a spec of their own later; this work changes the post editor's help text so it stops promising them. O9: yes, two letters in the dashboard's activity too. O10: yes, collapse uploads ("You uploaded 12 images"). O11: yes, both left-overs of part 1 are in this work.
 
+## As built (part 1, CS Studio's forms and lists)
+
+Built by `docs/superpowers/plans/2026-10-24-layout-points-forms-and-lists.md`, in thirteen tasks. The plan's twelve rulings, one line each:
+
+1. O3's numbers replace Decision 1's 1,536px: a translation tab's column is `--cs-form-max-pair` (1144px), two 560px columns and a 24px gap, side by side from 824px of form width.
+2. Settings stays 760px on its language tabs; its pair stacks there, as it does in the Media panel.
+3. The cap is a class on existing elements (`Admin::EditorScreen::FormColumn.classes`: `admin-form-column`, plus `--pair` on a non-default language), never a new wrapper.
+4. The dashboard's activity row keeps its own initials until plan 2; `PersonName.initials` changes for notes, presence, the holder avatar and the hold strip.
+5. "Missing" replaces "not translated" in the chip, the language tabs' screen-reader words and the matrix's cell names; the posts list's filter segments and the chip's outdated sentence stay.
+6. The Translations row's stretched link sits in the action cell, not the sticky title cell; the title cell is `z-20`, the cell links `z-10`, "Translate →" is shown by `opacity`.
+7. The stuck save bar is found by `-bottom-px` and an `IntersectionObserver` at threshold 1; its shadow is the token `--cs-shadow-stuck`, dark in both schemes.
+8. The social links' marker is `site_setting[social_links_present]`, and `Values#social_rows` honours it, so a refused save keeps a cleared list cleared.
+9. The reference card's triangle shows only where the card folds (stacked).
+10. Settings' current section is the last heading whose top is above 40% of the window; the last on a page scrolled to its end; the first on a page that does not scroll.
+11. The related-posts help (O7) says the posts are linked in the Mind graph and the site does not show them yet.
+12. Media's drop zone wrapper is `hidden` once the library holds a kept image; the file input inside it stays the upload target; a library of trashed images is empty.
+
+Departures from the spec's text, and from the plan's:
+
+- Decision 1's 1,536px is O3's 1,144px (ruling 1).
+- The matrix's missing name now says "missing" (O4), where the spec had left the old word.
+- The dashboard row's initials and the Mind graph's count badges (O11) are plan 2's, by the plan's ruling 4 and its scope note; the dashboard's grid, empty lines and collapsed activity are plan 2's too, and the site (E) is plan 3's.
+- Task 6 listens to the window's scroll and resize instead of using an `IntersectionObserver` for the nav (a tall section never crosses a threshold at the 40% line), and its system test uses a 400px window, because at 700px Publishing's heading cannot reach the top and ruling 10 makes the last section current.
+- Task 10 adds `isolate` to the matrix's scroll wrapper: ruling 6's `z-20` title cells otherwise painted over the shell's sticky top bar below 1280px.
+- Task 10's system test presses the Type cell with a native mouse click, which lands on the stretched link (that is the feature), and a second test holds the top bar over the titles.
+- Task 8's stuck edge is a pixel clip (`-bottom-px`); at a fractional browser zoom it may never read as stuck, which was not checked by hand.
+- Outdated cells use the chip's own mark, ↻ (O4), not the ◐ of one example in the plan's Review Focus.
+
 ## What this does not do
 
 - No related posts on the public site (O7), no tag pages, no navigation block type.
