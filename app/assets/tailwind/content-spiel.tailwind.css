@@ -277,6 +277,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 }
 @media (prefers-reduced-motion: reduce) { :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
 
+/* Settings' in-page nav (Admin::SettingsScreen::NavComponent): the link of the
+   section in view is current. The look is read from `aria-current`, so it
+   cannot drift from what a screen reader hears; ink text and a 2px ink bar at
+   the left, as the selected tree row has. */
+.admin-settings-nav a[aria-current="true"] { color: var(--cs-ink); box-shadow: inset 2px 0 0 var(--cs-ink); }
+
 /* Admin::Ui::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::Ui::DialogComponent::WIDTHS). */
 .admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }

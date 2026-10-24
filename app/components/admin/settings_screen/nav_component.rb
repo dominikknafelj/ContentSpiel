@@ -10,7 +10,12 @@ module Admin
     # These are plain same-page links, never `data-turbo-frame="_top"`: on a
     # screen with the save footer a `#fragment` link is neither a visit nor a
     # history entry (`admin--saving--save-bar` moves the focus by hand), so following
-    # one never asks "Leave without saving?". The ⌘K palette's Settings rows
+    # one never asks "Leave without saving?".
+    #
+    # The link of the section in view carries `aria-current="true"`, set by
+    # `admin--settings--nav` (the server marks none: which section is in view
+    # is the scroll's); the stylesheet draws it from that attribute. The links
+    # work as before without the script. The ⌘K palette's Settings rows
     # use the same ids from another screen, as ordinary visits.
     class NavComponent < Admin::AdminComponent
       SECTIONS = [

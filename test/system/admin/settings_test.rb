@@ -132,6 +132,37 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal "Typed, then jump", find_field("settings-en-title").value
   end
 
+  test "the section in view is the nav's current one, in ink with the bar, and follows the scroll" do
+    # Short enough that Publishing's heading can be scrolled to the top without the page's end stopping it.
+    page.driver.resize(1400, 400)
+    visit admin_settings_path
+    await_admin_controllers
+    nav = "nav[aria-label='Settings sections']"
+
+    assert_selector "#{nav} a[aria-current=true]", text: "Site", count: 1
+    look = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector(#{"#{nav} a[aria-current=true]".to_json})); return [ s.color, s.boxShadow ] })()")
+    ink = page.evaluate_script("getComputedStyle(document.body).getPropertyValue('--cs-ink')")
+    assert_match(/inset/, look[1])
+    assert_equal look[0], page.evaluate_script("(() => { const p = document.createElement('p'); p.style.color = #{ink.strip.to_json}; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c })()")
+
+    page.execute_script("document.getElementById('publishing').scrollIntoView({ block: 'start' })")
+    assert_selector "#{nav} a[aria-current=true]", text: "Publishing", count: 1
+    page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+    assert_selector "#{nav} a[aria-current=true]", text: "AI translation", count: 1
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
+  test "on a window where nothing scrolls the first section is current" do
+    page.driver.resize(1400, 4000)
+    visit admin_settings_path
+    await_admin_controllers
+
+    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Site", count: 1
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   test "a blank social row counts nothing, a typed label counts one" do
     visit admin_settings_path
     await_admin_controllers
