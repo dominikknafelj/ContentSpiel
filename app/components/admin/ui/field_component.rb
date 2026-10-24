@@ -56,7 +56,7 @@ module Admin
       # changed" note beside the original -- the same contract
       # `Admin::Columns::Base` gives every column field.
       def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil,
-        translation_state: nil, translation_confirm: nil, translation_record: nil)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, placeholder: nil)
         @field = field
         @form_name = form_name
         @value = value
@@ -67,6 +67,7 @@ module Admin
         @translation_state = translation_state
         @translation_confirm = translation_confirm
         @translation_record = translation_record
+        @placeholder = placeholder
       end
 
       # The field's own label where its type gives one (`label: "File name"`),
@@ -85,9 +86,12 @@ module Admin
       # not also editing a hand-kept dispatch table here.
       def input_component
         "Admin::Fields::#{field.type.to_s.camelize}Field".constantize.new(
-          field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix
+          field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder
         )
       end
+
+      # The help line under the input, named for its `aria-describedby`.
+      def help_id = "#{input_id}-help"
 
       # True once the caller has handed over something to compare against --
       # see the class comment for why that's the caller's call, not this
@@ -127,7 +131,7 @@ module Admin
 
       private
 
-      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record
+      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder
     end
   end
 end

@@ -306,4 +306,29 @@ class TranslationStateParityTest < ActiveSupport::TestCase
       end
     end
   end
+
+  # Plan ruling 5: no block's text makes its page missing, and a title is
+  # optional, so a Note never does; its title and its text are tracked for
+  # outdated. A change of the kind changes no state.
+  test "a note's title is tracked like a caption: never missing, outdated when the original changes, and a change of the kind changes no state" do
+    as_owner do
+      page = create_page(title: "Guide", translations: { "de" => { title: "Leitfaden" }, "es" => { title: "Guía" } })
+      block = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "note", settings: { "kind" => "tip", "title" => "Before you publish" } },
+        translations: { "en" => { body: rich_doc("Mind the address.") } }).record
+      assert_parity page
+      assert_equal "complete", stored_state(page, "de"), "a title and a text left untranslated are a choice, not a gap"
+
+      assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { "title" => "Vor dem Veröffentlichen" } } }).ok?
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "title" => "Before you go live" } }).ok?
+      assert_parity page
+      assert_equal "outdated", stored_state(page, "de")
+      assert_equal :outdated, block.reload.translation_state(:title, "de")
+      assert_equal "complete", stored_state(page, "es")
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "kind" => "warning" } }).ok?
+      assert_parity page
+      assert_equal "outdated", stored_state(page, "de")
+      assert_equal "complete", stored_state(page, "es")
+    end
+  end
 end

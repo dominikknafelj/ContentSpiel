@@ -116,6 +116,31 @@
   --th-syn-tag: var(--th-on-band-strong);
   --th-syn-attribute: var(--th-on-band-strong);
   --th-syn-embed: var(--th-on-band-strong);
+  /* A note on this band (note block spec, decision 10; plan ruling 8)
+     shares the band's ground and its text is the band's, as code's is; left
+     alone its ground would stay the page's light tint, computed on the page,
+     under the band's light text. Each kind keeps its colour on its rule and
+     its icon (the ink, which colours the word too): the band is a dark
+     ground in both schemes, so the inks are light in both, a kind's hue
+     mixed with the band's text, and Important the band's own accent. The
+     lowest is Tip's ink in dark, 6.6:1 against the band
+     (test/integration/design_tokens_test.rb). */
+  --th-note-note-ground: var(--th-band-strong);
+  --th-note-note-line: var(--th-on-band-strong-dim);
+  --th-note-note-ink: var(--th-on-band-strong);
+  --th-note-note-border: var(--th-line);
+  --th-note-tip-ground: var(--th-band-strong);
+  --th-note-tip-line: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
+  --th-note-tip-ink: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
+  --th-note-tip-border: var(--th-line);
+  --th-note-important-ground: var(--th-band-strong);
+  --th-note-important-line: var(--th-on-band-strong-accent);
+  --th-note-important-ink: var(--th-on-band-strong-accent);
+  --th-note-important-border: var(--th-line);
+  --th-note-warning-ground: var(--th-band-strong);
+  --th-note-warning-line: color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong));
+  --th-note-warning-ink: color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong));
+  --th-note-warning-border: var(--th-line);
 }
 .content-section--strong .content-block--code { color-scheme: dark; }
 

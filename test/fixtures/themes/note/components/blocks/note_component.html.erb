@@ -1,0 +1,8 @@
+<%# A theme's own Note block, written from what `Theme::Contract` gives the template (`block`, `page`,
+    `kind`, `heading`, `titled?`, `word`, `icon`, `body`; docs/reference/theming.md, "The Note block"): a
+    section named by its heading, the kind's word said first, hidden, under a heading the editor wrote only, the
+    heading printed through ERB's own escaping, the text as handed over. %>
+<section class="plain-note" data-kind="<%= kind %>" data-icon="<%= icon %>" data-titled="<%= titled? %>" data-block="<%= block.id %>" data-page="<%= page.id %>" aria-labelledby="plain-note-<%= block.id %>">
+  <h2 id="plain-note-<%= block.id %>"><% if titled? %><span class="plain-note__kind"><%= word %>:</span> <% end %><%= heading %></h2>
+  <div class="plain-note__text"><%= body %></div>
+</section>

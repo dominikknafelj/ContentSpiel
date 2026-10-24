@@ -6,11 +6,15 @@
   <%# One side of the translation pair (or the whole field): label, input, the Translate button
       and the suggestion box. The error slot stays a direct child of `.admin-field`. %>
   <% field_side = capture do %>
-    <%# A switch carries its own label beside it (`Admin::Fields::BooleanField`); a second one above it would say it twice. %>
-    <% unless field.type == :boolean %>
+    <%# A switch carries its own label beside it (`Admin::Fields::BooleanField`), and a segmented
+        control its legend (`Admin::Fields::SelectField`); a second one above either would say it twice. %>
+    <% unless field.type == :boolean || field.segmented? %>
       <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
     <% end %>
     <%= render input_component %>
+    <% if field.help %>
+      <p id="<%= help_id %>" class="mt-1 text-sm text-meta"><%= field.help %></p>
+    <% end %>
     <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
     <%= render "admin/shared/translation_box", button: box_button %>
   <% end %>

@@ -283,6 +283,20 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller*='admin--']", count: 0
   end
 
+  test "a public page with a Note block needs no script: it carries no controller of its own and no admin script" do
+    page = create_page(title: "Guide")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "note", settings: { "kind" => "tip" } },
+      translations: { "en" => { body: rich_doc("Words.") } }).ok?
+    publish_changes(page)
+
+    get PublicSite::Urls.new.path_for(page, "en")
+
+    assert_select "aside.content-block--note-tip:not([data-controller])"
+    ADMIN_ONLY.each do |name|
+      assert modulepreloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a page with a Note block"
+    end
+  end
+
   private
 
   def modulepreloads = css_select("link[rel=modulepreload]").map { |link| link["href"] }

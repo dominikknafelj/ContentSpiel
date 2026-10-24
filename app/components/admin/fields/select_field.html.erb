@@ -1,1 +1,17 @@
-<%= select_tag input_name, options_for_select(option_pairs, value), id: input_id, class: setup_select_class, include_blank: blank_choice, required: field.required? %>
+<% if field.segmented? %>
+  <%# `control: :segmented` (see the class comment): the fieldset carries the field's id, which its
+      error slot and its legend are named after; each segment is a label around its radio. %>
+  <%= tag.fieldset id: input_id, class: "m-0 min-w-0 border-0 p-0" do %>
+    <legend class="<%= setup_label_class %> mb-1"><%= field.label %></legend>
+    <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+      <% option_pairs.each do |label, option| %>
+        <label for="<%= segment_id(option) %>" class="<%= SEGMENT_CLASS %>">
+          <%= radio_button_tag input_name, option, checked?(option), id: segment_id(option), class: "sr-only", required: field.required? %>
+          <span><%= label %></span>
+        </label>
+      <% end %>
+    </div>
+  <% end %>
+<% else %>
+  <%= select_tag input_name, options_for_select(option_pairs, value), id: input_id, class: setup_select_class, include_blank: blank_choice, required: field.required? %>
+<% end %>

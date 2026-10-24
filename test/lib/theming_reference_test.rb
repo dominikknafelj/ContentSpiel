@@ -64,6 +64,16 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_equal Theme::Contract::RICH_TEXT.sort, rows("Rich text selectors").keys.sort
   end
 
+  # The Note block's section: what its template is handed, held to its line
+  # of the ledger, and its sixteen tokens named.
+  test "the Note block's table names exactly the methods of its entry, and the section names its tokens" do
+    section = section("The Note block")
+
+    assert_equal ContractLedger::COMPONENTS.fetch("blocks/note_component").sort, section.scan(/^\| `([^`]+)` \|/).flatten.sort
+    BlockTypes.fetch(:note).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
+    BlockTypes::Note::ICONS.each_value { |icon| assert_includes section, "`#{icon}`" }
+  end
+
   # The Code block's own section: what its template is handed, the four
   # words and the markup the copy script reads, each table held to the code
   # it describes. The script's side is read from its file (`static targets`

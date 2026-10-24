@@ -133,6 +133,8 @@ class Theme::ContractTest < ActiveSupport::TestCase
     end
     assert_equal %w[caption filename language_label lines string], component_methods_called("blocks/code_component").sort,
       "the reading sees what the Code block's template calls (and so could fail)"
+    assert_equal %w[block body heading icon kind titled? word], component_methods_called("blocks/note_component").sort,
+      "the reading sees what the Note block's template calls (and so could fail)"
   end
 
   # What the reference promises of those methods: each is safe for an empty
@@ -149,6 +151,19 @@ class Theme::ContractTest < ActiveSupport::TestCase
     I18n.with_locale(:de) do
       assert_equal [ "Copy", "Copy code", "Copied", "Not copied" ], %i[copy copy_code copied failed].map { |key| component.send(:string, key) }
     end
+  end
+
+  # What the reference promises of the Note block's eight names: each
+  # answers for a block with nothing in it, so a theme's template needs no
+  # guard; and the component draws nothing without text.
+  test "each method the Note block's template may call answers for an empty block" do
+    page = root_page
+    component = Blocks::NoteComponent.new(block: ContentBlock.new(owner: page, block_type: "note"), page: page)
+    render_inline(component)
+
+    assert_equal [ "note", "Note", false, "Note", "info" ], %i[kind heading titled? word icon].map { |name| component.send(name) }
+    assert_equal "", component.send(:body).to_s.strip
+    assert_equal false, component.render?
   end
 
   test "every listed template has its default under app/views, and says what it is" do

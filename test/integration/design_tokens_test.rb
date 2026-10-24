@@ -252,6 +252,135 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/text-decoration:\s*underline;/, code[/\.content-block--code \.code-head button:hover\s*\{([^}]*)\}/m, 1].to_s)
   end
 
+  NOTE_KINDS = BlockTypes::Note::KINDS.keys.freeze
+
+  # Note block spec, "The public side": plain rules on tokens; each kind's
+  # four tokens drawn in one place; the text, links and inline code the
+  # theme's own.
+  test "the note's stylesheet is declared by the type, holds no colour of its own, and draws each kind by its four tokens" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/note.css").read
+    bare = css.gsub(%r{/\*.*?\*/}m, "")
+    rule = ->(selector) { bare[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
+
+    assert_equal Rails.root.join("app/assets/tailwind/themes/default/note.css"), BlockTypes.fetch(:note).stylesheet_path
+    refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, bare)
+    NOTE_KINDS.each do |kind|
+      %w[ground line ink border].each do |part|
+        assert_match(/--note-#{part}:\s*var\(--th-note-#{kind}-#{part}\);/, rule.(".content-block--note-#{kind}"), "#{kind}'s #{part}")
+      end
+    end
+    box = rule.(".content-block--note")
+    assert_match(/background:\s*var\(--note-ground\);/, box)
+    assert_match(/border:\s*1px solid var\(--note-border\);/, box)
+    assert_match(/border-left:\s*3px solid var\(--note-line\);/, box)
+    head = rule.(".content-block--note .note-head")
+    assert_match(/color:\s*var\(--note-ink\);/, head)
+    assert_match(/font-size:\s*inherit;/, head, "the h3 is the body's size, whatever the theme's h3 is (plan ruling 14)")
+    assert_match(/clip-path:\s*inset\(50%\);/, rule.(".content-block--note .note-kind"), "the kind's word before a title is heard, not seen (decision 6)")
+    assert_no_match(/color:/, rule.(".content-block--note .note-body"), "the text is the theme's ink, from .cs-prose")
+    code = rule.(".content-block--note .note-body :not(pre) > code")
+    assert_match(/background:\s*var\(--th-surface\);/, code)
+    assert_match(/border:\s*1px solid var\(--th-line\);/, code)
+  end
+
+  # Spec decision 9 (Claude Design D4a): Note neutral, Tip the ok green,
+  # Important the accent blue, Warning the warn amber; red is for errors.
+  NOTE_HUES = { "note" => "--th-line-strong", "tip" => "--th-ok", "important" => "--th-accent", "warning" => "--th-warn" }.freeze
+
+  test "the sixteen note tokens are defined from the theme's base tokens in both schemes, never a literal, each kind in its hue and none in red" do
+    theme_tokens.each do |theme, tokens|
+      NOTE_KINDS.each do |kind|
+        %w[ground line ink border].each do |part|
+          value = tokens.fetch("--th-note-#{kind}-#{part}") { flunk("--th-note-#{kind}-#{part} is not defined for #{theme}") }
+          assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/, value, "#{theme} --th-note-#{kind}-#{part} is #{value}")
+          assert_no_match(/danger/, value, "#{theme} --th-note-#{kind}-#{part}: red is kept for errors and destructive actions")
+        end
+        assert_equal "var(#{NOTE_HUES.fetch(kind)})", tokens.fetch("--th-note-#{kind}-line"), "#{theme}: the #{kind}'s rule is its hue"
+      end
+      assert_equal "color-mix(in srgb, var(--th-ink) 4%, var(--th-paper))", tokens.fetch("--th-note-note-ground"), "#{theme}: a Note is a 4% tint of the text colour"
+    end
+  end
+
+  # Note block spec, "Contrast": the text, the link colour and the kind's
+  # ink, each at 4.5:1 on the kind's ground, on the page, in a tinted band
+  # and in a strong band, in both schemes. 4 kinds x 3 x 3 grounds x 2 = 72.
+  # A note's ground is computed where it is declared: on the page and in a
+  # tinted band it is the page's tint; a strong band re-values it to the
+  # band's own ground.
+  test "every note's text, link and word are readable on its ground, on the page, in a tinted band and in a strong band, in both themes" do
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+        "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.each do |place, (inside, around)|
+        outside = resolve_colour(tokens, around, inside: inside)
+        NOTE_KINDS.each do |kind|
+          ground = resolve_colour(tokens, "--th-note-#{kind}-ground", inside: inside, under: outside)
+          [ "--th-ink", "--th-accent", "--th-note-#{kind}-ink" ].each do |token|
+            ratio = contrast(ground, resolve_colour(tokens, token, inside: inside))
+            assert_operator ratio, :>=, 4.5, "#{token} on the #{kind} ground in #{place} (#{theme}) is #{ratio.round(2)}:1"
+            pairs += 1
+          end
+        end
+      end
+    end
+    assert_equal 72, pairs
+  end
+
+  # Spec decision 10 (Claude Design D4b), plan ruling 8: on a strong band a
+  # note shares the band's ground and its text is the band's, but each kind
+  # keeps its colour on its rule and its icon (the ink, which colours the
+  # word too): Note the band's dim and text, Important the band's accent,
+  # Tip and Warning their hue mixed with the band's text. The band is a dark
+  # ground in both schemes, so these are light inks in both, each at 3:1 or
+  # better against the band (the ink is held at 4.5:1 above, as text).
+  test "on a strong band a note shares the band's ground and each kind keeps its colour: its rule and its icon at 3:1 against the band in both themes; a tinted band leaves the notes alone" do
+    strong = band_values("strong")
+    expected = {
+      "note" => %w[var(--th-on-band-strong-dim) var(--th-on-band-strong)],
+      "tip" => [ "color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong))" ] * 2,
+      "important" => %w[var(--th-on-band-strong-accent)] * 2,
+      "warning" => [ "color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong))" ] * 2
+    }
+    expected.each do |kind, (line, ink)|
+      assert_equal "var(--th-band-strong)", strong["--th-note-#{kind}-ground"], "#{kind}: the band's ground"
+      assert_equal line, strong["--th-note-#{kind}-line"], "#{kind}'s rule"
+      assert_equal ink, strong["--th-note-#{kind}-ink"], "#{kind}'s word and icon"
+      assert_equal "var(--th-line)", strong["--th-note-#{kind}-border"], "#{kind}: the band's line"
+    end
+    assert_no_match(/danger/, strong.select { |name, _| name.start_with?("--th-note-") }.values.join(" "), "no kind is red on the band either")
+    assert_empty band_values("tinted").keys.grep(/--th-note-/)
+
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      band = resolve_colour(tokens, "--th-band-strong")
+      inks = NOTE_KINDS.map { |kind| resolve_colour(tokens, "--th-note-#{kind}-ink", inside: strong) }
+      assert_equal 4, inks.uniq.size, "#{theme}: four kinds, four colours on the band"
+      NOTE_KINDS.each do |kind|
+        %w[line ink].each do |part|
+          ratio = contrast(band, resolve_colour(tokens, "--th-note-#{kind}-#{part}", inside: strong))
+          assert_operator ratio, :>=, 3.0, "the #{kind}'s #{part} against a strong band (#{theme}) is #{ratio.round(2)}:1"
+          pairs += 1
+        end
+      end
+    end
+    assert_equal 16, pairs
+  end
+
+  test "the measuring reads a colour mixed of two tokens as the two mixed" do
+    tokens = { "--th-paper" => "#ffffff", "--th-ink" => "#000000",
+               "--th-quarter" => "color-mix(in srgb, var(--th-ink) 25%, var(--th-paper))",
+               "--th-three-quarters" => "color-mix(in srgb, var(--th-ink) 75%, var(--th-paper))" }
+
+    # Worked by hand, not by `mix`: black at 25% over white is 0.75 in the encoded
+    # values, and ((0.75 + 0.055) / 1.055)^2.4 = 0.5225 in linear light (75% is 0.25
+    # encoded, 0.0508 linear). Swapped operands or an inverted share give the other.
+    quarter = resolve_colour(tokens, "--th-quarter")
+    three_quarters = resolve_colour(tokens, "--th-three-quarters")
+    quarter.each { |channel| assert_in_delta 0.5225, channel, 0.001, "25% black over white" }
+    three_quarters.each { |channel| assert_in_delta 0.0508, channel, 0.001, "75% black over white" }
+    assert_operator contrast(quarter, resolve_colour(tokens, "--th-paper")), :<, contrast(three_quarters, resolve_colour(tokens, "--th-paper"))
+  end
+
   # Code block spec §5: one token per role the highlighter names, each with
   # its dark value.
   SYNTAX_TOKENS = %w[comment keyword string constant tag attribute embed].map { |role| "--th-syn-#{role}" }.freeze

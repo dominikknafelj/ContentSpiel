@@ -1511,4 +1511,137 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "##{ActionView::RecordIdentifier.dom_id(block)} textarea", count: 0
     assert_select "##{ActionView::RecordIdentifier.dom_id(block)} details[data-shared-fields] dd pre", text: /a = 1/
   end
+
+  # Note block plan, ruling 12: neither a card's head nor a tile's face is
+  # re-rendered by a save, so an icon that follows its block is replaced by
+  # id in the save's answer; any other type's answer carries no icon.
+  test "a save of a block whose icon follows it redraws the icon on its card and its tile; another type's save redraws none" do
+    BlockTypes.register(:test_flag) do |t|
+      TestTypes.declare(t)
+      t.label "Flag"
+      t.field :tone, :select, options: %w[calm loud], default: "calm"
+      t.icon "info", for_block: ->(block) { block.settings["tone"] == "loud" ? "triangle_alert" : "info" }
+    end
+    flag = @page.content_blocks.create!(block_type: "test_flag", position: 0)
+
+    patch "#{blocks_path}/#{flag.id}", params: { block: { settings: { tone: "loud" } }, base_updated_at: flag.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action='replace'][target='block-#{flag.id}-icon-card'] template span#block-#{flag.id}-icon-card[data-block-icon='triangle_alert']"
+    assert_select "turbo-stream[action='replace'][target='block-#{flag.id}-icon-tile'] template span#block-#{flag.id}-icon-tile[data-block-icon='triangle_alert']"
+
+    code = @page.content_blocks.create!(block_type: "code", position: 1)
+    patch "#{blocks_path}/#{code.id}", params: { block: { settings: { filename: "a.rb" } }, base_updated_at: code.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[target^='block-#{code.id}-icon-']", count: 0
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  # --- the Note block (note block spec, "CS Studio") ---
+
+  def note_block(**attributes) = @page.content_blocks.create!(block_type: "note", position: 0, **attributes)
+
+  def save_note(block, settings, base: block.reload.updated_at.iso8601(6), tab: nil, locale: nil, **more)
+    path = "#{blocks_path}/#{block.id}#{"?locale=#{locale}" if locale}"
+    patch path, params: { block: { settings: settings, **more }, base_updated_at: base }, as: :turbo_stream, headers: { "X-Notes-Tab" => tab }.compact
+  end
+
+  test "adding a Note streams its card with the kind's four buttons, Note checked, and its kind and title are saved, the card's icon following the kind" do
+    post blocks_path, params: { block: { block_type: "note" } }, as: :turbo_stream
+    assert_response :success
+    block = @page.content_blocks.sole
+    assert_equal({ "kind" => "note" }, block.settings)
+    assert_select "turbo-stream template input[type=radio][name='block[settings][kind]']", count: 4
+    assert_select "turbo-stream template input[type=radio][value='note'][checked]"
+    assert_select "turbo-stream template .admin-block-card__head span#block-#{block.id}-icon-card[data-block-icon='info']"
+
+    save_note(block, { kind: "tip", title: "  Before you publish  " })
+
+    assert_response :success
+    assert_equal({ "kind" => "tip" }, block.reload.settings)
+    assert_equal({ "en" => { "title" => "Before you publish" } }, block.translated_settings)
+    assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-card'] template span[data-block-icon='lightbulb']"
+  end
+
+  # Review focus 2: a kind stored around the services checks no button and
+  # is refused as it stands; picking one saves.
+  test "a note whose stored kind is not on the list is refused as it stands, and picking a kind saves" do
+    block = note_block
+    block.update_columns(settings: { "kind" => "danger" }) # version: none (a test writes a kind around the services)
+
+    save_note(block, { title: "x" })
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{block.id}-kind-errors'] template", text: /Kind is not included in the list/
+
+    save_note(block, { kind: "warning", title: "x" })
+    assert_response :success
+    assert_equal "warning", block.reload.settings["kind"]
+  end
+
+  # Review focus 5, plan ruling 2.
+  test "a note's title over 80 characters is refused on the German tab too, and nothing is written" do
+    with_locales(%w[en de], default: "en") do
+      block = note_block
+      stamp = block.reload.updated_at
+
+      assert_no_difference -> { Audit::Event.count } do
+        save_note(block, { title: "x" * 81 }, locale: "de")
+      end
+      assert_response :unprocessable_entity
+      assert_select "turbo-stream[target='block-#{block.id}-title-errors'] template", text: /Title is too long \(maximum is 80 characters\)/
+      assert_equal({}, block.reload.translated_settings)
+      assert_equal stamp, block.updated_at
+
+      save_note(block, { title: "x" * 81 })
+      assert_response :unprocessable_entity
+
+      save_note(block, { title: "x" * 80 }, locale: "de")
+      assert_response :success
+      assert_equal "x" * 80, block.reload.translated_settings.dig("de", "title")
+    end
+  end
+
+  test "a Note's save is refused when it is stale and when another tab holds it, like any block's" do
+    block = note_block
+    base = block.updated_at.iso8601(6)
+
+    save_note(block, { kind: "tip" }, base: base, tab: "tab-aaaaaaaa")
+    assert_response :success
+    travel 1.minute do
+      save_note(block, { kind: "warning" }, base: base, tab: "tab-aaaaaaaa")
+    end
+    assert_response :conflict
+    assert_equal "tip", block.reload.settings["kind"]
+
+    sign_in_as users(:two)
+    save_note(block, { kind: "important" }, tab: "tab-bbbbbbbb")
+    assert_response :conflict
+    assert_equal "tip", block.reload.settings["kind"]
+  end
+
+  test "a Note in a column says its kind and text on its tile, is duplicated with its title, and is deleted" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    post blocks_path, params: { block: { block_type: "note" }, section_id: section.id, column: 2 }, as: :turbo_stream
+    assert_response :success
+    block = @page.content_blocks.find_by!(block_type: "note")
+    assert_equal [ section.id, 2 ], [ block.section_id, block.section_column ]
+
+    save_note(block, { kind: "important", title: "Read this" })
+    assert_response :success
+    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template", text: /Read this · Empty/
+    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template svg", count: 0
+    assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-tile'] template span[data-block-icon='circle_alert']"
+    assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-card'] template span[data-block-icon='circle_alert']"
+
+    post "#{blocks_path}/#{block.id}/duplicate", as: :turbo_stream
+    assert_response :success
+    copy = @page.content_blocks.where(block_type: "note").where.not(id: block.id).sole
+    assert_equal [ { "kind" => "important" }, { "en" => { "title" => "Read this" } } ], [ copy.settings, copy.translated_settings ]
+
+    delete "#{blocks_path}/#{copy.id}", as: :turbo_stream
+    assert_response :success
+    assert_not ContentBlock.exists?(copy.id)
+  end
 end

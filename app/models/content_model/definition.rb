@@ -28,7 +28,21 @@ module ContentModel
     # input's label, a translation tab's shared fields, a group's rows on the
     # public page, and a validation message (`ContentBlock` and `Post`
     # `.human_attribute_name`).
-    OPTIONS = %i[required default min max translated options of blank label].freeze
+    #
+    # `control:` is how CS Studio draws a field where its type's default
+    # control is wrong for it: `:segmented` draws a `:select`'s choices as a
+    # row of buttons (radios underneath, so it works from the keyboard and
+    # without a script; note block spec, decision 7). It is a look and changes
+    # nothing about the value or its validation.
+    #
+    # `help:` is a line under a string field in CS Studio (the Note block's
+    # title: what an empty one does), and `placeholder_from:` names a select
+    # declared BEFORE the string whose chosen label is the string's
+    # placeholder (the Note block's title shows the kind's word, design
+    # answer B3). Both are literals of the type's definition, as `label:` is.
+    # `max:` on a string counts characters, as on a code field.
+    OPTIONS = %i[required default min max translated options of blank label control help placeholder_from].freeze
+    CONTROLS = %i[segmented].freeze
 
     # One field in the schema: `options` carries everything but name/type
     # (`required:`, `default:`, `min:`/`max:`, `translated:`, `options:` for
@@ -41,6 +55,10 @@ module ContentModel
       def required? = options[:required] == true
       def group? = GROUP_TYPES.include?(type)
       def label = options[:label].presence || name.humanize
+      # The line under the field in CS Studio, or nil.
+      def help = options[:help].presence
+      # Drawn as a row of buttons (`control: :segmented`), not a <select>.
+      def segmented? = type == :select && options[:control] == :segmented
     end
 
     attr_reader :name, :fields, :uses_columns
@@ -76,6 +94,17 @@ module ContentModel
       raise ArgumentError, "code fields can't be translated (the code is the same in every language)" if type == :code && options[:translated]
       raise ArgumentError, "`label:` is the field's name as a person reads it, a string" if options.key?(:label) && !(options[:label].is_a?(String) && options[:label].present?)
       raise ArgumentError, "`blank:` names the empty choice of a select that isn't required" if options.key?(:blank) && (!%i[select content_type].include?(type) || options[:required])
+      if options.key?(:control)
+        raise ArgumentError, "`control:` is one of #{CONTROLS.map(&:inspect).join(", ")}" unless CONTROLS.include?(options[:control])
+        raise ArgumentError, "`control: :segmented` draws a select's choices as buttons: it is for a select" unless type == :select
+        raise ArgumentError, "`control: :segmented` has no button for a select's empty choice: it is for a select without `blank:`" if options.key?(:blank)
+      end
+      raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help) && !(type == :string && options[:help].is_a?(String) && options[:help].strip != "")
+      if options.key?(:placeholder_from)
+        source = @fields.find { |candidate| candidate.name == options[:placeholder_from].to_s }
+        raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" unless type == :string && source&.type == :select
+      end
+      raise ArgumentError, "`max:` on a string field is a number of characters, a positive Integer" if type == :string && options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
 
       @fields << Field.new(name: name.to_s, type: type, options: options)
     end

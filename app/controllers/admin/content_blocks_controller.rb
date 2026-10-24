@@ -141,6 +141,7 @@ module Admin
       end
       streams << refused if refused
       streams << tile_summary_stream(result) if block.section_id
+      streams.concat(block_icon_streams(result.record)) if result.ok? && block.definition&.icon_follows_block?
       streams.concat(section_save_streams(result.record, layout_before: layout_before, columns_before: columns_before)) if block.container? && result.ok?
       streams.concat(publishing_state_streams(@page)) if result.ok?
 
@@ -347,6 +348,21 @@ module Admin
     def tile_summary_stream(result)
       turbo_stream.replace(Admin::EditorScreen::TileSummaryComponent.dom_id(result.record),
         Admin::EditorScreen::TileSummaryComponent.new(block: result.record, locale: admin_locale, invalid: !result.ok? && !result.denied?))
+    end
+
+    # A type whose icon follows its block (`icon ... for_block:`, the Note
+    # block's kind; note block plan, ruling 12) has the icon redrawn on the
+    # card's head and on the tile with every answer to a save that went
+    # through, as the tile's line is: neither is re-rendered by a save
+    # otherwise, and a kind chosen and saved would keep the old kind's icon
+    # until a reload. Only the icon's span is replaced, never the head or the
+    # face around it (the face may hold the focus). Replacing an id that is
+    # not on the page (a block at the top level has no tile) does nothing.
+    def block_icon_streams(block)
+      %i[card tile].map do |place|
+        turbo_stream.replace(Admin::EditorScreen::BlockIconComponent.dom_id(block, place),
+          Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: place, block: block))
+      end
     end
 
     # A block in a section is two elements (sections spec §4.3): its tile,

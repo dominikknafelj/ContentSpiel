@@ -61,6 +61,13 @@ module ContentModel
 
       validate :validate_fields
 
+      # A translated string's limit in every language this object holds, not
+      # only its own: a block's settings are validated in the default
+      # language alone (`ContentBlock#settings_are_valid`), and a German
+      # title would otherwise be stored at any length (note block plan,
+      # ruling 2). One error per field, however many languages are over.
+      validate :validate_lengths_in_every_language
+
       # Casts and sets each key for this instance's locale -- a translated
       # field's write always lands in `@translations[@locale]`, never in
       # `@values`, regardless of which hash the caller happens to be updating
@@ -253,6 +260,7 @@ module ContentModel
           errors.add(field.name, :inclusion) if field.type == :select && !select_options(field).include?(value)
           errors.add(field.name, :inclusion) if field.type == :content_type && ContentTypes.find(value).nil?
           errors.add(field.name, :too_long, **code_limit(field.options[:max])) if field.type == :code && field.options[:max] && value.length > field.options[:max]
+          errors.add(field.name, :too_long, count: field.options[:max]) if field.type == :string && field.options[:max] && value.length > field.options[:max]
           errors.add(field.name, :invalid) if field.type == :url && !url?(value)
           errors.add(field.name, :greater_than_or_equal_to, count: field.options[:min]) if field.options[:min] && value.is_a?(Integer) && value < field.options[:min]
           errors.add(field.name, :less_than_or_equal_to, count: field.options[:max]) if field.options[:max] && value.is_a?(Integer) && value > field.options[:max]
@@ -265,6 +273,17 @@ module ContentModel
       # the limit grouped ("20,000"), as the counter under the field writes
       # it. Rails' own message would print the bare digits.
       def code_limit(max) = { count: max, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(max) }
+
+      def validate_lengths_in_every_language
+        definition.fields.each do |field|
+          max = field.options[:max]
+          next unless field.type == :string && field.translated? && max
+          next if errors.added?(field.name, :too_long, count: max)
+
+          over = @translations.values.any? { |values| cast(field, values.to_h[field.name]).to_s.length > max }
+          errors.add(field.name, :too_long, count: max) if over
+        end
+      end
 
       def select_options(field)
         options = field.options[:options]

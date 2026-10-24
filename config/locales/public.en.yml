@@ -11,6 +11,14 @@ en:
   public:
     blocks:
       # bin/rails generate block_type adds a type's scope below this line.
+      # The Note block's heading where the editor typed no title: the
+      # kind's word (`Blocks::NoteComponent`).
+      note:
+        kinds:
+          note: "Note"
+          tip: "Tip"
+          important: "Important"
+          warning: "Warning"
       # The Code block's copy button: its label, its accessible name, and
       # what it says for two seconds after a press (or when the browser
       # refuses the clipboard).
