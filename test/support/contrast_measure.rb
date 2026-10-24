@@ -9,6 +9,8 @@ module ContrastMeasure
   # Hex and `oklch()` are the two notations the opaque tokens use; a colour
   # thinned out with `color-mix(… <share>%, transparent)` or written as
   # `rgba()` is painted over `under`, which a caller that expects one hands in.
+  # A colour mixed of two tokens with `color-mix(in srgb, var(a) N%, var(b))`
+  # (the Note block's tokens) is the two mixed, each read where the mix is.
   #
   # `inside` is what a band declares for everything in it. A name it
   # declares is the band's value, whose own `var()`s are read inside the
@@ -25,6 +27,9 @@ module ContrastMeasure
     when /\Acolor-mix\(in srgb, var\((#{TOKEN})\) ([\d.]+)%, transparent\)\z/o
       under or flunk("#{name} is a thinned colour and nothing was named for it to be painted over")
       mix(resolve_colour(tokens, $1, inside: inside), under, $2.to_f / 100)
+    when /\Acolor-mix\(in srgb, var\((#{TOKEN})\) ([\d.]+)%, var\((#{TOKEN})\)\)\z/o
+      top, share, bottom = $1, $2.to_f / 100, $3
+      mix(resolve_colour(tokens, top, under: under, inside: inside), resolve_colour(tokens, bottom, under: under, inside: inside), share)
     when /\Argba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)\z/
       under or flunk("#{name} is a translucent colour and nothing was named for it to be painted over")
       mix([ $1, $2, $3 ].map { |channel| decode(channel.to_i / 255.0) }, under, $4.to_f)
