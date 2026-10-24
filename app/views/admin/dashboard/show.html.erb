@@ -1,5 +1,5 @@
 <%# CS Studio's start page (design pass round 2, Task 16): one-row quick
-    create, the cards in an auto-fit grid (each at most 5 rows and a "→"
+    create, the cards in a grid of at most three columns (`.admin-dashboard-cards`) (each at most 5 rows and a "→"
     to the fuller list), then "Recent activity". Every list comes from
     `Dashboard::Feed` / `Dashboard::Activity` / `Dashboard::TranslationNeeds`,
     already read-scoped and loaded in a constant number of queries; the
@@ -9,6 +9,7 @@
     No `content_for :tree` here: the dashboard isn't a Pages screen, so the
     layout's grid collapses to its two-column form, same as every other
     module but Pages. %>
+<div class="admin-dashboard">
 <h1 class="mb-4 text-h1 text-ink">Dashboard</h1>
 
 <% quick_create = Admin::DashboardScreen::QuickCreateComponent.new(**(@draft || {})) %>
@@ -23,7 +24,7 @@
 <% posts_list = ->(status, label) { [ admin_posts_path(scope: status, **admin_url_options), label ] if can?("posts.read") } %>
 <% going_live = @feed.going_live_next %>
 
-<div class="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-4">
+<div class="admin-dashboard-cards">
   <%# Notes (notes spec §5): what was addressed to the viewer, and where
       threads are open. Each is a frame of its own that its own GET answers
       again (`Admin::NoteInboxController`). The unread number is the
@@ -66,4 +67,5 @@
   <% if can?("audit.view") %>
     <%= link_to "Full audit log →", admin_audit_events_path(**admin_url_options), class: "self-end text-sm text-ink hover:underline", data: { turbo_frame: "_top" } %>
   <% end %>
+</div>
 </div>
