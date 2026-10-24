@@ -535,4 +535,49 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "figure.content-block--code", count: 0
   end
+
+  # Drafts of live content: a visitor reads a live page's note from its
+  # published copy, its title in each language included, until the page's
+  # changes are published. Under a title the heading starts with the kind's
+  # hidden word, from the copy's kind; German has no words file, so it is
+  # English there.
+  test "a note on a live page is read from its published copy: its kind, its title in each language and its text change only when published" do
+    with_locales(%w[en de es], default: "en") do
+      page = create_page(title: "Guide")
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "note", settings: { "kind" => "tip", "title" => "Before you publish" } },
+        translations: { "en" => { body: rich_doc("Mind the address.") }, "de" => { settings: { "title" => "Vor dem Veröffentlichen" } } }).record
+      publish_changes(page)
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "kind" => "warning", "title" => "Changed" } },
+        translations: { "en" => { body: rich_doc("New words.") }, "de" => { settings: { "title" => "Geändert" } } }).ok?
+
+      get PublicSite::Urls.new.path_for(page, "en")
+      assert_select "aside.content-block--note-tip #note-#{block.id}-heading", text: "Tip: Before you publish"
+      assert_select "aside .note-body", text: /Mind the address/
+      get PublicSite::Urls.new.path_for(page, "de")
+      assert_select "#note-#{block.id}-heading", text: "Tip: Vor dem Veröffentlichen"
+
+      publish_changes(page)
+      get PublicSite::Urls.new.path_for(page, "en")
+      assert_select "aside.content-block--note-warning #note-#{block.id}-heading", text: "Warning: Changed"
+      assert_select "aside .note-body", text: /New words/
+      get PublicSite::Urls.new.path_for(page, "de")
+      assert_select "#note-#{block.id}-heading", text: "Warning: Geändert"
+    end
+  end
+
+  test "a note at the top level and in a section's column is drawn from the copy, in the column once" do
+    page = create_page(title: "Guide")
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    [ nil, section ].each do |holder|
+      placement = holder ? { section_id: holder.id, section_column: 2 } : {}
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "note", settings: { "kind" => "important" } }.merge(placement),
+        translations: { "en" => { body: rich_doc("Words #{holder ? "inside" : "outside"}.") } }).ok?
+    end
+    publish_changes(page)
+
+    get PublicSite::Urls.new.path_for(page, "en")
+    assert_select "aside.content-block--note-important", count: 2
+    assert_select ".content-section aside.content-block--note", count: 1, text: /Words inside/
+  end
 end

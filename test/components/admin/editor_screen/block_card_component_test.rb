@@ -661,4 +661,48 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
       end
     end
   end
+
+  def note_block(page, kind: "tip", title: "Before you publish")
+    block = page.content_blocks.new(block_type: "note", position: 0, settings: { "kind" => kind })
+    block.assign_settings({ "title" => title }, locale: "en")
+    block.save!
+    block
+  end
+
+  # Note block spec, "CS Studio": the kind's icon in the head (plan ruling
+  # 12), the kind's four buttons, the title with the kind's word as its
+  # placeholder and its help line, then the text.
+  test "a note's card: its kind's icon in the head, the kind's four buttons, the stored one checked, then the title with the kind's word as placeholder and its help, then the text" do
+    page = create_page(title: "Note card")
+    block = note_block(page)
+
+    render_card(block, page: page)
+
+    assert_selector ".admin-block-card__head span#block-#{block.id}-icon-card[data-block-icon=lightbulb]", count: 1
+    assert_selector ".admin-block-card__head [data-block-icon]", count: 1
+    assert_selector "fieldset#block-#{block.id}-kind legend", exact_text: "Kind"
+    assert_equal %w[Note Tip Important Warning], self.page.all("fieldset#block-#{block.id}-kind label").map { |label| label.text.strip }
+    assert_selector "input#block-#{block.id}-kind-tip[type=radio][checked]"
+    title = self.page.find("input#block-#{block.id}-title")
+    assert_equal "Before you publish", title.value
+    assert_equal "Tip", title[:placeholder]
+    assert_selector "p#block-#{block.id}-title-help", text: "kind"
+    order = rendered_content.index("block-#{block.id}-kind") < rendered_content.index("block-#{block.id}-title") && rendered_content.index("block-#{block.id}-title") < rendered_content.index("admin-rich-text")
+    assert order, "kind, then title, then the text"
+  end
+
+  test "on a translation tab a note's title is an input beside its English original, and its kind is a shared field" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "Note tab")
+      block = note_block(page)
+
+      render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
+
+      assert_selector "input[name='block[settings][title]']:not([readonly]):not([disabled])"
+      assert_selector "[data-original-for='title']", text: "Before you publish"
+      assert_equal "Tip", self.page.find("input[name='block[settings][title]']")[:placeholder]
+      assert_no_selector "input[type=radio]", visible: :all
+      assert_selector "details[data-shared-fields] dd", text: "Tip", visible: :all
+    end
+  end
 end
