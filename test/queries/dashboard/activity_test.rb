@@ -207,13 +207,15 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
   end
 
   test "a complete run beside a cut one reads its exact count and its own start" do
-    page = as(@me) { create_page(title: "Whole") }
+    # The page's own events are older than the uploads, so the read holds
+    # exactly two runs: the three blocks, then the uploads' tail, cut at 60.
+    page = travel_to(2.hours.ago) { as(@me) { create_page(title: "Whole") } }
     start = 1.second.from_now.change(usec: 0)
     add_blocks(page, %w[rich_text] * 3, from: start)
     61.times { travel_to(1.hour.ago) { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } } }
 
     rows = activity.rows
-    assert_equal [ [ "block.created", 3 ] ], rows.map { |row| [ row.event.action, row.count ] }.select { |a, _| a == "block.created" }
+    assert_equal [ [ "block.created", 3 ] ], rows.map { |row| [ row.event.action, row.count ] }
     block_row = rows.find { |row| row.event.action == "block.created" }
     assert_equal "added 3 Rich text blocks to", words(block_row).first
     assert_equal start, block_row.at
