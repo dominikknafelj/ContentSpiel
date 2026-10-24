@@ -70,6 +70,9 @@
     <fieldset class="admin-column" id="settings-social-links" data-field-name="social_links" data-controller="admin--settings--repeat-rows"
               data-admin--settings--repeat-rows-next-value="<%= values.social_rows.size %>">
       <legend class="<%= setup_label_class %> mb-1">Social links</legend>
+      <%# The form says it carries the links, so no rows means none (Decision 6);
+          a client that posts nothing leaves them. %>
+      <%= hidden_field_tag "site_setting[social_links_present]", "1", id: nil %>
       <div class="flex flex-col gap-2" data-admin--settings--repeat-rows-target="list">
         <% values.social_rows.each_with_index do |(name, url), index| %>
           <%= render "admin/settings/social_link_row", index: index, name: name, url: url %>

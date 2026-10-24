@@ -61,13 +61,13 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     # A social link row added is counted, and removed it is not.
     click_on "+ Add link"
-    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 2
+    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 1
     assert_selector footer, text: /\b1 unsaved change\b/i # a blank row is nothing yet
     page.all("[data-admin--settings--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
     assert_selector footer, text: /\b2 unsaved changes\b/i # typed in, it is one more
     page.all("[data-admin--settings--repeat-rows-target=row]").last.find("button[aria-label='Remove link']").click
     assert_selector footer, text: /\b1 unsaved change\b/i # and gone with its row
-    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 1
+    assert_no_selector "[data-admin--settings--repeat-rows-target=list] input"
 
     click_on "English"
     fill_in "settings-en-tagline", with: "Things I learned lately"
@@ -84,6 +84,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     visit admin_settings_path
     await_admin_controllers
 
+    click_on "+ Add link"
     fill_in "settings-social-0-name", with: "GitHub"
     fill_in "settings-social-0-url", with: "https://github.com/dana"
     click_on "+ Add link"
@@ -173,19 +174,20 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /\b1 unsaved change/i
   end
 
-  test "removing the only social link, then Save, deletes it" do
+  test "removing the only social link removes its row, and Save deletes it" do
     site_settings(:default).update!(social_links: { "GitHub" => "https://github.com/dana" })
     visit admin_settings_path
     await_admin_controllers
 
     find("button[aria-label='Remove link']").click
     assert_selector footer, text: /unsaved change/i
-    assert_field "settings-social-0-name", with: ""
-    click_on "Save"
+    assert_no_selector "[data-admin--settings--repeat-rows-target=row]"
+    assert_selector "button[data-action='admin--settings--repeat-rows#add']:focus"
+    press "Save"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal({}, site_settings(:default).reload.social_links.to_h)
     visit admin_settings_path
-    assert_field "settings-social-0-name", with: ""
+    assert_no_field "settings-social-0-name"
   end
 
   test "the error summary's link reveals the hidden panel and focuses the field" do

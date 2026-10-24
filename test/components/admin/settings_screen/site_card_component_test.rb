@@ -51,14 +51,13 @@ class Admin::SettingsScreen::SiteCardComponentTest < ViewComponent::TestCase
     assert_no_selector "input[name='site_setting[remove_logo]']", visible: :all
   end
 
-  test "the time zone, with its help, and one empty social link row with a template for more" do
+  test "the time zone with its help; no social link row without a link, the marker, a template and + Add link" do
     render_card
 
     assert_selector "select[name='site_setting[time_zone]']"
     assert_text "Used for scheduled publishing."
-    assert_selector "[data-admin--settings--repeat-rows-target=list] input[name='site_setting[social_links][0][name]'][placeholder='Label, e.g. GitHub']", count: 1
-    assert_selector "[data-admin--settings--repeat-rows-target=list] input", count: 2
-    assert_selector "[data-admin--settings--repeat-rows-target=list] button[aria-label='Remove link']", count: 1
+    assert_no_selector "[data-admin--settings--repeat-rows-target=list] input"
+    assert_selector "#settings-social-links input[type=hidden][name='site_setting[social_links_present]'][value='1']", visible: :all
     assert_selector "template#settings-social-link-template", visible: :all
     assert_selector "button[data-action='admin--settings--repeat-rows#add']", text: "+ Add link"
   end

@@ -64,7 +64,7 @@ module Admin
       posted = params[:site_setting]
       posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
       permitted = posted.permit(
-        :logo, :remove_logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
+        :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],
         # `language_order` is the one tracked field that makes a reorder a
@@ -122,7 +122,9 @@ module Admin
       attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model).to_h
       attributes = drop_blank_file_params(attributes, fields: %w[logo])
       attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(permitted[:remove_logo])
-      attributes["social_link_rows"] = social_link_rows(permitted[:social_links]) if rows_posted?(permitted[:social_links])
+      if rows_posted?(permitted[:social_links]) || permitted[:social_links_present] == "1"
+        attributes["social_link_rows"] = social_link_rows(permitted[:social_links])
+      end
 
       translated = (permitted[:translations]&.to_h || {}).transform_values { |fields| fields.slice(*Settings::Save::TRANSLATED.map(&:to_s)) }.reject { |_, fields| fields.empty? }
       [ attributes, translated ]
@@ -154,6 +156,10 @@ module Admin
       end
     end
 
+    # The fieldset also posts `social_links_present=1`: with it, no rows means
+    # the editor removed every link (the list is cleared); without it, no rows
+    # means the form did not carry the links and they are left be.
+    #
     # `social_links[0][name]`-style rows arrive as a hash keyed by row number
     # (or, from a scripted client, a plain array); either way, row order.
     # Rows are an array, or a hash keyed by row number; any other shape (a forged

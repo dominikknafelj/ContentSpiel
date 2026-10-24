@@ -249,13 +249,22 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "#settings-social-links input[value='https://example.org/blog']"
   end
 
-  test "a single blank row, what removing the last link leaves, clears the stored links" do
+  test "the fieldset posted with no rows clears the stored links" do
     @site.update!(social_links: { "GitHub" => "https://github.com/dana" })
 
-    save social_links: { "0" => { name: "", url: "" } }
+    save social_links_present: "1"
 
     assert_response :see_other
     assert_equal({}, @site.reload.social_links.to_h)
+  end
+
+  test "a form without the marker and without rows leaves the stored links alone" do
+    @site.update!(social_links: { "GitHub" => "https://github.com/dana" })
+
+    save time_zone: "Berlin"
+
+    assert_response :see_other
+    assert_equal({ "GitHub" => "https://github.com/dana" }, @site.reload.social_links.to_h)
   end
 
   test "a forged social_links shape is ignored, never a 500" do
@@ -267,13 +276,22 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal({ "GitHub" => "https://github.com/dana" }, @site.reload.social_links.to_h)
   end
 
-  test "with no social links the form shows one empty row" do
+  test "with no social links the form shows no row, only + Add link" do
     get "/cs-studio/settings"
 
-    assert_select "input[name='site_setting[social_links][0][name]']", 1
-    assert_select "#settings-social-links [data-admin--settings--repeat-rows-target=list] input[name$='[name]']", 1
+    assert_select "#settings-social-links [data-admin--settings--repeat-rows-target=list] input", 0
     assert_select "template#settings-social-link-template input[name$='[name]']", 1
     assert_select "button", text: "+ Add link"
+  end
+
+  test "a refused save after removing every link shows no rows, not the stored ones" do
+    @site.update!(social_links: { "GitHub" => "https://github.com/dana" })
+
+    save social_links_present: "1", translations: { Locales.default => { title: "" } }
+
+    assert_response :unprocessable_entity
+    assert_select "#settings-social-links [data-admin--settings--repeat-rows-target=list] input", 0
+    assert_equal({ "GitHub" => "https://github.com/dana" }, @site.reload.social_links.to_h)
   end
 
   test "a social link without a scheme is refused with a message, and the typed row stays" do
