@@ -1,0 +1,60 @@
+/* The Note block (note block spec, "The public side"; `Blocks::NoteComponent`).
+   Plain rules on tokens, not utilities. A tinted box with a 3px rule on the
+   left in the kind's colour, a 1px frame, and a heading line (an h3, at the
+   body's size whatever the theme's h3 is) of the kind's icon and word (or
+   the editor's title) in the kind's ink at weight 600. Under an editor's
+   title the kind's word stands first in `.note-kind`, visually hidden: it
+   is heard and not seen (decision 6). The text is the theme's own:
+   `.cs-prose` draws it in --th-ink with links in --th-accent, and a band
+   re-values those for what is inside it.
+
+   Each kind hands its four tokens to four local names, so the box's rules
+   are written once. The tokens are the theme's (`tokens.css`, defined from
+   the base tokens); a strong band re-values all sixteen (`sections.css`).
+
+   Inline code inside a note stands on --th-surface with a 1px line, so it
+   is told from the tint (design answer B2). */
+.content-block--note {
+  margin-block: 2rem;
+  padding: var(--th-sp-3) var(--th-sp-4);
+  background: var(--note-ground);
+  border: 1px solid var(--note-border);
+  border-left: 3px solid var(--note-line);
+  border-radius: var(--th-radius);
+}
+.content-block--note-note { --note-ground: var(--th-note-note-ground); --note-line: var(--th-note-note-line); --note-ink: var(--th-note-note-ink); --note-border: var(--th-note-note-border); }
+.content-block--note-tip { --note-ground: var(--th-note-tip-ground); --note-line: var(--th-note-tip-line); --note-ink: var(--th-note-tip-ink); --note-border: var(--th-note-tip-border); }
+.content-block--note-important { --note-ground: var(--th-note-important-ground); --note-line: var(--th-note-important-line); --note-ink: var(--th-note-important-ink); --note-border: var(--th-note-important-border); }
+.content-block--note-warning { --note-ground: var(--th-note-warning-ground); --note-line: var(--th-note-warning-line); --note-ink: var(--th-note-warning-ink); --note-border: var(--th-note-warning-border); }
+.content-block--note .note-head {
+  display: flex;
+  align-items: center;
+  gap: var(--th-sp-2);
+  margin: 0 0 var(--th-sp-2);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: 600;
+  color: var(--note-ink);
+}
+.content-block--note .note-icon { width: 1rem; height: 1rem; flex: none; }
+.content-block--note .note-kind {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.content-block--note .note-body > :first-child { margin-top: 0; }
+.content-block--note .note-body :not(pre) > code {
+  background: var(--th-surface);
+  border: 1px solid var(--th-line);
+  border-radius: var(--th-radius);
+  padding: 0 0.25em;
+}

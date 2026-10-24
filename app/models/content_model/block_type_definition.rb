@@ -36,8 +36,10 @@ module ContentModel
     # Ruling 6): each is a branch of CS Studio's icon partial
     # (`app/views/admin/shared/_icon.html.erb`, Lucide), which a model may
     # not name; `block_icon_component_test.rb` draws every one. A type names
-    # one or none; an outside type picks from the same list.
-    ICONS = %w[pilcrow image code_xml posts columns_2].freeze
+    # one or none; an outside type picks from the same list. The last four
+    # are the Note block's kinds (note block plan, rulings 11 and 12), which
+    # its blocks' cards and tiles draw through `for_block:`.
+    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert].freeze
 
     # The columns a block type may name with `uses`: the block card draws and
     # the save services write these four and no other (`BlockCardComponent`'s
@@ -116,12 +118,39 @@ module ContentModel
     end
 
     # The icon CS Studio draws for the type in the picker, on a card's head
-    # and on a section's tile: one of `ICONS`, or none.
-    def icon(name = nil)
+    # and on a section's tile: one of `ICONS`, or none. `for_block:` is a
+    # callable taking one block and answering one of `ICONS`: a block's card
+    # and tile draw what it answers for that block, in place of the type's
+    # (the Note block's kind; note block plan, ruling 12). The picker, which
+    # has no block, draws the type's, so the type's should be the icon of
+    # the value a new block starts with.
+    def icon(name = nil, for_block: nil)
       return @icon if name.nil?
       refuse "icon is one of #{ICONS.join(", ")} (the icons CS Studio draws for a block type): #{name.inspect}" unless ICONS.include?(name.to_s)
+      refuse "`icon for_block:` is a callable taking the block and answering one of #{ICONS.join(", ")}" unless for_block.nil? || for_block.respond_to?(:call)
 
+      @icon_for_block = for_block
       @icon = name.to_s
+    end
+
+    # Whether a block's card and tile draw an icon of the block's own
+    # (`for_block:`), which a save then has to redraw
+    # (`Admin::ContentBlocksController#block_icon_streams`).
+    def icon_follows_block? = !@icon_for_block.nil?
+
+    # The icon one block of the type is drawn with: what `for_block:`
+    # answers for it, else the type's own (nil for a type with none). A name
+    # off the list raises, naming the list: only a built-in may declare
+    # `for_block:` (`refuse_outside!`), so a wrong answer is this
+    # repository's fault, and the name reaches the icon partial as a symbol,
+    # never as markup.
+    def icon_for(block)
+      return @icon unless icon_follows_block? && block
+
+      name = @icon_for_block.call(block).to_s
+      refuse "its icon for a block is one of #{ICONS.join(", ")}: #{name.truncate(40).inspect}" unless ICONS.include?(name)
+
+      name
     end
 
     def uses(*columns)
@@ -301,7 +330,8 @@ module ContentModel
     # form of the site (`HeldFields.allowed_actions`), an outside type has no
     # editor script of its own until step 2, so any action it named would be
     # one of the CMS's, kept alive in every held form. Step 2 opens it, with
-    # the owner's prefix on the identifier. The
+    # the owner's prefix on the identifier. Nor `icon ... for_block:`, for the
+    # reason written at its refusal. The
     # stylesheet is read here, once, at registration: one that is not there
     # stops the boot as this type's, not as a bare system error.
     def refuse_outside!
@@ -311,6 +341,13 @@ module ContentModel
       if read_only_actions.any?
         refuse "a block type from outside declares no read_only_actions yet: it brings no editor script of its own, and an " \
                "action it named would be one of the CMS's, kept in every held form of the site: #{read_only_actions.inspect}"
+      end
+      # A gem's callable would be asked on every card and tile of the editor,
+      # where one that raised is a 500; the tile's rescue for a gem's
+      # `summary` is not repeated for an icon until a gem asks for one.
+      if icon_follows_block?
+        refuse "a block type from outside names one icon for all its blocks: `icon for_block:` is the CMS's own yet, " \
+               "because a callable that raised would fail every editor page holding a block of the type"
       end
       # A token name has no underscore (`TOKEN_NAME`), so `photo_gallery`'s
       # tokens start with `photo-gallery-`.

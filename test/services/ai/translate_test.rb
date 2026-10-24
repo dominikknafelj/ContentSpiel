@@ -336,4 +336,24 @@ class AI::TranslateTest < ActiveSupport::TestCase
 
     assert translate(own.reload, %w[alt], actor: users(:author)).last.ok?
   end
+
+  test "a note's title goes to the provider as plain text and its text as Markdown, and its kind is not offered" do
+    page = as_owner { create_page(title: "Guide") }
+    block = as_owner do
+      ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "note", settings: { "kind" => "tip", "title" => "Before you publish" } },
+        translations: { "en" => { body: rich_doc("Mind the address.") } }).record
+    end
+
+    service, result = translate(block, %w[title body])
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "[de] Before you publish", service.suggestions["title"]
+    assert_equal "[de] Mind the address.", service.suggestions["body"].to_h.dig("content", 0, "content", 0, "text")
+    assert_equal [ :plain, :markdown ], StubProvider.calls.map { |call| call[:format] }
+    assert_nil block.reload.settings_object(locale: "de").title, "nothing is saved"
+
+    _, refused = translate(block, %w[kind])
+    assert_not refused.ok?
+    assert_equal [ "Kind can't be translated" ], refused.errors
+  end
 end

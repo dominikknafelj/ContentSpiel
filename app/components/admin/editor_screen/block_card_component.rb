@@ -333,6 +333,21 @@ module Admin
       # blank here rather than silently showing the English one.
       def value_for(field) = settings_object&.public_send(field.name)
 
+      # What a schema field that takes its placeholder from a select
+      # (`placeholder_from:`, the Note block's title) shows: the label of the
+      # choice stored now, which is the same in every language and so read
+      # from the default one, and the select's input name and labels, for
+      # `admin--ui--placeholder-from` to follow a new choice before it is
+      # saved. Nil for every other field. A translation tab draws no input
+      # for the select, so there the placeholder stays the stored choice's.
+      def placeholder_for(field)
+        source = field.options[:placeholder_from] or return nil
+        choice = definition.fields.find { |candidate| candidate.name == source.to_s } or return nil
+        options = choice.options[:options]
+        labels = options.is_a?(Hash) ? options.transform_keys(&:to_s) : Array(options).to_h { |option| [ option.to_s, option.to_s ] }
+        { text: labels[default_settings_object&.public_send(choice.name).to_s], source: "block[settings][#{choice.name}]", labels: labels }
+      end
+
       # The default-language value for a translated schema field, shown
       # read-only once the editing locale isn't the default one (spec §6.2) --
       # same `nil`-means-"nothing to compare against" contract

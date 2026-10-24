@@ -72,6 +72,37 @@
   --th-syn-tag: oklch(0.42 0.07 200);
   --th-syn-attribute: oklch(0.44 0.10 300);
   --th-syn-embed: oklch(0.46 0.15 25);
+
+  /* The Note block's four kinds (note block spec, decision 9: Claude
+     Design's D4a), four tokens each, every one DEFINED from the base tokens
+     above, so a theme that re-colours its base re-colours the notes. Note is
+     neutral: a 4% tint of the text colour, a --th-line-strong rule, its word
+     and icon in the text colour, a --th-line frame. Tip is --th-ok, Important
+     the accent, Warning --th-warn; each has the hue at 8% over the page for
+     its ground, the hue for its rule, the hue's ink for its word and icon
+     (the accent is its own ink) and the hue at 24% for its frame. No kind is
+     red: --th-danger is kept for errors and destructive actions. The text stays --th-ink. A strong band
+     re-values all sixteen (sections.css).
+     test/integration/design_tokens_test.rb holds the 72 pairs: the ink, the
+     accent and the kind's ink on each kind's ground, on the page, in a
+     tinted band and in a strong band, in both themes; the lowest here is
+     the accent on the Important ground, 4.88:1. */
+  --th-note-note-ground: color-mix(in srgb, var(--th-ink) 4%, var(--th-paper));
+  --th-note-note-line: var(--th-line-strong);
+  --th-note-note-ink: var(--th-ink);
+  --th-note-note-border: var(--th-line);
+  --th-note-tip-ground: color-mix(in srgb, var(--th-ok) 8%, var(--th-paper));
+  --th-note-tip-line: var(--th-ok);
+  --th-note-tip-ink: var(--th-ok-ink);
+  --th-note-tip-border: color-mix(in srgb, var(--th-ok) 24%, var(--th-paper));
+  --th-note-important-ground: color-mix(in srgb, var(--th-accent) 8%, var(--th-paper));
+  --th-note-important-line: var(--th-accent);
+  --th-note-important-ink: var(--th-accent);
+  --th-note-important-border: color-mix(in srgb, var(--th-accent) 24%, var(--th-paper));
+  --th-note-warning-ground: color-mix(in srgb, var(--th-warn) 8%, var(--th-paper));
+  --th-note-warning-line: var(--th-warn);
+  --th-note-warning-ink: var(--th-warn-ink);
+  --th-note-warning-border: color-mix(in srgb, var(--th-warn) 24%, var(--th-paper));
 }
 
 [data-theme="dark"] {
@@ -117,6 +148,26 @@
   --th-syn-tag: oklch(0.78 0.07 200);
   --th-syn-attribute: oklch(0.76 0.09 300);
   --th-syn-embed: oklch(0.76 0.11 25);
+
+  /* The notes again: Note's 4% tint of the text colour, and 12% of the hue
+     over the dark page for the other three. The lowest here is the accent
+     on the Important ground, 6.9:1. */
+  --th-note-note-ground: color-mix(in srgb, var(--th-ink) 4%, var(--th-paper));
+  --th-note-note-line: var(--th-line-strong);
+  --th-note-note-ink: var(--th-ink);
+  --th-note-note-border: var(--th-line);
+  --th-note-tip-ground: color-mix(in srgb, var(--th-ok) 12%, var(--th-paper));
+  --th-note-tip-line: var(--th-ok);
+  --th-note-tip-ink: var(--th-ok-ink);
+  --th-note-tip-border: color-mix(in srgb, var(--th-ok) 24%, var(--th-paper));
+  --th-note-important-ground: color-mix(in srgb, var(--th-accent) 12%, var(--th-paper));
+  --th-note-important-line: var(--th-accent);
+  --th-note-important-ink: var(--th-accent);
+  --th-note-important-border: color-mix(in srgb, var(--th-accent) 24%, var(--th-paper));
+  --th-note-warning-ground: color-mix(in srgb, var(--th-warn) 12%, var(--th-paper));
+  --th-note-warning-line: var(--th-warn);
+  --th-note-warning-ink: var(--th-warn-ink);
+  --th-note-warning-border: color-mix(in srgb, var(--th-warn) 24%, var(--th-paper));
 }
 
 :root {

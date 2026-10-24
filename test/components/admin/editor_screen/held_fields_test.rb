@@ -270,4 +270,27 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     left = Nokogiri::HTML5.fragment(rendered_content).css("fieldset.admin-held [data-action]").flat_map { |node| node["data-action"].split }
     assert_equal [ "input->admin--editor--code-limit#update" ], left, "the counter, which reads, is left in a held code card, and nothing else is"
   end
+
+  # Plan ruling 10: a note's card held by someone else keeps its stored
+  # kind checked and disables every button, the title is read-only with its
+  # text, and its placeholder script reads only, so it is no action to keep.
+  test "a note's card, rewritten; held by someone else its kind's buttons are disabled with the stored one checked, its title read-only, and no save is wired" do
+    page = create_page(title: "Held note")
+    block = page.content_blocks.new(block_type: "note", position: 0, settings: { "kind" => "warning" })
+    block.assign_settings({ "title" => "Mind" }, locale: "en")
+    block.save!
+    as_owner { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true) }
+    assert_survives(rendered_content)
+
+    reserve(block, page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en") }
+    held = Nokogiri::HTML5.fragment(rendered_content)
+
+    assert_equal [ "disabled" ] * 4, held.css("fieldset.admin-held input[type=radio]").map { |radio| radio["disabled"] }
+    assert_equal [ "warning" ], held.css("input[type=radio][checked]").map { |radio| radio["value"] }
+    assert_selector "fieldset.admin-held input[name='block[settings][title]'][readonly][value='Mind']"
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
+    assert_empty held.css("fieldset.admin-held [data-action]").flat_map { |node| node["data-action"].split }.grep(/placeholder-from/),
+      "the placeholder script listens without an action, so there is nothing of it to keep"
+  end
 end

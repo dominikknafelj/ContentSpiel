@@ -16,6 +16,7 @@ module ContractLedger
     "blocks/rich_text_component" => %w[block page],
     "blocks/image_component" => %w[block page asset alt caption sizes],
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
+    "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width],
     "posts/blog_list_component" => %w[posts page],
@@ -31,6 +32,10 @@ module ContractLedger
     shadow-menu
     band-tinted band-strong on-band-strong on-band-strong-dim on-band-strong-accent
     syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed
+    note-note-ground note-note-line note-note-ink note-note-border
+    note-tip-ground note-tip-line note-tip-ink note-tip-border
+    note-important-ground note-important-line note-important-ink note-important-border
+    note-warning-ground note-warning-line note-warning-ink note-warning-border
   ].freeze
 
   FIXED_TOKENS = %w[

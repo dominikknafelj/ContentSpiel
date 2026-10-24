@@ -9,12 +9,14 @@ module Admin
     # `original`, `locale` and `errors` too. Keeping one signature for every
     # subclass is what lets `Ui::FieldComponent#input_component` construct
     # whichever one it dispatches to without a type-by-type special case.
+    # `placeholder:` is what the caller hands a field that shows one
+    # (`Admin::Fields::StringField`); every other type ignores it.
     class Base < Admin::AdminComponent
       # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a
       # caller supplied.
-      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil)
+      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil)
         @field = field
         @form_name = form_name
         @value = value
@@ -22,15 +24,20 @@ module Admin
         @locale = locale
         @errors = errors
         @id_prefix = id_prefix || Admin::Ui::FieldComponent.dom_id_prefix(form_name)
+        @placeholder = placeholder
       end
 
       private
 
-      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix
+      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :placeholder
 
       def input_name = "#{form_name}[#{field.name}]"
 
       def input_id = "#{id_prefix}-#{field.name}"
+
+      # The id of the help line `Admin::Ui::FieldComponent` draws under a
+      # field whose type gives one (`help:`), for the input's `aria-describedby`.
+      def help_id = field.help ? "#{input_id}-help" : nil
 
       # A container may be a `ContentModel::FieldSet` instance (a real
       # reader per field name), a plain Hash (an admin form's raw params, or

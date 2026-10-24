@@ -247,7 +247,47 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     definition.icon :pilcrow
     assert_equal "pilcrow", definition.icon
     error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").icon "rocket" }
-    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, posts, columns_2/, error.message)
+    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
+  end
+
+  # Note block plan, ruling 12: the Note's icon in the picker is its type's
+  # (`info`), and on a block's card and tile its kind's. A callable answers
+  # it for each block, from the same closed list.
+  test "a block type's icon may follow its block: the callable answers one of the list for each block, and the type's own stands where there is no block" do
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    definition.icon :info, for_block: ->(block) { block.settings["tone"] == "loud" ? "triangle_alert" : "info" }
+
+    assert_equal "info", definition.icon
+    assert definition.icon_follows_block?
+    assert_equal "triangle_alert", definition.icon_for(ContentBlock.new(settings: { "tone" => "loud" }))
+    assert_equal "info", definition.icon_for(ContentBlock.new(settings: {}))
+    assert_equal "info", definition.icon_for(nil), "the picker has no block"
+
+    plain = ContentModel::BlockTypeDefinition.new("y").tap { |type| type.icon :pilcrow }
+    assert_not plain.icon_follows_block?
+    assert_equal "pilcrow", plain.icon_for(ContentBlock.new(settings: { "tone" => "loud" }))
+    assert_nil ContentModel::BlockTypeDefinition.new("z").icon_for(ContentBlock.new), "a type with no icon has none for its blocks"
+
+    error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").icon :info, for_block: "triangle_alert" }
+    assert_includes error.message, "callable"
+  end
+
+  test "a block's icon off the list raises, naming the list, and never reaches the page as markup" do
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    definition.icon :info, for_block: ->(_block) { "<svg onload=x>" }
+
+    error = assert_raises(ArgumentError) { definition.icon_for(ContentBlock.new) }
+    assert_match(/\Ax: its icon for a block is one of pilcrow, .*, triangle_alert/, error.message)
+  end
+
+  # An outside type's callable would be asked on every card and tile of the
+  # editor, where a raise is a 500: not yet (plan ruling 12).
+  test "a block type from outside names one icon for all its blocks: for_block is refused at registration" do
+    definition = ContentModel::BlockTypeDefinition.new("gallery/flag")
+    definition.icon :info, for_block: ->(_block) { "info" }
+
+    error = assert_raises(ArgumentError) { definition.finalize! }
+    assert_match(/\Agallery\/flag: a block type from outside names one icon/, error.message)
   end
 
   # Task 8 review M2: the tile's cut and the Code block's summary's are one

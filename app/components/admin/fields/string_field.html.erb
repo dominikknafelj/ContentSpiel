@@ -1,1 +1,2 @@
-<%= tag.input type: "text", name: input_name, id: input_id, value: value, class: setup_input_class, required: field.required? %>
+<%= tag.input type: "text", name: input_name, id: input_id, value: value, class: setup_input_class, required: field.required?,
+      placeholder: placeholder_text, aria: { describedby: help_id }, data: placeholder_data %>

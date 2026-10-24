@@ -293,4 +293,22 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     end
     assert_no_match(/\$2a\$/, json, "a bcrypt digest leaked")
   end
+
+  # The first translated schema field of a built-in type: the snapshot holds
+  # the title in each language as `translated_settings`, and a changes row
+  # holds the column's old and new value (no Mobility column, no code field).
+  test "a note's translated title is in the snapshot per language, and its change is the column's old and new value" do
+    with_locales(%w[en de], default: "en") do
+      saved = ContentBlocks::Save.call(create_page(title: "With a note").content_blocks.new, attributes: { block_type: "note", settings: { "kind" => "tip", "title" => "Before" } })
+      assert saved.ok?, saved.errors.to_sentence
+      block = saved.record
+
+      assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { "title" => "Vorher" } } }).ok?
+
+      changes = Audit::Snapshot.field_changes_for(block)
+      assert_equal [ { "en" => { "title" => "Before" } }, { "en" => { "title" => "Before" }, "de" => { "title" => "Vorher" } } ], changes["translated_settings"]
+      assert_equal({ "en" => { "title" => "Before" }, "de" => { "title" => "Vorher" } }, Audit::Snapshot.for(block.reload)["translated_settings"])
+      assert_equal({ "kind" => "tip" }, Audit::Snapshot.for(block)["settings"])
+    end
+  end
 end

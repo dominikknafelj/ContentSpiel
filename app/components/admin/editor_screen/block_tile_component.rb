@@ -119,11 +119,12 @@ module Admin
 
       def note_key = ::Notes.key(block)
 
+      # A type whose icon follows its block (the Note's kind) shows the block's own.
       # The type's icon stands in for its name on the face (contrast and
       # buttons spec, C2), which then keeps the name as `sr-only` text so the
       # face's accessible name still says the type. A type with no icon
       # keeps its visible name (Ruling 7).
-      def block_icon = @block_icon ||= Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: :tile)
+      def block_icon = @block_icon ||= Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: :tile, block: block)
 
       def icon? = block_icon.render?
 

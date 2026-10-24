@@ -24,6 +24,15 @@ module ThemeTestHelper
 
   def with_code_theme(&block) = Theme.with(code_theme, &block)
 
+  # A fourth theme, of two files (`test/fixtures/themes/note`): its own
+  # template for the Note block, written from the reference's section alone
+  # (docs/reference/theming.md, "The Note block"), and a stylesheet for it.
+  NOTE = Rails.root.join("test/fixtures/themes/note")
+
+  def note_theme = Theme.load(ThemeFolder.new(NOTE))
+
+  def with_note_theme(&block) = Theme.with(note_theme, &block)
+
   # A copy of the second theme in a directory of its own, for a test that
   # adds, changes or removes a file. Yields the directory as a Pathname.
   def with_theme_copy

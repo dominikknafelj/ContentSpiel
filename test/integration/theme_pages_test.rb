@@ -551,6 +551,42 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    guide = create_page(title: "Guide")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: guide), attributes: { block_type: "note", settings: { "kind" => "warning", "title" => "<b>Mind</b>" } },
+      translations: { "en" => { body: rich_doc("Check the **address**.") } })
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(guide)
+
+    with_note_theme { get "/guide" }
+
+    assert_response :success
+    assert_select "section.plain-note[data-kind='warning'][data-icon='triangle-alert'][data-titled='true'][data-block='#{block.id}'][data-page='#{guide.id}'][aria-labelledby='plain-note-#{block.id}']" do
+      assert_select "h2#plain-note-#{block.id}", text: "Warning: <b>Mind</b>"
+      assert_select "h2#plain-note-#{block.id} .plain-note__kind", text: "Warning:"
+      assert_select "div.plain-note__text strong", text: "address"
+    end
+    assert_select "aside.content-block--note", count: 0
+    assert_select "section.plain-note b", count: 0
+
+    with_plain_theme { get "/guide" }
+
+    assert_response :success
+    assert_select "div.plain-frame aside.content-block--note-warning h3#note-#{block.id}-heading", text: "Warning: <b>Mind</b>"
+    assert_select "section.plain-note", count: 0
+  end
+
+  test "the fourth theme is sound, checked deeply too: a Note template of the contract's names" do
+    folder = ThemeFolder.new(ThemeTestHelper::NOTE)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    assert_equal %w[assets/stylesheets/theme.css components/blocks/note_component.html.erb], folder.files
+    template = folder.read("components/blocks/note_component.html.erb")
+    Theme::Contract.components.fetch("blocks/note_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
+    assert_no_match(/settings|title\b|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name (the kind's word is `word`, not a key looked up), and no string marked safe")
+  end
+
   test "the preview is drawn by the theme too, with the CMS's preview bar" do
     sign_in_as users(:one)
 
