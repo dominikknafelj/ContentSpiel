@@ -5,8 +5,13 @@
 const MIN_ZOOM = 0.05
 const MAX_ZOOM = 4
 // "Fit all" never zooms a small graph in further than this: three nodes
-// stretched over the whole box would be drawn as three huge gaps.
-const MAX_FIT_ZOOM = 1.5
+// stretched over the whole box would be drawn as three huge gaps. Raised from
+// 1.5 with the layout points spec (decision 15): a small graph now fills the
+// canvas, and three is as far as it may be stretched.
+const MAX_FIT_ZOOM = 3
+// The share of each side of the canvas that fit leaves empty: a tenth, so the
+// graph fills about 80% of it on the axis that binds (Ruling 12).
+const FIT_MARGIN = 0.1
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value))
 
@@ -50,17 +55,17 @@ export function bounds(positions, indexes) {
   return minX === Infinity ? null : { minX, minY, maxX, maxY }
 }
 
-// The camera that shows the whole box with `padding` pixels around it, its
-// middle in the middle of the canvas. A box with no extent (one node, or
-// every node at one point) has nothing to scale by: it is centred at the
-// largest fit zoom.
-export function fit(box, width, height, padding = 40) {
+// The camera that shows the whole box, `margin` (a fraction of each side of
+// the canvas, FIT_MARGIN by default) left empty around it, its middle in the
+// middle of the canvas. A box with no extent (one node, or every node at one
+// point) has nothing to scale by: it is centred at the largest fit zoom.
+export function fit(box, width, height, margin = FIT_MARGIN) {
   if (!box) return { k: 1, tx: width / 2, ty: height / 2 }
 
   const spanX = box.maxX - box.minX
   const spanY = box.maxY - box.minY
-  const roomX = Math.max(width - padding * 2, 1)
-  const roomY = Math.max(height - padding * 2, 1)
+  const roomX = Math.max(width * (1 - margin * 2), 1)
+  const roomY = Math.max(height * (1 - margin * 2), 1)
   const k = clamp(Math.min(spanX > 0 ? roomX / spanX : Infinity, spanY > 0 ? roomY / spanY : Infinity), MIN_ZOOM, MAX_FIT_ZOOM)
   return { k, tx: width / 2 - ((box.minX + box.maxX) / 2) * k, ty: height / 2 - ((box.minY + box.maxY) / 2) * k }
 }

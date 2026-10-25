@@ -1815,7 +1815,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_selector "[data-mind-graph-card]", visible: :visible
     await_graph
-    assert_card_beside(a, side: "right")
+    # The side is the one the view leaves room for, and Fit decides where the
+    # node is dropped from: not pinned to "right" any more, the card is
+    # checked beside the node on whichever side it is shown, and inside the
+    # canvas, which is what the side is chosen for.
+    assert_card_beside(a)
+    assert_operator element_box("[data-mind-graph-card]")["right"], :<=, canvas_box[2], "the card is shown on the side that has room"
+    assert_operator element_box("[data-mind-graph-card]")["left"], :>=, canvas_box[0]
     within("[data-mind-graph-card]") { assert_button "Unpin" }
   end
 
@@ -3862,7 +3868,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # The canvas's colours at `samples` points evenly round a node's centre,
   # `radius` pixels from it: one read, after the frames `pixel_at` waits for.
   # `quadrant: :left` reads the quarter on the node's left only, where there
-  # is no label.
+  # is no label. A sample is the pixel that CONTAINS its point (floor): rounding
+  # reads the pixel after it, up to a pixel away, which put a sample 8px out
+  # on the antialiased edge of a mark of radius 7 whenever its centre fell
+  # at a fraction (the fitted view's zoom puts it at one).
   def ring_pixels(node, radius:, samples:, quadrant: nil)
     point = screen_position(node)
     await_frames
@@ -3875,7 +3884,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         return Array.from({ length: #{samples} }, (_, step) => {
           const angle = #{quadrant == :left ? "Math.PI * 0.75 + step * Math.PI / 2 / #{samples}" : "step * 2 * Math.PI / #{samples}"}
           const x = #{point["x"]} + #{radius} * Math.cos(angle), y = #{point["y"]} + #{radius} * Math.sin(angle)
-          return Array.from(context.getImageData(Math.round((x - box.left) * ratio), Math.round((y - box.top) * ratio), 1, 1).data)
+          return Array.from(context.getImageData(Math.floor((x - box.left) * ratio), Math.floor((y - box.top) * ratio), 1, 1).data)
         })
       })()
     JS

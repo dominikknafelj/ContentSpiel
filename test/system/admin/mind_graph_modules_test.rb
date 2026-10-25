@@ -409,7 +409,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_nil js_module("mind_graph/camera", "m.bounds(new Float32Array([1, 2]), [])")
   end
 
-  test "camera: fit puts every corner inside the padded box and the middle in the middle" do
+  test "camera: fit leaves a tenth of the canvas on each side of a wide box, its middle in the middle" do
     result = js_module("mind_graph/camera", <<~JS)
       (() => {
         const box = { minX: -500, minY: -100, maxX: 500, maxY: 100 }
@@ -418,19 +418,31 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       })()
     JS
 
-    assert_in_delta 0.72, result["k"], 0.001
-    assert_in_delta 40, result["topLeft"][0], 0.01
-    assert_in_delta 760, result["bottomRight"][0], 0.01
+    assert_in_delta 0.64, result["k"], 0.001
+    assert_in_delta 80, result["topLeft"][0], 0.01
+    assert_in_delta 720, result["bottomRight"][0], 0.01
     assert_equal [ 400, 300 ], result["middle"].map(&:round)
-    assert_operator result["topLeft"][1], :>=, 40
+    assert_operator result["topLeft"][1], :>=, 60
   end
 
   # Review focus 5: one node, or all nodes at one point.
-  test "camera: fitting a single point does not divide by zero or zoom past 1.5" do
+  test "camera: fitting a single point does not divide by zero or zoom past 3" do
     result = js_module("mind_graph/camera", "(() => { const c = m.fit({ minX: 7, minY: 7, maxX: 7, maxY: 7 }, 800, 600); return [c.k, ...m.toScreen(c, 7, 7)] })()")
 
-    assert_equal [ 1.5, 400, 300 ], result
+    assert_equal [ 3, 400, 300 ], result
     assert_equal({ "k" => 1, "tx" => 400, "ty" => 300 }, js_module("mind_graph/camera", "m.fit(null, 800, 600)"))
+  end
+
+  # Layout points spec, decision 15: a small graph is zoomed in to fill the
+  # box, up to 3 and never further.
+  test "camera: a small graph is zoomed in to fill the box, up to 3 and never further" do
+    small = js_module("mind_graph/camera", "m.fit({ minX: -100, minY: -50, maxX: 100, maxY: 50 }, 800, 600).k")
+    tiny = js_module("mind_graph/camera", "m.fit({ minX: -10, minY: -5, maxX: 10, maxY: 5 }, 800, 600).k")
+
+    assert_in_delta 3.2, js_module("mind_graph/camera", "Math.min(800 * 0.8 / 200, 600 * 0.8 / 100)"), 0.001
+    assert_equal 3, small, "200 by 100 would fill 80% at 3.2: it stops at the cap"
+    assert_equal 3, tiny
+    assert_in_delta 2.4, js_module("mind_graph/camera", "m.fit({ minX: -100, minY: -50, maxX: 100, maxY: 50 }, 600, 300).k"), 0.001
   end
 
   test "hit test: the nearest node within its radius plus slack, or none" do
@@ -627,9 +639,9 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       })()
     JS
 
-    assert_in_delta 0.52, result["k"], 0.001
-    assert_in_delta 40, result["top"][1], 0.01
-    assert_in_delta 560, result["bottom"][1], 0.01
+    assert_in_delta 0.48, result["k"], 0.001
+    assert_in_delta 60, result["top"][1], 0.01
+    assert_in_delta 540, result["bottom"][1], 0.01
     assert_equal [ 400, 300 ], result["middle"].map(&:round)
   end
 
