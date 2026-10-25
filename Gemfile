@@ -124,7 +124,7 @@ gem "opentelemetry-exporter-otlp", "~> 0.37"
 
 # The official Ruby SDK for MCP servers (design spec section 10) --
 # [https://github.com/modelcontextprotocol/ruby-sdk].
-gem "mcp", "~> 1.7"
+gem "mcp", "~> 1.8"
 
 gem "rack-attack", "~> 6.8"
 
