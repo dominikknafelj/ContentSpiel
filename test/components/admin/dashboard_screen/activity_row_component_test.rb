@@ -4,17 +4,24 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
   setup { Current.actor = users(:one); Current.channel = :admin }
   teardown { Current.reset }
 
-  def row_for(actor: users(:one), channel: :admin, &change)
-    post = Current.set(actor:, channel:) { create_post(title: "Hello", published: false) }
+  def row_for(actor: users(:one), channel: :admin, title: "Hello", &change)
+    post = Current.set(actor:, channel:) { create_post(title:, published: false) }
     change&.call(post)
     Dashboard::Activity.new(actor: users(:one), channel: :admin).rows.find { |r| r.record == post }
+  end
+
+  # A row of a change whose actor is handed over, a deleted user or nobody.
+  def row_with(user:, user_id:, title:)
+    row = row_for(title:)
+    actor = Audit::Sentence::Actor.new(you: false, user:, user_id:, via_label: nil, none: false)
+    row.with(sentence: row.sentence.with(actor:))
   end
 
   test "a person has a round avatar with their initial, the sentence links the title, and a draft shows its chip" do
     row = row_for
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 
-    assert_selector "span.rounded-full", text: users(:one).display_name[0].upcase
+    assert_selector "span.rounded-full.uppercase[aria-hidden=true]", exact_text: "on"
     assert_text "You created “Hello”" # the viewer's own change, as in the audit log
     assert_selector "a[href='/cs-studio/posts/#{row.record.id}']", text: "Hello"
     assert_text "Draft"
@@ -26,9 +33,24 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     row = row_for(actor: token, channel: :mcp)
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 
-    assert_selector "span.rounded-full", text: users(:two).display_name[0].upcase
+    assert_selector "span.rounded-full.uppercase[aria-hidden=true]", exact_text: "tw"
     assert_text "#{users(:two).display_name} via Claude desktop created “Hello”"
     assert_selector ".admin-channel-chip[data-channel=mcp]", text: "MCP"
+  end
+
+  # The owner's O9: the dashboard's circle is the two-letter rule
+  # (`PersonName.initials`) of the name the row shows, drawn upper-case.
+  test "the circle is two letters of the name the row shows: two words, one word, a deleted user, System" do
+    users(:two).update!(name: "Ada Lovelace")
+    render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(actor: users(:two), title: "First"))
+    assert_selector "span.rounded-full.uppercase", exact_text: "AL"
+
+    users(:two).update!(name: "Δήμητρα")
+    render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(actor: users(:two), title: "Second"))
+    assert_selector "span.rounded-full.uppercase", exact_text: "Δή"
+
+    assert_equal "ad", Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: 999_999, title: "Deleted")).initials
+    assert_equal "Sy", Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: nil, title: "Nobody")).initials
   end
 
   [ "<script>x</script>", "😀" * 60 ].each_with_index do |name, index|

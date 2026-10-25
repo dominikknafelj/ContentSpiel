@@ -30,6 +30,12 @@ class PersonNameTest < ActiveSupport::TestCase
     assert_equal "d", PersonName.initials("d")
   end
 
+  test "a one-word name in another script gives its first two letters" do
+    assert_equal "Δή", PersonName.initials("Δήμητρα")
+    assert_equal "Юл", PersonName.initials("Юлия")
+    assert_equal "美咲", PersonName.initials("美咲")
+  end
+
   test "initials of odd names: digits, an emoji, an accent, a leading at sign, nothing" do
     assert_equal "7o", PersonName.initials("7 of 9")
     assert_equal "👩‍🚀d", PersonName.initials("👩‍🚀 dana")
