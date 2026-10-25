@@ -160,7 +160,7 @@ import { messages } from "i18n/messages"
 import { createLayout } from "mind_graph/layout_client"
 import { identity, toGraph, zoomAt, panBy, bounds, fit } from "mind_graph/camera"
 import { nodeAt } from "mind_graph/hit_test"
-import { chooseLabels, labelAt, LABEL_GAP, LABEL_HEIGHT } from "mind_graph/labels"
+import { chooseLabels, badgeBoxes, labelAt, LABEL_GAP, LABEL_HEIGHT } from "mind_graph/labels"
 import { placeCard } from "mind_graph/card_placement"
 import { readTheme, watchTheme } from "mind_graph/theme"
 import { draw, radiusFor, labelFont } from "mind_graph/renderer"
@@ -437,7 +437,8 @@ export function mount(element) {
       // canvas's top-left corner -- so a frame drawn before then (the data has
       // just come, or the worker never started) is an empty one, not a pile.
       const labels = state.placed ? chooseLabels({ order: state.order, positions: state.positions, widths: state.widths, radii: state.radii,
-        camera: state.camera, width: state.width, height: state.height, always, free: state.free }) : []
+        camera: state.camera, width: state.width, height: state.height, always, free: state.free,
+        obstacles: badgeBoxes({ nodes: state.nodes, indexes: state.visibleNodes, positions: state.positions, radii: state.radii, camera: state.camera }) }) : []
       // With reduced motion a label switches on, it does not fade in (§5.2).
       if (reducedMotion.matches) labels.forEach((label) => { label.alpha = 1 })
       // The hovered node's label is drawn whatever the rule said of it: marked

@@ -8,7 +8,7 @@
 //    up a place, so zoomed into a corner the budget goes to what can be seen.
 //    The last quarter of that reach fades -- strictly, from just below full
 //    strength to just above none -- so a label arrives gradually as you zoom in.
-// 2. NO OVERLAP. A label is placed only where no label placed before it is;
+// 2. NO OVERLAP. A label is placed only where no label placed before it, and no notes badge, is;
 //    better-connected nodes place first, so the hub wins.
 // 3. `always` -- the selection, the focus, the selection's neighbours -- is
 //    labelled at any zoom, at full strength, and places before everything
@@ -26,6 +26,10 @@
 //    `order` (the filter shows it). Rule 2 still holds: no overlap wins over
 //    "always shown".
 //
+// A NOTES BADGE is one more box the labels keep clear of (`obstacles`, from
+// `badgeBoxes`), by the same test as rule 2: no label, and no notes badge
+// (Claude Design, 2026-10-25), covers another. The layout makes no room.
+//
 // A node outside the canvas gets no label. Answers `{ index, alpha, x, y }`,
 // `x`/`y` the label's left edge and vertical middle in screen pixels: a label
 // sits right of its node, LABEL_GAP pixels from the node's edge, centred on
@@ -34,12 +38,27 @@
 //
 // LABEL_GAP and LABEL_HEIGHT are also the hit test's (`hit_test.js`): a drawn
 // label is part of its node's target.
+import { notesBadgeBox } from "mind_graph/marks"
+
 const LABEL_BUDGET = 40
 export const LABEL_GAP = 4
 export const LABEL_HEIGHT = 14
 
 const GAP = LABEL_GAP
 const HEIGHT = LABEL_HEIGHT
+
+const overlaps = (box, other) => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top
+
+// The boxes (badge and ring) of the notes badges of `indexes`, in screen
+// pixels; a node with none is left out.
+export function badgeBoxes({ nodes, indexes, positions, radii, camera }) {
+  const boxes = []
+  for (const index of indexes) {
+    const box = notesBadgeBox(nodes[index], positions[index * 2] * camera.k + camera.tx, positions[index * 2 + 1] * camera.k + camera.ty, radii[index])
+    if (box) boxes.push(box)
+  }
+  return boxes
+}
 
 export function labelAt({ index, positions, radii, camera }) {
   const sx = positions[index * 2] * camera.k + camera.tx
@@ -51,7 +70,7 @@ export function labelAt({ index, positions, radii, camera }) {
 // `free` HAS NO DEFAULT, on purpose: a caller that forgot it would name Home
 // and the post types only while the budget lasts, and nothing would look
 // wrong on a small graph. Without it this throws.
-export function chooseLabels({ order, positions, widths, radii, camera, width, height, always, free }) {
+export function chooseLabels({ order, positions, widths, radii, camera, width, height, always, free, obstacles = [] }) {
   const reach = Math.max(1, Math.ceil(LABEL_BUDGET * camera.k * camera.k))
   const fadeFrom = reach * 0.75
   const placed = []
@@ -67,7 +86,7 @@ export function chooseLabels({ order, positions, widths, radii, camera, width, h
     const sx = positions[index * 2] * camera.k + camera.tx
     const sy = positions[index * 2 + 1] * camera.k + camera.ty
     const box = { left: sx + radii[index] + GAP, top: sy - HEIGHT / 2, right: sx + radii[index] + GAP + widths[index], bottom: sy + HEIGHT / 2 }
-    if (placed.some((other) => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top)) return
+    if (obstacles.some((other) => overlaps(box, other)) || placed.some((other) => overlaps(box, other))) return
 
     placed.push(box)
     labels.push({ index, alpha, x: box.left, y: sy })
