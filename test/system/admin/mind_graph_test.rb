@@ -1822,15 +1822,6 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_card_beside(a)
     assert_operator element_box("[data-mind-graph-card]")["right"], :<=, canvas_box[2], "the card is shown on the side that has room"
     assert_operator element_box("[data-mind-graph-card]")["left"], :>=, canvas_box[0]
-    # Where the canvas leaves room for the card on BOTH sides of the node, it
-    # prefers the right (measured against the canvas as it is drawn, no pinned
-    # figure; the module test "card placement" holds the rule at exact widths).
-    node = screen_position(a)
-    card = element_box("[data-mind-graph-card]")
-    reach = 7 + 22 + card["width"] + 8
-    if node["x"] + reach <= canvas_box[2] && node["x"] - reach >= canvas_box[0]
-      assert_equal "right", find("[data-mind-graph-card]")["data-side"], "both sides have room: the card prefers the right"
-    end
     within("[data-mind-graph-card]") { assert_button "Unpin" }
   end
 
