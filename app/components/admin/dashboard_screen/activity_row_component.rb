@@ -22,11 +22,15 @@ module Admin
       def sentence = row.sentence
 
       # The circle's letters (Ruling 7, O9): the two-letter rule of the name
-      # the row shows, "You" included, drawn upper-case by the template. The
-      # circle stays this row's own 28px one.
+      # the circle is named by, drawn upper-case by the template. A user is
+      # named by `PersonName.of` (their name, else the part of the address
+      # before the at sign), as notes and presence name them; a deleted user
+      # and System are the label the row shows. The sentence beside the circle
+      # keeps the full address. The circle stays this row's own 28px one.
       def initials
         actor = sentence.actor
-        PersonName.initials(Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label.to_s)
+        name = actor.user ? PersonName.of(actor.user) : Admin::Ui::UserNameComponent.new(user: nil, user_id: actor.user_id).label
+        PersonName.initials(name.to_s)
       end
 
       def via_token? = sentence.actor.via_label.present?

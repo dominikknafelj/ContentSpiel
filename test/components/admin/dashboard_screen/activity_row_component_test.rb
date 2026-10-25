@@ -53,6 +53,20 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     assert_equal "Sy", Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: nil, title: "Nobody")).initials
   end
 
+  # A user with no name is shown by the part of the address before the at
+  # sign (PersonName.of), so the circle's letters are that part's letters,
+  # not the whole address's: "a@example.com" is "a", not "ae".
+  test "a user with no name has the letters of the part of the address before the at sign" do
+    users(:two).update!(name: nil, email_address: "a@example.com")
+    render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(actor: users(:two), title: "Local"))
+    assert_selector "span.rounded-full.uppercase[aria-hidden=true]", exact_text: "a"
+    assert_text "a@example.com"
+
+    users(:two).update!(email_address: "o.neil@example.com")
+    render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(actor: users(:two), title: "Dotted"))
+    assert_selector "span.rounded-full.uppercase", exact_text: "on"
+  end
+
   [ "<script>x</script>", "😀" * 60 ].each_with_index do |name, index|
     test "a token's name is escaped, whatever it holds (#{index})" do
       token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin), name:)
