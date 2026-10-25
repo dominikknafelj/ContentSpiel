@@ -27,7 +27,7 @@
   <%# One box, three parts: the SEARCH, the GRAPH (a local view's focus bar,
       the legend's row, the canvas) and the LIST. In the document
       they come in that order, because the Tab key follows the document (spec
-      §5.7: search, focus bar, the legend's toggles and its "Status" link,
+      §5.7: search, focus bar, the legend's toggles, the marks and its "Status key…" button,
       zoom buttons, canvas, card, list -- the list last, since it can hold
       two thousand rows). On screen, from
       1,100px, the graph is the left column over the box's whole height and
@@ -244,7 +244,7 @@
     <div data-mind-graph-list aria-label="<%= t(".list_label") %>" role="region" class="min-h-80 border-t border-line pb-3 min-[1100px]:col-start-2 min-[1100px]:row-start-2 min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l"></div>
   </div>
   <%# The status key (pages spec §6; design answer H6): the dialog the
-      legend's "Status" link opens. OUTSIDE the graph's element on purpose:
+      legend's "Status key…" button opens. OUTSIDE the graph's element on purpose:
       the Tab order of the box is the search, the graph and the list, a
       closed dialog is no part of it, and the graph's script and its `reset`
       write nothing here. %>

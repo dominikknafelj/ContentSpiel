@@ -80,11 +80,11 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
   end
 
   # Third design answers: status is not a filter. The five looks are a key
-  # behind a "Status" link (H6: a dialog), not in the legend's row.
+  # behind a "Status key…" button (H6: a dialog), not in the legend's row.
   test "the legend's Status button opens the key and is no filter" do
     legend
 
-    assert_selector "button[type=button][data-legend-status][aria-haspopup=dialog][data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status"
+    assert_selector "button[type=button][data-legend-status][aria-haspopup=dialog][data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status key…"
     assert_no_selector "[data-legend-state]", visible: :all
     assert_no_selector "dialog", visible: :all
     assert_no_text "Draft or scheduled"
@@ -109,6 +109,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     assert_equal [ %w[page post tag type], %w[tree lists related tag] ], toggles.call
 
     legend(content_types: [], pages: false)
+    assert_no_selector "[data-legend-section=show]"
     assert_no_selector "fieldset, input"
   end
 
@@ -119,11 +120,21 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "the keys that are no controls are a list named Legend, after the toggles and the Status button" do
-    legend
+  # Layout points spec, D and decision 14; Claude Design's O5: two groups a
+  # person can see, "Show" over the toggles of both kinds and "Key" over the
+  # marks, "Status key…" last in Key. The marks hold no stop, so the Tab
+  # order is still the toggles, then the button.
+  test "the legend is two labelled groups: Show over both kinds of toggle, then Key over the marks, with Status key… last" do
+    legend(content_types: %w[blog])
 
-    assert_selector "[data-mind-graph-legend] fieldset[data-legend-group=lines] ~ button[data-legend-status] ~ ul[aria-label='Legend']"
-    assert_no_selector "ul[aria-label='Legend'] input, ul[aria-label='Legend'] button"
+    assert_selector "[data-mind-graph-legend] > [data-legend-section=show] + [data-legend-section=key]"
+    assert_selector "[data-legend-section=show] > span[aria-hidden=true]:first-child", exact_text: "Show"
+    assert_selector "[data-legend-section=show] > fieldset[data-legend-group=nodes] + fieldset[data-legend-group=lines]"
+    assert_selector "[data-legend-section=key] > span#mind-graph-legend-key:first-child", exact_text: "Key"
+    assert_selector "span#mind-graph-legend-key + ul[data-legend-keys][aria-labelledby=mind-graph-legend-key] + button[data-legend-status]:last-child", exact_text: "Status key…"
+    assert_selector "[data-legend-section] > span.font-cs-mono.text-label.uppercase.tracking-mono", count: 2
+    assert_no_selector "ul[data-legend-keys] button, ul[data-legend-keys] input"
+    assert_no_selector "[aria-label='Legend']"
   end
 
   # The mark of a node that stays where it was dropped (the round of
@@ -132,7 +143,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
   test "names the pin mark" do
     legend(content_types: [])
 
-    assert_selector "ul[aria-label='Legend'] li[data-legend=pinned]", text: "Pinned"
+    assert_selector "ul[data-legend-keys] li[data-legend=pinned]", text: "Pinned"
     assert_selector "[data-legend=pinned] canvas[data-swatch=pinned]"
   end
 
@@ -142,7 +153,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
   test "names the notes badge, last, after the pin" do
     legend(content_types: [])
 
-    assert_selector "ul[aria-label='Legend'] li[data-legend=pinned] + li:last-child[data-legend=notes]", text: "Open notes"
+    assert_selector "ul[data-legend-keys] li[data-legend=pinned] + li:last-child[data-legend=notes]", text: "Open notes"
     assert_selector "[data-legend=notes] canvas[data-swatch=notes]"
   end
 end

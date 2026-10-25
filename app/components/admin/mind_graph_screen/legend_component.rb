@@ -3,8 +3,11 @@ module Admin
     # The mind graph's legend, WHICH IS ITS FILTER (pages in the mind graph,
     # spec §6; design answers part one §4 and F6): the kinds of node and the
     # kinds of line are checkboxes, everything on, each with its count
-    # ("Pages 200"), in place of the All / Related / Tags radios. After them
-    # the "Status" link, and then the keys that switch nothing: one entry
+    # ("Pages 200"), in place of the All / Related / Tags radios. Drawn
+    # as two labelled groups (Claude Design's O5): "Show" over the toggles
+    # of both kinds, then "Key" over the keys that switch nothing, with the
+    # "Status key…" button last (the Tab order is the toggles, then the
+    # button: the marks hold no stop). The keys are: one entry
     # per content type PRESENT among the viewer's readable posts (not every
     # registered type -- a legend of types you can't see is noise, and a
     # type the viewer can't read at all would be disclosed by it), "Retired
@@ -27,7 +30,7 @@ module Admin
     #
     # STATUS IS NOT A FILTER (the third design answers): the five looks are
     # a key of their own, a dialog (`StatusKeyComponent`, H6), and here is
-    # only the "Status" link that opens it.
+    # only the "Status key…" button that opens it.
     #
     # Server-rendered, so every name is text and a type's dot is the real
     # component. A SWATCH is a small canvas (`SwatchComponent`) that the

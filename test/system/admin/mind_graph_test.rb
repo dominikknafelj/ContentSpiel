@@ -446,7 +446,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # Third design answers and H6: status is not a filter. The key is a dialog
-  # named "Status key" behind the legend's "Status" link, in the chip's words.
+  # named "Status key" behind the legend's "Status key…" button, in the chip's words.
   test "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" do
     create_post(title: "Alpha", tags: [ "t" ])
     create_post(title: "Beta", tags: [ "t" ])
@@ -456,7 +456,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{key}[open]", visible: :all
     before = [ graph["data-nodes"], graph["data-edges"] ]
 
-    button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status")
+    button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status key…")
     button.execute_script("this.focus()")
     page.driver.browser.keyboard.type(:Enter)
 
@@ -473,7 +473,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "#{key}[open]", visible: :all
-    await_js("document.activeElement?.textContent.trim() === 'Status'")
+    await_js("document.activeElement?.textContent.trim() === 'Status key…'")
     assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "Escape closed the key and nothing of the graph"
   end
 
@@ -3628,10 +3628,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     JS
 
     assert_equal [ "search", "focus bar", "legend", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
-    # The toggles, then "Status", and every one of them a stop the Tab key
+    # The toggles, then "Status key…", and every one of them a stop the Tab key
     # makes: none is taken out of the order.
     legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
-    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status", 0 ] ], legend
+    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status key…", 0 ] ], legend
   end
 
   test "a title with markup in it is text in the list and in the search results" do
