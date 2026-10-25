@@ -180,6 +180,11 @@ module Dashboard
 
     def actor_key(event) = [ event.user_id, event.actor_type, event.actor_id ]
 
+    # A floor row (a lone run the read cut off) of count 1 says no "or more":
+    # `at_least:` is asked only for a count above one. Accepted: dropping the
+    # row would empty a feed whose one row it is, and the case needs most of
+    # the read's events to be gone (deleted blocks), so it is rare and right
+    # in what it states.
     def row_for(run, floor: false)
       event, record = run.first
       oldest = run.last.first

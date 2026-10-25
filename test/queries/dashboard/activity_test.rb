@@ -279,6 +279,20 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal [ [ "block.created", 1 ] ] * 5, runs
   end
 
+  test "a person's own blocks and their token's on one page are two rows" do
+    page = as(@me) { create_page(title: "Two hands") }
+    token, = ApiToken.generate!(@me, group: access_control_groups(:admin), name: "Claude desktop")
+    start = 1.second.from_now.change(usec: 0) # after the page's own events: they would split the run
+    add_blocks(page, %w[rich_text] * 2, from: start)
+    2.times do |index|
+      travel_to(start + 4.minutes + 1.minute * index) do
+        as(token, channel: :mcp) { ContentBlocks::Save.call(ContentBlock.new(owner: page, block_type: "rich_text")) }
+      end
+    end
+
+    assert_equal [ [ "block.created", 2 ], [ "block.created", 2 ] ], runs
+  end
+
   test "a block deleted from a run is not counted and does not split it" do
     page = as(@me) { create_page(title: "Three") }
     blocks = add_blocks(page, %w[rich_text] * 3)

@@ -171,7 +171,7 @@ Built by `docs/superpowers/plans/2026-10-25-layout-points-dashboard-and-mind-gra
 4. The count is of distinct subjects; the type is named only when every block of the run has the same one, else "blocks"; the plurals are written by hand.
 5. Uploads are a new part kind, `:collection`, linked to the library through `Audit::Sentence.library_route` and never quoted.
 6. The read is four times the row limit and collapsed in Ruby, so a feed of collapsing events shows fewer than fifteen rows.
-7. The activity row's letters are `PersonName.initials` of the name the row shows, in the row's own 28px circle.
+7. The activity row's letters are `PersonName.initials` of the name the row shows, in the row's own 28px circle (refined by Task 5, below: a user's letters come from PersonName.of).
 8. The empty action is a slot, `empty_action`, not a label and a URL.
 9. "Start a draft" links to `#dashboard_draft_title` and moves the focus there; "Drafts →" goes to `scope=drafts` (Claude Design, 2026-10-25).
 10. The empty line's link is ink and underlined.

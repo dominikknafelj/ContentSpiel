@@ -93,7 +93,7 @@ const BACKING_HEIGHT = 18
 // How far outside the canvas an edge's end or a node's edge may be and still
 // count as on it: half the widest stroke, rounded up, and a node's rings and
 // its notes badge (which reaches furthest on a page's card: "99+" and its ring
-// there end 30px left of the card's edge, and 20.5px left of a 7px dot's).
+// there end 30px left of the card's edge, and 22px left of a 7px dot's edge, 29px from its centre).
 const EDGE_MARGIN = 2
 const NODE_MARGIN = 30
 // A ring's distance from the mark's edge.
@@ -260,6 +260,7 @@ function drawNotes(context, theme, node, x, y, radius) {
   // (`roundRect` is newer than the rest of what is drawn here): a missing
   // method would throw inside the draw and take the whole canvas with it,
   // for every graph that has a note on any post.
+  // The ring's extent is `notesBadgeBox`'s (`marks.js`): change them together.
   const pill = (inset) => {
     context.beginPath()
     const left = right - half * 2 - inset, width = half * 2 + inset * 2, height = NOTES_BADGE * 2 + inset * 2

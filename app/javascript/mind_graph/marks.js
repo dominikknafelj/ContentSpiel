@@ -165,7 +165,7 @@ export const notesLabel = (node) => (node.open_notes > 99 ? "99+" : String(node.
 // The one geometry the renderer and the labels share: the badge's pill as
 // { right, top, half } (its right edge, its top edge, half its width), in
 // screen pixels, for a post or a page with notes; null for anything else.
-function notesPill(node, x, y, radius) {
+export function notesPill(node, x, y, radius) {
   if ((node.open_notes ?? 0) <= 0 || (node.kind !== "post" && node.kind !== "page")) return null
   const corner = topCorner(node, radius)
   const half = Math.max(NOTES_BADGE, NOTES_CHARACTER * notesLabel(node).length + NOTES_BADGE_PAD)
@@ -173,9 +173,8 @@ function notesPill(node, x, y, radius) {
   return { right, top: y - corner.y - NOTES_BADGE, half }
 }
 
-export { notesPill }
-
-// The badge's box WITH its ring, in screen pixels.
+// The badge's box WITH its ring, in screen pixels. (`drawNotes` in
+// `renderer.js` derives the same extent from `NOTES_RING`: change them together.)
 export function notesBadgeBox(node, x, y, radius) {
   const pill = notesPill(node, x, y, radius)
   if (!pill) return null

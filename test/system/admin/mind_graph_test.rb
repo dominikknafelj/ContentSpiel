@@ -1822,6 +1822,15 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_card_beside(a)
     assert_operator element_box("[data-mind-graph-card]")["right"], :<=, canvas_box[2], "the card is shown on the side that has room"
     assert_operator element_box("[data-mind-graph-card]")["left"], :>=, canvas_box[0]
+    # Where the canvas leaves room for the card on BOTH sides of the node, it
+    # prefers the right (measured against the canvas as it is drawn, no pinned
+    # figure; the module test "card placement" holds the rule at exact widths).
+    node = screen_position(a)
+    card = element_box("[data-mind-graph-card]")
+    reach = 7 + 22 + card["width"] + 8
+    if node["x"] + reach <= canvas_box[2] && node["x"] - reach >= canvas_box[0]
+      assert_equal "right", find("[data-mind-graph-card]")["data-side"], "both sides have room: the card prefers the right"
+    end
     within("[data-mind-graph-card]") { assert_button "Unpin" }
   end
 
@@ -3868,10 +3877,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # The canvas's colours at `samples` points evenly round a node's centre,
   # `radius` pixels from it: one read, after the frames `pixel_at` waits for.
   # `quadrant: :left` reads the quarter on the node's left only, where there
-  # is no label. A sample is the pixel that CONTAINS its point (floor): rounding
-  # reads the pixel after it, up to a pixel away, which put a sample 8px out
-  # on the antialiased edge of a mark of radius 7 whenever its centre fell
-  # at a fraction (the fitted view's zoom puts it at one).
+  # is no label. A sample is the pixel that CONTAINS its point (floor). The
+  # point's CENTRE is fractional (the fitted view's zoom puts it at a fraction),
+  # and rounding reads the NEAREST pixel's corner, i.e. the pixel after the
+  # point for a fraction under one half, up to a pixel away, which put a sample
+  # 8px out on the antialiased edge of a mark of radius 7; flooring reads the
+  # pixel that contains the point.
   def ring_pixels(node, radius:, samples:, quadrant: nil)
     point = screen_position(node)
     await_frames

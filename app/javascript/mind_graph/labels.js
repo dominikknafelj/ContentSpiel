@@ -28,7 +28,8 @@
 //
 // A NOTES BADGE is one more box the labels keep clear of (`obstacles`, from
 // `badgeBoxes`), by the same test as rule 2: no label, and no notes badge
-// (Claude Design, 2026-10-25), covers another. The layout makes no room.
+// (Claude Design, 2026-10-25), covers another. The layout makes no room. (The hovered node's label is drawn
+// whatever the rule said, obstacles included: `labelAt`.)
 //
 // A node outside the canvas gets no label. Answers `{ index, alpha, x, y }`,
 // `x`/`y` the label's left edge and vertical middle in screen pixels: a label
