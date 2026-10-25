@@ -27,47 +27,47 @@
     <div data-legend-section="show" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
       <span aria-hidden="true" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= t(".show") %></span>
       <% toggle_groups.each do |group, kinds, name| %>
-    <fieldset data-legend-group="<%= group %>" class="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-0 p-0">
-      <legend class="sr-only"><%= name %></legend>
-      <% kinds.each do |kind| %>
-        <% label = t(group == :nodes ? ".nodes.#{kind}" : ".edges.#{kind}") %>
-        <label data-legend-toggle="<%= kind %>" class="inline-flex cursor-pointer items-center gap-1.5">
-          <%= render Admin::Ui::CheckboxComponent.new(name: "mind_graph_#{group}", value: kind, checked: true, id: "mind-graph-#{group}-#{kind}", autocomplete: "off",
-                data: { action: "change->admin--mind-graph--graph#filter", name: label }) %>
-          <%= render Admin::MindGraphScreen::SwatchComponent.new(swatch_name(group, kind)) %>
-          <span><%= label %></span>
-          <span data-legend-count aria-hidden="true" class="font-cs-mono text-label text-meta"></span>
-        </label>
-      <% end %>
-    </fieldset>
+        <fieldset data-legend-group="<%= group %>" class="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-0 p-0">
+          <legend class="sr-only"><%= name %></legend>
+          <% kinds.each do |kind| %>
+            <% label = t(group == :nodes ? ".nodes.#{kind}" : ".edges.#{kind}") %>
+            <label data-legend-toggle="<%= kind %>" class="inline-flex cursor-pointer items-center gap-1.5">
+              <%= render Admin::Ui::CheckboxComponent.new(name: "mind_graph_#{group}", value: kind, checked: true, id: "mind-graph-#{group}-#{kind}", autocomplete: "off",
+                    data: { action: "change->admin--mind-graph--graph#filter", name: label }) %>
+              <%= render Admin::MindGraphScreen::SwatchComponent.new(swatch_name(group, kind)) %>
+              <span><%= label %></span>
+              <span data-legend-count aria-hidden="true" class="font-cs-mono text-label text-meta"></span>
+            </label>
+          <% end %>
+        </fieldset>
       <% end %>
     </div>
   <% end %>
   <div data-legend-section="key" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
     <span id="mind-graph-legend-key" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= t(".key") %></span>
-  <ul data-legend-keys class="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0" aria-labelledby="mind-graph-legend-key">
-    <% type_names.each do |name| %>
-      <li data-legend-type="<%= name %>"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: name) %></li>
-    <% end %>
-    <% if retired? %>
-      <li class="inline-flex items-center gap-1.5" data-legend="retired">
-        <%= render Admin::MindGraphScreen::SwatchComponent.new(:retired) %>
-        <%= t(".retired") %>
+    <ul data-legend-keys class="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0" aria-labelledby="mind-graph-legend-key">
+      <% type_names.each do |name| %>
+        <li data-legend-type="<%= name %>"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: name) %></li>
+      <% end %>
+      <% if retired? %>
+        <li class="inline-flex items-center gap-1.5" data-legend="retired">
+          <%= render Admin::MindGraphScreen::SwatchComponent.new(:retired) %>
+          <%= t(".retired") %>
+        </li>
+      <% end %>
+      <li class="inline-flex items-center gap-1.5" data-legend="pinned">
+        <%= render Admin::MindGraphScreen::SwatchComponent.new(:pinned) %>
+        <%= t(".pinned") %>
       </li>
-    <% end %>
-    <li class="inline-flex items-center gap-1.5" data-legend="pinned">
-      <%= render Admin::MindGraphScreen::SwatchComponent.new(:pinned) %>
-      <%= t(".pinned") %>
-    </li>
-    <%# A post or a page with open notes (notes spec §4.4): the count badge the
-        canvas draws on the mark's top-left corner, opposite the pin. %>
-    <li class="inline-flex items-center gap-1.5" data-legend="notes">
-      <%= render Admin::MindGraphScreen::SwatchComponent.new(:notes) %>
-      <%= t(".notes") %>
-    </li>
-  </ul>
-  <%= tag.button t(".status"), type: "button", aria: { haspopup: "dialog" },
-        class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-        data: { legend_status: true, **dialog_trigger(Admin::MindGraphScreen::StatusKeyComponent::ID) } %>
+      <%# A post or a page with open notes (notes spec §4.4): the count badge the
+          canvas draws on the mark's top-left corner, opposite the pin. %>
+      <li class="inline-flex items-center gap-1.5" data-legend="notes">
+        <%= render Admin::MindGraphScreen::SwatchComponent.new(:notes) %>
+        <%= t(".notes") %>
+      </li>
+    </ul>
+    <%= tag.button t(".status"), type: "button", aria: { haspopup: "dialog" },
+          class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+          data: { legend_status: true, **dialog_trigger(Admin::MindGraphScreen::StatusKeyComponent::ID) } %>
   </div>
 </div>
