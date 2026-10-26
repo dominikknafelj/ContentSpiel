@@ -87,8 +87,7 @@ module Blocks
     def string(key)
       return unknown_string(key) unless STRINGS.include?(key.to_s.to_sym)
 
-      full = "public.blocks.code.#{key}"
-      I18n.t(full, locale: I18n.exists?(full, I18n.locale) ? I18n.locale : :en)
+      PublicStrings.read("public.blocks.code.#{key}")
     end
 
     def unknown_string(key)

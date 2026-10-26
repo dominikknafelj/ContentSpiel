@@ -363,7 +363,7 @@ A theme's own partials go under `views/theme/`, by any name ending in `.html.erb
 
 ### Components
 
-Under the theme's `components/`, as `<path>.html.erb`. The methods are what the template may call, each safe for an empty block (`alt` and `caption` answer nil without an image; the Code block's answer nil, and `lines` an empty list, without code); a method not listed is the CMS's to change. Beside its own methods every component's template may also call `translated`, `rich_text`, `post_date`, `resume_period`, `post_url_path`, `page_url_path`, `render_block` and `helpers`. Through `helpers` the rest of the helpers table is reached.
+Under the theme's `components/`, as `<path>.html.erb`. The methods are what the template may call, each safe for an empty block (`alt` and `caption` answer nil without an image; the Code block's answer nil, and `lines` an empty list, without code); a method not listed is the CMS's to change. Beside its own methods every component's template may also call `translated`, `rich_text`, `post_date`, `resume_period`, `post_url_path`, `page_url_path`, `render_block`, `site_string` and `helpers`. Through `helpers` the rest of the helpers table is reached.
 
 | Component | Its template may call |
 |---|---|
@@ -395,6 +395,7 @@ What a page or layout template may call (`ThemeHelper`, `PagesHelper`). `public_
 | `safe_social_links` | the footer's links, http, https and mailto only |
 | `home_url_path` | the homepage's address in the language shown |
 | `page_url_path(page)` | a page's address |
+| `site_string(key)` | one of the site's own words (`public.site` in `config/locales/public.<locale>.yml`) in the language shown, English where that language has none |
 | `post_url_path(post)` | a post's address |
 | `post_date(post)` | a post's publication date |
 | `resume_period(post)` | a resume entry's years |

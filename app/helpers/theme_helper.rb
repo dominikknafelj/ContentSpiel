@@ -51,6 +51,37 @@ module ThemeHelper
   NOT_THE_ARTICLE = %w[nav aside header footer a].freeze
   OUTSIDE_THE_ARTICLE = NOT_THE_ARTICLE.map { |name| "ancestor::#{name}" }.join(" | ").freeze
 
+  # The site's own words, the keys of `public.site`
+  # (`config/locales/public.en.yml`): what `site_string` answers, and nothing
+  # else. The default templates' labels ("In this section", "Tagged").
+  SITE_STRINGS = %i[in_this_section tagged].freeze
+  UNKNOWN_SITE_STRINGS_LOCK = Mutex.new
+
+  # Whether this is the first time the process meets `key`, which keeps an
+  # unknown key in a theme's template to one log line and not one per visitor
+  # (the Code block's memo is that class's; this one is the helper's own).
+  def self.first_unknown_site_string?(key)
+    UNKNOWN_SITE_STRINGS_LOCK.synchronize { (@unknown_site_strings ||= Set.new).add?(key).present? }
+  end
+
+  # One of the site's own words in the visitor's language where
+  # `config/locales/public.<locale>.yml` has it, in English otherwise.
+  #
+  # ONLY THE KEYS OF `SITE_STRINGS`, as `Blocks::CodeComponent#string` answers
+  # only its four: a theme's template calls this with a key its author typed,
+  # and I18n's answer for one that does not exist is a sentence ("Translation
+  # missing: …") that would be a label on a public page. Where a theme is
+  # written (development, test) another key raises and names the keys; in
+  # production it is no word, and one line in the log per key for the life of
+  # the process. It is on the theming contract because a page template has no
+  # component to carry a `string` method and the post detail's template needs
+  # it too.
+  def site_string(key)
+    return unknown_site_string(key) unless SITE_STRINGS.include?(key.to_s.to_sym)
+
+    PublicStrings.read("public.site.#{key}")
+  end
+
   # Current.site memoizes itself for the process/request; no ivar of our own
   # needed the way SetupController's @site_setting is.
   def theme_site
@@ -401,4 +432,14 @@ module ThemeHelper
   # The answer says "not found". The CMS's own: a template asks
   # `page_found?`.
   def not_found_answer? = response.not_found?
+
+  # `site_string`'s answer for a key that is not the site's: raises where a
+  # theme is written, else no word and one log line per key.
+  def unknown_site_string(key)
+    message = "ThemeHelper#site_string has no #{key.to_s.to_sym.inspect}: the site's words are #{SITE_STRINGS.map(&:inspect).join(", ")}"
+    raise ArgumentError, message if Rails.env.local?
+
+    Rails.logger.warn(message) if ThemeHelper.first_unknown_site_string?(key.to_s)
+    ""
+  end
 end
