@@ -2,9 +2,14 @@ name: CI
 
 # A pull request's run is the only automatic one: a merge to main is the code
 # that run already tested, and running it again there cost about half of the
-# account's Actions minutes (a full run is about 48 billed minutes: a private
-# repository pays per job, rounded up). `workflow_dispatch` runs everything on
-# any branch, main included, by hand ("Run workflow", or `gh workflow run CI`).
+# account's Actions minutes (a private repository pays per job, rounded up).
+# `workflow_dispatch` runs everything on any branch, main included, by hand ("Run workflow", or `gh workflow run CI`).
+#
+# The browser suite is the bulk of a run's minutes (measured on PR #91's run: about 77
+# billed minutes with the suite, about 21 without it), so since 2026-10-26 it runs
+# only in a run started by hand, and is run locally before every push, until
+# the repository is public and Actions minutes are free; then the `if` of
+# `system-test-shard` below goes.
 on:
   pull_request:
   workflow_dispatch:
@@ -179,9 +184,10 @@ jobs:
   # the whole suite on two processes took 28 minutes. `bin/system-test-shard`
   # deals the files so each job holds about the same number of tests
   # (test/lib/system_test_shards_test.rb keeps every file in exactly one).
+  # Only a run started by hand runs them (see the top of this file).
   system-test-shard:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     strategy:
@@ -236,8 +242,9 @@ jobs:
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
 
-  # One check that speaks for the four: green when every shard passed, or when
-  # the suite was skipped because only documents changed.
+  # One check that speaks for the four: green when every shard passed, when
+  # the suite was skipped because only documents changed, and on a pull request,
+  # where the shards are skipped by design (see the top of this file).
   system-test:
     needs: [changes, system-test-shard]
     if: always()
@@ -247,9 +254,14 @@ jobs:
         env:
           CODE: ${{ needs.changes.outputs.code }}
           SHARDS: ${{ needs.system-test-shard.result }}
+          EVENT: ${{ github.event_name }}
         run: |
           if [ "$CODE" = "false" ] && [ "$SHARDS" = "skipped" ]; then
             echo "Only documents changed: the browser suite was not run."
+            exit 0
+          fi
+          if [ "$EVENT" != "workflow_dispatch" ] && [ "$SHARDS" = "skipped" ]; then
+            echo "The browser suite is not run on pull requests while the repository is private; it is run locally before every push. To run it on CI: gh workflow run CI --ref <branch> (or \"Run workflow\")."
             exit 0
           fi
           [ "$SHARDS" = "success" ] || { echo "system tests: $SHARDS"; exit 1; }

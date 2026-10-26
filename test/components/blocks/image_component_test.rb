@@ -20,6 +20,16 @@ class Blocks::ImageComponentTest < ActiveSupport::TestCase
     end
   end
 
+  test "the caption is the sans at the small size in the faint colour, as typed" do
+    block = root_page.content_blocks.create!(block_type: :image, position: 0, media_asset: create_media_asset, caption: "A photo of Vienna")
+
+    render_inline(Blocks::ImageComponent.new(block: block, page: root_page))
+
+    assert_selector "figcaption.font-cs.text-small.text-meta", text: "A photo of Vienna", exact_text: true
+    classes = page.find("figcaption")[:class].split
+    assert_empty classes & %w[font-cs-mono uppercase tracking-mono text-label]
+  end
+
   # The block's own per-use alt/caption win; the library image's defaults
   # fill in where the block leaves them blank (media library spec §3.3).
   test "the asset's own alt and caption are the defaults behind the block's overrides" do

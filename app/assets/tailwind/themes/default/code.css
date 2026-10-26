@@ -136,10 +136,10 @@
 }
 .content-block--code figcaption {
   margin-top: var(--th-sp-2);
-  font-family: var(--th-mono);
-  font-size: var(--th-t-label);
-  letter-spacing: var(--th-track-mono);
-  text-transform: uppercase;
+  /* A caption is text, as typed: the sans at the small size, not a mono label
+     (the head's language label above stays one). */
+  font-family: var(--th-font);
+  font-size: var(--th-t-small);
   color: var(--th-meta);
 }
 .content-block--code .syn-comment { color: var(--th-syn-comment); }

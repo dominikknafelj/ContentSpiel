@@ -5,8 +5,8 @@
   <% if excerpt.present? %><p class="mt-4 text-lg text-dim"><%= excerpt %></p><% end %>
   <div class="cs-prose mt-8"><%= rich_text(post) %></div>
   <% if post.tags.any? %>
-    <ul class="mt-10 flex flex-wrap gap-3 font-cs-mono text-label uppercase tracking-mono text-meta">
-      <% post.tags.each do |tag| %><li><%= tag.name %></li><% end %>
-    </ul>
+    <%# One line of text, not a list: "Tagged rails, ruby" is a sentence, and a ul would be read as "list, 2 items".
+        The label is mono like the date; the names are the small sans, as stored (no transform), plain text, no links. %>
+    <p class="post-tags mt-10"><span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= site_string(:tagged) %></span> <span class="font-cs text-small text-meta"><%= post.tags.map(&:name).join(", ") %></span></p>
   <% end %>
 </article>

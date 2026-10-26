@@ -199,6 +199,16 @@ Rulings the build added beyond the plan's sixteen:
 - **The notes swatch moved to `[18, 14.1]` in `swatches.js` (Task 8)**, so the ring fits the 26x22 swatch; the swatch's size is unchanged.
 - **The draw-order test takes the first `roundRect` after the last label (Task 8)**, since a page's card is a `roundRect` too.
 
+## As built (part 3, the site)
+
+Built by the plan "Layout points, part 3: the site", in five tasks. The plan's five rulings, one line each:
+
+1. One helper, `site_string(key)`, joins the contract (`Theme::Contract::HELPERS` and `COMPONENT_HELPERS`) and the theming reference's Helpers table; it answers the keys under `public.site` and no other (Decision 17).
+2. The language-or-English lookup is written once, `PublicStrings.read(full_key)`, called by `site_string`, `Blocks::CodeComponent#string` and `Blocks::NoteComponent#word`.
+3. The tags are one line of text, the label then the names joined in the template, not a list.
+4. The subpages nav is named by its label (`aria-labelledby`), and a post's own page draws none.
+5. The caption utilities need a size: `--text-small: var(--th-t-small)` joins `theme.css`'s `@theme` (a Tailwind name, not a `--th-` token; Decision 16 holds).
+
 ## What this does not do
 
 - No related posts on the public site (O7), no tag pages, no navigation block type.

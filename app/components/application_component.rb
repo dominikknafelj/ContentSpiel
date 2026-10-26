@@ -18,5 +18,5 @@
 # `include` would call the *module's* `public_urls`, and there isn't one --
 # it's a controller method the module only ever expected to be mixed into.
 class ApplicationComponent < ViewComponent::Base
-  delegate :translated, :rich_text, :post_date, :resume_period, :post_url_path, :page_url_path, :render_block, to: :helpers
+  delegate :translated, :rich_text, :post_date, :resume_period, :post_url_path, :page_url_path, :render_block, :site_string, to: :helpers
 end

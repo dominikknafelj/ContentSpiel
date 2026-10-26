@@ -363,7 +363,7 @@ A theme's own partials go under `views/theme/`, by any name ending in `.html.erb
 
 ### Components
 
-Under the theme's `components/`, as `<path>.html.erb`. The methods are what the template may call, each safe for an empty block (`alt` and `caption` answer nil without an image; the Code block's answer nil, and `lines` an empty list, without code); a method not listed is the CMS's to change. Beside its own methods every component's template may also call `translated`, `rich_text`, `post_date`, `resume_period`, `post_url_path`, `page_url_path`, `render_block` and `helpers`. Through `helpers` the rest of the helpers table is reached.
+Under the theme's `components/`, as `<path>.html.erb`. The methods are what the template may call, each safe for an empty block (`alt` and `caption` answer nil without an image; the Code block's answer nil, and `lines` an empty list, without code); a method not listed is the CMS's to change. Beside its own methods every component's template may also call `translated`, `rich_text`, `post_date`, `resume_period`, `post_url_path`, `page_url_path`, `render_block`, `site_string` and `helpers`. Through `helpers` the rest of the helpers table is reached.
 
 | Component | Its template may call |
 |---|---|
@@ -395,6 +395,7 @@ What a page or layout template may call (`ThemeHelper`, `PagesHelper`). `public_
 | `safe_social_links` | the footer's links, http, https and mailto only |
 | `home_url_path` | the homepage's address in the language shown |
 | `page_url_path(page)` | a page's address |
+| `site_string(key)` | one of the site's own words (`public.site` in `config/locales/public.<locale>.yml`) in the language shown, English where that language has none |
 | `post_url_path(post)` | a post's address |
 | `post_date(post)` | a post's publication date |
 | `resume_period(post)` | a resume entry's years |
@@ -540,6 +541,19 @@ A highlighted note in the flow of a page: a kind (Note, Tip, Important, Warning)
 **Contrast is computed, for the default theme's values only.** `test/integration/design_tokens_test.rb` holds 72 pairs at 4.5:1 or better: `--th-ink`, `--th-accent` and the kind's ink on each kind's ground, on the page, in a tinted band and in a strong band, in both schemes ("every note's text, link and word are readable on its ground..."); and 16 at 3:1 or better: each kind's rule and ink against a strong band, in both schemes ("on a strong band a note shares the band's ground and each kind keeps its colour..."). Nothing measures a theme's values.
 
 The fourth theme (`test/fixtures/themes/note`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one", "the fourth theme is sound, checked deeply too: a Note template of the contract's names").
+
+### The default theme's captions, subpages list and tags
+
+How the default theme draws three things, for a theme author who copies it (all by value and class: no token, template path or component method changed).
+
+- **Captions** (the Code block's, the Image block's and a rich-text figure's) are text: `--th-font` at `--th-t-small` (13px, the `text-small` utility, whose `--text-small` is `theme.css`'s alias of that token), sentence case as typed (no `text-transform`, no tracking), in `--th-meta`. Mono stays for labels: dates, a code block's language label, the "Tagged" label, the "In this section" label and the footer.
+- **A page's subpages** are `nav.page-children`, named by a mono label, "In this section" (`aria-labelledby`, so a screen reader's landmarks say that and not a second unnamed "navigation"). Its links are set as the header's menu is (`--th-dim`, ink on hover, no underline), one per line. A post's own page draws none, even under a listing page that has subpages, and a page whose subpages are all drafts or in the trash draws neither the label nor the nav.
+- **Tags** are one line of text, not a list: the mono label "Tagged", then the names as stored (no upper-casing), joined by ", ", plain text and no links, escaped.
+- **The label's words** come from `site_string(key)` (the Helpers table): the keys under `public.site` in `config/locales/public.<locale>.yml` (`in_this_section`, `tagged`), in the language shown and in English where that language has no file. Any other key raises in development and test, naming the keys, and in production is no word and one log line per key. `Blocks::CodeComponent#string`, `Blocks::NoteComponent#word` and `site_string` all read through `PublicStrings.read`.
+
+Guards: `test/integration/design_tokens_test.rb`: "a caption is text: the Code block's and a rich text's are the sans at the small size in the faint colour, as typed"; `test/integration/public_subpages_test.rb`: "a page with published subpages names the list In this section, in mono, and its links are the menu's: dim, ink on hover, no underline, one per line", "in a language without a public locale file the label is English, and with one it is that language's", "a post's own page draws no subpages list, though its listing page has subpages", "a page whose subpages are all drafts or in the trash draws no list, no label and no rule"; `test/components/posts/detail_component_test.rb`: "a post's tags are one line: a mono Tagged label, then the names as stored, joined by commas, in the small sans"; `test/helpers/theme_helper_site_string_test.rb`: "site_string answers the site's words in English", "a key that is not the site's raises where a theme is written, and names the keys", "in production an unknown key is no word and one log line"; `test/values/public_strings_test.rb`: "a key the visitor's language has is read in it, and one it lacks is English".
+
+**Release note:** Added `site_string`; the default theme's captions, subpages list and tags changed by value and class only.
 
 ## What a template may ask
 

@@ -56,8 +56,7 @@ module Blocks
     # `config/locales/public.<locale>.yml` has it, in English otherwise;
     # titled or not.
     def word
-      key = "public.blocks.note.kinds.#{kind}"
-      I18n.t(key, locale: I18n.exists?(key, I18n.locale) ? I18n.locale : :en)
+      PublicStrings.read("public.blocks.note.kinds.#{kind}")
     end
   end
 end
