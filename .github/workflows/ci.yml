@@ -5,6 +5,12 @@ name: CI
 # account's Actions minutes (a full run is about 48 billed minutes: a private
 # repository pays per job, rounded up). `workflow_dispatch` runs everything on
 # any branch, main included, by hand ("Run workflow", or `gh workflow run CI`).
+#
+# The browser suite is the bulk of a run's minutes (a pull request's run was
+# about 77 billed minutes, most of it the suite), so since 2026-10-26 it runs
+# only in a run started by hand, and is run locally before every push, until
+# the repository is public and Actions minutes are free; then the `if` of
+# `system-test-shard` below goes.
 on:
   pull_request:
   workflow_dispatch:
@@ -175,19 +181,20 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # The browser suite, as five jobs side by side: a runner has two cores, and
+  # The browser suite, as four jobs side by side: a runner has two cores, and
   # the whole suite on two processes took 28 minutes. `bin/system-test-shard`
   # deals the files so each job holds about the same number of tests
   # (test/lib/system_test_shards_test.rb keeps every file in exactly one).
+  # Only a run started by hand runs them (see the top of this file).
   system-test-shard:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4]
+        shard: [0, 1, 2, 3]
 
     services:
       postgres:
@@ -226,7 +233,7 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           bin/rails db:test:prepare tailwindcss:build
-          bin/rails test -v $(bin/system-test-shard ${{ matrix.shard }} 5)
+          bin/rails test -v $(bin/system-test-shard ${{ matrix.shard }} 4)
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v7
@@ -236,8 +243,9 @@ jobs:
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
 
-  # One check that speaks for the five: green when every shard passed, or when
-  # the suite was skipped because only documents changed.
+  # One check that speaks for the four: green when every shard passed, when
+  # the suite was skipped because only documents changed, and on a pull request,
+  # where the shards are skipped by design (see the top of this file).
   system-test:
     needs: [changes, system-test-shard]
     if: always()
@@ -247,9 +255,14 @@ jobs:
         env:
           CODE: ${{ needs.changes.outputs.code }}
           SHARDS: ${{ needs.system-test-shard.result }}
+          EVENT: ${{ github.event_name }}
         run: |
           if [ "$CODE" = "false" ] && [ "$SHARDS" = "skipped" ]; then
             echo "Only documents changed: the browser suite was not run."
+            exit 0
+          fi
+          if [ "$EVENT" != "workflow_dispatch" ] && [ "$SHARDS" = "skipped" ]; then
+            echo "The browser suite is not run on pull requests while the repository is private; it is run locally before every push. To run it on CI: gh workflow run CI --ref <branch> (or \"Run workflow\")."
             exit 0
           fi
           [ "$SHARDS" = "success" ] || { echo "system tests: $SHARDS"; exit 1; }
