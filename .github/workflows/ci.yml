@@ -175,7 +175,7 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # The browser suite, as four jobs side by side: a runner has two cores, and
+  # The browser suite, as five jobs side by side: a runner has two cores, and
   # the whole suite on two processes took 28 minutes. `bin/system-test-shard`
   # deals the files so each job holds about the same number of tests
   # (test/lib/system_test_shards_test.rb keeps every file in exactly one).
@@ -187,7 +187,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4]
 
     services:
       postgres:
@@ -226,7 +226,7 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           bin/rails db:test:prepare tailwindcss:build
-          bin/rails test -v $(bin/system-test-shard ${{ matrix.shard }} 4)
+          bin/rails test -v $(bin/system-test-shard ${{ matrix.shard }} 5)
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v7
@@ -236,7 +236,7 @@ jobs:
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
 
-  # One check that speaks for the four: green when every shard passed, or when
+  # One check that speaks for the five: green when every shard passed, or when
   # the suite was skipped because only documents changed.
   system-test:
     needs: [changes, system-test-shard]

@@ -27,8 +27,8 @@ class SystemTestShardsTest < ActiveSupport::TestCase
   # larger of that file and a fair share with some slack.
   test "no shard is much heavier than a fair share" do
     weights = SystemTestShard.weights(Rails.root.to_s)
-    loads = SystemTestShard.shards(4, Rails.root.to_s).map { |files| files.sum { |path| weights.fetch(path) } }
-    limit = [ weights.values.max, weights.values.sum / 4 * 1.15 ].max
+    loads = SystemTestShard.shards(5, Rails.root.to_s).map { |files| files.sum { |path| weights.fetch(path) } }
+    limit = [ weights.values.max, weights.values.sum / 5 * 1.15 ].max
 
     assert_operator loads.max, :<=, limit, "shard seconds: #{loads.map(&:round).inspect}"
   end
