@@ -74,12 +74,20 @@
     explicit at every such query (`Trashable` has no default scope); this
     one is pinned in `test/integration/trash_visibility_test.rb`. %>
 <%# Their titles are the published ones. %>
-<% children = published_views(@page.children.kept.published) # public: rows (the subpages' membership and order are the tree's; titles come from published_views) %>
+<%# The list is navigation, named by its mono label (`aria-labelledby`, so a
+    screen reader's landmarks say "In this section" and not a second unnamed
+    "navigation"), and its links are set as the header's menu is: dim, ink on
+    hover, no underline, one per line. A post's own page draws none (O7): its
+    listing page's subpages are that page's, and the post is not one of them.
+    Nothing without subpages -- no label, no rule -- so the label is inside the
+    same `if` as the rule. %>
+<% children = @post.nil? ? published_views(@page.children.kept.published) : [] # public: rows (the subpages' membership and order are the tree's; titles come from published_views) %>
 <% if children.any? %>
-  <nav class="page-children mt-12 border-t border-line pt-6">
-    <ul class="space-y-2">
+  <nav class="page-children mt-12 border-t border-line pt-6" aria-labelledby="page-children-label">
+    <p id="page-children-label" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= site_string(:in_this_section) %></p>
+    <ul class="mt-3 space-y-2">
       <% children.each do |child| %>
-        <li><%= link_to translated(child, :title), page_url_path(child), class: "text-accent underline underline-offset-2 hover:text-accent-hover" %></li>
+        <li><%= link_to translated(child, :title), page_url_path(child), class: "text-dim hover:text-ink" %></li>
       <% end %>
     </ul>
   </nav>
