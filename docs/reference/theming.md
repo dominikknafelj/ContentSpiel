@@ -542,6 +542,17 @@ A highlighted note in the flow of a page: a kind (Note, Tip, Important, Warning)
 
 The fourth theme (`test/fixtures/themes/note`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one", "the fourth theme is sound, checked deeply too: a Note template of the contract's names").
 
+### The default theme's captions, subpages list and tags
+
+How the default theme draws three things, for a theme author who copies it (all by value and class: no token, template path or component method changed).
+
+- **Captions** (the Code block's, the Image block's and a rich-text figure's) are text: `--th-font` at `--th-t-small` (13px, the `text-small` utility, whose `--text-small` is `theme.css`'s alias of that token), sentence case as typed (no `text-transform`, no tracking), in `--th-meta`. Mono stays for labels: dates, a code block's language label, the "Tagged" label, the "In this section" label and the footer.
+- **A page's subpages** are `nav.page-children`, named by a mono label, "In this section" (`aria-labelledby`, so a screen reader's landmarks say that and not a second unnamed "navigation"). Its links are set as the header's menu is (`--th-dim`, ink on hover, no underline), one per line. A post's own page draws none, even under a listing page that has subpages, and a page whose subpages are all drafts or in the trash draws neither the label nor the nav.
+- **Tags** are one line of text, not a list: the mono label "Tagged", then the names as stored (no upper-casing), joined by ", ", plain text and no links, escaped.
+- **The label's words** come from `site_string(key)` (the Helpers table): the keys under `public.site` in `config/locales/public.<locale>.yml` (`in_this_section`, `tagged`), in the language shown and in English where that language has no file. Any other key raises in development and test, naming the keys, and in production is no word and one log line per key. `Blocks::CodeComponent#string`, `Blocks::NoteComponent#word` and `site_string` all read through `PublicStrings.read`.
+
+**Release note:** Added `site_string`; the default theme's captions, subpages list and tags changed by value and class only.
+
 ## What a template may ask
 
 The helpers of the page tree and the article (`ThemeHelper`, theming spec §7). Each is read-only and memoised for the render, answers only what the public sees, and reads none of `params`, `request`, `cookies` or `session`: "the shown page" is the page the controller resolved (`@page`), never the request's path.
