@@ -94,7 +94,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     get path_of(post)
 
     assert_select "article h1", text: "Typed"
-    assert_select "article li", text: "rails"
+    assert_includes tags_on_post_page, "rails"
   end
 
   test "the rows and the copy taken from them draw the same page, for every block type, a section with blocks, in two languages" do
@@ -265,7 +265,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
     assert_equal before, main_html, "an unpublished tag change moved something of the page, the lists beside the article included"
     assert_operator main_html.index("Slotted body"), :<, main_html.index("Between the lists"), "an unpublished tag change moved the article"
-    assert_select "article li", text: "ruby"
+    assert_includes tags_on_post_page, "ruby"
 
     publish_changes(post)
     get path_of(post)
@@ -994,7 +994,9 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_equal [ "/tagged/carrier" ], list_hrefs
   end
 
-  def tags_on_post_page = css_select(".content-block--post-list-detail ul li").map { |item| item.text.strip }
+  # A post's tags are one line (`p.post-tags`: the label, then a span of the
+  # names joined by ", "), so the names are that span's text split again.
+  def tags_on_post_page = css_select("p.post-tags span:last-child").flat_map { |item| item.text.strip.split(", ") }.reject(&:empty?)
   def tags_in_list = css_select(".content-block--post-list li > span:last-child").map { |item| item.text.strip }
 
   # Found by hand: "rails" merged into "ruby", the tag "rails" was gone, and
