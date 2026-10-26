@@ -2,7 +2,7 @@
   <figure class="content-block content-block--image my-10">
     <%= render Media::PictureComponent.new(asset: asset, alt: alt, sizes: sizes, css_class: "w-full rounded-cs") %>
     <% if caption.present? %>
-      <figcaption class="mt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= caption %></figcaption>
+      <figcaption class="mt-2 font-cs text-small text-meta"><%= caption %></figcaption>
     <% end %>
   </figure>
 <% end %>

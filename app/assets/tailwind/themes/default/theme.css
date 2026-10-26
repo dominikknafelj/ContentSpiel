@@ -46,6 +46,7 @@
   --text-display: var(--th-t-display);
   --text-h1: var(--th-t-h1);
   --text-h2: var(--th-t-h2);
+  --text-small: var(--th-t-small);
   --text-label: var(--th-t-label);
   --tracking-mono: var(--th-track-mono);
   --tracking-wide: var(--th-track-wide);

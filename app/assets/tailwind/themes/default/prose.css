@@ -14,5 +14,5 @@
 .cs-prose pre { font-family: var(--th-mono); background: var(--th-sunken); padding: 1em; overflow-x: auto; border-radius: var(--th-radius); }
 .cs-prose code { font-family: var(--th-mono); font-size: 0.9em; }
 .cs-prose img { max-width: 100%; height: auto; border-radius: var(--th-radius); }
-.cs-prose figcaption { font-family: var(--th-mono); font-size: var(--th-t-label); color: var(--th-meta); margin-top: 0.5em; }
+.cs-prose figcaption { font-family: var(--th-font); font-size: var(--th-t-small); color: var(--th-meta); margin-top: 0.5em; }
 .cs-prose iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; }

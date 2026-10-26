@@ -33,6 +33,28 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes stylesheet("tailwind.css"), "md\\:rounded-l-cs"
   end
 
+  # A caption is text, not a label: the sans at the small size in the faint
+  # colour, sentence case as typed. Mono stays for labels (dates, the code
+  # block's language), so only the figcaption rules change; the Image block's
+  # caption takes the same look through utilities, hence `text-small`.
+  test "a caption is text: the Code block's and a rich text's are the sans at the small size in the faint colour, as typed" do
+    {
+      "code.css" => /\.content-block--code figcaption\s*\{([^}]*)\}/,
+      "prose.css" => /\.cs-prose figcaption\s*\{([^}]*)\}/
+    }.each do |file, rule|
+      css = Rails.root.join("app/assets/tailwind/themes/default", file).read
+      body = css[rule, 1]
+      assert body, "#{file} has the figcaption rule"
+      assert_match(/font-family:\s*var\(--th-font\)/, body, file)
+      assert_match(/font-size:\s*var\(--th-t-small\)/, body, file)
+      assert_match(/color:\s*var\(--th-meta\)/, body, file)
+      %w[text-transform letter-spacing --th-mono --th-t-label].each do |gone|
+        assert_not_includes body, gone, "#{file}: a caption has no #{gone}"
+      end
+    end
+    assert_match(/\.text-small\s*\{[^}]*var\(--th-t-small\)/m, stylesheet("theme.css"), "the theme build carries the text-small utility")
+  end
+
   # The preview bar looks the same in light and dark: two tokens, declared once
   # in the base block and never in the dark one, readable at 4.5:1 or better.
   test "the preview bar tokens are the same in light and dark and have readable contrast" do
