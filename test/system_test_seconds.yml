@@ -1,6 +1,6 @@
 # Seconds each system test file took on a CI runner (measured on 2026-10-26 from
 # PR #91's run: the sum of each file's per-test times, as the job prints them).
-# `bin/system-test-shard` deals CI's five
+# `bin/system-test-shard` deals CI's four
 # shards by these numbers so the jobs finish at about the same time. This table
 # needs no upkeep: a file it does not list is weighed by its number of tests, an
 # entry for a file that is gone is ignored, and a stale number only makes the

@@ -2,9 +2,8 @@ name: CI
 
 # A pull request's run is the only automatic one: a merge to main is the code
 # that run already tested, and running it again there cost about half of the
-# account's Actions minutes (a run with the browser suite is about 77 billed minutes, one without
-# it about 21: a private repository pays per job, rounded up). `workflow_dispatch` runs everything on
-# any branch, main included, by hand ("Run workflow", or `gh workflow run CI`).
+# account's Actions minutes (a private repository pays per job, rounded up).
+# `workflow_dispatch` runs everything on any branch, main included, by hand ("Run workflow", or `gh workflow run CI`).
 #
 # The browser suite is the bulk of a run's minutes (measured on PR #91's run: about 77
 # billed minutes with the suite, about 21 without it), so since 2026-10-26 it runs
