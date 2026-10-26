@@ -2,12 +2,12 @@ name: CI
 
 # A pull request's run is the only automatic one: a merge to main is the code
 # that run already tested, and running it again there cost about half of the
-# account's Actions minutes (a full run is about 48 billed minutes: a private
-# repository pays per job, rounded up). `workflow_dispatch` runs everything on
+# account's Actions minutes (a run with the browser suite is about 77 billed minutes, one without
+# it about 21: a private repository pays per job, rounded up). `workflow_dispatch` runs everything on
 # any branch, main included, by hand ("Run workflow", or `gh workflow run CI`).
 #
-# The browser suite is the bulk of a run's minutes (a pull request's run was
-# about 77 billed minutes, most of it the suite), so since 2026-10-26 it runs
+# The browser suite is the bulk of a run's minutes (measured on PR #91's run: about 77
+# billed minutes with the suite, about 21 without it), so since 2026-10-26 it runs
 # only in a run started by hand, and is run locally before every push, until
 # the repository is public and Actions minutes are free; then the `if` of
 # `system-test-shard` below goes.
