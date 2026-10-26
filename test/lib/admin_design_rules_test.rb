@@ -231,4 +231,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\b(?:760|1144)px/, css)
     assert_empty design_offences(/\[(?:760|1144)px\]|max-width:\s*(?:760|1144)px/)
   end
+
+  # Layout points spec, decision 13: at most three cards in a row, by the
+  # dashboard's own width, never `auto-fit`.
+  test "the dashboard's grid is one, two or three columns by its container, and never auto-fit" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-dashboard\s*\{\s*container:\s*admin-dashboard\s*\/\s*inline-size;\s*\}/, css)
+    assert_match(/@container admin-dashboard \(min-width: 40rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/m, css)
+    assert_match(/@container admin-dashboard \(min-width: 60rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/m, css)
+    assert_no_match(/auto-fit/, Rails.root.join("app/views/admin/dashboard/show.html.erb").read)
+  end
 end

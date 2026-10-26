@@ -544,6 +544,20 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
   .admin-section-lane__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+/* The dashboard's cards (layout points spec, C and decision 13): one column,
+   two from 40rem, three from 60rem, by the DASHBOARD's own width and not the
+   window's (the sidebar and the notes column take room the window does not
+   show), and never more than three: a wider window widens the cards and adds
+   no fourth, so no `auto-fit`. `turbo-frame.contents` keeps the two notes
+   cards, each a frame of its own, grid items. */
+.admin-dashboard { container: admin-dashboard / inline-size; }
+.admin-dashboard-cards { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@container admin-dashboard (min-width: 40rem) {
+  .admin-dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container admin-dashboard (min-width: 60rem) {
+  .admin-dashboard-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 /* A section's header controls (sections spec §4.1). A layout is shown as a
    diagram of its columns, their widths in the layout's own proportions (each
    bar's `flex` is the column's weight, `Admin::EditorScreen

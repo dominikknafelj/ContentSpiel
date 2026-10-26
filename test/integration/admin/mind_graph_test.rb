@@ -328,10 +328,10 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-mind-graph-legend] ul[aria-label='Legend'] [data-legend-type]", count: 1
-    assert_select "ul[aria-label='Legend'] [data-legend-type='resume_entry']", text: /#{ContentTypes.fetch("resume_entry").label}/
-    assert_select "ul[aria-label='Legend'] [data-legend='pinned']", text: /Pinned/
-    assert_select "ul[aria-label='Legend'] [data-legend='notes']", text: /Open notes/
+    assert_select "[data-mind-graph-legend] ul[data-legend-keys] [data-legend-type]", count: 1
+    assert_select "ul[data-legend-keys] [data-legend-type='resume_entry']", text: /#{ContentTypes.fetch("resume_entry").label}/
+    assert_select "ul[data-legend-keys] [data-legend='pinned']", text: /Pinned/
+    assert_select "ul[data-legend-keys] [data-legend='notes']", text: /Open notes/
     assert_select "[data-legend='retired']", count: 0
     # The five states are no part of the legend's row: they are the Status key's.
     assert_select "[data-mind-graph-legend] [data-legend-state]", count: 0
@@ -347,7 +347,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "ul[aria-label='Legend'] [data-legend-type]", count: 1
+    assert_select "ul[data-legend-keys] [data-legend-type]", count: 1
     assert_select "[data-legend-type='resume_entry']", count: 0
   end
 
@@ -357,7 +357,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "ul[aria-label='Legend'] [data-legend='retired']", text: /Retired type/
+    assert_select "ul[data-legend-keys] [data-legend='retired']", text: /Retired type/
     assert_select "[data-legend-type]", count: 0
   end
 
@@ -428,7 +428,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
   end
 
   # Third design answers and H6: status is not a filter; its key is a dialog
-  # the legend's "Status" link opens. Outside the graph's element, so it is
+  # the legend's "Status key…" button opens. Outside the graph's element, so it is
   # no part of the box's Tab order and the graph's script resets nothing in it.
   test "the status key is in the page once, a closed dialog outside the graph's element" do
     sign_in_as(users(:one))
@@ -441,11 +441,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--mind-graph--graph'] dialog", count: 0
     assert_select "dialog#mind-graph-status-key li[data-legend-state]", count: 5
     assert_select "dialog#mind-graph-status-key h2", text: "Status key"
-    assert_select "[data-mind-graph-legend] button[data-legend-status][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status"
+    assert_select "[data-mind-graph-legend] button[data-legend-status][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status key…"
   end
 
   # Mind graph canvas spec §5.7: the tab order is the search, the filter (the
-  # legend's toggles, then its "Status" button, which is named by its text),
+  # legend's toggles, then its "Status key…" button, which is named by its text),
   # the zoom buttons, then the canvas. (A swatch is a canvas too, and no stop:
   # only the graph's own canvas has a `tabindex`.) The buttons sit in the canvas's corner on
   # screen, but they come BEFORE it in the document, which is what the Tab key
@@ -463,7 +463,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
       .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name == "input" ? (node["type"] == "search" ? "search" : node["data-name"]) : node.name }
     # "Show everything" stands in a bar that is hidden until a large site has
     # opened around Home, where a focused view has its bar's links.
-    assert_equal [ "search", "Show everything", "Posts", "Tags", "Related", "Shares a tag", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_equal [ "search", "Show everything", "Posts", "Tags", "Related", "Shares a tag", "Status key…", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
     assert_select "[data-mind-graph-opened][hidden] button", text: "Show everything"
     assert_equal "search", css_select("[data-controller='admin--mind-graph--graph'] input, [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas").first["type"]
     assert_select "[data-controller='admin--mind-graph--graph'] canvas[data-swatch][tabindex]", count: 0
@@ -591,7 +591,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=checkbox] button canvas[tabindex]].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }.join(", "))
       .map { |node| { "button" => node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip), "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
-    assert_equal [ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "Status", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_equal [ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "Status key…", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
   end
 
   # Spec §5.7: the list comes after the canvas (and the card), so it is the

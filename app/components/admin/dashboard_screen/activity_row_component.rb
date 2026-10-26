@@ -1,7 +1,7 @@
 module Admin
   module DashboardScreen
     # One line of "Recent activity" (design pass round 2, Task 16): an avatar
-    # (round with the person's initial, a token's change included), one
+    # (round with the person's two letters, a token's change included), one
     # sentence -- "<name> published “<title>”", the title a link to the record's editor -- a status chip when the
     # record is not Live, and a relative time. A coalesced burst of edits
     # shows the time it last extended, with the whole span as its tooltip.
@@ -21,10 +21,16 @@ module Admin
 
       def sentence = row.sentence
 
-      # The avatar's letter: the person's own initial, "You" included.
-      def initial
+      # The circle's letters (Ruling 7, O9): the two-letter rule of the name
+      # the circle is named by, drawn upper-case by the template. A user is
+      # named by `PersonName.of` (their name, else the part of the address
+      # before the at sign), as notes and presence name them; a deleted user
+      # and System are the label the row shows. The sentence beside the circle
+      # keeps the full address. The circle stays this row's own 28px one.
+      def initials
         actor = sentence.actor
-        Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label.to_s.strip[0].to_s.upcase
+        name = actor.user ? PersonName.of(actor.user) : Admin::Ui::UserNameComponent.new(user: nil, user_id: actor.user_id).label
+        PersonName.initials(name.to_s)
       end
 
       def via_token? = sentence.actor.via_label.present?

@@ -446,7 +446,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # Third design answers and H6: status is not a filter. The key is a dialog
-  # named "Status key" behind the legend's "Status" link, in the chip's words.
+  # named "Status key" behind the legend's "Status key…" button, in the chip's words.
   test "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" do
     create_post(title: "Alpha", tags: [ "t" ])
     create_post(title: "Beta", tags: [ "t" ])
@@ -456,7 +456,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{key}[open]", visible: :all
     before = [ graph["data-nodes"], graph["data-edges"] ]
 
-    button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status")
+    button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status key…")
     button.execute_script("this.focus()")
     page.driver.browser.keyboard.type(:Enter)
 
@@ -473,7 +473,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "#{key}[open]", visible: :all
-    await_js("document.activeElement?.textContent.trim() === 'Status'")
+    await_js("document.activeElement?.textContent.trim() === 'Status key…'")
     assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "Escape closed the key and nothing of the graph"
   end
 
@@ -1815,7 +1815,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_selector "[data-mind-graph-card]", visible: :visible
     await_graph
-    assert_card_beside(a, side: "right")
+    # The side is the one the view leaves room for, and Fit decides where the
+    # node is dropped from: not pinned to "right" any more, the card is
+    # checked beside the node on whichever side it is shown, and inside the
+    # canvas, which is what the side is chosen for.
+    assert_card_beside(a)
+    assert_operator element_box("[data-mind-graph-card]")["right"], :<=, canvas_box[2], "the card is shown on the side that has room"
+    assert_operator element_box("[data-mind-graph-card]")["left"], :>=, canvas_box[0]
     within("[data-mind-graph-card]") { assert_button "Unpin" }
   end
 
@@ -3628,10 +3634,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     JS
 
     assert_equal [ "search", "focus bar", "legend", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
-    # The toggles, then "Status", and every one of them a stop the Tab key
+    # The toggles, then "Status key…", and every one of them a stop the Tab key
     # makes: none is taken out of the order.
     legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
-    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status", 0 ] ], legend
+    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status key…", 0 ] ], legend
   end
 
   test "a title with markup in it is text in the list and in the search results" do
@@ -3862,7 +3868,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # The canvas's colours at `samples` points evenly round a node's centre,
   # `radius` pixels from it: one read, after the frames `pixel_at` waits for.
   # `quadrant: :left` reads the quarter on the node's left only, where there
-  # is no label.
+  # is no label. A sample is the pixel that CONTAINS its point (floor). The
+  # point's CENTRE is fractional (the fitted view's zoom puts it at a fraction),
+  # and rounding reads the NEAREST pixel's corner, i.e. the pixel after the
+  # point for a fraction under one half, up to a pixel away, which put a sample
+  # 8px out on the antialiased edge of a mark of radius 7; flooring reads the
+  # pixel that contains the point.
   def ring_pixels(node, radius:, samples:, quadrant: nil)
     point = screen_position(node)
     await_frames
@@ -3875,7 +3886,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         return Array.from({ length: #{samples} }, (_, step) => {
           const angle = #{quadrant == :left ? "Math.PI * 0.75 + step * Math.PI / 2 / #{samples}" : "step * 2 * Math.PI / #{samples}"}
           const x = #{point["x"]} + #{radius} * Math.cos(angle), y = #{point["y"]} + #{radius} * Math.sin(angle)
-          return Array.from(context.getImageData(Math.round((x - box.left) * ratio), Math.round((y - box.top) * ratio), 1, 1).data)
+          return Array.from(context.getImageData(Math.floor((x - box.left) * ratio), Math.floor((y - box.top) * ratio), 1, 1).data)
         })
       })()
     JS

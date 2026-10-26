@@ -67,7 +67,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
       get admin_root_path
 
       assert_select "section[aria-labelledby=dashboard-going-live-next] li", text: /Soon.*in 5 days.*by you/m
-      assert_select "section[aria-labelledby=dashboard-going-live-next]", text: /Schedule a draft to see it here\./
+      assert_no_match "Schedule a draft", response.body
     end
   end
 
@@ -75,8 +75,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     sign_in_as users(:reader)
     get admin_root_path
     assert_match "No drafts.", response.body
-    assert_no_match "start one above", response.body
-    assert_no_match "Schedule a draft to see it here", response.body
+    assert_no_match "Start a draft", response.body
   end
 
   test "the needs-translation card shows each target language's numbers with several languages" do
@@ -99,11 +98,40 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-activity] li", text: /#{Regexp.escape(users(:two).email_address)} via Claude desktop edited “From MCP!”/
   end
 
+  # Claude Design's O6: each card's empty line, and the two actions.
+  test "every empty card says its one line, with Start a draft and Drafts → for someone who may create and read posts" do
+    with_locales(%w[en], default: "en")
+    sign_in_as users(:one)
+    get admin_root_path
+
+    lines = css_select("p[data-card-empty]").to_h { |line| [ line.ancestors("section").first["aria-labelledby"], line.text.squish ] }
+    assert_equal({ "dashboard-notes-for-you" => "No notes for you.", "dashboard-open-threads" => "No open threads.",
+                   "dashboard-drafts" => "No drafts. Start a draft", "dashboard-going-live-next" => "Nothing scheduled. Drafts →",
+                   "dashboard-unpublished-changes" => "No unpublished changes.", "dashboard-activity" => "No recent activity." }, lines)
+    assert_select "section[aria-labelledby=dashboard-drafts] p[data-card-empty] a[href='#dashboard_draft_title'][data-controller='admin--dashboard--start-draft'][data-action='admin--dashboard--start-draft#start'][data-admin--dashboard--start-draft-field-value='dashboard_draft_title']", text: "Start a draft"
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty] a[href='#{admin_posts_path(scope: "drafts")}'][data-turbo-frame=_top] span[aria-hidden=true]", text: "→"
+    assert_select ".admin-empty-state", count: 0
+  end
+
+  test "someone who may create nothing reads No drafts. alone, and Drafts → only with posts.read" do
+    sign_in_as users(:reader)
+    get admin_root_path
+    assert_select "section[aria-labelledby=dashboard-drafts] p[data-card-empty]", text: "No drafts."
+    assert_select "a", text: "Start a draft", count: 0
+    # The read-only group holds posts.read (test/fixtures/access_control/grants.yml).
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty] a[href='#{admin_posts_path(scope: "drafts")}']", count: 1
+
+    sign_in_as users(:editor_branch)
+    get admin_root_path
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty]", text: "Nothing scheduled."
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty] a", count: 0
+  end
+
   test "empty lists say so" do
     sign_in_as users(:reader)
     get admin_root_path
     assert_match "No drafts.", response.body
-    assert_match "Nothing scheduled on the site.", response.body
+    assert_match "Nothing scheduled.", response.body
     assert_match "No recent activity.", response.body
   end
 

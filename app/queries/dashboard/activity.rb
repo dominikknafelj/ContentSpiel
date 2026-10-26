@@ -39,6 +39,16 @@ module Dashboard
   # queries in a way that leaks, but a record trashed in between simply
   # drops out), and one preload of the events' users.
   #
+  # RUNS: events of a COLLAPSING action by the same person (user, actor type
+  # and id) on the same record (any image, for uploads), each at most
+  # `Audit::COALESCE_WINDOW` older than the run's newest, are ONE row with a
+  # count -- "added 4 Code blocks to “…”", "uploaded 12 images". They are
+  # joined in Ruby over the events the one query already read (READ_FACTOR
+  # times the limit), after the unreadable and the gone are left out, so such
+  # an event neither shows nor splits a run, and the statement count does not
+  # change. A block deleted since is no event here (its record is gone) and
+  # is not counted; the count is of distinct subjects.
+  #
   # A change made through an API token is shown as its *user's* (the event's
   # `user_id`, filled for a user and a token alike), the sentence's actor
   # carrying the token's name as recorded on the event
@@ -69,7 +79,23 @@ module Dashboard
     # happened and `span_end` when the coalesced burst last extended (nil for a
     # single moment). `record` is the page, post or image the sentence is
     # about (a block's owner).
-    Row = Data.define(:event, :record, :sentence, :at, :span_end)
+    #
+    # `count` is how many events a collapsed run holds (1 for an ordinary
+    # row); then `event` is the run's newest, `at` its oldest event's start and
+    # `span_end` the newest's last extension.
+    Row = Data.define(:event, :record, :sentence, :at, :span_end, :count) do
+      def initialize(count: 1, **rest) = super(count:, **rest)
+    end
+
+    # The event query reads this many times the rows wanted, so that a run
+    # collapsed into one row still leaves `limit` rows to show; a feed whose
+    # newest events all collapse shows fewer rows than `limit` rather than
+    # reading more (the cost is a longer LIMIT, never another statement).
+    READ_FACTOR = 4
+
+    # The actions a run of the same person on the same record joins into one
+    # row (blocks added or updated, uploads): `Audit::Sentence` words them.
+    COLLAPSING = Audit::Sentence::COUNTED
 
     def initialize(actor:, channel: Current.channel, limit: 15)
       @actor = actor
@@ -88,12 +114,19 @@ module Dashboard
       return [] unless readable # nothing readable: no query at all
 
       events = Audit::Event.where(action: ACTIONS).where(last_occurred_at: WINDOW.ago..).and(readable)
-        .order(last_occurred_at: :desc, id: :desc).limit(@limit).to_a
+        .order(last_occurred_at: :desc, id: :desc).limit(@limit * READ_FACTOR).to_a
       return [] if events.empty?
 
       records = readable_records(events)
       ActiveRecord::Associations::Preloader.new(records: events, associations: :user).call
-      events.filter_map { |event| row_for(event, records) }
+      found = runs(events, records)
+      # A full read may have cut its last run short: its count and start would
+      # be false. With other runs it is dropped (the feed shows fewer rows);
+      # alone it is kept and said to be "N or more".
+      cut = events.size == @limit * READ_FACTOR
+      only = cut && found.size == 1
+      found.pop if cut && found.size > 1
+      found.first(@limit).map { |run| row_for(run, floor: only) }
     end
 
     # The events whose subject the viewer may read (see the class comment), as
@@ -126,21 +159,56 @@ module Dashboard
       AccessControl.scope(@actor, key, model.all, channel: @channel).unscope(:order).select(:id)
     end
 
-    def row_for(event, records)
-      subject = subject_key(event, records)
-      record = records[subject]
-      return unless record
+    # `[[event, record], ...]` per run, newest first. An event whose record
+    # the viewer can't read (or is gone) is left out BEFORE the runs are
+    # made, so it neither shows nor splits one.
+    def runs(events, records)
+      events.filter_map { |event| (record = records[subject_key(event)]) && [ event, record ] }
+        .each_with_object([]) do |pair, runs|
+          if runs.last && joins?(runs.last, *pair) then runs.last << pair
+          else runs << [ pair ]
+          end
+        end
+    end
 
-      target = Audit::Sentence::Target.new(record.title.presence || "(untitled)", Audit::Sentence.route_for(record))
-      sentence = Audit::Sentence.build(event, viewer: @actor, target:, fallback_scheduled_at: (record.published_at if record.respond_to?(:published_at)))
-      Row.new(event:, record:, sentence:, at: event.occurred_at,
-        span_end: (event.last_occurred_at if event.last_occurred_at > event.occurred_at))
+    def joins?(run, event, record)
+      newest, newest_record = run.first
+      COLLAPSING.include?(event.action) && event.action == newest.action && actor_key(event) == actor_key(newest) &&
+        (event.action == "media.uploaded" || record == newest_record) &&
+        newest.last_occurred_at - event.last_occurred_at <= Audit::COALESCE_WINDOW
+    end
+
+    def actor_key(event) = [ event.user_id, event.actor_type, event.actor_id ]
+
+    # A floor row (a lone run the read cut off) of count 1 says no "or more":
+    # `at_least:` is asked only for a count above one. Accepted: dropping the
+    # row would empty a feed whose one row it is, and the case needs most of
+    # the read's events to be gone (deleted blocks), so it is rare and right
+    # in what it states.
+    def row_for(run, floor: false)
+      event, record = run.first
+      oldest = run.last.first
+      count = run.map { |(e, _)| e.subject_id }.uniq.size
+      mixed = run.map { |(e, _)| e.snapshot.is_a?(Hash) ? e.snapshot["block_type"] : nil }.uniq.size > 1
+      fallback = (record.published_at if record.respond_to?(:published_at))
+      target =
+        if count > 1 && event.action == "media.uploaded"
+          Audit::Sentence::Target.new(nil, Audit::Sentence.library_route)
+        else
+          Audit::Sentence::Target.new(record.title.presence || "(untitled)", Audit::Sentence.route_for(record))
+        end
+      sentence = Audit::Sentence.build(event, viewer: @actor, target:, fallback_scheduled_at: fallback, count:, mixed:, at_least: floor && count > 1)
+      # A floor row does not claim the run's start (the read stopped before
+      # it): it shows the newest event's own times.
+      start = floor ? event : oldest
+      Row.new(event:, record:, sentence:, at: start.occurred_at, count:,
+        span_end: (event.last_occurred_at if event.last_occurred_at > start.occurred_at))
     end
 
     # Where an event's sentence points: `[class name, id]` of the page, post
     # or image. A block's event reaches its owner through `@blocks`;
     # `block.reordered` already names the page as its subject.
-    def subject_key(event, records)
+    def subject_key(event)
       type = normalized_type(event.subject_type)
       if type == "ContentBlock"
         block = @blocks[event.subject_id] or return

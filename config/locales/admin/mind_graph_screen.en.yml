@@ -19,7 +19,7 @@ en:
       # set of words; the day of a scheduled change stands only on the chip).
       mind_graph_screen:
         legend:
-          label: "Legend"
+          key: "Key"
           show: "Show"
           lines: "Lines"
           nodes:
@@ -32,7 +32,7 @@ en:
             lists: "Lists"
             related: "Related"
             tag: "Shares a tag"
-          status: "Status"
+          status: "Status key…"
           retired: "Retired type"
           pinned: "Pinned"
         status_key:

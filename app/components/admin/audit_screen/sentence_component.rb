@@ -45,21 +45,26 @@ module Admin
         sentence.parts.map do |part|
           case part.kind
           when :subject then subject_html(part.text)
+          when :collection then collection_html(part.text)
           when :strong then content_tag(:span, part.text, class: "font-semibold")
           else part.text
           end
         end
       end
 
-      def subject_html(label)
+      def subject_html(label) = safe_join([ "“", linked(label), "”" ])
+
+      # A counted set ("12 images"): linked like a subject, never quoted.
+      def collection_html(label) = linked(label)
+
+      def linked(label)
         route = sentence.subject_route
-        inner = if route && ROUTES.include?(route.name)
+        if route && ROUTES.include?(route.name)
           link_to(label, helpers.public_send(route.name, *route.args, **route.params, **url_options),
             class: "relative z-10 font-semibold hover:underline", data: { turbo_frame: "_top" })
         else
           content_tag(:span, label, class: "font-semibold")
         end
-        safe_join([ "“", inner, "”" ])
       end
 
       def url_options = helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}

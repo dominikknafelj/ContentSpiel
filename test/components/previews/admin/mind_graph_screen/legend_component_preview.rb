@@ -1,7 +1,7 @@
 module Admin
   module MindGraphScreen
     # `Admin::MindGraphScreen::LegendComponent`: the toggles a viewer gets, the
-    # "Status" link, the types present and the fixed keys. (The swatches are
+    # "Status key…" button, the types present and the fixed keys. (The swatches are
     # canvases `admin--mind-graph--swatches` has the graph's renderer draw.)
     class LegendComponentPreview < ViewComponent::Preview
       def registered_types

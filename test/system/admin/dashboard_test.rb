@@ -80,4 +80,46 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
       assert_text "published “To publish”"
     end
   end
+
+  # The cards' grid (layout points spec, C and decision 13): three columns at
+  # most, by the dashboard's own width. Six cards (two languages, so "Needs
+  # translation" is drawn) make the 3x2 the design asked for.
+  def card_grid
+    page.evaluate_script(<<~JS)
+      (() => {
+        const grid = document.querySelector(".admin-dashboard-cards")
+        const cards = Array.from(grid.querySelectorAll(":scope > section, :scope > turbo-frame > section"))
+        return { columns: getComputedStyle(grid).gridTemplateColumns.split(" ").length, cards: cards.length,
+                 rows: new Set(cards.map((card) => Math.round(card.getBoundingClientRect().top))).size }
+      })()
+    JS
+  end
+
+  test "the cards stand three in a row at 1600px and at 1400px, two rows of three, and one in a row at 600px" do
+    with_locales(%w[en de], default: "en")
+    create_post(title: "Untranslated")
+    sign_in_via_form(users(:one))
+    begin
+      [ [ 1600, 3, 2 ], [ 1400, 3, 2 ], [ 600, 1, 6 ] ].each do |width, columns, rows|
+        page.driver.resize(width, 1000)
+        visit admin_root_path
+        await_admin_controllers
+        assert_equal({ "columns" => columns, "cards" => 6, "rows" => rows }, card_grid, "at #{width}px")
+      end
+    ensure
+      page.driver.resize(1400, 1400)
+    end
+  end
+
+  # O6: "Start a draft" takes the person to the quick-create row: the focus
+  # moves to its title, ready to type (a fragment alone would only scroll).
+  test "Start a draft in an empty Your drafts moves the focus to the quick-create title" do
+    sign_in_via_form(users(:one))
+    visit admin_root_path
+    await_admin_controllers
+
+    within("section[aria-labelledby=dashboard-drafts]") { press "Start a draft" }
+    await_js("document.activeElement?.id === 'dashboard_draft_title'")
+    assert_equal admin_root_path, URI(page.current_url).path
+  end
 end

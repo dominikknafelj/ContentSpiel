@@ -409,7 +409,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_nil js_module("mind_graph/camera", "m.bounds(new Float32Array([1, 2]), [])")
   end
 
-  test "camera: fit puts every corner inside the padded box and the middle in the middle" do
+  test "camera: fit leaves a tenth of the canvas on each side of a wide box, its middle in the middle" do
     result = js_module("mind_graph/camera", <<~JS)
       (() => {
         const box = { minX: -500, minY: -100, maxX: 500, maxY: 100 }
@@ -418,19 +418,31 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       })()
     JS
 
-    assert_in_delta 0.72, result["k"], 0.001
-    assert_in_delta 40, result["topLeft"][0], 0.01
-    assert_in_delta 760, result["bottomRight"][0], 0.01
+    assert_in_delta 0.64, result["k"], 0.001
+    assert_in_delta 80, result["topLeft"][0], 0.01
+    assert_in_delta 720, result["bottomRight"][0], 0.01
     assert_equal [ 400, 300 ], result["middle"].map(&:round)
-    assert_operator result["topLeft"][1], :>=, 40
+    assert_operator result["topLeft"][1], :>=, 60
   end
 
   # Review focus 5: one node, or all nodes at one point.
-  test "camera: fitting a single point does not divide by zero or zoom past 1.5" do
+  test "camera: fitting a single point does not divide by zero or zoom past 3" do
     result = js_module("mind_graph/camera", "(() => { const c = m.fit({ minX: 7, minY: 7, maxX: 7, maxY: 7 }, 800, 600); return [c.k, ...m.toScreen(c, 7, 7)] })()")
 
-    assert_equal [ 1.5, 400, 300 ], result
+    assert_equal [ 3, 400, 300 ], result
     assert_equal({ "k" => 1, "tx" => 400, "ty" => 300 }, js_module("mind_graph/camera", "m.fit(null, 800, 600)"))
+  end
+
+  # Layout points spec, decision 15: a small graph is zoomed in to fill the
+  # box, up to 3 and never further.
+  test "camera: a small graph is zoomed in to fill the box, up to 3 and never further" do
+    small = js_module("mind_graph/camera", "m.fit({ minX: -100, minY: -50, maxX: 100, maxY: 50 }, 800, 600).k")
+    tiny = js_module("mind_graph/camera", "m.fit({ minX: -10, minY: -5, maxX: 10, maxY: 5 }, 800, 600).k")
+
+    assert_in_delta 3.2, js_module("mind_graph/camera", "Math.min(800 * 0.8 / 200, 600 * 0.8 / 100)"), 0.001
+    assert_equal 3, small, "200 by 100 would fill 80% at 3.2: it stops at the cap"
+    assert_equal 3, tiny
+    assert_in_delta 2.4, js_module("mind_graph/camera", "m.fit({ minX: -100, minY: -50, maxX: 100, maxY: 50 }, 600, 300).k"), 0.001
   end
 
   test "hit test: the nearest node within its radius plus slack, or none" do
@@ -627,9 +639,9 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       })()
     JS
 
-    assert_in_delta 0.52, result["k"], 0.001
-    assert_in_delta 40, result["top"][1], 0.01
-    assert_in_delta 560, result["bottom"][1], 0.01
+    assert_in_delta 0.48, result["k"], 0.001
+    assert_in_delta 60, result["top"][1], 0.01
+    assert_in_delta 540, result["bottom"][1], 0.01
     assert_equal [ 400, 300 ], result["middle"].map(&:round)
   end
 
@@ -922,7 +934,8 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     page, more, type, noted_type = drawn
 
     assert_includes page, [ "circle", 7, -5, 3 ], "the pin on the card's top-right corner"
-    assert_includes page, [ "box", -10, -5, 14, 14, 7 ], "the badge's box, its right edge 4px over the top-left corner"
+    assert_includes page, [ "box", -16, -5, 14, 14, 7 ], "the badge outside the card: its right edge 2px clear of the card's left edge, its centre on the top edge"
+    assert_includes page, [ "box", -16, -5, 18, 18, 9 ], "its ring, 2px of the canvas's ground all round"
     assert_includes more, [ "circle", 30, -8, 3 ], "the pill's pin on its corner, not 21px above it"
     assert_includes type, [ "circle", 0, 0, 9 ], "a hovered hub's ring: a 1px line 2.5px out, so its outer edge is 3px out"
     assert_equal type.reject { |shape| shape == [ "circle", 0, 0, 9 ] }, noted_type, "a post type carries no notes badge, whatever the data says"
@@ -1326,10 +1339,64 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     drawn = notes_badges([ 3, 12, 120, 0, nil ], tags: [ 5 ], tag_notes: 4)
 
     assert_equal [
-      [ "pill", 34.96, 37.96, 14, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "3", 41.96, 45.46, "ink", "count" ],
-      [ "pill", 128.96, 37.96, 20, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "12", 138.96, 45.46, "ink", "count" ],
-      [ "pill", 222.96, 37.96, 26, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "99+", 235.96, 45.46, "ink", "count" ]
+      [ "pill", 32.96, 35.96, 18, 18, 9, "surface" ], [ "pill", 34.96, 37.96, 14, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "3", 41.96, 45.46, "ink", "count" ],
+      [ "pill", 126.96, 35.96, 24, 18, 9, "surface" ], [ "pill", 128.96, 37.96, 20, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "12", 138.96, 45.46, "ink", "count" ],
+      [ "pill", 220.96, 35.96, 30, 18, 9, "surface" ], [ "pill", 222.96, 37.96, 26, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "99+", 235.96, 45.46, "ink", "count" ]
     ], drawn.reject { |entry| entry.first == "pin" }
+  end
+
+  # Claude Design's K3 (2026-10-12), the "count badges overlap the page
+  # cards" of the 2026-10-15 review: on a page's card, Home's too, the badge
+  # stands OUTSIDE the card, 2px clear of its left edge, centred on its top
+  # edge, and grows leftwards; a post's still reaches 4px over its corner.
+  test "renderer: a page's notes badge stands outside its card, on a page and on Home, and a post's is as it was" do
+    page_badge, home_badge, post_badge = shapes_drawn([ { kind: "page", open_notes: 120 }, { kind: "page", home: true, open_notes: 12 }, { open_notes: 3 } ])
+      .map { |shapes| shapes.find { |shape| shape.first == "box" && shape.last == 7 } }
+
+    assert_equal [ "box", -22, -5, 26, 14, 7 ], page_badge, "99+ on a 14 by 10 card: right edge at -9, 2px left of -7"
+    assert_equal [ "box", -21, -6.5, 20, 14, 7 ], home_badge, "12 on Home's 18 by 13 card: right edge at -11"
+    assert_operator post_badge[1] + post_badge[3] / 2, :>, -7 * 0.71, "a post's badge still reaches over its corner"
+  end
+
+  # Claude Design's answer of 2026-10-25 (a): a badge that lands on a
+  # neighbour covers it cleanly. Every badge is drawn after every mark and
+  # every label, on a 2px ring of the canvas's ground (the theme's `surface`,
+  # never a colour), at its node's strength.
+  test "renderer: the notes badges are drawn after every mark and label, each on a ring of the canvas's ground" do
+    calls = draw_calls([ { kind: "page", open_notes: 3, label: "About" }, { label: "Neighbour" } ], positions: [ 100, 100, 70, 96 ], labels: [ 0, 1 ])
+    texts = calls.each_index.select { |i| calls[i][0] == "fillText" && calls[i][1] != "3" }
+    marks = calls.each_index.select { |i| calls[i][0] == "fill" && calls[i][1] != "surface" }
+    # The first pill after the last label is the badge's ring (a page's card is a roundRect too, and comes earlier).
+    rings = calls.each_index.select { |i| calls[i][0] == "roundRect" && i > texts.max }.first
+
+    assert_equal 2, texts.size
+    assert_not_nil rings, "a pill is drawn after the last label"
+    assert_operator marks.max, :<, rings, "a badge is drawn before a label or a mark"
+    assert_equal [ "fill", "surface", 1 ], calls[rings + 1], "the ring is the ground, at the node's strength"
+  end
+
+  # Claude Design's answer of 2026-10-25 (b): the badge's box is one more box
+  # the labels keep clear of, by the rule that keeps labels apart; the layout
+  # makes no room for it.
+  test "labels: a label that would cover a notes badge is not placed, and one clear of it is" do
+    labelled = js_module("mind_graph/labels", <<~JS)
+      m.chooseLabels({ free: new Set(), order: [0, 1], positions: new Float32Array([0, 0, 0, 200]), widths: [80, 80], radii: [8, 8],
+        camera: { k: 1, tx: 100, ty: 50 }, width: 800, height: 600, always: new Set(),
+        obstacles: [ { left: 150, top: 40, right: 180, bottom: 58 } ] }).map((label) => label.index)
+    JS
+
+    assert_equal [ 1 ], labelled
+  end
+
+  test "labels: the badge boxes are a post's and a page's, ring included, and none for a tag, a type or a node without notes" do
+    boxes = js_module("mind_graph/labels", <<~JS)
+      m.badgeBoxes({ nodes: [ { kind: "page", open_notes: 120 }, { kind: "post", degree: 1, open_notes: 3 }, { kind: "tag", open_notes: 4 }, { kind: "type", id: "type-a", open_notes: 2 }, { kind: "post", degree: 1, open_notes: 0 } ],
+        indexes: [ 0, 1, 2, 3, 4 ], positions: new Float32Array([ 100, 100, 200, 100, 300, 100, 400, 100, 500, 100 ]), radii: [ 7, 7, 4.5, 6, 7 ], camera: { k: 1, tx: 0, ty: 0 } })
+    JS
+
+    assert_equal 2, boxes.size
+    assert_equal({ "left" => 63, "top" => 86, "right" => 93, "bottom" => 104 }, boxes.first)
+    { "left" => 182.96, "top" => 85.96, "right" => 200.96, "bottom" => 103.96 }.each { |side, value| assert_in_delta value, boxes.second[side], 0.01, side }
   end
 
   # The pin's dot is at the top-right and the badge at the top-left, "so both
@@ -1339,16 +1406,17 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   # at two digits and all of it at "99+".
   test "renderer: a pinned node's notes badge never reaches its pin, whatever the count" do
     drawn = notes_badges([ 1, 12, 120 ], pinned: [ 0, 1, 2 ])
-    pills = drawn.select { |entry| entry.first == "pill" }
+    rings, pills = drawn.select { |entry| entry.first == "pill" }.each_slice(2).to_a.transpose
     pins = drawn.select { |entry| entry.first == "pin" }
 
-    assert_equal [ 3, 3 ], [ pills.size, pins.size ]
-    pills.zip(pins).each do |(_, left, _top, width, *), (_, x, _y, radius)|
-      badge_right = left + width + 0.5 # half its 1px line
+    assert_equal [ 3, 3, 3 ], [ rings.size, pills.size, pins.size ]
+    rings.zip(pins).each do |(_, left, _top, width, *), (_, x, _y, radius)|
+      ring_right = left + width        # the ring is a fill: no line
       pin_left = x - radius - 0.75     # half the dot's 1.5px ring
-      assert_operator badge_right, :<, pin_left, "the badge (to #{badge_right}) reaches the pin's dot (from #{pin_left})"
+      assert_operator ring_right, :<, pin_left, "the badge's ring (to #{ring_right}) reaches the pin's dot (from #{pin_left})"
     end
     assert_equal [ 14, 20, 26 ], pills.map { |pill| pill[3] }
+    assert_equal [ 18, 24, 30 ], rings.map { |ring| ring[3] }
     rights = pills.each_with_index.map { |pill, index| (pill[1] + pill[3] - index * 100).round(2) }
     assert_equal [ 48.96 ] * 3, rights, "the badge's right edge moved with its width"
   end
@@ -2391,6 +2459,43 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
       "nodeAlphas" => paths.select { |path| shape.call(path) == [ "arc", *shape.call(path)&.slice(1, 2), NODE_RADIUS ] }.map { |path| done.call(path, "fill")[1] },
       "ringWidths" => rings.map { |path| done.call(path, "stroke")[2] }
     }
+  end
+
+  # Draws `nodes` (posts of degree one unless they say otherwise) at
+  # `positions` and answers, in order, every fillText as ["fillText", text],
+  # every roundRect as ["roundRect"] and every fill as ["fill", fillStyle,
+  # globalAlpha]; `labels` are node indexes drawn at `labelAt`'s place.
+  def draw_calls(nodes, positions:, labels:)
+    drawn = page.evaluate_async_script(<<~JS, nodes, positions, labels)
+      const [given, positions, labelled, done] = arguments
+      import("mind_graph/renderer").then(({ draw, radiusFor }) => {
+        const log = []
+        const set = {}
+        const context = new Proxy({}, {
+          get: (_, name) => {
+            if (name === "fillText") return (text) => { log.push(["fillText", text]) }
+            if (name === "roundRect") return () => { log.push(["roundRect"]) }
+            if (name === "fill") return () => { log.push(["fill", set.fillStyle, set.globalAlpha]) }
+            return () => {}
+          },
+          set: (_, name, value) => { set[name] = value; return true }
+        })
+        const nodes = given.map((node, index) => ({ id: `n-${index}`, kind: "post", degree: 1, colour_index: 1, status: "live", ...node }))
+        const radii = nodes.map(radiusFor)
+        draw(context, {
+          width: 400, height: 300, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
+          theme: { ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", page: "page", tree: "tree", radius: 4,
+                   categories: [1, 2, 3, 4, 5, 6].map((slot) => `cat-${slot}`), font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count" },
+          nodes, edges: [], positions: Float32Array.from(positions), radii, widths: nodes.map(() => 0),
+          visibleNodes: nodes.map((_, index) => index), visibleEdges: [],
+          labels: labelled.map((index) => ({ index, alpha: 1, x: positions[index * 2] + radii[index] + 4, y: positions[index * 2 + 1] })),
+          selected: -1, neighbours: new Set(), focusIndex: -1, hovered: -1, pinned: new Set()
+        })
+        done(log)
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "renderer: #{drawn["error"]}" if drawn.is_a?(Hash)
+    drawn
   end
 
   # Draws posts of degree one (radius 7), 100 px apart from x = 50 at y = 50,

@@ -20,13 +20,35 @@ class Admin::DashboardScreen::CardComponentTest < ViewComponent::TestCase
     assert_selector "li", count: 8
   end
 
-  test "empty shows its sentence in the card, no arrow without a link, and the hint when given" do
-    render_inline Admin::DashboardScreen::CardComponent.new(title: "Going live next", id: "g", empty: "Nothing scheduled.", hint: "Schedule a draft to see it here.")
+  # Layout points spec, decision 12 and Claude Design's O6: an empty card says
+  # one line in dim, left-aligned where its first row would be, with its
+  # action (if any) after it. No centred bold title, no 48px of padding.
+  test "an empty card says one line where its first row would be, in dim, with its action after it" do
+    render_inline Admin::DashboardScreen::CardComponent.new(title: "Your drafts", id: "d", empty: "No drafts.") do |card|
+      card.with_empty_action { '<a href="#x">Start a draft</a>'.html_safe }
+    end
 
-    assert_text "Nothing scheduled."
-    assert_text "Schedule a draft to see it here."
+    assert_selector "section > header + p[data-card-empty].px-4.text-sm.text-dim", text: /\ANo drafts\.\s+Start a draft\z/
+    assert_selector "p[data-card-empty] a[href='#x']", text: "Start a draft"
+    assert_no_selector ".admin-empty-state, h3, ul"
+  end
+
+  test "an empty card without an action says its line alone, and a card with rows draws neither" do
+    render_inline Admin::DashboardScreen::CardComponent.new(title: "Going live next", id: "g", empty: "Nothing scheduled.")
+    assert_selector "p[data-card-empty]", exact_text: "Nothing scheduled."
     assert_no_selector "a"
-    assert_no_selector "li"
+
+    render_inline Admin::DashboardScreen::CardComponent.new(title: "Your drafts", id: "d", empty: "No drafts.") do |card|
+      card.with_row { "A row" }
+      card.with_empty_action { '<a href="#x">Start a draft</a>'.html_safe }
+    end
+    assert_no_selector "p[data-card-empty]"
+    assert_no_text "Start a draft"
+  end
+
+  # Spec, Ruling 5: the hint under a short list is gone, also with rows.
+  test "there is no hint line any more" do
+    assert_raises(ArgumentError) { Admin::DashboardScreen::CardComponent.new(title: "Going live next", id: "g", empty: "None", hint: "Schedule a draft to see it here.") }
   end
 
   # The notes cards' header extras (notes spec §5): a count beside the title

@@ -68,7 +68,7 @@ export const SCENES = {
   "state-live-change-scheduled": look({ changes: "scheduled" }),
   retired: { node: post({ colour_index: null }) },
   pinned: { node: post(), hue: "dim", pinned: true },
-  notes: { node: post({ open_notes: 1 }), hue: "dim", at: [ 17, 14 ] }
+  notes: { node: post({ open_notes: 1 }), hue: "dim", at: [ 18, 14.1 ] }
 }
 
 // Draws the swatch called `name` on `context`, `width` by `height` CSS

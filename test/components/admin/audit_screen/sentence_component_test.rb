@@ -91,4 +91,14 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
     render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("page.taken_over", metadata: { "from_user_id" => 1, "to_user_id" => 2, "answered" => false }))
     assert_text "You took over editing “Hello”"
   end
+
+  test "a collection is linked where the sentence has a route, and never quoted" do
+    upload = Audit::Event.new(action: "media.uploaded", channel: "admin", user_id: users(:one).id, occurred_at: Time.current, last_occurred_at: Time.current)
+    sentence = Audit::Sentence.build(upload, viewer: users(:one), target: Audit::Sentence::Target.new(nil, Audit::Sentence.library_route), count: 12)
+    render_inline Admin::AuditScreen::SentenceComponent.new(sentence:)
+
+    assert_text "You uploaded 12 images"
+    assert_no_text "“"
+    assert_selector "a[href='/cs-studio/media']", exact_text: "12 images"
+  end
 end

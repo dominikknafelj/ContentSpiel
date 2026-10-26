@@ -187,7 +187,158 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     60.times { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } }
 
     assert_equal [ readable ], activity(blog_reader).rows.map(&:record)
-    assert_equal 15, activity(@me).rows.size
+    # Sixty uploads fill the read (15 * 4) exactly, so the read cannot tell
+    # that the run ends there: it is the only run, kept, and counted as a
+    # floor ("60 or more"), never as a number it may not be.
+    # The owner's sixty uploads are now one run (the owner's O10), read in
+    # one LIMIT of sixty events, so the older post is past the read (Decision
+    # 11's cost: a feed whose newest events collapse shows fewer rows).
+    rows = activity(@me).rows
+    assert_equal [ [ "media.uploaded", 60 ] ], rows.map { |row| [ row.event.action, row.count ] }
+    assert_equal "uploaded 60 or more images", rows.first.sentence.parts.map(&:text).join
+  end
+
+  test "a run the read cut off says N or more and claims no start" do
+    61.times { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } }
+    row = activity.rows.sole
+    assert_equal 60, row.count
+    assert_equal "uploaded 60 or more images", row.sentence.parts.map(&:text).join
+    assert_equal row.event.occurred_at, row.at, "the start is the newest event's own, not the run's"
+  end
+
+  test "a complete run beside a cut one reads its exact count and its own start" do
+    # The page's own events are older than the uploads, so the read holds
+    # exactly two runs: the three blocks, then the uploads' tail, cut at 60.
+    page = travel_to(2.hours.ago) { as(@me) { create_page(title: "Whole") } }
+    start = 1.second.from_now.change(usec: 0)
+    add_blocks(page, %w[rich_text] * 3, from: start)
+    61.times { travel_to(1.hour.ago) { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } } }
+
+    rows = activity.rows
+    assert_equal [ [ "block.created", 3 ] ], rows.map { |row| [ row.event.action, row.count ] }
+    block_row = rows.find { |row| row.event.action == "block.created" }
+    assert_equal "added 3 Rich text blocks to", words(block_row).first
+    assert_equal start, block_row.at
+    assert_empty rows.select { |row| row.event.action == "media.uploaded" }
+  end
+
+  test "a run the read cut off beside another run is not shown" do
+    kept = as(@me) { create_post(title: "Kept", published: false) }
+    61.times { travel_to(1.hour.ago) { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } } }
+    assert_equal [ kept ], activity.rows.map(&:record), "the last run is cut by the read: dropped, not shown with a false number"
+  end
+
+  # --- layout points spec, decision 11: runs ---------------------------------
+
+  def add_blocks(page, types, actor: @me, every: 2.minutes, from: 1.second.from_now.change(usec: 0))
+    types.each_with_index.map do |type, index|
+      travel_to(from + every * index) { as(actor) { ContentBlocks::Save.call(ContentBlock.new(owner: page, block_type: type)).record } }
+    end
+  end
+
+  def runs(actor = @me) = activity(actor).rows.select { |row| row.event.action.start_with?("block.", "media.") }.map { |row| [ row.event.action, row.count ] }
+
+  test "four blocks added to one page in a row are one row with their count, its time the first one's and its span the run's" do
+    page = as(@me) { create_page(title: "Code block demo") }
+    start = 1.second.from_now.change(usec: 0) # after the page's own events: they would split the run
+    add_blocks(page, %w[rich_text] * 4, from: start)
+
+    row = activity.rows.find { |r| r.event.action == "block.created" }
+    assert_equal [ [ "block.created", 4 ] ], runs
+    assert_equal [ "added 4 Rich text blocks to", "Code block demo", "" ], words(row)
+    assert_equal page, row.record
+    assert_equal start, row.at
+    assert_equal start + 6.minutes, row.span_end
+  end
+
+  test "blocks of mixed types are counted as blocks" do
+    page = as(@me) { create_page(title: "Mixed") }
+    add_blocks(page, %w[rich_text post_list rich_text])
+
+    assert_equal [ "added 3 blocks to", "Mixed", "" ], words(activity.rows.find { |r| r.event.action == "block.created" })
+  end
+
+  test "a run ends ten minutes after its newest event" do
+    page = as(@me) { create_page(title: "Slow") }
+    add_blocks(page, %w[rich_text] * 3, every: 5.minutes + 30.seconds)
+
+    assert_equal [ [ "block.created", 2 ], [ "block.created", 1 ] ], runs
+  end
+
+  test "a run is broken by another person's event between, by another page and by another action" do
+    one = as(@me) { create_page(title: "One") }
+    other = as(@me) { create_page(title: "Other") }
+    start = 1.second.from_now.change(usec: 0) # after the page's own events: they would split the run
+    add_blocks(one, %w[rich_text], from: start)
+    add_blocks(one, %w[rich_text], actor: users(:two), from: start + 1.minute)
+    add_blocks(one, %w[rich_text], from: start + 2.minutes)
+    add_blocks(other, %w[rich_text], from: start + 3.minutes)
+    travel_to(start + 4.minutes) { as(@me) { Pages::Save.call(other, translations: { Locales.default => { title: "Other, renamed" } }) } }
+    add_blocks(other, %w[rich_text], from: start + 5.minutes)
+
+    assert_equal [ [ "block.created", 1 ] ] * 5, runs
+  end
+
+  test "a person's own blocks and their token's on one page are two rows" do
+    page = as(@me) { create_page(title: "Two hands") }
+    token, = ApiToken.generate!(@me, group: access_control_groups(:admin), name: "Claude desktop")
+    start = 1.second.from_now.change(usec: 0) # after the page's own events: they would split the run
+    add_blocks(page, %w[rich_text] * 2, from: start)
+    2.times do |index|
+      travel_to(start + 4.minutes + 1.minute * index) do
+        as(token, channel: :mcp) { ContentBlocks::Save.call(ContentBlock.new(owner: page, block_type: "rich_text")) }
+      end
+    end
+
+    assert_equal [ [ "block.created", 2 ], [ "block.created", 2 ] ], runs
+  end
+
+  test "a block deleted from a run is not counted and does not split it" do
+    page = as(@me) { create_page(title: "Three") }
+    blocks = add_blocks(page, %w[rich_text] * 3)
+    as(@me) { ContentBlocks::Destroy.call(blocks.second) }
+
+    assert_equal [ "added 2 Rich text blocks to", "Three", "" ], words(activity.rows.find { |r| r.event.action == "block.created" })
+  end
+
+  # The owner's O10: twelve uploads in a row are one row, linked to the library.
+  test "uploads in a row are one row, whatever the images, and read uploaded 12 images" do
+    12.times { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } }
+
+    row = activity.rows.first
+    assert_equal [ [ "media.uploaded", 12 ] ], runs
+    assert_equal [ [ :text, "uploaded " ], [ :collection, "12 images" ] ], row.sentence.parts.map { |part| [ part.kind, part.text ] }
+    assert_equal Audit::Sentence.library_route, row.sentence.subject_route
+    assert_empty activity(users(:reader)).rows, "a viewer without media.upload sees no upload, counted or not"
+  end
+
+  test "an untitled page still names its target in a counted row" do
+    page = as(@me) { create_page(title: "Blank soon") }
+    page.update_columns(title: {}) # a page whose title is blank in every language
+    add_blocks(page, %w[rich_text] * 2)
+
+    assert_equal [ "added 2 Rich text blocks to", "(untitled)", "" ], words(activity.rows.find { |r| r.event.action == "block.created" })
+  end
+
+  test "after collapsing there are at most fifteen rows" do
+    # Each page's pair at a minute of its own, so no other page's event sits between.
+    20.times { |i| add_blocks(as(@me) { create_page(title: "P#{i}") }, %w[rich_text rich_text], every: 1.second, from: (i + 1).minutes.from_now.change(usec: 0)) }
+
+    rows = activity.rows
+    assert_equal 15, rows.size
+    assert rows.all? { _1.count == 2 }
+  end
+
+  test "the same number of statements for a run of 5 blocks and one of 60 (the second read also holds the first's)" do
+    counts = [ 5, 60 ].map do |n|
+      page = as(@me) { create_page(title: "N#{n}") }
+      n.times { as(@me) { Audit.record("block.created", subject: page.content_blocks.create!(block_type: "rich_text", position: 0)) } }
+      Current.set(actor: @me, channel: :admin) do
+        Dashboard::Activity.new(actor: @me).rows # warm up
+        capture_sql { Dashboard::Activity.new(actor: @me).rows.each { |row| row.record.title } }.size
+      end
+    end
+    assert_equal counts.first, counts.last
   end
 
   test "a block event whose owner the viewer can't read is absent, one on a readable owner is listed" do
@@ -215,8 +366,9 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     kept = create_media_asset
     gone = create_media_asset
     legacy = create_media_asset
-    as(@me) { Audit.record("media.uploaded", subject: kept) }
-    as(@me) { Audit.record("media.uploaded", subject: gone) }
+    # More than the coalesce window apart, so they are three rows, not a run.
+    travel_to(30.minutes.ago) { as(@me) { Audit.record("media.uploaded", subject: kept) } }
+    travel_to(15.minutes.ago) { as(@me) { Audit.record("media.uploaded", subject: gone) } }
     Audit::Event.create!(action: "media.uploaded", actor: @me, user_id: @me.id, subject_type: "MediaAsset", subject_id: legacy.id,
       subject_label: "legacy", occurred_at: Time.current, last_occurred_at: Time.current)
     gone.update!(trashed_at: Time.current)

@@ -340,7 +340,9 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     assert_selector "#note-thread-#{@thread.id}-reply [role=alert]", text: "Someone you mentioned can't see this page."
 
     assert_not reply_field.readonly?
-    reply_field.send_keys(" or not")
+    # The field was drawn again and cuprite 0.19 leaves the caret at its start,
+    # so the caret goes to the end before typing.
+    reply_field.send_keys(:end, " or not")
     assert_equal "For @[999999] or not", reply_field.value
   end
 

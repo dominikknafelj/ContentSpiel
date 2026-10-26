@@ -1,5 +1,5 @@
 // Draws one frame of the mind graph (mind graph canvas spec §4.3, §5.1).
-// Order: edges, nodes (each with its pin mark and its notes badge), labels, rings. Everything is in SCREEN pixels: the
+// Order: edges, marks (each with its pin), labels, notes badges, rings. Everything is in SCREEN pixels: the
 // camera moves a node's centre, and a node is the same size at every zoom.
 //
 // The marks and the five looks of a record's state are `marks.js`'s
@@ -27,9 +27,11 @@
 // - WITH OPEN NOTES (`open_notes` above zero, a post's and a page's; notes spec §4.4):
 //   the count in a small mono badge on the mark's top-LEFT corner, opposite
 //   the pin, so a node can carry both: the badge keeps its right edge where
-//   it is and grows to the LEFT with its text, away from the pin. Not a ring:
-//   a ring means hovered, selected or focused. Drawn with the node, at the
-//   node's strength, and the same size at every zoom. Always neutral: what
+//   it is and grows to the LEFT with its text, away from the pin. A card's
+//   badge stands OUTSIDE it, over whatever it lands on, on a 2px ring of the
+//   ground (`marks.js`, `notesPill`). Not a ring:
+//   a ring means hovered, selected or focused. Drawn after the labels, at
+//   the node's strength, and the same size at every zoom. Always neutral: what
 //   is unread for the viewer is said on the rows of the node's card.
 // - The focus of a local view: a dotted accent ring.
 // A ring follows its mark: a tag's is a square, a page's card's a box, the
@@ -45,7 +47,7 @@
 //
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`), and
 // what dims is dimmed by `globalAlpha`.
-import { drawMark, boxOf, radiusFor, topCorner } from "mind_graph/marks"
+import { drawMark, boxOf, radiusFor, topCorner, notesPill, notesLabel, NOTES_BADGE, NOTES_RING } from "mind_graph/marks"
 
 // The app and the module tests ask for a node's size here.
 export { radiusFor }
@@ -90,24 +92,14 @@ const BACKING_X = 4
 const BACKING_HEIGHT = 18
 // How far outside the canvas an edge's end or a node's edge may be and still
 // count as on it: half the widest stroke, rounded up, and a node's rings and
-// its notes badge (which reaches furthest on a page's card: "99+" there ends
-// 22.5px left of the card's edge, and 20.5px left of a 7px dot's).
+// its notes badge (which reaches furthest on a page's card: "99+" and its ring
+// there end 30px left of the card's edge, and 22px left of a 7px dot's edge, 29px from its centre).
 const EDGE_MARGIN = 2
-const NODE_MARGIN = 23
+const NODE_MARGIN = 30
 // A ring's distance from the mark's edge.
 const HOVER_RING = 2.5
 const SELECTED_RING = 4
 const FOCUS_RING = 5
-// A post or a page with open notes (notes spec §4.4, handoff "Mind graph node badge"):
-// the count in a small pill on the mark's top-left corner. Half its height
-// (the handoff's 14px line), half a character's advance at 10px mono, the
-// room beside the text (`px-1`), and how far the pill reaches over the
-// corner (the handoff's "overlapping by 4px").
-const NOTES_BADGE = 7
-const NOTES_CHARACTER = 3
-const NOTES_BADGE_PAD = 4
-const NOTES_OVERLAP = 4
-
 // `edges[i].source` / `.target` are node INDEXES (`app.js` converts the ids
 // once), `visibleNodes` / `visibleEdges` indexes too. `width` and `height` are
 // CSS pixels; the bitmap is `ratio` times that, which the transform takes up.
@@ -154,14 +146,16 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   context.lineCap = "butt"
   context.setLineDash([])
 
+  const badged = []
   for (const index of visibleNodes) {
     if (beyond(x(index), y(index), radii[index] + NODE_MARGIN)) continue
     context.globalAlpha = dimmed(index) ? DIM : 1
     const node = nodes[index]
     drawMark(context, theme, node, x(index), y(index), radii[index])
     if (pinned.has(index)) drawPin(context, theme, x(index), y(index), topCorner(node, radii[index]))
-    // A record's notes: a tag, a post type and the pill have none.
-    if ((node.open_notes ?? 0) > 0 && (node.kind === "post" || node.kind === "page")) drawNotes(context, theme, node, x(index), y(index), topCorner(node, radii[index]))
+    // A record's notes: a tag, a post type and the pill have none. Drawn
+    // after every mark and label, below.
+    if (notesPill(node, x(index), y(index), radii[index])) badged.push(index)
   }
 
   context.textBaseline = "middle"
@@ -188,6 +182,13 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
     context.fillStyle = chosen ? theme.ink : theme[LABEL_COLOURS[node.kind]]
     context.strokeText(node.label, label.x, label.y)
     context.fillText(node.label, label.x, label.y)
+  }
+
+  // The notes badges, over every mark and label, each on a ring of the
+  // canvas's ground, at its node's strength.
+  for (const index of badged) {
+    context.globalAlpha = dimmed(index) ? DIM : 1
+    drawNotes(context, theme, nodes[index], x(index), y(index), radii[index])
   }
 
   // Rings, over everything: the focus's, the hovered node's, the selection's.
@@ -244,27 +245,34 @@ function drawPin(context, theme, x, y, corner) {
 // A neutral pill, like the count badges of the lists: surface, a line, ink
 // (handoff: `bg-surface border-line-strong text-ink`), whatever the viewer
 // has read. Never the only cue: the node's card says the count in words.
-// More than ninety-nine reads "99+".
+// More than ninety-nine reads "99+". It stands on a ring of the canvas's
+// ground (`NOTES_RING`), which is what lets it cover a neighbour cleanly.
 //
-// THE RIGHT EDGE IS FIXED, 4px over the mark's top-left corner, and the pill
-// grows to the left: the pin's dot is at the top-right, and a pill centred on
-// the corner covered half of it at two digits and all of it at "99+" on a
-// small mark. `save` and `restore` keep the node's own strength
-// (`globalAlpha`) and leave the text settings as the labels expect them.
-function drawNotes(context, theme, node, x, y, corner) {
-  const label = node.open_notes > 99 ? "99+" : String(node.open_notes)
-  const half = Math.max(NOTES_BADGE, NOTES_CHARACTER * label.length + NOTES_BADGE_PAD)
-  const right = x - corner.x + NOTES_OVERLAP
-  context.save()
-  context.setLineDash([])
-  context.beginPath()
+// THE RIGHT EDGE IS FIXED and the pill grows to the left (`marks.js`): the
+// pin's dot is at the top-right, and a pill centred on the corner covered
+// half of it at two digits and all of it at "99+" on a small mark. `save`
+// and `restore` keep the node's own strength (`globalAlpha`) and leave the
+// text settings as the labels expect them.
+function drawNotes(context, theme, node, x, y, radius) {
+  const label = notesLabel(node)
+  const { right, top, half } = notesPill(node, x, y, radius)
   // A pill where the canvas can draw one; a plain rectangle where it can't
   // (`roundRect` is newer than the rest of what is drawn here): a missing
   // method would throw inside the draw and take the whole canvas with it,
   // for every graph that has a note on any post.
-  if (typeof context.roundRect === "function") context.roundRect(right - half * 2, y - corner.y - NOTES_BADGE, half * 2, NOTES_BADGE * 2, NOTES_BADGE)
-  else context.rect(right - half * 2, y - corner.y - NOTES_BADGE, half * 2, NOTES_BADGE * 2)
+  // The ring's extent is `notesBadgeBox`'s (`marks.js`): change them together.
+  const pill = (inset) => {
+    context.beginPath()
+    const left = right - half * 2 - inset, width = half * 2 + inset * 2, height = NOTES_BADGE * 2 + inset * 2
+    if (typeof context.roundRect === "function") context.roundRect(left, top - inset, width, height, NOTES_BADGE + inset)
+    else context.rect(left, top - inset, width, height)
+  }
+  context.save()
+  context.setLineDash([])
+  pill(NOTES_RING)
   context.fillStyle = theme.surface
+  context.fill()
+  pill(0)
   context.fill()
   context.strokeStyle = theme.line
   context.lineWidth = 1
@@ -273,6 +281,6 @@ function drawNotes(context, theme, node, x, y, corner) {
   context.textAlign = "center"
   context.textBaseline = "middle"
   context.fillStyle = theme.ink
-  context.fillText(label, right - half, y - corner.y + 0.5)
+  context.fillText(label, right - half, top + NOTES_BADGE + 0.5)
   context.restore()
 }

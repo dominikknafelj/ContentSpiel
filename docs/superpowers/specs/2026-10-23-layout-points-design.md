@@ -161,6 +161,44 @@ Departures from the spec's text, and from the plan's:
 - Task 8's stuck edge is a pixel clip (`-bottom-px`); at a fractional browser zoom it may never read as stuck, which was not checked by hand.
 - Outdated cells use the chip's own mark, ↻ (O4), not the ◐ of one example in the plan's Review Focus.
 
+## As built (part 2, the dashboard and the Mind graph)
+
+Built by `docs/superpowers/plans/2026-10-25-layout-points-dashboard-and-mind-graph.md`, in nine tasks. The plan's sixteen rulings, one line each:
+
+1. A run's window is measured from the run's newest event (`last_occurred_at`), the feed's sort key.
+2. Only the counted actions collapse: `Audit::Sentence::COUNTED` (`block.created`, `block.updated`, `media.uploaded`), which `Dashboard::Activity::COLLAPSING` is.
+3. "The same person" is `[user_id, actor_type, actor_id]`: a user and each token are separate actors.
+4. The count is of distinct subjects; the type is named only when every block of the run has the same one, else "blocks"; the plurals are written by hand.
+5. Uploads are a new part kind, `:collection`, linked to the library through `Audit::Sentence.library_route` and never quoted.
+6. The read is four times the row limit and collapsed in Ruby, so a feed of collapsing events shows fewer than fifteen rows.
+7. The activity row's letters are `PersonName.initials` of the name the row shows, in the row's own 28px circle (refined by Task 5, below: a user's letters come from PersonName.of).
+8. The empty action is a slot, `empty_action`, not a label and a URL.
+9. "Start a draft" links to `#dashboard_draft_title` and moves the focus there; "Drafts →" goes to `scope=drafts` (Claude Design, 2026-10-25).
+10. The empty line's link is ink and underlined.
+11. The dashboard's view is converted to keys (`admin.dashboard.show.*`).
+12. "About 80%" is a tenth of the canvas on each side, on the axis that binds; `MAX_FIT_ZOOM` is 3.
+13. The legend's "Show" label is hidden from a screen reader, "Key" labels the list, and "Status key…" follows the list inside the Key group.
+14. A page's badge (Home's too) moves outside its card; a post's badge, the pin and the hit test stay; `NODE_MARGIN` is 30.
+15. A badge is drawn after every mark and label, on a 2px ring of `surface` (Claude Design, 2026-10-25); the layout makes no room for it.
+16. Labels keep clear of badges: the badges' boxes are obstacles `chooseLabels` refuses a label over (Claude Design, 2026-10-25).
+
+Departures from the spec's text:
+
+- Decision 12's "a label and a URL" is a slot (ruling 8).
+- The counted actions are three, not every action (ruling 2).
+- The activity row keeps its own 28px circle (ruling 7).
+- Decision 14's "Status" link moved into Key as "Status key…", last (O5), outside the key list (ruling 13).
+- The dashboard view was converted to keys (ruling 11).
+- O6's "Your drafts →" is "Drafts →", and a page's badge is drawn last on a ring of the ground and kept clear of labels: Claude Design's two answers of 2026-10-25 to this plan's questions (rulings 9, 15, 16).
+
+Rulings the build added beyond the plan's sixteen:
+
+- **A row never states a false number (Task 4).** When the read of sixty events is full, its last run may have been cut short. That run is dropped when other rows stand beside it; a lone cut run is a floor, "N or more" (`at_least:` on `Audit::Sentence.build`), with the newest event's own times; a complete run beside a cut one stays exact.
+- **The circle's letters follow `PersonName.of` (Task 5).** For a user they are `PersonName.initials(PersonName.of(user))`, the rule notes and presence use, so an account with no name gets the letters of the part of its address before the at sign; for a deleted user or System they come from the row's label. The viewer's own row shows their own letters, not "You"; the sentence beside the circle keeps the full address.
+- **The fit's numbers (Task 7).** `FIT_MARGIN` is 0.1 and `MAX_FIT_ZOOM` is 3.
+- **The notes swatch moved to `[18, 14.1]` in `swatches.js` (Task 8)**, so the ring fits the 26x22 swatch; the swatch's size is unchanged.
+- **The draw-order test takes the first `roundRect` after the last label (Task 8)**, since a page's card is a `roundRect` too.
+
 ## What this does not do
 
 - No related posts on the public site (O7), no tag pages, no navigation block type.

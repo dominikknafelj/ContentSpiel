@@ -1,4 +1,4 @@
-<span class="flex size-7 shrink-0 items-center justify-center text-xs font-semibold <%= avatar_class %>" aria-hidden="true"><%= initial %></span>
+<span class="flex size-7 shrink-0 items-center justify-center text-xs font-semibold uppercase <%= avatar_class %>" aria-hidden="true"><%= initials %></span>
 <p class="min-w-0 flex-1 text-sm text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
 <% if via_token? %>
   <%= render Admin::Ui::ChannelChipComponent.new(channel: channel) %>

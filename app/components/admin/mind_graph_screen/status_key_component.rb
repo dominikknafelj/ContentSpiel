@@ -4,7 +4,7 @@ module Admin
     # answers "Status in the legend" and H6): the five looks a page or a post
     # can have on the canvas, each with its name. Status is NOT a filter, so
     # the looks are no toggles and not in the legend's row: the legend's
-    # "Status" link opens this, CS Studio's one dialog, named "Status key".
+    # "Status key…" button opens this, CS Studio's one dialog, named "Status key".
     #
     # The names are THE CHIP'S WORDS (H6: one set of words): "Live,
     # unpublished changes" and "Live, change scheduled"; the day of a

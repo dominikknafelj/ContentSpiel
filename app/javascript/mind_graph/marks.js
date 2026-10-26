@@ -141,6 +141,46 @@ export function topCorner(node, radius) {
   return box ? { x: box.width / 2, y: box.height / 2 } : { x: radius * CIRCLE_CORNER, y: radius * CIRCLE_CORNER }
 }
 
+// A post or a page with open notes (notes spec §4.4, handoff "Mind graph node
+// badge"): the count in a small pill on the mark's top-left corner. Half its
+// height (the handoff's 14px line), half a character's advance at 10px mono,
+// the room beside the text (`px-1`), and how far a POST's pill reaches over
+// the corner (the handoff's "overlapping by 4px").
+//
+// A PAGE'S CARD'S BADGE STANDS OUTSIDE IT (Claude Design's K3, 2026-10-12;
+// the "count badges overlap the page cards" of the 2026-10-15 review): its
+// right edge NOTES_CLEAR px clear of the card's left edge, centred on its top
+// edge, growing leftwards. The ring is NOTES_RING px of the canvas's ground
+// all round it (Claude Design, 2026-10-25), which is why the badge may land
+// on a neighbour and cover it cleanly.
+export const NOTES_BADGE = 7
+export const NOTES_CHARACTER = 3
+export const NOTES_BADGE_PAD = 4
+export const NOTES_OVERLAP = 4
+export const NOTES_CLEAR = 2
+export const NOTES_RING = 2
+
+export const notesLabel = (node) => (node.open_notes > 99 ? "99+" : String(node.open_notes))
+
+// The one geometry the renderer and the labels share: the badge's pill as
+// { right, top, half } (its right edge, its top edge, half its width), in
+// screen pixels, for a post or a page with notes; null for anything else.
+export function notesPill(node, x, y, radius) {
+  if ((node.open_notes ?? 0) <= 0 || (node.kind !== "post" && node.kind !== "page")) return null
+  const corner = topCorner(node, radius)
+  const half = Math.max(NOTES_BADGE, NOTES_CHARACTER * notesLabel(node).length + NOTES_BADGE_PAD)
+  const right = node.kind === "page" ? x - corner.x - NOTES_CLEAR : x - corner.x + NOTES_OVERLAP
+  return { right, top: y - corner.y - NOTES_BADGE, half }
+}
+
+// The badge's box WITH its ring, in screen pixels. (`drawNotes` in
+// `renderer.js` derives the same extent from `NOTES_RING`: change them together.)
+export function notesBadgeBox(node, x, y, radius) {
+  const pill = notesPill(node, x, y, radius)
+  if (!pill) return null
+  return { left: pill.right - pill.half * 2 - NOTES_RING, top: pill.top - NOTES_RING, right: pill.right + NOTES_RING, bottom: pill.top + NOTES_BADGE * 2 + NOTES_RING }
+}
+
 export function drawMark(context, theme, node, x, y, radius) {
   context.setLineDash([])
   if (node.kind === "tag") return drawTag(context, theme, x, y, radius)
