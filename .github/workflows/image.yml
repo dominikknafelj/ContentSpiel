@@ -10,8 +10,7 @@ name: Image
 # When: on every push to main (a merge), and by hand for any branch or tag
 # ("Run workflow", or `gh workflow run Image --ref <branch>`). A merge to main
 # is not tested again (see ci.yml), so this builds what the pull request's run
-# tested. One build is about five billed minutes while the repository is
-# private.
+# tested.
 #
 # The tags: the full commit id, which is what a site pins
 # (`ghcr.io/<owner>/content_spiel:<40 characters>`), and `main` for the newest
