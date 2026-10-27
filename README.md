@@ -46,7 +46,8 @@ per topic: start with the one that covers what you are about to change.
 Hosting a site is `docs/reference/hosting.md`, and writing a theme is
 `docs/reference/theming.md`.
 
-## Security and licence
+## Contributing, security and licence
 
-Report a vulnerability privately, as `SECURITY.md` says. ContentSpiel is
+How a change gets in is `CONTRIBUTING.md`. Report a vulnerability privately, as
+`SECURITY.md` says. ContentSpiel is
 released under the MIT licence (`LICENSE`).
