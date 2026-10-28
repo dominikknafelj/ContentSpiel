@@ -67,4 +67,30 @@ class RichText::TableNodesTest < ActiveSupport::TestCase
     assert_not_includes html, "<p>"
     assert_predicate html, :html_safe?
   end
+
+  # `render_fragments` is `render_fragment` for many lists at once, from one
+  # parse: every answer is the one the cell would get alone, whatever is in
+  # it (marks, a link, a line break, text that looks like markup, a stray
+  # cell node of a hand-made body, nothing at all), and the wrappers it draws
+  # them in never reach a cell.
+  test "render_fragments answers what render_fragment answers for each list, from one sanitizer pass" do
+    link = { "type" => "link", "attrs" => { "href" => "https://example.com" } }
+    lists = [
+      [ text("a ", { "type" => "bold" }), text("<b>b</b>") ],
+      [ text("go", link), { "type" => "hardBreak" }, text("on", { "type" => "italic" }) ],
+      [],
+      "not a list",
+      [ { "type" => "tableCell", "content" => [ paragraph(text("stray")) ] }, text("</div><div>x") ],
+      [ text("<script>alert(1)</script>") ]
+    ]
+    renderer = RichText::HtmlRenderer.new(RichText::RenderContext.new(locale: "en", urls: PublicSite::Urls.new, document: document(paragraph)))
+    alone = lists.map { |nodes| renderer.render_fragment(nodes) }
+
+    together, parses = SanitizerParses.during { renderer.render_fragments(lists) }
+    assert_equal 1, parses, "one parse and one scrubber pass for every list"
+    assert_equal alone, together
+    assert together.all?(&:html_safe?)
+    assert together.none? { |html| html.include?("<div") }
+    assert_equal [], renderer.render_fragments([])
+  end
 end

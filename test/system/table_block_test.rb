@@ -108,7 +108,14 @@ class TableBlockSystemTest < ApplicationSystemTestCase
     JS
   end
 
+  # Equal to its token is not enough by itself: a scheme or a band that
+  # changed nothing would pass it. So the head's colour must also MOVE where
+  # the tokens say it does: between light and dark on the page and in the
+  # band, and between the page and the band in light. In dark it does not
+  # move between the two, by the tokens' own values (the page's ink and the
+  # strong band's text are both #ededee), so that pair is not asserted.
   test "in both schemes the header, cells and caption are drawn in the table's tokens, on the page and in a strong band" do
+    heads = {}
     [ nil, "strong" ].each do |background|
       @page.content_blocks.destroy_all
       open_table(%w[Plan Price Notes], header_column: true, caption: "Plans compared", background: background)
@@ -118,9 +125,15 @@ class TableBlockSystemTest < ApplicationSystemTestCase
           %w[head cell caption rule ground].each do |part|
             assert_equal seen[part].last, seen[part].first, "#{background || 'plain'} band, #{scheme}: #{part}"
           end
+          heads[[ background || "plain", scheme ]] = seen["head"].first
         end
       end
     end
+
+    %w[plain strong].each do |band|
+      assert_not_equal heads[[ band, "light" ]], heads[[ band, "dark" ]], "#{band}: the head's colour is the scheme's"
+    end
+    assert_not_equal heads[%w[plain light]], heads[%w[strong light]], "light: the strong band re-values the head"
   end
 
   test "in a tinted band the caption is the dim colour, not the page's meta" do

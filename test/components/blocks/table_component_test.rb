@@ -123,4 +123,51 @@ class Blocks::TableComponentTest < ActiveSupport::TestCase
 
     assert_selector "thead th", text: "Plan"
   end
+
+  # A public page drew every cell itself, uncached, one sanitizer pass each:
+  # 0.44 s a view for a table at the hard limits. The cells are one render now
+  # (`RichText::Document#table_cells_html`), cached by the document's digest as
+  # a body's render is: a second view of the same table parses nothing, draws
+  # the same markup, and a changed cell is drawn anew. With a real store: the
+  # suite's null store would cache nothing.
+  test "the cells are drawn in one pass, cached by the document: a second view parses nothing, and a changed cell is drawn" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    begin
+      block = table_block("| Plan | Price |\n| --- | ---: |\n| **Basic** | 5 |\n| Pro | 1 < 2 |")
+      view = -> { Current.reset; draw(block).to_html }
+
+      first, first_parses = SanitizerParses.during { view.call }
+      assert_equal 1, first_parses, "one sanitizer pass for every cell of the table"
+      second, second_parses = SanitizerParses.during { view.call }
+      assert_equal 0, second_parses, "the second view reads the cells from the cache"
+      assert_equal first, second
+      assert_includes first, "<strong>Basic</strong>"
+      assert_includes first, "1 &lt; 2"
+
+      document = block.body_document(locale: :en).to_h
+      document["content"][0]["content"][2]["content"][0]["content"][0]["content"] = [ { "type" => "text", "text" => "Team" } ]
+      block.assign_body(document, locale: :en)
+      block.save!
+      third, third_parses = SanitizerParses.during { view.call }
+      assert_equal 1, third_parses
+      assert_includes third, "Team"
+      assert_not_includes third, ">Pro<"
+    ensure
+      Rails.cache = original_cache
+    end
+  end
+
+  # What a cell prints is what the cell's own render would print, for every
+  # cell: the one pass is a faster way to the same markup, not other markup.
+  test "each cell's markup is the one its own render gives" do
+    block = table_block("| *Plan* | [Price](https://example.com) |\n| --- | :-: |\n| a<br>b | `5` |")
+    document = block.body_document(locale: :en)
+    renderer = RichText::HtmlRenderer.new(RichText::RenderContext.new(locale: :en, urls: PublicSite::Urls.new, document: document))
+    alone = TableBody.new(document).rows.map { |row| row.map { |cell| renderer.render_fragment(cell.nodes) } }
+
+    assert_equal alone, document.table_cells_html(locale: :en, urls: PublicSite::Urls.new)
+    assert alone.flatten.any? { |html| html.include?("<a ") }
+  end
 end

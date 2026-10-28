@@ -201,9 +201,39 @@ module RichText
       context = RichText::RenderContext.new(locale: locale, urls: urls, document: self)
       return RichText::HtmlRenderer.new(context).render(self) if context.preview
 
-      Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]) do
+      Rails.cache.fetch(render_cache_key("rich_text", locale, context)) do
         RichText::HtmlRenderer.new(context).render(self)
       end
+    end
+
+    # A Table block's cells drawn to HTML (`Blocks::TableComponent`):
+    # Array<Array<String>>, one scrubbed, html_safe String per cell of
+    # `TableBody.new(self).rows`, in the same rows and the same order, so the
+    # component pairs each with the cell's `header` and `align` by position.
+    #
+    # The same render cache as `#to_html`, under the same key but for its
+    # first word (`render_cache_key`): the digest, the schema, the locale, the
+    # content version and the code revision say everything a cell's HTML
+    # depends on, as they do for a body, and a preview is drawn every time for
+    # the same reason. Before this a public page drew every cell itself,
+    # uncached, each through a sanitizer pass of its own: a table at the hard
+    # limits (500 rows of 30 cells) cost about 0.44 s of every page view,
+    # while a prose body of the same text was one cached read. Now the cells
+    # are one render with one sanitizer pass (`HtmlRenderer#render_fragments`)
+    # once per document, and a cached read after that.
+    #
+    # What is cached is plain Strings (a cache store keeps no SafeBuffer's
+    # flag reliably): they are the renderer's scrubbed output, marked safe
+    # again on the way out.
+    def table_cells_html(locale: I18n.locale, urls: PublicSite::Urls.new)
+      context = RichText::RenderContext.new(locale: locale, urls: urls, document: self)
+      cells =
+        if context.preview
+          draw_table_cells(context)
+        else
+          Rails.cache.fetch(render_cache_key("rich_text_table_cells", locale, context)) { draw_table_cells(context) }
+        end
+      cells.map { |row| row.map(&:html_safe) }
     end
 
     # "No text and no embeds" (spec §3.1) -- an empty paragraph, or a `doc`
@@ -385,6 +415,22 @@ module RichText
     FLANKING_MARKS = %w[bold italic strike].freeze
 
     private
+
+    # The render cache's key (`#to_html`): what a render is drawn from, each
+    # part's reason in `#to_html`'s comment. `kind` keeps a body's render and
+    # a table's cells (`#table_cells_html`) apart, since both are drawn from
+    # one document.
+    def render_cache_key(kind, locale, context)
+      [ kind, digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]
+    end
+
+    # Every cell drawn in one pass, then put back into its rows. Plain Strings,
+    # for the cache (`#table_cells_html`).
+    def draw_table_cells(context)
+      rows = TableBody.new(self).rows
+      drawn = RichText::HtmlRenderer.new(context).render_fragments(rows.flatten.map(&:nodes)).map { |html| String.new(html) }
+      rows.map { |row| drawn.shift(row.size) }
+    end
 
     # One `"content"` Array's inline children, with `#normalized`'s edge-
     # whitespace rule applied and equal-marked neighbours merged. Anything

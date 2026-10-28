@@ -158,7 +158,14 @@ module HasRichTextBody
     return [] unless document.to_h.is_a?(Hash)
 
     if body_content_kind == :table
-      return [] if document.blank?
+      # A blank body is still of the right shape: nothing at all (what the
+      # editor writes when its table is gone, `storedDocument`), or one table
+      # of equal rows. A blank body of any other shape (an empty paragraph
+      # beside a blank table, a ragged table of empty cells) was let through
+      # here once, saved, and then could not be loaded by the grid, whose
+      # document is `table?` (`rich_text/schema.js`); so only an empty one
+      # skips the checks below.
+      return [] if document.blank? && document.to_h["content"].blank?
       return [ "a Table block's body is exactly one table" ] unless document.table?
       return [ "a table's rows have the same number of cells" ] if TableBody.new(document).ragged?
 

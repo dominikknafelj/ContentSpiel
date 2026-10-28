@@ -63,6 +63,38 @@ module RichText
       Rails::HTML5::SafeListSanitizer.new.sanitize(html, scrubber: RichTextScrubber.new).html_safe
     end
 
+    # Many fragments at once (a Table block's cells, `RichText::Document#
+    # table_cells_html`): Array<SafeBuffer>, one per list of nodes, each what
+    # `render_fragment` would answer for it, from ONE parse and ONE scrubber
+    # pass. A sanitizer pass per cell was most of what a large table cost:
+    # 15,000 cells were 15,000 parses.
+    #
+    # Each fragment is drawn inside a `div` of its own, the whole is parsed and
+    # scrubbed as `SafeListSanitizer#sanitize` does it (`Loofah.html5_fragment`,
+    # `scrub!` with the scrubber, `to_html` in UTF-8: the gem's own three
+    # steps, taken here so the wrappers can be split apart again before they
+    # are serialised), and each wrapper's children are its fragment. A `div`
+    # is what a cell's content lands in on its own too: a fragment's context
+    # is the body, where a stray `tr` or `td` a hand-made cell renders is
+    # dropped either way. The wrappers are only trusted when the parse left
+    # exactly one `div` per fragment at the top; if it ever did not (markup
+    # that escaped its wrapper), every fragment is drawn by `render_fragment`
+    # alone, slow and right.
+    def render_fragments(lists)
+      lists = lists.map { |nodes| nodes.is_a?(Array) ? nodes : [] }
+      return [] if lists.empty?
+
+      html = HELPERS.safe_join(lists.map { |nodes| HELPERS.tag.div(HELPERS.safe_join(nodes.map { |node| render_node(node, 1) })) })
+      fragment = Loofah.html5_fragment(html)
+      fragment.scrub!(RichTextScrubber.new)
+      wrappers = fragment.children
+      unless wrappers.size == lists.size && wrappers.all? { |node| node.element? && node.name == "div" }
+        return lists.map { |nodes| render_fragment(nodes) }
+      end
+
+      wrappers.map { |wrapper| wrapper.children.to_html(encoding: "UTF-8").html_safe }
+    end
+
     private
 
     attr_reader :context

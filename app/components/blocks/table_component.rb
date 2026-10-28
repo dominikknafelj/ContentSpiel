@@ -37,14 +37,19 @@ module Blocks
     def document = @document ||= ::Locales.read(block, :body)
     def table = @table ||= TableBody.new(document)
 
+    # Each cell's HTML comes from one render of the whole table, cached by
+    # the document's digest as a body's render is
+    # (`RichText::Document#table_cells_html`), in the context a body's own
+    # render has (the visitor's language, the public addresses a cell's link
+    # may need), so a cell is drawn as the same text would be in prose. The
+    # list is in `table.rows`' order, read from the same document, so a cell
+    # takes its HTML by position.
     def rows
       @rows ||= begin
-        # The context a body's own render has (the visitor's language, the
-        # public addresses a cell's link may need), so a cell is drawn as the
-        # same text would be in prose.
-        context = ::RichText::RenderContext.new(locale: I18n.locale, urls: helpers.public_urls, document: document)
-        renderer = ::RichText::HtmlRenderer.new(context)
-        table.rows.map { |row| row.map { |cell| Cell.new(cell.header, cell.align, renderer.render_fragment(cell.nodes)) } }
+        html = document.table_cells_html(locale: I18n.locale, urls: helpers.public_urls)
+        table.rows.each_with_index.map do |row, r|
+          row.each_with_index.map { |cell, c| Cell.new(cell.header, cell.align, html.dig(r, c) || "".html_safe) }
+        end
       end
     end
 

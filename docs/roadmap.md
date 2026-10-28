@@ -840,6 +840,7 @@ Left by the Table block (spec "As built"; `docs/reference/content-blocks-and-typ
 - **The editor suites ran on `prosemirror-view` 1.42.8 and `prosemirror-transform` 1.12.4**, the patch upgrades the table pin requires; a regression in the editor is the sign to look again.
 - **Live refresh replacing a clean copied grid has no test of its own** (it follows from the merge rule: the form is clean).
 - **A sticky `th` has no `z-index`**: a positioned element in a later `td` would paint over it (none today).
+- **No total size cap on a table**: the hard limits (500 rows, 30 columns, 2,000 characters a cell) allow about 30 million characters in one table, and prose bodies have no cap either; the public render is cached by the document (`RichText::Document#table_cells_html`), so a large table costs its first view and its saves, not every view. Closed by a cap on a body's size, for every body at once, or when a site is slowed by one.
 
 ### Pages in the Mind graph
 

@@ -68,6 +68,30 @@ class ContentBlockTableBodyTest < ActiveSupport::TestCase
     end
   end
 
+  # A blank body skipped the shape checks once: a blank table beside an empty
+  # paragraph, or a ragged table of empty cells, was saved and the grid could
+  # not load it. Blank is still one table of equal rows, or nothing.
+  test "a blank body of the wrong shape is refused: a blank table beside an empty paragraph, a ragged table of empty cells, an empty paragraph alone" do
+    empty_paragraph = { "type" => "paragraph" }
+    empty_cell = { "type" => "tableCell", "content" => [ empty_paragraph ] }
+    with_table_type do |type|
+      beside = block(type, doc(table(row(empty_cell, empty_cell)), empty_paragraph))
+      assert_not_predicate beside, :valid?
+      assert_match(/exactly one table/, beside.errors[:body].to_sentence)
+
+      ragged = block(type, doc(table(row(empty_cell, empty_cell), row(empty_cell))))
+      assert_not_predicate ragged, :valid?
+      assert_match(/same number of cells/, ragged.errors[:body].to_sentence)
+
+      alone = block(type, doc(empty_paragraph))
+      assert_not_predicate alone, :valid?
+      assert_match(/exactly one table/, alone.errors[:body].to_sentence)
+
+      blank_grid = block(type, doc(table(row(empty_cell, empty_cell), row(empty_cell, empty_cell))))
+      assert_predicate blank_grid, :valid?, blank_grid.errors.full_messages.to_sentence
+    end
+  end
+
   test "rows of different lengths are refused" do
     with_table_type do |type|
       ragged = block(type, doc(table(row(cell, cell), row(cell))))
