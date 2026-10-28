@@ -518,4 +518,180 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     assert_selector grid_of(block), text: "c1!"
     assert_equal 30, rows_of(block.reload.body_document(locale: :en)).first.size, "nothing over the limit is stored"
   end
+
+  # ----- A table per language: the translation tab (Task 7) -----
+  #
+  # Table block spec decisions 8, 9 and 10: a language with no table starts
+  # as a copy of the default language's, shown and not written; the state,
+  # the reference card and AI are the body's.
+
+  # Translates a table's Markdown cell by cell, from a word list, keeping
+  # every pipe and the delimiter row: the shape that comes back is the shape
+  # that went out. The system tests' AI provider (`GatedProvider`) prefixes
+  # the whole text, which would put a word before the table's first pipe; the
+  # app server runs in this process, so it sees this registration too.
+  class TableProvider
+    NAME = "test/tables".freeze
+    WORDS = { "Plan" => "Tarif", "Price" => "Preis", "Basic" => "Einfach", "Starter" => "Anfang", "Pro" => "Profi" }.freeze
+
+    def initialize(api_key:, model:); end
+
+    def translate(texts:, from:, to:, format:) = texts.map { |text| text.gsub(/\b(#{WORDS.keys.join("|")})\b/) { WORDS.fetch(Regexp.last_match(1)) } }
+
+    def test_connection = true
+  end
+
+  def with_table_provider
+    AI::Providers.register(TableProvider::NAME, TableProvider)
+    site_settings(:default).update!(ai_provider: TableProvider::NAME, ai_api_key: "sk-test")
+    yield
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  def body_in(block, locale) = block.reload.body_document(locale: locale)
+
+  def saved_in(block, locale, &condition)
+    document = nil
+    assert_eventually(wait: 6, message: -> { "the #{locale} document never matched: #{document.to_h.to_json}" }) do
+      document = body_in(block, locale)
+      condition.call(document)
+    end
+    assert_empty document.validate, "the grid saved a document the server schema rejects"
+    document
+  end
+
+  # A Table whose languages are written through the save service, as an
+  # editor's saves are, so each translation keeps the source it was made from.
+  def translated_table(page, languages)
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "table" },
+      translations: languages.transform_values { |document| { body: document } }).record
+    assert block.persisted?
+    block
+  end
+
+  def open_translation(page, locale = "de")
+    visit "/cs-studio/pages/#{page.id}?locale=#{locale}"
+    assert_selector ".ProseMirror"
+    await_admin_controllers
+  end
+
+  def right_aligned_prices = words([ %w[Plan Price], %w[Basic 5] ]).tap { |doc| doc["content"][0]["content"].each { |row| row["content"][1]["attrs"] = { "align" => "right" } } }
+
+  test "the copied grid saves nothing until a cell is changed; then the language is Translated and the site shows it" do
+    with_locales(%w[en de es], default: "en")
+    live = create_page(title: "Live prices", translations: { "de" => { title: "Preise" } })
+    block = translated_table(live, "en" => right_aligned_prices)
+    publish_changes(live)
+    source = body_in(block, :en).to_h
+
+    open_translation(live)
+    assert_selector "#{grid_of(block)} tr:first-child > th", count: 2
+    assert_equal [ "Plan", "Price", "Basic", "5" ], all("#{grid_of(block)} th, #{grid_of(block)} td").map(&:text)
+    assert_equal "right", cell(block, 1, 1).evaluate_script("getComputedStyle(this).textAlign")
+    assert_equal({ "type" => "doc", "content" => [] }, JSON.parse(find("#{card(block)} input[name='block[body]']", visible: :all).value), "the field stays empty")
+    assert_selector "#{card(block)} [data-original-for='body'][data-translation-state='missing']"
+    assert_selector "#{card(block)} [data-translate-slot='body']"
+    assert_equal "", find("#{card(block)} input[name='block[caption]']").value.to_s, "the caption is not copied"
+
+    cell(block, 1, 0).click
+    await_frames
+    assert_writes_settled
+    assert_empty Array(body_in(block, :de).to_h["content"]), "a click is no change: nothing is saved"
+    assert_equal :missing, block.translation_state("body", "de")
+
+    key(:End)
+    "Basic".length.times { key(:Backspace) }
+    type_text "Einfach"
+    document = saved_in(block, :de) { |doc| doc.table? && texts(doc).dig(1, 0) == "Einfach" }
+    assert_equal [ %w[Plan Price], %w[Einfach 5] ], texts(document), "the copy is saved whole with the change"
+    assert_equal aligns(RichText::Document.new(source)), aligns(document), "alignment came with the copy"
+    assert_equal [ %w[th th], %w[td td] ], kinds(document)
+    assert_equal source, body_in(block, :en).to_h, "the source is untouched"
+    assert_equal :current, block.reload.translation_state("body", "de")
+
+    assert_writes_settled
+    publish_changes(live)
+    visit PublicSite::Urls.new.path_for(live, "de")
+    assert_selector "table td", text: "Einfach"
+    assert_no_selector "table td", text: "Basic"
+  end
+
+  test "a changed source cell makes the table Outdated, the reference card names the cell's words, and Still correct clears it" do
+    with_locales(%w[en de es], default: "en")
+    block = translated_table(@page, "en" => words([ %w[Plan Price], %w[Basic 5] ]), "de" => words([ %w[Tarif Preis], %w[Einfach 5] ]))
+    assert_equal :current, block.translation_state("body", "de")
+    assert ContentBlocks::Save.call(block.reload, translations: { "en" => { body: words([ %w[Plan Price], %w[Starter 5] ]) } }).ok?
+    assert_equal :outdated, block.reload.translation_state("body", "de")
+
+    open_translation(@page)
+    within("#{card(block)} [data-original-for='body']") do
+      assert_selector "del", text: "Basic"
+      assert_selector "ins", text: "Starter"
+      assert_no_selector "ins", text: "Plan"
+      click_on "Still correct — mark up to date"
+    end
+
+    assert_no_selector "#{card(block)} [data-original-for='body'] ins", wait: 5
+    assert_equal :current, block.reload.translation_state("body", "de")
+    assert_equal [ %w[Tarif Preis], %w[Einfach 5] ], texts(body_in(block, :de)), "Still correct changes nothing of the table"
+  end
+
+  test "Suggest update offers a table of the source's shape and Use puts it in the grid" do
+    with_locales(%w[en de es], default: "en")
+    with_table_provider do
+      block = translated_table(@page, "en" => words([ %w[Plan Price], %w[Basic 5] ]))
+
+      # An empty language: Translate, and Use fills the copied grid.
+      open_translation(@page)
+      within("#{card(block)} [data-translate-slot='body']") { find(:button, "Translate", exact: true).click }
+      box = "#{card(block)} [data-field-name='body'] [id^='translation-suggestion-']"
+      assert_selector "#{box} table td", text: "Einfach"
+      assert_empty Array(body_in(block, :de).to_h["content"]), "a suggestion saves nothing by itself"
+      within(box) { find(:button, "Use", exact: true).click }
+      document = saved_in(block, :de) { |doc| doc.table? && texts(doc) == [ %w[Tarif Preis], %w[Einfach 5] ] }
+      assert_equal [ %w[th th], %w[td td] ], kinds(document)
+      assert_writes_settled
+
+      # This language's own table of another shape, and a changed source.
+      assert ContentBlocks::Save.call(block.reload, translations: { "de" => { body: words([ %w[Tarif Preis Extra], %w[Einfach 5 x], %w[Profi 9 y] ]) } }).ok?
+      assert ContentBlocks::Save.call(block.reload, translations: { "en" => { body: words([ %w[Plan Price], %w[Starter 5] ]) } }).ok?
+      assert_equal :outdated, block.reload.translation_state("body", "de")
+
+      open_translation(@page)
+      assert_selector "#{grid_of(block)} tr", count: 3
+      within("#{card(block)} [data-original-for='body']") { find(:button, "Suggest update", exact: true).click }
+      assert_selector "#{box} table tr", count: 2
+      assert_selector "#{box} table td", text: "Anfang"
+      assert_selector "#{grid_of(block)} tr", count: 3, wait: 0
+      within(box) { find(:button, "Use", exact: true).click }
+
+      assert_selector "#{grid_of(block)} tr", count: 2
+      document = saved_in(block, :de) { |doc| texts(doc) == [ %w[Tarif Preis], %w[Anfang 5] ] }
+      assert_equal [ %w[th th], %w[td td] ], kinds(document), "Use replaces the table whatever shape it had"
+      assert_equal :current, block.reload.translation_state("body", "de")
+    end
+  end
+
+  test "the translation tab's own grid has all the controls" do
+    with_locales(%w[en de es], default: "en")
+    block = translated_table(@page, "en" => words([ %w[Plan Price], %w[Basic 5] ]), "de" => words([ %w[Tarif Preis], %w[Einfach 5] ]))
+
+    open_translation(@page)
+    assert_selector "#{card(block)} [data-controller~='admin--editor--table']"
+    assert_selector "#{card(block)} input[role=switch]", count: 2
+    assert_selector "#{card(block)} [role=toolbar]"
+    # The source beside it is read-only: a rendered table, not a grid.
+    assert_selector "#{card(block)} [data-original-for='body'] table th", text: "Plan"
+    assert_no_selector "#{card(block)} [data-original-for='body'] .ProseMirror"
+
+    cell(block, 1, 0).click
+    press "Add row"
+    row_menu(block, "Insert below")
+    column_menu(block, "Insert right")
+    document = saved_in(block, :de) { |doc| rows_of(doc).size == 4 && rows_of(doc).first.size == 3 }
+    assert_equal [ 3, 3, 3, 3 ], texts(document).map(&:size), "four rows of three columns"
+    assert_equal %w[Tarif Preis Einfach 5].sort, texts(document).flatten.reject(&:empty?).sort, "every word kept"
+    assert_equal [ %w[Plan Price], %w[Basic 5] ], texts(body_in(block, :en)), "the source keeps its own shape"
+  end
 end

@@ -197,4 +197,19 @@ class RichText::DocumentTest < ActiveSupport::TestCase
     end
     assert_nothing_raised { RichText::Document.new(42).normalized.to_h }
   end
+
+  # The text a translation keeps of its original and the reference card diffs
+  # (`Translations.source_text`): a table is read cell by cell, row by row, so
+  # a changed cell is named by its own words and not the whole table's line.
+  test "a table's plain paragraphs are its cells' texts, row by row" do
+    row = ->(kind, *texts) { { "type" => "tableRow", "content" => texts.map { |value| { "type" => kind, "content" => [ value ? para(value) : { "type" => "paragraph" } ] } } } }
+    table = { "type" => "table", "content" => [
+      row.call("tableHeader", "Plan", "Price"),
+      { "type" => "tableRow", "content" => [ { "type" => "tableCell", "content" => [ paragraph(text("Basic", "bold"), { "type" => "hardBreak" }, text("plan")) ] }, { "type" => "tableCell", "content" => [ { "type" => "paragraph" } ] } ] },
+      row.call("tableCell", "Pro", "9 €")
+    ] }
+
+    assert_equal [ "Plan", "Price", "Basic\nplan", "Pro", "9 €" ], doc(table).plain_paragraphs
+    assert_equal [ "Before", "Plan", "Price", "Basic\nplan", "Pro", "9 €", "After" ], doc(para("Before"), table, para("After")).plain_paragraphs
+  end
 end

@@ -20,11 +20,12 @@ module Admin
     # controller taken off, as every form's are.
     #
     # The two switches and the warning are drawn from what the grid SHOWS:
-    # the stored table, or the starting grid of a Table that has none yet
-    # (`TableBody.starting_document`, which `starting_content` hands the
-    # column: shown, not written, until the first change). The script draws
-    # them again after every change; the server draws the first, so a card
-    # reads right before its script runs.
+    # the stored table, or, for a Table that has none yet, the column's
+    # starting content (`starting:`, the column's own `#starting_content`:
+    # the starting grid, `TableBody.starting_document`, or on a translation
+    # tab the copy of the original's table; shown, not written, until the
+    # first change). The script draws them again after every change; the
+    # server draws the first, so a card reads right before its script runs.
     #
     # The delete confirmations are `TableDeleteDialogsComponent`, which the
     # card draws OUTSIDE its form (a dialog's `<form method="dialog">` cannot
@@ -49,16 +50,17 @@ module Admin
       COLUMN_ITEMS = [ %w[insert_left insertColumnLeft], %w[insert_right insertColumnRight], %w[move_left moveColumnLeft], %w[move_right moveColumnRight] ].freeze
       ALIGNS = TableBody::ALIGNS
 
-      def initialize(block:, document:)
+      def initialize(block:, document:, starting: nil)
         @block = block
         @document = document
+        @starting = starting
       end
 
       private
 
       attr_reader :block
 
-      def shown = @shown ||= TableBody.new(self.class.filled?(@document) ? @document : TableBody.starting_document)
+      def shown = @shown ||= TableBody.new(self.class.filled?(@document) ? @document : (@starting || TableBody.starting_document))
 
       def header_row? = shown.header_row?
 

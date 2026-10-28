@@ -250,4 +250,76 @@ class Admin::Columns::RichTextColumnComponentTableTest < ViewComponent::TestCase
     assert_equal "table", editor_element["data-admin--rich-text--editor-content-value"]
     assert_equal [ "Bold", "Italic", "Inline code", "Link" ], toolbar_labels
   end
+
+  # Table block spec, decision 8: a language with no table starts as a copy of
+  # the default language's, SHOWN as the editor's starting content while its
+  # field stays empty.
+  def table_of(rows, aligns: {})
+    { "type" => "doc", "content" => [ { "type" => "table", "content" => rows.each_with_index.map do |row, index|
+      { "type" => "tableRow", "content" => row.each_with_index.map do |text, column|
+        cell = { "type" => index.zero? ? "tableHeader" : "tableCell", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
+        aligns[column] ? cell.merge("attrs" => { "align" => aligns[column] }) : cell
+      end }
+    end } ] }
+  end
+
+  # An AI provider that is set up, so the Translate button renders; it is never asked.
+  class StubProvider
+    def initialize(api_key:, model:); end
+  end
+
+  def starting_content = JSON.parse(editor_element["data-admin--rich-text--editor-starting-content-value"].to_s.presence || "null")
+
+  def stored_input = page.find("input[name='block[body]']", visible: :all)
+
+  test "on a translation tab a language with no table starts from the source's table, with the field empty, Translate offered and the mark Missing" do
+    Current.actor = users(:one)
+    AI::Providers.register("test/stub", StubProvider)
+    Current.site.update!(ai_provider: "test/stub", ai_api_key: "sk-test")
+    record = create_page(title: "Prices")
+    source = table_of([ %w[Plan Price], %w[Basic 5] ], aligns: { 1 => "right" })
+    block = record.content_blocks.new(block_type: "table", position: 0)
+    block.assign_body(source, locale: :en)
+    block.assign_body(table_of([ %w[Tarif Preis] ]), locale: :es)
+    block.caption = "Our prices"
+    block.save!
+    stored = block.reload.body_document(locale: :en).to_h
+
+    render_inline Admin::EditorScreen::BlockCardComponent.new(page: record, block: block, locale: "de")
+
+    assert_equal stored, starting_content, "the copy is the source's table as stored: shape, alignment, header kinds and words"
+    assert_equal({ "type" => "doc", "content" => [] }, JSON.parse(stored_input.value), "the field stays empty")
+    assert_selector "[data-translate-slot='body'] button", text: "Translate"
+    assert_selector "[data-original-for='body'][data-translation-state='missing']"
+    assert_selector "[data-original-for='body'] table th", text: "Plan"
+    assert_equal "", page.find("input[name='block[caption]']").value.to_s, "the caption is not copied"
+    # The header switches read what the grid shows: the copy's header row.
+    assert page.find("input[role=switch]", match: :first).checked?
+
+    render_inline Admin::EditorScreen::BlockCardComponent.new(page: record, block: block, locale: "es")
+    assert_nil starting_content, "a language with a table of its own starts from nothing but it"
+    assert_includes stored_input.value, "Tarif"
+
+    render_inline Admin::EditorScreen::BlockCardComponent.new(page: record, block: block, locale: "en")
+    assert_nil starting_content, "the default language shows its own table"
+
+    empty = record.content_blocks.create!(block_type: "table", position: 1)
+    render_inline Admin::EditorScreen::BlockCardComponent.new(page: record, block: empty, locale: "de")
+    assert_equal JSON.parse(TableBody.starting_document.to_json), starting_content, "with no source table it is the starting grid"
+  ensure
+    Current.reset
+    Rails.application.reloader.prepare!
+  end
+
+  test "a read-only column is never given the source's copy" do
+    source = table_of([ %w[Plan Price], %w[Basic 5] ])
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, original: source, locale: "de", body_content: :table, editable: false)
+    assert_nil starting_content
+
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, original: source, locale: "de", body_content: :table)
+    assert_equal source, starting_content
+
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, original: source, locale: "de")
+    assert_nil starting_content, "rich text has no copy: only a table's grid starts from the source"
+  end
 end

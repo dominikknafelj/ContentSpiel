@@ -72,9 +72,21 @@ module Admin
     # in the editor, which then writes the whole document, starting content
     # and change together. So a field nobody touched autosaves nothing, a live
     # refresh sees a clean form, and every rule about an empty field still
-    # holds. A new Table's 3 × 3 grid is one (`TableBody.starting_document`);
-    # a language's copy of the source table is another (table block spec,
-    # decision 8). It is general: nothing in it knows of tables.
+    # holds. A new Table's 3 × 3 grid is one (`TableBody.starting_document`),
+    # which the caller hands in. It is general: nothing in it knows of tables.
+    #
+    # The one starting content this column decides itself is a table's on a
+    # translation tab (table block spec, decision 8): an editable table whose
+    # language has no table yet, beside an original that is one, starts as a
+    # COPY of the original's table as stored (its shape, alignment, header
+    # kinds and words), in place of whatever the caller handed in. Shown, not
+    # written: the field stays empty, so AI Translate is offered
+    # (`translation_field_empty?`), the field's mark stays ○ Missing and the
+    # site keeps showing the default language's table until the translator's
+    # first change is saved. A copy written into the field would count as an
+    # edit, and one saved untouched would read "Translated" with the original's
+    # words in it. A held or read-only grid gets no copy: what it shows would
+    # read as this language's table.
     class RichTextColumnComponent < Base
       CONTENTS = %i[rich table].freeze
 
@@ -90,8 +102,24 @@ module Admin
 
       def editable? = @editable
 
-      # The JSON of `starting_content:`, or nil (no attribute) without one.
-      def starting_content_json = @starting_content.presence && self.class.to_document(@starting_content).to_h.to_json
+      # What the editor shows while the field is empty (see the class
+      # comment): the original's table on a translation tab, else
+      # `starting_content:`. A Hash, or nil.
+      def starting_content
+        return original_document.to_h if source_copy?
+
+        @starting_content.presence && self.class.to_document(@starting_content).to_h
+      end
+
+      # The JSON of `#starting_content`, or nil (no attribute) without one.
+      def starting_content_json = starting_content&.to_json
+
+      # An editable table with no table of its own, beside an original that is
+      # one. "No table" is the script's rule for showing starting content (an
+      # input whose document has no top-level node, `filled` in the editor
+      # controller), not `blank?`: a stored table of empty cells is this
+      # language's own and is what the editor shows.
+      def source_copy? = table? && editable? && Array(document.to_h["content"]).empty? && original_document.table?
 
       def table? = @content == :table
 

@@ -136,12 +136,20 @@ module RichText
     # translations screen can diff it later (`Translations::SourceDiff`).
     # Marks are dropped, a hard break is a newline, and the items of a list
     # or quote are separated by newlines.
+    #
+    # A table (the Table block's body, table block spec decision 9) is one
+    # entry PER CELL, row by row, empty cells dropped: read as one top-level
+    # node it would be a single run of every word with nothing between the
+    # cells ("PlanPriceBasic"), and the reference card's word diff of a
+    # changed cell would be that whole line. Only what is kept as text is
+    # read this way; the digest that says whether the original changed is
+    # the document's own (`#digest`), and does not move with this.
     PLAIN_PLACEHOLDERS = { "image" => "[image]", "youtube" => "[video]", "horizontalRule" => "[rule]" }.freeze
 
     PLAIN_BLOCK_CONTAINERS = %w[bulletList orderedList listItem blockquote].freeze
 
     def plain_paragraphs
-      Array(@hash["content"]).filter_map { |node| plain_text_of(node).strip.presence }
+      Array(@hash["content"]).flat_map { |node| plain_units(node) }.filter_map { |node| plain_text_of(node).strip.presence }
     end
 
     # Renders this document to Markdown (design spec §3.4) -- MCP's read
@@ -456,6 +464,17 @@ module RichText
       end
 
       result_holder[0]
+    end
+
+    # The nodes `#plain_paragraphs` reads one entry each from: a table's
+    # cells in reading order, any other top-level node itself. A table's
+    # shape is the schema's (rows of cells), so this walks two fixed levels
+    # and no further; anything else in it is skipped, as `plain_text_of`
+    # reads a non-Hash as nothing.
+    def plain_units(node)
+      return [ node ] unless node.is_a?(Hash) && node["type"] == "table"
+
+      Array(node["content"]).flat_map { |row| row.is_a?(Hash) ? Array(row["content"]) : [] }
     end
 
     def plain_text_of(node, depth = 0)

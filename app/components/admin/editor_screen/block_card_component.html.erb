@@ -169,7 +169,7 @@
             <%# A Table's grid with its controls around it, for someone who may change it now; held or
                 read only, the grid alone (table block spec, decision 13: see `table_controls?`). %>
             <% if table_controls? %>
-              <%= render Admin::EditorScreen::TableControlsComponent.new(block: block, document: column_value("body")) do %>
+              <%= render Admin::EditorScreen::TableControlsComponent.new(block: block, document: column_value("body"), starting: body_column.starting_content) do %>
                 <%= render body_column %>
               <% end %>
             <% else %>
