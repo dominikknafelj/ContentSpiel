@@ -21,7 +21,17 @@
    the same.
 
    The header column is sticky on --th-table-ground, so a cell scrolled
-   under it is hidden by it; the ground must be opaque, and is. */
+   under it is hidden by it; the ground must be opaque, and is. A mask would
+   fade the sticky cells with the rest, so a table with a header column has
+   no mask on its left: the sticky cells carry the left fade themselves, a
+   24px gradient from the ground on their own right side, shown as the box is
+   scrolled (the same scroll timeline, read through `scroll(nearest)`).
+
+   A cell has a floor (`min-width`): `overflow-wrap: anywhere` lowers a
+   cell's minimum width to a single character, so without one the table
+   would always squeeze into the column and never scroll. With it a wide
+   table is wider than the column and scrolls in its box, and only a word
+   longer than the floor breaks. */
 @property --table-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --table-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
 
@@ -46,7 +56,8 @@
 @keyframes table-fade-end { from { --table-fade-end: 24px; } to { --table-fade-end: 0px; } }
 
 .table-scroll table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   font-size: var(--th-t-small);
   line-height: 1.5;
@@ -65,18 +76,18 @@
   padding: 10px 12px;
   vertical-align: top;
   text-align: left;
+  min-width: 10ch;
   overflow-wrap: anywhere;
 }
 .table-scroll tbody tr + tr > th,
-.table-scroll tbody tr + tr > td,
-.table-scroll thead + tbody > tr:first-child > th,
-.table-scroll thead + tbody > tr:first-child > td { border-top: 1px solid var(--th-table-line); }
+.table-scroll tbody tr + tr > td { border-top: 1px solid var(--th-table-line); }
 .table-scroll thead th {
   border-bottom: 1px solid var(--th-table-rule);
   font-weight: 600;
   color: var(--th-table-head);
 }
-.table-scroll tbody th[scope="row"] {
+.table-scroll tbody th[scope="row"],
+.table-scroll:has(tbody th[scope="row"]) thead th:first-child {
   position: sticky;
   left: 0;
   background: var(--th-table-ground);
@@ -86,3 +97,33 @@
 .table-scroll .align-left { text-align: left; }
 .table-scroll .align-center { text-align: center; }
 .table-scroll .align-right { text-align: right; }
+
+/* A table with a header column: no mask on the left (it would fade the sticky
+   cells), the end's only, and the sticky cells draw the left fade. */
+.table-scroll:has(tbody th[scope="row"]) { --table-fade-start: 0px; }
+.table-scroll tbody th[scope="row"]::after,
+.table-scroll:has(tbody th[scope="row"]) thead th:first-child::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  width: 24px;
+  background: linear-gradient(to right, var(--th-table-ground), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+@supports (animation-timeline: scroll()) {
+  .table-scroll:has(tbody th[scope="row"]) {
+    animation: table-fade-end linear both;
+    animation-timeline: scroll(self inline);
+    animation-range: calc(100% - 24px) 100%;
+  }
+  .table-scroll tbody th[scope="row"]::after,
+  .table-scroll:has(tbody th[scope="row"]) thead th:first-child::after {
+    animation: table-edge-in linear both;
+    animation-timeline: scroll(nearest inline);
+    animation-range: 0 24px;
+  }
+}
+@keyframes table-edge-in { from { opacity: 0; } to { opacity: 1; } }

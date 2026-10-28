@@ -1,20 +1,33 @@
 <%# A theme's own Table block, written from what `Theme::Contract` gives the template (`block`, `page`,
     `rows`, `header_row?`, `header_column?`, `column_count`, `caption`; docs/reference/theming.md, "The Table
-    block"): a scroll box named by the caption's id, the header row in a thead, a header column's cells as
-    row headers, every cell's text as handed over (`html`) and its alignment as a data attribute. %>
-<div class="plain-table" tabindex="0" role="region" data-columns="<%= column_count %>" data-block="<%= block.id %>" data-page="<%= page.id %>"<% if caption %> aria-labelledby="plain-table-<%= block.id %>"<% end %>>
+    block"): a scroll box named by the caption's id, or by a word of its own without one, the header row in a
+    thead, a header column's cells as row headers, every cell's text as handed over (`html`) and its
+    alignment as a data attribute. %>
+<div class="plain-table" tabindex="0" role="region" data-columns="<%= column_count %>" data-block="<%= block.id %>" data-page="<%= page.id %>"<% if caption %> aria-labelledby="plain-table-<%= block.id %>"<% else %> aria-label="Table"<% end %>>
   <table>
     <% if caption %><caption id="plain-table-<%= block.id %>"><%= caption %></caption><% end %>
-    <% rows.each_with_index do |row, r| %>
-      <% if r.zero? && header_row? %><thead><% elsif r == (header_row? ? 1 : 0) %><tbody><% end %>
-      <tr>
-        <% row.each_with_index do |cell, c| %>
-          <% tag = (r.zero? && header_row?) ? "th" : ((c.zero? && header_column?) ? "th" : "td") %>
-          <<%= tag %> data-align="<%= cell.align %>"><%= cell.html %></<%= tag %>>
+    <% head = header_row? ? rows.first(1) : [] %>
+    <% if head.any? %>
+      <thead>
+        <% head.each do |row| %>
+          <tr><% row.each do |cell| %><th scope="col" data-align="<%= cell.align %>"><%= cell.html %></th><% end %></tr>
         <% end %>
-      </tr>
-      <% if r.zero? && header_row? %></thead><% end %>
+      </thead>
     <% end %>
-    </tbody>
+    <% if rows.size > head.size %>
+      <tbody>
+        <% rows.drop(head.size).each do |row| %>
+          <tr>
+            <% row.each_with_index do |cell, c| %>
+              <% if c.zero? && header_column? %>
+                <th scope="row" data-align="<%= cell.align %>"><%= cell.html %></th>
+              <% else %>
+                <td data-align="<%= cell.align %>"><%= cell.html %></td>
+              <% end %>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    <% end %>
   </table>
 </div>
