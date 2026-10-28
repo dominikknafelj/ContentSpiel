@@ -51,10 +51,10 @@ class RichText::TableNodesTest < ActiveSupport::TestCase
     assert_not_includes html, "<p>"
   end
 
-  test "a class that is not a cell's alignment does not survive the scrubber" do
+  test "a table cell keeps a class only as its alignment, and another element keeps its class" do
     html = RichTextScrubber.new.then { |scrubber| Rails::HTML5::SafeListSanitizer.new.sanitize(%(<p class="align-left">a</p><table><tbody><tr><td class="evil">b</td><td class="align-center">c</td></tr></tbody></table>), scrubber: scrubber) }
     assert_not_includes html, "evil"
-    assert_not_includes html, %(<p class)
+    assert_includes html, %(<p class="align-left">)
     assert_includes html, %(<td class="align-center">)
   end
 
