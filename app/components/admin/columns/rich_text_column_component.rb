@@ -57,13 +57,31 @@ module Admin
     # something could be done. `admin--rich-text--editor` already mounts the editor
     # read-only inside a `fieldset[disabled]` and guards every popover and
     # command on that, so the missing toolbar costs it nothing.
+    #
+    # `body_content: :table` (a Table block's body, `ContentBlock#body_content_kind`,
+    # table block spec decisions 3 and 11) draws the same column as the
+    # block's grid: the editor is told `content: "table"` and builds the table
+    # schema and keys of `rich_text/table.js` instead of the ordinary set, and
+    # the toolbar holds only what a cell may hold (`TABLE_TOOLBAR_GROUPS`: the
+    # marks bold, italic and code, and Link, which makes internal links too)
+    # with no Insert menu, since nothing a cell holds is inserted as a block.
     class RichTextColumnComponent < Base
-      def initialize(editable: true, **options)
+      CONTENTS = %i[rich table].freeze
+
+      # `body_content:`, as the block type's definition names it (`content:`
+      # is ViewComponent's own method).
+      def initialize(editable: true, body_content: :rich, **options)
         super(**options)
         @editable = editable
+        @content = body_content.to_sym
+        raise ArgumentError, "body_content is one of #{CONTENTS.join(", ")}: #{body_content.inspect}" unless CONTENTS.include?(@content)
       end
 
       def editable? = @editable
+
+      def table? = @content == :table
+
+      def content_kind = @content.to_s
 
       # [action, accessible name, visible text, toggle?]. `action` is the
       # `admin--rich-text--editor` method the button runs (`data-action` below) and
@@ -109,6 +127,12 @@ module Admin
         ]
       ].freeze
 
+      # A table's toolbar (see the class comment): `TOOLBAR_GROUPS`' own
+      # buttons, the ones a cell's marks (`HasRichTextBody::TABLE_CELL_MARKS`)
+      # can use. Strikethrough is not among them: the server refuses it in a cell.
+      TABLE_ACTIONS = %w[bold italic code link].freeze
+      TABLE_TOOLBAR_GROUPS = TOOLBAR_GROUPS.map { |group| group.select { |action, *| TABLE_ACTIONS.include?(action) } }.reject(&:empty?).freeze
+
       # The "Insert ▾" menu's items, same shape as `TOOLBAR_GROUPS`'.
       INSERT_MENU = [
         [ "internalLink", "Page link", "Page link", false ],
@@ -130,10 +154,13 @@ module Admin
       # choose) -- the button's only way to add an image is the picker, which
       # isn't on the page without it. An image already in the document stays
       # editable by selecting it.
-      def toolbar_groups = TOOLBAR_GROUPS
+      def toolbar_groups = table? ? TABLE_TOOLBAR_GROUPS : TOOLBAR_GROUPS
 
+      # None for a table (see the class comment).
       def insert_menu
-        can?("media.upload") ? INSERT_MENU : INSERT_MENU.reject { |action, *| action == "image" }
+        return [] if table?
+
+        @insert_menu ||= can?("media.upload") ? INSERT_MENU : INSERT_MENU.reject { |action, *| action == "image" }
       end
 
       # Shared by the toolbar's buttons and the menu's items; `data-action`

@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { Editor } from "@tiptap/core"
 import { extensions, safeHref, normalizeHref } from "rich_text/schema"
+import { storedDocument } from "rich_text/table"
 import { createPopover, createField, createButton } from "rich_text/popover"
 import { createTargetSearch } from "rich_text/target_search"
 
@@ -53,7 +54,12 @@ export default class extends Controller {
     locale: String,
     assets: Object,
     linkTitles: Object,
-    readOnly: Boolean
+    readOnly: Boolean,
+    // The body's kind (`ContentBlock#body_content_kind`): "rich", every
+    // body's, or "table", a Table block's grid (table block spec decision
+    // 11) -- the same editor with the table schema and keys of
+    // `rich_text/table.js` and nothing else (`extensions({ content })`).
+    content: { type: String, default: "rich" }
   }
 
   static texts = {
@@ -97,7 +103,8 @@ export default class extends Controller {
       extensions: extensions({
         resolveAssetUrl: (id) => this.assets[id]?.url || null,
         resolveLinkTitle: (type, id) => this.linkTitles[`${type}:${id}`] || null,
-        onEditImage: (position) => this.openImageDialog(position)
+        onEditImage: (position) => this.openImageDialog(position),
+        content: this.contentValue
       }),
       injectCSS: false,
       editable: !this.readOnly,
@@ -208,7 +215,10 @@ export default class extends Controller {
   writeDocument() {
     if (this.contentInvalid || !this.editor) return
 
-    this.inputTarget.value = JSON.stringify(this.editor.getJSON())
+    // A grid's document is written as the server stores it: without the
+    // cells' editor-only attributes, and empty as `{ type: "doc", content: [] }`.
+    const json = this.editor.getJSON()
+    this.inputTarget.value = JSON.stringify(this.contentValue === "table" ? storedDocument(json) : json)
     this.inputTarget.dispatchEvent(new Event("input", { bubbles: true }))
   }
 

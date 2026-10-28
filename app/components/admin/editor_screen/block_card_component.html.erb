@@ -164,7 +164,7 @@
             <%= render Admin::Columns::RichTextColumnComponent.new(
                   name: "body", id: field_id("body"), html_name: field_html_name("body"),
                   value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale,
-                  editable: editable? && !read_only_hold?, **translation("body")
+                  editable: editable? && !read_only_hold?, body_content: block.body_content_kind, **translation("body")
                 ) %>
           <% when "caption" %>
             <%= render Admin::Columns::PlainColumnComponent.new(

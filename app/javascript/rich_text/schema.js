@@ -5,6 +5,15 @@ import { Plugin, PluginKey } from "@tiptap/pm/state"
 import { Youtube, YoutubePaste } from "rich_text/youtube"
 import { Image } from "rich_text/image"
 import { InternalLink } from "rich_text/internal_link"
+import { Document } from "@tiptap/extension-document"
+import { Paragraph } from "@tiptap/extension-paragraph"
+import { Text } from "@tiptap/extension-text"
+import { HardBreak } from "@tiptap/extension-hard-break"
+import { Bold } from "@tiptap/extension-bold"
+import { Italic } from "@tiptap/extension-italic"
+import { Code } from "@tiptap/extension-code"
+import { UndoRedo } from "@tiptap/extensions"
+import { SchemaTable, SchemaTableRow, SchemaTableHeader, SchemaTableCell, TableKeys } from "rich_text/table"
 
 // The editor's schema, in one place, matched against `RichText::Schema`
 // (`app/models/rich_text/built_ins.rb`, the source of truth) type by type
@@ -166,10 +175,55 @@ const SchemaOrderedList = OrderedList.extend({
   }
 })
 
+// The link mark as every body has it, table cells included.
+function schemaLink() {
+  return SchemaLink.configure({
+    openOnClick: false,
+    autolink: true,
+    linkOnPaste: true,
+    defaultProtocol: "https",
+    HTMLAttributes: { target: null, rel: "noopener noreferrer nofollow", class: null },
+    isAllowedUri: (url) => safeHref(url)
+  })
+}
+
+// A Table block's body (table block spec decisions 3 and 11; the body rule
+// is `HasRichTextBody#body_kind_errors_for`): one table or nothing (`table?`:
+// an editor emptied of its table is an empty document, which the server
+// takes as a blank body), cells of one paragraph (`rich_text/table.js`), and
+// in a cell the marks `HasRichTextBody::TABLE_CELL_MARKS` allows -- bold,
+// italic, code, link and internalLink -- and a hard break. No StarterKit:
+// it would bring headings, lists, quotes and the rest, which a paste could
+// then put into a cell; undo and redo are its one behaviour this needs.
+function tableExtensions({ resolveLinkTitle }) {
+  return [
+    Document.extend({ content: "table?" }),
+    Paragraph,
+    Text,
+    HardBreak,
+    Bold,
+    Italic,
+    Code,
+    UndoRedo,
+    schemaLink(),
+    InternalLink.configure({ resolveTitle: resolveLinkTitle }),
+    SchemaTable,
+    SchemaTableRow,
+    SchemaTableHeader,
+    SchemaTableCell,
+    TableKeys
+  ]
+}
+
 // `resolveAssetUrl(assetId)`, `resolveLinkTitle(type, id)` and
 // `onEditImage(position)` come from `admin--rich-text--editor` -- see `image.js` /
-// `internal_link.js`.
-export function extensions({ resolveAssetUrl, resolveLinkTitle, onEditImage }) {
+// `internal_link.js`. `content` is the body's kind (`ContentBlock#body_content_kind`,
+// handed over by the column): `"rich"`, every body's today, or `"table"`, a
+// Table block's grid. The ordinary set has no table nodes, so a `<table>`
+// pasted into a post's body keeps its text and loses its structure.
+export function extensions({ resolveAssetUrl, resolveLinkTitle, onEditImage, content = "rich" }) {
+  if (content === "table") return tableExtensions({ resolveLinkTitle })
+
   return [
     StarterKit.configure({
       heading: { levels: [ 2, 3, 4 ] },
@@ -178,14 +232,7 @@ export function extensions({ resolveAssetUrl, resolveLinkTitle, onEditImage }) {
       orderedList: false
     }),
     SchemaOrderedList,
-    SchemaLink.configure({
-      openOnClick: false,
-      autolink: true,
-      linkOnPaste: true,
-      defaultProtocol: "https",
-      HTMLAttributes: { target: null, rel: "noopener noreferrer nofollow", class: null },
-      isAllowedUri: (url) => safeHref(url)
-    }),
+    schemaLink(),
     InternalLink.configure({ resolveTitle: resolveLinkTitle }),
     Youtube,
     YoutubePaste,

@@ -210,3 +210,44 @@ class Admin::Columns::RichTextColumnComponentTranslationTest < ViewComponent::Te
     assert_empty heading.grep(/accent-tint/)
   end
 end
+
+# The Table block's grid (table block spec decisions 3 and 11): the same
+# column in table mode, `content: :table`, which the block card passes from
+# the type's `body_content`. The editor builds its table schema from the
+# `content` value; the toolbar holds the cell's marks and Link, and nothing
+# that inserts a block.
+class Admin::Columns::RichTextColumnComponentTableTest < ViewComponent::TestCase
+  include ContentHelper
+
+  def editor_element = page.find("[data-controller='admin--rich-text--editor']")
+
+  def toolbar_labels = page.all("[role=toolbar] button", visible: :all).map { |button| button["aria-label"] }
+
+  test "a table block's body is drawn in table mode with the limited toolbar and no insert menu; a text block's is not" do
+    record = create_page(title: "Grid")
+    table = record.content_blocks.create!(block_type: "table", position: 0)
+    text = record.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    render_inline Admin::EditorScreen::BlockCardComponent.new(page: record, block: table, locale: "en")
+    assert_equal "table", editor_element["data-admin--rich-text--editor-content-value"]
+    assert_equal [ "Bold", "Italic", "Inline code", "Link" ], toolbar_labels
+    assert_no_selector "[role=toolbar] [data-controller='admin--ui--menu']", visible: :all
+    assert_no_selector "[role=toolbar] [role=menu]", visible: :all
+    assert_selector ".admin-rich-text-editor.admin-rich-text-table"
+
+    render_inline Admin::EditorScreen::BlockCardComponent.new(page: record, block: text, locale: "en")
+    assert_equal "rich", editor_element["data-admin--rich-text--editor-content-value"]
+    assert_includes toolbar_labels, "Heading 2"
+    assert_selector "[role=toolbar] [data-controller='admin--ui--menu']"
+    assert_no_selector ".admin-rich-text-table"
+  end
+
+  test "the column draws rich text unless it is told table" do
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
+    assert_equal "rich", editor_element["data-admin--rich-text--editor-content-value"]
+
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, body_content: :table)
+    assert_equal "table", editor_element["data-admin--rich-text--editor-content-value"]
+    assert_equal [ "Bold", "Italic", "Inline code", "Link" ], toolbar_labels
+  end
+end
