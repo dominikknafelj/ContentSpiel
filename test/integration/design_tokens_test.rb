@@ -521,6 +521,66 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes css, "bg-ink\\/6"
   end
 
+  TABLE_TOKENS = %w[table-rule table-line table-head table-caption table-ground].freeze
+
+  # Table block spec, "The public side": five tokens from the base, in both
+  # schemes, never a literal.
+  test "the five table tokens are defined from the theme's base tokens in both schemes, never a literal" do
+    theme_tokens.each do |theme, tokens|
+      TABLE_TOKENS.each do |name|
+        value = tokens.fetch("--th-#{name}") { flunk("--th-#{name} is not defined for #{theme}") }
+        assert_match(/\Avar\(--th-[\w-]+\)\z/, value, "#{theme} --th-#{name} is #{value}")
+      end
+      assert_equal "var(--th-line-strong)", tokens.fetch("--th-table-rule")
+      assert_equal "var(--th-line)", tokens.fetch("--th-table-line")
+      assert_equal "var(--th-ink)", tokens.fetch("--th-table-head")
+      assert_equal "var(--th-meta)", tokens.fetch("--th-table-caption")
+      assert_equal "var(--th-paper)", tokens.fetch("--th-table-ground")
+    end
+  end
+
+  test "the table's stylesheet is declared by the type and holds no colour of its own" do
+    path = Rails.root.join("app/assets/tailwind/themes/default/table.css")
+    bare = path.read.gsub(%r{/\*.*?\*/}m, "")
+
+    assert_equal path, BlockTypes.fetch(:table).stylesheet_path
+    refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(|\bcolor-mix\(/, bare, "every colour is a token")
+    assert_no_match(/Written by bin\/rails generate block_type/, path.read, "the stylesheet is the type's own now: the generator's destroy must not remove it")
+    TABLE_TOKENS.each { |name| assert_includes bare, "var(--th-#{name})", "the stylesheet draws with --th-#{name}" }
+  end
+
+  # Header text, cell text and caption at 4.5:1 against the table's ground, on
+  # the page, in a tinted band and in a strong band, in both schemes: 3 x 3 x 2.
+  # The cell text is --th-ink, which a strong band re-values to its text.
+  test "a table's header text, cell text and caption are readable on its ground, on the page, in a tinted band and in a strong band, in both themes" do
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+        "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.each do |place, (inside, around)|
+        outside = resolve_colour(tokens, around, inside: inside)
+        ground = resolve_colour(tokens, "--th-table-ground", inside: inside, under: outside)
+        %w[--th-table-head --th-ink --th-table-caption].each do |token|
+          ratio = contrast(ground, resolve_colour(tokens, token, inside: inside))
+          assert_operator ratio, :>=, 4.5, "#{token} on the table's ground in #{place} (#{theme}) is #{ratio.round(2)}:1"
+          pairs += 1
+        end
+      end
+    end
+    assert_equal 18, pairs
+  end
+
+  test "a tinted band changes only the table's ground and caption; a strong band re-values all five" do
+    assert_equal %w[--th-table-caption --th-table-ground], band_values("tinted").keys.grep(/--th-table-/).sort
+    assert_equal "var(--th-band-tinted)", band_values("tinted")["--th-table-ground"]
+    strong = band_values("strong")
+    assert_equal TABLE_TOKENS.map { |name| "--th-#{name}" }.sort, strong.keys.grep(/--th-table-/).sort
+    assert_equal "color-mix(in srgb, var(--th-on-band-strong) 40%, transparent)", strong["--th-table-rule"]
+    assert_equal "color-mix(in srgb, var(--th-on-band-strong) 16%, transparent)", strong["--th-table-line"]
+    assert_equal "var(--th-on-band-strong)", strong["--th-table-head"]
+    assert_equal "var(--th-on-band-strong-dim)", strong["--th-table-caption"]
+    assert_equal "var(--th-band-strong)", strong["--th-table-ground"]
+  end
+
   private
     def helpers = ActionController::Base.helpers
 

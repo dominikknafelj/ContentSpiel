@@ -1,0 +1,7 @@
+/* The fifth theme's stylesheet: its own Table template's rules, on the
+   default theme's table tokens, which this theme does not change. */
+.plain-table { overflow-x: auto; }
+.plain-table table { border-collapse: collapse; }
+.plain-table th, .plain-table td { padding: var(--th-sp-2); border-bottom: 1px solid var(--th-table-line); }
+.plain-table thead th { border-bottom-color: var(--th-table-rule); color: var(--th-table-head); }
+.plain-table caption { color: var(--th-table-caption); }

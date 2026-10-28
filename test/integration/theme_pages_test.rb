@@ -587,6 +587,44 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_no_match(/settings|title\b|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name (the kind's word is `word`, not a key looked up), and no string marked safe")
   end
 
+  test "a theme replaces the Table block's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    prices = create_page(title: "Prices")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: prices), attributes: { block_type: "table" },
+      translations: { "en" => { body: rich_doc("| Plan | Price |\n| :-- | --: |\n| **Basic** | 5 & 6 |", tables: true), caption: "Plans <i>compared</i>" } })
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(prices)
+
+    with_table_theme { get "/prices" }
+
+    assert_response :success
+    assert_select "div.plain-table[role=region][tabindex='0'][data-columns='2'][data-block='#{block.id}'][data-page='#{prices.id}'][aria-labelledby='plain-table-#{block.id}']" do
+      assert_select "caption#plain-table-#{block.id}", text: "Plans <i>compared</i>"
+      assert_select "thead th[data-align=left]", text: "Plan"
+      assert_select "thead th[data-align=right]", text: "Price"
+      assert_select "tbody td strong", text: "Basic"
+      assert_select "tbody td[data-align=right]", text: "5 & 6"
+    end
+    assert_select "div.table-scroll", count: 0
+    assert_select "div.plain-table i", count: 0
+
+    with_plain_theme { get "/prices" }
+
+    assert_response :success
+    assert_select "div.plain-frame div.content-block--table.table-scroll table caption", text: "Plans <i>compared</i>"
+    assert_select "div.plain-table", count: 0
+  end
+
+  test "the fifth theme is sound, checked deeply too: a Table template of the contract's names" do
+    folder = ThemeFolder.new(ThemeTestHelper::TABLE)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    assert_equal %w[assets/stylesheets/theme.css components/blocks/table_component.html.erb], folder.files
+    template = folder.read("components/blocks/table_component.html.erb")
+    Theme::Contract.components.fetch("blocks/table_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
+    assert_no_match(/settings|I18n|\bt\(|PublicStrings|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
+  end
+
   test "the preview is drawn by the theme too, with the CMS's preview bar" do
     sign_in_as users(:one)
 

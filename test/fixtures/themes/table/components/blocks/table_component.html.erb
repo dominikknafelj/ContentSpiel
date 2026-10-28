@@ -1,0 +1,20 @@
+<%# A theme's own Table block, written from what `Theme::Contract` gives the template (`block`, `page`,
+    `rows`, `header_row?`, `header_column?`, `column_count`, `caption`; docs/reference/theming.md, "The Table
+    block"): a scroll box named by the caption's id, the header row in a thead, a header column's cells as
+    row headers, every cell's text as handed over (`html`) and its alignment as a data attribute. %>
+<div class="plain-table" tabindex="0" role="region" data-columns="<%= column_count %>" data-block="<%= block.id %>" data-page="<%= page.id %>"<% if caption %> aria-labelledby="plain-table-<%= block.id %>"<% end %>>
+  <table>
+    <% if caption %><caption id="plain-table-<%= block.id %>"><%= caption %></caption><% end %>
+    <% rows.each_with_index do |row, r| %>
+      <% if r.zero? && header_row? %><thead><% elsif r == (header_row? ? 1 : 0) %><tbody><% end %>
+      <tr>
+        <% row.each_with_index do |cell, c| %>
+          <% tag = (r.zero? && header_row?) ? "th" : ((c.zero? && header_column?) ? "th" : "td") %>
+          <<%= tag %> data-align="<%= cell.align %>"><%= cell.html %></<%= tag %>>
+        <% end %>
+      </tr>
+      <% if r.zero? && header_row? %></thead><% end %>
+    <% end %>
+    </tbody>
+  </table>
+</div>

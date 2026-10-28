@@ -80,6 +80,13 @@
   background: var(--th-band-tinted);
   --th-meta: var(--th-dim);
   --th-sunken: var(--th-surface);
+  /* A table's tokens are computed where they are declared, on the page, so
+     the band gives the two that differ: the ground (its sticky column and its
+     fade must match the band they stand on) and the caption, which is
+     --th-meta and would keep the page's value, 4.3:1 on this band in the
+     light theme, where the line above reads it as dim. */
+  --th-table-ground: var(--th-band-tinted);
+  --th-table-caption: var(--th-dim);
 }
 /* Strong is the strongest step of its scheme -- the page inverted in light,
    a raised dark ground in dark -- with its own three text colours. `color` is
@@ -141,6 +148,16 @@
   --th-note-warning-line: color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong));
   --th-note-warning-ink: color-mix(in srgb, var(--th-warn) 60%, var(--th-on-band-strong));
   --th-note-warning-border: var(--th-line);
+  /* A table on this band (table block spec, "The public side"): head and
+     cell text are the band's text, the caption its dim, the header rule the
+     text at 40% and the row lines at 16%, on the band's own ground. The
+     computed tokens would otherwise keep the page's values under light text.
+     The caption is the lowest pair (test/integration/design_tokens_test.rb). */
+  --th-table-rule: color-mix(in srgb, var(--th-on-band-strong) 40%, transparent);
+  --th-table-line: color-mix(in srgb, var(--th-on-band-strong) 16%, transparent);
+  --th-table-head: var(--th-on-band-strong);
+  --th-table-caption: var(--th-on-band-strong-dim);
+  --th-table-ground: var(--th-band-strong);
 }
 .content-section--strong .content-block--code { color-scheme: dark; }
 
