@@ -53,6 +53,16 @@ module RichText
       Rails::HTML5::SafeListSanitizer.new.sanitize(html, scrubber: RichTextScrubber.new).html_safe
     end
 
+    # Inline nodes (a table cell's paragraph content) drawn with no wrapper,
+    # scrubbed as `render` scrubs: what a Table block's cell prints, in the
+    # theme's own markup around it. Anything that is not a list of nodes is
+    # nothing.
+    def render_fragment(nodes)
+      nodes = [] unless nodes.is_a?(Array)
+      html = HELPERS.safe_join(nodes.map { |node| render_node(node, 1) })
+      Rails::HTML5::SafeListSanitizer.new.sanitize(html, scrubber: RichTextScrubber.new).html_safe
+    end
+
     private
 
     attr_reader :context

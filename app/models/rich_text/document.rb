@@ -205,6 +205,16 @@ module RichText
     # every error.
     def blank? = !content?(@hash)
 
+    # Whether the document's only top-level node is a table: what a Table
+    # block's body is (`HasRichTextBody#body_errors_for`). Anything else, an
+    # empty document included, is not.
+    def table?
+      return false unless @hash.is_a?(Hash) && @hash["content"].is_a?(Array)
+
+      nodes = @hash["content"]
+      nodes.size == 1 && nodes.first.is_a?(Hash) && nodes.first["type"] == "table"
+    end
+
     # A stable content hash for the render cache key (spec §3.3) and for
     # "did this locale's document actually change" checks -- a canonical,
     # *key-sorted* serialization fed straight into a running `Digest::SHA256`,

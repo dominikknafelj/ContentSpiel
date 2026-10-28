@@ -192,6 +192,52 @@ module RichText
         node.markdown_out { |n, children, ctx| "\\\n" }
       end
 
+      # A table (the Table block's body only: `HasRichTextBody#body_errors_for`
+      # refuses one in any other body, table block spec decision 2). The
+      # schema says what ProseMirror's own table does -- rows of cells, a
+      # cell one paragraph (inline content, marks included, no lists, no
+      # images, no second paragraph) -- and not what the body rule says: that
+      # the rows are as long as one another is `TableBody`'s business, since a
+      # content expression cannot count. A header is a cell of its own type,
+      # so which row or column is a header is stored, not inferred.
+      #
+      # `markdown_out` is left off on purpose until the Markdown form of a
+      # table is written (a pipe table); a cell's `html` unwraps its one
+      # paragraph, since a `<p>` in every cell is markup nobody asked for.
+      RichText::Schema.register_node("table") do |node|
+        node.group "block"
+        node.content "tableRow+"
+        node.html { |n, children, ctx| TAG.tag.table(TAG.tag.tbody(children)) }
+      end
+
+      RichText::Schema.register_node("tableRow") do |node|
+        node.content "cell+"
+        node.html { |n, children, ctx| TAG.tag.tr(children) }
+      end
+
+      # A row takes `cell+`, a group of the two cell types: the content
+      # expressions have no alternation (`RichText::ContentExpression`), and a
+      # group is what that file says to register instead.
+      #
+      # `scope="col"` on every header: the node cannot know its row, and a
+      # header column's cells would be `scope="row"`; `col` is right for the
+      # header row, which is the usual table, and is not wrong for a screen
+      # reader in the other (it reads the cell's own text first either way).
+      { "tableHeader" => :th, "tableCell" => :td }.each do |name, tag_name|
+        RichText::Schema.register_node(name) do |node|
+          node.group "cell"
+          node.content "paragraph"
+          node.attribute :align, :string, in: %w[left center right]
+          node.html do |n, children, ctx|
+            align = n.dig("attrs", "align")
+            options = {}
+            options[:scope] = "col" if tag_name == :th
+            options[:class] = "align-#{align}" if %w[left center right].include?(align)
+            TAG.tag.public_send(tag_name, unwrap_cell(children), **options)
+          end
+        end
+      end
+
       # `heading.level` is capped at H4 (design decisions table: "Standard
       # set ... heading H2-H4") -- CS Studio's page tree already reserves
       # H1 for the page's own title, so an editor picking a heading level
@@ -418,6 +464,18 @@ module RichText
     # The value sits in a single-quoted attribute, so its own `'` is written
     # as `&#39;` (decoded straight back); nothing else in it can end the
     # attribute early.
+    # A cell's one paragraph without its `<p>`: the children are this
+    # renderer's own already-escaped output, and inline content holds no `<p>`
+    # of its own, so the first and the last tag are the paragraph's. A cell
+    # that is not exactly one paragraph (a hand-made document the validator
+    # would have refused) is drawn as it is.
+    def self.unwrap_cell(children)
+      html = children.to_s
+      return children unless html.start_with?("<p>") && html.end_with?("</p>") && html.scan("<p>").size == 1
+
+      html.delete_prefix("<p>").delete_suffix("</p>").html_safe
+    end
+
     def self.safe_href?(value)
       return false unless value.is_a?(String)
 
