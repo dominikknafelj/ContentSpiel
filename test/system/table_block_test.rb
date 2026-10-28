@@ -19,14 +19,19 @@ class TableBlockSystemTest < ApplicationSystemTestCase
     head + (1..rows).map { |r| "| " + columns.each_index.map { |c| "r#{r}c#{c + 1} cell text" }.join(" | ") + " |" }.join("\n")
   end
 
-  def open_table(columns, header_column: false)
-    doc = rich_doc(grid(columns), tables: true)
+  def open_table(columns, header_column: false, caption: nil, background: nil, rows: 3)
+    doc = rich_doc(grid(columns, rows: rows), tables: true)
     if header_column
       doc = doc.deep_dup
       rows = doc["content"].find { |node| node["type"] == "table" }["content"]
       rows.drop(1).each { |row| row["content"].first["type"] = "tableHeader" }
     end
-    result = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "table" }, translations: { "en" => { body: doc } })
+    attributes = { block_type: "table" }
+    if background
+      section = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "one", "background" => background } }).record
+      attributes.merge!(section_id: section.id, section_column: 1)
+    end
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: attributes, translations: { "en" => { body: doc, caption: caption }.compact })
     assert result.ok?, result.errors.to_sentence
     publish_changes(@page)
     visit PublicSite::Urls.new.path_for(@page, "en")
@@ -80,5 +85,62 @@ class TableBlockSystemTest < ApplicationSystemTestCase
 
     assert_not box("box.scrollWidth > box.clientWidth"), "nothing to scroll"
     assert_equal [ "0px", "0px" ], fades
+  end
+
+  # A colour as the browser resolves it, from a token on the element itself.
+  TOKEN = "const token = (name) => { const span = document.createElement('span'); span.style.color = `var(${name})`; box.append(span); const colour = getComputedStyle(span).color; span.remove(); return colour };".freeze
+
+  def with_scheme(scheme)
+    page.execute_script("document.documentElement.dataset.theme = arguments[0]", scheme)
+    yield
+  ensure
+    page.execute_script("document.documentElement.dataset.theme = 'light'")
+  end
+
+  def drawn
+    page.evaluate_script(<<~JS.squish)
+      (() => { const box = document.querySelector('#{BOX}'); #{TOKEN}
+        const colour = (selector, property = 'color') => getComputedStyle(box.querySelector(selector))[property];
+        return { head: [colour('thead th'), token('--th-table-head')], cell: [colour('tbody td'), token('--th-ink')],
+                 caption: [colour('caption'), token('--th-table-caption')], dim: token('--th-dim'),
+                 rule: [colour('thead th', 'borderBottomColor'), token('--th-table-rule')],
+                 ground: [colour('tbody th[scope=row]', 'backgroundColor'), token('--th-table-ground')] } })()
+    JS
+  end
+
+  test "in both schemes the header, cells and caption are drawn in the table's tokens, on the page and in a strong band" do
+    [ nil, "strong" ].each do |background|
+      @page.content_blocks.destroy_all
+      open_table(%w[Plan Price Notes], header_column: true, caption: "Plans compared", background: background)
+      %w[light dark].each do |scheme|
+        with_scheme(scheme) do
+          seen = drawn
+          %w[head cell caption rule ground].each do |part|
+            assert_equal seen[part].last, seen[part].first, "#{background || 'plain'} band, #{scheme}: #{part}"
+          end
+        end
+      end
+    end
+  end
+
+  test "in a tinted band the caption is the dim colour, not the page's meta" do
+    open_table(%w[Plan Price], header_column: true, caption: "Plans compared", background: "tinted")
+    %w[light dark].each do |scheme|
+      with_scheme(scheme) do
+        seen = drawn
+        assert_equal seen["dim"], seen["caption"].first, "tinted band, #{scheme}"
+        assert_equal seen["caption"].last, seen["caption"].first
+      end
+    end
+  end
+
+  test "a word longer than a cell's floor breaks inside the cell and the page does not scroll" do
+    with_window(375) do
+      open_table(%w[Plan Price])
+      box("box.querySelector('tbody td').textContent = 'x'.repeat(120); 0")
+
+      assert_operator box("box.querySelector('tbody td').scrollWidth"), :<=, box("box.querySelector('tbody td').clientWidth"), "the word stays in its cell"
+      assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=, page.evaluate_script("window.innerWidth")
+    end
   end
 end
