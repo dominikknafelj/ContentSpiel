@@ -30,6 +30,16 @@ class Notes::HeadingTest < ActiveSupport::TestCase
     assert_equal "Short and sweet", name_of(@text).words
   end
 
+  # A table's plain paragraphs are its cells, row by row
+  # (`RichText::Document#plain_paragraphs`), so the first is its first cell.
+  test "a note on a Table block is headed by its first cell's text" do
+    table = @page.content_blocks.create!(block_type: "table", position: 3)
+    table.assign_body(rich_doc("| Plan name | Price |\n| --- | --- |\n| Basic | 5 |", tables: true), locale: :en)
+    table.save!
+
+    assert_equal "Plan name", name_of(table).words
+  end
+
   test "the words are the tab's language's, and the default language's when the tab's is blank" do
     with_locales(%w[en de], default: "en") do
       write(@text, :en, "English words here")

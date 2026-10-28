@@ -541,12 +541,15 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     def test_connection = true
   end
 
+  # Registered once and left registered, as `GatedProvider.install!` is: the
+  # app server runs in this process, and resetting the registries
+  # (`reloader.prepare!`) under a request still on the wire (an autosave, a
+  # live fetch, a presence beat) could answer it from an empty registry. The
+  # site's setting is the test's own row, rolled back with it.
   def with_table_provider
-    AI::Providers.register(TableProvider::NAME, TableProvider)
+    AI::Providers.register(TableProvider::NAME, TableProvider) unless AI::Providers.find(TableProvider::NAME) == TableProvider
     site_settings(:default).update!(ai_provider: TableProvider::NAME, ai_api_key: "sk-test")
     yield
-  ensure
-    Rails.application.reloader.prepare!
   end
 
   def body_in(block, locale) = block.reload.body_document(locale: locale)
@@ -599,6 +602,17 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     assert_writes_settled
     assert_empty Array(body_in(block, :de).to_h["content"]), "a click is no change: nothing is saved"
     assert_equal :missing, block.translation_state("body", "de")
+
+    # Until a change is saved the German page shows the default language's table.
+    editor = current_url
+    visit PublicSite::Urls.new.path_for(live, "de")
+    assert_selector "table td", text: "Basic"
+    assert_no_selector "table td", text: "Einfach"
+    visit editor
+    assert_selector ".ProseMirror"
+    await_admin_controllers
+
+    cell(block, 1, 0).click
 
     key(:End)
     "Basic".length.times { key(:Backspace) }
