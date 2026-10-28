@@ -1,6 +1,6 @@
 # The Table block
 
-Status: draft (2026-10-27). The look and the editor are Claude Design's: B4 to B8 of 2026-10-13 (`.superpowers/design-answers/2026-10-13-note-and-table-blocks.md`) as revised on 2026-10-27 (`.superpowers/design-answers/2026-10-27-table-block.md`). The owner's decisions are from the brainstorm of 2026-10-27. Calls marked "(our call)" are this spec's, not the owner's.
+Status: built (2026-10-28; "As built" at the end). The look and the editor are Claude Design's: B4 to B8 of 2026-10-13 (`.superpowers/design-answers/2026-10-13-note-and-table-blocks.md`) as revised on 2026-10-27 (`.superpowers/design-answers/2026-10-27-table-block.md`). The owner's decisions are from the brainstorm of 2026-10-27. Calls marked "(our call)" are this spec's, not the owner's.
 
 ## Why
 
@@ -118,3 +118,39 @@ By the recipe ("Adding a block type", steps 0 to 11); the shared tests build the
 In `contentspiel-docs`, after the block ships: `editors/pages/build-a-page-with-blocks.md` (the Table block), the translating pages (a table per language, the copy, the state), `integrators/theming/the-theme-contract.md` (the component's line, the five tokens, the release note), and the loader (`bin/load` writes a Table block for a Markdown table instead of paragraphs).
 
 ## As built
+
+Built by `docs/superpowers/plans/2026-10-28-table-block.md` in nine tasks on the branch `table-block`; the reference is `docs/reference/content-blocks-and-types.md`, "The Table block", with `docs/reference/rich-text.md`, "Tables", `docs/reference/translations.md` and `docs/reference/theming.md`, "The Table block". Where the code differs from this spec it is below, with what the departure costs if it is wrong.
+
+**The rulings taken while building**, one line each:
+
+1. **The "starting content" mechanism is general and was built for the new table's 3 × 3 grid** (the plan named it only for the translation tab's copy): `admin--rich-text--editor` has a `startingContent` value, shown when the hidden input holds no block and never written until the first real change. The translation tab's copy of the source is its second use. Cost if wrong: a small API re-shaped.
+2. **Three guards were red between the type and its look** (Task 3 to Task 4): the theming reference's tokens and components tables and "every declared token is defined". Cost: one task's red run.
+3. **Table is registered after Note, not after Section** (where the generator put it), so the picker reads Rich text, Image, Code, Note, Table, Post list, Section and the containers stay last. Cost if wrong: one line moved back.
+4. **An empty table's tile reads "Empty table" alone, a hint part, although decision 14 says "text parts only"**: that phrase meant no icon part (the icon is the type's), and a hint is how every type says empty. Cost if wrong: one part changed to text.
+5. **A tinted band re-values the caption (`--th-table-caption` to `--th-dim`) as well as the ground**, where the spec said only the ground changes: a token defined at `:root` from `--th-meta` keeps the page's `--th-meta`, which is 4.3:1 on the light tinted band, and the band's own re-valued `--th-meta` never reaches it. The theming reference says any token so defined must be re-declared in the band. Cost if wrong: one line in `sections.css`.
+6. **A phone-width public system test was written in Task 4, not Task 8**, because both browser-only defects (a wide table shrinking, the left fade masking the sticky column) needed it then.
+7. **Borders are `border-collapse: separate` with no spacing**, not `collapse`: sticky cells keep their borders under it, and the look is unchanged (one header rule, row lines between rows, no frame). Cost if wrong: a look regression.
+8. **The grid's look in CS Studio beyond the spec is open**, the plainest option from existing tokens: cell borders, padding, header style, the multi-cell selection tint, the "⋯" and "+" handles, the column menu's "Align" group, and the reference card's and the suggestion's table (plain rich-text styles). Recorded for the owner and Claude Design, not decided. Cost if wrong: a styling pass.
+9. **The table pin raised `prosemirror-view` 1.42.5 to 1.42.8 and `prosemirror-transform` 1.12.1 to 1.12.4** for the whole editor, kept because the table extension requires them and the editor's suites pass on them; the pull request names them. `bin/importmap pin` also stripped `preload: "admin"` from twenty lines, re-added by hand. Cost if wrong: an editor regression the editor's system tests would show.
+
+**Departures from the decisions.**
+
+- **Decision 2: the declaration is `t.body_content :table`, not `t.uses :body, content: :table`** (`BlockTypeDefinition#body_content`, `ContentBlock#body_content_kind`, `HasRichTextBody#body_content_kind`); an outside type may not declare it. A section declares no body, so "a section's body" is vacuous.
+- **Decision 3: the marks are limited by the body rule** (`TABLE_CELL_MARKS`: bold, italic, code, link, internalLink), because the node schema admits every registered mark and strike would otherwise be stored.
+- **Decision 7: the limits' sentences carry no language prefix**, being for an editor ("A table can have at most 30 columns and 500 rows.", "A cell can have at most 2,000 characters."); a body-kind error (a table in a text block, prose beside a table, ragged rows, a mark outside the list) is a developer's and carries it.
+- **Decision 4 has two edges the build names and keeps**: a header switch in a one-row or one-column table can snap back (the cells' kind is the only state), and a structural change through the controls re-makes every cell's kind from the switches, which rewrites a stored header cell in the middle of a table to a plain one.
+- **Decision 8: the block card's switches and the grid follow the copy** (a source without a header row starts the switch off), and the copy is the editor's `startingContent`, so no script writes it.
+- **Decision 9: `plain_paragraphs` descends into a table** (one entry per cell, row by row, empty cells dropped), which also changes what `plain_paragraphs.first` means for the tile, a note's heading and the changes overview (a table's first non-empty cell); the digest is unchanged.
+- **Decision 10: the AI suggestion is exactly one table of the source's shape, else `AI::Translate::DIFFERENT_TABLE` fails the call**, and it takes the source's cell kinds and alignment, since Markdown cannot spell a header column or no header row. The message is a constant, as the service's others are, not a key. Markdown tables are read and written only with `tables: true`, passed by this one caller.
+- **Decision 11: Esc goes to the row's "⋯" menu** (the keyboard path to the controls, since Tab moves between cells) and Tab on to the column's, in place of "Esc leaves the grid"; and a paste into a cell is flattened to inline text.
+- **Decision 13: a held grid declares no `read_only_actions`.** The card draws the grid alone, with no controls, toolbar or warning, so there is nothing to allow; `HeldFields` and its test are unchanged.
+- **Decision 14: the tile reads "Table · 4 × 12 · " and the caption, else the words of the first row that has any text.**
+- **The public side: seven names** (`block`, `page`, `rows`, `header_row?`, `header_column?`, `column_count`, `caption`); the scroll fade is a scroll-driven mask with no script, and with a header column the left fade is drawn on the sticky cells so the column is not faded; cells have a `10ch` floor.
+
+**Also built, not in the spec.** `app/javascript/rich_text/editors.js` (a WeakMap from element to editor, with the `:attached` and `:detached` events) so the table controller reaches the editor with no outlet; `Admin::EditorScreen::TableDeleteDialogsComponent` (drawn after the card's form, since a dialog form cannot nest); a fifth fixture theme, `test/fixtures/themes/table`, written from the reference alone; `RichText::HtmlRenderer#render_fragment`.
+
+**The files.** `app/models/block_types/table.rb`; `app/components/blocks/table_component.*`; `app/values/table_body.rb`; `app/models/rich_text/built_ins.rb`, `markdown.rb`, `document.rb`, `html_renderer.rb`; `app/models/concerns/has_rich_text_body.rb`; `app/sanitizers/rich_text_scrubber.rb`; `app/services/ai/translate.rb`; `app/javascript/rich_text/table.js`, `schema.js`, `editors.js`; `app/javascript/controllers/admin/editor/table_controller.js`; `app/components/admin/editor_screen/table_controls_component.*`, `table_delete_dialogs_component.rb`; `app/components/admin/columns/rich_text_column_component.*`; `app/assets/tailwind/themes/default/table.css`, `tokens.css`, `sections.css`; `app/assets/tailwind/admin-rich-text.css`; `vendor/javascript/@tiptap--extension-table.js`, `@tiptap--pm--tables.js`, `prosemirror-tables.js`.
+
+**Left as known gaps** (`docs/roadmap.md`, "Known gaps", "Table block"): the grid's CS Studio look and the card's table styling (open design questions); the snap-back and the rewritten header cell; English public words; the flattening of a Markdown table outside AI translation; no sticky header row; no hover test; no test of a live refresh over a clean copied grid.
+
+**For the documentation (work in `contentspiel-docs`):** `editors/pages/build-a-page-with-blocks.md`, the translating pages (a table per language, the copy, the state), `integrators/theming/the-theme-contract.md` (the component's seven names, the five tokens, the release note, and the tinted-band caption rule), and the loader (a real Table block for a Markdown table).
