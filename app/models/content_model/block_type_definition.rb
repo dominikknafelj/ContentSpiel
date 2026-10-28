@@ -38,8 +38,9 @@ module ContentModel
     # not name; `block_icon_component_test.rb` draws every one. A type names
     # one or none; an outside type picks from the same list. The last four
     # are the Note block's kinds (note block plan, rulings 11 and 12), which
-    # its blocks' cards and tiles draw through `for_block:`.
-    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert].freeze
+    # its blocks' cards and tiles draw through `for_block:`; `table`
+    # is the Table block's.
+    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table].freeze
 
     # The columns a block type may name with `uses`: the block card draws and
     # the save services write these four and no other (`BlockCardComponent`'s

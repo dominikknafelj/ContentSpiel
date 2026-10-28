@@ -93,8 +93,8 @@ module ContentHelper
   # loudly on a conversion warning: a test's own fixed Markdown degrading
   # silently would make it assert against something other than what it
   # reads as.
-  def rich_doc(markdown)
-    document, warnings = RichText::Document.from_markdown(markdown)
+  def rich_doc(markdown, tables: false)
+    document, warnings = RichText::Document.from_markdown(markdown, tables: tables)
     assert_empty warnings, "rich_doc(#{markdown.inspect}) produced warnings"
     document.to_h
   end

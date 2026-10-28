@@ -37,6 +37,9 @@ en:
           # answers (block types spec, decision 8).
           types:
             # bin/rails generate block_type adds a type's scope below this line.
+            table:
+              word: "Table"
+              empty: "Empty table"
             note:
               empty: "Empty"
             code:

@@ -36,7 +36,7 @@ module BlockSamples
       own = locale == default ? {} : values.slice(*fields)
       [ locale, values.except(*fields).transform_keys(&:to_sym).merge(own.any? ? { settings: own } : {}) ]
     end
-    translations[default] = (translations[default] || {}).merge(body: rich_doc(sample.body)) if sample.body
+    translations[default] = (translations[default] || {}).merge(body: rich_doc(sample.body, tables: definition.body_content == :table)) if sample.body
 
     result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: attributes, translations: translations)
     assert result.ok?, "the sample of #{definition.name} does not save: #{result.errors.to_sentence}"
