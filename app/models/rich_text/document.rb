@@ -115,7 +115,11 @@ module RichText
     # round trip through `update_post` would silently strip every reference
     # the token can't see. `nil` (the default) checks everything: a new
     # body has nothing to be known against.
-    def self.from_markdown(markdown, known_references: nil) = RichText::Markdown.load(markdown, known_references: known_references)
+    #
+    # `tables:` (default false) reads a GFM table as a `table` node, for the
+    # one body that may hold one (the Table block's); see `RichText::Markdown
+    # .load`.
+    def self.from_markdown(markdown, known_references: nil, tables: false) = RichText::Markdown.load(markdown, known_references: known_references, tables: tables)
 
     # Converts stored ActionText/Trix HTML (design spec §5) into
     # `[RichText::Document, unmapped]` -- `unmapped` being one String per

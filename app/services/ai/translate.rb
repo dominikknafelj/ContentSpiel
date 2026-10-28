@@ -37,6 +37,7 @@ module AI
     MAX_CHARACTERS = 6_000
 
     TOO_MUCH = "Too much at once — translate in parts".freeze
+    DIFFERENT_TABLE = "The translation came back with a different table: try again.".freeze
 
     attr_reader :suggestions, :warnings
 
@@ -121,7 +122,14 @@ module AI
     # parsed as the actor, whose read rights decide the rest.
     def suggest(field, original, translation)
       if original[:format] == :markdown
-        document, warnings = as_actor { RichText::Document.from_markdown(translation, known_references: original[:document].references) }
+        # A Table block's body is the one body read with tables: a model that
+        # drops a row or a column leaves a table that no longer lines up with
+        # the original, and a translation of a table is worthless that way, so
+        # it fails the whole call (the `rescue AI::Error` in `#call`) rather
+        # than offering a table of another shape.
+        tables = original[:document].table?
+        document, warnings = as_actor { RichText::Document.from_markdown(translation, known_references: original[:document].references, tables: tables) }
+        raise AI::Error, DIFFERENT_TABLE if tables && TableBody.new(document).shape != TableBody.new(original[:document]).shape
         @suggestions[field] = document
         @warnings[field] = warnings
       else

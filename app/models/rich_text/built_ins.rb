@@ -201,18 +201,28 @@ module RichText
       # content expression cannot count. A header is a cell of its own type,
       # so which row or column is a header is stored, not inferred.
       #
-      # `markdown_out` is left off on purpose until the Markdown form of a
-      # table is written (a pipe table); a cell's `html` unwraps its one
-      # paragraph, since a `<p>` in every cell is markup nobody asked for.
+      # Its Markdown form is a GFM pipe table. GFM has no table without a
+      # header row, so the first row is always written as the header and
+      # reads back as header cells: a table whose first row is body cells
+      # comes back with a header row (accepted: the pipe table cannot say
+      # otherwise, and the AI translation, the one caller that loads tables,
+      # compares only the shape). A cell's `html` unwraps its one paragraph,
+      # since a `<p>` in every cell is markup nobody asked for.
       RichText::Schema.register_node("table") do |node|
         node.group "block"
         node.content "tableRow+"
         node.html { |n, children, ctx| TAG.tag.table(TAG.tag.tbody(children)) }
+        node.markdown_out do |n, children, ctx|
+          first = Array(n.dig("content", 0, "content")).map { |cell| cell.is_a?(Hash) ? cell.dig("attrs", "align") : nil }
+          delimiter = first.map { |align| { "left" => ":---", "center" => ":---:", "right" => "---:" }.fetch(align, "---") }
+          ([ children.first, "| #{delimiter.join(" | ")} |" ] + children.drop(1)).compact.join("\n")
+        end
       end
 
       RichText::Schema.register_node("tableRow") do |node|
         node.content "cell+"
         node.html { |n, children, ctx| TAG.tag.tr(children) }
+        node.markdown_out { |n, children, ctx| "| #{children.join(" | ")} |" }
       end
 
       # A row takes `cell+`, a group of the two cell types: the content
@@ -228,6 +238,7 @@ module RichText
           node.group "cell"
           node.content "paragraph"
           node.attribute :align, :string, in: %w[left center right]
+          node.markdown_out { |n, children, ctx| RichText::Markdown::Dumper.table_cell_line(children) }
           node.html do |n, children, ctx|
             align = n.dig("attrs", "align")
             options = {}
