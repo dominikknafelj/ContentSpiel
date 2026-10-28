@@ -122,6 +122,41 @@ class AI::TranslateTest < ActiveSupport::TestCase
     assert_equal %w[left right], TableBody.new(suggestion).rows.first.map(&:align)
   end
 
+  test "a suggestion keeps the source's cell kinds and alignment: a header column, and no header row" do
+    post = post_with
+    document, = RichText::Document.from_markdown("| a | b |\n| :-: | - |\n| c | d |\n", tables: true)
+    hash = document.to_h.deep_dup
+    rows = hash["content"].first["content"]
+    rows.each { |row| row["content"].each { |cell| cell["type"] = "tableCell" } }
+    rows.each { |row| row["content"].first["type"] = "tableHeader" }
+    kinds = ->(doc) { doc.to_h["content"].first["content"].map { |row| row["content"].map { |cell| [ cell["type"], cell.dig("attrs", "align") ] } } }
+    source = RichText::Document.new(hash)
+    post.define_singleton_method(:translation_value) { |field, locale| field == "body" ? source : super(field, locale) }
+    StubProvider.handler = ->(texts, _format) { texts }
+
+    service, result = translate(post, %w[body])
+    assert result.ok?, result.errors.to_sentence
+    assert_equal kinds.(source), kinds.(service.suggestions["body"])
+
+    headerless = RichText::Document.new(hash.deep_dup.tap { |h| h["content"].first["content"].each { |row| row["content"].each { |cell| cell["type"] = "tableCell" } } })
+    post.define_singleton_method(:translation_value) { |field, locale| field == "body" ? headerless : super(field, locale) }
+    service, result = translate(post, %w[body])
+    assert result.ok?, result.errors.to_sentence
+    assert_equal kinds.(headerless), kinds.(service.suggestions["body"])
+  end
+
+  test "a suggestion with prose beside the table fails the whole call" do
+    post = post_with
+    table_original(post)
+    StubProvider.handler = ->(texts, _format) { texts.map { |text| "Hier:\n\n#{text}" } }
+
+    service, result = translate(post, %w[body])
+
+    assert_not result.ok?
+    assert_equal [ AI::Translate::DIFFERENT_TABLE ], result.errors
+    assert_empty service.suggestions
+  end
+
   test "a suggestion whose table has another shape fails the whole call and offers nothing" do
     post = post_with(excerpt: "Summary")
     table_original(post)

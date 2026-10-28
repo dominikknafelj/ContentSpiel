@@ -74,4 +74,10 @@ class RichText::MarkdownTableTest < ActiveSupport::TestCase
     assert_equal %w[tableHeader tableCell], loaded.to_h["content"].first["content"].map { |row| row["content"].first["type"] }
     assert_equal TableBody.new(document).shape, TableBody.new(loaded).shape
   end
+
+  test "strikethrough in a cell is dropped with a warning" do
+    loaded, warnings = load_tables("| a |\n| - |\n| ~~gone~~ |\n")
+    assert_includes warnings, "dropped strikethrough in a table cell"
+    assert_equal [ { "type" => "text", "text" => "gone" } ], loaded.to_h.dig("content", 0, "content", 1, "content", 0, "content", 0, "content")
+  end
 end

@@ -129,13 +129,36 @@ module AI
         # than offering a table of another shape.
         tables = original[:document].table?
         document, warnings = as_actor { RichText::Document.from_markdown(translation, known_references: original[:document].references, tables: tables) }
-        raise AI::Error, DIFFERENT_TABLE if tables && TableBody.new(document).shape != TableBody.new(original[:document]).shape
+        # Exactly one table, as the original: prose before or after it would pass
+        # a shape comparison and then fail the body rule after "Use".
+        raise AI::Error, DIFFERENT_TABLE if tables && (!document.table? || TableBody.new(document).shape != TableBody.new(original[:document]).shape)
+        document = with_source_cells(document, original[:document]) if tables
         @suggestions[field] = document
         @warnings[field] = warnings
       else
         @suggestions[field] = translation
         @warnings[field] = []
       end
+    end
+
+    # GFM cannot say a header column or a table with no header row (its first
+    # row is always the header), so the loaded suggestion has the wrong cell
+    # kinds. Once the shapes are equal, each suggested cell takes its kind and
+    # alignment from the source cell at the same position.
+    def with_source_cells(document, source)
+      source_rows = source.to_h["content"].first["content"]
+      hash = document.to_h.deep_dup
+      hash["content"].first["content"].each_with_index do |row, r|
+        row["content"].each_with_index do |cell, c|
+          from = source_rows.dig(r, "content", c)
+          next unless from.is_a?(Hash)
+
+          cell["type"] = from["type"]
+          align = from.dig("attrs", "align")
+          align ? cell["attrs"] = { "align" => align } : cell.delete("attrs")
+        end
+      end
+      RichText::Document.new(hash)
     end
   end
 end

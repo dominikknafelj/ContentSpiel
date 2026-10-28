@@ -213,6 +213,7 @@ module RichText
         node.content "tableRow+"
         node.html { |n, children, ctx| TAG.tag.table(TAG.tag.tbody(children)) }
         node.markdown_out do |n, children, ctx|
+          # The first row's alignment speaks for its column: GFM has one per column.
           first = Array(n.dig("content", 0, "content")).map { |cell| cell.is_a?(Hash) ? cell.dig("attrs", "align") : nil }
           delimiter = first.map { |align| { "left" => ":---", "center" => ":---:", "right" => "---:" }.fetch(align, "---") }
           ([ children.first, "| #{delimiter.join(" | ")} |" ] + children.drop(1)).compact.join("\n")

@@ -803,7 +803,9 @@ module RichText
         when :escaped then render_inline(node, marks_stack, depth)
         when :emph then render_inline(node, marks_stack + [ { "type" => "italic" } ], depth + 1)
         when :strong then render_inline(node, marks_stack + [ { "type" => "bold" } ], depth + 1)
-        when :strikethrough then render_inline(node, @in_cell ? marks_stack : marks_stack + [ { "type" => "strike" } ], depth + 1)
+        when :strikethrough
+          warn_once(:cell_strike, "dropped strikethrough in a table cell") if @in_cell
+          render_inline(node, @in_cell ? marks_stack : marks_stack + [ { "type" => "strike" } ], depth + 1)
         when :code then [ text_node(node.string_content.to_s, marks_stack + [ { "type" => "code" } ]) ]
         when :link then render_link(node, marks_stack, depth + 1)
         when :image
