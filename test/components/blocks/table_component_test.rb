@@ -42,17 +42,25 @@ class Blocks::TableComponentTest < ActiveSupport::TestCase
     assert_selector "tbody td", count: 2
   end
 
-  test "both, and neither" do
-    draw(table_block("| a | b |\n| --- | --- |\n| c | d |").tap { |b| b.update!(body: b.body) })
-    assert_selector "thead", count: 1
-
-    block = table_block
+  def with_cell_types(block, header_row:, header_column:)
     document = block.body_document(locale: :en).to_h
-    document["content"][0]["content"].each { |row| row["content"].each { |cell| cell["type"] = "tableCell" } }
+    document["content"][0]["content"].each_with_index do |row, r|
+      row["content"].each_with_index do |cell, c|
+        cell["type"] = (header_row && r.zero?) || (header_column && c.zero?) ? "tableHeader" : "tableCell"
+      end
+    end
     block.assign_body(document, locale: :en)
     block.save!
-    draw(block)
+    block
+  end
 
+  test "both, and neither" do
+    draw(with_cell_types(table_block, header_row: true, header_column: true))
+    assert_selector "thead th[scope=col]", count: 2
+    assert_selector "tbody th[scope=row]", count: 2
+    assert_selector "tbody td", count: 2
+
+    draw(with_cell_types(table_block, header_row: false, header_column: false))
     assert_no_selector "thead"
     assert_no_selector "th"
     assert_selector "tbody tr", count: 3

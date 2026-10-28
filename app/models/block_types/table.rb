@@ -47,9 +47,14 @@ module BlockTypes
       body = TableBody.new(block.body_document(locale: locale))
       return [ [ :hint, :empty ] ] if body.blank?
 
-      columns, rows = body.column_count, body.row_count
-      first = block.caption(locale: locale).to_s.strip.presence || body.rows.first.map { |cell| cell.text.strip }.reject(&:empty?).join(" ")
-      [ [ :text, "Table · #{columns} × #{rows} · " ], [ :text, first.truncate(SUMMARY_LENGTH) ] ]
+      line = [ :text, "Table · #{body.column_count} × #{body.row_count}" ]
+      # The caption, else the words of the first row that has any text (a
+      # table whose header row is blank is not a table with no words).
+      first = block.caption(locale: locale).to_s.strip.presence ||
+              body.rows.map { |row| row.map { |cell| cell.text.strip }.reject(&:empty?).join(" ") }.find(&:present?)
+      return [ line ] unless first
+
+      [ [ :text, "#{line.last} · " ], [ :text, first.truncate(SUMMARY_LENGTH) ] ]
     end
   end
 end

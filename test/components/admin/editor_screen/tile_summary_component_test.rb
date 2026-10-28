@@ -258,6 +258,12 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
 
     assert_text "Table · 3 × 3 · Plan Price Storage"
 
+    blank_head = block("table")
+    blank_head.assign_body(rich_doc("| | |\n| --- | --- |\n| A | 1 |", tables: true), locale: :en)
+    blank_head.save!
+    render_summary blank_head
+    assert_text "Table · 2 × 2 · A 1"
+
     empty = block("table")
     render_summary empty
     assert_text "Empty table"
