@@ -152,6 +152,8 @@ module HasRichTextBody
   # error, not an editor's, so it carries the language prefix.
   def body_content_kind = :rich
 
+  TABLE_CELL_MARKS = %w[bold italic code link internalLink].freeze
+
   def body_kind_errors_for(document)
     return [] unless document.to_h.is_a?(Hash)
 
@@ -160,7 +162,11 @@ module HasRichTextBody
       return [ "a Table block's body is exactly one table" ] unless document.table?
       return [ "a table's rows have the same number of cells" ] if TableBody.new(document).ragged?
 
-      []
+      marks = TableBody.new(document).rows.flatten.flat_map(&:nodes).flat_map { |node| node.is_a?(Hash) && node["marks"].is_a?(Array) ? node["marks"] : [] }
+      # A cell holds bold, italic, code and links, and a line break (decision 3):
+      # the schema admits every registered mark, so the rule is here.
+      outside = marks.filter_map { |mark| mark["type"] if mark.is_a?(Hash) }.uniq - TABLE_CELL_MARKS
+      outside.any? ? [ "a table cell allows only bold, italic, code and links: #{outside.join(", ")}" ] : []
     else
       table_in?(document.to_h) ? [ "a table is allowed only in a Table block" ] : []
     end

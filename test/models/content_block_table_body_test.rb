@@ -49,6 +49,19 @@ class ContentBlockTableBodyTest < ActiveSupport::TestCase
     end
   end
 
+  test "a cell holding a struck text is refused, and bold, italic, code and links are fine" do
+    struck = { "type" => "text", "text" => "old", "marks" => [ { "type" => "strike" } ] }
+    kept = %w[bold italic code].map { |m| { "type" => "text", "text" => "k", "marks" => [ { "type" => m } ] } }
+    with_table_type do |type|
+      bad = block(type, doc(table(row({ "type" => "tableCell", "content" => [ { "type" => "paragraph", "content" => [ struck ] } ] }))))
+      assert_not_predicate bad, :valid?
+      assert_match(/\A\(en\) a table cell allows only .*strike/, bad.errors[:body].first)
+
+      ok = block(type, doc(table(row({ "type" => "tableCell", "content" => [ { "type" => "paragraph", "content" => kept } ] }))))
+      assert_predicate ok, :valid?, ok.errors.full_messages.to_sentence
+    end
+  end
+
   test "an empty body is valid" do
     with_table_type do |type|
       assert_predicate block(type, RichText::Document.empty.to_h), :valid?
