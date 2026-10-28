@@ -16,6 +16,7 @@
             controller: "admin--rich-text--editor",
             "admin--rich-text--editor-read-only-value": !editable?,
             "admin--rich-text--editor-content-value": content_kind,
+            "admin--rich-text--editor-starting-content-value": starting_content_json,
             action: "focusout->admin--rich-text--editor#containFocus media-picker:picked->admin--rich-text--editor#picked translate:use->admin--rich-text--editor#applySuggestion rich-text-dialog:closed->admin--rich-text--editor#dialogClosed",
             "admin--rich-text--editor-link-targets-url-value": link_targets_url,
             "admin--rich-text--editor-locale-value": editor_locale,

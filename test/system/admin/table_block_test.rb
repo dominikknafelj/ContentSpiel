@@ -8,8 +8,10 @@ require "application_system_test_case"
 # `RichText::Document#validate` and the block's body rule, so whatever the
 # grid can make is something the server accepts.
 #
-# The starting grid of a new block is Task 6's: these tests start from a
-# block whose body already holds a grid of empty cells.
+# The grid's controls (`admin--editor--table`, Task 6): the two header
+# switches, the warning line, the current row's and column's "⋯" menus and
+# "+", "Add row", the delete confirmation, the starting grid of a new Table
+# and the read-only grid of someone who does not hold the block.
 class Admin::TableBlockSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -245,5 +247,275 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     # Its words, in order: how they are put into paragraphs is the ordinary
     # editor's parse of cells it has no node for, unchanged by the grid.
     assert_match(/Plan.*Price.*Basic.*5/m, document.plain_paragraphs.join("\n"))
+  end
+  # ----- The grid's controls (Task 6) -----
+
+  # A table of the given words, the first row headers.
+  def words(rows)
+    {
+      "type" => "doc",
+      "content" => [ {
+        "type" => "table",
+        "content" => rows.each_with_index.map do |row, index|
+          { "type" => "tableRow", "content" => row.map do |text|
+            paragraph = text.empty? ? { "type" => "paragraph" } : { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] }
+            { "type" => index.zero? ? "tableHeader" : "tableCell", "content" => [ paragraph ] }
+          end }
+        end
+      } ]
+    }
+  end
+
+  def words_block(rows, page: @page)
+    block = page.content_blocks.new(block_type: "table", position: page.content_blocks.count)
+    block.assign_body(words(rows), locale: :en)
+    block.save!
+    block
+  end
+
+  def card(block) = "#content_block_#{block.id}"
+
+  # A menu's item: the menu's "⋯" pressed, then the item, as a person does.
+  # An item is found by its words, an alignment by its name ("Align right":
+  # its words are "Right" and the check mark).
+  def column_menu(block, item) = pick("#{card(block)} [data-admin--editor--table-target=columnControls]", "Column actions", item)
+
+  def row_menu(block, item) = pick("#{card(block)} [data-admin--editor--table-target=rowControls]", "Row actions", item)
+
+  def pick(controls, menu, item)
+    within(controls) do
+      find("button[aria-label='#{menu}']").click
+      within("[role=menu]") do
+        (item.start_with?("Align ") ? find("button[aria-label='#{item}']") : find("button", text: /\A#{Regexp.escape(item)}\z/)).click
+      end
+    end
+  end
+
+  def kinds(document) = rows_of(document).map { |row| row.map { |cell| cell["type"] == "tableHeader" ? "th" : "td" } }
+
+  def aligns(document) = rows_of(document).map { |row| row.map { |cell| cell.dig("attrs", "align") } }
+
+  def stored(block) = block.reload.body(locale: "en")
+
+  test "a new Table starts as a 3 × 3 grid with a header row, and nothing is saved until a cell is typed in" do
+    block = @page.content_blocks.create!(block_type: "table", position: 0)
+    open_editor
+
+    assert_selector "#{grid_of(block)} tr", count: 3
+    assert_selector "#{grid_of(block)} tr:first-child > th", count: 3
+    assert_selector "#{grid_of(block)} tr:nth-child(2) > td", count: 3
+    assert find("#{card(block)} input[role=switch]", match: :first).checked?, "Header row is on"
+    assert_equal({ "type" => "doc", "content" => [] }, JSON.parse(find("#{card(block)} input[name='block[body]']", visible: :all).value), "the field stays empty")
+    cell(block, 1, 1).click
+    await_frames
+    assert_writes_settled
+    assert stored(block).blank? || stored(block) == { "type" => "doc", "content" => [] }, "a click is no change: nothing is saved"
+
+    type_text "5 €"
+    document = saved(block) { |doc| doc.table? && texts(doc).dig(1, 1) == "5 €" }
+    assert_equal [ %w[th th th], %w[td td td], %w[td td td] ], kinds(document)
+  end
+
+  test "a column's menu inserts, moves, aligns and deletes; deleting a column with text asks first; the cells show the alignment" do
+    block = words_block([ %w[Plan Price], %w[Basic 5] ])
+    open_editor
+
+    cell(block, 0, 0).click
+    column_menu(block, "Insert right")
+    document = saved(block) { |doc| rows_of(doc).first.size == 3 }
+    assert_equal [ [ "Plan", "", "Price" ], [ "Basic", "", "5" ] ], texts(document)
+    assert_equal [ %w[th th th], %w[td td td] ], kinds(document), "the new column's first cell is a header like its row"
+
+    column_menu(block, "Move right") # the new column, current after the insert
+    document = saved(block) { |doc| texts(doc).first == [ "Plan", "Price", "" ] }
+    assert_equal [ [ "Plan", "Price", "" ], [ "Basic", "5", "" ] ], texts(document)
+
+    cell(block, 1, 1).click
+    column_menu(block, "Align right")
+    document = saved(block) { |doc| aligns(doc).all? { |row| row[1] == "right" } }
+    assert_equal [ [ nil, "right", nil ], [ nil, "right", nil ] ], aligns(document), "every cell of the column, the header's too, and no other"
+    assert_equal %w[right right], [ 0, 1 ].map { |row| cell(block, row, 1).evaluate_script("getComputedStyle(this).textAlign") }, "the grid's cells show it"
+    assert_equal "left", cell(block, 1, 0).evaluate_script("getComputedStyle(this).textAlign")
+    within("#{card(block)} [data-admin--editor--table-target=columnControls]") do
+      find("button[aria-label='Column actions']").click
+      assert_selector "[role=menuitemradio][aria-checked=true]", text: "Right"
+      assert_selector "[role=menuitemradio][aria-checked=false]", count: 2
+      find("button[aria-haspopup=menu]").send_keys(:escape)
+    end
+
+    # A row added afterwards takes its column's alignment (Tab in the last cell adds one).
+    cell(block, 1, 2).click
+    key(:Tab)
+    document = saved(block) { |doc| rows_of(doc).size == 3 }
+    assert_equal "right", aligns(document)[2][1]
+
+    cell(block, 0, 2).click
+    column_menu(block, "Delete column") # no text in it: deleted at once
+    assert_no_selector "dialog[open]"
+    document = saved(block) { |doc| rows_of(doc).first.size == 2 }
+    assert_equal [ %w[Plan Price], %w[Basic 5], [ "", "" ] ], texts(document)
+
+    cell(block, 0, 0).click
+    column_menu(block, "Delete column")
+    within("dialog[open]") do
+      assert_text "Delete this column?"
+      press "Cancel"
+    end
+    assert_no_selector "dialog[open]"
+    assert_selector "#{grid_of(block)} tr:first-child > *", count: 2
+
+    column_menu(block, "Delete column")
+    within("dialog[open]") { press "Delete column" }
+    document = saved(block) { |doc| rows_of(doc).first.size == 1 }
+    assert_equal [ [ "Price" ], [ "5" ], [ "" ] ], texts(document)
+    assert_equal [ [ "right" ], [ "right" ], [ "right" ] ], aligns(document)
+    every_cell_one_paragraph(document)
+  end
+
+  test "a row's menu inserts above, moves and deletes, and the header row stays the first row" do
+    block = words_block([ %w[Plan Price], %w[Basic 5], %w[Pro 12] ])
+    open_editor
+    focused = -> { page.evaluate_script("document.activeElement.getAttribute('aria-label')") }
+
+    # The keyboard's way to the controls: Esc leaves the grid to the row's "⋯", Tab goes on to the column's.
+    cell(block, 2, 0).click
+    key(:Escape)
+    assert_eventually(message: -> { "Esc went to #{focused.call.inspect}" }) { focused.call == "Row actions" }
+    key(:Tab)
+    assert_equal "Column actions", focused.call
+
+    cell(block, 2, 0).click
+    row_menu(block, "Move up")
+    document = saved(block) { |doc| texts(doc)[1] == %w[Pro 12] }
+    assert_equal [ %w[Plan Price], %w[Pro 12], %w[Basic 5] ], texts(document)
+
+    row_menu(block, "Move up") # Pro, now the second row: it becomes the first, and the header
+    document = saved(block) { |doc| texts(doc)[0] == %w[Pro 12] }
+    assert_equal [ %w[th th], %w[td td], %w[td td] ], kinds(document), "the header row is the first row, whatever moved"
+
+    row_menu(block, "Insert above")
+    document = saved(block) { |doc| rows_of(doc).size == 4 }
+    assert_equal [ [ "", "" ], %w[Pro 12], %w[Plan Price], %w[Basic 5] ], texts(document)
+    assert_equal [ %w[th th], %w[td td], %w[td td], %w[td td] ], kinds(document)
+
+    row_menu(block, "Delete row") # empty: at once
+    document = saved(block) { |doc| rows_of(doc).size == 3 }
+    cell(block, 2, 0).click
+    row_menu(block, "Delete row")
+    within("dialog[open]") { press "Delete row" }
+    document = saved(block) { |doc| rows_of(doc).size == 2 }
+    assert_equal [ %w[Pro 12], %w[Plan Price] ], texts(document)
+
+    press "Add row"
+    document = saved(block) { |doc| rows_of(doc).size == 3 }
+    assert_equal [ %w[th th], %w[td td], %w[td td] ], kinds(document)
+  end
+
+  test "Header row and First column as header turn cells into headers and back, and the site draws th" do
+    live = create_page(title: "Live prices")
+    block = words_block([ %w[Plan Price], %w[Basic 5], %w[Pro 12] ], page: live)
+    publish_changes(live)
+    visit "/cs-studio/pages/#{live.id}"
+    assert_selector ".ProseMirror"
+    await_admin_controllers
+
+    find("#{card(block)} label", text: "Header row").click
+    document = saved(block) { |doc| kinds(doc).flatten.uniq == [ "td" ] }
+    assert_selector "#{grid_of(block)} th", count: 0
+
+    find("#{card(block)} label", text: "First column as header").click
+    document = saved(block) { |doc| kinds(doc).map(&:first).uniq == [ "th" ] }
+    assert_equal [ %w[th td], %w[th td], %w[th td] ], kinds(document)
+
+    find("#{card(block)} label", text: "Header row").click
+    document = saved(block) { |doc| kinds(doc).first == %w[th th] }
+    assert_equal [ %w[th th], %w[th td], %w[th td] ], kinds(document)
+
+    find("#{card(block)} label", text: "First column as header").click
+    document = saved(block) { |doc| kinds(doc)[1].first == "td" }
+    assert_equal [ %w[th th], %w[td td], %w[td td] ], kinds(document), "the corner stays a header of the row"
+
+    find("#{card(block)} label", text: "First column as header").click
+    saved(block) { |doc| kinds(doc)[1].first == "th" }
+    assert_writes_settled
+    publish_changes(live)
+    visit PublicSite::Urls.new.path_for(live, "en")
+    assert_selector "table th", count: 4
+    assert_equal %w[Plan Price Basic Pro], all("table th").map(&:text)
+    assert_selector "table td", count: 2
+  end
+
+  test "adding a sixth column shows the warning at once, removing it takes it away" do
+    block = words_block([ %w[A B C D E], %w[1 2 3 4 5] ])
+    open_editor
+    warning = "#{card(block)} [data-admin--editor--table-target=warning]"
+    assert_no_selector warning
+
+    cell(block, 0, 0).click
+    press "Add a column"
+    assert_selector warning, text: "6 columns. On a phone, visitors scroll sideways to read this table.", exact_text: true
+
+    cell(block, 0, 5).click
+    column_menu(block, "Delete column")
+    assert_no_selector warning
+    saved(block) { |doc| rows_of(doc).first.size == 5 }
+  end
+
+  test "the editor's edge fade on a five-column grid is on the side that has more, and follows the scroll" do
+    block = table_block(columns: 5)
+    open_editor
+    box = "#{grid_of(block)} .tableWrapper"
+    fades = -> { find(box).evaluate_script("[getComputedStyle(this).getPropertyValue('--admin-table-fade-start').trim(), getComputedStyle(this).getPropertyValue('--admin-table-fade-end').trim()]") }
+
+    assert_equal [ "0px", "24px" ], fades.call, "at rest: more to the right, the right edge fades"
+    find(box).execute_script("this.scrollLeft = this.scrollWidth")
+    assert_eventually(message: -> { "scrolled to the end: the left edge fades, the right does not (#{fades.call})" }) { fades.call == [ "24px", "0px" ] }
+  end
+
+  test "a second person sees the grid read-only: no controls, no toolbar, nothing typed" do
+    block = words_block([ %w[Plan Price], %w[Basic 5] ])
+    open_editor
+    cell(block, 1, 1).click
+    type_text "0"
+    saved(block) { |doc| texts(doc).dig(1, 1) == "50" }
+    assert_writes_settled
+
+    using_session(:dana) do
+      sign_in_via_form(users(:two))
+      visit "/cs-studio/pages/#{@page.id}"
+      assert_selector ".ProseMirror"
+      await_admin_controllers
+
+      assert_selector "#{card(block)}[data-editing-held=true]"
+      assert_selector "#{grid_of(block)}[contenteditable=false]"
+      assert_no_selector "#{card(block)} [role=toolbar]"
+      assert_no_selector "#{card(block)} [data-controller~='admin--editor--table']"
+      assert_no_selector "#{card(block)} input[role=switch]"
+      assert_no_selector "button[aria-label='Row actions'], button[aria-label='Column actions'], button[aria-label='Add a column'], button[aria-label='Add a row']", visible: :all
+      assert_no_button "Add row"
+
+      cell(block, 0, 0).click
+      type_text "ZZZ"
+      key(:Tab)
+      await_frames
+      assert_no_text "ZZZ"
+      assert_selector "#{grid_of(block)} tr", count: 2
+    end
+    assert_equal [ %w[Plan Price], %w[Basic 50] ], texts(block.reload.body_document(locale: :en))
+  end
+
+  test "over the hard limit the save is refused with the table's sentence and the grid keeps its text" do
+    block = words_block([ Array.new(30) { |n| "H#{n + 1}" }, Array.new(30) { |n| "c#{n + 1}" } ])
+    open_editor
+
+    cell(block, 1, 0).click
+    type_text "!"
+    saved(block) { |doc| texts(doc).dig(1, 0) == "c1!" }
+    press "Add a column"
+
+    assert_selector "##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-body-errors", text: "A table can have at most 30 columns and 500 rows."
+    assert_selector "#{grid_of(block)} tr:first-child > *", count: 31
+    assert_selector grid_of(block), text: "c1!"
+    assert_equal 30, rows_of(block.reload.body_document(locale: :en)).first.size, "nothing over the limit is stored"
   end
 end

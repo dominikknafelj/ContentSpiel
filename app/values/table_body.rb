@@ -29,6 +29,23 @@ class TableBody
 
   ALIGNS = %w[left center right].freeze
 
+  # The grid a Table with no table yet shows in the editor: three columns by
+  # three rows of empty cells, the first row headers (Claude Design's B5:
+  # "Header row" is on by default). It is the editor's STARTING content
+  # (`admin--rich-text--editor`'s `startingContent`), never stored by itself:
+  # the form's body field stays empty until the editor's first real change,
+  # so a Table nobody typed into saves nothing and its body stays blank.
+  STARTING_ROWS = 3
+  STARTING_COLUMNS = 3
+
+  def self.starting_document
+    rows = Array.new(STARTING_ROWS) do |row|
+      cells = Array.new(STARTING_COLUMNS) { { "type" => row.zero? ? "tableHeader" : "tableCell", "content" => [ { "type" => "paragraph" } ] } }
+      { "type" => "tableRow", "content" => cells }
+    end
+    { "type" => "doc", "content" => [ { "type" => "table", "content" => rows } ] }
+  end
+
   def initialize(document)
     @document = document
   end

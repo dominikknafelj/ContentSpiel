@@ -65,19 +65,33 @@ module Admin
     # the toolbar holds only what a cell may hold (`TABLE_TOOLBAR_GROUPS`: the
     # marks bold, italic and code, and Link, which makes internal links too)
     # with no Insert menu, since nothing a cell holds is inserted as a block.
+    #
+    # `starting_content:` (a document Hash, or nil) is what the editor SHOWS
+    # while the field is empty, without writing it into the field: the
+    # hidden input keeps the stored (empty) value until the first real change
+    # in the editor, which then writes the whole document, starting content
+    # and change together. So a field nobody touched autosaves nothing, a live
+    # refresh sees a clean form, and every rule about an empty field still
+    # holds. A new Table's 3 × 3 grid is one (`TableBody.starting_document`);
+    # a language's copy of the source table is another (table block spec,
+    # decision 8). It is general: nothing in it knows of tables.
     class RichTextColumnComponent < Base
       CONTENTS = %i[rich table].freeze
 
       # `body_content:`, as the block type's definition names it (`content:`
       # is ViewComponent's own method).
-      def initialize(editable: true, body_content: :rich, **options)
+      def initialize(editable: true, body_content: :rich, starting_content: nil, **options)
         super(**options)
         @editable = editable
         @content = body_content.to_sym
+        @starting_content = starting_content
         raise ArgumentError, "body_content is one of #{CONTENTS.join(", ")}: #{body_content.inspect}" unless CONTENTS.include?(@content)
       end
 
       def editable? = @editable
+
+      # The JSON of `starting_content:`, or nil (no attribute) without one.
+      def starting_content_json = @starting_content.presence && self.class.to_document(@starting_content).to_h.to_json
 
       def table? = @content == :table
 

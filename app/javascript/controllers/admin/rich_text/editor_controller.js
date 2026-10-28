@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { Editor } from "@tiptap/core"
 import { extensions, safeHref, normalizeHref } from "rich_text/schema"
 import { storedDocument } from "rich_text/table"
+import { attach, detach } from "rich_text/editors"
 import { createPopover, createField, createButton } from "rich_text/popover"
 import { createTargetSearch } from "rich_text/target_search"
 
@@ -59,7 +60,16 @@ export default class extends Controller {
     // body's, or "table", a Table block's grid (table block spec decision
     // 11) -- the same editor with the table schema and keys of
     // `rich_text/table.js` and nothing else (`extensions({ content })`).
-    content: { type: String, default: "rich" }
+    content: { type: String, default: "rich" },
+    // What the editor SHOWS while the hidden input is empty, without writing
+    // it there (`RichTextColumnComponent`'s `starting_content:`): a new
+    // Table's 3 x 3 grid, a language's copy of the source table. The input
+    // keeps its empty value until the first real change, which writes the
+    // whole document (`documentChanged`: loading content is no transaction
+    // that changes the document), so a field nobody touched sends nothing,
+    // a live refresh sees a clean form, and an empty field stays empty to
+    // every rule that asks. General: nothing here knows what it holds.
+    startingContent: Object
   }
 
   static texts = {
@@ -126,6 +136,12 @@ export default class extends Controller {
     })
 
     this.refreshToolbar()
+    // For a controller AROUND this one that works on the same document (the
+    // Table block's grid controls, `admin--editor--table`): the editor is
+    // found through `rich_text/editors`, and its coming and going is an event,
+    // never an outlet (the scripts' rule).
+    attach(this.element, this.editor)
+    this.dispatch("attached", { detail: { editor: this.editor } })
   }
 
   disconnect() {
@@ -135,6 +151,8 @@ export default class extends Controller {
     // Turbo Stream replaced its block card): close it, answer nobody.
     if (this.dialogContext) window.dispatchEvent(new CustomEvent("rich-text-dialog:withdraw", { detail: { opener: this.element } }))
     this.dialogContext = null
+    detach(this.element)
+    this.dispatch("detached")
     this.editor?.destroy()
     this.editor = null
     this.editorTarget.replaceChildren()
@@ -166,16 +184,21 @@ export default class extends Controller {
     this.element.querySelector("[role=toolbar]")?.removeAttribute("hidden")
   }
 
-  // The hidden input's JSON, or nothing for an empty/absent document (an
-  // empty `doc` isn't valid ProseMirror content -- a doc needs at least one
-  // block -- and would otherwise trip the content check below).
+  // The hidden input's JSON, else the starting content (see the value), or
+  // nothing for an empty/absent document (an empty `doc` isn't valid
+  // ProseMirror content -- a doc needs at least one block -- and would
+  // otherwise trip the content check below). An input that holds something
+  // the JSON parser refuses shows nothing, never the starting content, which
+  // would read as if that were the field's value.
   initialContent() {
+    let stored
     try {
-      const document = JSON.parse(this.inputTarget.value || "null")
-      return document && Array.isArray(document.content) && document.content.length > 0 ? document : null
+      stored = JSON.parse(this.inputTarget.value || "null")
     } catch {
       return null
     }
+    if (filled(stored)) return stored
+    return filled(this.startingContentValue) ? this.startingContentValue : null
   }
 
   // A stored document the editor's schema can't represent (a type
@@ -610,6 +633,11 @@ export default class extends Controller {
     else chain.updateAttributes("image", { alt: answer.alt, caption: answer.caption })
     chain.run()
   }
+}
+
+// A document with at least one block in it.
+function filled(document) {
+  return Boolean(document && Array.isArray(document.content) && document.content.length > 0)
 }
 
 // Text that is a URL rather than a title to search for: a scheme (http:,

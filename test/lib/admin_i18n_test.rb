@@ -137,6 +137,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/mind_graph_screen/legend_component.html.erb
     app/helpers/admin/messages_helper.rb
     app/javascript/i18n/messages.js
+    app/javascript/controllers/admin/editor/table_controller.js
     app/javascript/controllers/admin/saving/save_bar_controller.js
     app/javascript/controllers/admin/saving/pending_lock_controller.js
     app/javascript/controllers/admin/ui/chip_input_controller.js
@@ -173,6 +174,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/mind_graph_screen/status_key_component.rb
     app/components/admin/mind_graph_screen/status_key_component.html.erb
     app/components/admin/mind_graph_screen/swatch_component.rb
+    app/components/admin/editor_screen/table_controls_component.rb
+    app/components/admin/editor_screen/table_controls_component.html.erb
+    app/components/admin/editor_screen/table_delete_dialogs_component.rb
     app/components/admin/editor_screen/section_card_component.rb
     app/components/admin/editor_screen/section_card_component.html.erb
     app/components/admin/editor_screen/section_group_component.rb

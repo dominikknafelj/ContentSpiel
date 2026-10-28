@@ -92,6 +92,65 @@ en:
           # and is true only of its notes.
           published_body: "Blocks don’t go to the trash. The block is removed from the site only when the changes are published; until then “Discard changes…” brings it back. Its notes are deleted now and do not come back."
           confirm: "Delete block"
+        # The Table block's grid controls (table block spec, "CS Studio";
+        # Claude Design's B5 and its 2026-10-27 follow-up), around the grid of
+        # a Table's card. `warning` is advice, never a refusal (decision 7):
+        # the script says it again as rows and columns change, from these
+        # same keys, so `%{count}` is filled by the server and by the script.
+        table_controls:
+          options: "Table options"
+          header_row: "Header row"
+          header_column: "First column as header"
+          warning:
+            columns:
+              one: "%{count} column. On a phone, visitors scroll sideways to read this table."
+              other: "%{count} columns. On a phone, visitors scroll sideways to read this table."
+            rows:
+              one: "%{count} row. A long table is easier to read split into several."
+              other: "%{count} rows. A long table is easier to read split into several."
+          row:
+            menu: "Row actions"
+            insert_above: "Insert above"
+            insert_below: "Insert below"
+            move_up: "Move up"
+            move_down: "Move down"
+            delete: "Delete row"
+          column:
+            menu: "Column actions"
+            insert_left: "Insert left"
+            insert_right: "Insert right"
+            move_left: "Move left"
+            move_right: "Move right"
+            # The column's alignment, the current one checked. `label` is
+            # what the item shows under "Align", `name` what it is called.
+            align: "Align"
+            aligns:
+              left:
+                label: "Left"
+                name: "Align left"
+              center:
+                label: "Centre"
+                name: "Align centre"
+              right:
+                label: "Right"
+                name: "Align right"
+            delete: "Delete column"
+          # The "+" at the end of the row the pointer or the caret is in, the
+          # "+" under its column, and the button under the grid that is
+          # always there (for touch).
+          add_column: "Add a column"
+          add_row_here: "Add a row"
+          add_row: "Add row"
+        # Deleting a row or a column that has text asks first (B5).
+        table_delete_dialogs:
+          row:
+            title: "Delete this row?"
+            body: "Its cells have text in them, and the text is deleted with the row."
+            confirm: "Delete row"
+          column:
+            title: "Delete this column?"
+            body: "Its cells have text in them, and the text is deleted with the column."
+            confirm: "Delete column"
         # The heading of a block's form under a section's lanes.
         panel_title:
           title: "%{type} · column %{column}"

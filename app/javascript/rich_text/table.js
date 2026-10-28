@@ -140,6 +140,186 @@ export const TableKeys = Extension.create({
   }
 })
 
+// A row added in any way (Tab in the last cell, Insert above or below, the
+// "+" and "Add row") takes its column's alignment (decision 5: the editor
+// writes whole columns, and a cell never has an alignment its column does
+// not have). prosemirror-tables makes a new row's cells with no attributes,
+// so they would read as left in a right-aligned column. A row is new when the
+// table it is in after the change holds a row node that was not in the table
+// before (ProseMirror keeps the node objects of what a step did not touch), and
+// its column's alignment is the first row's as it was before the change.
+export const TableColumnAlignment = Extension.create({
+  name: "tableColumnAlignment",
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("tableColumnAlignment"),
+        appendTransaction: (transactions, oldState, newState) => {
+          if (!transactions.some((transaction) => transaction.docChanged)) return null
+
+          const before = tableNode(oldState.doc)
+          const after = tableNode(newState.doc)
+          if (!before || !after || after.childCount <= before.childCount) return null
+
+          const kept = new Set()
+          before.forEach((row) => kept.add(row))
+          const aligns = []
+          before.firstChild.forEach((cell) => aligns.push(alignOf(cell)))
+
+          let tr = null
+          let rowPosition = TABLE_START
+          after.forEach((row) => {
+            if (!kept.has(row)) {
+              row.forEach((cell, offset, column) => {
+                const align = aligns[column] ?? null
+                if (alignOf(cell) === align) return
+                tr ||= newState.tr
+                tr.setNodeMarkup(rowPosition + 1 + offset, null, { ...cell.attrs, align })
+              })
+            }
+            rowPosition += row.nodeSize
+          })
+          return tr
+        }
+      })
+    ]
+  }
+})
+
+// --- The grid, by row and column ------------------------------------------
+//
+// What `admin--editor--table` (the rows', columns' and header controls around
+// the grid) reads and writes. The table is the document's one top-level node
+// (`Document.extend({ content: "table?" })`, `schema.js`), so it starts at 0
+// and its first row at 1. Rows and columns count from zero; a table here has
+// no spans, so a row's n-th cell is column n.
+const TABLE_START = 1
+
+function alignOf(cell) {
+  return ALIGNMENTS.includes(cell.attrs.align) ? cell.attrs.align : null
+}
+
+// The document's table node, or null.
+export function tableNode(doc) {
+  const first = doc.firstChild
+  return first && first.type.name === "table" ? first : null
+}
+
+// `{ rows, columns }` of the document's table, `{ rows: 0, columns: 0 }` without one.
+export function gridShape(doc) {
+  const table = tableNode(doc)
+  if (!table) return { rows: 0, columns: 0 }
+  return { rows: table.childCount, columns: TableMap.get(table).width }
+}
+
+// The position of the cell node at (row, column), or null.
+export function cellPosition(doc, row, column) {
+  const table = tableNode(doc)
+  if (!table) return null
+  const map = TableMap.get(table)
+  if (row < 0 || column < 0 || row >= map.height || column >= map.width) return null
+  return TABLE_START + map.map[row * map.width + column]
+}
+
+// A position inside the cell's one paragraph, where a caret can be: at the
+// end of its text.
+export function insideCell(doc, row, column) {
+  const position = cellPosition(doc, row, column)
+  if (position === null) return null
+  return position + doc.nodeAt(position).nodeSize - 2
+}
+
+// `{ row, column }` of the cell the selection's head is in, or null.
+export function selectedCell(state) {
+  const $cell = cellAround(state.selection.$head)
+  const table = tableNode(state.doc)
+  if (!$cell || !table) return null
+  const rect = TableMap.get(table).findCell($cell.pos - TABLE_START)
+  return { row: rect.top, column: rect.left }
+}
+
+// Whether a row's (or a column's) cells hold any text: what Delete asks
+// first for (Claude Design's B5).
+export function rowHasText(doc, row) {
+  const table = tableNode(doc)
+  return Boolean(table && row < table.childCount && table.child(row).textContent.trim() !== "")
+}
+
+export function columnHasText(doc, column) {
+  const table = tableNode(doc)
+  if (!table) return false
+  let found = false
+  table.forEach((row) => {
+    if (column < row.childCount && row.child(column).textContent.trim() !== "") found = true
+  })
+  return found
+}
+
+// The column's alignment as the column menu shows it: its first cell's
+// ("left" for none: absent is left, decision 5).
+export function columnAlign(doc, column) {
+  const table = tableNode(doc)
+  const cell = table && column < table.firstChild.childCount ? table.firstChild.child(column) : null
+  return (cell && alignOf(cell)) || "left"
+}
+
+// Every cell of the column to `align`; "left" is written as no alignment,
+// absent being left (decision 5), so the stored cell carries no attribute.
+export function alignColumn(tr, column, align) {
+  const table = tableNode(tr.doc)
+  if (!table) return tr
+  const value = align === "left" ? null : align
+  let rowPosition = TABLE_START
+  table.forEach((row) => {
+    let cellPosition = rowPosition + 1
+    row.forEach((cell, _offset, index) => {
+      if (index === column && alignOf(cell) !== value) tr.setNodeMarkup(cellPosition, null, { ...cell.attrs, align: value })
+      cellPosition += cell.nodeSize
+    })
+    rowPosition += row.nodeSize
+  })
+  return tr
+}
+
+// "Header row" and "First column as header" as the cells say (decision 4,
+// and `TableBody#header_row?` / `#header_column?`, the server's reading):
+// every cell of the first row is a header; the first cell of every row is.
+export function headerState(doc) {
+  const table = tableNode(doc)
+  if (!table) return { row: false, column: false }
+  let column = true
+  table.forEach((row) => { if (row.firstChild?.type.name !== "tableHeader") column = false })
+  let row = table.firstChild.childCount > 0
+  table.firstChild.forEach((cell) => { if (cell.type.name !== "tableHeader") row = false })
+  return { row, column }
+}
+
+// The cells' kinds made what the two switches say: a cell is a header when
+// it is in the first row with "Header row" on, or in the first column with
+// "First column as header" on, and a plain cell otherwise. Run with the
+// switches as they were BEFORE a row or column is inserted, moved or deleted,
+// so a header row stays the table's first row whatever moved (a row moved
+// down from the top becomes a body row, and the row that is now first becomes
+// the header), and after either switch is pressed. Attributes (the
+// alignment) are kept.
+export function applyHeaders(tr, { row: headerRow, column: headerColumn }) {
+  const table = tableNode(tr.doc)
+  if (!table) return tr
+  const { tableHeader, tableCell } = tr.doc.type.schema.nodes
+  let rowPosition = TABLE_START
+  table.forEach((row, _offset, rowIndex) => {
+    let cellPosition = rowPosition + 1
+    row.forEach((cell, _cellOffset, columnIndex) => {
+      const type = (headerRow && rowIndex === 0) || (headerColumn && columnIndex === 0) ? tableHeader : tableCell
+      if (cell.type !== type) tr.setNodeMarkup(cellPosition, type, cell.attrs)
+      cellPosition += cell.nodeSize
+    })
+    rowPosition += row.nodeSize
+  })
+  return tr
+}
+
 // What the editor writes into the hidden input for a table body: the
 // document without the editor's own cell attributes (see the top of this
 // file), and an editor emptied of its table as an empty document, the one

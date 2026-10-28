@@ -13,7 +13,7 @@ import { Bold } from "@tiptap/extension-bold"
 import { Italic } from "@tiptap/extension-italic"
 import { Code } from "@tiptap/extension-code"
 import { UndoRedo } from "@tiptap/extensions"
-import { SchemaTable, SchemaTableRow, SchemaTableHeader, SchemaTableCell, TableKeys } from "rich_text/table"
+import { SchemaTable, SchemaTableRow, SchemaTableHeader, SchemaTableCell, TableKeys, TableColumnAlignment } from "rich_text/table"
 
 // The editor's schema, in one place, matched against `RichText::Schema`
 // (`app/models/rich_text/built_ins.rb`, the source of truth) type by type
@@ -211,7 +211,8 @@ function tableExtensions({ resolveLinkTitle }) {
     SchemaTableRow,
     SchemaTableHeader,
     SchemaTableCell,
-    TableKeys
+    TableKeys,
+    TableColumnAlignment
   ]
 }
 
