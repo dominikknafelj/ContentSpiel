@@ -76,6 +76,16 @@ require "ripper"
 # The rules are pinned against small samples at the foot of this file.
 class AdminI18nTest < ActiveSupport::TestCase
   CONVERTED = %w[
+    app/components/admin/settings_screen/mail_card_component.rb
+    app/components/admin/settings_screen/mail_card_component.html.erb
+    app/components/admin/settings_screen/mail_login_component.rb
+    app/components/admin/settings_screen/mail_login_component.html.erb
+    app/components/admin/settings_screen/mail_state_component.rb
+    app/components/admin/settings_screen/mail_alert_component.rb
+    app/components/admin/settings_screen/mail_test_result_component.rb
+    app/controllers/admin/mail_logins_controller.rb
+    app/javascript/controllers/admin/settings/mail_controller.js
+    app/views/admin/settings/_mail_login_forms.html.erb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
     app/components/admin/dashboard_screen/card_component.rb

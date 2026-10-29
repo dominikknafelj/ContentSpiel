@@ -135,12 +135,17 @@ class MailSettings
   # the security is one we know and, for `none`, there is no login, and in
   # production the site has an address to build links from.
   def complete?
-    return false if @production && !@address&.configured?
+    return false if address_missing?
     return false if value(:sender_address).blank?
     return false unless security_acceptable?
 
     stand_in? || (value(:server).present? && value(:port).present?)
   end
+
+  # Production without a site address (`PUBLIC_HOST`): no link could be
+  # mailed, so mail is "Not set up" whatever the fields hold, and the state's
+  # sentence says why.
+  def address_missing? = @production && !@address&.configured?
 
   def fingerprint
     key = Rails.application.key_generator.generate_key(FINGERPRINT_KEY, 32)

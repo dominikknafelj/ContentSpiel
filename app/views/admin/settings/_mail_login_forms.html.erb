@@ -1,0 +1,26 @@
+<%# locals: site_setting, main_base -- the forms of the Mail card's instant actions, kept
+    OUTSIDE the Settings form as the AI key's are (`_ai_key_forms`, which says
+    why): the test mail's, the login's, and the Remove dialog's, which only
+    exists while a login does. The card's controls reach them by `form=`. The
+    wrapper carries the id a login write's Turbo Stream replaces
+    (`Admin::MailLoginsController`); `main_base` is carried as there. %>
+<div id="settings-mail-login-forms">
+  <%= form_with method: :post, id: Admin::SettingsScreen::MailTestResultComponent::TEST_FORM, html: { class: "hidden" },
+        data: { controller: "admin--ui--busy" }, url: send_test_mail_admin_settings_path do end %>
+  <%= form_with url: admin_settings_mail_login_path, method: :patch, id: Admin::SettingsScreen::MailLoginComponent::LOGIN_FORM, html: { class: "hidden" } do %>
+    <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
+  <% end %>
+
+  <% if site_setting.mail_login_set? %>
+    <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: Admin::SettingsScreen::MailLoginComponent::REMOVE_DIALOG,
+          title: t("admin.components.settings_screen.mail_login.remove_dialog.title"),
+          body: t("admin.components.settings_screen.mail_login.remove_dialog.body")) do |dialog| %>
+      <% dialog.with_confirm_action do %>
+        <%= form_with url: admin_settings_mail_login_path, method: :delete do %>
+          <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t("admin.components.settings_screen.mail_login.remove_dialog.confirm"), variant: :danger, type: "submit") %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

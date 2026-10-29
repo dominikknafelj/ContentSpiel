@@ -7,7 +7,10 @@ Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc,
   # An API token's SHA-256 lookup digest (`api_tokens.lookup_digest`): the exact name, not a bare
   # :digest, which would also hide harmless digests. The :token entry no longer matches it.
-  :lookup_digest
+  :lookup_digest,
+  # The mail login's username (docs/reference/mail.md): a credential for several providers (Postmark's
+  # server token, SES's access key id). Its password is :passw's.
+  :mail_username
 ]
 
 # A note's text (notes spec, decision D14: it reaches no log). The notes forms

@@ -4,10 +4,13 @@
     (`#settings-form`) wraps the whole column and carries the ONE save footer
     (`Admin::Ui::SaveBarComponent`, at its bottom): the Site and Publishing cards,
     the Languages card's order and fallbacks and the AI card's provider and
-    model are its fields. What can't be a field of it -- the AI key (its own
-    save, instantly, never rendered back), Test connection, and the Languages
+    model are its fields, and so are the Mail card's server, port, security
+    and sender. What can't be a field of it -- the AI key and the mail login
+    (each its own save, instantly, never rendered back), Test connection,
+    Send test mail, and the Languages
     card's Default, Turn off and Add -- is associated with forms of its own
-    that sit AFTER this one in `#settings-ai-key-forms` and
+    that sit AFTER this one in `#settings-ai-key-forms`,
+    `#settings-mail-login-forms` and
     `#settings-language-forms` (forms can't nest, and the dialog forms can't be
     inside it either), through the `form=` attribute or a dialog trigger.
     Each card shows only for the right that owns it (decision D9): a viewer with
@@ -25,7 +28,9 @@
 <% base = params[:base_updated_at].presence || @site_setting.updated_at.iso8601(6) %>
 <% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
      "trash_retention_days" => "settings-trash_retention_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
-     "social_links" => "settings-social-0-name" } %>
+     "social_links" => "settings-social-0-name", "mail_server" => "settings-mail_server", "mail_port" => "settings-mail_port",
+     "mail_security" => "settings-mail_security", "mail_sender_name" => "settings-mail_sender_name",
+     "mail_sender_address" => "settings-mail_sender_address" } %>
 
 <div class="grid grid-cols-1 items-start gap-x-7 gap-y-4 lg:grid-cols-[170px_minmax(0,var(--cs-form-max))]">
   <div class="lg:sticky lg:top-[calc(var(--admin-top-offset)+1.75rem)]">
@@ -58,6 +63,8 @@
           <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>
           <%= render Admin::SettingsScreen::AiCardComponent.new(site_setting: @site_setting, values: values,
                 provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
+          <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: @site_setting, mail_settings: MailSettings.current(@site_setting), values: values,
+                errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
         <% end %>
 
         <%= render Admin::Ui::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
@@ -66,6 +73,7 @@
       <%# Forms of their own, outside the one above (see the comment at the top). %>
       <% if manage_settings %>
         <%= render "admin/settings/ai_key_forms", site_setting: @site_setting, main_base: base %>
+        <%= render "admin/settings/mail_login_forms", site_setting: @site_setting, main_base: base %>
       <% end %>
       <% if manage_languages %>
         <div id="settings-language-forms"><%= render Admin::SettingsScreen::LanguageDialogsComponent.new(site_setting: @site_setting) %></div>

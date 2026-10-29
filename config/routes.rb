@@ -216,6 +216,12 @@ Rails.application.routes.draw do
       # never in the form's data, so it can't be counted as a pending change or
       # sent with the rest).
       resource :ai_key, only: %i[update destroy]
+      # Settings → Mail (docs/reference/mail.md): a test mail to the person
+      # pressing it, answered in place, and the mail login's own save and
+      # remove (`Admin::MailLoginsController`), written once and never shown
+      # again -- instant actions beside the Settings form, like the AI key's.
+      post :send_test_mail
+      resource :mail_login, only: %i[update destroy]
     end
 
     # Languages (cs-studio spec §6.1; round 3, Task 6 moved them INTO the

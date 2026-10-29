@@ -44,9 +44,41 @@ module Settings
   # default language is `Locales::MakeDefault`, the language list
   # `Enable`/`Disable`/`languages:`.
   #
+  # The mail settings (docs/reference/mail.md) are plain `attributes` too:
+  # `mail_server`, `mail_port`, `mail_security`, `mail_sender_name` and
+  # `mail_sender_address` (checked by `SiteSetting`'s validations), and the
+  # LOGIN, `mail_username` and `mail_password`, which are pulled out and
+  # written like the AI key (`#write_mail_login`): straight to their columns,
+  # never decrypting what is stored, audited as "Mail login: set / not set".
+  # A mail field the host's environment sets (`MailSettings#from_host?`) is
+  # not the screen's to change: naming one refuses the whole call, before
+  # anything is written.
+  #
+  # WITHOUT ENCRYPTION KEYS (spec "Security rules") writing the AI key or the
+  # mail login raises `ActiveRecord::Encryption::Errors::Configuration` at
+  # the first encryption, inside the transaction: it is answered with one
+  # sentence (`.no_encryption_keys`), the transaction is rolled back, so
+  # nothing of the call is written, and nothing is recorded.
+  #
   # Recorded as `settings.updated`, and only when something actually changed.
   class Save < ApplicationService
     TRANSLATED = %i[title tagline].freeze
+
+    MAIL_LOGIN = %i[mail_username mail_password].freeze
+
+    # The attribute of each `MailSettings` field.
+    MAIL_ATTRIBUTES = {
+      mail_server: :server, mail_port: :port, mail_security: :security, mail_sender_name: :sender_name,
+      mail_sender_address: :sender_address, mail_username: :username, mail_password: :password
+    }.freeze
+
+    # Looked up at each call, so a later locale switch applies; `raise: true`
+    # so a missing key never becomes a "translation missing" sentence.
+    def self.no_encryption_keys = I18n.t("admin.settings.save.no_encryption_keys", raise: true)
+
+    def self.set_by_host(attribute)
+      I18n.t("admin.settings.save.set_by_host", field: SiteSetting.human_attribute_name(attribute), raise: true)
+    end
 
     def initialize(site = Current.site, attributes: {}, translations: {}, languages: nil, actor: Current.actor)
       @site = site
@@ -57,6 +89,12 @@ module Settings
       # Kept out of `assign_attributes` -- see `#write_ai_key`.
       @ai_key_given = @attributes.key?(:ai_api_key)
       @new_ai_key = @attributes.delete(:ai_api_key).to_s.strip.presence
+
+      # Kept out of `assign_attributes` too -- see `#write_mail_login`. Only
+      # the keys given are written: a login half set by the host posts the
+      # other half alone.
+      @mail_login = @attributes.slice(*MAIL_LOGIN).transform_values { |value| value.to_s.strip.presence }
+      @attributes = @attributes.except(*MAIL_LOGIN)
 
       # Only the translated keys count, and a language left with none is
       # dropped: `{ "en" => {} }` is no site part, so a languages-only call
@@ -75,6 +113,10 @@ module Settings
       end
       if languages_part? && !authorize!("languages.manage", @site)
         return denied("languages.manage", @site)
+      end
+
+      if site_part? && (from_host = mail_attributes_from_host).any?
+        return failure(@site, from_host.map { |attribute| self.class.set_by_host(attribute) })
       end
 
       needed_languages = languages_part?
@@ -121,6 +163,7 @@ module Settings
         if site_part?
           @site.save || raise(ActiveRecord::Rollback)
           ai_key_change = write_ai_key if @ai_key_given
+          mail_login_change = write_mail_login if @mail_login.any?
           # A new default language (or a changed language list through the
           # wizard's `attributes`) changes what every record's state is
           # relative to; anything else only the site's own title and tagline
@@ -135,6 +178,8 @@ module Settings
           changes = Audit::Snapshot.field_changes_for(@site)
           changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing
           changes["AI key"] = ai_key_change if ai_key_change
+          # "Mail login", like "AI key": matches no `filter_parameters` entry.
+          changes["Mail login"] = mail_login_change if mail_login_change
           record_event("settings.updated", subject: @site, field_changes: changes) if changes.any?
         end
 
@@ -169,6 +214,12 @@ module Settings
       return failure(@site) unless saved
 
       success(@site)
+    rescue ActiveRecord::Encryption::Errors::Configuration
+      # The transaction is already rolled back; the row in memory still
+      # holds what was assigned and "saved" (see the languages refusal above
+      # for why it is reloaded).
+      @site.reload
+      failure(@site, [ self.class.no_encryption_keys ])
     end
 
     private
@@ -201,10 +252,44 @@ module Settings
       [ before, @new_ai_key.present? ].map { |set| set ? "set" : "not set" }
     end
 
+    # The mail login (spec decision 2), written as the AI key is and for the
+    # same reasons (see `#write_ai_key`): straight to the columns, after the
+    # main save and in its transaction, never decrypting what is stored, so a
+    # login the current keys can't read can still be replaced or removed.
+    # Only the given columns are written (nil removes one);
+    # `mail_login_saved_at` ("Set on 14 Oct 2026") is now while any half of
+    # the login is stored afterwards, nil once none is. A change to the
+    # login is a change of the delivery settings, which `MailSettings`'s
+    # fingerprint sees by itself: nothing is cleared here.
+    #
+    # Returns the audit row's `"Mail login"` change, "set"/"not set" before
+    # and after (never a value: `Audit::Snapshot::NEVER_STORED` keeps both
+    # columns out of the snapshot), or nil when there was none and still is.
+    def write_mail_login
+      before = @site.mail_login_set?
+      after = MAIL_LOGIN.any? do |column|
+        @mail_login.key?(column) ? @mail_login[column].present? : @site.public_send(:"#{column}_before_type_cast").present?
+      end
+      return nil if !before && !after
+
+      now = Time.current
+      @site.update_columns(**@mail_login, mail_login_saved_at: (now if after), updated_at: now) # version: none (the mail login is on no public page)
+      [ before, after ].map { |set| set ? "set" : "not set" }
+    end
+
+    # The given mail attributes whose field the host's environment sets.
+    def mail_attributes_from_host
+      given = MAIL_ATTRIBUTES.keys.select { |attribute| @attributes.key?(attribute) || @mail_login.key?(attribute) }
+      return [] if given.empty?
+
+      settings = MailSettings.current(@site)
+      given.select { |attribute| settings.from_host?(MAIL_ATTRIBUTES[attribute]) }
+    end
+
     # Whether the call carries site fields (or nothing at all, which has
     # always meant a settings save); false for a call that is only `languages:`.
     def site_part?
-      @languages.nil? || @attributes.any? || @ai_key_given || @translations.any?
+      @languages.nil? || @attributes.any? || @ai_key_given || @mail_login.any? || @translations.any?
     end
 
     # Whether the call needs `languages.manage`: the order (`languages:`), the

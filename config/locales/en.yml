@@ -69,8 +69,32 @@ en:
         ai_provider: "AI provider"
         ai_model: "AI model"
         ai_api_key: "AI API key"
+        # Settings → Mail's fields, named as the card names them.
+        mail_server: "Server"
+        mail_port: "Port"
+        mail_security: "Security"
+        mail_sender_name: "Sender name"
+        mail_sender_address: "Sender address"
+        mail_username: "Username"
+        mail_password: "Password"
     errors:
       models:
+        # Settings → Mail: each refusal is a whole sentence, the same under
+        # its field and in the summary (`SiteSetting`'s mail validations).
+        site_setting:
+          attributes:
+            mail_sender_name:
+              format: "%{message}"
+              line_break: "Sender name can't contain a line break."
+            mail_sender_address:
+              format: "%{message}"
+              one_address: "Sender address must be one address, like no-reply@example.com."
+            mail_port:
+              format: "%{message}"
+              port_range: "Port must be a number from 1 to 65535."
+            mail_security:
+              format: "%{message}"
+              security_choice: "Security must be STARTTLS or TLS."
         user:
           attributes:
             # The password length rule's message is a whole sentence

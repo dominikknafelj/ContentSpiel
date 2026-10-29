@@ -20,8 +20,15 @@ module Audit
   module Snapshot
     # `ai_api_key` (translation helpers spec §6.2) already matches the
     # `_key` filter; it's listed here too so it stays out even if that
-    # filter entry is ever narrowed.
-    NEVER_STORED = %w[password password_confirmation password_digest token token_digest lookup_digest ai_api_key].freeze
+    # filter entry is ever narrowed. The mail login (docs/reference/mail.md)
+    # likewise: its username is a credential for several providers, and
+    # leaving the columns out also means a snapshot never decrypts them. The
+    # mail settings' fingerprint is an HMAC of the delivery settings, login
+    # included: never shown, logged or audited.
+    NEVER_STORED = %w[
+      password password_confirmation password_digest token token_digest lookup_digest ai_api_key
+      mail_username mail_password mail_verified_fingerprint
+    ].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
     # addresses out of *request logs*. The audit log is different: the spec
@@ -36,8 +43,11 @@ module Audit
     # digests nobody reads in a changes row. It stays in the full snapshot,
     # which is the version basis, not a diff. `translation_original_changed_at`
     # is the same kind of bookkeeping (a per-field time derived from the
-    # original's own listed change).
-    IGNORED_CHANGES = %w[created_at updated_at unpublished_changes_at translation_sources translation_original_changed_at ai_api_key_saved_at].freeze
+    # original's own listed change). The mail columns here are its state
+    # (when the login was saved, the last success and failure), written by
+    # sends, never a setting someone changed.
+    IGNORED_CHANGES = %w[created_at updated_at unpublished_changes_at translation_sources translation_original_changed_at ai_api_key_saved_at
+      mail_login_saved_at mail_verified_at mail_last_sent_at mail_failed_at mail_failure].freeze
 
     # The columns that hold a type's schema fields (`ContentBlock#settings`,
     # `Post#metadata`), whose changes are read with the record's

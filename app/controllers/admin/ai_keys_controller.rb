@@ -61,9 +61,14 @@ module Admin
       if result.ok?
         moved = !base_older_than?(before, carried) && carried_parseable?(carried)
         answer(site, base: carried, moved_to: (site.updated_at.iso8601(6) if moved), notice: notice)
+      elsif result.denied?
+        answer(site, base: carried, error: result.errors.to_sentence, status: :forbidden, toast: true)
       else
-        status = result.denied? ? :forbidden : :unprocessable_entity
-        answer(site, base: carried, error: result.errors.to_sentence, status: status, toast: true)
+        # A refusal of the key itself -- on a site without encryption keys,
+        # "This site has no encryption keys, so a password can't be stored."
+        # (`Settings::Save.no_encryption_keys`, nothing written) -- is shown
+        # where "Enter the API key first." is, with the entry open.
+        answer(site, base: carried, error: result.errors.to_sentence, status: :unprocessable_entity)
       end
     end
 
