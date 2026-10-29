@@ -1,0 +1,3 @@
+<p><%= t("mail.invite.intro", inviter: inviter_name, site: site_name) %></p>
+<%= render "mails/button", url: invite_url, label: t("mail.invite.button") %>
+<p><%= t("mail.invite.outro", date: valid_until) %></p>

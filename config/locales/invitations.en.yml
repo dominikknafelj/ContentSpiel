@@ -1,0 +1,6 @@
+# The invitation page (`InvitationsController`; lazy-lookup scope of
+# `app/views/invitations/show.html.erb`). Task 9 adds the accept form's words.
+en:
+  invitations:
+    show:
+      expired: "This invite has expired. Ask the person who invited you to send a new one."

@@ -95,6 +95,42 @@ class ApplicationMailer < ActionMailer::Base
     end
   end
 
+  # WHERE THE LINK POINTS (safe-address spec, "Mail"). A mail is read outside
+  # any request, so its link needs an origin from somewhere, and the
+  # environment's `default_url_options` is not it: in production that is the
+  # site's address only when one is configured, and elsewhere a literal.
+  #
+  # - The site's configured address (`PUBLIC_HOST`) whenever there is one,
+  #   whatever `origin` says.
+  # - Otherwise, IN DEVELOPMENT AND TEST ONLY (`request_origin_used?`), `origin`:
+  #   the origin of the request that asked for the reset
+  #   (`Admin::PasswordsController#create`), which is where the person was a
+  #   moment ago. It is a String because the mail is delivered by a job. It
+  #   is parsed as an address and nothing else of it is used: a value that
+  #   is not an origin is no origin, and the mailer never logs it. (Active
+  #   Job logs a job's arguments, so in development the origin is in the
+  #   job's own lines and in the queue's row: an address, never a token.)
+  # - Otherwise no mail: `mail` is not called, so Action Mailer delivers
+  #   nothing, and the log says what to set. The line names no person and
+  #   holds no token.
+  #
+  # WHY NOWHERE ELSE. The request's origin is whatever `Host` the request
+  # named, and a site with no address configured refuses no host. Anyone
+  # could then ask for a reset of an address they know under a host of their
+  # own, and the account's owner would be mailed a valid token on a link to
+  # that host (password-reset poisoning). On a developer's machine the
+  # request's origin is the only address there is, and the only one asking
+  # is the developer.
+  #
+  # An ALLOW-list (`local?` is Rails' own "development or test"), never
+  # `!env.production?`: a staging, preview or demo environment is exactly
+  # the kind that sits on a public address without `PUBLIC_HOST`, and host
+  # authorisation is set up from `production.rb` alone, so an environment
+  # nobody named here must fail closed.
+  def self.request_origin_used?(env = Rails.env)
+    env.local?
+  end
+
   def mail(...)
     super.tap { |message| deliver_with_site_settings(message) unless @site_settings_applied }
   end
@@ -123,4 +159,22 @@ class ApplicationMailer < ActionMailer::Base
   def say_not_sent
     Rails.logger.warn "[ContentSpiel] A mail was not sent: outgoing mail is not set up."
   end
+
+  # Shared by the mails that carry a link (PasswordsMailer, InvitesMailer),
+  # so the origin rules above are written once.
+  def link_origin(origin)
+    configured = SiteAddress.current
+    return configured.url_options if configured.configured?
+
+    return {} unless self.class.request_origin_used?
+
+    SiteAddress.parse(origin, source: "the request's origin").url_options
+  rescue SiteAddress::Invalid
+    {}
+  end
+
+  # The site's name in the mail's default language, as text: the subject,
+  # the heading and the footer. Read per message, so in the job.
+  def site_name = Locales.read(SiteSetting.instance, :title, locale: I18n.default_locale)
+  helper_method :site_name
 end

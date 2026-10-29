@@ -2,12 +2,18 @@
 <html>
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <style>
-      /* Email styles need to be inline */
-    </style>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title><%= site_name %></title>
   </head>
 
-  <body>
-    <%= yield %>
+  <%# Colours are named, not hex: a mail has no tokens, and CS Studio's sources carry no literal (admin_design_rules_test). One column of at most 560px, system fonts, inline styles (a mail client
+      reads no stylesheet), the site's name as text and no image: nothing is
+      fetched when the mail is opened, so nothing can track it. %>
+  <body style="margin:0;padding:24px 16px;background:whitesmoke;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:black;">
+    <div style="max-width:560px;margin:0 auto;background:white;padding:32px;">
+      <p style="margin:0 0 24px;font-size:20px;font-weight:700;"><%= site_name %></p>
+      <%= yield %>
+      <p style="margin:32px 0 0;font-size:13px;color:dimgray;"><%= t("mail.footer", site: site_name) %></p>
+    </div>
   </body>
 </html>

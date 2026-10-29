@@ -420,6 +420,11 @@ Rails.application.routes.draw do
   get "setup/:step", to: "setup#show", as: :setup_step
   patch "setup/:step", to: "setup#update"
 
+  # The invitation's link (mail spec): `invitation#<token>`, the token in the
+  # fragment so no server sees it. Outside the admin scope: the person has no
+  # account yet. Declared before the public catch-alls.
+  get "invitation", to: "invitations#show", as: :invitation
+
   # The MCP server (design spec section 10), bearer-token authenticated
   # (McpController#authenticate) -- declared here, before the public-site
   # catch-all below, or "/mcp" would be swallowed as a page path instead.
