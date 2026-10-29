@@ -107,6 +107,20 @@ class MailSettingsTest < ActiveSupport::TestCase
     assert_equal [ "before-user", "before-pass" ], [ site.mail_username, site.mail_password ]
   end
 
+  # The jsonb column's raw value is its JSON text: written back as it was
+  # read raw, it was encoded a second time into a JSON string.
+  test "a with_mail_state nested inside :failed puts the failure back as the same Hash" do
+    with_mail_state(:failed) do
+      before = SiteSetting.instance.reload.mail_failure
+      assert_kind_of Hash, before
+
+      with_mail_state(:working) { assert_nil SiteSetting.instance.reload.mail_failure }
+
+      assert_equal before, SiteSetting.instance.reload.mail_failure
+      assert_equal "login", MailFailure.load(SiteSetting.instance.mail_failure).key
+    end
+  end
+
   test "a change of any delivery setting, from either source, makes a verified site untested; a change of the sender name does not" do
     with_mail_state(:working) do
       assert_equal :working, MailSettings.current(env: {}).state

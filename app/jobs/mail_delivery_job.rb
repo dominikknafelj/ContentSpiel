@@ -11,22 +11,35 @@
 #     after the last. A failure is never recorded per attempt: one blip that
 #     the next attempt gets through must not put "Last send failed" on the
 #     dashboard.
-#   - Anything else (a refused login, a refused sender, a TLS mismatch, a
-#     bug) will not pass by waiting: recorded at once and discarded.
+#   - Any other failure of the delivery (a refused login, a refused sender,
+#     a TLS mismatch, a reply nobody expected) will not pass by waiting:
+#     recorded at once, and the job ends there.
+#   - An error raised BEFORE the delivery is no mail failure (plan ruling
+#     T2b, `MailFailure.delivery?`): a record deleted since the mail was
+#     queued (`ActiveJob::DeserializationError`), a template or a mailer that
+#     raises. It is raised on as Active Job always does: the job fails with
+#     its backtrace, its log line and `Rails.error`, and nothing is recorded,
+#     so the dashboard does not tell the owner to check settings that are fine.
 #
 # The handlers are `rescue_from`s, and Active Job tries the LAST declared
 # first: `retry_on` comes after the catch-all so a connection error is
-# retried and not discarded. Recording a failure answers the MailFailure and
-# raises nothing, so the job ends there: a failed mail is no failed job, and
-# Solid Queue's failed list does not fill with mails the dashboard already
-# shows. The job's own log lines name the error's class and message; a
-# connection error's message names the server and the port, never the login.
+# retried. A recorded failure raises nothing, so a failed mail is no failed
+# job and Solid Queue's failed list does not fill with mails the dashboard
+# already shows. What is logged of one is Action Mailer's "Failed delivery"
+# line (and, for a retry, Active Job's "Retrying"/"Stopped retrying"), with
+# the server's reply already scrubbed of the login by `SmtpDelivery`.
 class MailDeliveryJob < ActionMailer::MailDeliveryJob
   ATTEMPTS = 4
 
-  rescue_from(StandardError) { |error| ApplicationMailer.record_failed(error) }
+  rescue_from(StandardError) do |error|
+    raise error unless MailFailure.delivery?(error)
+
+    ApplicationMailer.record_failed(error)
+  end
 
   retry_on(*MailFailure::CONNECTION_ERRORS, attempts: ATTEMPTS, wait: :polynomially_longer) do |_job, error|
+    raise error unless MailFailure.delivery?(error)
+
     ApplicationMailer.record_failed(error)
   end
 

@@ -587,9 +587,10 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
 
   private
 
-  # A mail is queued with the fingerprint of the mail settings it was asked
-  # under (`ApplicationMailer.queue`), a param of the mailer.
-  def queued(mailer) = mailer.with(fingerprint: MailSettings.current.fingerprint)
+    # A mail is queued with the fingerprint of the mail settings it was asked
+    # under (`ApplicationMailer.queue`), a param of the mailer.
+    def queued(mailer) = mailer.with(fingerprint: MailSettings.current.fingerprint)
+
     def assert_notice(text)
       assert_select "main", /#{text}/
     end

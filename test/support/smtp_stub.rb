@@ -15,12 +15,15 @@ require "base64"
 #
 # Scripts (`SCRIPTS`):
 #   :success           a whole exchange, STARTTLS and AUTH PLAIN offered
-#   :login_refused     535 on AUTH, echoing the username the client sent
-#                      (some servers do; the stored line must not hold it)
+#   :login_refused     535 on AUTH, echoing the username and the password the
+#                      client sent (some servers echo what they were sent;
+#                      no stored line, log line or span may hold either)
 #   :sender_refused    550 on MAIL FROM
 #   :starttls_refused  offers STARTTLS and answers it with 454
 #   :no_starttls       does not offer STARTTLS at all
 #   :silent            accepts the connection and never says a word
+#   :hang_up           closes the connection when asked MAIL FROM: a failure
+#                      of the exchange that is no SMTP reply at all
 #
 # STARTTLS is real: the server side upgrades the socket with a self-signed
 # certificate for 127.0.0.1 made once per process (`certificate`). The client
@@ -31,7 +34,7 @@ require "base64"
 # `SmtpStub.closed_port` is a port on 127.0.0.1 that nobody listens on (bound
 # and closed again): a connection to it is refused at once.
 class SmtpStub
-  SCRIPTS = %i[success login_refused sender_refused starttls_refused no_starttls silent].freeze
+  SCRIPTS = %i[success login_refused sender_refused starttls_refused no_starttls silent hang_up].freeze
   HOST = "127.0.0.1".freeze
 
   attr_reader :port, :commands, :messages
@@ -146,11 +149,14 @@ class SmtpStub
         end
       when "AUTH"
         if @script == :login_refused
-          say io, "535 5.7.8 Authentication failed for #{login_of(line)}"
+          user, password = login_of(line)
+          say io, "535 5.7.8 Authentication failed for #{user} (#{password})"
         else
           say io, "235 2.7.0 Authentication successful"
         end
       when "MAIL"
+        break if @script == :hang_up
+
         say io, (@script == :sender_refused ? "550 5.7.1 Sender address rejected" : "250 2.1.0 Ok")
       when "RCPT" then say io, "250 2.1.5 Ok"
       when "DATA"
@@ -195,7 +201,7 @@ class SmtpStub
 
   # AUTH PLAIN's initial response is base64 of "\0user\0password".
   def login_of(line)
-    Base64.decode64(line.split(" ", 3)[2].to_s).split("\0")[1].to_s
+    Base64.decode64(line.split(" ", 3)[2].to_s).split("\0")[1, 2].map(&:to_s)
   end
 
   def say(io, text)

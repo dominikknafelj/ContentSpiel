@@ -15,6 +15,11 @@ class ApplicationMailerTest < ActionMailer::TestCase
     def probe(to)
       mail(to: to, subject: "Probe") { |format| format.text { render plain: "Hello from the probe." } }
     end
+
+    # A mailer whose template raises: a bug, never a failed delivery.
+    def broken(to)
+      mail(to: to, subject: "Broken") { |format| format.text { raise NoMethodError, "undefined method 'title' for nil" } }
+    end
   end
 
   def stub_settings(port, security: "starttls", login: true, **columns)
@@ -84,7 +89,7 @@ class ApplicationMailerTest < ActionMailer::TestCase
 
   test "each failing script records its key and line and hides nothing: ready? stays true for a verified site" do
     expected = {
-      login_refused: [ "login", "535 5.7.8 Authentication failed for …" ],
+      login_refused: [ "login", "535 5.7.8 Authentication failed for … (…)" ],
       sender_refused: [ "sender", "550 5.7.1 Sender address rejected" ],
       starttls_refused: [ "security", "454 4.7.0 TLS not available" ]
     }
@@ -110,6 +115,37 @@ class ApplicationMailerTest < ActionMailer::TestCase
       assert_equal "Could not reach 127.0.0.1 on port #{site.mail_port}. Check server and port.",
         failure.sentence(server: SmtpStub::HOST, port: site.mail_port)
       assert MailSettings.current.ready?
+    end
+  end
+
+  # Ruling T2b: what the exchange raises is a failed delivery, whatever it
+  # is; a server that hangs up answers no SMTP reply at all.
+  test "an unexpected error inside the SMTP exchange is recorded as other" do
+    SmtpStub.start(:hang_up) do |port, stub|
+      with_mail_state(:working, **stub_settings(port)) do
+        failure = SmtpStub.trusted { send_probe }
+
+        assert_equal "other", failure.key
+        assert_includes stub.verbs, "MAIL"
+        assert_equal "other", site.mail_failure["key"]
+        assert_equal :failed, MailSettings.current.state
+      end
+    end
+  end
+
+  # Ruling T2b: an error raised before the delivery is a bug. It is raised
+  # on, and the site's mail is not called failed for it.
+  test "a mailer or template that raises is raised on and recorded as no mail failure" do
+    SmtpStub.start(:success) do |port, stub|
+      with_mail_state(:working, **stub_settings(port)) do
+        assert_raises(NoMethodError) do
+          SmtpStub.trusted { ApplicationMailer.deliver_now_and_record(ProbeMailer.broken("bea@example.test")) }
+        end
+
+        assert_empty stub.commands, "nothing was sent"
+        assert_nil site.mail_failed_at
+        assert_equal :working, MailSettings.current.state
+      end
     end
   end
 

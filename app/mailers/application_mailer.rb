@@ -63,7 +63,9 @@ class ApplicationMailer < ActionMailer::Base
   end
 
   # Delivers now and records the outcome: nil when it was sent (or there was
-  # nothing to send), the MailFailure otherwise. For the test mail, which is
+  # nothing to send), the MailFailure when the delivery failed. An error
+  # raised before the delivery (the mailer's code, a template) is a bug and
+  # is raised on, not recorded (`MailFailure.delivery?`, ruling T2b). For the test mail, which is
   # sent in the request: the timeouts (`MailSettings::OPEN_TIMEOUT`,
   # `READ_TIMEOUT`) bound how long that can take.
   def self.deliver_now_and_record(delivery)
@@ -71,6 +73,8 @@ class ApplicationMailer < ActionMailer::Base
     record_sent(delivery.deliver_now, fingerprint: fingerprint)
     nil
   rescue StandardError => error
+    raise unless MailFailure.delivery?(error)
+
     record_failed(error)
   end
 

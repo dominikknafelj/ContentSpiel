@@ -60,6 +60,7 @@ class MailFailureTest < ActiveSupport::TestCase
       Net::SMTPFatalError.new(reply("550 5.7.1 Rejected")),
       MailFailure.mark(Net::SMTPFatalError.new(reply("554 5.7.1 Message refused")), :mailfrom),
       ArgumentError.new("SMTP From address may not be blank"),
+      MailFailure.mark(OpenSSL::SSL::SSLError.new("SSL_read: unexpected eof while reading"), :mailfrom),
       RuntimeError.new("anything")
     ]
     others.each do |error|

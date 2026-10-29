@@ -12,7 +12,7 @@ require "base64"
 #   login     Net::SMTPAuthenticationError (a 535)
 #   connect   CONNECTION_ERRORS: refused, unreachable, a timeout, an unknown
 #             host. The same list is what MailDeliveryJob retries.
-#   security  an SSL error (a TLS handshake that failed: TLS on a plain
+#   security  an SSL error of the handshake (a TLS handshake that failed: TLS on a plain
 #             port, STARTTLS on a TLS port, a certificate that isn't the
 #             server's), STARTTLS not offered ("STARTTLS is not supported on
 #             this server", which net-smtp raises before sending anything),
@@ -54,7 +54,8 @@ class MailFailure
 
   # `settings` is a MailSettings, read for the effective login alone.
   def self.from(error, settings)
-    new(key: key_for(error), line: scrub(line_for(error), settings.value(:username), settings.value(:password)))
+    line = scrub(line_for(error), settings.value(:username), settings.value(:password))
+    new(key: key_for(error), line: line.lines.first.to_s.strip.truncate(LINE_LIMIT, omission: HIDDEN))
   end
 
   # The same error with the login replaced by "…" in its reply, for an error
@@ -78,19 +79,33 @@ class MailFailure
     new(key: stored["key"], line: stored["line"])
   end
 
-  # Notes on `error` the SMTP command that was in progress; answers the error.
+  # Notes on `error` that it came out of the delivery itself (raised inside
+  # `ApplicationMailer::SmtpDelivery#deliver!`) and the SMTP command that was
+  # in progress, nil before the first; answers the error.
   def self.mark(error, command)
+    error.instance_variable_set(:@mail_delivery, true)
     error.instance_variable_set(:@mail_command, command&.to_sym)
     error
   end
 
   def self.command_of(error) = error.instance_variable_get(:@mail_command)
 
+  # Whether `error` is a FAILED DELIVERY (plan ruling T2b): raised by the SMTP
+  # exchange, and so something the owner's settings or the server explain.
+  # Anything raised before it (a record deleted since the mail was queued,
+  # a template, a mailer's own code) is a bug and is not a mail failure: it
+  # is raised on, fails its job and reaches `Rails.error`, and the dashboard
+  # does not tell the owner to check settings that are fine.
+  def self.delivery?(error) = error.instance_variable_get(:@mail_delivery) == true
+
   def self.key_for(error)
     case error
     when *CONNECTION_ERRORS then "connect"
     when Net::SMTPAuthenticationError then "login"
-    when OpenSSL::SSL::SSLError then "security"
+    # A handshake that failed is a security mismatch; the TLS layer's error
+    # once the session is past it (a server that hangs up mid-mail on a TLS
+    # socket reads "unexpected eof") is not.
+    when OpenSSL::SSL::SSLError then [ nil, :starttls ].include?(command_of(error)) ? "security" : "other"
     when Net::SMTPUnsupportedCommand
       error.message.to_s.include?("STARTTLS") ? "security" : "other"
     when Net::SMTPError
@@ -110,7 +125,7 @@ class MailFailure
       when *CONNECTION_ERRORS, OpenSSL::SSL::SSLError then error.message
       else error.class.name
       end
-    text.to_s.lines.first.to_s.strip.truncate(LINE_LIMIT, omission: HIDDEN)
+    text.to_s # scrubbed whole first, then cut to one line (`from`)
   end
 
   def self.status_of(error) = error.response&.status.to_s

@@ -13,6 +13,12 @@ class MailDeliveryJobTest < ActiveJob::TestCase
 
   setup { @user = users(:one) }
 
+  class BrokenMailer < ApplicationMailer
+    def broken(to)
+      mail(to: to, subject: "Broken") { |format| format.text { raise NoMethodError, "undefined method 'title' for nil" } }
+    end
+  end
+
   def queue_reset
     ApplicationMailer.queue(PasswordsMailer, :reset, @user, origin: "http://localhost:3000")
   end
@@ -65,7 +71,7 @@ class MailDeliveryJobTest < ActiveJob::TestCase
           performs, recorded = SmtpStub.trusted { count_attempts { perform_enqueued_jobs { queue_reset } } }
 
           assert_equal [ 1, [ 1 ] ], [ performs, recorded ]
-          assert_equal({ "key" => "login", "line" => "535 5.7.8 Authentication failed for …" }, site.mail_failure)
+          assert_equal({ "key" => "login", "line" => "535 5.7.8 Authentication failed for … (…)" }, site.mail_failure)
           assert_equal 1, stub.verbs.count("AUTH")
           assert_no_enqueued_jobs
         end
@@ -132,6 +138,34 @@ class MailDeliveryJobTest < ActiveJob::TestCase
 
       assert_nil site.mail_last_sent_at
       assert_nil site.mail_failed_at
+    end
+  end
+
+  # Ruling T2b: a bug is no failed delivery. The job raises, so it fails as
+  # Active Job's jobs do (in a worker: its backtrace, its log line and
+  # Rails.error), and the dashboard is told nothing.
+  test "a template that raises fails the job and records no mail failure" do
+    with_mail_state(:working) do
+      ApplicationMailer.queue(BrokenMailer, :broken, "bea@example.test")
+      assert_raises(NoMethodError) { perform_enqueued_jobs }
+
+      assert_nil site.mail_failed_at
+      assert_equal :working, state
+    end
+  end
+
+  test "a record deleted since the mail was queued fails the job and records no mail failure" do
+    with_site_address(nil) do
+      with_mail_state(:working) do
+        queue_reset
+        @user.sessions.delete_all
+        @user.delete
+
+        assert_raises(ActiveJob::DeserializationError) { perform_enqueued_jobs }
+
+        assert_nil site.mail_failed_at
+        assert_equal :working, state
+      end
     end
   end
 

@@ -34,7 +34,10 @@
 # ciphertext encrypts it again, so the login would read back as the
 # ciphertext of the old login. They are saved decrypted (nil when the keys
 # can't read them) and written back through the attribute, which encrypts
-# the same plaintext once.
+# the same plaintext once. Every other column is saved as its cast value too
+# (a Hash for `mail_failure`, a Time for a datetime): the raw value of the
+# jsonb column is its JSON text, which `update_columns` would encode again
+# into a JSON string.
 module MailState
   COLUMNS = %w[
     mail_server mail_port mail_security mail_sender_name mail_sender_address
@@ -51,7 +54,7 @@ module MailState
 
   def with_mail_state(state, **settings)
     site = SiteSetting.instance
-    saved = COLUMNS.index_with { |name| LOGIN.include?(name) ? plaintext(site, name) : site.read_attribute_before_type_cast(name) }
+    saved = COLUMNS.index_with { |name| LOGIN.include?(name) ? plaintext(site, name) : site.read_attribute(name) }
     site.update_columns(COLUMNS.index_with { nil }) # version: none (a test helper)
     columns = mail_state_columns(state).merge(settings.stringify_keys)
     site.update_columns(columns) if columns.any? # version: none (a test helper)
