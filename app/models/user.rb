@@ -1,5 +1,11 @@
 class User < ApplicationRecord
   has_secure_password
+
+  # How long an invitation's link works (spec: seven days). The mail names
+  # the date from this, so the token and the sentence cannot disagree.
+  INVITE_VALID_FOR = 7.days
+  # No block yet: Task 8 adds `{ invite_sent_at }` when that column exists.
+  generates_token_for :invite, expires_in: INVITE_VALID_FOR
   has_many :sessions, dependent: :destroy
   has_many :api_tokens, dependent: :destroy
   has_many :memberships, class_name: "AccessControl::Membership", dependent: :destroy

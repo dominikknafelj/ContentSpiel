@@ -32,6 +32,13 @@ Rails.application.routes.draw do
     # fragment for the palette's turbo-frame, read-only, open to every
     # signed-in user (each row is already narrowed to what they may read).
     get "jump", to: "jump#show", as: :jump
+
+    # The invitation's link (mail spec): `<admin>/invitation#<token>`, the
+    # token in the fragment so no server sees it. Under the admin path like
+    # the reset page, so it shadows no public page slug. The leading slash
+    # keeps `InvitationsController` out of the `Admin::` module: like the
+    # reset page it is outside the shell's sign-in requirement.
+    get "invitation", to: "/invitations#show", as: :invitation
     # The password reset. The token of the mailed link is in NO address a
     # server sees: the link is `password/edit#<token>`, a browser keeps what
     # follows the "#" to itself, and the form sends the token in its body,
@@ -419,11 +426,6 @@ Rails.application.routes.draw do
   get "setup", to: "setup#index", as: :setup
   get "setup/:step", to: "setup#show", as: :setup_step
   patch "setup/:step", to: "setup#update"
-
-  # The invitation's link (mail spec): `invitation#<token>`, the token in the
-  # fragment so no server sees it. Outside the admin scope: the person has no
-  # account yet. Declared before the public catch-alls.
-  get "invitation", to: "invitations#show", as: :invitation
 
   # The MCP server (design spec section 10), bearer-token authenticated
   # (McpController#authenticate) -- declared here, before the public-site
