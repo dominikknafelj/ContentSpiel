@@ -94,6 +94,22 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_includes error.message, "body, caption, alt, image"
   end
 
+  test "body_content is :rich unless declared, takes :table, refuses anything else; an outside type may not declare :table" do
+    d = definition
+    assert_equal :rich, d.body_content
+    d.body_content :table
+    assert_equal :table, d.body_content
+    assert_equal :table, definition.tap { |other| other.body_content "table" }.body_content
+    assert_match(/\Atest_shape: body_content is one of rich, table/, assert_raises(ArgumentError) { definition.body_content :markdown }.message)
+
+    error = assert_raises(ArgumentError) { BlockTypes.register("gem_owner/grid") { |t| t.body_content :table } }
+    assert_match(/\Agem_owner\/grid: .*body_content :table/, error.message)
+    assert_not_includes BlockTypes.all.map(&:name), "gem_owner/grid"
+    BlockTypes.register("gem_owner/words") { |t| t.body_content :rich; TestTypes.declare(t) }
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   test "owner is the part of the name before the slash, and a built-in has none" do
     assert_nil definition("code").owner
     assert_equal "gallery", definition("gallery/album").owner

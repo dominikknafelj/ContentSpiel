@@ -161,11 +161,20 @@
         <% uses_columns.each do |column| %>
           <% case column
              when "body" %>
-            <%= render Admin::Columns::RichTextColumnComponent.new(
-                  name: "body", id: field_id("body"), html_name: field_html_name("body"),
-                  value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale,
-                  editable: editable? && !read_only_hold?, **translation("body")
-                ) %>
+            <% body_column = Admin::Columns::RichTextColumnComponent.new(
+                 name: "body", id: field_id("body"), html_name: field_html_name("body"),
+                 value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale,
+                 editable: editable? && !read_only_hold?, body_content: block.body_content_kind, starting_content: starting_content, **translation("body")
+               ) %>
+            <%# A Table's grid with its controls around it, for someone who may change it now; held or
+                read only, the grid alone (table block spec, decision 13: see `table_controls?`). %>
+            <% if table_controls? %>
+              <%= render Admin::EditorScreen::TableControlsComponent.new(block: block, document: column_value("body"), starting: body_column.starting_content) do %>
+                <%= render body_column %>
+              <% end %>
+            <% else %>
+              <%= render body_column %>
+            <% end %>
           <% when "caption" %>
             <%= render Admin::Columns::PlainColumnComponent.new(
                   name: "caption", id: field_id("caption"), html_name: field_html_name("caption"),
@@ -191,6 +200,8 @@
       <% end %>
       <% end %>
       <% end %>
+      <%# Outside the form: see the component. %>
+      <%= render Admin::EditorScreen::TableDeleteDialogsComponent.new(block: block) if table_controls? %>
     </div>
   <% end %>
 

@@ -17,6 +17,7 @@ module ContractLedger
     "blocks/image_component" => %w[block page asset alt caption sizes],
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
     "blocks/note_component" => %w[block page kind heading titled? word icon body],
+    "blocks/table_component" => %w[block page rows header_row? header_column? column_count caption],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width],
     "posts/blog_list_component" => %w[posts page],
@@ -36,6 +37,7 @@ module ContractLedger
     note-tip-ground note-tip-line note-tip-ink note-tip-border
     note-important-ground note-important-line note-important-ink note-important-border
     note-warning-ground note-warning-line note-warning-ink note-warning-border
+    table-rule table-line table-head table-caption table-ground
   ].freeze
 
   FIXED_TOKENS = %w[

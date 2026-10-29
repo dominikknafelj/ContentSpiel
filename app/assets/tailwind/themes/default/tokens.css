@@ -103,6 +103,20 @@
   --th-note-warning-line: var(--th-warn);
   --th-note-warning-ink: var(--th-warn-ink);
   --th-note-warning-border: color-mix(in srgb, var(--th-warn) 24%, var(--th-paper));
+
+  /* The table block (table block spec, "The public side"): five tokens from
+     the base, the same in both schemes. The rule under the header and the
+     lines between rows are decoration (the header's weight marks the header,
+     the lines only guide the eye), so they are not held to a contrast; the
+     header text, the cell text (--th-ink) and the caption are held to 4.5:1
+     against the ground (test/integration/design_tokens_test.rb). The ground
+     is the page's, for the edge fade and the sticky header column, which must
+     hide what scrolls under them. */
+  --th-table-rule: var(--th-line-strong);
+  --th-table-line: var(--th-line);
+  --th-table-head: var(--th-ink);
+  --th-table-caption: var(--th-meta);
+  --th-table-ground: var(--th-paper);
 }
 
 [data-theme="dark"] {
@@ -168,6 +182,20 @@
   --th-note-warning-line: var(--th-warn);
   --th-note-warning-ink: var(--th-warn-ink);
   --th-note-warning-border: color-mix(in srgb, var(--th-warn) 24%, var(--th-paper));
+
+  /* The table block (table block spec, "The public side"): five tokens from
+     the base, the same in both schemes. The rule under the header and the
+     lines between rows are decoration (the header's weight marks the header,
+     the lines only guide the eye), so they are not held to a contrast; the
+     header text, the cell text (--th-ink) and the caption are held to 4.5:1
+     against the ground (test/integration/design_tokens_test.rb). The ground
+     is the page's, for the edge fade and the sticky header column, which must
+     hide what scrolls under them. */
+  --th-table-rule: var(--th-line-strong);
+  --th-table-line: var(--th-line);
+  --th-table-head: var(--th-ink);
+  --th-table-caption: var(--th-meta);
+  --th-table-ground: var(--th-paper);
 }
 
 :root {

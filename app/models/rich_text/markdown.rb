@@ -108,7 +108,11 @@ module RichText
 
     class << self
       def dump(document) = Dumper.new.dump(document)
-      def load(markdown, known_references: nil) = Loader.new(markdown, known_references: known_references).load
+      # `tables:` (default false: every body but the Table block's) reads a GFM
+      # table as a `table` node; without it a table degrades to one paragraph
+      # per row, as it always has, because no other body may hold a table
+      # (`HasRichTextBody#body_errors_for`).
+      def load(markdown, known_references: nil, tables: false) = Loader.new(markdown, known_references: known_references, tables: tables).load
 
       # Escapes a single text node's literal content (see `ESCAPE_CHARS`).
       # Shared between `Dumper#render_text_node` and `BuiltIns`' `code`
@@ -233,6 +237,23 @@ module RichText
       # position in its parent's `"content"` array.
       LIST_CONTAINER_TYPES = %w[bulletList orderedList].freeze
 
+      # Like a list, a table and its rows are written by the node that knows
+      # the layout (the table writes the delimiter line from its first row's
+      # alignments, a row joins its cells with pipes), so each hands its
+      # `markdown_out` an Array of what its children rendered.
+      TABLE_CONTAINER_TYPES = %w[table tableRow].freeze
+
+      # A cell is one line of a pipe table, so its paragraph is written as the
+      # inline Markdown it is and then made safe for that line: a hard break
+      # (`\\\n` in a paragraph) is `<br>`, which GFM reads back as an inline
+      # HTML node the loader maps to a hardBreak again (only inside a cell),
+      # and a `|` is escaped (`\\|`, also inside a code span, where GFM
+      # unescapes it). A backslash needs nothing here: `ESCAPE_CHARS` already
+      # doubles a literal one.
+      def self.table_cell_line(inline)
+        inline.gsub("\\\n", "<br>").gsub("\n", " ").gsub("|", "\\|")
+      end
+
       # Prefixes `content` (one already-rendered `listItem`'s block-joined
       # Markdown, one or more lines) with `marker` (`"- "`/`"1. "`) on its
       # first line, and indents every continuation line underneath it by
@@ -309,7 +330,7 @@ module RichText
         child_nodes = content.is_a?(Array) ? content : []
 
         children =
-          if LIST_CONTAINER_TYPES.include?(type_name)
+          if LIST_CONTAINER_TYPES.include?(type_name) || TABLE_CONTAINER_TYPES.include?(type_name)
             child_nodes.map { |child| render_node(child) }
           elsif BLOCK_CONTAINER_TYPES.include?(type_name)
             child_nodes.map { |child| render_node(child) }.reject(&:empty?).join("\n\n")
@@ -452,8 +473,10 @@ module RichText
       # `known_references`: see `RichText::Document.from_markdown`. Only
       # `#valid_node?`/`#valid_mark?` read it -- the existence/readability
       # checks are the only rules a known reference is exempt from.
-      def initialize(markdown, known_references: nil)
+      def initialize(markdown, known_references: nil, tables: false)
         @known_references = known_references
+        @tables = tables
+        @in_cell = false
         source = markdown.is_a?(String) ? markdown : markdown.to_s
         @source = source.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "")
       rescue StandardError
@@ -562,8 +585,14 @@ module RichText
         when :code_block then [ code_block_node(node) ]
         when :thematic_break then [ { "type" => "horizontalRule" } ]
         when :table
-          record_warning("degraded a table to one paragraph per row")
-          table_rows_as_paragraphs(node)
+          # A table is table, row, cell, paragraph, text: three levels below
+          # it, which must still fit the document's depth.
+          if @tables && depth + 3 <= MAX_DEPTH
+            [ table_node(node) ]
+          else
+            record_warning("degraded a table to one paragraph per row")
+            table_rows_as_paragraphs(node)
+          end
         when :html_block
           record_warning("dropped a raw HTML block")
           []
@@ -589,6 +618,59 @@ module RichText
           { "type" => "paragraph", "content" => text.empty? ? [] : [ { "type" => "text", "text" => text } ] }
         end
       end
+
+      # A GFM table as a `table` node (the Table block's body only, `tables:
+      # true`). GFM's first row is its header, so its cells are `tableHeader`s
+      # and every other row's `tableCell`s; the alignment is the delimiter
+      # line's, one per column, and goes onto every cell of the column. A short
+      # row is padded with empty cells to the header's width (the editor and
+      # `TableBody#ragged?` want a rectangle); Commonmarker itself drops the
+      # cells a row has beyond the header's.
+      #
+      # Commonmarker's Ruby nodes expose neither the alignments nor which row
+      # is the header, so the alignments are read from the table's own
+      # normalised CommonMark (`| :-- | :-: | --: |` is always its second line,
+      # whatever the source's spacing or indentation was).
+      def table_node(table)
+        aligns = table_alignments(table)
+        rows = table.each.to_a
+        width = [ aligns.size, rows.map { |row| row.each.count }.max.to_i ].max
+        content = rows.each_with_index.map do |row, index|
+          cells = row.each.map.with_index { |cell, column| table_cell_node(cell, index.zero?, aligns[column]) }
+          cells += Array.new(width - cells.size) { |offset| table_cell_node(nil, index.zero?, aligns[cells.size + offset]) }
+          { "type" => "tableRow", "content" => cells }
+        end
+        { "type" => "table", "content" => content }
+      end
+
+      def table_alignments(table)
+        delimiter = table.to_commonmark.lines[1].to_s.strip.delete_prefix("|").delete_suffix("|")
+        delimiter.split("|").map do |spec|
+          spec = spec.strip
+          if spec.start_with?(":") && spec.end_with?(":") then "center"
+          elsif spec.start_with?(":") then "left"
+          elsif spec.end_with?(":") then "right"
+          end
+        end
+      end
+
+      def table_cell_node(cell, header, align)
+        inline = cell ? with_cell_inline { merge_text_runs(render_inline(cell)) } : []
+        node = { "type" => header ? "tableHeader" : "tableCell", "content" => [ { "type" => "paragraph", "content" => inline } ] }
+        node["attrs"] = { "align" => align } if align
+        node
+      end
+
+      # Inside a cell `<br>` is a hard break and strikethrough is not a mark
+      # (a cell allows bold, italic, code and links, `TABLE_CELL_MARKS`).
+      def with_cell_inline
+        @in_cell = true
+        yield
+      ensure
+        @in_cell = false
+      end
+
+      CELL_BREAK = %r{\A<br\s*/?>\z}i
 
       def paragraph_node(node) = { "type" => "paragraph", "content" => merge_text_runs(render_inline(node)) }
 
@@ -721,15 +803,21 @@ module RichText
         when :escaped then render_inline(node, marks_stack, depth)
         when :emph then render_inline(node, marks_stack + [ { "type" => "italic" } ], depth + 1)
         when :strong then render_inline(node, marks_stack + [ { "type" => "bold" } ], depth + 1)
-        when :strikethrough then render_inline(node, marks_stack + [ { "type" => "strike" } ], depth + 1)
+        when :strikethrough
+          warn_once(:cell_strike, "dropped strikethrough in a table cell") if @in_cell
+          render_inline(node, @in_cell ? marks_stack : marks_stack + [ { "type" => "strike" } ], depth + 1)
         when :code then [ text_node(node.string_content.to_s, marks_stack + [ { "type" => "code" } ]) ]
         when :link then render_link(node, marks_stack, depth + 1)
         when :image
           record_warning("dropped an image with a plain URL (#{node.url}); use an ::image{} directive instead")
           render_inline(node, marks_stack, depth)
         when :html_inline
-          record_warning("dropped raw inline HTML")
-          []
+          if @in_cell && node.literal.to_s.strip.match?(CELL_BREAK)
+            [ { "type" => "hardBreak" } ]
+          else
+            record_warning("dropped raw inline HTML")
+            []
+          end
         else
           record_warning("dropped unsupported inline content (#{node.type})")
           []

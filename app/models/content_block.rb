@@ -175,6 +175,10 @@ class ContentBlock < ApplicationRecord
   # to 500 (global constraints).
   def definition = BlockTypes.find(block_type)
 
+  # What the body may hold (`HasRichTextBody#body_content_kind`): the type's
+  # `body_content`, plain rich text for a type that is not registered.
+  def body_content_kind = definition&.body_content || :rich
+
   # Whether this block holds other blocks: asked of the type's capability,
   # never of its name. False for an unregistered type.
   def container? = definition&.capability?(:container) || false

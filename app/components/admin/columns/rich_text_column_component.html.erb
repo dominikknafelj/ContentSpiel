@@ -15,6 +15,8 @@
           data: {
             controller: "admin--rich-text--editor",
             "admin--rich-text--editor-read-only-value": !editable?,
+            "admin--rich-text--editor-content-value": content_kind,
+            "admin--rich-text--editor-starting-content-value": starting_content_json,
             action: "focusout->admin--rich-text--editor#containFocus media-picker:picked->admin--rich-text--editor#picked translate:use->admin--rich-text--editor#applySuggestion rich-text-dialog:closed->admin--rich-text--editor#dialogClosed",
             "admin--rich-text--editor-link-targets-url-value": link_targets_url,
             "admin--rich-text--editor-locale-value": editor_locale,
@@ -50,8 +52,12 @@
               <%= tool_button(action, label, text, toggle, extra_class: "min-w-7") %>
             <% end %>
           </div>
+          <%# A separator between groups, and before the Insert menu where there is one. %>
+          <% if insert_menu.any? || !group.equal?(toolbar_groups.last) %>
           <span role="separator" aria-orientation="vertical" class="mx-0.5 w-px shrink-0 bg-line bg-clip-content py-1"></span>
+          <% end %>
         <% end %>
+        <% if insert_menu.any? %>
         <%= render Admin::Ui::MenuComponent.new(label: "Insert ▾", align: :right,
               button_class: "inline-flex cursor-pointer whitespace-nowrap items-center gap-1 rounded-cs px-2 py-1 text-sm text-ink hover:bg-ink/6") do |menu| %>
           <% insert_menu.each do |action, label, text, toggle| %>
@@ -60,6 +66,7 @@
             <% end %>
           <% end %>
         <% end %>
+        <% end %>
       </div>
       <% end %>
 
@@ -67,7 +74,7 @@
           textbox; the controller gives *it* `aria-labelledby` from
           `data-labelledby`. %>
       <%= tag.div id: editor_id,
-            class: "admin-rich-text-editor #{editable? ? "rounded-b-cs" : "rounded-cs"} border border-field-line bg-surface text-ink",
+            class: "admin-rich-text-editor #{"admin-rich-text-table " if table?}#{editable? ? "rounded-b-cs" : "rounded-cs"} border border-field-line bg-surface text-ink",
             data: { "admin--rich-text--editor-target": "editor", labelledby: label_id } %>
 
       <p class="mt-1 text-sm text-danger-ink" role="alert" data-admin--rich-text--editor-target="message"></p>

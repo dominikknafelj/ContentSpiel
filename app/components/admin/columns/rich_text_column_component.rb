@@ -57,13 +57,73 @@ module Admin
     # something could be done. `admin--rich-text--editor` already mounts the editor
     # read-only inside a `fieldset[disabled]` and guards every popover and
     # command on that, so the missing toolbar costs it nothing.
+    #
+    # `body_content: :table` (a Table block's body, `ContentBlock#body_content_kind`,
+    # table block spec decisions 3 and 11) draws the same column as the
+    # block's grid: the editor is told `content: "table"` and builds the table
+    # schema and keys of `rich_text/table.js` instead of the ordinary set, and
+    # the toolbar holds only what a cell may hold (`TABLE_TOOLBAR_GROUPS`: the
+    # marks bold, italic and code, and Link, which makes internal links too)
+    # with no Insert menu, since nothing a cell holds is inserted as a block.
+    #
+    # `starting_content:` (a document Hash, or nil) is what the editor SHOWS
+    # while the field is empty, without writing it into the field: the
+    # hidden input keeps the stored (empty) value until the first real change
+    # in the editor, which then writes the whole document, starting content
+    # and change together. So a field nobody touched autosaves nothing, a live
+    # refresh sees a clean form, and every rule about an empty field still
+    # holds. A new Table's 3 × 3 grid is one (`TableBody.starting_document`),
+    # which the caller hands in. It is general: nothing in it knows of tables.
+    #
+    # The one starting content this column decides itself is a table's on a
+    # translation tab (table block spec, decision 8): an editable table whose
+    # language has no table yet, beside an original that is one, starts as a
+    # COPY of the original's table as stored (its shape, alignment, header
+    # kinds and words), in place of whatever the caller handed in. Shown, not
+    # written: the field stays empty, so AI Translate is offered
+    # (`translation_field_empty?`), the field's mark stays ○ Missing and the
+    # site keeps showing the default language's table until the translator's
+    # first change is saved. A copy written into the field would count as an
+    # edit, and one saved untouched would read "Translated" with the original's
+    # words in it. A held or read-only grid gets no copy: what it shows would
+    # read as this language's table.
     class RichTextColumnComponent < Base
-      def initialize(editable: true, **options)
+      CONTENTS = %i[rich table].freeze
+
+      # `body_content:`, as the block type's definition names it (`content:`
+      # is ViewComponent's own method).
+      def initialize(editable: true, body_content: :rich, starting_content: nil, **options)
         super(**options)
         @editable = editable
+        @content = body_content.to_sym
+        @starting_content = starting_content
+        raise ArgumentError, "body_content is one of #{CONTENTS.join(", ")}: #{body_content.inspect}" unless CONTENTS.include?(@content)
       end
 
       def editable? = @editable
+
+      # What the editor shows while the field is empty (see the class
+      # comment): the original's table on a translation tab, else
+      # `starting_content:`. A Hash, or nil.
+      def starting_content
+        return original_document.to_h if source_copy?
+
+        @starting_content.presence && self.class.to_document(@starting_content).to_h
+      end
+
+      # The JSON of `#starting_content`, or nil (no attribute) without one.
+      def starting_content_json = starting_content&.to_json
+
+      # An editable table with no table of its own, beside an original that is
+      # one. "No table" is the script's rule for showing starting content (an
+      # input whose document has no top-level node, `filled` in the editor
+      # controller), not `blank?`: a stored table of empty cells is this
+      # language's own and is what the editor shows.
+      def source_copy? = table? && editable? && Array(document.to_h["content"]).empty? && original_document.table?
+
+      def table? = @content == :table
+
+      def content_kind = @content.to_s
 
       # [action, accessible name, visible text, toggle?]. `action` is the
       # `admin--rich-text--editor` method the button runs (`data-action` below) and
@@ -109,6 +169,12 @@ module Admin
         ]
       ].freeze
 
+      # A table's toolbar (see the class comment): `TOOLBAR_GROUPS`' own
+      # buttons, the ones a cell's marks (`HasRichTextBody::TABLE_CELL_MARKS`)
+      # can use. Strikethrough is not among them: the server refuses it in a cell.
+      TABLE_ACTIONS = %w[bold italic code link].freeze
+      TABLE_TOOLBAR_GROUPS = TOOLBAR_GROUPS.map { |group| group.select { |action, *| TABLE_ACTIONS.include?(action) } }.reject(&:empty?).freeze
+
       # The "Insert ▾" menu's items, same shape as `TOOLBAR_GROUPS`'.
       INSERT_MENU = [
         [ "internalLink", "Page link", "Page link", false ],
@@ -130,10 +196,13 @@ module Admin
       # choose) -- the button's only way to add an image is the picker, which
       # isn't on the page without it. An image already in the document stays
       # editable by selecting it.
-      def toolbar_groups = TOOLBAR_GROUPS
+      def toolbar_groups = table? ? TABLE_TOOLBAR_GROUPS : TOOLBAR_GROUPS
 
+      # None for a table (see the class comment).
       def insert_menu
-        can?("media.upload") ? INSERT_MENU : INSERT_MENU.reject { |action, *| action == "image" }
+        return [] if table?
+
+        @insert_menu ||= can?("media.upload") ? INSERT_MENU : INSERT_MENU.reject { |action, *| action == "image" }
       end
 
       # Shared by the toolbar's buttons and the menu's items; `data-action`

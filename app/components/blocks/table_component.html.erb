@@ -1,0 +1,36 @@
+<%# The Table block (table block spec, "The public side"): a scroll box (`div.table-scroll`, a focusable
+    `region` so a keyboard reaches a table wider than the screen) named by the caption's id, or by the
+    public word "Table" when there is no caption, and in it the table. A header row is a `thead` of
+    `th scope="col"`; a header column's cells are `th scope="row"`; the rest are `td`. A cell's `html` is
+    the rich-text renderer's scrubbed output, safe as it is; every other value goes through ERB's
+    escaping. The label is the template's own key (not a promise). The class names are the default
+    theme's own (table.css), not a promise; the caption's id is written from `block`. %>
+<% caption_id = "table-#{block.id}-caption" %>
+<% body_rows = header_row? ? rows.drop(1) : rows %>
+<div class="content-block content-block--table table-scroll" tabindex="0" role="region" <% if caption %>aria-labelledby="<%= caption_id %>"<% else %>aria-label="<%= PublicStrings.read("public.blocks.table.label") %>"<% end %>>
+  <table class="table">
+    <% if caption %><caption id="<%= caption_id %>"><%= caption %></caption><% end %>
+    <% if header_row? %>
+      <thead>
+        <tr>
+          <% rows.first.each do |cell| %>
+            <th scope="col"<% if cell.align %> class="align-<%= cell.align %>"<% end %>><%= cell.html %></th>
+          <% end %>
+        </tr>
+      </thead>
+    <% end %>
+    <tbody>
+      <% body_rows.each do |row| %>
+        <tr>
+          <% row.each_with_index do |cell, index| %>
+            <% if header_column? && index.zero? %>
+              <th scope="row"<% if cell.align %> class="align-<%= cell.align %>"<% end %>><%= cell.html %></th>
+            <% else %>
+              <td<% if cell.align %> class="align-<%= cell.align %>"<% end %>><%= cell.html %></td>
+            <% end %>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

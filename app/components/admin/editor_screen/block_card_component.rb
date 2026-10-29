@@ -382,6 +382,15 @@ module Admin
         block.public_send(name, locale: locale)
       end
 
+      # A Table's grid controls (`TableControlsComponent`) are drawn only where
+      # the table can be changed now: not for a reader, not in a held form.
+      def table_controls? = block.body_content_kind == :table && editable? && !read_only_hold?
+
+      # What the body's editor shows while its field is empty: a Table's
+      # starting grid, where its controls are drawn (a held or read-only grid
+      # with no table shows none: there is nothing it could start).
+      def starting_content = table_controls? ? TableControlsComponent.starting_content(column_value("body")) : nil
+
       def column_original(name)
         return nil if name == "image" || locale.to_s == ::Locales.default
         return block.body_document(locale: ::Locales.default) if name == "body"

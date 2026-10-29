@@ -120,6 +120,10 @@ module HasRichTextBody
       next if previous[code].is_a?(Hash) && RichText::Document.new(previous[code]).normalized.to_h == value
 
       body_errors_for(value, previous[code]).each { |message| errors.add(:body, :invalid, message: "(#{code}) #{message}") }
+      # The table's limits are sentences for an editor and are said as they
+      # are: a language prefix on "A table can have at most 30 columns and 500
+      # rows." would read as the table being in another language's body.
+      body_limit_messages_for(value).each { |message| errors.add(:body, :invalid, message: message) }
     end
   end
 
@@ -135,6 +139,72 @@ module HasRichTextBody
     return [ "isn't a valid document" ] unless value.is_a?(Hash)
 
     known = previous.is_a?(Hash) ? RichText::Document.new(previous).references : nil
-    RichText::Document.new(value).validate(known_references: known)
+    document = RichText::Document.new(value)
+    document.validate(known_references: known) + body_kind_errors_for(document)
+  end
+
+  # What a body of this record may hold beyond the schema: `:rich` (every body
+  # but a Table block's) refuses a table anywhere, `:table` holds exactly one
+  # table or nothing. A table is allowed in a body that says so and in no other
+  # (table block spec, decision 2): the public text, the Markdown form and the
+  # editor's toolbar of every other body know nothing of one, and a table is
+  # wide in a way a paragraph's column is not. A developer's or a client's
+  # error, not an editor's, so it carries the language prefix.
+  def body_content_kind = :rich
+
+  TABLE_CELL_MARKS = %w[bold italic code link internalLink].freeze
+
+  def body_kind_errors_for(document)
+    return [] unless document.to_h.is_a?(Hash)
+
+    if body_content_kind == :table
+      # A blank body is still of the right shape: nothing at all (what the
+      # editor writes when its table is gone, `storedDocument`), or one table
+      # of equal rows. A blank body of any other shape (an empty paragraph
+      # beside a blank table, a ragged table of empty cells) was let through
+      # here once, saved, and then could not be loaded by the grid, whose
+      # document is `table?` (`rich_text/schema.js`); so only an empty one
+      # skips the checks below.
+      return [] if document.blank? && document.to_h["content"].blank?
+      return [ "a Table block's body is exactly one table" ] unless document.table?
+      return [ "a table's rows have the same number of cells" ] if TableBody.new(document).ragged?
+
+      marks = TableBody.new(document).rows.flatten.flat_map(&:nodes).flat_map { |node| node.is_a?(Hash) && node["marks"].is_a?(Array) ? node["marks"] : [] }
+      # A cell holds bold, italic, code and links, and a line break (decision 3):
+      # the schema admits every registered mark, so the rule is here.
+      outside = marks.filter_map { |mark| mark["type"] if mark.is_a?(Hash) }.uniq - TABLE_CELL_MARKS
+      outside.any? ? [ "a table cell allows only bold, italic, code and links: #{outside.join(", ")}" ] : []
+    else
+      table_in?(document.to_h) ? [ "a table is allowed only in a Table block" ] : []
+    end
+  end
+
+  # The hard limits of a Table block's table, as `TableBody` knows them, each
+  # an editor's sentence (`errors.messages.table_too_large`, `table_cell_too_long`).
+  def body_limit_messages_for(value)
+    return [] unless body_content_kind == :table && value.is_a?(Hash)
+
+    document = RichText::Document.new(value)
+    return [] unless document.table?
+
+    delimited = ->(number) { ActiveSupport::NumberHelper.number_to_delimited(number) }
+    TableBody.new(document).limit_errors.map do |error|
+      case error
+      when :size
+        I18n.t("errors.messages.table_too_large", columns: delimited.(TableBody::MAX_COLUMNS), rows: delimited.(TableBody::MAX_ROWS))
+      when :cell
+        I18n.t("errors.messages.table_cell_too_long", characters: delimited.(TableBody::MAX_CELL))
+      end
+    end
+  end
+
+  # Whether a `table` node is anywhere in the document, to the depth the
+  # validator allows (a deeper one is that validator's error already).
+  def table_in?(node, depth = 0)
+    return false unless node.is_a?(Hash) && depth <= RichText::Document::MAX_DEPTH
+    return true if node["type"] == "table"
+
+    content = node["content"]
+    content.is_a?(Array) && content.any? { |child| table_in?(child, depth + 1) }
   end
 end

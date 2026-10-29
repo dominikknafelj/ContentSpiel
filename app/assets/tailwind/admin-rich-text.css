@@ -43,3 +43,56 @@
 .admin-rich-text-internal-link { cursor: default; }
 .admin-rich-text-content a.admin-rich-text-internal-link { text-decoration-style: dotted; }
 .admin-rich-text-content .admin-rich-text-missing { color: var(--cs-danger-ink); border-color: var(--cs-danger); }
+
+/* The Table block's grid (table block spec decision 12; `rich_text/table.js`,
+   the column's `admin-rich-text-table`). A column is at least 160px
+   (`cellMinWidth`, which Tiptap's TableView writes into the colgroup and the
+   table's min-width), so four fit the 640px editor column; from five the table
+   is wider than its box, `div.tableWrapper`, which scrolls sideways inside the
+   card and leaves the editor its width. The edge fade is the site's
+   (`themes/default/table.css`): the box is masked at its two ends by a
+   gradient whose lengths follow its own scroll position, 24px on the side that
+   has more, none on a grid that fits (the mask reads alpha only: its opaque
+   stop is the surface token for want of a literal). Without scroll-driven
+   animations there is no fade and the grid scrolls all the same.
+
+   A cell shows its column's alignment by the class the server writes
+   (`align-*`). The lines and the header's weight are the plainest the
+   editor's tokens give; the grid's look beyond the floor and the fade is
+   Claude Design's to answer (Task 5's report, open question). A selection of
+   several cells (prosemirror-tables' `selectedCell`) is tinted with the
+   accent tint. */
+@property --admin-table-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --admin-table-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+.admin-rich-text-table .tableWrapper {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, var(--cs-surface) var(--admin-table-fade-start), var(--cs-surface) calc(100% - var(--admin-table-fade-end)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, var(--cs-surface) var(--admin-table-fade-start), var(--cs-surface) calc(100% - var(--admin-table-fade-end)), transparent 100%);
+}
+@supports (animation-timeline: scroll()) {
+  .admin-rich-text-table .tableWrapper {
+    animation: admin-table-fade-start linear both, admin-table-fade-end linear both;
+    animation-timeline: scroll(self inline), scroll(self inline);
+    animation-range: 0 24px, calc(100% - 24px) 100%;
+  }
+}
+@keyframes admin-table-fade-start { from { --admin-table-fade-start: 0px; } to { --admin-table-fade-start: 24px; } }
+@keyframes admin-table-fade-end { from { --admin-table-fade-end: 24px; } to { --admin-table-fade-end: 0px; } }
+
+.admin-rich-text-table table { border-collapse: collapse; table-layout: fixed; width: 100%; }
+.admin-rich-text-table th,
+.admin-rich-text-table td {
+  position: relative;
+  border: 1px solid var(--cs-line);
+  padding: 6px 8px;
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.admin-rich-text-table th { font-weight: 600; }
+.admin-rich-text-table .align-left { text-align: left; }
+.admin-rich-text-table .align-center { text-align: center; }
+.admin-rich-text-table .align-right { text-align: right; }
+.admin-rich-text-table .selectedCell { background: var(--cs-accent-tint); }

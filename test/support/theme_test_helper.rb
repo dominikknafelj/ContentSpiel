@@ -33,6 +33,15 @@ module ThemeTestHelper
 
   def with_note_theme(&block) = Theme.with(note_theme, &block)
 
+  # A fifth theme, of two files (`test/fixtures/themes/table`): its own
+  # template for the Table block, written from the reference's section alone
+  # (docs/reference/theming.md, "The Table block"), and a stylesheet for it.
+  TABLE = Rails.root.join("test/fixtures/themes/table")
+
+  def table_theme = Theme.load(ThemeFolder.new(TABLE))
+
+  def with_table_theme(&block) = Theme.with(table_theme, &block)
+
   # A copy of the second theme in a directory of its own, for a test that
   # adds, changes or removes a file. Yields the directory as a Pathname.
   def with_theme_copy

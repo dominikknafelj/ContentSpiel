@@ -35,15 +35,36 @@
 # the elements the contract lists"). An `s` carries no attribute of its own
 # and nothing that runs.
 class RichTextScrubber < Rails::HTML::PermitScrubber
+  # `class` is kept on every element, as it always was (Rails' list has none,
+  # so it is added below). The one restriction is a table cell's: on `th` and
+  # `td` it survives only as the alignment `RichText::BuiltIns`' `tableCell`
+  # writes (`align-left|center|right`), because a cell's class is styled by
+  # the theme and any other value would be a hook a pasted table could use
+  # (`scrub_attribute`).
+  CELL_ALIGN_CLASS = /\Aalign-(left|center|right)\z/
+
   YOUTUBE_NOCOOKIE_EMBED_SRC = %r{\Ahttps://www\.youtube-nocookie\.com/embed/[A-Za-z0-9_-]{11}\z}
 
   def initialize
     super
-    self.tags = Rails::HTML5::SafeListSanitizer.allowed_tags + %w[figure figcaption iframe s]
-    self.attributes = Rails::HTML5::SafeListSanitizer.allowed_attributes + %w[frameborder allow allowfullscreen referrerpolicy srcset sizes loading decoding]
+    self.tags = Rails::HTML5::SafeListSanitizer.allowed_tags + %w[figure figcaption iframe s table tbody tr th td]
+    self.attributes = Rails::HTML5::SafeListSanitizer.allowed_attributes + %w[frameborder allow allowfullscreen referrerpolicy srcset sizes loading decoding scope class]
   end
 
   private
+
+  # `class` is on the flat list so that this hook sees it: kept as it is
+  # everywhere, but on a `th` or `td` only as a cell's alignment
+  # (`CELL_ALIGN_CLASS`), otherwise removed.
+  def scrub_attribute(node, attr_node)
+    if attr_node.name == "class" && %w[th td].include?(node.name)
+      return if attr_node.value.match?(CELL_ALIGN_CLASS)
+
+      return attr_node.remove
+    end
+
+    super
+  end
 
   def allowed_node?(node)
     return youtube_nocookie_embed?(node) if node.name == "iframe"

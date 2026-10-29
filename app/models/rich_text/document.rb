@@ -115,7 +115,11 @@ module RichText
     # round trip through `update_post` would silently strip every reference
     # the token can't see. `nil` (the default) checks everything: a new
     # body has nothing to be known against.
-    def self.from_markdown(markdown, known_references: nil) = RichText::Markdown.load(markdown, known_references: known_references)
+    #
+    # `tables:` (default false) reads a GFM table as a `table` node, for the
+    # one body that may hold one (the Table block's); see `RichText::Markdown
+    # .load`.
+    def self.from_markdown(markdown, known_references: nil, tables: false) = RichText::Markdown.load(markdown, known_references: known_references, tables: tables)
 
     # Converts stored ActionText/Trix HTML (design spec §5) into
     # `[RichText::Document, unmapped]` -- `unmapped` being one String per
@@ -132,12 +136,20 @@ module RichText
     # translations screen can diff it later (`Translations::SourceDiff`).
     # Marks are dropped, a hard break is a newline, and the items of a list
     # or quote are separated by newlines.
+    #
+    # A table (the Table block's body, table block spec decision 9) is one
+    # entry PER CELL, row by row, empty cells dropped: read as one top-level
+    # node it would be a single run of every word with nothing between the
+    # cells ("PlanPriceBasic"), and the reference card's word diff of a
+    # changed cell would be that whole line. Only what is kept as text is
+    # read this way; the digest that says whether the original changed is
+    # the document's own (`#digest`), and does not move with this.
     PLAIN_PLACEHOLDERS = { "image" => "[image]", "youtube" => "[video]", "horizontalRule" => "[rule]" }.freeze
 
     PLAIN_BLOCK_CONTAINERS = %w[bulletList orderedList listItem blockquote].freeze
 
     def plain_paragraphs
-      Array(@hash["content"]).filter_map { |node| plain_text_of(node).strip.presence }
+      Array(@hash["content"]).flat_map { |node| plain_units(node) }.filter_map { |node| plain_text_of(node).strip.presence }
     end
 
     # Renders this document to Markdown (design spec §3.4) -- MCP's read
@@ -189,9 +201,39 @@ module RichText
       context = RichText::RenderContext.new(locale: locale, urls: urls, document: self)
       return RichText::HtmlRenderer.new(context).render(self) if context.preview
 
-      Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]) do
+      Rails.cache.fetch(render_cache_key("rich_text", locale, context)) do
         RichText::HtmlRenderer.new(context).render(self)
       end
+    end
+
+    # A Table block's cells drawn to HTML (`Blocks::TableComponent`):
+    # Array<Array<String>>, one scrubbed, html_safe String per cell of
+    # `TableBody.new(self).rows`, in the same rows and the same order, so the
+    # component pairs each with the cell's `header` and `align` by position.
+    #
+    # The same render cache as `#to_html`, under the same key but for its
+    # first word (`render_cache_key`): the digest, the schema, the locale, the
+    # content version and the code revision say everything a cell's HTML
+    # depends on, as they do for a body, and a preview is drawn every time for
+    # the same reason. Before this a public page drew every cell itself,
+    # uncached, each through a sanitizer pass of its own: a table at the hard
+    # limits (500 rows of 30 cells) cost about 0.44 s of every page view,
+    # while a prose body of the same text was one cached read. Now the cells
+    # are one render with one sanitizer pass (`HtmlRenderer#render_fragments`)
+    # once per document, and a cached read after that.
+    #
+    # What is cached is plain Strings (a cache store keeps no SafeBuffer's
+    # flag reliably): they are the renderer's scrubbed output, marked safe
+    # again on the way out.
+    def table_cells_html(locale: I18n.locale, urls: PublicSite::Urls.new)
+      context = RichText::RenderContext.new(locale: locale, urls: urls, document: self)
+      cells =
+        if context.preview
+          draw_table_cells(context)
+        else
+          Rails.cache.fetch(render_cache_key("rich_text_table_cells", locale, context)) { draw_table_cells(context) }
+        end
+      cells.map { |row| row.map(&:html_safe) }
     end
 
     # "No text and no embeds" (spec §3.1) -- an empty paragraph, or a `doc`
@@ -204,6 +246,16 @@ module RichText
     # instant it finds anything, `#validate` has to keep going to collect
     # every error.
     def blank? = !content?(@hash)
+
+    # Whether the document's only top-level node is a table: what a Table
+    # block's body is (`HasRichTextBody#body_errors_for`). Anything else, an
+    # empty document included, is not.
+    def table?
+      return false unless @hash.is_a?(Hash) && @hash["content"].is_a?(Array)
+
+      nodes = @hash["content"]
+      nodes.size == 1 && nodes.first.is_a?(Hash) && nodes.first["type"] == "table"
+    end
 
     # A stable content hash for the render cache key (spec §3.3) and for
     # "did this locale's document actually change" checks -- a canonical,
@@ -364,6 +416,22 @@ module RichText
 
     private
 
+    # The render cache's key (`#to_html`): what a render is drawn from, each
+    # part's reason in `#to_html`'s comment. `kind` keeps a body's render and
+    # a table's cells (`#table_cells_html`) apart, since both are drawn from
+    # one document.
+    def render_cache_key(kind, locale, context)
+      [ kind, digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]
+    end
+
+    # Every cell drawn in one pass, then put back into its rows. Plain Strings,
+    # for the cache (`#table_cells_html`).
+    def draw_table_cells(context)
+      rows = TableBody.new(self).rows
+      drawn = RichText::HtmlRenderer.new(context).render_fragments(rows.flatten.map(&:nodes)).map { |html| String.new(html) }
+      rows.map { |row| drawn.shift(row.size) }
+    end
+
     # One `"content"` Array's inline children, with `#normalized`'s edge-
     # whitespace rule applied and equal-marked neighbours merged. Anything
     # that isn't a well-formed text node passes through untouched.
@@ -442,6 +510,17 @@ module RichText
       end
 
       result_holder[0]
+    end
+
+    # The nodes `#plain_paragraphs` reads one entry each from: a table's
+    # cells in reading order, any other top-level node itself. A table's
+    # shape is the schema's (rows of cells), so this walks two fixed levels
+    # and no further; anything else in it is skipped, as `plain_text_of`
+    # reads a non-Hash as nothing.
+    def plain_units(node)
+      return [ node ] unless node.is_a?(Hash) && node["type"] == "table"
+
+      Array(node["content"]).flat_map { |row| row.is_a?(Hash) ? Array(row["content"]) : [] }
     end
 
     def plain_text_of(node, depth = 0)

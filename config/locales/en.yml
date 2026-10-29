@@ -55,6 +55,11 @@ en:
   errors:
     messages:
       code_too_long: "is too long (maximum is %{limit} characters)"
+      # A Table block's body over its hard limits (`TableBody`): the editors'
+      # own sentences, shown with no language prefix. The figures arrive
+      # formatted ("2,000").
+      table_too_large: "A table can have at most %{columns} columns and %{rows} rows."
+      table_cell_too_long: "A cell can have at most %{characters} characters."
 
   # How these columns are named in validation messages ("AI provider isn't
   # an available provider", not Rails' default "Ai provider ...").

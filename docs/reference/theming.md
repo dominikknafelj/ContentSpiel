@@ -1,6 +1,6 @@
 # Theming: the folder, the four seams and the contract
 
-> Describes: `lib/theme_folder.rb`, `lib/theme_css.rb`, `lib/tasks/theme_css.rake`, `lib/tasks/theme.rake`, `app/values/theme.rb`, `app/values/theme/` (`contract.rb`, `check.rb`, `scaffold.rb`), `config/initializers/theme.rb`, `config/initializers/types.rb` (the theme's prepare, its last lines), `config/application.rb` (the `content_spiel.host_announcement` initializer), `config/importmap.rb`, `app/javascript/site.js`, `app/javascript/controllers/index.js`, `app/controllers/public_controller.rb`, `app/controllers/concerns/public_page_rendering.rb`, `app/views/layouts/application.html.erb`, `app/views/layouts/public/`, `app/views/pages/`, `app/queries/public_site/branch.rb`, `app/helpers/theme_helper.rb`, `app/helpers/pages_helper.rb` (`document_title`, `themed_title`), `app/models/setup/system_check.rb` (the "Theme" row), `bin/theme-build-check`, the comment above `assets:precompile` in the `Dockerfile`, `test/fixtures/themes/plain`, `test/fixtures/themes/code`, `test/fixtures/themes/note`, `test/support/theme_test_helper.rb`; and of the Code block what a theme meets: its entry and tokens in the contract, `app/assets/tailwind/themes/default/code.css`, the strong band's values in `sections.css`, and the markup `app/javascript/controllers/code_copy_controller.js` asks of a template; and of the Note block, its entry and tokens in the contract, `app/assets/tailwind/themes/default/note.css` and the strong band's sixteen values in `sections.css`.
+> Describes: `lib/theme_folder.rb`, `lib/theme_css.rb`, `lib/tasks/theme_css.rake`, `lib/tasks/theme.rake`, `app/values/theme.rb`, `app/values/theme/` (`contract.rb`, `check.rb`, `scaffold.rb`), `config/initializers/theme.rb`, `config/initializers/types.rb` (the theme's prepare, its last lines), `config/application.rb` (the `content_spiel.host_announcement` initializer), `config/importmap.rb`, `app/javascript/site.js`, `app/javascript/controllers/index.js`, `app/controllers/public_controller.rb`, `app/controllers/concerns/public_page_rendering.rb`, `app/views/layouts/application.html.erb`, `app/views/layouts/public/`, `app/views/pages/`, `app/queries/public_site/branch.rb`, `app/helpers/theme_helper.rb`, `app/helpers/pages_helper.rb` (`document_title`, `themed_title`), `app/models/setup/system_check.rb` (the "Theme" row), `bin/theme-build-check`, the comment above `assets:precompile` in the `Dockerfile`, `test/fixtures/themes/plain`, `test/fixtures/themes/code`, `test/fixtures/themes/note`, `test/fixtures/themes/table`, `test/support/theme_test_helper.rb`; and of the Code block what a theme meets: its entry and tokens in the contract, `app/assets/tailwind/themes/default/code.css`, the strong band's values in `sections.css`, and the markup `app/javascript/controllers/code_copy_controller.js` asks of a template; and of the Note block, its entry and tokens in the contract, `app/assets/tailwind/themes/default/note.css` and the strong band's sixteen values in `sections.css`; and of the Table block, its entry and tokens in the contract, `app/assets/tailwind/themes/default/table.css` and the bands' values in `sections.css`.
 
 Spec: `docs/superpowers/specs/2026-10-12-theming-design.md` (its last section, "As built", lists where the code departed from it). What a host sets and how a site's image is built is also in `docs/reference/hosting.md`; the guide for a theme's author lives in `contentspiel-docs`, not here.
 
@@ -264,7 +264,7 @@ The overrides and the callback are private, so none is an action. Nothing public
 
 ### Tokens
 
-Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothing and names no block. A theme changes one by declaring it again in its own stylesheet. The first group (`Theme::Contract.themed_tokens`, `--th-paper` to `--th-note-warning-border`) has a value for the light scheme and one for the dark, and is declared again under both `:root, [data-theme="light"]` and `[data-theme="dark"]`; the rest (`.fixed_tokens`) have one value.
+Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothing and names no block. A theme changes one by declaring it again in its own stylesheet. The first group (`Theme::Contract.themed_tokens`, `--th-paper` to `--th-table-ground`) has a value for the light scheme and one for the dark, and is declared again under both `:root, [data-theme="light"]` and `[data-theme="dark"]`; the rest (`.fixed_tokens`) have one value.
 
 | Token | What it is |
 |---|---|
@@ -318,6 +318,11 @@ Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothi
 | `--th-note-warning-line` | a Warning's rule on the left |
 | `--th-note-warning-ink` | a Warning's word and icon |
 | `--th-note-warning-border` | a Warning's frame |
+| `--th-table-rule` | a table's rule under its header row |
+| `--th-table-line` | the lines between a table's rows |
+| `--th-table-head` | a table's header text |
+| `--th-table-caption` | a table's caption |
+| `--th-table-ground` | what a table stands on: its sticky header column's ground and its edge fade |
 | `--th-font` | the text face |
 | `--th-mono` | the monospaced face |
 | `--th-t-display` | the homepage's title size |
@@ -371,6 +376,7 @@ Under the theme's `components/`, as `<path>.html.erb`. The methods are what the 
 | `blocks/image_component` | `block`, `page`, `asset`, `alt`, `caption`, `sizes` |
 | `blocks/code_component` | `block`, `page`, `lines`, `code`, `language`, `language_label`, `filename`, `caption`, `string` |
 | `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body` |
+| `blocks/table_component` | `block`, `page`, `rows`, `header_row?`, `header_column?`, `column_count`, `caption` |
 | `blocks/post_list_component` | `block`, `page`, `list_component` |
 | `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width` |
 | `posts/blog_list_component` | `posts`, `page` |
@@ -541,6 +547,38 @@ A highlighted note in the flow of a page: a kind (Note, Tip, Important, Warning)
 **Contrast is computed, for the default theme's values only.** `test/integration/design_tokens_test.rb` holds 72 pairs at 4.5:1 or better: `--th-ink`, `--th-accent` and the kind's ink on each kind's ground, on the page, in a tinted band and in a strong band, in both schemes ("every note's text, link and word are readable on its ground..."); and 16 at 3:1 or better: each kind's rule and ink against a strong band, in both schemes ("on a strong band a note shares the band's ground and each kind keeps its colour..."). Nothing measures a theme's values.
 
 The fourth theme (`test/fixtures/themes/note`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one", "the fourth theme is sound, checked deeply too: a Note template of the contract's names").
+
+### The Table block
+
+A table of cells in the flow of a page (table block spec; the block itself is in `docs/reference/content-blocks-and-types.md`). What a theme can do with it, from the least work to the most:
+
+1. **Re-colour it: re-colour the base tokens**, or declare the five `--th-table-*` again under both selectors. Each is defined from the base in the default theme: `--th-table-rule` (the rule under the header row) is `--th-line-strong`, `--th-table-line` (the lines between rows) `--th-line`, `--th-table-head` (header text) `--th-ink`, `--th-table-caption` `--th-meta`, and `--th-table-ground` (what the table stands on: its sticky header column and its edge fade) `--th-paper`. The cell text is `--th-ink`, links and inline code the rich text's.
+2. **Restyle it: rules of its own** under `.content-block--table`. The default template's class names (`table-scroll`, `align-left`, `align-center`, `align-right`) are the default theme's own, not on a list.
+3. **Replace its template**: `components/blocks/table_component.html.erb`.
+
+**What the template is handed** (`Theme::Contract.components`). The component draws nothing for a table with no text in the language shown or along the site's fallback (`render?`).
+
+| Method | What it answers |
+|---|---|
+| `block` | the block: a published view on the site, the rows in a preview. `block.id` tells two tables of a page apart (an `id` for `aria-labelledby`) |
+| `page` | the page the block is drawn on |
+| `rows` | the rows, each a list of cells; a cell answers `header?`, `align` (`"left"`, `"center"`, `"right"` or nil) and `html` (its inline content, rendered and safe as it is) |
+| `header_row?` | whether the first row heads the columns |
+| `header_column?` | whether the first cell of every other row heads its row |
+| `column_count` | the number of columns |
+| `caption` | the caption in the language shown, with the site's fallback; nil for none |
+
+**What a template should keep.** A scroll box that a keyboard reaches (`tabindex="0"`, `role="region"`) and that is named, by the caption's id or, without a caption, by a word of its own; real header cells (`th` with `scope`) for the header row and a header column, so a screen reader reads a cell with its headers; and the cell's `html` printed as handed over, since it is already scrubbed. The scroll box lets a wide table scroll sideways inside the column, so that the page never does.
+
+**The edge fade and the sticky column need no script.** The default stylesheet masks the scroll box at its ends with a gradient whose two lengths are driven by its own scroll position (a scroll-driven animation): the fade is on the side that has more, and a table that fits has none. A browser without scroll-driven animations shows no fade; the table scrolls all the same. The header column is `position: sticky` on `--th-table-ground`, which must be opaque. A theme whose page is not `--th-paper` coloured sets `--th-table-ground` to what its tables stand on.
+
+**On a section's bands** (`sections.css`): a tinted band re-values the ground (`--th-band-tinted`) and the caption (`--th-dim`, since `--th-meta` is not readable on that band in the light theme). **Why the band must say it:** a custom property is computed where it is declared, so a token DEFINED from `--th-meta` at `:root` (`--th-table-caption: var(--th-meta)`) keeps the page's `--th-meta` inside the band, and the band's own re-valued `--th-meta` never reaches it. The page's `--th-meta` is 4.3:1 on the light tinted band, so the caption is re-declared in the band (`sections.css`). Any token a theme or a block type defines from a base token that a band re-values has the same trap, and must be re-declared in that band (the contrast resolver in `test/integration/design_tokens_test.rb` models it as the browser does). CLAUDE.md's "`--th-meta` is 4.5:1 on the tinted band" stays true for `--th-meta` itself. **A strong band re-values all five**: header and cell text the band's text, caption its dim, the header rule the text at 40%, the row lines at 16%, the ground the band's. A theme's own `--th-table-*` therefore do not reach a table in a strong band; a theme that wants other colours there declares them in a rule of its own for `.content-section--strong` and answers for their contrast.
+
+**Contrast is computed, for the default theme's values only.** `test/integration/design_tokens_test.rb` holds 18 pairs at 4.5:1 or better: header text, cell text and caption against the table's ground, on the page, in a tinted band and in a strong band, in both schemes ("a table's header text, cell text and caption are readable on its ground..."). The rule and the row lines are decoration and are not held to a ratio. Nothing measures a theme's values.
+
+The fifth theme (`test/fixtures/themes/table`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Table block's template from the contract's names alone, and a theme that does not is drawn the default one", "the fifth theme is sound, checked deeply too: a Table template of the contract's names").
+
+**Release note:** Added the Table block: `blocks/table_component` and five themed tokens, `--th-table-rule`, `--th-table-line`, `--th-table-head`, `--th-table-caption` and `--th-table-ground`.
 
 ### The default theme's captions, subpages list and tags
 
@@ -749,6 +787,7 @@ A change to a file of the theme reloads the application at the next request, as 
 - **`with_theme_copy { |dir| … }`** yields a copy of the second theme in a directory of its own, for a test that adds, changes or removes a file. Load it with `Theme.load(ThemeFolder.new(dir))`: a theme made with `Theme.new(path:)` is unchecked and has the fingerprint `default`, so the ETag does not tell it from the default theme. **One `Theme` does not re-read a changed template in the test environment** (ViewComponent compiles once, and Action View caches a template by its path): a test that edits a file builds a new theme, in a copy of its own.
 - **The third theme, `test/fixtures/themes/code`**, and `with_code_theme { … }`: two files, a template for the Code block written from the contract's nine names and the copy script's markup (it draws a `div.plain-code`, never the default's `figure`), and a stylesheet that declares the seven syntax tokens again for both schemes. Neither its assets nor a controller are on the test environment's paths: it has no image, font or script, and the suite's built stylesheet is the default theme's, so the browser test that shows its tokens at work puts the file's text into the page after the built stylesheet, which is where the build puts a theme's.
 - **A fourth theme, `test/fixtures/themes/note`** (`with_note_theme`), is a Note template written from "The Note block" alone and a stylesheet for it.
+- **A fifth theme, `test/fixtures/themes/table`** (`with_table_theme`), is a Table template written from "The Table block" alone and a stylesheet for it.
 - **The second theme, `test/fixtures/themes/plain`**: plain CSS, no utilities but one. It replaces `_frame`, `_title`, `_icons`, `_head`, `pages/show`, the Rich text block's template and one post list (`posts/blog_list_component`); it changes `--th-accent` for both schemes; it brings two partials under `views/theme/`, one controller (`hello_controller.js`) and one image. Its frame and page draw the section's tree, the crumbs, a table of contents and previous and next on every page, which is why the canary and the trash test can ask it. **It deliberately does not replace the header, the footer, the Image block, the Code block or the 404**, so every test of it is also a test of the fallback. Any file added to it changes its fingerprint; no test pins the value.
 - **The second theme's assets and controller are on the test environment's paths from the start** (`config/environments/test.rb`, `test/fixtures/themes/importmap.rb`): Propshaft's load path and the import map are fixed when the application starts and the suite swaps themes in-process. So `image_path("plain-mark.svg")` resolves under the default theme too, and "the default theme has no theme controller in its map" cannot be shown in the suite; the browser test shows the other half, that it is not REGISTERED off the public site.
 - **The suite's stylesheet is the default theme's.** System status' Theme row therefore WARNS under `with_plain_theme` (the stamp is `default`): a test that wants the OK row under a theme hands `stylesheet_probe: -> { true }` to `Setup::SystemCheck`.

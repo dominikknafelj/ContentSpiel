@@ -250,6 +250,25 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
   # colour. Plan ruling 6: the tile only. The kind's icon is not a part of
   # the line: the tile draws it before the line (plan ruling 12,
   # block_tile_component_test.rb), and the summary draws none.
+  test "a table's tile reads Table · 3 × 3 · and its first header words" do
+    table = block("table")
+    table.assign_body(rich_doc("| Plan | Price | Storage |\n| --- | --- | --- |\n| A | 1 | 2 |\n| B | 3 | 4 |", tables: true), locale: :en)
+    table.save!
+    render_summary table
+
+    assert_text "Table · 3 × 3 · Plan Price Storage"
+
+    blank_head = block("table")
+    blank_head.assign_body(rich_doc("| | |\n| --- | --- |\n| A | 1 |", tables: true), locale: :en)
+    blank_head.save!
+    render_summary blank_head
+    assert_text "Table · 2 × 2 · A 1"
+
+    empty = block("table")
+    render_summary empty
+    assert_text "Empty table"
+  end
+
   test "a note is its word or its title and the start of its text; one without text says Empty" do
     note = block("note", settings: { "kind" => "tip" })
     note.assign_body(rich_doc("First words of the note.\n\nA second paragraph."), locale: :en)

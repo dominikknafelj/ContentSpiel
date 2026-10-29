@@ -17,6 +17,10 @@ en:
       tagged: "Tagged"
     blocks:
       # bin/rails generate block_type adds a type's scope below this line.
+      # The Table block's scroll box where the table has no caption to name it
+      # (`app/components/blocks/table_component.html.erb`).
+      table:
+        label: "Table"
       # The Note block's heading where the editor typed no title: the
       # kind's word (`Blocks::NoteComponent`).
       note:

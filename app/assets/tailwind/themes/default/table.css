@@ -1,0 +1,129 @@
+/* The Table block (table block spec, "The public side";
+   `Blocks::TableComponent`). Plain rules on tokens, not utilities, and every
+   colour a --th- token: the five --th-table-* tokens are defined in
+   tokens.css from the base tokens, and a strong band re-values them in
+   sections.css (a tinted band changes the ground and the caption).
+
+   `.table-scroll` is the scroll box: it scrolls sideways inside the content
+   column, so the page itself never does. It is a focusable region, so its
+   outline is drawn inside (a mask, below, would cut one drawn outside).
+
+   The edge fade needs no script. The box is masked at its two ends by a
+   gradient whose two lengths are animated by the box's own scroll position
+   (a scroll-driven animation): the left edge fades in over the first 24px
+   scrolled, the right edge fades out over the last 24px, so the fade is on
+   the side that has more and nowhere else, and a table that fits has none.
+   It fades the text to the ground the table stands on (the band's, which is
+   what --th-table-ground is) rather than painting that colour over it, which
+   a background of the box cannot do: it is behind the text. (A mask reads
+   only alpha: its opaque stop is the ground token for want of a literal.) A browser
+   without scroll-driven animations draws no fade and the table scrolls all
+   the same.
+
+   The header column is sticky on --th-table-ground, so a cell scrolled
+   under it is hidden by it; the ground must be opaque, and is. A mask would
+   fade the sticky cells with the rest, so a table with a header column has
+   no mask on its left: the sticky cells carry the left fade themselves, a
+   24px gradient from the ground on their own right side, shown as the box is
+   scrolled (the same scroll timeline, read through `scroll(nearest)`).
+
+   A cell has a floor (`min-width`): `overflow-wrap: anywhere` lowers a
+   cell's minimum width to a single character, so without one the table
+   would always squeeze into the column and never scroll. With it a wide
+   table is wider than the column and scrolls in its box, and only a word
+   longer than the floor breaks. */
+@property --table-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --table-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+.content-block--table { margin-block: 2rem; }
+
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, var(--th-table-ground) var(--table-fade-start), var(--th-table-ground) calc(100% - var(--table-fade-end)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, var(--th-table-ground) var(--table-fade-start), var(--th-table-ground) calc(100% - var(--table-fade-end)), transparent 100%);
+}
+.table-scroll:focus-visible { outline: 2px solid var(--th-accent); outline-offset: -2px; }
+
+@supports (animation-timeline: scroll()) {
+  .table-scroll {
+    animation: table-fade-start linear both, table-fade-end linear both;
+    animation-timeline: scroll(self inline), scroll(self inline);
+    animation-range: 0 24px, calc(100% - 24px) 100%;
+  }
+}
+@keyframes table-fade-start { from { --table-fade-start: 0px; } to { --table-fade-start: 24px; } }
+@keyframes table-fade-end { from { --table-fade-end: 24px; } to { --table-fade-end: 0px; } }
+
+.table-scroll table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: var(--th-t-small);
+  line-height: 1.5;
+  color: var(--th-ink);
+}
+.table-scroll caption {
+  caption-side: bottom;
+  padding: 10px 12px;
+  text-align: left;
+  font-family: var(--th-font);
+  font-size: var(--th-t-small);
+  color: var(--th-table-caption);
+}
+.table-scroll th,
+.table-scroll td {
+  padding: 10px 12px;
+  vertical-align: top;
+  text-align: left;
+  min-width: 10ch;
+  overflow-wrap: anywhere;
+}
+.table-scroll tbody tr + tr > th,
+.table-scroll tbody tr + tr > td { border-top: 1px solid var(--th-table-line); }
+.table-scroll thead th {
+  border-bottom: 1px solid var(--th-table-rule);
+  font-weight: 600;
+  color: var(--th-table-head);
+}
+.table-scroll tbody th[scope="row"],
+.table-scroll:has(tbody th[scope="row"]) thead th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--th-table-ground);
+  font-weight: 600;
+  color: var(--th-table-head);
+}
+.table-scroll .align-left { text-align: left; }
+.table-scroll .align-center { text-align: center; }
+.table-scroll .align-right { text-align: right; }
+
+/* A table with a header column: no mask on the left (it would fade the sticky
+   cells), the end's only, and the sticky cells draw the left fade. */
+.table-scroll:has(tbody th[scope="row"]) { --table-fade-start: 0px; }
+.table-scroll tbody th[scope="row"]::after,
+.table-scroll:has(tbody th[scope="row"]) thead th:first-child::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  width: 24px;
+  background: linear-gradient(to right, var(--th-table-ground), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+@supports (animation-timeline: scroll()) {
+  .table-scroll:has(tbody th[scope="row"]) {
+    animation: table-fade-end linear both;
+    animation-timeline: scroll(self inline);
+    animation-range: calc(100% - 24px) 100%;
+  }
+  .table-scroll tbody th[scope="row"]::after,
+  .table-scroll:has(tbody th[scope="row"]) thead th:first-child::after {
+    animation: table-edge-in linear both;
+    animation-timeline: scroll(nearest inline);
+    animation-range: 0 24px;
+  }
+}
+@keyframes table-edge-in { from { opacity: 0; } to { opacity: 1; } }

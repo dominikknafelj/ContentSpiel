@@ -97,6 +97,82 @@ class AI::TranslateTest < ActiveSupport::TestCase
     assert_equal events, Audit::Event.where(action: "ai.translated").count
   end
 
+  # No post body may hold a table (only the Table block's does), so the table
+  # original is handed to the service the way a Table block's body is: as the
+  # value `translation_value` reads.
+  def table_original(post)
+    document, = RichText::Document.from_markdown("| Name | Qty |\n| :--- | ---: |\n| Flour | 2 |\n| Sugar | 3 |\n", tables: true)
+    post.define_singleton_method(:translation_value) { |field, locale| field == "body" ? document : super(field, locale) }
+    document
+  end
+
+  test "a table body goes out as GFM and its suggestion comes back as a table of the source's shape" do
+    post = post_with
+    original = table_original(post)
+    StubProvider.handler = ->(texts, _format) { texts.map { |text| text.sub("Name", "Name").sub("Flour", "Mehl").sub("Sugar", "Zucker") } }
+
+    service, result = translate(post, %w[body])
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal [ original.to_markdown ], StubProvider.calls.first[:texts]
+    assert_equal :markdown, StubProvider.calls.first[:format]
+    suggestion = service.suggestions["body"]
+    assert_equal [ 3, 2 ], TableBody.new(suggestion).shape
+    assert_equal %w[Name Qty Mehl 2 Zucker 3], TableBody.new(suggestion).rows.flatten.map(&:text)
+    assert_equal %w[left right], TableBody.new(suggestion).rows.first.map(&:align)
+  end
+
+  test "a suggestion keeps the source's cell kinds and alignment: a header column, and no header row" do
+    post = post_with
+    document, = RichText::Document.from_markdown("| a | b |\n| :-: | - |\n| c | d |\n", tables: true)
+    hash = document.to_h.deep_dup
+    rows = hash["content"].first["content"]
+    rows.each { |row| row["content"].each { |cell| cell["type"] = "tableCell" } }
+    rows.each { |row| row["content"].first["type"] = "tableHeader" }
+    kinds = ->(doc) { doc.to_h["content"].first["content"].map { |row| row["content"].map { |cell| [ cell["type"], cell.dig("attrs", "align") ] } } }
+    source = RichText::Document.new(hash)
+    post.define_singleton_method(:translation_value) { |field, locale| field == "body" ? source : super(field, locale) }
+    StubProvider.handler = ->(texts, _format) { texts }
+
+    service, result = translate(post, %w[body])
+    assert result.ok?, result.errors.to_sentence
+    assert_equal kinds.(source), kinds.(service.suggestions["body"])
+
+    headerless = RichText::Document.new(hash.deep_dup.tap { |h| h["content"].first["content"].each { |row| row["content"].each { |cell| cell["type"] = "tableCell" } } })
+    post.define_singleton_method(:translation_value) { |field, locale| field == "body" ? headerless : super(field, locale) }
+    service, result = translate(post, %w[body])
+    assert result.ok?, result.errors.to_sentence
+    assert_equal kinds.(headerless), kinds.(service.suggestions["body"])
+  end
+
+  test "a suggestion with prose beside the table fails the whole call" do
+    post = post_with
+    table_original(post)
+    StubProvider.handler = ->(texts, _format) { texts.map { |text| "Hier:\n\n#{text}" } }
+
+    service, result = translate(post, %w[body])
+
+    assert_not result.ok?
+    assert_equal [ AI::Translate::DIFFERENT_TABLE ], result.errors
+    assert_empty service.suggestions
+  end
+
+  test "a suggestion whose table has another shape fails the whole call and offers nothing" do
+    post = post_with(excerpt: "Summary")
+    table_original(post)
+    StubProvider.handler = lambda do |texts, format|
+      format == :plain ? texts.map { "Zusammenfassung" } : texts.map { |text| text.lines.first(3).join }
+    end
+
+    service, result = translate(post, %w[excerpt body])
+
+    assert_not result.ok?
+    assert_equal [ AI::Translate::DIFFERENT_TABLE ], result.errors
+    assert_equal "The translation came back with a different table: try again.", result.errors.first
+    assert_empty service.suggestions
+    assert_empty service.warnings
+  end
+
   test "rich text goes as Markdown and comes back as a document, keeping images and links, with warnings passed through" do
     page = as_owner { create_page(title: "About") }
     asset = create_media_asset

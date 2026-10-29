@@ -89,7 +89,10 @@ pin "sortablejs", preload: "admin" # @1.15.7
 pin "d3-force", preload: false # @3.0.0
 # Tiptap 3 and its ProseMirror dependencies (tiptap spec §4.1), vendored by
 # `bin/importmap pin @tiptap/core @tiptap/starter-kit @tiptap/extension-link`
-# -- no npm, no CDN at runtime. `preload: "admin"` on every one of them (see
+# and, for the Table block's grid (table spec decision 11), `bin/importmap pin
+# @tiptap/extension-table@3.31.3`, which brought `@tiptap/pm/tables` and
+# `prosemirror-tables` (and moved prosemirror-transform and -view up a patch
+# release) -- no npm, no CDN at runtime. `preload: "admin"` on every one of them (see
 # the top of this file); re-add it after a re-pin -- `bin/importmap pin`
 # writes the line without it, which would modulepreload the whole editor
 # stack on every public page.
@@ -143,7 +146,10 @@ pin "prosemirror-keymap", preload: "admin" # @1.2.3
 pin "prosemirror-model", preload: "admin" # @1.25.12
 pin "prosemirror-schema-list", preload: "admin" # @1.5.1
 pin "prosemirror-state", preload: "admin" # @1.4.4
-pin "prosemirror-transform", preload: "admin" # @1.12.1
-pin "prosemirror-view", preload: "admin" # @1.42.5
+pin "prosemirror-transform", preload: "admin" # @1.12.4
+pin "prosemirror-view", preload: "admin" # @1.42.8
 pin "rope-sequence", preload: "admin" # @1.3.4
 pin "w3c-keyname", preload: "admin" # @2.2.8
+pin "@tiptap/extension-table", to: "@tiptap--extension-table.js", preload: "admin" # @3.31.3
+pin "@tiptap/pm/tables", to: "@tiptap--pm--tables.js", preload: "admin" # @3.31.3
+pin "prosemirror-tables", preload: "admin" # @1.8.5

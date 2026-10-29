@@ -1,0 +1,59 @@
+<%# `relative`: the floating "⋯" and "+" are placed against this box by the script (see the class comment). %>
+<%= tag.div class: "admin-table-controls relative", data: controller_data, "data-messages": messages do %>
+  <%# The options row: two switches, checkboxes with no name (nothing of them is sent: the grid's cells
+      are what a header IS, decision 4), which the script applies to the grid and reads back from it. %>
+  <div role="group" aria-label="<%= t(".options") %>" class="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <span class="inline-flex items-center gap-2">
+      <%= switch(:header_row, header_row?) %>
+      <label for="<%= id_prefix %>-header-row" class="text-sm text-ink"><%= t(".header_row") %></label>
+    </span>
+    <span class="inline-flex items-center gap-2">
+      <%= switch(:header_column, header_column?) %>
+      <label for="<%= id_prefix %>-header-column" class="text-sm text-ink"><%= t(".header_column") %></label>
+    </span>
+  </div>
+
+  <%# The warning line: the warn alert at its small size, advice and never a refusal (decision 7).
+      Polite, as a sentence that comes while someone is working. %>
+  <div aria-live="polite">
+    <%= tag.p warning, hidden: warning.empty?, class: "mb-2 rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-warn-ink",
+          data: { "admin--editor--table-target": "warning" } %>
+  </div>
+
+  <%= content %>
+
+  <%# The current row's "⋯", centred on the grid's left edge at that row. %>
+  <%= tag.div hidden: true, class: FLOATING_CLASS, data: { "admin--editor--table-target": "rowControls" } do %>
+    <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".row.menu"), align: :left, close_on_select: true, button_class: HANDLE_CLASS) do |menu| %>
+      <% ROW_ITEMS.each do |key, action| %>
+        <% menu.with_item { item(t(".row.#{key}"), action, table_command: key) } %>
+      <% end %>
+      <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
+      <% menu.with_item { item(t(".row.delete"), "deleteRow", danger: true, table_command: "delete_row") } %>
+    <% end %>
+  <% end %>
+
+  <%# The current column's "⋯", centred on the grid's top edge at that column. %>
+  <%= tag.div hidden: true, class: FLOATING_CLASS, data: { "admin--editor--table-target": "columnControls" } do %>
+    <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".column.menu"), align: :left, close_on_select: true, button_class: HANDLE_CLASS) do |menu| %>
+      <% COLUMN_ITEMS.each do |key, action| %>
+        <% menu.with_item { item(t(".column.#{key}"), action, table_command: key) } %>
+      <% end %>
+      <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
+      <% menu.with_item { tag.p(t(".column.align"), class: "px-2 pt-1 text-label text-meta", "aria-hidden": "true") } %>
+      <% ALIGNS.each do |align| %>
+        <% menu.with_item { align_item(align) } %>
+      <% end %>
+      <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
+      <% menu.with_item { item(t(".column.delete"), "deleteColumn", danger: true, table_command: "delete_column") } %>
+    <% end %>
+  <% end %>
+
+  <%= handle(t(".add_column"), "addColumn", "addColumn") %>
+  <%= handle(t(".add_row_here"), "addRow", "addRowHere") %>
+
+  <%# For touch, where nothing is hovered: always there. %>
+  <div class="mt-2">
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".add_row"), variant: :secondary, size: :small, data: { action: "admin--editor--table#addRow" }) %>
+  </div>
+<% end %>

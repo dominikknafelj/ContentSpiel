@@ -38,8 +38,9 @@ module ContentModel
     # not name; `block_icon_component_test.rb` draws every one. A type names
     # one or none; an outside type picks from the same list. The last four
     # are the Note block's kinds (note block plan, rulings 11 and 12), which
-    # its blocks' cards and tiles draw through `for_block:`.
-    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert].freeze
+    # its blocks' cards and tiles draw through `for_block:`; `table`
+    # is the Table block's.
+    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table].freeze
 
     # The columns a block type may name with `uses`: the block card draws and
     # the save services write these four and no other (`BlockCardComponent`'s
@@ -211,6 +212,21 @@ module ContentModel
       @read_only_actions = ids.freeze
     end
 
+    BODY_CONTENT = %i[rich table].freeze
+
+    # What the type's `body` holds: `:rich` (the default, any rich text but a
+    # table) or `:table` (exactly one table, the Table block). Tables are
+    # allowed in a body that says so and in no other (table block spec,
+    # decision 2), so `HasRichTextBody#body_errors_for` asks this.
+    def body_content(kind = nil)
+      return @body_content || :rich if kind.nil?
+
+      kind = kind.to_sym if kind.respond_to?(:to_sym)
+      refuse "body_content is one of #{BODY_CONTENT.join(", ")}: #{kind.inspect}" unless BODY_CONTENT.include?(kind)
+
+      @body_content = kind
+    end
+
     def sample(**values)
       return @sample if values.empty?
 
@@ -345,6 +361,10 @@ module ContentModel
       # A gem's callable would be asked on every card and tile of the editor,
       # where one that raised is a 500; the tile's rescue for a gem's
       # `summary` is not repeated for an icon until a gem asks for one.
+      # The table body is the CMS's own: its editor, its Markdown form and its
+      # public markup are the Table block's, so an outside type has no way to
+      # say what a table in its body would mean.
+      refuse "a block type from outside holds rich text only: `body_content :table` is the CMS's own" unless body_content == :rich
       if icon_follows_block?
         refuse "a block type from outside names one icon for all its blocks: `icon for_block:` is the CMS's own yet, " \
                "because a callable that raised would fail every editor page holding a block of the type"
