@@ -36,6 +36,11 @@ Rails.application.configure do
   # ActionMailer::Base.deliveries array.
   config.action_mailer.delivery_method = :test
 
+  # No network in tests: ApplicationMailer dials SMTP only on this machine
+  # (the stub, test/support/smtp_stub.rb), and any other server's mail goes to
+  # :test, where the settings' state is recorded as for a real send.
+  config.x.mail.smtp_loopback_only = true
+
   # Set host to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "example.com" }
 

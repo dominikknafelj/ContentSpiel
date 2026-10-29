@@ -6,3 +6,9 @@ default:
   title: { en: Test Site }
   default_locale: en
   setup_completed_at: <%= Time.current.to_fs(:db) %>
+  # A sender address and nothing else of mail: with the test environment's
+  # stand-in (`:test`, plan Ruling 1) the settings are complete and untested,
+  # so a mail a test builds has a From and is delivered into
+  # `ActionMailer::Base.deliveries`. A test that needs another state says so
+  # with `with_mail_state` (test/support/mail_state.rb).
+  mail_sender_address: no-reply@example.test

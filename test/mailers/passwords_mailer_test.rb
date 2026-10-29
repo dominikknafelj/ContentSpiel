@@ -135,7 +135,7 @@ class PasswordsMailerTest < ActionMailer::TestCase
       end
 
       assert_equal [ NOT_SENT ], log.lines.map(&:strip).grep(/ContentSpiel/)
-      assert_includes log, "ActionMailer::MailDeliveryJob", "the job's own lines are in the capture"
+      assert_includes log, "MailDeliveryJob", "the job's own lines are in the capture"
       assert_no_token_in log
     end
   end
@@ -150,7 +150,7 @@ class PasswordsMailerTest < ActionMailer::TestCase
         perform_enqueued_jobs { PasswordsMailer.reset(@user).deliver_later }
       end
 
-      assert_includes log, "ActionMailer::MailDeliveryJob"
+      assert_includes log, "MailDeliveryJob"
       assert_includes log, @user.email_address
       assert_match TOKEN, log
     end

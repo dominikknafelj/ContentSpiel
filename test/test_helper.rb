@@ -27,8 +27,12 @@ end
 # an address sets one with `with_site_address` (test/support/site_address_helper.rb).
 # THEME_PATH goes the same way: `ThemeFolder` ignores it under test anyway,
 # and a child process a test starts (test/lib/production_boot_test.rb) must
-# get the theme the test names and not the shell's.
-%w[PUBLIC_HOST SITEMAP_HOST THEME_PATH].each { |name| ENV.delete(name) }
+# get the theme the test names and not the shell's. The mail variables go too
+# (`MailSettings::ENV_NAMES`): a developer's MAIL_SMTP_SERVER would otherwise
+# point every test's mail at a real server.
+%w[PUBLIC_HOST SITEMAP_HOST THEME_PATH
+   MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
+   MAIL_SENDER_NAME MAIL_SENDER_ADDRESS].each { |name| ENV.delete(name) }
 
 require_relative "../config/environment"
 SiteAddress.reset!
@@ -45,6 +49,7 @@ require_relative "support/built_in_block_types"
 require_relative "support/contract_ledger"
 require_relative "support/site_address_helper"
 require_relative "support/mail_state"
+require_relative "support/smtp_stub"
 require_relative "support/log_capture"
 require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"

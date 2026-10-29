@@ -1,0 +1,11 @@
+en:
+  mail:
+    # A failed send's sentence, by its key (`MailFailure::KEYS`; spec, "A
+    # failure's sentence"). Shown in CS Studio: System status shows the
+    # sentence alone, the Mail card the sentence and the server's line.
+    failure:
+      login: "The server refused the login. Check username and password."
+      connect: "Could not reach %{server} on port %{port}. Check server and port."
+      security: "The server expects a different security setting. Try STARTTLS with port 587, or TLS with port 465."
+      sender: "The server refused the sender address."
+      other: "The mail could not be sent."

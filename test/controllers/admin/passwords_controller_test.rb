@@ -44,7 +44,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   test "create" do
     with_site_address(nil) do
       post admin_password_path, params: { email_address: @user.email_address }
-      assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user, { origin: "http://www.example.com" } ]
+      assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user, { origin: "http://www.example.com" } ]
       assert_redirected_to new_admin_password_path(sent: 1)
 
       follow_redirect!
@@ -59,7 +59,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     with_site_address("https://docs.example.org") do
       post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
 
-      assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user ]
+      assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user ]
       assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
     end
   end
@@ -72,7 +72,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
       with_site_address(nil) do
         post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
 
-        assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user ]
+        assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user ]
         assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
         assert_no_emails { perform_enqueued_jobs }
         assert_redirected_to new_admin_password_path(sent: 1)
@@ -586,6 +586,10 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  # A mail is queued with the fingerprint of the mail settings it was asked
+  # under (`ApplicationMailer.queue`), a param of the mailer.
+  def queued(mailer) = mailer.with(fingerprint: MailSettings.current.fingerprint)
     def assert_notice(text)
       assert_select "main", /#{text}/
     end

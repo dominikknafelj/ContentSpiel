@@ -31,8 +31,13 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
-  # Don't care if the mailer can't send.
-  config.action_mailer.raise_delivery_errors = false
+  # With no server set in Settings -> Mail (or MAIL_SMTP_SERVER), a mail is
+  # written to tmp/mails and counts as sent (plan Ruling 1), so "Send test
+  # mail" turns resets and invites on without a provider. With a server set,
+  # ApplicationMailer sends through it. A failure raises either way and is
+  # recorded (ApplicationMailer sets raise_delivery_errors on each message).
+  config.action_mailer.delivery_method = :file
+  config.action_mailer.raise_delivery_errors = true
 
   # Make template changes take effect immediately.
   config.action_mailer.perform_caching = false

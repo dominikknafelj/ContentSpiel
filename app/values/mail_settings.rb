@@ -170,8 +170,17 @@ class MailSettings
     address.format
   end
 
-  # For `delivery_method: :smtp, delivery_method_options:`. Port and server
-  # are the effective ones; the login only when there is one.
+  # For the SMTP delivery of a message (`ApplicationMailer`). Port and
+  # server are the effective ones; the login only when there is one.
+  #
+  # Each security says all three of the mail gem's switches, because the gem
+  # fills in what is not said: with neither STARTTLS switch given it uses
+  # STARTTLS "if offered" (`:auto`), so `none` would become STARTTLS whenever
+  # a server offered it (or plain whenever someone on the way struck the
+  # offer). `starttls` is `:always` (net-smtp refuses a server that does not
+  # offer it, before the login), `tls` is TLS from the first byte with both
+  # STARTTLS switches off (the gem refuses `tls` beside either), and `none`
+  # is plain SMTP with both off: never upgraded, as the host asked.
   def smtp_options
     options = { address: value(:server), port: value(:port) }
     if login_set?
@@ -179,10 +188,13 @@ class MailSettings
       options[:password] = value(:password)
       options[:authentication] = :plain
     end
-    case value(:security)
-    when "starttls" then options[:enable_starttls] = true
-    when "tls" then options[:tls] = true
-    end
+    options.merge!(
+      case value(:security)
+      when "starttls" then { enable_starttls: true, enable_starttls_auto: false }
+      when "tls" then { tls: true, enable_starttls: false, enable_starttls_auto: false }
+      else { enable_starttls: false, enable_starttls_auto: false }
+      end
+    )
     options.merge(open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT)
   end
 

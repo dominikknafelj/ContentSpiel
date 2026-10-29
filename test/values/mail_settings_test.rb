@@ -93,6 +93,20 @@ class MailSettingsTest < ActiveSupport::TestCase
     assert_equal before, SiteSetting.instance.reload.attributes.slice(*MailState::COLUMNS)
   end
 
+  # The login columns are encrypted: put back as their ciphertext through
+  # `update_columns`, they were encrypted a second time and read back as the
+  # ciphertext of the old login.
+  test "with_mail_state puts a login set before the block back as it was, readable" do
+    SiteSetting.instance.update_columns(mail_username: "before-user", mail_password: "before-pass") # version: none (a test's setting)
+    with_mail_state(:working, mail_username: "inside-user", mail_password: "inside-pass") do
+      assert_equal "inside-user", SiteSetting.instance.mail_username
+    end
+    with_mail_state(:not_set_up) { assert_nil SiteSetting.instance.mail_password }
+
+    site = SiteSetting.instance.reload
+    assert_equal [ "before-user", "before-pass" ], [ site.mail_username, site.mail_password ]
+  end
+
   test "a change of any delivery setting, from either source, makes a verified site untested; a change of the sender name does not" do
     with_mail_state(:working) do
       assert_equal :working, MailSettings.current(env: {}).state
@@ -144,7 +158,9 @@ class MailSettingsTest < ActiveSupport::TestCase
     assert_equal "none", relay.value(:security)
     options = relay.smtp_options
     assert_not options[:tls]
-    assert_not options[:enable_starttls]
+    # Said, not left out: left out, the mail gem uses STARTTLS when offered
+    # (Ruling T2a; the stub test sees no STARTTLS on the wire).
+    assert_equal [ false, false ], options.values_at(:enable_starttls, :enable_starttls_auto)
 
     assert_not settings(site, env: none.merge("MAIL_SMTP_USERNAME" => "user")).complete?
     assert_not settings(site, env: none.merge("MAIL_SMTP_PASSWORD" => "pass")).complete?
@@ -161,10 +177,10 @@ class MailSettingsTest < ActiveSupport::TestCase
     base = { mail_server: "smtp.test", mail_port: 587, mail_sender_address: "a@example.test" }
 
     starttls = settings(site_with(**base, mail_security: "starttls")).smtp_options
-    assert_equal({ address: "smtp.test", port: 587, enable_starttls: true, open_timeout: 5, read_timeout: 10 }, starttls)
+    assert_equal({ address: "smtp.test", port: 587, enable_starttls: true, enable_starttls_auto: false, open_timeout: 5, read_timeout: 10 }, starttls)
 
     tls = settings(site_with(**base, mail_port: 465, mail_security: "tls")).smtp_options
-    assert_equal({ address: "smtp.test", port: 465, tls: true, open_timeout: 5, read_timeout: 10 }, tls)
+    assert_equal({ address: "smtp.test", port: 465, tls: true, enable_starttls: false, enable_starttls_auto: false, open_timeout: 5, read_timeout: 10 }, tls)
 
     assert_equal true, settings(site_with(**base)).smtp_options[:enable_starttls], "STARTTLS is the default"
 

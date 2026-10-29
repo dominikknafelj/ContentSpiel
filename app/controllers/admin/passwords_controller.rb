@@ -31,8 +31,10 @@ module Admin
         # knows: a String, because a job delivers the mail, which
         # `PasswordsMailer` parses before it uses any of it. Anywhere else
         # without an address the mailer builds no mail and logs why; the
-        # answer below is the same words either way.
-        PasswordsMailer.reset(user, **reset_mail_origin).deliver_later
+        # answer below is the same words either way. Queued through
+        # `ApplicationMailer.queue`, so the job carries the fingerprint of
+        # the mail settings it was asked under.
+        ApplicationMailer.queue(PasswordsMailer, :reset, user, **reset_mail_origin)
       end
 
       # The "sent" state is a param on the request page, not a flash and not
