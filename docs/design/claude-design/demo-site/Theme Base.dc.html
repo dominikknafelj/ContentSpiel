@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+<style>*,*::before,*::after{box-sizing:border-box;} body{margin:0;background:#060607;} a{color:inherit;} a:hover{color:inherit;}</style>
+</helmet>
+<div style="{{ sheetStyle }}">
+<div style="width: 2160px; padding: 80px; box-sizing: border-box; font-family: var(--font-sans); display: flex; flex-direction: column; gap: 72px;">
+  <header style="display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 48px; align-items: end;">
+    <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-accent);">Content Spiel · Default theme · Sheet 3 / 3</span>
+    <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+      <h1 style="margin: 0; font-weight: 700; font-size: 68px; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase;">Theme base</h1>
+      <p style="margin: 0; font-size: 17px; line-height: var(--lh-body); color: var(--color-text-muted); max-width: 820px; text-wrap: pretty;">The named tokens every block reads, and the base styles of plain HTML elements. A site re-colours by changing the colour roles; blocks never contain raw colours or sizes. Values follow Photo·spiel; the light scheme and the lifted subtle-text colour are additions for this theme.</p>
+    </div>
+  </header>
+
+  <div style="display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 48px; border-top: 1px solid var(--color-line-strong); padding-top: 48px;">
+    <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+      <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">01</span>
+      <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Tokens</h2>
+      <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Colour roles change per scheme. Everything else is shared, with a smaller phone value where noted.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0 72px; align-items: start;">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="6">
+        <div style="display: flex; flex-direction: column; margin-bottom: 56px;">
+          <div style="display: grid; grid-template-columns: 210px minmax(0,1fr) 150px 150px; gap: var(--space-3); padding: 0 0 var(--space-2); border-bottom: 1px solid var(--color-line-strong); font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">
+            <span style="color: var(--color-text); font-weight: 500;">{{ g.title }}</span><span>Use</span><span>{{ g.colA }}</span><span>{{ g.colB }}</span>
+          </div>
+          <sc-for list="{{ g.rows }}" as="t" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 210px minmax(0,1fr) 150px 150px; gap: var(--space-3); align-items: center; padding: 9px 0; border-bottom: 1px solid var(--color-line);">
+              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--color-text);">{{ t.name }}</span>
+              <span style="font-size: var(--fs-small); line-height: 1.4; color: var(--color-text-muted);">{{ t.use }}</span>
+              <span style="display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--fs-label); color: var(--color-text-muted); min-width: 0;">
+                <sc-if value="{{ t.swatch }}" hint-placeholder-val="{{ false }}"><span style="width: 18px; height: 18px; flex: none; background: {{ t.a }}; border: 1px solid rgba(128,128,128,0.4);"></span></sc-if>
+                <span style="overflow-wrap: anywhere;">{{ t.a }}</span>
+              </span>
+              <span style="display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--fs-label); color: var(--color-text-muted); min-width: 0;">
+                <sc-if value="{{ t.swatch }}" hint-placeholder-val="{{ false }}"><span style="width: 18px; height: 18px; flex: none; background: {{ t.b }}; border: 1px solid rgba(128,128,128,0.4);"></span></sc-if>
+                <span style="overflow-wrap: anywhere;">{{ t.b }}</span>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 48px; border-top: 1px solid var(--color-line-strong); padding-top: 48px;">
+    <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+      <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">02</span>
+      <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Section backgrounds</h2>
+      <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">None and tinted keep the scheme. Strong swaps in the opposite scheme, so every block inside stays legible with no extra tokens.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 72px;">
+      <sc-for list="{{ schemes }}" as="s" hint-placeholder-count="2">
+        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">{{ s.label }} scheme</span>
+          <div style="{{ s.style }}">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr));">
+              <div style="padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid var(--color-line);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-accent);">none</span>
+                <span style="font-weight: 600; font-size: var(--fs-h3); text-transform: uppercase;">Heading</span>
+                <span style="font-size: var(--fs-small); color: var(--color-text-muted);">Muted text and a <a href="#" style="color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px;">link</a></span>
+                <div style="margin-top: var(--space-2);"><x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" size="sm" hint-size="80px,30px">Button</x-import></div>
+              </div>
+              <div style="background: var(--color-surface); padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-accent);">tinted</span>
+                <span style="font-weight: 600; font-size: var(--fs-h3); text-transform: uppercase;">Heading</span>
+                <span style="font-size: var(--fs-small); color: var(--color-text-muted);">Muted text and a <a href="#" style="color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px;">link</a></span>
+                <div style="margin-top: var(--space-2);"><x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" size="sm" hint-size="80px,30px">Button</x-import></div>
+              </div>
+              <div style="{{ s.strong }}">
+                <div style="padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2);">
+                  <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-accent);">strong</span>
+                  <span style="font-weight: 600; font-size: var(--fs-h3); text-transform: uppercase;">Heading</span>
+                  <span style="font-size: var(--fs-small); color: var(--color-text-muted);">Muted text and a <a href="#" style="color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px;">link</a></span>
+                  <div style="margin-top: var(--space-2);"><x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" size="sm" hint-size="80px,30px">Button</x-import></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 48px; border-top: 1px solid var(--color-line-strong); padding-top: 48px;">
+    <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+      <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">03</span>
+      <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Base styles</h2>
+      <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Plain elements as they render inside rich text and anywhere else on a page. Form controls are styled now so the contact form can follow later.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 72px;">
+      <sc-for list="{{ schemes }}" as="s" hint-placeholder-count="2">
+        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">{{ s.label }} scheme</span>
+          <div style="{{ s.style }}">
+            <div style="padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: var(--space-6); border: 1px solid var(--color-line);">
+
+              <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Headings</span>
+                <h1 style="margin: 0; font-weight: 700; font-size: 56px; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase;">H1 · Display</h1>
+                <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); line-height: var(--lh-heading); letter-spacing: -0.01em; text-transform: uppercase;">H2 · Section heading</h2>
+                <h3 style="margin: 0; font-weight: 600; font-size: var(--fs-h3); line-height: var(--lh-heading); letter-spacing: 0.01em; text-transform: uppercase;">H3 · Card and sub-heading</h3>
+                <h4 style="margin: 0; font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-accent);">H4 · Kicker and index line</h4>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: var(--space-3); max-width: var(--width-text);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Text and links</span>
+                <p style="margin: 0; font-size: var(--fs-lead); line-height: 1.45; color: var(--color-text);">Lead paragraph, 19px. Used for the first paragraph of a page when the editor marks it.</p>
+                <p style="margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--color-text-muted);">Body text is 16px on a 1.5 line height, in the muted text colour so headings carry the weight. <strong style="color: var(--color-text); font-weight: 600;">Bold uses the full text colour</strong>, <em>italic stays muted</em>, and <a href="#" style="color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;" style-hover="color: var(--color-text);">links are accent with an underline</a>.</p>
+                <p style="margin: 0; font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-subtle);">Small text, 13px, for captions and notes.</p>
+                <div style="display: flex; flex-wrap: wrap; gap: var(--space-5); font-size: var(--fs-body); padding-top: var(--space-2);">
+                  <a href="#" style="color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;">Default</a>
+                  <a href="#" style="color: var(--color-text); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;">Hover</a>
+                  <a href="#" style="color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; outline: 1px solid var(--color-accent); outline-offset: 3px;">Focus</a>
+                  <a href="#" style="color: var(--color-accent); text-decoration: none; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; align-self: center;">Mono link →</a>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Buttons</span>
+                <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;">
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" hint-size="110px,40px">Primary</x-import>
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" hint-size="110px,40px">Secondary</x-import>
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="ghost" hint-size="80px,40px">Ghost</x-import>
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" disabled="{{ true }}" hint-size="110px,40px">Disabled</x-import>
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" size="sm" hint-size="80px,30px">Small</x-import>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-5);">
+                <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                  <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Unordered list</span>
+                  <ul style="margin: 0; padding-left: 1.1em; list-style: square; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--color-text-muted);">
+                    <li>First item in a list</li>
+                    <li>Second item, which runs a little longer and wraps onto a second line</li>
+                    <li>Third item</li>
+                  </ul>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                  <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Ordered list</span>
+                  <ol style="margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--color-text-muted);">
+                    <li>Send a short brief</li>
+                    <li>First meeting, no charge</li>
+                    <li>Written proposal within a week</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Quote (inside rich text)</span>
+                <blockquote style="margin: 0; padding-left: var(--space-4); border-left: 1px solid var(--color-line-strong); display: flex; flex-direction: column; gap: var(--space-2);">
+                  <p style="margin: 0; font-weight: 300; font-size: 24px; line-height: 1.3; color: var(--color-text); max-width: 30ch;">A quoted passage sits on a hairline, set light and large.</p>
+                  <cite style="font-style: normal; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">— Source, 2026</cite>
+                </blockquote>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Code</span>
+                <p style="margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--color-text-muted);">Inline code such as <code style="font-family: var(--font-mono); font-size: 0.86em; background: var(--color-surface); color: var(--color-text); padding: 2px 6px; border: 1px solid var(--color-line);">--color-accent</code> uses the mono face on the surface colour.</p>
+                <pre style="margin: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; background: var(--color-surface); color: var(--color-text); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-line); overflow-x: auto;">:root {
+  --color-accent: oklch(0.74 0.10 236);
+  --color-primary: oklch(0.76 0.14 62);
+}</pre>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Table</span>
+                <table style="width: 100%; border-collapse: collapse; font-size: var(--fs-small);">
+                  <thead>
+                    <tr>
+                      <th style="text-align: left; font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line-strong);">Phase</th>
+                      <th style="text-align: left; font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line-strong);">Duration</th>
+                      <th style="text-align: right; font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line-strong);">Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td style="padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text);">Research</td><td style="padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text-muted);">3 weeks</td><td style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text-muted); text-align: right; font-family: var(--font-mono);">15%</td></tr>
+                    <tr><td style="padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text);">Design</td><td style="padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text-muted);">8 weeks</td><td style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text-muted); text-align: right; font-family: var(--font-mono);">55%</td></tr>
+                    <tr><td style="padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text);">Production</td><td style="padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text-muted);">5 weeks</td><td style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text-muted); text-align: right; font-family: var(--font-mono);">30%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-2);">Form controls</span>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-4);">
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Field" label="Name" hint-size="100%,72px">
+                    <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Input" placeholder="Your name" hint-size="100%,46px"></x-import>
+                  </x-import>
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Field" label="Subject" hint-size="100%,72px">
+                    <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Select" hint-size="100%,46px">
+                      <option>New project</option>
+                      <option>Existing project</option>
+                      <option>Press</option>
+                    </x-import>
+                  </x-import>
+                </div>
+                <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Field" label="Message" hint="Plain text, up to 2,000 characters." hint-size="100%,150px">
+                  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Textarea" rows="3" placeholder="A few lines about the project" hint-size="100%,96px"></x-import>
+                </x-import>
+                <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Checkbox" checked="{{ true }}" label="I have read the privacy notice" hint-size="260px,24px"></x-import>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  static BASE = {
+    '--font-sans': '"Archivo", system-ui, -apple-system, sans-serif', '--font-mono': '"IBM Plex Mono", ui-monospace, monospace',
+    '--fs-display': '68px', '--fs-h2': '30px', '--fs-h3': '18px', '--fs-quote': '38px', '--fs-lead': '19px', '--fs-body': '16px', '--fs-small': '13px', '--fs-label': '11px',
+    '--lh-body': '1.5', '--lh-heading': '1.15', '--lh-tight': '1.02',
+    '--track': '0.06em', '--track-wide': '0.18em', '--track-mono': '0.14em',
+    '--space-1': '4px', '--space-2': '8px', '--space-3': '14px', '--space-4': '22px', '--space-5': '34px', '--space-6': '54px', '--space-7': '80px',
+    '--radius': '0px', '--radius-control': '2px', '--radius-pill': '999px', '--radius-admin': '2px',
+    '--width-page': '1200px', '--width-text': '680px', '--pad-page': '34px', '--gap-col': '34px', '--space-section': '80px',
+    '--ease': 'cubic-bezier(0.22, 1, 0.36, 1)',
+  };
+  static DARK = { bg: '#060607', surface: '#101013', text: '#f5f5f6', muted: '#8c8d92', subtle: '#76777c', line: 'rgba(255,255,255,0.10)', lineStrong: 'rgba(255,255,255,0.22)', accent: 'oklch(0.74 0.10 236)', primary: 'oklch(0.76 0.14 62)', onPrimary: '#1a1206', field: '#0d0d10' };
+  static LIGHT = { bg: '#f5f5f6', surface: '#e8e8ea', text: '#0b0b0d', muted: '#55565b', subtle: '#6b6c71', line: 'rgba(6,6,7,0.12)', lineStrong: 'rgba(6,6,7,0.28)', accent: 'oklch(0.50 0.11 236)', primary: 'oklch(0.76 0.14 62)', onPrimary: '#1a1206', field: '#ffffff' };
+  static scheme(c) {
+    return { '--color-bg': c.bg, '--color-surface': c.surface, '--color-text': c.text, '--color-text-muted': c.muted, '--color-text-subtle': c.subtle, '--color-line': c.line, '--color-line-strong': c.lineStrong, '--color-accent': c.accent, '--color-primary': c.primary, '--color-on-primary': c.onPrimary, '--color-field': c.field,
+      '--bg': c.bg, '--fg': c.text, '--fg-dim': c.muted, '--fg-faint': c.subtle, '--line': c.line, '--line-strong': c.lineStrong, '--accent': c.accent, '--accent-amber': c.primary, '--on-accent': c.onPrimary, '--panel': c.field, '--panel-2': c.surface,
+      background: c.bg, color: c.text };
+  }
+  renderVals() {
+    const C = Component, L = C.LIGHT, D = C.DARK;
+    const col = (name, key, use) => ({ name: '--color-' + name, use, a: L[key], b: D[key], swatch: true });
+    const row = (name, use, a, b) => ({ name: '--' + name, use, a, b: b ?? a, swatch: false });
+    return {
+      sheetStyle: { ...C.BASE, ...C.scheme(D), minHeight: '100vh' },
+      schemes: [
+        { label: 'Light', style: C.scheme(L), strong: C.scheme(D) },
+        { label: 'Dark', style: C.scheme(D), strong: C.scheme(L) },
+      ],
+      groups: [
+        { title: 'Colour roles', colA: 'Light', colB: 'Dark', rows: [
+          col('bg', 'bg', 'Page background, section “none”'),
+          col('surface', 'surface', 'Section “tinted”, code, row hover'),
+          col('text', 'text', 'Headings, strong text'),
+          col('text-muted', 'muted', 'Body text, nav idle'),
+          col('text-subtle', 'subtle', 'Meta, captions, labels (≥ 4.5:1)'),
+          col('line', 'line', 'Soft dividers'),
+          col('line-strong', 'lineStrong', 'Structural rules, button outline'),
+          col('accent', 'accent', 'Links, kickers, focus ring'),
+          col('primary', 'primary', 'Primary button fill'),
+          col('on-primary', 'onPrimary', 'Text on primary'),
+          col('field', 'field', 'Form control background'),
+        ] },
+        { title: 'Section backgrounds', colA: 'Light page', colB: 'Dark page', rows: [
+          row('section-none', 'Transparent on the page', 'var(--color-bg)'),
+          row('section-tinted', 'Same scheme, raised', 'var(--color-surface)'),
+          row('section-strong', 'Opposite scheme applied', 'dark scheme', 'light scheme'),
+        ] },
+        { title: 'Type', colA: 'Desktop', colB: 'Phone', rows: [
+          row('font-sans', 'Everything visual', 'Archivo'),
+          row('font-mono', 'Meta, labels, code', 'IBM Plex Mono'),
+          row('fs-display', 'H1, hero, CTA · 700 caps', '68px', '34px'),
+          row('fs-h2', 'H2 · 700 caps', '30px', '24px'),
+          row('fs-h3', 'H3, card heading · 600 caps', '18px'),
+          row('fs-quote', 'Quote block · 300', '38px', '23px'),
+          row('fs-lead', 'Lead paragraph', '19px'),
+          row('fs-body', 'Body', '16px'),
+          row('fs-small', 'Captions, notes', '13px'),
+          row('fs-label', 'Mono labels, H4', '11px'),
+          row('lh-body / heading / tight', 'Line heights', '1.5 / 1.15 / 1.02'),
+          row('track / wide / mono', 'Letter spacing', '.06 / .18 / .14em'),
+        ] },
+        { title: 'Spacing', colA: 'Value', colB: '', rows: [
+          row('space-1', 'Hairline offsets', '4px', ''), row('space-2', 'Label to content', '8px', ''), row('space-3', 'Tight stack', '14px', ''),
+          row('space-4', 'Default stack', '22px', ''), row('space-5', 'Block gap in a column', '34px', ''), row('space-6', 'Large gap', '54px', ''), row('space-7', 'CTA padding', '80px', ''),
+        ] },
+        { title: 'Widths & layout', colA: 'Desktop', colB: 'Phone', rows: [
+          row('width-page', 'Section “content” width', '1200px', '100%'),
+          row('width-text', 'Reading measure', '680px', '100%'),
+          row('pad-page', 'Page inset', '34px', '20px'),
+          row('gap-col', 'Column gap in sections', '34px', '— (stacked)'),
+          row('space-section', 'Section padding, top/bottom', '80px', '54px'),
+        ] },
+        { title: 'Radii & motion', colA: 'Value', colB: '', rows: [
+          row('radius', 'Images, cards, sections', '0', ''),
+          row('radius-control', 'Buttons, inputs', '2px', ''),
+          row('radius-pill', 'Tags, toggles', '999px', ''),
+          row('ease', 'All transitions', 'cubic-bezier(.22,1,.36,1)', ''),
+        ] },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

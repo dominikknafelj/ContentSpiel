@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<style>body{margin:0;background:#0f1012;font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,button{font-family:inherit}</style>
+</helmet>
+<div data-theme="dark" style="display:grid;grid-template-columns:232px minmax(0,1fr);height:100vh;overflow:hidden;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="graph" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 24px;display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0;box-sizing:border-box;height:100vh">
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <h1 style="margin:0;font-size:26px;font-weight:600">Mind graph</h1>
+    <p style="margin:0;font-size:14px;color:var(--cs-dim)">How your posts relate to each other. Scroll or pinch to zoom, drag to move.</p>
+  </div>
+
+  <div data-screen-label="Graph workspace" style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px;border:1px solid var(--cs-line);border-radius:2px;background:var(--cs-surface);overflow:hidden">
+    <section style="display:flex;flex-direction:column;min-width:0;min-height:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--cs-line)">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--cs-dim)">
+          <span style="display:flex;gap:6px;align-items:center"><span style="width:8px;height:8px;border-radius:999px;background:var(--cs-cat-1)"></span>Blog</span>
+          <span style="display:flex;gap:6px;align-items:center"><span style="width:8px;height:8px;border-radius:999px;background:var(--cs-cat-3)"></span>Resume entry</span>
+          <span style="display:flex;gap:6px;align-items:center"><span style="width:8px;height:8px;border-radius:999px;background:var(--cs-cat-2)"></span>Now update</span>
+          <span style="display:flex;gap:6px;align-items:center"><span style="width:7px;height:7px;border:1.5px solid var(--cs-meta)"></span>Tag</span>
+          <span style="display:flex;gap:6px;align-items:center"><span style="width:18px;height:1.5px;background:var(--cs-ink)"></span>Related post</span>
+          <span style="display:flex;gap:6px;align-items:center"><span style="width:18px;border-top:1px dashed var(--cs-meta)"></span>Shares a tag</span>
+          <span style="display:flex;gap:6px;align-items:center"><span style="position:relative;width:8px;height:8px;border-radius:999px;background:var(--cs-meta)"><span style="position:absolute;top:-3px;right:-3px;width:4px;height:4px;border-radius:999px;background:var(--cs-ink);border:1.5px solid var(--cs-surface)"></span></span>Pinned</span>
+        </div>
+        <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden">
+          <button style="font-size:12px;padding:5px 10px;border:0;border-right:1px solid var(--cs-line);background:var(--cs-ink);color:var(--cs-paper)">All</button>
+          <button style="font-size:12px;padding:5px 10px;border:0;border-right:1px solid var(--cs-line);background:transparent;color:var(--cs-ink)">Related</button>
+          <button style="font-size:12px;padding:5px 10px;border:0;background:transparent;color:var(--cs-ink)">Tags</button>
+        </div>
+      </div>
+
+      <div style="position:relative;flex:1;min-height:420px;overflow:hidden">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="12">
+            <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="{{ e.stroke }}" stroke-width="{{ e.w }}" stroke-dasharray="{{ e.dash }}" opacity="{{ e.op }}" vector-effect="non-scaling-stroke"></line>
+          </sc-for>
+        </svg>
+        <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="12">
+          <div style="position:absolute;left:{{ n.left }};top:{{ n.top }};opacity:{{ n.op }};width:0;height:0">
+            <div style="position:absolute;top:0;{{ n.anchor }}:{{ n.off }};transform:translateY(-50%);display:flex;flex-direction:{{ n.dir }};align-items:center;gap:6px;white-space:nowrap;cursor:pointer;padding:3px;border-radius:2px;background:{{ n.plate }}">
+              <span style="position:relative;flex:none;width:{{ n.d }};height:{{ n.d }};box-sizing:border-box;border-radius:{{ n.rad }};background:{{ n.fill }};border:{{ n.border }};box-shadow:{{ n.ring }}">
+                <sc-if value="{{ n.pinned }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-4px;right:-4px;width:6px;height:6px;border-radius:999px;background:var(--cs-ink);border:2px solid var(--cs-surface)"></span></sc-if>
+              </span>
+              <span style="font-size:{{ n.fs }};font-family:{{ n.ff }};font-weight:{{ n.fw }};color:{{ n.tc }}">{{ n.label }}</span>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="position:absolute;left:calc(40% + 22px);top:52%;transform:translateY(-50%);width:264px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;box-shadow:var(--cs-shadow-menu);padding:14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:8px;height:8px;border-radius:999px;background:var(--cs-cat-1)"></span>
+            <span style="font-size:12px;color:var(--cs-dim)">Blog</span>
+            <span style="font-size:11px;padding:1px 6px;border-radius:999px;background:var(--cs-ok-tint);color:var(--cs-ok-ink)">Live</span>
+            <button aria-label="Close" style="margin-left:auto;border:0;background:transparent;color:var(--cs-meta);font-size:16px;line-height:1;cursor:pointer;padding:2px 4px">×</button>
+          </div>
+          <span style="font-size:15px;font-weight:600;line-height:1.3;text-wrap:pretty">Translating Everything With Mobility</span>
+          <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:var(--cs-meta)">3 RELATED · 2 TAGS</span>
+          <div style="display:flex;gap:6px;padding-top:4px">
+            <a href="Studio%20Post%20Editor.dc.html" style="font-size:13px;font-weight:500;padding:6px 11px;border-radius:2px;background:var(--cs-ink);color:var(--cs-paper)">Open post</a>
+            <button style="font-size:13px;padding:6px 11px;border-radius:2px;border:1px solid var(--cs-line-strong);background:transparent;color:var(--cs-ink);cursor:pointer">Focus</button>
+            <button style="font-size:13px;padding:6px 11px;border-radius:2px;border:1px solid var(--cs-line-strong);background:transparent;color:var(--cs-ink);cursor:pointer">Pin</button>
+          </div>
+        </div>
+
+        <div style="position:absolute;right:12px;bottom:12px;display:flex;gap:8px;align-items:center">
+          <button style="font-size:12px;padding:5px 10px;border-radius:2px;border:1px solid var(--cs-line-strong);background:var(--cs-surface);color:var(--cs-ink);cursor:pointer">Release 1 pinned</button>
+          <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface)">
+            <button aria-label="Zoom out" style="font-size:13px;width:30px;padding:5px 0;border:0;border-right:1px solid var(--cs-line);background:transparent;color:var(--cs-ink)">−</button>
+            <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);padding:0 8px;display:flex;align-items:center;border-right:1px solid var(--cs-line)">100%</span>
+            <button aria-label="Zoom in" style="font-size:13px;width:30px;padding:5px 0;border:0;border-right:1px solid var(--cs-line);background:transparent;color:var(--cs-ink)">+</button>
+            <button style="font-size:12px;padding:5px 10px;border:0;background:transparent;color:var(--cs-ink)">Fit</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside style="border-left:1px solid var(--cs-line);display:flex;flex-direction:column;min-height:0">
+      <div style="padding:10px 12px;border-bottom:1px solid var(--cs-line)">
+        <input placeholder="Find a post or tag…" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid var(--cs-line-strong);border-radius:2px;background:var(--cs-paper);color:var(--cs-ink)">
+      </div>
+      <div style="flex:1;overflow:auto;padding:6px 0 12px">
+        <div style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 12px 6px">POSTS · {{ postCount }}</div>
+        <sc-for list="{{ postRows }}" as="r" hint-placeholder-count="8">
+          <div style="display:flex;gap:8px;align-items:center;padding:6px 12px;font-size:13px;cursor:pointer;background:{{ r.bg }};color:{{ r.tc }}">
+            <span style="flex:none;width:8px;height:8px;border-radius:999px;background:{{ r.c }}"></span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+            <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ r.deg }}</span>
+          </div>
+        </sc-for>
+        <div style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:16px 12px 6px">TAGS · {{ tagCount }}</div>
+        <sc-for list="{{ tagRows }}" as="r" hint-placeholder-count="5">
+          <div style="display:flex;gap:8px;align-items:center;padding:6px 12px;font-size:12px;font-family:var(--cs-mono);cursor:pointer;background:{{ r.bg }};color:{{ r.tc }}">
+            <span style="flex:none;width:7px;height:7px;border:1.5px solid var(--cs-meta)"></span>
+            <span style="flex:1">{{ r.label }}</span>
+            <span style="font-size:11px;color:var(--cs-meta)">{{ r.deg }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </aside>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const C = { b: 'var(--cs-cat-1)', n: 'var(--cs-cat-2)', r: 'var(--cs-cat-3)' };
+    const N = {
+      mob: [40, 52, 'b', 'Translating Everything With Mobility'], build: [60, 32, 'b', 'Building ContentSpiel'],
+      fall: [30, 70, 'b', 'Locale fallbacks in Rails'], ship: [50, 78, 'n', 'Now: shipping translations'],
+      turbo: [82, 42, 'b', 'Turbo frames without tears'], stim: [72, 64, 'b', 'A small Stimulus controller'],
+      deploy: [88, 74, 'b', 'Deploying with Kamal'], res1: [14, 24, 'r', 'Platform engineer, 2023–'],
+      res2: [10, 60, 'r', 'Rails consultant, 2019–2023'], now2: [66, 88, 'n', 'Now: reading on type systems'],
+      blog: [24, 88, 'b', 'Why I left WordPress'],
+      ruby: [47, 20, 't', 'ruby'], hotwire: [76, 18, 't', 'hotwire'], i18n: [22, 44, 't', 'i18n'],
+      ops: [92, 56, 't', 'ops'], career: [8, 40, 't', 'career'], writing: [42, 92, 't', 'writing']
+    };
+    const E = [['mob','build','r'],['mob','fall','r'],['mob','ship','r'],['mob','ruby','t'],['mob','i18n','t'],['build','ruby','t'],['build','hotwire','t'],['fall','i18n','t'],['fall','ruby','t'],['ship','i18n','t'],['turbo','hotwire','t'],['stim','hotwire','t'],['turbo','build','r'],['deploy','ops','t'],['deploy','build','r'],['res1','career','t'],['res2','career','t'],['now2','ship','r'],['blog','writing','t'],['now2','writing','t'],['build','writing','t']];
+    const sel = 'mob', hov = 'fall', pin = 'build';
+    const nb = new Set([sel]); const deg = {};
+    E.forEach(([a, b]) => { deg[a] = (deg[a] || 0) + 1; deg[b] = (deg[b] || 0) + 1; if (a === sel) nb.add(b); if (b === sel) nb.add(a); });
+    const edges = E.map(([a, b, k]) => { const on = a === sel || b === sel;
+      return { x1: N[a][0], y1: N[a][1], x2: N[b][0], y2: N[b][1], dash: k === 't' ? '3 3' : '',
+        stroke: on ? (k === 'r' ? 'var(--cs-ink)' : 'var(--cs-dim)') : 'var(--cs-line-strong)', w: on && k === 'r' ? 1.5 : 1, op: on ? 1 : 0.5 }; });
+    const nodes = Object.entries(N).map(([id, [x, y, t, label]]) => {
+      const tag = t === 't', r = tag ? 5 : 5 + Math.min(deg[id] || 0, 6) * 1.2, left = x > 75;
+      const isSel = id === sel, isHov = id === hov;
+      return { left: x + '%', top: y + '%', op: nb.has(id) ? 1 : 0.28, d: 2 * r + 'px', rad: tag ? '0' : '999px',
+        anchor: left ? 'right' : 'left', off: -(r + 3) + 'px', dir: left ? 'row-reverse' : 'row',
+        fill: tag ? 'var(--cs-surface)' : C[t], border: tag ? '1.5px solid var(--cs-meta)' : '0',
+        ring: isSel ? '0 0 0 2px var(--cs-surface), 0 0 0 4px var(--cs-accent)' : isHov ? '0 0 0 2px var(--cs-surface), 0 0 0 3px var(--cs-ink)' : 'none',
+        plate: isHov ? 'var(--cs-sunken)' : 'transparent', pinned: id === pin,
+        label: tag ? label + ' (' + deg[id] + ')' : label, fs: tag ? '11px' : '12px', ff: tag ? 'var(--cs-mono)' : 'var(--cs-font)',
+        fw: isSel ? 600 : 400, tc: isSel || isHov ? 'var(--cs-ink)' : tag ? 'var(--cs-meta)' : 'var(--cs-dim)' };
+    });
+    const row = id => ({ label: N[id][3], deg: deg[id] || 0, c: C[N[id][2]],
+      bg: id === sel ? 'var(--cs-accent-tint)' : id === hov ? 'var(--cs-sunken)' : 'transparent', tc: id === sel ? 'var(--cs-ink)' : id === hov ? 'var(--cs-ink)' : 'var(--cs-dim)' });
+    const ids = Object.keys(N), posts = ids.filter(i => N[i][2] !== 't').sort((a, b) => (deg[b] || 0) - (deg[a] || 0)), tags = ids.filter(i => N[i][2] === 't');
+    return { edges, nodes, postRows: posts.map(row), tagRows: tags.map(row), postCount: posts.length, tagCount: tags.length };
+  }
+}
+</script>
+</body>
+</html>

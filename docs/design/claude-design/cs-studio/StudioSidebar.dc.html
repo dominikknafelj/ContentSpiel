@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+</helmet>
+<aside style="width:232px;box-sizing:border-box;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;gap:14px;padding:16px 12px;background:var(--cs-chrome);border-right:1px solid var(--cs-line);color:var(--cs-ink);font-family:var(--cs-font)">
+  <div style="display:flex;flex-direction:column;gap:3px;padding:2px 8px 12px;border-bottom:1px solid var(--cs-line)">
+    <span style="font-weight:700;font-size:12px;letter-spacing:0.18em">CONTENT·SPIEL</span>
+    <span style="font-size:13px;color:var(--cs-dim)">Test Site</span>
+  </div>
+  <button style="display:flex;align-items:center;gap:8px;font:inherit;font-size:13px;color:var(--cs-meta);background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 8px 6px 10px;cursor:pointer;text-align:left">
+    <span style="flex:1">Jump to…</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-dim);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px">⌘K</span>
+  </button>
+  <nav style="display:flex;flex-direction:column;gap:1px;overflow-y:auto;flex:1;min-height:0">
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:12px 8px 5px">{{ g.label }}</span>
+      <sc-for list="{{ g.items }}" as="n" hint-placeholder-count="5">
+        <a href="{{ n.href }}" style="display:flex;justify-content:space-between;align-items:center;font-size:14px;text-decoration:none;font-weight:{{ n.weight }};color:{{ n.color }};background:{{ n.bg }};border-radius:2px;padding:6px 8px" style-hover="background:var(--cs-sunken);color:var(--cs-ink)">
+          <span>{{ n.label }}</span><span style="font-family:var(--cs-mono);font-size:10px;color:{{ n.badgeColor }}">{{ n.badge }}</span>
+        </a>
+      </sc-for>
+    </sc-for>
+  </nav>
+  <div style="display:flex;flex-direction:column;gap:10px;padding-top:12px;border-top:1px solid var(--cs-line)">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden">
+      <sc-for list="{{ themes }}" as="t" hint-placeholder-count="3">
+        <button onClick="{{ t.pick }}" style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.1em;padding:6px 0;border:0;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:0 4px">
+      <span style="width:26px;height:26px;flex-shrink:0;border-radius:999px;background:var(--cs-ink);color:var(--cs-paper);font-size:10px;font-weight:600;display:grid;place-items:center">MK</span>
+      <span style="display:flex;flex-direction:column;min-width:0;flex:1"><span style="font-size:13px;font-weight:500">Mara König</span><span style="font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">one@example.com · Owner</span></span>
+    </div>
+    <div style="display:flex;gap:14px;padding:0 4px;font-size:12px"><a href="Studio%20Change%20Password.dc.html" style="color:var(--cs-dim);text-decoration:none">Change password</a><a href="Studio%20Sign%20In.dc.html" style="color:var(--cs-dim);text-decoration:none">Sign out</a></div>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:232,&quot;height&quot;:800},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dashboard&quot;,&quot;pages&quot;,&quot;posts&quot;,&quot;media&quot;,&quot;translations&quot;,&quot;tags&quot;,&quot;trash&quot;,&quot;users&quot;,&quot;groups&quot;,&quot;settings&quot;,&quot;ai&quot;,&quot;status&quot;,&quot;audit&quot;],&quot;default&quot;:&quot;dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { theme: 'auto' };
+  componentDidMount() {
+    let t = 'auto'; try { t = localStorage.getItem('cs-theme') || 'auto'; } catch (e) {}
+    this.apply(t);
+  }
+  apply(t) {
+    try { localStorage.setItem('cs-theme', t); } catch (e) {}
+    const eff = t === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+    document.documentElement.dataset.theme = eff;
+    this.setState({ theme: t });
+  }
+  renderVals() {
+    const a = this.props.active || 'dashboard';
+    const f = s => 'Studio%20' + s.replace(/ /g, '%20') + '.dc.html';
+    const G = [
+      ['CONTENT', [['dashboard', 'Dashboard', f('Dashboard')], ['pages', 'Pages', f('Pages')], ['posts', 'Posts', f('Posts')], ['media', 'Media', f('Media')], ['translations', 'Translations', f('Translations')], ['tags', 'Tags', f('Tags')], ['graph', 'Mind graph', f('Mind Graph')], ['trash', 'Trash', f('Trash'), '3']]],
+      ['PEOPLE', [['users', 'Users', f('Users')], ['groups', 'Groups', f('Groups')]]],
+      ['SYSTEM', [['settings', 'Settings', f('Settings')], ['ai', 'AI assistant', f('AI Assistant')], ['status', 'System status', f('System Status')], ['audit', 'Audit log', f('Audit Log')]]]
+    ];
+    return {
+      groups: G.map(([label, items]) => ({ label, items: items.map(([id, l, href, badge, warn]) => {
+        const on = id === a;
+        return { label: l, href, badge: badge || '', badgeColor: warn ? 'var(--cs-warn-ink)' : 'var(--cs-meta)',
+          bg: on ? 'var(--cs-sunken)' : 'transparent', color: on ? 'var(--cs-ink)' : 'var(--cs-dim)', weight: on ? 500 : 400 };
+      }) })),
+      themes: [['light', 'LIGHT'], ['dark', 'DARK'], ['auto', 'AUTO']].map(([id, label]) => ({ label,
+        pick: () => this.apply(id),
+        bg: this.state.theme === id ? 'var(--cs-ink)' : 'transparent', fg: this.state.theme === id ? 'var(--cs-paper)' : 'var(--cs-dim)' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

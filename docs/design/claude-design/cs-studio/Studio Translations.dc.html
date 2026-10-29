@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="translations" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:18px;max-width:1200px;width:100%;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <h1 style="margin:0;font-size:26px;font-weight:600">Translations</h1>
+    <p style="margin:0;font-size:14px;color:var(--cs-dim)">Everything that isn’t translated yet, or changed in English after it was. Outdated items are listed first because they’re already visible on the site.</p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+    <sc-for list="{{ summary }}" as="s" hint-placeholder-count="2">
+      <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+        <span style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:15px;font-weight:600">{{ s.name }}</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ s.pct }} DONE</span></span>
+        <span style="display:block;height:4px;background:var(--cs-sunken);border-radius:999px;overflow:hidden"><span style="display:block;height:4px;width:{{ s.pct }};background:var(--cs-ok)"></span></span>
+        <span style="font-size:13px;color:var(--cs-dim)">{{ s.text }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+    <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface)">
+      <sc-for list="{{ kinds }}" as="k" hint-placeholder-count="4">
+        <button onClick="{{ k.go }}" style="font-size:13px;padding:6px 11px;border:0;border-right:1px solid var(--cs-line);cursor:pointer;background:{{ k.bg }};color:{{ k.fg }}">{{ k.label }}</button>
+      </sc-for>
+    </div>
+    <span style="display:flex;gap:16px;align-items:center;font-size:12px;color:var(--cs-dim)">
+      <span style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--cs-mono);font-size:10px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">DE</span>Translated</span>
+      <span style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-warn-ink);border:1px solid var(--cs-warn);border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">DE ↻</span>Outdated</span>
+      <span style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);border:1px dashed var(--cs-line-strong);border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">DE ○</span>Missing</span>
+    </span>
+  </div>
+
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;overflow-x:auto">
+    <div style="display:grid;grid-template-columns:minmax(240px,1fr) 110px 110px 110px 150px;gap:12px;min-width:760px;padding:9px 16px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta)">
+      <span>ITEM</span><span>TYPE</span><span>DEUTSCH</span><span>ESPAÑOL</span><span></span>
+    </div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+      <div style="display:grid;grid-template-columns:minmax(240px,1fr) 110px 110px 110px 150px;gap:12px;min-width:760px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--cs-line)" style-hover="background:var(--cs-paper)">
+        <a href="{{ r.href }}" style="font-size:14px;font-weight:500;color:var(--cs-ink)">{{ r.title }}</a>
+        <span style="font-size:13px;color:var(--cs-dim)">{{ r.type }}</span>
+        <span><span title="{{ r.de.tip }}" style="font-family:var(--cs-mono);font-size:10px;color:{{ r.de.fg }};border:1px {{ r.de.style }} {{ r.de.border }};border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">{{ r.de.label }}</span></span>
+        <span><span title="{{ r.es.tip }}" style="font-family:var(--cs-mono);font-size:10px;color:{{ r.es.fg }};border:1px {{ r.es.style }} {{ r.es.border }};border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">{{ r.es.label }}</span></span>
+        <a href="{{ r.href }}" style="font-size:13px;text-align:right">{{ r.cta }}</a>
+      </div>
+    </sc-for>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { kind: 'All' };
+  renderVals() {
+    const chip = (code, s) => ({ label: code + (s === 'outdated' ? ' ↻' : s === 'missing' ? ' ○' : ''), tip: { done: 'Translated', missing: 'Not translated', outdated: 'English changed since translation' }[s],
+      fg: s === 'done' ? 'var(--cs-ink)' : s === 'outdated' ? 'var(--cs-warn-ink)' : 'var(--cs-meta)',
+      border: s === 'outdated' ? 'var(--cs-warn)' : 'var(--cs-line-strong)', style: s === 'missing' ? 'dashed' : 'solid' });
+    const P = 'Studio%20Pages.dc.html', E = 'Studio%20Post%20Editor.dc.html', M = 'Studio%20Media.dc.html';
+    const all = [
+      ['Welcome to our new site', 'Post', E, 'outdated', 'missing'],
+      ['Site settings · title, tagline', 'Settings', 'Studio%20Settings.dc.html', 'done', 'missing'],
+      ['Home', 'Page', P, 'missing', 'missing'], ['About', 'Page', P, 'done', 'missing'], ['Blog', 'Page', P, 'missing', 'missing'],
+      ['Services', 'Page', P, 'missing', 'missing'], ['Photography', 'Page', P, 'missing', 'missing'], ['Copywriting', 'Page', P, 'missing', 'missing'],
+      ['Five lenses we actually use', 'Post', E, 'missing', 'missing'], ['Autumn workshop dates', 'Post', E, 'missing', 'missing'],
+      ['Now: shipping translations', 'Post', E, 'missing', 'missing'], ['Desk detail', 'Image', M, 'missing', 'missing']
+    ];
+    const k = this.state.kind;
+    const map = { Pages: 'Page', Posts: 'Post', Images: 'Image' };
+    return {
+      summary: [
+        { name: 'Deutsch', pct: '14%', text: '12 missing · 1 outdated' },
+        { name: 'Español', pct: '0%', text: '14 missing' }
+      ],
+      kinds: ['All', 'Pages', 'Posts', 'Images'].map(label => ({ label, go: () => this.setState({ kind: label }),
+        bg: k === label ? 'var(--cs-ink)' : 'transparent', fg: k === label ? 'var(--cs-paper)' : 'var(--cs-ink)' })),
+      rows: all.filter(r => k === 'All' || r[1] === map[k]).map(([title, type, href, de, es]) => ({
+        title, type, href, de: chip('DE', de), es: chip('ES', es), cta: de === 'outdated' ? 'Review changes →' : 'Translate →' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

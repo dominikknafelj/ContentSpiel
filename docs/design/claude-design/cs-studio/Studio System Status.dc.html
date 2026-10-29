@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="status" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:16px;max-width:900px;width:100%;box-sizing:border-box">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:26px;font-weight:600">System status</h1><p style="margin:0;font-size:14px;color:var(--cs-dim)">3 of 4 checks passed · last run 17:30</p></div>
+    <button style="font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 14px">Run checks again</button>
+  </div>
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+    <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:16px;padding:14px 16px;border-bottom:1px solid var(--cs-line);align-items:start">
+        <span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid {{ c.border }};color:{{ c.fg }};border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:{{ c.dot }}"></span>{{ c.state }}</span></span>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+          <span style="font-size:14px;font-weight:600">{{ c.name }}</span>
+          <span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">{{ c.text }}</span>
+          <sc-if value="{{ c.hasCode }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px;align-items:flex-start;background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 9px 9px 12px">
+              <code style="flex:1;font-family:var(--cs-mono);font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word">{{ c.code }}</code>
+              <button style="font-size:12px;font-weight:500;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:3px 9px">Copy</button>
+            </div>
+            <a href="#" style="font-size:13px">How to configure outgoing mail →</a>
+          </sc-if>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const ok = { state: 'OK', dot: 'var(--cs-ok)', fg: 'var(--cs-ink)', border: 'var(--cs-line-strong)', hasCode: false, code: '' };
+    return { checks: [
+      { ...ok, state: 'Warning', dot: 'var(--cs-warn)', fg: 'var(--cs-warn-ink)', border: 'var(--cs-warn)', name: 'Outgoing mail',
+        text: 'Password reset by email won’t work until mail is configured. Until then, reset a password from the server console:', hasCode: true,
+        code: 'bin/rails runner \'User.find_by(email_address: "you@example.com").update!(password: "new password")\'' },
+      { ...ok, name: 'File storage', text: 'Uploads can be stored and read back.' },
+      { ...ok, name: 'Image processing', text: 'Images can be resized.' },
+      { ...ok, name: 'Background jobs', text: 'Jobs run inside the web process (test adapter).' }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

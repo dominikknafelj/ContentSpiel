@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,button{font-family:inherit}</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;background:var(--cs-paper);color:var(--cs-ink)">
+  <header style="display:flex;justify-content:space-between;align-items:center;padding:20px 28px">
+    <span style="font-weight:700;font-size:12px;letter-spacing:0.18em">CONTENT·SPIEL</span>
+    <div style="display:grid;grid-template-columns:repeat(3,auto);border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden">
+      <sc-for list="{{ themes }}" as="t" hint-placeholder-count="3">
+        <button onClick="{{ t.pick }}" style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.1em;padding:6px 10px;border:0;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+  </header>
+  <main style="flex:1;display:flex;justify-content:center;padding:64px 22px">
+    <form style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:14px;color:var(--cs-dim)">Test Site</span>
+        <h1 style="margin:0;font-size:28px;font-weight:600">Sign in</h1>
+      </div>
+      <sc-if value="{{ showError }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:10px 12px;background:var(--cs-danger-tint);color:var(--cs-danger-ink);border-radius:2px;font-size:13px;line-height:1.5">That email and password don’t match. Try again or reset your password.</div>
+      </sc-if>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">EMAIL</span>
+        <input type="email" autocomplete="username" value="one@example.com" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint);border-radius:2px;padding:10px 12px;outline:none"></input></label>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;justify-content:space-between"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">PASSWORD</span><a href="#" style="font-size:12px">Forgot password?</a></span>
+        <input type="password" autocomplete="current-password" placeholder="Your password" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:10px 12px;outline:none"></input></label>
+      <button type="button" style="font-weight:500;font-size:14px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:10px 16px;cursor:pointer" style-hover="background:var(--cs-accent-hover)">Sign in</button>
+    </form>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;error&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { theme: 'auto' };
+  componentDidMount() { let t = 'auto'; try { t = localStorage.getItem('cs-theme') || 'auto'; } catch (e) {} this.apply(t); }
+  apply(t) {
+    try { localStorage.setItem('cs-theme', t); } catch (e) {}
+    document.documentElement.dataset.theme = t === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+    this.setState({ theme: t });
+  }
+  renderVals() {
+    return {
+      showError: !!this.props.error,
+      themes: [['light', 'LIGHT'], ['dark', 'DARK'], ['auto', 'AUTO']].map(([id, label]) => ({ label, pick: () => this.apply(id),
+        bg: this.state.theme === id ? 'var(--cs-ink)' : 'transparent', fg: this.state.theme === id ? 'var(--cs-paper)' : 'var(--cs-dim)' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

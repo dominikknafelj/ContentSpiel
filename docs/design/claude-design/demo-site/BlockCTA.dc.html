@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+</helmet>
+<div style="width: 100%; display: grid; grid-template-columns: {{ cols }}; gap: var(--space-4) var(--space-6); align-items: end; font-family: var(--font-sans); color: var(--color-text);">
+  <h2 style="margin: 0; font-weight: 700; font-size: {{ hSize }}; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase; text-wrap: balance;">{{ heading }}</h2>
+  <div style="display: flex; flex-direction: column; gap: var(--space-4); min-width: 0;">
+    <sc-if value="{{ text }}" hint-placeholder-val="{{ true }}">
+      <p style="margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--color-text-muted); text-wrap: pretty;">{{ text }}</p>
+    </sc-if>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+      <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" hint-size="140px,40px">{{ primaryLabel }}</x-import>
+      <sc-if value="{{ secondaryLabel }}" hint-placeholder-val="{{ true }}">
+        <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" hint-size="140px,40px">{{ secondaryLabel }}</x-import>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;half&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;heading&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Call to action heading&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;text&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;primaryLabel&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Primary action&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;secondaryLabel&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Secondary&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const size = p.size ?? 'full';
+    return {
+      heading: p.heading ?? 'Call to action heading',
+      text: p.text ?? 'One or two sentences that say what happens next and why it is worth doing.',
+      primaryLabel: p.primaryLabel ?? 'Primary action',
+      secondaryLabel: p.secondaryLabel ?? 'Secondary',
+      cols: size === 'full' ? 'minmax(0,1.4fr) minmax(0,1fr)' : 'minmax(0,1fr)',
+      hSize: size === 'full' ? 'var(--fs-display)' : size === 'half' ? '34px' : '26px',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+</helmet>
+<figure style="margin: 0; width: 100%; display: flex; flex-direction: column; gap: var(--space-5); font-family: var(--font-sans); color: var(--color-text); border-top: 1px solid var(--color-line-strong); padding-top: var(--space-4);">
+  <blockquote style="margin: 0; font-weight: 300; font-size: {{ qSize }}; line-height: 1.25; letter-spacing: -0.005em; max-width: 30ch; text-wrap: pretty;">{{ quote }}</blockquote>
+  <figcaption style="display: flex; align-items: center; gap: var(--space-3);">
+    <sc-if value="{{ showPortrait }}" hint-placeholder-val="{{ true }}">
+      <div style="width: 52px; flex: none;">
+        <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Placeholder" seed="{{ seed }}" ratio="1/1" vignette="{{ false }}" hint-size="52px,52px"></x-import>
+      </div>
+    </sc-if>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <span style="font-weight: 600; font-size: var(--fs-body);">{{ name }}</span>
+      <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">{{ role }}</span>
+    </div>
+  </figcaption>
+</figure>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;half&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;quote&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;person&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Full name&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Role · Organisation&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showPortrait&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;seed&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:5,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const size = p.size ?? 'full';
+    return {
+      quote: p.quote ?? '“A quote of one to three sentences, set large enough to read as a pause in the page.”',
+      name: p.person ?? 'Full name',
+      role: p.role ?? 'Role · Organisation',
+      showPortrait: p.showPortrait ?? true,
+      seed: p.seed ?? 5,
+      qSize: size === 'full' ? 'var(--fs-quote)' : size === 'half' ? '26px' : '21px',
+    };
+  }
+}
+</script>
+</body>
+</html>

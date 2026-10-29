@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="content-spiel.css">
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}button,input{font-family:inherit}</style>
+</helmet>
+<div style="background:#d9d8d2;min-height:100vh;padding:48px;display:flex;flex-direction:column;gap:80px;font-family:var(--cs-font);color:#141417;box-sizing:border-box">
+
+<header style="display:flex;flex-direction:column;gap:8px;max-width:900px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">CS STUDIO · NOTES ON CONTENT · LIGHT + DARK</span>
+  <h1 style="margin:0;font-size:34px;font-weight:600">Notes on content</h1>
+  <p style="margin:0;font-size:15px;line-height:1.6;color:#55565b;text-wrap:pretty">Built with Content Spiel tokens and existing Studio patterns. Three things are new and each has a reason. The drawer gets the menu shadow because it floats over the editor. Accent means unread for you: the sidebar badge, unread pills and the mention toast dot. Reaction chips use the 999px tag-chip shape. Thread layout: <a href="#1b">1b</a>, where the thread replaces the list.</p>
+</header>
+
+<sc-for list="{{ opts }}" as="op" hint-placeholder-count="2">
+<section id="{{ op.id }}" data-screen-label="Page editor + drawer {{ op.id }}" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;max-width:1100px">
+    <span style="font-family:var(--cs-mono);font-size:12px;font-weight:500;background:#141417;color:#f5f4f0;padding:2px 8px;border-radius:2px">{{ op.id }}</span>
+    <span style="font-size:20px;font-weight:600">{{ op.title }}</span>
+    <span style="font-size:14px;line-height:1.55;color:#55565b;flex-basis:100%;max-width:900px;text-wrap:pretty">{{ op.note }}</span>
+  </div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }} · 1440</span>
+  <div data-theme="{{ th.id }}" style="width:1440px;height:1100px;position:relative;overflow:hidden;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);display:grid;grid-template-columns:232px 272px minmax(0,1fr)">
+
+    <aside style="display:flex;flex-direction:column;gap:14px;padding:16px 12px;background:var(--cs-chrome);border-right:1px solid var(--cs-line);box-sizing:border-box">
+      <div style="display:flex;flex-direction:column;gap:3px;padding:2px 8px 12px;border-bottom:1px solid var(--cs-line)"><span style="font-weight:700;font-size:12px;letter-spacing:0.18em">CONTENT·SPIEL</span><span style="font-size:13px;color:var(--cs-dim)">Test Site</span></div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cs-meta);background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 8px 6px 10px"><span style="flex:1">Jump to…</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-dim);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px">⌘K</span></div>
+      <nav style="display:flex;flex-direction:column;gap:1px">
+        <sc-for list="{{ navPages }}" as="g" hint-placeholder-count="3">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:12px 8px 5px">{{ g.label }}</span>
+          <sc-for list="{{ g.items }}" as="n" hint-placeholder-count="5">
+            <span style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:{{ n.weight }};color:{{ n.color }};background:{{ n.bg }};border-radius:2px;padding:6px 8px"><span>{{ n.label }}</span><span style="font-family:var(--cs-mono);font-size:10px;line-height:16px;border-radius:999px;color:{{ n.bc }};background:{{ n.bb }};padding:{{ n.bp }}">{{ n.badge }}</span></span>
+          </sc-for>
+        </sc-for>
+      </nav>
+    </aside>
+
+    <aside style="border-right:1px solid var(--cs-line);background:var(--cs-chrome);display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 14px 12px"><span style="font-size:15px;font-weight:600">Pages</span><span style="font-weight:500;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">+ New page</span></div>
+      <div style="display:flex;flex-direction:column;gap:1px;padding:0 8px">
+        <sc-for list="{{ tree }}" as="r" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px {{ r.ind }};border-radius:2px;background:{{ r.bg }}">
+            <span style="color:var(--cs-meta);font-size:11px;letter-spacing:-2px">⋮⋮</span>
+            <span style="flex:1;min-width:0;font-size:14px;font-weight:{{ r.weight }}">{{ r.t }}</span>
+            <span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">{{ r.tr }}</span>
+            <sc-if value="{{ r.p.has }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;border:1px solid {{ r.p.bd }};background:{{ r.p.bg }};color:{{ r.p.fg }};font-family:var(--cs-mono);font-size:10px">{{ is.msg }}{{ r.p.n }}</span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </aside>
+
+    <main style="display:flex;flex-direction:column;min-width:0">
+      <header style="background:var(--cs-paper);border-bottom:1px solid var(--cs-line);padding:16px 28px 0;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+          <span style="font-size:12px;color:var(--cs-meta)">Pages / Home /</span>
+          <div style="display:flex;gap:8px;align-items:center;margin-right:400px">
+            <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-ok-ink);margin-right:6px">● SAVED TO SITE 10:42</span>
+            <span aria-pressed="true" style="display:inline-flex;align-items:center;gap:7px;font-weight:500;font-size:13px;background:var(--cs-sunken);border:1px solid var(--cs-ink);border-radius:2px;padding:6px 11px">{{ ic.msg }}Notes<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-dim)">4</span></span>
+            <span style="font-weight:500;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Preview</span>
+            <span style="font-size:14px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">⋯</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px"><h1 style="margin:0;font-size:26px;font-weight:600">About</h1><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>Live</span></div>
+        <div style="display:flex;gap:10px;align-items:center;font-size:12px"><span style="font-family:var(--cs-mono);color:var(--cs-dim)">/about</span><a href="#">View on site ↗</a></div>
+        <div style="display:flex;gap:2px">
+          <span style="font-size:13px;padding:8px 12px;border-bottom:2px solid var(--cs-ink);font-weight:600">English</span>
+          <span style="display:flex;gap:7px;align-items:center;font-size:13px;padding:8px 12px;border-bottom:2px solid transparent;color:var(--cs-dim)">Deutsch</span>
+          <span style="display:flex;gap:7px;align-items:center;font-size:13px;padding:8px 12px;border-bottom:2px solid transparent;color:var(--cs-dim)">Español<span style="width:7px;height:7px;border-radius:999px;box-sizing:border-box;border:1px solid var(--cs-meta)"></span></span>
+        </div>
+      </header>
+      <div style="padding:22px 28px;display:flex;flex-direction:column;gap:16px;max-width:1080px;box-sizing:border-box">
+        <span style="font-size:17px;font-weight:600">Blocks</span>
+        <section style="background:var(--cs-surface);border:1px solid var(--cs-accent);border-radius:2px">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--cs-line)"><span style="color:var(--cs-meta);font-size:11px;letter-spacing:-2px">⋮⋮</span><span style="font-size:14px;font-weight:600">Rich text</span><span style="font-size:13px;color:var(--cs-meta)">Intro</span><span style="display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;border:1px solid var(--cs-line-strong);color:var(--cs-meta);font-family:var(--cs-mono);font-size:11px">{{ is.msg }}1</span><span style="margin-left:auto;color:var(--cs-meta)">⋯</span></div>
+          <div style="padding:14px 16px;font-size:15px;line-height:1.6;display:flex;flex-direction:column;gap:8px"><span style="font-size:20px;font-weight:600">Our story</span><span>We rebuilt everything from scratch in 2024, starting with the editor our own team uses every day.</span></div>
+        </section>
+        <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--cs-line)"><span style="color:var(--cs-meta);font-size:11px;letter-spacing:-2px">⋮⋮</span><span style="font-size:14px;font-weight:600">Section</span><span style="font-size:13px;color:var(--cs-meta)">Team · 2 columns</span><span style="margin-left:auto;color:var(--cs-meta)">⋯</span></div>
+          <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="border:1px solid var(--cs-line-strong);border-radius:2px;padding:10px 12px;display:flex;flex-direction:column;gap:8px"><span style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">COLUMN 1 · IMAGE</span><span style="display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;border:1px solid var(--cs-line-strong);color:var(--cs-meta);font-family:var(--cs-mono);font-size:10px">{{ is.msg }}1</span></span><span style="aspect-ratio:16/9;background:linear-gradient(135deg,var(--cs-ph-a),var(--cs-ph-b))"></span></div>
+            <div style="border:1px solid var(--cs-line-strong);border-radius:2px;padding:10px 12px;display:flex;flex-direction:column;gap:8px"><span style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">COLUMN 2 · RICH TEXT</span><span style="display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;background:var(--cs-accent-tint);color:var(--cs-accent);border:1px solid var(--cs-accent-tint);font-family:var(--cs-mono);font-size:10px">{{ is.msg }}1</span></span><span style="font-size:14px;line-height:1.55">Mara König leads product. Jonas Lind builds the editor. Joanna Pérez runs translation.</span></div>
+          </div>
+        </section>
+        <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--cs-line)"><span style="color:var(--cs-meta);font-size:11px;letter-spacing:-2px">⋮⋮</span><span style="font-size:14px;font-weight:600">Image</span><span style="font-size:13px;color:var(--cs-meta)">Office</span><span style="margin-left:auto;color:var(--cs-meta)">⋯</span></div>
+          <div style="padding:14px"><span style="display:block;width:180px;aspect-ratio:4/3;background:linear-gradient(135deg,var(--cs-ph-a),var(--cs-ph-b))"></span></div>
+        </section>
+      </div>
+    </main>
+
+    <aside aria-label="Notes" style="position:absolute;top:0;right:0;bottom:0;width:400px;background:var(--cs-surface);border-left:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);display:flex;flex-direction:column">
+
+      <sc-if value="{{ op.isB }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--cs-line)">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:5px 8px 5px 4px;border-radius:2px">{{ ic.back }}All notes<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">4</span></span>
+        <a href="#" style="margin-left:auto;font-size:12px;color:var(--cs-dim);text-decoration:underline;text-underline-offset:3px">Stop notifying me</a>
+        <span aria-label="Close" style="width:28px;height:28px;display:grid;place-items:center;color:var(--cs-dim)">{{ ic.x }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--cs-line)">
+        <span style="display:flex;flex-direction:column;gap:2px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">RICH TEXT · INTRO</span><span style="font-size:13px;color:var(--cs-dim)">2 messages · started on <span style="font-family:var(--cs-mono);font-size:10px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:0 5px">DE</span></span></span>
+        <span title="Pin" style="margin-left:auto;width:28px;height:28px;display:grid;place-items:center;color:var(--cs-dim)">{{ ic.pin }}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:500;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">{{ is.check }}Resolve</span>
+      </div>
+      <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:14px 16px"><div style="background:var(--cs-sunken);border:1px solid var(--cs-line);border-radius:2px;padding:8px 10px;display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">QUOTED</span><span style="font-size:13px;line-height:1.5">„Wir haben 2023 alles von Grund auf neu gebaut.“</span></div></div>
+        <sc-for list="{{ msgs }}" as="m" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-top:1px solid var(--cs-line)">
+            <span style="display:flex;gap:8px;align-items:center;font-size:13px"><span style="width:20px;height:20px;border-radius:999px;box-sizing:border-box;border:1px solid {{ m.avBd }};background:{{ m.avBg }};color:{{ m.avFg }};font-family:var(--cs-mono);font-size:8px;display:grid;place-items:center">{{ m.av }}</span><b style="font-weight:600">{{ m.name }}</b><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ m.when }}</span><sc-if value="{{ m.edited }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--cs-meta)">· edited</span></sc-if><span style="margin-left:auto;color:var(--cs-meta)">⋯</span></span>
+            <span style="font-size:14px;line-height:1.55;text-wrap:pretty"><span style="color:var(--cs-accent);font-weight:500">{{ m.mention }}</span>{{ m.text }}</span>
+            <sc-if value="{{ m.hasPdf }}" hint-placeholder-val="{{ false }}"><span style="display:grid;grid-template-columns:16px minmax(0,1fr) 28px;gap:10px;align-items:center;border:1px solid var(--cs-line);border-radius:2px;padding:6px 6px 6px 10px;color:var(--cs-dim)">{{ ic.file }}<span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:13px;color:var(--cs-ink)">press-kit-2024.pdf</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">PDF · 1.2 MB</span></span><span title="Download" style="width:28px;height:28px;display:grid;place-items:center">{{ ic.download }}</span></span></sc-if>
+            <sc-if value="{{ m.hasImg }}" hint-placeholder-val="{{ false }}"><span style="display:grid;place-items:end start;aspect-ratio:16/9;background:linear-gradient(135deg,var(--cs-ph-a),var(--cs-ph-b));border:1px solid var(--cs-line)"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-dim);padding:6px 8px">about-2023.png</span></span></sc-if>
+            <sc-if value="{{ m.hasReacts }}" hint-placeholder-val="{{ false }}"><span style="display:flex;gap:6px;flex-wrap:wrap">
+              <sc-for list="{{ m.reacts }}" as="r" hint-placeholder-count="2"><span style="display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;border:1px solid {{ r.bd }};background:{{ r.bg }};font-size:13px">{{ r.e }}<span style="font-family:var(--cs-mono);font-size:11px;color:{{ r.fg }}">{{ r.n }}</span></span></sc-for>
+              <span title="Add reaction" style="display:inline-grid;place-items:center;width:30px;height:24px;border-radius:999px;border:1px solid var(--cs-line);color:var(--cs-meta)">{{ is.smile }}</span>
+            </span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="position:relative;padding:12px 16px 16px;border-top:1px solid var(--cs-line)">
+        <div role="listbox" style="position:absolute;left:16px;bottom:calc(100% - 6px);width:250px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column;z-index:2">
+          <sc-for list="{{ picker }}" as="p" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:2px;background:{{ p.bg }}"><span style="width:22px;height:22px;border-radius:999px;box-sizing:border-box;border:1px solid var(--cs-line-strong);background:var(--cs-sunken);font-family:var(--cs-mono);font-size:9px;display:grid;place-items:center">{{ p.av }}</span><span style="display:flex;flex-direction:column"><span style="font-size:13px">{{ p.name }}</span><span style="font-size:11px;color:var(--cs-meta)">{{ p.sub }}</span></span></span></sc-for>
+        </div>
+        <div style="border:1px solid var(--cs-accent);border-radius:2px">
+          <div style="padding:9px 10px;font-size:14px;line-height:1.5;min-height:62px;box-sizing:border-box">Thanks both. <span style="color:var(--cs-accent);font-weight:500">@Jo</span><span style="display:inline-block;width:1px;height:16px;background:var(--cs-ink);vertical-align:-3px"></span></div>
+          <div style="display:flex;align-items:center;gap:2px;padding:4px 6px;border-top:1px solid var(--cs-line);color:var(--cs-dim)">
+            <span title="Attach up to 5 files, 10 MB each" style="width:28px;height:28px;display:grid;place-items:center">{{ ic.clip }}</span>
+            <span title="Emoji" style="width:28px;height:28px;display:grid;place-items:center">{{ ic.smile }}</span>
+            <span title="Mention someone" style="width:28px;height:28px;display:grid;place-items:center;color:var(--cs-ink);background:var(--cs-sunken);border-radius:2px">{{ ic.at }}</span>
+            <span style="margin-left:auto;font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">⌘↵</span>
+            <span style="font-weight:500;font-size:12px;background:var(--cs-accent);color:var(--cs-on-accent);border-radius:2px;padding:5px 11px;margin-left:6px">Send</span>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </aside>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+</sc-for>
+
+<section data-screen-label="Openers" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px"><span style="font-size:20px;font-weight:600">Openers</span><span style="font-size:14px;line-height:1.55;color:#55565b;text-wrap:pretty">Neutral pill = open threads. Accent pill = something unread for you. With no notes, nothing shows until you hover or focus the card; touch and keyboard users can always use “Add note” in the block menu. A section's header shows no total, only its columns do, so a thread is never counted twice.</span></div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }}</span>
+  <div data-theme="{{ th.id }}" style="width:900px;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);padding:28px;box-sizing:border-box;display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">EDITOR HEADER · NONE · OPEN · UNREAD FOR YOU · DRAWER OPEN</span>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:7px;font-weight:500;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 11px">{{ ic.msg }}Notes</span>
+        <span style="display:inline-flex;align-items:center;gap:7px;font-weight:500;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 11px">{{ ic.msg }}Notes<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-dim)">4</span></span>
+        <span style="display:inline-flex;align-items:center;gap:7px;font-weight:500;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 11px">{{ ic.msg }}Notes<span style="font-family:var(--cs-mono);font-size:11px;line-height:16px;padding:0 6px;border-radius:999px;background:var(--cs-accent);color:var(--cs-on-accent)">4</span></span>
+        <span style="display:inline-flex;align-items:center;gap:7px;font-weight:500;font-size:13px;background:var(--cs-sunken);border:1px solid var(--cs-ink);border-radius:2px;padding:6px 11px">{{ ic.msg }}Notes<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-dim)">4</span></span>
+        <span style="font-weight:500;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Preview</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <sc-for list="{{ cardStates }}" as="c" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">{{ c.label }}</span>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:{{ c.bg }};border:1px solid var(--cs-line);border-radius:2px;outline:{{ c.ring }};outline-offset:2px">
+            <span style="color:var(--cs-meta);font-size:11px;letter-spacing:-2px">⋮⋮</span><span style="font-size:14px;font-weight:600">Rich text</span><span style="font-size:13px;color:var(--cs-meta)">Intro</span>
+            <sc-if value="{{ c.add }}" hint-placeholder-val="{{ false }}"><span title="Add note" style="display:inline-grid;place-items:center;width:24px;height:24px;color:var(--cs-meta)">{{ ic.msgPlus }}</span></sc-if>
+            <sc-if value="{{ c.p.has }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;border:1px solid {{ c.p.bd }};background:{{ c.p.bg }};color:{{ c.p.fg }};font-family:var(--cs-mono);font-size:11px">{{ is.msg }}{{ c.p.n }}</span></sc-if>
+            <span style="margin-left:auto;color:var(--cs-meta)">⋯</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:22px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">SECTION TILES</span>
+        <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="border:1px solid var(--cs-line-strong);border-radius:2px;padding:10px;display:flex;align-items:center;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">COLUMN 1 · IMAGE</span><span style="display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;border:1px solid var(--cs-line-strong);color:var(--cs-meta);font-family:var(--cs-mono);font-size:10px">{{ is.msg }}1</span></div>
+          <div style="border:1px solid var(--cs-line-strong);border-radius:2px;padding:10px;display:flex;align-items:center;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">COLUMN 2 · RICH TEXT</span><span title="Add note" style="color:var(--cs-meta)">{{ is.msgPlus }}</span><span style="font-size:11px;color:var(--cs-meta)">on focus</span></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">BLOCK MENU</span>
+        <div style="background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column">
+          <span style="display:flex;align-items:center;gap:8px;font-size:13px;padding:7px 9px;background:var(--cs-sunken);border-radius:2px">Add note</span>
+          <span style="font-size:13px;padding:7px 9px">Duplicate</span>
+          <span style="font-size:13px;padding:7px 9px">Move up</span>
+          <span style="height:1px;background:var(--cs-line);margin:4px 0"></span>
+          <span style="font-size:13px;padding:7px 9px;color:var(--cs-danger)">Delete block…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Drawer states" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px"><span style="font-size:20px;font-weight:600">Drawer states</span><span style="font-size:14px;line-height:1.55;color:#55565b;text-wrap:pretty">Empty drawer. A new message arriving while you have an unsent reply: it is added above the composer with a NEW divider, and your draft and cursor stay where they are. If you have scrolled up, a “1 new message ↓” button appears and the list does not jump. With reduced motion on, a GIF shows as a still frame with Play.</span></div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }}</span>
+  <div data-theme="{{ th.id }}" style="display:flex;gap:24px;font-family:var(--cs-font);color:var(--cs-ink)">
+    <div style="width:400px;height:820px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 12px 14px 16px;border-bottom:1px solid var(--cs-line)"><span style="font-size:15px;font-weight:600">Notes</span><span style="margin-left:auto;font-weight:500;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">New note</span><span style="width:28px;height:28px;display:grid;place-items:center;color:var(--cs-dim)">{{ ic.x }}</span></div>
+      <div style="padding:28px 16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+        <span style="font-size:15px;font-weight:500">No notes on this page</span>
+        <span style="font-size:13px;line-height:1.55;color:var(--cs-dim);text-wrap:pretty">Notes are for the people working on About. Start one here or from a block’s ⋯ menu. Visitors to the site never see them.</span>
+        <span style="margin-top:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border-radius:2px;padding:7px 13px">New note</span>
+      </div>
+    </div>
+    <div style="width:400px;height:820px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--cs-line)"><span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:5px 8px 5px 4px">{{ ic.back }}All notes<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">4</span></span><a href="#" style="margin-left:auto;font-size:12px;color:var(--cs-dim);text-decoration:underline;text-underline-offset:3px">Stop notifying me</a><span style="width:28px;height:28px;display:grid;place-items:center;color:var(--cs-dim)">{{ ic.x }}</span></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--cs-line)"><span style="display:flex;flex-direction:column;gap:2px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">RICH TEXT · INTRO</span><span style="font-size:13px;color:var(--cs-dim)">3 messages</span></span><span style="margin-left:auto;width:28px;height:28px;display:grid;place-items:center;color:var(--cs-dim)">{{ ic.pin }}</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:500;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">{{ is.check }}Resolve</span></div>
+      <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+        <sc-for list="{{ msgsShort }}" as="m" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-bottom:1px solid var(--cs-line)">
+            <span style="display:flex;gap:8px;align-items:center;font-size:13px"><span style="width:20px;height:20px;border-radius:999px;box-sizing:border-box;border:1px solid {{ m.avBd }};background:{{ m.avBg }};color:{{ m.avFg }};font-family:var(--cs-mono);font-size:8px;display:grid;place-items:center">{{ m.av }}</span><b style="font-weight:600">{{ m.name }}</b><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ m.when }}</span></span>
+            <span style="font-size:14px;line-height:1.5;color:var(--cs-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.mention }}{{ m.text }}</span>
+          </div>
+        </sc-for>
+        <span style="display:flex;align-items:center;gap:8px;padding:10px 16px 0;font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-accent)"><span style="flex:1;height:1px;background:var(--cs-accent)"></span>NEW</span>
+        <div style="display:flex;flex-direction:column;gap:8px;padding:10px 16px 14px">
+          <span style="display:flex;gap:8px;align-items:center;font-size:13px"><span style="width:20px;height:20px;border-radius:999px;box-sizing:border-box;border:1px solid var(--cs-line-strong);background:var(--cs-sunken);font-family:var(--cs-mono);font-size:8px;display:grid;place-items:center">JL</span><b style="font-weight:600">Jonas Lind</b><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">now</span></span>
+          <span style="font-size:14px;line-height:1.5">Fixed in the Spanish too.</span>
+          <span style="position:relative;display:grid;place-items:center;aspect-ratio:4/3;max-width:240px;background:linear-gradient(135deg,var(--cs-ph-a),var(--cs-ph-b));border:1px solid var(--cs-line)"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">{{ is.play }}Play</span><span style="position:absolute;left:6px;bottom:5px;font-family:var(--cs-mono);font-size:10px;color:var(--cs-dim)">GIF · done.gif</span></span>
+        </div>
+      </div>
+      <div style="padding:12px 16px 16px;border-top:1px solid var(--cs-line)">
+        <div style="border:1px solid var(--cs-accent);border-radius:2px">
+          <div style="padding:9px 10px;font-size:14px;line-height:1.5;min-height:62px;box-sizing:border-box">I’ll ask Joanna to check the date in the press kit<span style="display:inline-block;width:1px;height:16px;background:var(--cs-ink);vertical-align:-3px"></span></div>
+          <div style="display:flex;align-items:center;gap:2px;padding:4px 6px;border-top:1px solid var(--cs-line);color:var(--cs-dim)"><span style="width:28px;height:28px;display:grid;place-items:center">{{ ic.clip }}</span><span style="width:28px;height:28px;display:grid;place-items:center">{{ ic.smile }}</span><span style="width:28px;height:28px;display:grid;place-items:center">{{ ic.at }}</span><span style="margin-left:auto;font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">⌘↵</span><span style="font-weight:500;font-size:12px;background:var(--cs-accent);color:var(--cs-on-accent);border-radius:2px;padding:5px 11px;margin-left:6px">Send</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Delete block dialog" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px"><span style="font-size:20px;font-weight:600">Delete a block that has notes</span><span style="font-size:14px;line-height:1.55;color:#55565b">The existing confirm dialog with its scrim. The warning appears only when the block has open notes. Resolved notes are deleted too, without a warning.</span></div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }}</span>
+  <div data-theme="{{ th.id }}" style="position:relative;width:760px;height:440px;overflow:hidden;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);padding:28px;box-sizing:border-box">
+    <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;height:120px"></div>
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.4);display:grid;place-items:center">
+      <div role="dialog" style="width:460px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:22px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box">
+        <span style="font-size:17px;font-weight:600">Delete this block?</span>
+        <span style="font-size:14px;line-height:1.55;color:var(--cs-dim)">Rich text · Intro will be removed from About in every language.</span>
+        <div style="display:flex;gap:10px;padding:10px 12px;background:var(--cs-warn-tint);border-radius:2px;font-size:13px;line-height:1.5;color:var(--cs-warn-ink)"><span style="font-weight:600">!</span><span>This block has 2 open notes. They will be deleted with it.</span></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+          <span style="font-weight:500;font-size:13px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Cancel</span>
+          <span style="font-weight:500;font-size:13px;background:var(--cs-danger);color:#fff;border-radius:2px;padding:7px 13px">Delete block</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Narrow sheet" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px"><span style="font-size:20px;font-weight:600">Below 1024px: full-screen sheet</span><span style="font-size:14px;line-height:1.55;color:#55565b">The sheet covers the editor. Back returns to the page at the same scroll position. Opening a thread works as in the chosen layout. Toasts stay where they normally are.</span></div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }} · 820</span>
+  <div data-theme="{{ th.id }}" style="width:820px;height:760px;overflow:hidden;background:var(--cs-surface);color:var(--cs-ink);font-family:var(--cs-font);display:flex;flex-direction:column">
+    <div style="height:48px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--cs-chrome);border-bottom:1px solid var(--cs-line)"><span style="font-size:16px">☰</span><span style="font-weight:700;font-size:12px;letter-spacing:0.18em">CONTENT·SPIEL</span><span style="margin-left:auto;font-family:var(--cs-mono);font-size:10px;color:var(--cs-dim);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px">⌘K</span></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--cs-line)">
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px 6px 7px">{{ ic.back }}Back to About</span>
+      <span style="font-size:15px;font-weight:600;margin-left:6px">Notes</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">4 OPEN</span>
+      <span style="margin-left:auto;font-weight:500;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">New note</span>
+    </div>
+    <div style="display:flex;flex-direction:column;max-width:720px;width:100%;align-self:center">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:16px 16px 6px">PINNED</span>
+      <sc-for list="{{ sheetRows }}" as="t" hint-placeholder-count="4">
+        <sc-if value="{{ t.isHead }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:18px 16px 6px">{{ t.head }}</span></sc-if>
+        <sc-if value="{{ t.isRow }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 16px;gap:12px;padding:12px 16px;border-bottom:1px solid var(--cs-line)">
+            <span style="width:24px;height:24px;border-radius:999px;box-sizing:border-box;border:1px solid {{ t.avBd }};background:{{ t.avBg }};color:{{ t.avFg }};font-family:var(--cs-mono);font-size:9px;display:grid;place-items:center">{{ t.av }}</span>
+            <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="display:flex;gap:8px;align-items:baseline;font-size:14px"><b style="font-weight:{{ t.fw }}">{{ t.name }}</b><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ t.when }}</span></span><span style="font-size:14px;line-height:1.45;color:{{ t.tc }}">{{ t.text }}</span><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.1em;color:var(--cs-meta)">{{ t.meta }}</span></span>
+            <span style="width:7px;height:7px;margin-top:8px;border-radius:999px;background:{{ t.dot }}"></span>
+          </div>
+        </sc-if>
+      </sc-for>
+      <span style="display:flex;align-items:center;gap:8px;padding:16px;font-size:14px;color:var(--cs-dim)"><span style="font-size:10px">▸</span>Resolved (3)</span>
+    </div>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Dashboard" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px"><span style="font-size:20px;font-weight:600">Dashboard, sidebar badge and mention toast</span><span style="font-size:14px;line-height:1.55;color:#55565b;text-wrap:pretty">The two cards go first in the existing card grid. Your drafts, Going live next and Needs translation follow unchanged and are left out here. Unread rows show first, with an accent dot and ink text. Opening a row marks it read. The sidebar badge counts unread items and disappears at zero. The toast uses the existing inverted pattern with an accent dot, which is new for “for you”, and stays 8s.</span></div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }} · 1440</span>
+  <div data-theme="{{ th.id }}" style="width:1440px;height:820px;position:relative;overflow:hidden;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);display:grid;grid-template-columns:232px minmax(0,1fr)">
+    <aside style="display:flex;flex-direction:column;gap:14px;padding:16px 12px;background:var(--cs-chrome);border-right:1px solid var(--cs-line)">
+      <div style="display:flex;flex-direction:column;gap:3px;padding:2px 8px 12px;border-bottom:1px solid var(--cs-line)"><span style="font-weight:700;font-size:12px;letter-spacing:0.18em">CONTENT·SPIEL</span><span style="font-size:13px;color:var(--cs-dim)">Test Site</span></div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cs-meta);background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 8px 6px 10px"><span style="flex:1">Jump to…</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-dim);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px">⌘K</span></div>
+      <nav style="display:flex;flex-direction:column;gap:1px">
+        <sc-for list="{{ navDash }}" as="g" hint-placeholder-count="3">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:12px 8px 5px">{{ g.label }}</span>
+          <sc-for list="{{ g.items }}" as="n" hint-placeholder-count="5">
+            <span style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:{{ n.weight }};color:{{ n.color }};background:{{ n.bg }};border-radius:2px;padding:6px 8px"><span>{{ n.label }}</span><span style="font-family:var(--cs-mono);font-size:10px;line-height:16px;border-radius:999px;color:{{ n.bc }};background:{{ n.bb }};padding:{{ n.bp }}">{{ n.badge }}</span></span>
+          </sc-for>
+        </sc-for>
+      </nav>
+    </aside>
+    <main style="position:relative;padding:28px 32px;display:flex;flex-direction:column;gap:22px;min-width:0">
+      <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">FRIDAY 9 OCTOBER</span><h1 style="margin:0;font-size:26px;font-weight:600">Dashboard</h1></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start">
+        <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+          <div style="display:flex;align-items:baseline;gap:10px;padding:13px 16px;border-bottom:1px solid var(--cs-line)"><span style="font-size:15px;font-weight:600">Notes for you</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-accent)">3 NEW</span><a href="#" style="margin-left:auto;font-size:13px">Mark all read</a></div>
+          <sc-for list="{{ inbox }}" as="i" hint-placeholder-count="5">
+            <a href="#" style="display:grid;grid-template-columns:7px 24px minmax(0,1fr) auto;gap:10px;align-items:start;padding:11px 16px;border-bottom:1px solid var(--cs-line);color:var(--cs-ink)" style-hover="background:var(--cs-paper)">
+              <span style="width:7px;height:7px;margin-top:9px;border-radius:999px;background:{{ i.dot }}"></span>
+              <span style="width:24px;height:24px;border-radius:999px;box-sizing:border-box;border:1px solid var(--cs-line-strong);background:var(--cs-sunken);font-family:var(--cs-mono);font-size:9px;display:grid;place-items:center">{{ i.av }}</span>
+              <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                <span style="font-size:13px;color:{{ i.tc }}"><b style="font-weight:{{ i.fw }};color:{{ i.nc }}">{{ i.who }}</b> {{ i.did }}</span>
+                <span style="font-size:13px;color:var(--cs-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ i.line }}</span>
+                <span style="font-size:12px;color:var(--cs-meta)">{{ i.where }}</span>
+              </span>
+              <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ i.when }}</span>
+            </a>
+          </sc-for>
+          <a href="#" style="display:block;padding:10px 16px;font-size:13px">All notes for you →</a>
+        </section>
+        <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:13px 16px;border-bottom:1px solid var(--cs-line)"><span style="font-size:15px;font-weight:600">Open threads</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">9</span></div>
+          <sc-for list="{{ openThreads }}" as="o" hint-placeholder-count="5">
+            <a href="#" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--cs-line);color:var(--cs-ink)" style-hover="background:var(--cs-paper)">
+              <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ o.title }}</span><span style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--cs-meta)"><span style="width:6px;height:6px;border-radius:{{ o.shape }};background:{{ o.cat }}"></span>{{ o.type }} · {{ o.last }}</span></span>
+              <span style="display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;border:1px solid var(--cs-line-strong);color:var(--cs-meta);font-family:var(--cs-mono);font-size:11px">{{ is.msg }}{{ o.n }}</span>
+            </a>
+          </sc-for>
+        </section>
+      </div>
+      <div role="status" style="position:absolute;left:50%;bottom:24px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:var(--cs-ink);color:var(--cs-paper);border-radius:2px;padding:10px 12px 10px 14px;box-shadow:var(--cs-shadow-menu);font-size:13px;max-width:420px;white-space:nowrap"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;background:var(--cs-accent)"></span><span style="flex:1">Dana mentioned you on About</span><span style="font-weight:600;text-decoration:underline;text-underline-offset:3px">Open</span><span style="opacity:0.7">×</span></div>
+    </main>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Other surfaces" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px"><span style="font-size:20px;font-weight:600">Other surfaces</span><span style="font-size:14px;line-height:1.55;color:#55565b;text-wrap:pretty">The same pill everywhere: open threads, accent when something is unread for you, nothing when the count is zero. In the posts list the column has no header label, just the icon, to save width. In the page tree the count comes after the translation markers.</span></div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }}</span>
+  <div data-theme="{{ th.id }}" style="width:1100px;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);padding:28px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px">
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:22px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">POSTS LIST</span>
+        <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 130px 96px 56px 80px;gap:12px;padding:9px 16px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);align-items:center"><span>TITLE</span><span>TYPE</span><span>STATUS</span><span title="Open notes" style="color:var(--cs-meta)">{{ is.msg }}</span><span>UPDATED</span></div>
+          <sc-for list="{{ posts }}" as="p" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 130px 96px 56px 80px;gap:12px;padding:10px 16px;border-bottom:1px solid var(--cs-line);font-size:13px;align-items:center">
+              <span style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.title }}</span>
+              <span style="display:flex;gap:7px;align-items:center;color:var(--cs-dim)"><span style="width:7px;height:7px;border-radius:999px;background:{{ p.cat }}"></span>{{ p.type }}</span>
+              <span style="color:var(--cs-dim)">{{ p.status }}</span>
+              <span><sc-if value="{{ p.pl.has }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;border:1px solid {{ p.pl.bd }};background:{{ p.pl.bg }};color:{{ p.pl.fg }};font-family:var(--cs-mono);font-size:11px">{{ p.pl.n }}</span></sc-if></span>
+              <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ p.when }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">PAGE TREE ROW</span>
+        <div style="background:var(--cs-chrome);border:1px solid var(--cs-line);padding:8px;display:flex;flex-direction:column;gap:1px">
+          <sc-for list="{{ tree }}" as="r" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px {{ r.ind }};border-radius:2px;background:{{ r.bg }}">
+              <span style="color:var(--cs-meta);font-size:11px;letter-spacing:-2px">⋮⋮</span>
+              <span style="flex:1;min-width:0;font-size:14px;font-weight:{{ r.weight }}">{{ r.t }}</span>
+              <span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">{{ r.tr }}</span>
+              <sc-if value="{{ r.p.has }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:999px;border:1px solid {{ r.p.bd }};background:{{ r.p.bg }};color:{{ r.p.fg }};font-family:var(--cs-mono);font-size:10px">{{ is.msg }}{{ r.p.n }}</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MEDIA LIBRARY · TILE CHIP + PANEL</span>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;border:1px solid var(--cs-line);background:var(--cs-surface)">
+        <div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start">
+          <sc-for list="{{ tiles }}" as="t" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="position:relative;display:block;aspect-ratio:4/3;background:linear-gradient(135deg,var(--cs-ph-a),var(--cs-ph-b));outline:{{ t.ring }};outline-offset:2px">
+                <sc-if value="{{ t.has }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:6px;right:6px;display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);color:var(--cs-ink);font-family:var(--cs-mono);font-size:11px">{{ is.msg }}{{ t.n }}</span></sc-if>
+              </span>
+              <span style="font-size:12px;color:var(--cs-dim)">{{ t.name }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="border-left:1px solid var(--cs-line);display:flex;flex-direction:column">
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--cs-line)">
+            <span style="font-size:15px;font-weight:600">harbour-dawn.jpg</span>
+            <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">ALT TEXT</span><span style="font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 10px">Harbour cranes at dawn, Malmö</span></label>
+          </div>
+          <div style="display:flex;align-items:center;padding:12px 16px 6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">NOTES · 2 OPEN</span><a href="#" style="margin-left:auto;font-size:12px">Open in drawer</a></div>
+          <sc-for list="{{ mediaNotes }}" as="t" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 8px;gap:10px;padding:9px 16px;border-bottom:1px solid var(--cs-line)">
+              <span style="width:24px;height:24px;border-radius:999px;box-sizing:border-box;border:1px solid var(--cs-line-strong);background:var(--cs-sunken);font-family:var(--cs-mono);font-size:9px;display:grid;place-items:center">{{ t.av }}</span>
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="display:flex;gap:8px;align-items:baseline;font-size:13px"><b style="font-weight:{{ t.fw }}">{{ t.name }}</b><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ t.when }}</span></span><span style="font-size:13px;line-height:1.45;color:{{ t.tc }}">{{ t.text }}</span></span>
+              <span style="width:7px;height:7px;margin-top:8px;border-radius:999px;background:{{ t.dot }}"></span>
+            </div>
+          </sc-for>
+          <div style="padding:12px 16px"><span style="display:block;font-size:13px;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 10px">Write a note…</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MIND GRAPH · COUNT BADGE + NODE CARD</span>
+      <div style="position:relative;height:420px;background:var(--cs-surface);border:1px solid var(--cs-line);overflow:hidden">
+        <svg viewBox="0 0 1044 420" style="position:absolute;inset:0;width:100%;height:100%"><line x1="330" y1="210" x2="560" y2="110" stroke="var(--cs-ink)" stroke-width="1.5"></line><line x1="330" y1="210" x2="200" y2="330" stroke="var(--cs-dim)" stroke-dasharray="3 3"></line><line x1="560" y1="110" x2="860" y2="160" stroke="var(--cs-line-strong)"></line><line x1="330" y1="210" x2="180" y2="90" stroke="var(--cs-dim)" stroke-dasharray="3 3"></line></svg>
+        <sc-for list="{{ gnodes }}" as="n" hint-placeholder-count="5">
+          <div style="position:absolute;left:{{ n.x }};top:{{ n.y }};width:0;height:0;opacity:{{ n.op }}">
+            <span style="position:absolute;left:{{ n.off }};top:{{ n.off }};width:{{ n.d }};height:{{ n.d }};border-radius:{{ n.rad }};box-sizing:border-box;background:{{ n.fill }};border:{{ n.bd }};box-shadow:{{ n.ring }}">
+              <sc-if value="{{ n.has }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:calc(100% - 4px);bottom:calc(100% - 4px);font-family:var(--cs-mono);font-size:10px;line-height:14px;padding:0 4px;border-radius:999px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);color:var(--cs-ink)">{{ n.n }}</span></sc-if>
+            </span>
+            <span style="position:absolute;left:14px;top:-9px;white-space:nowrap;font-size:12px;color:{{ n.tc }};font-weight:{{ n.fw }}">{{ n.label }}</span>
+          </div>
+        </sc-for>
+        <div style="position:absolute;left:352px;top:236px;width:300px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;box-shadow:var(--cs-shadow-menu);padding:14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box">
+          <span style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:999px;background:var(--cs-cat-1)"></span><span style="font-size:12px;color:var(--cs-dim)">Blog</span><span style="margin-left:auto;color:var(--cs-meta)">×</span></span>
+          <span style="font-size:15px;font-weight:600;line-height:1.3">Translating Everything With Mobility</span>
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding-top:2px">OPEN NOTES · 2</span>
+          <sc-for list="{{ graphNotes }}" as="t" hint-placeholder-count="2">
+            <span style="display:grid;grid-template-columns:20px minmax(0,1fr) 7px;gap:8px;align-items:center;font-size:13px"><span style="width:20px;height:20px;border-radius:999px;box-sizing:border-box;border:1px solid var(--cs-line-strong);background:var(--cs-sunken);font-family:var(--cs-mono);font-size:8px;display:grid;place-items:center">{{ t.av }}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ t.tc }}">{{ t.text }}</span><span style="width:7px;height:7px;border-radius:999px;background:{{ t.dot }}"></span></span>
+          </sc-for>
+          <span style="font-size:13px;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 9px">Start a note…</span>
+          <span style="display:flex;gap:6px"><span style="font-size:13px;font-weight:500;padding:6px 11px;border-radius:2px;background:var(--cs-ink);color:var(--cs-paper)">Open post</span><span style="font-size:13px;padding:6px 11px;border-radius:2px;border:1px solid var(--cs-line-strong)">Focus</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Account notes switches" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px"><span style="font-size:20px;font-weight:600">Your account: Notes group</span><span style="font-size:14px;line-height:1.55;color:#55565b;text-wrap:pretty">Both switches apply to mentions only and save with the screen’s existing save bar. “Allow in this browser” is instant: it opens the browser’s permission prompt. If the browser blocks notifications, the line says “Blocked in this browser. Change it in the site settings of your browser.” and the button goes away. Permission is per browser, so the switch can be on while the line still shows.</span></div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="2">
+  <div style="display:flex;flex-direction:column;gap:8px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">{{ th.label }}</span>
+  <div data-theme="{{ th.id }}" style="width:760px;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);padding:28px 32px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px">
+    <h1 style="margin:0;font-size:26px;font-weight:600">Mara König</h1>
+    <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">NAME · OPTIONAL</span><span style="font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 10px">Mara König</span></label>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">EMAIL</span><span style="font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 10px">one@example.com</span></label>
+    </section>
+    <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:3px"><span style="font-size:16px;font-weight:600">Notes</span><span style="font-size:13px;color:var(--cs-dim)">For when someone mentions you. Everything else collects in Notes for you on the Dashboard.</span></div>
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--cs-line)">
+        <span style="flex:1;font-size:14px">Play a sound when I’m mentioned</span>
+        <span role="switch" aria-checked="true" style="width:34px;height:20px;border-radius:999px;background:var(--cs-accent);position:relative;flex:none"><span style="position:absolute;top:2px;left:16px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;padding:14px 18px">
+        <div style="display:flex;align-items:center;gap:14px"><span style="flex:1;font-size:14px">Show a desktop notification when I’m mentioned</span><span role="switch" aria-checked="true" style="width:34px;height:20px;border-radius:999px;background:var(--cs-accent);position:relative;flex:none"><span style="position:absolute;top:2px;left:16px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span></div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--cs-accent-tint);border-radius:2px;font-size:13px;line-height:1.5"><span style="color:var(--cs-accent);font-weight:600">i</span><span style="flex:1">This browser hasn’t been allowed to show notifications yet.</span><span style="font-weight:500;font-size:12px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">Allow in this browser</span></div>
+      </div>
+    </section>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px">
+      <span style="font-size:13px;color:var(--cs-dim)">1 unsaved change</span>
+      <span style="display:flex;gap:8px"><span style="font-weight:500;font-size:13px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Cancel</span><span style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border-radius:2px;padding:7px 13px">Save</span></span>
+    </div>
+  </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const P = {
+      msg: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
+      msgPlus: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', 'M12 7v6', 'M9 10h6'],
+      clip: ['m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'],
+      smile: ['M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0', 'M8 14s1.5 2 4 2 4-2 4-2', 'M9 9h.01', 'M15 9h.01'],
+      at: ['M16 12a4 4 0 1 1-8 0a4 4 0 1 1 8 0', 'M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8'],
+      pin: ['M12 17v5', 'M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z'],
+      x: ['M18 6 6 18', 'm6 6 12 12'],
+      back: ['m12 19-7-7 7-7', 'M19 12H5'],
+      file: ['M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z', 'M14 2v4a2 2 0 0 0 2 2h4', 'M16 13H8', 'M16 17H8'],
+      download: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3'],
+      check: ['M20 6 9 17l-5-5'],
+      play: ['M6 3l14 9-14 9z']
+    };
+    const mk = s => Object.fromEntries(Object.keys(P).map(k => [k, React.createElement('svg', { width: s, height: s, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', style: { display: 'block', flex: 'none' } }, P[k].map((d, i) => React.createElement('path', { key: i, d })))]));
+    const av = (i, you) => ({ av: i, avBg: you ? 'var(--cs-ink)' : 'var(--cs-sunken)', avFg: you ? 'var(--cs-paper)' : 'var(--cs-ink)', avBd: you ? 'var(--cs-ink)' : 'var(--cs-line-strong)' });
+    const pill = (n, unread) => ({ has: n > 0, n, bg: unread ? 'var(--cs-accent-tint)' : 'transparent', fg: unread ? 'var(--cs-accent)' : 'var(--cs-meta)', bd: unread ? 'var(--cs-accent-tint)' : 'var(--cs-line-strong)' });
+    const row = (i, you, name, when, text, meta, unread) => ({ ...av(i, you), name, when, text, meta, isRow: true, fw: unread ? 600 : 500, tc: unread ? 'var(--cs-ink)' : 'var(--cs-dim)', dot: unread ? 'var(--cs-accent)' : 'transparent' });
+    const nav = active => [
+      ['CONTENT', [['dashboard', 'Dashboard', '3', 1], ['pages', 'Pages'], ['posts', 'Posts'], ['media', 'Media'], ['translations', 'Translations'], ['tags', 'Tags'], ['graph', 'Mind graph'], ['trash', 'Trash', '3']]],
+      ['PEOPLE', [['users', 'Users'], ['groups', 'Groups']]],
+      ['SYSTEM', [['settings', 'Settings'], ['ai', 'AI assistant'], ['status', 'System status'], ['audit', 'Audit log']]]
+    ].map(([label, items]) => ({ label, items: items.map(([id, l, b, acc]) => ({ label: l, badge: b || '',
+      bc: acc ? 'var(--cs-on-accent)' : 'var(--cs-meta)', bb: acc ? 'var(--cs-accent)' : 'transparent', bp: acc ? '0 6px' : '0',
+      bg: id === active ? 'var(--cs-sunken)' : 'transparent', color: id === active ? 'var(--cs-ink)' : 'var(--cs-dim)', weight: id === active ? 500 : 400 })) }));
+    const pinnedRow = row('MK', true, 'Mara König', 'Mon', 'All copy needs my sign-off before the relaunch on 14 October.', 'WHOLE PAGE · 2 REPLIES', false);
+    const groups = [
+      { head: 'SECTION TEAM › COLUMN 1 · IMAGE', rows: [row('JP', false, 'Joanna Pérez', 'yesterday', 'The portrait looks soft on retina screens. Is there a larger original?', '1 REPLY', false)] },
+      { head: 'SECTION TEAM › COLUMN 2 · RICH TEXT', rows: [row('JL', false, 'Jonas Lind', '3h', 'The bios run longer than the others. Trim to two lines?', '3 REPLIES · 1 NEW', true)] }
+    ];
+    const reacts = [{ e: '👍', n: 2, bg: 'var(--cs-accent-tint)', bd: 'var(--cs-accent)', fg: 'var(--cs-accent)' }, { e: '👀', n: 1, bg: 'var(--cs-sunken)', bd: 'var(--cs-line)', fg: 'var(--cs-dim)' }];
+    const msgs = [
+      { ...av('DW'), name: 'Dana Weiss', when: '2h', hasLang: true, mention: '@Mara König', text: ' the German says 2023 here, the press kit says 2024. Which one is right?', hasPdf: true, hasReacts: true, reacts },
+      { ...av('MK', true), name: 'Mara König', when: '1h', edited: true, mention: '', text: '2024 is right. I’ll fix the German. Here is the old page for comparison:', hasImg: true }
+    ];
+    return {
+      ic: mk(16), is: mk(12),
+      themes: [{ id: 'light', label: 'LIGHT' }, { id: 'dark', label: 'DARK' }],
+      opts: [
+        { id: '1b', isB: true, title: 'Page editor + notes drawer · thread replaces the list', note: 'Opening a thread replaces the list, and “All notes” takes you back. The composer stays at the bottom, so it, the @mention picker and Resolve are always within reach, and messages are divided by hairlines. My preference for a 400px drawer, since it also matches the full-screen sheet.' }
+      ],
+      navPages: nav('pages'), navDash: nav('dashboard'),
+      tree: [['Home', 8, '○ 1', 0], ['About', 26, '', 4, true, true], ['Blog', 26, '', 0], ['Resume', 26, '○ 1', 1], ['Now', 26, '', 0]].map(([t, ind, tr, n, unread, sel]) => ({ t, ind: ind + 'px', tr, p: pill(n, unread), bg: sel ? 'var(--cs-sunken)' : 'transparent', weight: sel ? 600 : 400 })),
+      pinned: [pinnedRow], groups, msgs, msgsShort: msgs,
+      picker: [{ av: 'JL', name: 'Jonas Lind', sub: 'jonas@example.com', bg: 'var(--cs-sunken)' }, { av: 'JP', name: 'Joanna Pérez', sub: 'joanna@example.com', bg: 'transparent' }],
+      cardStates: [
+        { label: 'NO NOTES · AT REST', p: pill(0), bg: 'var(--cs-surface)', ring: 'none' },
+        { label: 'NO NOTES · HOVER OR KEYBOARD FOCUS', add: true, p: pill(0), bg: 'var(--cs-surface)', ring: '2px solid var(--cs-accent)' },
+        { label: 'OPEN THREADS', p: pill(2), bg: 'var(--cs-surface)', ring: 'none' },
+        { label: 'UNREAD FOR YOU', p: pill(2, true), bg: 'var(--cs-surface)', ring: 'none' }
+      ],
+      sheetRows: [{ ...pinnedRow }, { isHead: true, head: 'RICH TEXT · INTRO' }, row('DW', false, 'Dana Weiss', '2h', '@Mara König the German says 2023 here, the press kit says 2024. Which one is right?', '2 MESSAGES', false),
+        { isHead: true, head: groups[0].head }, groups[0].rows[0], { isHead: true, head: groups[1].head }, groups[1].rows[0]],
+      inbox: [
+        ['DW', 'Dana Weiss', 'mentioned you', '@Mara König the German says 2023 here, the press kit says 2024.', 'About › Rich text · Intro', '2h', 1],
+        ['JL', 'Jonas Lind', 'replied', 'Trimmed all three. Have a look before I do the German.', 'About › Team › Column 2', '3h', 1],
+        ['JP', 'Joanna Pérez', 'resolved a thread', 'Wrong date in the summary', 'Translating Everything With Mobility', '5h', 1],
+        ['DW', 'Dana Weiss', 'reopened a thread', 'The crop cuts off the crane on narrow screens', 'Library image · harbour-dawn.jpg', 'yesterday'],
+        ['JL', 'Jonas Lind', 'replied', 'Linked the talk recording, see the PDF.', 'Now: shipping translations', 'Mon']
+      ].map(([a, who, did, line, where, when, u]) => ({ av: a, who, did, line, where, when, dot: u ? 'var(--cs-accent)' : 'transparent', fw: u ? 600 : 500, nc: 'var(--cs-ink)', tc: u ? 'var(--cs-ink)' : 'var(--cs-dim)' })),
+      openThreads: [
+        ['About', 'Page', 'var(--cs-meta)', '2px', 'Dana Weiss · 2h', 4],
+        ['Translating Everything With Mobility', 'Blog', 'var(--cs-cat-1)', '999px', 'Joanna Pérez · 5h', 2],
+        ['harbour-dawn.jpg', 'Library image', 'var(--cs-meta)', '2px', 'Dana Weiss · yesterday', 1],
+        ['Now: shipping translations', 'Now update', 'var(--cs-cat-2)', '999px', 'Jonas Lind · Mon', 1],
+        ['Home', 'Page', 'var(--cs-meta)', '2px', 'Mara König · 2 Oct', 1]
+      ].map(([title, type, cat, shape, last, n]) => ({ title, type, cat, shape, last, n })),
+      posts: [
+        ['Translating Everything With Mobility', 'Blog', 'var(--cs-cat-1)', '', 2, true, '2h'],
+        ['Building ContentSpiel', 'Blog', 'var(--cs-cat-1)', '', 0, false, 'yesterday'],
+        ['Now: shipping translations', 'Now update', 'var(--cs-cat-2)', 'Draft', 1, false, 'Mon'],
+        ['Platform engineer, 2023–', 'Resume entry', 'var(--cs-cat-3)', '', 0, false, '28 Sep'],
+        ['Autumn workshop dates', 'Blog', 'var(--cs-cat-1)', 'Scheduled', 0, false, '27 Sep']
+      ].map(([title, type, cat, status, n, u, when]) => ({ title, type, cat, status, pl: pill(n, u), when })),
+      tiles: [['harbour-dawn.jpg', 2, true], ['team-2025.jpg', 0], ['office-wide.jpg', 0], ['portrait-jl.jpg', 1], ['press-kit-cover.png', 0], ['old-about.png', 0]].map(([name, n, sel]) => ({ name, n, has: n > 0, ring: sel ? '2px solid var(--cs-accent)' : 'none' })),
+      mediaNotes: [
+        { av: 'DW', name: 'Dana Weiss', when: 'yesterday', text: 'The crop cuts off the crane on narrow screens.', fw: 600, tc: 'var(--cs-ink)', dot: 'var(--cs-accent)' },
+        { av: 'JP', name: 'Joanna Pérez', when: '28 Sep', text: 'Alt text needs the Spanish version.', fw: 500, tc: 'var(--cs-dim)', dot: 'transparent' }
+      ],
+      gnodes: [
+        { x: '330px', y: '210px', d: '20px', off: '-10px', rad: '999px', fill: 'var(--cs-cat-1)', bd: '0', ring: '0 0 0 2px var(--cs-surface), 0 0 0 4px var(--cs-accent)', has: true, n: 2, label: 'Translating Everything With Mobility', tc: 'var(--cs-ink)', fw: 600, op: 1 },
+        { x: '560px', y: '110px', d: '16px', off: '-8px', rad: '999px', fill: 'var(--cs-cat-1)', bd: '0', ring: 'none', has: true, n: 1, label: 'Building ContentSpiel', tc: 'var(--cs-dim)', fw: 400, op: 1 },
+        { x: '860px', y: '160px', d: '12px', off: '-6px', rad: '999px', fill: 'var(--cs-cat-1)', bd: '0', ring: 'none', has: false, label: 'Deploying with Kamal', tc: 'var(--cs-dim)', fw: 400, op: 0.35 },
+        { x: '200px', y: '330px', d: '10px', off: '-5px', rad: '0', fill: 'var(--cs-surface)', bd: '1.5px solid var(--cs-meta)', ring: 'none', has: false, label: 'i18n (3)', tc: 'var(--cs-meta)', fw: 400, op: 1 },
+        { x: '180px', y: '90px', d: '10px', off: '-5px', rad: '0', fill: 'var(--cs-surface)', bd: '1.5px solid var(--cs-meta)', ring: 'none', has: false, label: 'ruby (4)', tc: 'var(--cs-meta)', fw: 400, op: 1 }
+      ],
+      graphNotes: [
+        { av: 'JP', text: 'The Spanish title is too long for the card', tc: 'var(--cs-ink)', dot: 'var(--cs-accent)' },
+        { av: 'DW', text: 'Link the German version of the talk?', tc: 'var(--cs-dim)', dot: 'transparent' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

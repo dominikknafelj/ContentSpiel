@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="posts" hint-size="232px,100vh"></dc-import>
+<main style="display:flex;flex-direction:column;min-width:0">
+  <header style="position:sticky;top:0;z-index:5;background:var(--cs-paper);border-bottom:1px solid var(--cs-line);padding:16px 28px 0;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--cs-meta)"><a href="Studio%20Posts.dc.html" style="color:var(--cs-meta)">Posts</a> / <span style="display:inline-flex;gap:6px;align-items:center"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-cat-1)"></span>Blog post</span></span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-family:var(--cs-mono);font-size:11px;color:{{ saveColor }};margin-right:6px">{{ saveState }}</span>
+        <button style="font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;cursor:pointer">Preview</button>
+        <sc-if value="{{ drafts }}" hint-placeholder-val="{{ false }}"><button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;cursor:pointer">Publish changes</button></sc-if>
+        <button style="font-size:14px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px;cursor:pointer">⋯</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <h1 style="margin:0;font-size:26px;font-weight:600">{{ heading }}</h1>
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>Live</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;font-size:12px">
+      <span style="font-family:var(--cs-mono);color:var(--cs-dim)">{{ path }}</span>
+      <button style="font-size:11px;background:transparent;color:var(--cs-dim);border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px">Copy</button>
+      <a href="Demo%20Site.dc.html">View on site ↗</a>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;gap:2px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.pick }}" title="{{ t.tip }}" style="display:flex;gap:7px;align-items:center;font-size:13px;padding:8px 12px;border:0;border-bottom:2px solid {{ t.line }};background:transparent;color:{{ t.fg }};font-weight:{{ t.weight }};cursor:pointer">{{ t.name }}<span style="width:7px;height:7px;border-radius:999px;box-sizing:border-box;background:{{ t.dotBg }};border:1px solid {{ t.dotBorder }};display:{{ t.dotDisplay }}"></span></button>
+        </sc-for>
+      </div>
+      <sc-if value="{{ tr }}" hint-placeholder-val="{{ true }}">
+        <button style="font-weight:500;font-size:12px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px;margin-bottom:6px">Suggest translation for 1 empty field</button>
+      </sc-if>
+    </div>
+  </header>
+
+  <div style="padding:22px 28px 64px;max-width:1080px;width:100%;box-sizing:border-box">
+  <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:18px;display:flex;flex-direction:column;gap:20px">
+
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:12px;align-items:start">
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TITLE</span>
+        <span style="font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px">{{ title }}</span></label>
+      <sc-if value="{{ tr }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:18px;border:1px solid var(--cs-warn);border-radius:2px;background:var(--cs-paper);padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+          <span style="display:flex;justify-content:space-between;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">ENGLISH</span><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.1em;color:var(--cs-warn-ink)">↻ CHANGED 1 DAY AGO</span></span>
+          <span style="font-size:14px">Welcome to <span style="text-decoration:line-through;color:var(--cs-danger-ink);background:var(--cs-danger-tint);padding:0 2px">the</span> <span style="color:var(--cs-ok-ink);background:var(--cs-ok-tint);padding:0 2px">our</span> new site</span>
+          <span style="display:flex;gap:6px;flex-wrap:wrap">
+            <button style="font-size:12px;font-weight:500;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:4px 9px">Suggest update</button>
+            <button style="font-size:12px;font-weight:500;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:4px 9px">Still correct — mark up to date</button>
+          </span>
+        </div>
+      </sc-if>
+    </div>
+
+    <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">SLUG</span>
+      <div style="display:flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden"><span style="font-family:var(--cs-mono);font-size:12px;color:var(--cs-meta);background:var(--cs-sunken);padding:10px;border-right:1px solid var(--cs-line)">{{ slugPrefix }}</span><span style="font-family:var(--cs-mono);font-size:13px;padding:9px 11px">welcome-to-the-new-site</span></div></label>
+
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:12px;align-items:start">
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">EXCERPT</span>
+        <span style="font-size:14px;line-height:1.5;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;min-height:56px;box-sizing:border-box">{{ excerpt }}</span></label>
+      <sc-if value="{{ tr }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:18px;border:1px solid var(--cs-line);border-radius:2px;background:var(--cs-paper);padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">ENGLISH</span>
+          <span style="font-size:14px">We rebuilt everything from scratch.</span>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:12px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">BODY</span>
+        <div style="border:1px solid var(--cs-line-strong);border-radius:2px">
+          <div style="display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:5px 6px;border-bottom:1px solid var(--cs-line);background:var(--cs-paper);font-family:var(--cs-mono);font-size:12px;color:var(--cs-dim)">
+            <span style="padding:3px 7px;font-weight:600">B</span><span style="padding:3px 7px;font-style:italic">I</span><span style="padding:3px 7px">&lt;&gt;</span>
+            <span style="width:1px;height:16px;background:var(--cs-line-strong);margin:0 4px"></span>
+            <span style="padding:3px 7px">H2</span><span style="padding:3px 7px">H3</span>
+            <span style="width:1px;height:16px;background:var(--cs-line-strong);margin:0 4px"></span>
+            <span style="padding:3px 7px">•</span><span style="padding:3px 7px">1.</span>
+            <span style="width:1px;height:16px;background:var(--cs-line-strong);margin:0 4px"></span>
+            <span style="padding:3px 7px">Link</span><span style="padding:3px 7px">Insert ▾</span>
+          </div>
+          <sc-if value="{{ hasSuggestion }}" hint-placeholder-val="{{ true }}">
+            <div style="margin:10px;border:1px solid var(--cs-accent);border-radius:2px;background:var(--cs-accent-tint);padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+              <span style="display:flex;justify-content:space-between"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-accent)">SUGGESTED TRANSLATION · EDIT BEFORE USING</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">CLAUDE-SONNET-5</span></span>
+              <div contenteditable="true" style="font-size:14px;line-height:1.6;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 10px;outline:none">Wir haben alles von Grund auf neu gebaut.<br></br><br></br>Hier ist der Grund.</div>
+              <span style="display:flex;gap:6px">
+                <button onClick="{{ useIt }}" style="font-size:12px;font-weight:500;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:4px 10px;cursor:pointer">Use</button>
+                <button onClick="{{ discard }}" style="font-size:12px;font-weight:500;background:transparent;color:var(--cs-dim);border:1px solid var(--cs-line-strong);border-radius:2px;padding:4px 10px;cursor:pointer">Discard</button>
+              </span>
+            </div>
+          </sc-if>
+          <div style="padding:12px 14px;font-size:15px;line-height:1.6;min-height:90px;color:{{ bodyColor }}">{{ body }}</div>
+        </div>
+      </div>
+      <sc-if value="{{ tr }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:18px;border:1px solid var(--cs-line);border-radius:2px;background:var(--cs-paper);padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.6">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">ENGLISH</span>
+          <span>We rebuilt everything from scratch.</span><span>Here is why.</span>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TAGS · SHARED BY ALL LANGUAGES</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 8px">
+        <span style="display:inline-flex;gap:6px;align-items:center;font-size:12px;background:var(--cs-sunken);border-radius:999px;padding:3px 6px 3px 10px">news <span style="color:var(--cs-meta)">×</span></span>
+        <span style="display:inline-flex;gap:6px;align-items:center;font-size:12px;background:var(--cs-sunken);border-radius:999px;padding:3px 6px 3px 10px">studio <span style="color:var(--cs-meta)">×</span></span>
+        <span style="font-size:13px;color:var(--cs-meta);padding:2px 4px">Add a tag…</span>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">RELATED POSTS</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 8px">
+        <span style="font-size:13px;color:var(--cs-meta);padding:2px 4px">Search posts to link…</span>
+      </div>
+      <span style="font-size:12px;color:var(--cs-meta)">Related posts show at the end of the article and in the Mind graph.</span></div>
+  </section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;drafts&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;lang&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;en&quot;,&quot;de&quot;,&quot;es&quot;],&quot;default&quot;:&quot;de&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { lang: null, suggestion: true, used: false };
+  renderVals() {
+    const lang = this.state.lang ?? this.props.lang ?? 'de';
+    const tr = lang !== 'en';
+    const de = lang === 'de';
+    const used = this.state.used;
+    return {
+      drafts: !!this.props.drafts, saveState: this.props.drafts ? 'SAVED 10:42' : '● SAVED TO SITE 10:42', saveColor: this.props.drafts ? 'var(--cs-meta)' : 'var(--cs-ok-ink)',
+      tr, cols: tr ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)',
+      heading: de ? 'Willkommen auf der neuen Seite' : lang === 'es' ? 'Welcome to our new site' : 'Welcome to our new site',
+      title: de ? 'Willkommen auf der neuen Seite' : lang === 'es' ? '' : 'Welcome to our new site',
+      path: (tr ? '/' + lang : '') + '/blog/welcome-to-the-new-site',
+      slugPrefix: (tr ? '/' + lang : '') + '/blog/',
+      excerpt: de ? 'Alles neu.' : lang === 'es' ? '' : 'We rebuilt everything from scratch.',
+      hasSuggestion: de && this.state.suggestion && !used,
+      body: used ? 'Wir haben alles von Grund auf neu gebaut. Hier ist der Grund.' : tr ? 'Empty — write it, or use the suggestion.' : 'We rebuilt everything from scratch. Here is why.',
+      bodyColor: tr && !used ? 'var(--cs-meta)' : 'var(--cs-ink)',
+      useIt: () => this.setState({ used: true }), discard: () => this.setState({ suggestion: false }),
+      tabs: [['en', 'English', 'done'], ['de', 'Deutsch', 'outdated'], ['es', 'Español', 'missing']].map(([id, name, s]) => ({ name,
+        pick: () => this.setState({ lang: id }), tip: { done: '', outdated: 'English changed since translation', missing: 'Not translated yet' }[s],
+        line: id === lang ? 'var(--cs-ink)' : 'transparent', fg: id === lang ? 'var(--cs-ink)' : 'var(--cs-dim)', weight: id === lang ? 600 : 400,
+        dotDisplay: s === 'done' ? 'none' : 'inline-block', dotBg: s === 'outdated' ? 'var(--cs-warn)' : 'transparent', dotBorder: s === 'outdated' ? 'var(--cs-warn)' : 'var(--cs-meta)' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

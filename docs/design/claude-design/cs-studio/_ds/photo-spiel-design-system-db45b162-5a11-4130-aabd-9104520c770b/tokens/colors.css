@@ -1,0 +1,64 @@
+/* ============================================================
+   COLORS — VANTAGE (the production theme)
+   True black ground so photographs glow; near-white text stepping
+   down through dim/faint; cold steel-blue accent (amber is the
+   photographer's saved default). Hairlines do the dividing.
+   ============================================================ */
+:root {
+  /* --- base surfaces --- */
+  --bg:        #060607;   /* page background, true black */
+  --bg-elev:   #0c0c0e;   /* slightly raised surfaces */
+  --panel:     #0d0d10;   /* admin panels / inputs */
+  --panel-2:   #131318;   /* admin menus / raised panels */
+  --pure:      #000000;   /* photo letterbox / tile ground */
+
+  /* --- base text --- */
+  --fg:        #f5f5f6;   /* primary text */
+  --fg-dim:    #8c8d92;   /* secondary text, idle nav */
+  --fg-faint:  #515257;   /* captions, meta, mono labels */
+
+  /* --- hairlines (the structural language of Vantage) --- */
+  --line:        rgba(255,255,255,0.10);  /* soft dividers */
+  --line-strong: rgba(255,255,255,0.22);  /* structural contact-sheet rules */
+
+  /* --- accent ---
+     Native Vantage accent is steel-blue; amber is the photographer's
+     saved global default and the admin primary-button color. */
+  --accent:        oklch(0.74 0.10 236);  /* steel-blue (native) */
+  --accent-amber:  oklch(0.76 0.14 62);   /* amber (saved default) */
+
+  /* --- accent options (Tweaks + per-album appearance) --- */
+  --accent-auto:    var(--accent);        /* inherit theme accent */
+  --accent-steel:   oklch(0.74 0.10 236);
+  --accent-amber-o: oklch(0.76 0.14 62);
+  --accent-mono:    #e9e3d3;              /* warm off-white */
+  --accent-crimson: oklch(0.64 0.17 25);
+
+  /* --- status --- */
+  --ok:      oklch(0.74 0.13 150);   /* processed / published */
+  --danger:  oklch(0.66 0.18 25);    /* delete / destructive */
+
+  /* --- on-accent ink (text that sits on an amber fill) --- */
+  --on-accent: #1a1206;
+
+  /* ============================================================
+     SEMANTIC ALIASES — reference these in product code
+     ============================================================ */
+  --surface-page:    var(--bg);
+  --surface-elev:    var(--bg-elev);
+  --surface-panel:   var(--panel);
+  --surface-menu:    var(--panel-2);
+
+  --text-primary:    var(--fg);
+  --text-secondary:  var(--fg-dim);
+  --text-meta:       var(--fg-faint);   /* mono labels, captions, EXIF keys */
+  --text-link:       var(--accent);
+  --text-on-accent:  var(--on-accent);
+
+  --border-soft:     var(--line);
+  --border-strong:   var(--line-strong);
+  --border-focus:    var(--accent);
+
+  --fill-primary:    var(--accent-amber);  /* primary button */
+  --fill-danger:     var(--danger);
+}

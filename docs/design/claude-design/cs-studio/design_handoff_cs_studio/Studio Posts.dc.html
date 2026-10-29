@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="posts" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:18px;max-width:1200px;width:100%;box-sizing:border-box">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+    <h1 style="margin:0;font-size:26px;font-weight:600">Posts</h1>
+    <div style="display:flex">
+      <a href="Studio%20Post%20Editor.dc.html" style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px 0 0 2px;padding:8px 14px">New blog post</a>
+      <button style="font-size:11px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-left:1px solid var(--cs-on-accent);border-radius:0 2px 2px 0;padding:8px 9px;cursor:pointer;opacity:0.95">▾</button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input placeholder="Search titles" style="width:220px;font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 10px;outline:none"></input>
+    <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface)">
+      <sc-for list="{{ scopes }}" as="s" hint-placeholder-count="4">
+        <button onClick="{{ s.go }}" style="display:flex;gap:6px;align-items:center;font-size:13px;padding:6px 11px;border:0;border-right:1px solid var(--cs-line);cursor:pointer;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}<span style="font-family:var(--cs-mono);font-size:10px;opacity:0.7">{{ s.n }}</span></button>
+      </sc-for>
+    </div>
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Type: All <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Tag: Any <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Translation: Any <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+  </div>
+
+  <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;padding:8px 12px;background:var(--cs-accent-tint);border-radius:2px;font-size:13px">
+      <span><b style="font-weight:600">{{ selCount }}</b> selected</span>
+      <span style="display:flex;gap:8px">
+        <button style="font-size:12px;font-weight:500;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">Publish</button>
+        <button style="font-size:12px;font-weight:500;background:var(--cs-surface);color:var(--cs-danger);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">Move to trash</button>
+        <button onClick="{{ clearSel }}" style="font-size:12px;background:transparent;color:var(--cs-dim);border:0;padding:5px 6px;cursor:pointer">Clear</button>
+      </span>
+    </div>
+  </sc-if>
+
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;overflow-x:auto">
+    <div style="display:grid;grid-template-columns:20px minmax(240px,1fr) 130px 120px 130px 96px 44px;gap:12px;min-width:820px;padding:9px 14px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta);align-items:center">
+      <span style="width:14px;height:14px;border:1px solid var(--cs-line-strong);border-radius:2px;box-sizing:border-box"></span><span>TITLE</span><span>TYPE</span><span>STATUS</span><span>TRANSLATIONS</span><span>UPDATED ↓</span><span></span>
+    </div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:20px minmax(240px,1fr) 130px 120px 130px 96px 44px;gap:12px;min-width:820px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--cs-line);background:{{ r.rowBg }}" style-hover="background:var(--cs-paper)">
+        <button onClick="{{ r.toggle }}" style="width:14px;height:14px;padding:0;border-radius:2px;box-sizing:border-box;cursor:pointer;border:1px solid {{ r.cbBorder }};background:{{ r.cbBg }};color:var(--cs-on-accent);font-size:10px;line-height:12px">{{ r.check }}</button>
+        <a href="Studio%20Post%20Editor.dc.html" style="display:flex;flex-direction:column;gap:2px;min-width:0;color:var(--cs-ink)">
+          <span style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.title }}</span>
+          <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.path }}</span>
+        </a>
+        <span style="display:flex;gap:7px;align-items:center;font-size:13px;color:var(--cs-dim)"><span style="width:7px;height:7px;border-radius:999px;background:{{ r.cat }}"></span>{{ r.type }}</span>
+        <span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:{{ r.dot }}"></span>{{ r.status }}</span></span>
+        <span style="display:flex;gap:4px;align-items:center">
+          <sc-for list="{{ r.tr }}" as="t" hint-placeholder-count="2"><span title="{{ t.tip }}" style="font-family:var(--cs-mono);font-size:10px;color:{{ t.fg }};border:1px {{ t.style }} {{ t.border }};border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">{{ t.label }}</span></sc-for>
+        </span>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ r.when }}</span>
+        <button style="font-size:14px;background:transparent;border:0;color:var(--cs-meta);cursor:pointer" title="Preview, duplicate, move to trash">⋯</button>
+      </div>
+    </sc-for>
+    <div style="display:flex;justify-content:space-between;padding:10px 14px;font-size:12px;color:var(--cs-dim)"><span>{{ rowCount }} posts</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">FILTERS APPLY AS YOU CHOOSE</span></div>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { scope: 'All', sel: [] };
+  renderVals() {
+    const S = { Live: 'var(--cs-ok)', Draft: 'var(--cs-meta)', Scheduled: 'var(--cs-warn)' };
+    const C = { 'Blog post': 'var(--cs-cat-1)', 'Now update': 'var(--cs-cat-2)', 'Resume entry': 'var(--cs-cat-3)' };
+    const tr = (code, s) => ({ label: code + (s === 'outdated' ? ' ↻' : s === 'missing' ? ' ○' : ''), tip: { done: 'Translated', missing: 'Not translated', outdated: 'English changed since translation' }[s],
+      fg: s === 'done' ? 'var(--cs-ink)' : s === 'outdated' ? 'var(--cs-warn-ink)' : 'var(--cs-meta)',
+      border: s === 'outdated' ? 'var(--cs-warn)' : 'var(--cs-line-strong)', style: s === 'missing' ? 'dashed' : 'solid' });
+    const all = [
+      [1, 'Now: shipping translations', '/now/shipping-translations', 'Now update', 'Live', 'missing', 'missing', '2h ago'],
+      [2, 'Notes on editing in the dark', '/blog/notes-on-editing-in-the-dark', 'Blog post', 'Draft', 'missing', 'missing', '2h ago'],
+      [3, 'Autumn workshop dates', '/blog/autumn-workshop-dates', 'Blog post', 'Scheduled', 'missing', 'missing', '2h ago'],
+      [4, 'Five lenses we actually use', '/blog/five-lenses-we-actually-use', 'Blog post', 'Live', 'missing', 'missing', '1d ago'],
+      [5, 'Welcome to our new site', '/blog/welcome-to-the-new-site', 'Blog post', 'Live', 'outdated', 'missing', '1d ago']
+    ];
+    const scope = this.state.scope;
+    const map = { All: null, Live: 'Live', Drafts: 'Draft', Scheduled: 'Scheduled' };
+    const rows = all.filter(r => !map[scope] || r[4] === map[scope]).map(([id, title, path, type, status, de, es, when]) => {
+      const on = this.state.sel.includes(id);
+      return { title, path, type, status, when, cat: C[type], dot: S[status], tr: [tr('DE', de), tr('ES', es)],
+        rowBg: on ? 'var(--cs-accent-tint)' : 'transparent', check: on ? '✓' : '',
+        cbBorder: on ? 'var(--cs-accent)' : 'var(--cs-line-strong)', cbBg: on ? 'var(--cs-accent)' : 'transparent',
+        toggle: () => this.setState(s => ({ sel: s.sel.includes(id) ? s.sel.filter(x => x !== id) : [...s.sel, id] })) };
+    });
+    const count = k => !map[k] ? all.length : all.filter(r => r[4] === map[k]).length;
+    return {
+      scopes: ['All', 'Live', 'Drafts', 'Scheduled'].map(label => ({ label, n: count(label), go: () => this.setState({ scope: label }),
+        bg: scope === label ? 'var(--cs-ink)' : 'transparent', fg: scope === label ? 'var(--cs-paper)' : 'var(--cs-ink)' })),
+      rows, rowCount: rows.length,
+      hasSel: this.state.sel.length > 0, selCount: this.state.sel.length, clearSel: () => this.setState({ sel: [] })
+    };
+  }
+}
+</script>
+</body>
+</html>

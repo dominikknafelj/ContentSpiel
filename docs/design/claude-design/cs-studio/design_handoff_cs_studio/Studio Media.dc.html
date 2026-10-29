@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr) 340px;min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="media" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:16px;min-width:0">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+    <h1 style="margin:0;font-size:26px;font-weight:600">Media</h1>
+    <button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:8px 14px;cursor:pointer">Upload images</button>
+  </div>
+  <div style="border:1px dashed var(--cs-line-strong);border-radius:2px;padding:14px;text-align:center;font-size:13px;color:var(--cs-dim)">Drop images anywhere on this page to upload. JPG, PNG, WebP or GIF, up to 10 MB.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input placeholder="Search title, alt text or filename" style="width:260px;font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 10px;outline:none"></input>
+    <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface)">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+        <button onClick="{{ f.go }}" style="display:flex;gap:6px;align-items:center;font-size:13px;padding:6px 11px;border:0;border-right:1px solid var(--cs-line);cursor:pointer;background:{{ f.bg }};color:{{ f.fg }}">{{ f.label }}<span style="font-family:var(--cs-mono);font-size:10px;opacity:0.7">{{ f.n }}</span></button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
+    <sc-for list="{{ items }}" as="m" hint-placeholder-count="3">
+      <button onClick="{{ m.pick }}" style="text-align:left;padding:0;cursor:pointer;background:var(--cs-surface);border:1px solid {{ m.border }};box-shadow:{{ m.ring }};border-radius:2px;display:flex;flex-direction:column;overflow:hidden;color:var(--cs-ink)">
+        <div style="aspect-ratio:4/3;width:100%;background:{{ m.fill }}"></div>
+        <div style="padding:9px 10px;display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:13px;font-weight:500">{{ m.title }}</span>
+          <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">{{ m.dims }}</span>
+            <sc-if value="{{ m.noAlt }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-warn-ink);border:1px solid var(--cs-warn);border-radius:2px;padding:0 4px">NO ALT</span></sc-if>
+            <sc-if value="{{ m.unused }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:0 4px">UNUSED</span></sc-if></span>
+        </div>
+      </button>
+    </sc-for>
+  </div>
+</main>
+
+<aside style="border-left:1px solid var(--cs-line);background:var(--cs-chrome);padding:20px;display:flex;flex-direction:column;gap:14px;height:100vh;position:sticky;top:0;box-sizing:border-box;overflow-y:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;font-weight:600">{{ sel.title }}</span><span style="font-size:16px;color:var(--cs-meta);cursor:pointer">×</span></div>
+  <div style="aspect-ratio:4/3;background:{{ sel.fill }};border:1px solid var(--cs-line)"></div>
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)"><span>FILE</span><span style="color:var(--cs-dim);text-align:right">{{ sel.file }}</span><span>SIZE</span><span style="color:var(--cs-dim);text-align:right">{{ sel.dims }} · {{ sel.kb }}</span></div>
+  <div style="display:flex;gap:2px;border-bottom:1px solid var(--cs-line)">
+    <span style="font-size:13px;padding:6px 10px;border-bottom:2px solid var(--cs-ink);font-weight:600">English</span>
+    <span style="font-size:13px;padding:6px 10px;color:var(--cs-dim);display:flex;gap:6px;align-items:center">Deutsch<span style="width:7px;height:7px;border-radius:999px;border:1px solid var(--cs-meta);box-sizing:border-box"></span></span>
+    <span style="font-size:13px;padding:6px 10px;color:var(--cs-dim);display:flex;gap:6px;align-items:center">Español<span style="width:7px;height:7px;border-radius:999px;border:1px solid var(--cs-meta);box-sizing:border-box"></span></span>
+  </div>
+  <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TITLE</span><span style="font-size:14px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 10px">{{ sel.title }}</span></label>
+  <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">ALT TEXT</span><span style="font-size:14px;background:var(--cs-surface);border:1px solid {{ sel.altBorder }};border-radius:2px;padding:8px 10px;color:{{ sel.altColor }}">{{ sel.alt }}</span><span style="font-size:12px;color:var(--cs-meta)">Describe the image for people who can’t see it.</span></label>
+  <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">CAPTION</span><span style="font-size:14px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 10px;min-height:38px;box-sizing:border-box">{{ sel.caption }}</span></label>
+  <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">USED ON</span><span style="font-size:13px;color:var(--cs-dim)">{{ sel.used }}</span></div>
+  <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:14px;border-top:1px solid var(--cs-line)">
+    <button disabled="{{ sel.trashDisabled }}" style="font-weight:500;font-size:13px;background:var(--cs-surface);color:{{ sel.trashColor }};border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 12px;align-self:flex-start;opacity:{{ sel.trashOpacity }}">Move to trash</button>
+    <span style="font-size:12px;color:var(--cs-meta)">{{ sel.trashHelp }}</span>
+  </div>
+</aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { f: 'All', sel: 2 };
+  renderVals() {
+    const all = [
+      { id: 0, title: 'tiny', file: 'tiny.png', dims: '1×1', kb: '68 B', fill: '#000', alt: '', caption: '', used: 'Not used anywhere.' },
+      { id: 1, title: 'Desk detail', file: 'desk.png', dims: '1600×1200', kb: '1.2 MB', fill: '#ff6647', alt: 'Notebook and camera on a desk', caption: 'Where the work happens', used: 'About › Image block' },
+      { id: 2, title: 'Studio window', file: 'studio-window.png', dims: '1600×1200', kb: '1.01 KB', fill: '#87ceeb', alt: 'Morning light through the studio window', caption: 'The studio, March', used: 'About › Hero image' }
+    ];
+    const used = m => !m.used.startsWith('Not');
+    const F = { All: () => true, Unused: m => !used(m), 'Missing alt': m => !m.alt, Untranslated: () => true };
+    const s = all.find(m => m.id === this.state.sel) || all[0];
+    return {
+      filters: Object.keys(F).map(label => ({ label, n: all.filter(F[label]).length, go: () => this.setState({ f: label }),
+        bg: this.state.f === label ? 'var(--cs-ink)' : 'transparent', fg: this.state.f === label ? 'var(--cs-paper)' : 'var(--cs-ink)' })),
+      items: all.filter(F[this.state.f]).map(m => ({ ...m, noAlt: !m.alt, unused: !used(m), pick: () => this.setState({ sel: m.id }),
+        border: m.id === s.id ? 'var(--cs-accent)' : 'var(--cs-line)', ring: m.id === s.id ? '0 0 0 3px var(--cs-accent-tint)' : 'none' })),
+      sel: { ...s, alt: s.alt || 'Add alt text', altColor: s.alt ? 'var(--cs-ink)' : 'var(--cs-meta)', altBorder: s.alt ? 'var(--cs-line-strong)' : 'var(--cs-warn)',
+        trashColor: used(s) ? 'var(--cs-meta)' : 'var(--cs-danger)', trashDisabled: used(s), trashOpacity: used(s) ? 0.55 : 1,
+        trashHelp: used(s) ? 'Can’t be trashed while ' + s.used.split(' ›')[0] + ' uses it. Remove it there first.' : 'Kept in Trash for 30 days.' }
+    };
+  }
+}
+</script>
+</body>
+</html>

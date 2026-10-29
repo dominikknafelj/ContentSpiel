@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="position:relative;display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="posts" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px;display:flex;flex-direction:column;gap:16px">
+  <h1 style="margin:0;font-size:26px;font-weight:600">Posts</h1>
+  <div style="height:38px;background:var(--cs-surface);border:1px solid var(--cs-line)"></div>
+  <div style="height:320px;background:var(--cs-surface);border:1px solid var(--cs-line)"></div>
+</main>
+
+<div style="position:fixed;inset:0;z-index:20;background:color-mix(in srgb, var(--cs-ink) 38%, transparent);display:flex;flex-direction:column;align-items:center;padding:20px 20px 40px;overflow-y:auto;box-sizing:border-box">
+  <div style="display:flex;flex-wrap:wrap;justify-content:center;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface);margin-bottom:{{ topGap }}">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="18">
+      <button onClick="{{ t.go }}" style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.1em;padding:6px 10px;border:0;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ isNewPost }}" hint-placeholder-val="{{ true }}">
+    <div role="dialog" style="width:100%;max-width:560px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">New post</span><span style="font-size:16px;color:var(--cs-meta)">×</span></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TYPE</span>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <sc-for list="{{ types }}" as="ty" hint-placeholder-count="3">
+              <button onClick="{{ ty.pick }}" style="display:flex;gap:8px;align-items:center;font-size:13px;padding:9px 10px;background:{{ ty.bg }};border:1px solid {{ ty.border }};border-radius:2px;color:var(--cs-ink);cursor:pointer"><span style="width:7px;height:7px;border-radius:999px;background:{{ ty.dot }}"></span>{{ ty.name }}</button>
+            </sc-for>
+          </div></div>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TITLE</span><input value="Notes on editing in the dark" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint);border-radius:2px;padding:9px 11px;outline:none"></input>
+          <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ typePath }}notes-on-editing-in-the-dark</span></label>
+        <span style="font-size:12px;color:var(--cs-meta)">Created as a draft in English. Everything can be changed in the editor.</span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)"><button style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 12px">Cancel</button><button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 14px">Create draft</button></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isNewPage }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" style="width:100%;max-width:560px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">New page</span><span style="font-size:16px;color:var(--cs-meta)">×</span></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:16px">
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TITLE</span><input value="Team" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">INSIDE</span><span style="display:flex;justify-content:space-between;font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px">Home › About<span style="font-size:10px;color:var(--cs-meta)">▾</span></span></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">PAGE TYPE</span><span style="display:flex;justify-content:space-between;font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px">Standard<span style="font-size:10px;color:var(--cs-meta)">▾</span></span></label>
+        </div>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">URL: /about/team</span>
+        <span style="font-size:12px;color:var(--cs-meta)">Created as a draft at the end of About. Drag it in the tree to move it.</span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)"><button style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 12px">Cancel</button><button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 14px">Create page</button></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isPicker }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" style="width:100%;max-width:880px;max-height:85vh;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">Choose an image</span><span style="display:flex;gap:14px;align-items:center"><button style="font-weight:500;font-size:12px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 11px">Upload</button><span style="font-size:16px;color:var(--cs-meta)">×</span></span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 18px;border-bottom:1px solid var(--cs-line)">
+        <input placeholder="Search title, alt text or filename" style="width:260px;font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 10px;outline:none"></input>
+        <span style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;font-size:13px"><span style="padding:6px 11px;background:var(--cs-ink);color:var(--cs-paper)">All</span><span style="padding:6px 11px;border-left:1px solid var(--cs-line)">Unused</span><span style="padding:6px 11px;border-left:1px solid var(--cs-line)">Missing alt</span></span>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:16px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+        <sc-for list="{{ media }}" as="m" hint-placeholder-count="8">
+          <button onClick="{{ m.pick }}" style="padding:0;text-align:left;cursor:pointer;background:var(--cs-surface);border:1px solid {{ m.border }};box-shadow:{{ m.ring }};border-radius:2px;overflow:hidden;display:flex;flex-direction:column;color:var(--cs-ink)">
+            <div style="aspect-ratio:4/3;width:100%;background:{{ m.fill }}"></div>
+            <span style="padding:7px 9px;display:flex;justify-content:space-between;gap:6px;font-size:12px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.title }}</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-warn-ink)">{{ m.flag }}</span></span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)">
+        <span style="font-size:13px;color:var(--cs-dim)">{{ pickText }}</span>
+        <span style="display:flex;gap:8px"><button style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 12px">Cancel</button><button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 14px">Use image</button></span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isPalette }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" style="width:100%;max-width:560px;margin-top:8vh;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--cs-line)"><input value="{{ q }}" onInput="{{ onQ }}" placeholder="Jump to a page, post or setting" style="flex:1;font-size:15px;color:var(--cs-ink);background:transparent;border:0;outline:none"></input><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px">ESC</span></div>
+      <div style="display:flex;flex-direction:column;padding:4px;max-height:420px;overflow-y:auto">
+        <sc-for list="{{ results }}" as="g" hint-placeholder-count="3">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 12px 4px">{{ g.label }}</span>
+          <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="2">
+            <span style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:2px;background:{{ r.bg }}">
+              <span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:7px;height:7px;border-radius:999px;background:{{ r.dot }};display:{{ r.dotDisplay }}"></span><span style="font-size:14px">{{ r.title }}</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.sub }}</span></span>
+              <span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">{{ r.right }}</span>
+            </span>
+          </sc-for>
+        </sc-for>
+        <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:18px 12px;display:flex;flex-direction:column;gap:4px"><span style="font-size:14px">Nothing matches “{{ q }}”.</span><span style="font-size:13px;color:var(--cs-dim)">Search covers page and post titles, slugs and settings.</span></div>
+          <span style="display:flex;justify-content:space-between;padding:8px 12px;border-radius:2px;background:var(--cs-sunken);font-size:14px"><span>New blog post “{{ q }}”</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">↵</span></span>
+        </sc-if>
+      </div>
+      <div style="display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--cs-line);font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"><span>↑↓ MOVE</span><span>↵ OPEN</span><span>⌘↵ NEW TAB</span></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isConfirm }}" hint-placeholder-val="{{ false }}">
+    <div role="alertdialog" style="width:100%;max-width:420px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">{{ cf.title }}</span><span style="font-size:16px;color:var(--cs-meta)">×</span></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.55;color:var(--cs-dim)"><span>{{ cf.body }}</span>
+        <sc-if value="{{ cf.hasWarn }}" hint-placeholder-val="{{ false }}"><span style="padding:10px 12px;background:var(--cs-warn-tint);color:var(--cs-warn-ink);border-radius:2px;font-size:13px">{{ cf.warn }}</span></sc-if></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)">
+        <button style="font-weight:500;font-size:13px;background:transparent;color:{{ cf.cancelColor }};border:1px solid transparent;border-radius:2px;padding:7px 12px">{{ cf.cancel }}</button>
+        <button style="font-weight:500;font-size:13px;background:{{ cf.okBg }};color:{{ cf.okFg }};border:1px solid {{ cf.okBg }};border-radius:2px;padding:7px 14px">{{ cf.ok }}</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;modal&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;new-post&quot;,&quot;new-page&quot;,&quot;picker&quot;,&quot;palette&quot;,&quot;delete&quot;,&quot;empty-trash&quot;,&quot;lang-off&quot;,&quot;default-lang&quot;,&quot;revoke&quot;,&quot;unpublish&quot;,&quot;delete-user&quot;,&quot;delete-group&quot;,&quot;merge-tag&quot;,&quot;delete-tag&quot;,&quot;make-owner&quot;,&quot;remove-owner&quot;,&quot;delete-block&quot;,&quot;unsaved&quot;],&quot;default&quot;:&quot;new-post&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { m: null, type: 0, pick: 1, q: 'ab' };
+  renderVals() {
+    const m = this.state.m ?? this.props.modal ?? 'new-post';
+    const ids = [['new-post', 'NEW POST'], ['new-page', 'NEW PAGE'], ['picker', 'MEDIA PICKER'], ['palette', '⌘K'], ['delete', 'DELETE NOW'], ['empty-trash', 'EMPTY TRASH'], ['lang-off', 'LANGUAGE OFF'], ['default-lang', 'DEFAULT LANG'], ['revoke', 'REVOKE TOKEN'], ['unpublish', 'UNPUBLISH'], ['delete-user', 'DELETE USER'], ['delete-group', 'DELETE GROUP'], ['merge-tag', 'MERGE TAG'], ['delete-tag', 'DELETE TAG'], ['make-owner', 'MAKE OWNER'], ['remove-owner', 'REMOVE OWNER'], ['delete-block', 'DELETE BLOCK'], ['unsaved', 'UNSAVED']];
+    const danger = { okBg: 'var(--cs-danger)', okFg: '#fff' }, primary = { okBg: 'var(--cs-accent)', okFg: 'var(--cs-on-accent)' };
+    const CF = {
+      'delete': { title: 'Delete “Retired announcement”?', body: 'It will be removed permanently, with all its translations. This can’t be undone.', ok: 'Delete permanently', ...danger },
+      'empty-trash': { title: 'Empty trash?', body: '3 items will be deleted permanently: 1 page (with 1 subpage), 1 post and 1 image.', ok: 'Empty trash', ...danger },
+      'lang-off': { title: 'Turn off Español?', body: 'Español disappears from the language switcher and /es pages show “not found”. Translations are kept, so turning it back on restores them.', ok: 'Turn off Español', ...primary },
+      'default-lang': { title: 'Make Deutsch the default?', body: 'Deutsch moves to / and English to /en. Existing links to English pages without /en will open the Deutsch version, or show “not found” where there is none.', warn: 'Deutsch becomes the source language, so every translation into English and Español is marked outdated (14 items).', ok: 'Change default language', ...primary },
+      'revoke': { title: 'Revoke “claude-desktop”?', body: 'The assistant acting as Mara König through this token loses access at once. The token stays listed as revoked, and its past changes stay in the audit log.', ok: 'Revoke token', ...danger },
+      'unpublish': { title: 'Unpublish “About”?', body: 'The page goes back to Draft and /about shows “not found”. Its 2 subpages also show “not found” until About is live again.', ok: 'Unpublish', ...primary },
+      'delete-user': { title: 'Delete two@example.com?', body: 'They can’t sign in any more and their AI tokens stop working. Their pages, posts and media stay; posts they wrote are left without an author.', ok: 'Delete user', ...danger },
+      'delete-group': { title: 'Delete “Branch editors”?', body: 'Its 1 member loses these permissions, and its 1 AI token is revoked. Users themselves are not deleted.', ok: 'Delete group', ...danger },
+      'merge-tag': { title: 'Merge “news” into “studio”?', body: '2 posts tagged “news” get “studio” instead, and “news” is deleted. This can’t be undone.', ok: 'Merge tags', ...danger },
+      'delete-tag': { title: 'Delete “news”?', body: 'It is removed from 2 posts. The posts themselves stay.', ok: 'Delete tag', ...danger },
+      'make-owner': { title: 'Make two@example.com an owner?', body: 'Owners have every permission, including managing other owners and removing your owner rights.', ok: 'Make owner', ...primary },
+      'remove-owner': { title: 'Remove owner rights from two@example.com?', body: 'They keep their groups and the permissions those give.', ok: 'Remove owner rights', ...primary },
+      'delete-block': { title: 'Delete this Rich text block?', body: 'Blocks don’t go to the trash. Its text in all languages is deleted permanently.', ok: 'Delete block', ...danger },
+      'unsaved': { title: 'Leave without saving?', body: 'You have 2 unsaved changes in Settings.', ok: 'Keep editing', cancel: 'Discard changes', cancelColor: 'var(--cs-danger)', ...primary }
+    };
+    const cf = CF[m] ? { cancel: 'Cancel', cancelColor: 'var(--cs-dim)', warn: '', ...CF[m] } : null;
+    const T = [['Blog post', 'var(--cs-cat-1)', '/blog/'], ['Now update', 'var(--cs-cat-2)', '/now/'], ['Resume entry', 'var(--cs-cat-3)', '/resume/']];
+    const fills = ['#87ceeb', '#ff6647', '#3a3f45', '#c9b28a', '#6b7a5a', '#2c4a6b', '#8a5a44', '#9aa3ab'];
+    const titles = ['Studio window', 'Desk detail', 'Hangar', 'Workshop table', 'Field notes', 'Night street', 'Brick wall', 'Fog'];
+    const all = [
+      { label: 'PAGES', rows: [['About', '/about', ''], ['About › Team', '/about/team', 'DRAFT']] },
+      { label: 'POSTS', rows: [['Notes about cameras', '/blog/notes-about-cameras', 'DRAFT', 'var(--cs-cat-1)'], ['Lab notes: ab test', '/now/lab-notes', '', 'var(--cs-cat-2)']] },
+      { label: 'SETTINGS', rows: [['Settings › Languages', '', ''], ['AI assistant', '', '']] }
+    ];
+    const q = this.state.q.toLowerCase().trim();
+    let first = true;
+    const results = all.map(g => ({ label: g.label, rows: g.rows.filter(r => !q || r[0].toLowerCase().includes(q) || r[1].includes(q)).map(([title, sub, right, dot]) => {
+      const sel = first; first = false;
+      return { title, sub, right: sel ? '↵' : right, dot: dot || 'transparent', dotDisplay: dot ? 'inline-block' : 'none', bg: sel ? 'var(--cs-sunken)' : 'transparent' };
+    }) })).filter(g => g.rows.length);
+    return {
+      tabs: ids.map(([id, label]) => ({ label, go: () => this.setState({ m: id }), bg: id === m ? 'var(--cs-ink)' : 'transparent', fg: id === m ? 'var(--cs-paper)' : 'var(--cs-dim)' })),
+      topGap: m === 'palette' ? '0' : '12vh',
+      isNewPost: m === 'new-post', isNewPage: m === 'new-page', isPicker: m === 'picker', isPalette: m === 'palette', isConfirm: !!cf, cf: cf || {},
+      types: T.map(([name, dot], i) => ({ name, dot, pick: () => this.setState({ type: i }),
+        bg: i === this.state.type ? 'var(--cs-accent-tint)' : 'var(--cs-surface)', border: i === this.state.type ? 'var(--cs-accent)' : 'var(--cs-line-strong)' })),
+      typePath: T[this.state.type][2],
+      media: titles.map((title, i) => ({ title, fill: fills[i], flag: i === 3 ? 'NO ALT' : '', pick: () => this.setState({ pick: i }),
+        border: i === this.state.pick ? 'var(--cs-accent)' : 'var(--cs-line)', ring: i === this.state.pick ? '0 0 0 3px var(--cs-accent-tint)' : 'none' })),
+      pickText: titles[this.state.pick] + ' selected',
+      q: this.state.q, onQ: e => this.setState({ q: e.target.value }), results, noResults: results.length === 0
+    };
+  }
+}
+</script>
+</body>
+</html>

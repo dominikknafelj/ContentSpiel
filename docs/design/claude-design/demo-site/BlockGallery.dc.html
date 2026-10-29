@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+</helmet>
+<div style="width: 100%; font-family: var(--font-sans); color: var(--color-text);">
+  <sc-if value="{{ isGrid }}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: {{ cols }}; gap: {{ gap }};">
+      <sc-for list="{{ items }}" as="it" hint-placeholder-count="6">
+        <button onClick="{{ it.open }}" style="all: unset; cursor: zoom-in; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0;" style-focus="outline: 1px solid var(--color-accent); outline-offset: 2px;">
+          <div style="overflow: hidden;">
+            <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Placeholder" seed="{{ it.seed }}" ratio="{{ ratio }}" hint-size="100%,160px"></x-import>
+          </div>
+          <sc-if value="{{ showCaptions }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; justify-content: space-between; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase;">
+              <span style="color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ it.caption }}</span>
+              <span style="color: var(--color-accent); flex: none;">{{ it.n }}</span>
+            </div>
+          </sc-if>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: var(--space-3); background: #000; padding: var(--space-3); --fg: #f5f5f6; --line-strong: rgba(245,245,246,0.3); --fg-dim: #8c8d92;">
+      <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: #8c8d92;">
+        <span>{{ current.n }} / {{ total }}</span>
+        <button onClick="{{ close }}" style="all: unset; cursor: pointer; color: #f5f5f6; font-size: 20px; line-height: 1; padding: 4px 8px;" aria-label="Close">×</button>
+      </div>
+      <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Placeholder" seed="{{ current.seed }}" ratio="3/2" watermark="© Studio" hint-size="100%,360px"></x-import>
+      <div style="display: flex; align-items: center; gap: var(--space-3);">
+        <button onClick="{{ prev }}" style="all: unset; cursor: pointer; color: #f5f5f6; font-size: 24px; padding: 4px 10px; border: 1px solid rgba(245,245,246,0.3);" aria-label="Previous">‹</button>
+        <span style="flex: 1; font-size: var(--fs-small); line-height: var(--lh-body); color: #c9cacd; text-align: center; text-wrap: pretty;">{{ current.caption }}</span>
+        <button onClick="{{ next }}" style="all: unset; cursor: pointer; color: #f5f5f6; font-size: 24px; padding: 4px 10px; border: 1px solid rgba(245,245,246,0.3);" aria-label="Next">›</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;half&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;items&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string[]&quot;},&quot;ratio&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;4/5&quot;,&quot;1/1&quot;,&quot;3/2&quot;],&quot;default&quot;:&quot;4/5&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;seedStart&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  state = { open: null };
+  renderVals() {
+    const p = this.props;
+    const size = p.size ?? 'full';
+    const src = p.items ?? ['Caption one', 'Caption two', 'Caption three', 'Caption four', 'Caption five', 'Caption six', 'Caption seven', 'Caption eight'];
+    const n = src.length;
+    const items = src.map((c, i) => ({ caption: c, seed: (p.seedStart ?? 0) + i, n: String(i + 1).padStart(2, '0'), open: () => this.setState({ open: i }) }));
+    const o = this.state.open;
+    return {
+      items, total: String(n).padStart(2, '0'),
+      isGrid: o === null, isOpen: o !== null,
+      current: o === null ? items[0] : items[o],
+      close: () => this.setState({ open: null }),
+      prev: () => this.setState({ open: (o - 1 + n) % n }),
+      next: () => this.setState({ open: (o + 1) % n }),
+      cols: size === 'full' ? 'repeat(4, minmax(0,1fr))' : size === 'half' ? 'repeat(3, minmax(0,1fr))' : 'repeat(2, minmax(0,1fr))',
+      gap: size === 'narrow' ? '4px' : 'var(--space-4) var(--space-2)',
+      showCaptions: size !== 'narrow',
+      ratio: p.ratio ?? '4/5',
+    };
+  }
+}
+</script>
+</body>
+</html>

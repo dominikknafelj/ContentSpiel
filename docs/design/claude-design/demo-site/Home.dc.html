@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+<style>*,*::before,*::after{box-sizing:border-box;} body{margin:0;background:#060607;} a{color:inherit;} a:hover{color:inherit;}</style>
+</helmet>
+<div style="{{ sheetStyle }}">
+<div style="display: flex; gap: 120px; align-items: flex-start; padding: 80px; width: max-content; font-family: var(--font-sans);">
+
+  <div style="display: flex; flex-direction: column; gap: var(--space-5);">
+    <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px; align-items: end;">
+      <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-accent);">Content Spiel · Demo site · Sheet 1 / 3</span>
+        <h1 style="margin: 0; font-weight: 700; font-size: 68px; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase;">Home · Desktop 1440</h1>
+      </div>
+      <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); line-height: 1.8;">Notes: block · section<br>layout · width · background</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column;">
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <header style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-4) var(--pad-page); border-bottom: 1px solid var(--color-line); background: var(--color-bg);">
+          <a href="#" style="display: flex; flex-direction: column; gap: 5px; text-decoration: none;">
+            <span style="font-weight: 600; font-size: 15px; letter-spacing: var(--track-wide); text-transform: uppercase;">Studio Nordlicht</span>
+            <span style="height: 1px; background: var(--color-line-strong);"></span>
+            <span style="font-family: var(--font-mono); font-size: 9px; letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-text-subtle);">Design · Hamburg</span>
+          </a>
+          <nav style="display: flex; gap: var(--space-5); font-size: 14px; letter-spacing: var(--track);">
+            <a href="#" style="text-decoration: none; color: var(--color-text-muted);" style-hover="color: var(--color-text);">Services</a>
+            <a href="#" style="text-decoration: none; color: var(--color-text-muted);" style-hover="color: var(--color-text);">Work</a>
+            <a href="#" style="text-decoration: none; color: var(--color-text-muted);" style-hover="color: var(--color-text);">About</a>
+            <a href="#" style="text-decoration: none; color: var(--color-text-muted);" style-hover="color: var(--color-text);">Blog</a>
+            <a href="#" style="text-decoration: none; color: var(--color-text-muted);" style-hover="color: var(--color-text);">Contact</a>
+          </nav>
+        </header>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px;">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">Site chrome</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Header with site name and main navigation. Part of the theme, not a block.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg);">
+          <dc-import name="BlockHero" size="full" image="background" seed="0" kicker="{{ c.hero.kicker }}" heading="{{ c.hero.heading }}" text="{{ c.hero.text }}" primary-label="See our work" secondary-label="Our services" hint-size="100%,620px"></dc-import>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">01 · HERO</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1 column · full width · background none. Image as background, kicker, text, two buttons.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg); padding: var(--space-section) var(--pad-page) var(--space-6);">
+          <div style="max-width: var(--width-page); margin: 0 auto;">
+            <dc-import name="BlockRichText" size="full" heading="{{ c.intro.heading }}" paragraphs="{{ c.intro.paragraphs }}" bullets="{{ c.empty }}" link-lead="Read more about" link-text="how we work" hint-size="100%,360px"></dc-import>
+          </div>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">02 · RICH TEXT</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1 column · content width · background none. The block keeps its own reading measure (680px).</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg); padding: var(--space-6) var(--pad-page) var(--space-section);">
+          <div style="max-width: var(--width-page); margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--gap-col);">
+            <sc-for list="{{ c.services }}" as="s" hint-placeholder-count="3">
+              <dc-import name="BlockTeaser" size="narrow" seed="{{ s.seed }}" heading="{{ s.heading }}" text="{{ s.text }}" link-label="{{ s.link }}" hint-size="100%,440px"></dc-import>
+            </sc-for>
+          </div>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">03 · TEASER CARD × 3</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 3 columns · content width · background none. One card per column, each linking to Services.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg); padding-bottom: var(--space-section);">
+          <dc-import name="BlockImage" size="full" seed="6" ratio="21/9" bleed="{{ true }}" caption="{{ c.image.caption }}" credit="Photo · Studio Nordlicht" hint-size="100%,660px"></dc-import>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">04 · IMAGE WITH CAPTION</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1 column · full width · background none. Image runs edge to edge; the caption keeps the page inset. Crop 21:9 (proposed option).</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg); padding: 0 var(--pad-page) var(--space-section);">
+          <div style="max-width: var(--width-page); margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-5);">
+            <dc-import name="BlockRichText" size="full" heading="Selected work" paragraphs="{{ c.work.paragraphs }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,120px"></dc-import>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--gap-col);">
+              <sc-for list="{{ c.cases }}" as="w" hint-placeholder-count="2">
+                <dc-import name="BlockTeaser" size="half" seed="{{ w.seed }}" meta="{{ w.meta }}" heading="{{ w.heading }}" text="{{ w.text }}" link-label="Read the case study" hint-size="100%,560px"></dc-import>
+              </sc-for>
+            </div>
+          </div>
+        </section>
+        <div style="padding-top: 0; display: flex; flex-direction: column; gap: var(--space-5); border-top: 1px solid var(--color-line);">
+          <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px;">
+            <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">05a · RICH TEXT</span>
+            <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1 column · content width · none. Heading and one line, introducing the cards.</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 70px;">
+            <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">05b · TEASER CARD × 2</span>
+            <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 2 columns · content width · none. Case studies, with the proposed meta line (type · year).</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-surface); padding: var(--space-section) var(--pad-page);">
+          <div style="max-width: var(--width-page); margin: 0 auto; display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: var(--gap-col); align-items: start;">
+            <dc-import name="BlockGallery" size="half" items="{{ c.gallery }}" seed-start="8" hint-size="100%,660px"></dc-import>
+            <dc-import name="BlockQuote" size="narrow" quote="{{ c.quote.text }}" person="{{ c.quote.name }}" role="{{ c.quote.role }}" seed="5" hint-size="100%,360px"></dc-import>
+          </div>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">06 · GALLERY + QUOTE</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 2:1 · content width · background tinted. Gallery in the wide column (3 across), testimonial with portrait in the narrow one. Click a frame to open it.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg); padding: var(--space-section) var(--pad-page);">
+          <div style="max-width: var(--width-page); margin: 0 auto; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr); gap: var(--gap-col); align-items: start;">
+            <dc-import name="BlockRichText" size="narrow" heading="{{ c.film.heading }}" paragraphs="{{ c.film.paragraphs }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,240px"></dc-import>
+            <dc-import name="BlockVideo" size="half" seed="1" title="{{ c.film.title }}" provider="vimeo.com" duration="2:14" hint-size="100%,460px"></dc-import>
+          </div>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">07 · RICH TEXT + VIDEO</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1:2 · content width · background none. Video shows a poster and a privacy note; the player loads on click.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg); padding: var(--space-section) var(--pad-page); border-top: 1px solid var(--color-line);">
+          <div style="max-width: var(--width-page); margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-5);">
+            <dc-import name="BlockRichText" size="full" heading="From the journal" paragraphs="{{ c.empty }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,60px"></dc-import>
+            <dc-import name="BlockPostList" size="full" layout="cards" posts="{{ c.posts }}" hint-size="100%,460px"></dc-import>
+          </div>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">08 · RICH TEXT + POST LIST</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1 column · content width · none. Two blocks stacked in one column. Post list as cards, latest 3.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="background: var(--color-bg); padding: var(--space-6) var(--pad-page) var(--space-section);">
+          <div style="max-width: var(--width-page); margin: 0 auto; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr); gap: var(--gap-col); align-items: start;">
+            <dc-import name="BlockRichText" size="narrow" heading="{{ c.faqIntro.heading }}" paragraphs="{{ c.faqIntro.paragraphs }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,200px"></dc-import>
+            <dc-import name="BlockFAQ" size="half" items="{{ c.faq }}" hint-size="100%,380px"></dc-import>
+          </div>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">09 · RICH TEXT + FAQ</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1:2 · content width · none. First answer open.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <section style="{{ strongStyle }}">
+          <div style="padding: var(--space-7) var(--pad-page);">
+            <div style="max-width: var(--width-page); margin: 0 auto;">
+              <dc-import name="BlockCTA" size="full" heading="{{ c.cta.heading }}" text="{{ c.cta.text }}" primary-label="Contact us" secondary-label="hello@nordlicht.studio" hint-size="100%,200px"></dc-import>
+            </div>
+          </div>
+        </section>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">10 · CALL TO ACTION</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Section · 1 column · full width · background strong. Strong applies the inverse colour scheme to everything inside.</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1440px 300px; gap: 40px;">
+        <footer style="background: var(--color-bg); padding: var(--space-6) var(--pad-page) var(--space-5); border-top: 1px solid var(--color-line);">
+          <div style="max-width: var(--width-page); margin: 0 auto; display: grid; grid-template-columns: minmax(0,2fr) repeat(2, minmax(0,1fr)); gap: var(--gap-col); font-size: var(--fs-small); line-height: 1.8; color: var(--color-text-muted);">
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+              <span style="font-weight: 600; font-size: 15px; letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-text);">Studio Nordlicht</span>
+              <span>{{ c.footer.address }}</span>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+              <a href="#" style="text-decoration: none; color: var(--color-text);" style-hover="color: var(--color-accent);">hello@nordlicht.studio</a>
+              <a href="#" style="text-decoration: none; color: var(--color-text);" style-hover="color: var(--color-accent);">+49 40 3861 2290</a>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+              <a href="#" style="text-decoration: none;" style-hover="color: var(--color-text);">Imprint</a>
+              <a href="#" style="text-decoration: none;" style-hover="color: var(--color-text);">Privacy</a>
+              <a href="#" style="text-decoration: none;" style-hover="color: var(--color-text);">LinkedIn ↗</a>
+            </div>
+          </div>
+          <div style="max-width: var(--width-page); margin: var(--space-6) auto 0; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">© 2026 Studio Nordlicht GmbH</div>
+        </footer>
+        <div style="padding-top: var(--space-4); display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-line);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">Site chrome</span>
+          <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Footer: address, mail, phone, legal links. Part of the theme, not a block.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <sc-for list="{{ phones }}" as="ph" hint-placeholder-count="2">
+    <div style="display: flex; flex-direction: column; gap: var(--space-5); width: 390px;">
+      <div style="display: flex; flex-direction: column; gap: var(--space-2); min-height: 99px; justify-content: flex-end;">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-accent);">Phone 390 · {{ ph.label }}</span>
+        <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Same sections. Columns stack in source order; every block uses its narrow layout.</span>
+      </div>
+      <div style="{{ ph.style }}">
+        <header style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3) var(--pad-page); border-bottom: 1px solid var(--color-line);">
+          <span style="font-weight: 600; font-size: 13px; letter-spacing: var(--track-wide); text-transform: uppercase;">Studio Nordlicht</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-muted); padding: 12px 0;">Menu</span>
+        </header>
+        <dc-import name="BlockHero" size="narrow" image="background" seed="0" kicker="{{ c.hero.kicker }}" heading="{{ c.hero.heading }}" text="{{ c.hero.text }}" primary-label="See our work" secondary-label="Our services" hint-size="100%,460px"></dc-import>
+        <div style="padding: var(--space-section) var(--pad-page); display: flex; flex-direction: column; gap: var(--space-6);">
+          <dc-import name="BlockRichText" size="narrow" heading="{{ c.intro.heading }}" paragraphs="{{ c.intro.paragraphs }}" bullets="{{ c.empty }}" link-lead="Read more about" link-text="how we work" hint-size="100%,420px"></dc-import>
+          <sc-for list="{{ c.services }}" as="s" hint-placeholder-count="3">
+            <dc-import name="BlockTeaser" size="narrow" seed="{{ s.seed }}" heading="{{ s.heading }}" text="{{ s.text }}" link-label="{{ s.link }}" hint-size="100%,420px"></dc-import>
+          </sc-for>
+        </div>
+        <div style="padding-bottom: var(--space-section);">
+          <dc-import name="BlockImage" size="narrow" seed="6" ratio="4/3" bleed="{{ true }}" caption="{{ c.image.caption }}" credit="Photo · Studio Nordlicht" hint-size="100%,340px"></dc-import>
+        </div>
+        <div style="padding: 0 var(--pad-page) var(--space-section); display: flex; flex-direction: column; gap: var(--space-5);">
+          <dc-import name="BlockRichText" size="narrow" heading="Selected work" paragraphs="{{ c.work.paragraphs }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,120px"></dc-import>
+          <sc-for list="{{ c.cases }}" as="w" hint-placeholder-count="2">
+            <dc-import name="BlockTeaser" size="narrow" seed="{{ w.seed }}" meta="{{ w.meta }}" heading="{{ w.heading }}" text="{{ w.text }}" link-label="Read the case study" hint-size="100%,440px"></dc-import>
+          </sc-for>
+        </div>
+        <div style="background: var(--color-surface); padding: var(--space-section) var(--pad-page); display: flex; flex-direction: column; gap: var(--space-6);">
+          <dc-import name="BlockGallery" size="narrow" items="{{ c.gallery }}" seed-start="8" hint-size="100%,700px"></dc-import>
+          <dc-import name="BlockQuote" size="narrow" quote="{{ c.quote.text }}" person="{{ c.quote.name }}" role="{{ c.quote.role }}" seed="5" hint-size="100%,340px"></dc-import>
+        </div>
+        <div style="padding: var(--space-section) var(--pad-page); display: flex; flex-direction: column; gap: var(--space-5);">
+          <dc-import name="BlockRichText" size="narrow" heading="{{ c.film.heading }}" paragraphs="{{ c.film.paragraphs }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,220px"></dc-import>
+          <dc-import name="BlockVideo" size="narrow" seed="1" title="{{ c.film.title }}" provider="vimeo.com" duration="2:14" hint-size="100%,260px"></dc-import>
+        </div>
+        <div style="padding: var(--space-section) var(--pad-page); border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: var(--space-4);">
+          <dc-import name="BlockRichText" size="narrow" heading="From the journal" paragraphs="{{ c.empty }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,40px"></dc-import>
+          <dc-import name="BlockPostList" size="narrow" posts="{{ c.posts }}" hint-size="100%,260px"></dc-import>
+        </div>
+        <div style="padding: 0 var(--pad-page) var(--space-section); display: flex; flex-direction: column; gap: var(--space-5);">
+          <dc-import name="BlockRichText" size="narrow" heading="{{ c.faqIntro.heading }}" paragraphs="{{ c.faqIntro.paragraphs }}" bullets="{{ c.empty }}" link-text="" hint-size="100%,180px"></dc-import>
+          <dc-import name="BlockFAQ" size="narrow" items="{{ c.faq }}" hint-size="100%,380px"></dc-import>
+        </div>
+        <div style="{{ ph.strong }}">
+          <div style="padding: var(--space-section) var(--pad-page);">
+            <dc-import name="BlockCTA" size="narrow" heading="{{ c.cta.heading }}" text="{{ c.cta.text }}" primary-label="Contact us" secondary-label="hello@nordlicht.studio" hint-size="100%,300px"></dc-import>
+          </div>
+        </div>
+        <footer style="padding: var(--space-6) var(--pad-page) var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--fs-small); line-height: 1.8; color: var(--color-text-muted);">
+          <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+            <span style="font-weight: 600; font-size: 13px; letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-text);">Studio Nordlicht</span>
+            <span>{{ c.footer.address }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; color: var(--color-text);">
+            <span>hello@nordlicht.studio</span>
+            <span>+49 40 3861 2290</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: var(--space-4);">
+            <span>Imprint</span><span>Privacy</span><span>LinkedIn ↗</span>
+          </div>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">© 2026 Studio Nordlicht GmbH</span>
+        </footer>
+      </div>
+    </div>
+  </sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  static BASE = {
+    '--font-sans': '"Archivo", system-ui, -apple-system, sans-serif', '--font-mono': '"IBM Plex Mono", ui-monospace, monospace',
+    '--fs-display': 'clamp(34px, 5vw, 68px)', '--fs-h2': '30px', '--fs-h3': '18px', '--fs-quote': 'clamp(23px, 2.8vw, 38px)', '--fs-lead': '19px', '--fs-body': '16px', '--fs-small': '13px', '--fs-label': '11px',
+    '--lh-body': '1.5', '--lh-heading': '1.15', '--lh-tight': '1.02',
+    '--track': '0.06em', '--track-wide': '0.18em', '--track-mono': '0.14em',
+    '--space-1': '4px', '--space-2': '8px', '--space-3': '14px', '--space-4': '22px', '--space-5': '34px', '--space-6': '54px', '--space-7': '80px',
+    '--radius': '0px', '--radius-control': '2px', '--radius-pill': '999px', '--radius-admin': '2px',
+    '--width-page': '1200px', '--width-text': '680px', '--pad-page': '34px', '--gap-col': '34px', '--space-section': '80px',
+    '--ease': 'cubic-bezier(0.22, 1, 0.36, 1)',
+  };
+  static PHONE = { '--pad-page': '20px', '--space-section': '54px', '--fs-display': '34px', '--fs-quote': '23px', '--fs-h2': '24px' };
+  static DARK = { bg: '#060607', surface: '#101013', text: '#f5f5f6', muted: '#8c8d92', subtle: '#76777c', line: 'rgba(255,255,255,0.10)', lineStrong: 'rgba(255,255,255,0.22)', accent: 'oklch(0.74 0.10 236)', primary: 'oklch(0.76 0.14 62)', onPrimary: '#1a1206', field: '#0d0d10' };
+  static LIGHT = { bg: '#f5f5f6', surface: '#e8e8ea', text: '#0b0b0d', muted: '#55565b', subtle: '#6b6c71', line: 'rgba(6,6,7,0.12)', lineStrong: 'rgba(6,6,7,0.28)', accent: 'oklch(0.50 0.11 236)', primary: 'oklch(0.76 0.14 62)', onPrimary: '#1a1206', field: '#ffffff' };
+  static scheme(c) {
+    return { '--color-bg': c.bg, '--color-surface': c.surface, '--color-text': c.text, '--color-text-muted': c.muted, '--color-text-subtle': c.subtle, '--color-line': c.line, '--color-line-strong': c.lineStrong, '--color-accent': c.accent, '--color-primary': c.primary, '--color-on-primary': c.onPrimary, '--color-field': c.field,
+      '--bg': c.bg, '--fg': c.text, '--fg-dim': c.muted, '--fg-faint': c.subtle, '--line': c.line, '--line-strong': c.lineStrong, '--accent': c.accent, '--accent-amber': c.primary, '--on-accent': c.onPrimary, '--panel': c.field, '--panel-2': c.surface,
+      background: c.bg, color: c.text };
+  }
+  static CONTENT = {
+    empty: [],
+    hero: { kicker: 'Design studio · Hamburg', heading: 'Design for institutions that plan in decades', text: 'We design identities, publications and websites for museums, foundations, publishers and public bodies. Seven people on one floor, since 2011.' },
+    intro: { heading: 'A small studio, on purpose', paragraphs: ['We keep the studio small so that the people you meet at the first meeting are the people who do the work. One of the two partners leads every project from briefing to handover.', 'Most of our clients stay for years. We redesign less often than we maintain, extend and teach: guidelines that teams can use, templates that survive the next annual report, websites that editors run themselves.'] },
+    services: [
+      { seed: 2, heading: 'Visual identity', text: 'Logos, type and colour systems, and the guidelines that keep them consistent across departments.', link: 'Identity' },
+      { seed: 5, heading: 'Publications', text: 'Annual reports, exhibition catalogues and books, from concept to print supervision.', link: 'Publications' },
+      { seed: 4, heading: 'Websites', text: 'Accessible sites on open-source content systems, with training for the teams who edit them.', link: 'Websites' },
+    ],
+    image: { caption: 'The studio occupies the second floor of a former shipping office in Hamburg-Altona.' },
+    work: { paragraphs: ['Two recent projects. The full list is on the work page.'] },
+    cases: [
+      { seed: 1, meta: 'Identity · Wayfinding · 2025', heading: 'Museum am Deich', text: 'A new identity and a sign system for a regional museum on the North Sea coast, built to withstand salt air and school groups.' },
+      { seed: 7, meta: 'Publication · 2026', heading: 'Elbufer Foundation annual report', text: 'A 96-page report in German and English, with an accessible PDF and a web version produced from the same files.' },
+    ],
+    gallery: ['Entrance, main sign', 'Floor plan at the ticket desk', 'Gallery numbers, enamel', 'Stair core, level 2', 'Outdoor path marker', 'Typeface specimen'],
+    quote: { text: '“They understood that a sign system has to work for the night guard as well as for the visitor. Three winters on, we have not had to replace a single panel.”', name: 'Hanna Petersen', role: 'Head of Operations · Museum am Deich' },
+    film: { heading: 'Signs, in use', paragraphs: ['A short film by the museum about the first winter with the new wayfinding: how visitors found their way, and what we changed after the first month.'], title: 'Museum am Deich: the first winter with the new signs' },
+    posts: [
+      { date: '02 Oct 2026', category: 'Wayfinding', title: 'What a museum sign has to survive', excerpt: 'Salt air, cleaning agents and a hundred thousand hands a year. Notes on materials after three winters at the coast.' },
+      { date: '18 Sep 2026', category: 'Identity', title: 'Writing guidelines people actually open', excerpt: 'Our brand manuals have got shorter every year. What we left out, and what teams asked for instead.' },
+      { date: '29 Aug 2026', category: 'Publications', title: 'Accessible PDFs from InDesign, step by step', excerpt: 'The checklist we run on every annual report before it goes to the client’s web team.' },
+    ],
+    faqIntro: { heading: 'Before you write to us', paragraphs: ['Answers to what new clients ask most often. For anything else, write or call.'] },
+    faq: [
+      { q: 'What size of project do you take on?', a: 'Most projects run between three and twelve months. For existing clients we also take smaller jobs, such as a single publication or a new section of a website.' },
+      { q: 'Do you take part in public tenders?', a: 'Yes. About half of our work comes through public procurement. We supply references, insurance certificates and team CVs on request.' },
+      { q: 'Can our own team edit the website afterwards?', a: 'That is the aim. We build on open-source content systems, hand over documentation and run two training sessions with your editors.' },
+      { q: 'Do you work outside Hamburg?', a: 'Most of our clients are in northern Germany and Denmark. We travel for workshops and work remotely in between.' },
+    ],
+    cta: { heading: 'Planning a project for next year?', text: 'Send us a few lines about the project, the timeline and the budget range. We reply within two working days.' },
+    footer: { address: 'Große Elbstraße 145, 22767 Hamburg' },
+  };
+  renderVals() {
+    const C = Component;
+    return {
+      c: C.CONTENT,
+      sheetStyle: { ...C.BASE, '--fs-display': '68px', '--fs-quote': '38px', ...C.scheme(C.DARK), minHeight: '100vh' },
+      strongStyle: C.scheme(C.LIGHT),
+      phones: [
+        { label: 'Light', style: { ...C.PHONE, ...C.scheme(C.LIGHT), border: '1px solid rgba(255,255,255,0.22)', overflow: 'hidden' }, strong: C.scheme(C.DARK) },
+        { label: 'Dark', style: { ...C.PHONE, ...C.scheme(C.DARK), border: '1px solid rgba(255,255,255,0.22)', overflow: 'hidden' }, strong: C.scheme(C.LIGHT) },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

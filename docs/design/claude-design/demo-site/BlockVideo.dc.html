@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+</helmet>
+<figure style="margin: 0; width: 100%; display: flex; flex-direction: column; gap: var(--space-3); font-family: var(--font-sans); color: var(--color-text);">
+  <sc-if value="{{ isIdle }}" hint-placeholder-val="{{ true }}">
+    <button onClick="{{ load }}" style="all: unset; cursor: pointer; position: relative; display: block; width: 100%;" style-focus="outline: 1px solid var(--color-accent); outline-offset: 2px;">
+      <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Placeholder" seed="{{ seed }}" ratio="16/9" hint-size="100%,300px"></x-import>
+      <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.38); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-3); text-align: center; color: #f5f5f6;">
+        <span style="display: flex; align-items: center; justify-content: center; width: {{ playSize }}; height: {{ playSize }}; border: 1px solid rgba(245,245,246,0.7); font-size: {{ glyphSize }}; padding-left: 3px; box-sizing: border-box;">▶</span>
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase;">Play video · {{ duration }}</span>
+        <sc-if value="{{ showNote }}" hint-placeholder-val="{{ true }}">
+          <span style="font-size: var(--fs-small); line-height: 1.4; color: rgba(245,245,246,0.82); max-width: 380px;">Playing loads the video from {{ provider }}, which may set cookies.</span>
+        </sc-if>
+      </div>
+    </button>
+  </sc-if>
+  <sc-if value="{{ isLoaded }}" hint-placeholder-val="{{ false }}">
+    <div style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: #8c8d92; text-align: center; padding: var(--space-3); box-sizing: border-box;">{{ provider }} player loads here</div>
+  </sc-if>
+  <figcaption style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-4);">
+    <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">{{ title }}</span>
+    <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); padding-top: 2px; white-space: nowrap;">{{ provider }} ↗</span>
+  </figcaption>
+</figure>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;half&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Video title&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;provider&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;youtube.com&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;duration&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;2:40&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;seed&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:4,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  state = { loaded: false };
+  renderVals() {
+    const p = this.props;
+    const narrow = (p.size ?? 'full') === 'narrow';
+    return {
+      isIdle: !this.state.loaded, isLoaded: this.state.loaded,
+      load: () => this.setState({ loaded: true }),
+      seed: p.seed ?? 4,
+      title: p.title ?? 'Video title or short description',
+      provider: p.provider ?? 'youtube.com',
+      duration: p.duration ?? '2:40',
+      showNote: !narrow,
+      playSize: narrow ? '44px' : '64px',
+      glyphSize: narrow ? '14px' : '18px',
+    };
+  }
+}
+</script>
+</body>
+</html>

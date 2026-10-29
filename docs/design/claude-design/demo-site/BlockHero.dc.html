@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+</helmet>
+<div style="width: 100%; font-family: var(--font-sans); color: var(--color-text);">
+  <sc-if value="{{ isBg }}" hint-placeholder-val="{{ true }}">
+    <div style="position: relative; width: 100%; min-height: {{ bgHeight }}; display: flex; align-items: flex-end; overflow: hidden; background: #000;">
+      <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Placeholder" seed="{{ seed }}" fill="{{ true }}" hint-size="100%,100%"></x-import>
+      <div style="position: absolute; inset: 0; background: radial-gradient(130% 100% at 0% 100%, rgba(0,0,0,0.82), rgba(0,0,0,0.35) 55%, transparent 80%);"></div>
+      <div style="position: relative; display: flex; flex-direction: column; gap: var(--space-4); padding: {{ pad }}; max-width: {{ textMax }}; --fg: #f5f5f6; --fg-dim: rgba(245,245,246,0.75); --line-strong: rgba(245,245,246,0.45); color: #f5f5f6; text-shadow: 0 1px 18px rgba(0,0,0,0.35);">
+        <sc-if value="{{ kicker }}" hint-placeholder-val="{{ true }}">
+          <div style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: rgba(245,245,246,0.8);">{{ kicker }}</div>
+        </sc-if>
+        <h1 style="margin: 0; font-weight: 700; font-size: {{ hSize }}; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase; text-wrap: balance;">{{ heading }}</h1>
+        <sc-if value="{{ text }}" hint-placeholder-val="{{ true }}">
+          <p style="margin: 0; font-size: {{ tSize }}; line-height: var(--lh-body); max-width: 560px; text-wrap: pretty;">{{ text }}</p>
+        </sc-if>
+        <sc-if value="{{ hasButtons }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2);">
+            <sc-if value="{{ primaryLabel }}" hint-placeholder-val="{{ true }}">
+              <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" hint-size="140px,40px">{{ primaryLabel }}</x-import>
+            </sc-if>
+            <sc-if value="{{ secondaryLabel }}" hint-placeholder-val="{{ true }}">
+              <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" hint-size="120px,40px">{{ secondaryLabel }}</x-import>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isSplit }}" hint-placeholder-val="{{ false }}">
+    <div style="display: grid; grid-template-columns: {{ splitCols }}; gap: {{ splitGap }}; align-items: center;">
+      <div style="order: {{ imgOrder }};">
+        <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Placeholder" seed="{{ seed }}" ratio="{{ imgRatio }}" hint-size="100%,320px"></x-import>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: var(--space-4); min-width: 0;">
+        <sc-if value="{{ kicker }}" hint-placeholder-val="{{ true }}">
+          <div style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-accent);">{{ kicker }}</div>
+        </sc-if>
+        <h1 style="margin: 0; font-weight: 700; font-size: {{ hSize }}; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase; text-wrap: balance;">{{ heading }}</h1>
+        <sc-if value="{{ text }}" hint-placeholder-val="{{ true }}">
+          <p style="margin: 0; font-size: {{ tSize }}; line-height: var(--lh-body); color: var(--color-text-muted); max-width: 560px; text-wrap: pretty;">{{ text }}</p>
+        </sc-if>
+        <sc-if value="{{ hasButtons }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2);">
+            <sc-if value="{{ primaryLabel }}" hint-placeholder-val="{{ true }}">
+              <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" hint-size="140px,40px">{{ primaryLabel }}</x-import>
+            </sc-if>
+            <sc-if value="{{ secondaryLabel }}" hint-placeholder-val="{{ true }}">
+              <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" hint-size="120px,40px">{{ secondaryLabel }}</x-import>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isPlain }}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4); max-width: 900px; padding: var(--space-5) 0;">
+      <sc-if value="{{ kicker }}" hint-placeholder-val="{{ true }}">
+        <div style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-accent);">{{ kicker }}</div>
+      </sc-if>
+      <h1 style="margin: 0; font-weight: 700; font-size: {{ hSize }}; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase; text-wrap: balance;">{{ heading }}</h1>
+      <sc-if value="{{ text }}" hint-placeholder-val="{{ true }}">
+        <p style="margin: 0; font-size: {{ tSize }}; line-height: var(--lh-body); color: var(--color-text-muted); max-width: 560px; text-wrap: pretty;">{{ text }}</p>
+      </sc-if>
+      <sc-if value="{{ hasButtons }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2);">
+          <sc-if value="{{ primaryLabel }}" hint-placeholder-val="{{ true }}">
+            <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" variant="primary" hint-size="140px,40px">{{ primaryLabel }}</x-import>
+          </sc-if>
+          <sc-if value="{{ secondaryLabel }}" hint-placeholder-val="{{ true }}">
+            <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Button" hint-size="120px,40px">{{ secondaryLabel }}</x-import>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;half&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;image&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;background&quot;,&quot;beside&quot;,&quot;none&quot;],&quot;default&quot;:&quot;background&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;imageSide&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;right&quot;,&quot;left&quot;],&quot;default&quot;:&quot;right&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;kicker&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Kicker · optional&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;heading&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Hero heading in two lines&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;text&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;primaryLabel&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Primary action&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;secondaryLabel&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Secondary&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;seed&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const size = p.size ?? 'full';
+    const image = p.image ?? 'background';
+    const full = size === 'full', half = size === 'half';
+    const primaryLabel = p.primaryLabel ?? 'Primary action';
+    const secondaryLabel = p.secondaryLabel ?? 'Secondary';
+    return {
+      kicker: p.kicker ?? 'Kicker · optional',
+      heading: p.heading ?? 'Hero heading in two lines',
+      text: p.text ?? 'An optional paragraph that introduces the page. One or two sentences work best.',
+      primaryLabel, secondaryLabel,
+      hasButtons: !!(primaryLabel || secondaryLabel),
+      seed: p.seed ?? 0,
+      isBg: image === 'background',
+      isSplit: image === 'beside',
+      isPlain: image === 'none',
+      hSize: full ? 'var(--fs-display)' : half ? '40px' : '30px',
+      tSize: full ? 'var(--fs-lead)' : 'var(--fs-body)',
+      bgHeight: full ? '620px' : half ? '460px' : '400px',
+      pad: full ? 'var(--space-6) var(--pad-page)' : 'var(--space-5) var(--space-4)',
+      textMax: full ? '780px' : '100%',
+      splitCols: full ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)',
+      splitGap: full ? 'var(--space-6)' : 'var(--space-4)',
+      imgOrder: full ? (p.imageSide === 'left' ? 0 : 2) : 0,
+      imgRatio: full ? '4/5' : '3/2',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="groups" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:16px;max-width:1000px;width:100%;box-sizing:border-box">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:26px;font-weight:600">Groups</h1><p style="margin:0;font-size:14px;color:var(--cs-dim);max-width:600px">A group is a set of permissions. People and AI tokens get what their groups allow; owners always have everything.</p></div>
+    <button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:8px 14px">New group</button>
+  </div>
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;overflow-x:auto">
+    <div style="display:grid;grid-template-columns:minmax(260px,1fr) 110px 90px 24px;gap:12px;min-width:560px;padding:9px 16px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta)"><span>GROUP</span><span>MEMBERS</span><span>TOKENS</span><span></span></div>
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5">
+      <a href="Studio%20Group%20Edit.dc.html" style="display:grid;grid-template-columns:minmax(260px,1fr) 110px 90px 24px;gap:12px;min-width:560px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--cs-line);color:var(--cs-ink)" style-hover="background:var(--cs-paper)">
+        <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+          <span style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:500">{{ g.name }}<sc-if value="{{ g.builtin }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--cs-mono);font-size:9px;letter-spacing:0.12em;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:0 5px">BUILT-IN</span></sc-if></span>
+          <span style="font-size:13px;color:var(--cs-dim)">{{ g.desc }}</span>
+        </span>
+        <span style="font-family:var(--cs-mono);font-size:12px;color:{{ g.mColor }}">{{ g.members }}</span>
+        <span style="font-family:var(--cs-mono);font-size:12px;color:{{ g.tColor }}">{{ g.tokens }}</span>
+        <span style="color:var(--cs-meta);font-size:14px">›</span>
+      </a>
+    </sc-for>
+  </div>
+  <p style="margin:0;font-size:12px;color:var(--cs-meta)">Built-in groups can be changed but not deleted. Deleting a custom group removes its permissions from its members and revokes its AI tokens.</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const G = [
+      ['Admin', 'Everything except managing owners.', true, 1, 0],
+      ['Editor', 'Full, unscoped access to posts and pages, plus tags and media.', true, 0, 0],
+      ['Author', 'Writes and edits their own posts; reads pages.', true, 1, 1],
+      ['Read only', 'Can read posts and pages. Useful for AI tokens that only search.', true, 1, 0],
+      ['Branch editors', 'Edit and publish pages under Services.', false, 1, 0]
+    ];
+    const c = n => n ? 'var(--cs-ink)' : 'var(--cs-meta)';
+    return { groups: G.map(([name, desc, builtin, m, t]) => ({ name, desc, builtin, members: m, tokens: t, mColor: c(m), tColor: c(t) })) };
+  }
+}
+</script>
+</body>
+</html>
