@@ -44,6 +44,7 @@ require_relative "support/block_samples"
 require_relative "support/built_in_block_types"
 require_relative "support/contract_ledger"
 require_relative "support/site_address_helper"
+require_relative "support/mail_state"
 require_relative "support/log_capture"
 require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
@@ -106,6 +107,7 @@ module ActiveSupport
     # `SiteAddress`'s memo dropped on both sides -- see
     # test/support/site_address_helper.rb.
     include SiteAddressHelper
+    include MailState
 
     # `with_plain_theme { ... }`: the second theme for a block -- see
     # test/support/theme_test_helper.rb.

@@ -24,9 +24,20 @@ class SiteSetting < ApplicationRecord
   # (`Audit::Snapshot::NEVER_STORED`).
   encrypts :ai_api_key
 
+  # The mail login (docs/reference/mail.md), encrypted the same way, and
+  # for the same reasons: never rendered (`mail_login_set?` says only
+  # whether one is stored), logged or audited. The username is a credential
+  # too for several providers (Postmark's server token, SES's access key id).
+  encrypts :mail_username, :mail_password
+
   # A select's "None" posts "", a pasted key often carries a trailing
   # newline: stored as nil / stripped instead.
   normalizes :ai_provider, :ai_model, :ai_api_key, with: ->(value) { value.to_s.strip.presence }
+
+  # The same for the mail fields: a blank form field is "not set", and a
+  # pasted value often carries a space or a newline at either end.
+  normalizes :mail_server, :mail_security, :mail_sender_name, :mail_sender_address,
+    :mail_username, :mail_password, with: ->(value) { value.to_s.strip.presence }
 
   # Only a provider somebody registered (`AI::Providers`); blank means AI
   # is off. Checked only when it changes, like `time_zone` below: a plugin
@@ -130,6 +141,12 @@ class SiteSetting < ApplicationRecord
 
     ai_api_key_saved_at&.in_time_zone(effective_time_zone)&.to_date
   end
+
+  # Whether a mail login is stored, read off the raw columns -- never
+  # decrypting (see `ai_api_key_set?`). The Settings screen and
+  # `MailSettings#login_set?` ask this, so a login the current keys can't
+  # read still shows as set and can still be removed.
+  def mail_login_set? = mail_username_before_type_cast.present? || mail_password_before_type_cast.present?
 
   def locale_codes
     Array(locales).map { |entry| entry["code"].to_s }

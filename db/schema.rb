@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_12_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_28_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -424,6 +424,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_100000) do
     t.text "ai_api_key"
     t.jsonb "translation_original_changed_at", default: {}, null: false
     t.datetime "ai_api_key_saved_at"
+    t.string "mail_server"
+    t.integer "mail_port"
+    t.string "mail_security"
+    t.string "mail_sender_name"
+    t.string "mail_sender_address"
+    t.text "mail_username"
+    t.text "mail_password"
+    t.datetime "mail_login_saved_at"
+    t.datetime "mail_verified_at"
+    t.string "mail_verified_fingerprint"
+    t.datetime "mail_last_sent_at"
+    t.datetime "mail_failed_at"
+    t.jsonb "mail_failure"
   end
 
   create_table "tags", force: :cascade do |t|
