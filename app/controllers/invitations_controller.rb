@@ -16,20 +16,22 @@
 # it out of the back/forward cache): the refused form carries the token.
 #
 # FOUR ANSWERS (M5): the form; "expired" for a link that lapsed, was
-# replaced by a resend, was withdrawn (the row is gone), or is no token at
-# all -- ONE answer, so the page never says whether an invite existed; and
-# "used" for a link whose invite was accepted (the token is signed over
-# `invite_sent_at`, which accepting keeps, so a used link still finds its
-# row for the seven days it is good).
+# replaced by a resend, was withdrawn (the invitation is gone), or is no
+# token at all -- ONE answer, so the page never says whether an invitation
+# existed; and "used" for a link whose invitation was accepted (the token is
+# signed over `sent_at`, which accepting keeps, so a used link still finds
+# its row for the seven days it is good) or whose address has an account by
+# now. Accepting creates the account (`Invitations::Accept`): until then the
+# person is no user, and the page knows them by the invitation alone.
 #
 # What the service answers for a link (`:expired`, `:used`) are symbols, not
 # words: the words are this page's (`config/locales/invitations.en.yml`).
 class InvitationsController < ApplicationController
   layout "product"
 
-  # What `Users::AcceptInvite` answers for a link that is no good, and the
+  # What `Invitations::Accept` answers for a link that is no good, and the
   # page's state for it.
-  LINK_STATES = { [ Users::AcceptInvite::EXPIRED ] => :expired, [ Users::AcceptInvite::USED ] => :used }.freeze
+  LINK_STATES = { [ Invitations::Accept::EXPIRED ] => :expired, [ Invitations::Accept::USED ] => :used }.freeze
 
   allow_unauthenticated_access
   before_action { response.cache_control.replace(no_store: true) }
@@ -50,16 +52,16 @@ class InvitationsController < ApplicationController
   # writes them as text). 409 is "used", 410 every other link that is no
   # good. It writes nothing; `update` decides again whatever was answered.
   def check
-    user = invited_user_for_token
-    case link_state(user)
-    when :open then render json: { email_address: user.email_address, name: user.name.to_s }
+    invitation = invitation_for_token
+    case link_state(invitation)
+    when :open then render json: { email_address: invitation.email_address, name: invitation.name.to_s }
     when :used then head :conflict
     else head :gone
     end
   end
 
-  # The accept form. `Users::AcceptInvite` judges the token again, under the
-  # row's lock; a link that is no good is the page's expired or used state,
+  # The accept form. `Invitations::Accept` judges the token again, under the
+  # invitation's lock, and creates the account; a link that is no good is the page's expired or used state,
   # drawn with no form; a refused password draws the form again with the
   # token it was sent with, the address and the typed name (a password never
   # comes back). Accepted, the person is signed in and lands on the
@@ -69,7 +71,7 @@ class InvitationsController < ApplicationController
     # A name that is not a string (a list, a hash) is no form a page sent.
     return head(:bad_request) unless params[:name].nil? || params[:name].is_a?(String)
 
-    result = Users::AcceptInvite.call(token: token_param, name: params[:name], password: params[:password],
+    result = Invitations::Accept.call(token: token_param, name: params[:name], password: params[:password],
       password_confirmation: params[:password_confirmation])
 
     if result.ok?
@@ -87,7 +89,7 @@ class InvitationsController < ApplicationController
       # Rendered, not redirected: the form needs the token again, and a
       # redirect could carry it only in an address or in the session.
       @token = token_param
-      @user = result.record
+      @invitation = result.record
       flash.now[:alert] = result.errors.to_sentence
       render :show, status: :unprocessable_entity
     end
@@ -101,17 +103,18 @@ class InvitationsController < ApplicationController
     token if token.is_a?(String) && token.present?
   end
 
-  # The row a token stands for, or nil: tampered, lapsed, replaced by a
-  # resend (it is signed over `invite_sent_at`), of a withdrawn invite (the
-  # row is gone) and blank are all nil.
-  def invited_user_for_token
+  # The invitation a token stands for, or nil: tampered, lapsed, replaced by
+  # a resend (it is signed over `sent_at`), withdrawn (the row is gone) and
+  # blank are all nil.
+  def invitation_for_token
     token = token_param
-    token && User.find_by_token_for(:invite, token)
+    token && Invitation.find_by_token_for(:accept, token)
   end
 
-  def link_state(user)
-    return :expired unless user
+  # As `Invitations::Accept` decides it (`Invitation#used?`).
+  def link_state(invitation)
+    return :expired unless invitation
 
-    user.invited? ? :open : :used
+    invitation.used? ? :used : :open
   end
 end

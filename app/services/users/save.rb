@@ -57,7 +57,6 @@ module Users
 
       owner_change = owner_change?
       return denied("users.manage", @user, message: "Only an owner can change who is an owner") if owner_change && !actor_owner?
-      return invited_owner if owner_change && !@user.owner && @user.invited?
 
       old_group_ids = @user.persisted? ? @user.memberships.pluck(:group_id).sort : []
       new_group_ids = requested_group_ids || old_group_ids
@@ -108,6 +107,26 @@ module Users
       AccessControl::Group.where(id: Array(@attributes[:group_ids]).compact_blank).pluck(:id).sort
     end
 
+    # Adding someone to a group hands them its grants, so it must be a
+    # group the actor could assign; taking someone out of one is managing
+    # that group as it stands (final fix wave, Important 2) -- the same
+    # test, `AccessControl.can_manage_group?`. For another user `outranked?`
+    # has already required it of every group they're in; this also covers
+    # the actor's own memberships. A token actor is judged on its
+    # effective rights (Minor 1).
+    def group_refusal(added_ids, removed_ids)
+      return if (added_ids + removed_ids).empty? || actor_owner?
+
+      groups = AccessControl::Group.includes(:grants).where(id: added_ids + removed_ids).order(:name)
+      groups.each do |group|
+        next if AccessControl.can_manage_group?(actor, group)
+
+        verb = added_ids.include?(group.id) ? "add users to" : "remove users from"
+        return denied("users.manage", @user, message: "You don't have permission to #{verb} the #{group.name} group")
+      end
+      nil
+    end
+
     # Through `Membership` itself so its `after_commit` drops the memoised
     # grants (see `Groups::Save#sync_members`).
     def sync_groups(old_ids, new_ids)
@@ -143,17 +162,6 @@ module Users
       owner = changes.delete("owner")
       record_event("user.owner_changed", subject: @user, field_changes: { "owner" => owner }) if owner
       record_event("user.updated", subject: @user, field_changes: changes) if changes.any?
-    end
-
-    # An invited person is never made an owner (spec "Invites": counted
-    # nowhere a user who can sign in is counted, the owner checks included):
-    # an owner row nobody can sign in to is an owner nobody is. Taking the
-    # flag away from such a row (one made by hand) stays allowed.
-    INVITED_OWNER = "An invited person can't be made an owner until they accept the invite.".freeze
-
-    def invited_owner
-      @user.errors.add(:owner, INVITED_OWNER)
-      failure(@user, [ INVITED_OWNER ])
     end
 
     # Final fix wave (C, P17): a typed password needs a typed confirmation.

@@ -68,20 +68,6 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a reset requested for an invited address is answered as for an unknown one, and sends nothing" do
-    invited = users(:reader)
-    invited.update_columns(invited_at: Time.current, invite_sent_at: Time.current) # version: none (a test's setup)
-    assert_no_enqueued_emails do
-      post admin_password_path, params: { email_address: invited.email_address }
-    end
-    assert_redirected_to new_admin_password_path(sent: 1)
-    unknown = response.location
-    assert_no_enqueued_emails do
-      post admin_password_path, params: { email_address: "nobody-here@example.test" }
-    end
-    assert_equal unknown, response.location
-  end
-
   test "the expired state says one sentence for a lapsed, a used and an invalid link" do
     get new_admin_password_path(expired: "1")
     assert_select "h1", text: "This reset link has expired"
@@ -508,22 +494,6 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
 
     assert_redirected_to new_admin_password_path(expired: 1)
-  end
-
-  # No reset mail goes to an invited row, so such a token was made outside
-  # the app; the row's open invite must not be finished through the reset.
-  test "a reset token of an invited row is the expired state, sets no password and is a 410 to the check" do
-    invited = invited_user("dana@example.com")
-    token = invited.password_reset_token
-    digest = invited.password_digest
-
-    post admin_check_password_path, params: { token: token }
-    assert_response :gone
-
-    patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
-    assert_redirected_to new_admin_password_path(expired: 1)
-    assert_equal digest, invited.reload.password_digest
-    assert invited.invited?
   end
 
   # THE EARLY CHECK (`check`): what the page's script asks once, with the

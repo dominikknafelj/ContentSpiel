@@ -20,10 +20,6 @@ module Admin
     # member is `Groups::Save`'s call -- a refusal is the 403 page -- and is not
     # second-guessed here.
     #
-    # INVITED people (mail spec "Invites") are members like anyone else, since
-    # an invite may put someone into groups; their chip says "Invited", as an
-    # owner's says "Owner", because they cannot sign in until they accept.
-    #
     # `users`: the members to show as chips, in the order given.
     class MembersComponent < AdminComponent
       HELP = "Owners aren't listed: they already have every permission.".freeze
@@ -42,7 +38,7 @@ module Admin
       # is already shown by their email, so nothing is repeated. An owner says so.
       def chips
         users.map do |user|
-          hint = [ ("Owner" if user.owner?), ("Invited" if user.invited?), (user.email_address if user.name.present?) ].compact.join(" · ").presence
+          hint = [ ("Owner" if user.owner?), (user.email_address if user.name.present?) ].compact.join(" · ").presence
           { value: user.id.to_s, label: user.display_name, hint: hint }
         end
       end

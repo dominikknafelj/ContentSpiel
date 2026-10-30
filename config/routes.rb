@@ -270,8 +270,7 @@ Rails.application.routes.draw do
     # Invites (mail spec "Invites", `Admin::InvitesController`): "Invite
     # person" posts `invites`; an invited row's menu resends
     # (`invites/:id/resend`) and withdraws (DELETE `invites/:id`). The id is
-    # the invited USER's: an invite is a user row in the invited state, not a
-    # record of its own.
+    # the `Invitation`'s: an invitation is no user until it is accepted.
     resources :invites, only: %i[create destroy] do
       member { post :resend }
     end

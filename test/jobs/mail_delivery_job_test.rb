@@ -186,15 +186,15 @@ class MailDeliveryJobTest < ActiveJob::TestCase
     end
   end
 
-  # Controller ruling T8a: an invite withdrawn before its mail went out is
-  # an ordinary event. The job ends quietly, logs one info line with no
+  # Controller ruling T8a: an invitation withdrawn before its mail went out
+  # is an ordinary event. The job ends quietly, logs one info line with no
   # address, records nothing and raises nothing.
-  test "an invite whose person was withdrawn before the mail went out is discarded quietly" do
+  test "an invitation withdrawn before the mail went out is discarded quietly" do
     with_site_address("https://cms.example.test") do
       with_mail_state(:working) do
-        invited = invited_user("withdrawn-early@example.com")
-        ApplicationMailer.queue(InvitesMailer, :invite, invited, inviter: users(:two))
-        invited.destroy!
+        invitation = open_invitation("withdrawn-early@example.com")
+        ApplicationMailer.queue(InvitesMailer, :invite, invitation)
+        invitation.destroy!
 
         log = capture_log do
           assert_no_emails { perform_enqueued_jobs }
@@ -208,12 +208,12 @@ class MailDeliveryJobTest < ActiveJob::TestCase
     end
   end
 
-  test "an invite whose inviter is gone still fails as a deleted record does" do
+  test "another mail whose record is gone still fails as a deleted record does" do
     with_site_address("https://cms.example.test") do
       with_mail_state(:working) do
-        inviter = User.create!(email_address: "inviter@example.com", password: "a-long-password-1")
-        ApplicationMailer.queue(InvitesMailer, :invite, invited_user("kept@example.com"), inviter: inviter)
-        inviter.destroy!
+        user = User.create!(email_address: "gone@example.com", password: "a-long-password-1")
+        ApplicationMailer.queue(PasswordsMailer, :reset, user)
+        user.destroy!
 
         assert_raises(ActiveJob::DeserializationError) { perform_enqueued_jobs }
         assert_nil site.mail_failed_at

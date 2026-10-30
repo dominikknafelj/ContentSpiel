@@ -115,7 +115,7 @@ module ActiveSupport
     # test/support/site_address_helper.rb.
     include SiteAddressHelper
     include MailState
-    # `invited_user(email)`: a row in the invited state -- see
+    # `open_invitation(email)`: an open invitation -- see
     # test/support/invites.rb.
     include Invites
     # `without_encryption_keys { ... }`: a site with no Active Record

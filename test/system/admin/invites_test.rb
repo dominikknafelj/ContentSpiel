@@ -4,8 +4,8 @@ require "application_system_test_case"
 # M5): an owner invites someone from the Users screen, the invited person
 # opens the mailed link (its token after a "#", which the page's script
 # moves into the form and out of the address), sets a password, lands on
-# the dashboard signed in, and can sign in with it afterwards; and an
-# invited row's menu resends and withdraws.
+# the dashboard signed in with the account accepting made, and can sign in
+# with it afterwards; and an invitation's row menu resends and withdraws.
 class Admin::InvitesSystemTest < ApplicationSystemTestCase
   include ActionMailer::TestHelper
 
@@ -20,7 +20,7 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
-  def row(user) = "##{ActionView::RecordIdentifier.dom_id(user)}"
+  def row(record) = "##{ActionView::RecordIdentifier.dom_id(record)}"
 
   def address = page.evaluate_script("window.location.href")
 
@@ -39,8 +39,8 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
       within("dialog#invite-person") { press "Send invite" }
       assert_text "Invite sent to dana@example.com."
     end
-    dana = User.find_by!(email_address: "dana@example.com")
-    within(row(dana)) do
+    invitation = Invitation.open.find_by!(email_address: "dana@example.com")
+    within(row(invitation)) do
       assert_text "Dana"
       assert_text "Invited"
     end
@@ -65,7 +65,8 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
     assert_selector "nav[aria-label='Modules']", wait: 15
     assert_text "Your account is ready."
     assert_current_path admin_root_path
-    assert_not dana.reload.invited?
+    assert invitation.reload.accepted?
+    dana = User.find_by!(email_address: "dana@example.com")
     assert_equal [ access_control_groups(:editor) ], dana.groups.to_a
 
     # The link is used now: it says so, with the way to sign in.
@@ -91,8 +92,8 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
   end
 
   test "resend and withdraw from the row menu" do
-    dana = invited_user("dana@example.com", sent_at: 2.days.ago)
-    was_sent = dana.invite_sent_at
+    dana = open_invitation("dana@example.com", sent_at: 2.days.ago)
+    was_sent = dana.sent_at
 
     visit admin_users_path
     await_admin_controllers
@@ -102,7 +103,7 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
       press "Resend invite"
     end
     assert_text "New invite sent to dana@example.com."
-    assert_operator dana.reload.invite_sent_at, :>, was_sent
+    assert_operator dana.reload.sent_at, :>, was_sent
 
     within(row(dana)) do
       find("button[aria-label='Actions for dana@example.com']").click
@@ -114,6 +115,6 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
     end
     assert_text "Invite to dana@example.com withdrawn."
     assert_no_selector row(dana)
-    assert_not User.exists?(dana.id)
+    assert_not Invitation.exists?(dana.id)
   end
 end

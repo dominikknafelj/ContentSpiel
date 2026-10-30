@@ -7,9 +7,10 @@ module Admin
   # (refused for the last owner, `Users::Destroy` ->
   # `User#ensure_not_last_owner`). A permission refusal from `Users::Save` (a
   # group the actor can't assign, an owner or an outranking user changed by
-  # someone who may not) is the 403 page. Inviting someone (a row with no
-  # password until they accept) is `Admin::InvitesController`; `new`/`create`
-  # here make a user with a password set up front.
+  # someone who may not) is the 403 page. Inviting someone is
+  # `Admin::InvitesController`: an invitation is no user until it is
+  # accepted (`Invitation`); `new`/`create` here make a user with a password
+  # set up front.
   #
   # Plain redirect-with-flash throughout, not autosave: a user's email and
   # password are exactly the kind of field an accidental keystroke-triggered
@@ -160,7 +161,7 @@ module Admin
     # Whether the owner toggle is locked because `user` is the last owner
     # (demoting them is refused anyway, by `User`'s own validation).
     helper_method def last_owner?(user)
-      user.persisted? && user.owner_in_database && User.can_sign_in.where(owner: true).count == 1
+      user.persisted? && user.owner_in_database && User.where(owner: true).count == 1
     end
   end
 end

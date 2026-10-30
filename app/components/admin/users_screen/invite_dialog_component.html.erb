@@ -13,7 +13,7 @@
       <% if email_errors.any? %>
         <p id="invite_email_address_error" class="mt-1 text-[13px] text-danger-ink" role="alert">
           <%= email_errors.to_sentence %><%# i18n-ok: to_sentence joins with the locale's support.array words %>
-          <% if resend_user %>
+          <% if resend_invitation %>
             <%= tag.button t(".resend"), type: "submit", form: RESEND_FORM_ID, class: "cursor-pointer text-accent underline hover:text-accent-hover hover:no-underline" %>
           <% end %>
         </p>
@@ -32,7 +32,7 @@
     <%= render Admin::UsersScreen::GroupCardsComponent.new(groups: groups, selected_ids: group_ids, assignable_ids: assignable_ids) %>
   <% end %>
 
-  <% if resend_user %>
+  <% if resend_invitation %>
     <%= form_with url: resend_path, method: :post, id: RESEND_FORM_ID, data: { turbo_frame: "_top" } do %><% end %>
   <% end %>
 

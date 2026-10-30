@@ -182,7 +182,7 @@ module Audit
       case record
       when nil then nil
       when Post, Page then translated_label(record, "title")
-      when User then record.email_address
+      when User, Invitation then record.email_address
       when AccessControl::Group, Tag then record.name
       when ContentBlock then "#{record.block_type.to_s.humanize} block ##{record.id}"
       when Media::Asset then record.title.presence || "Image ##{record.id}"
@@ -244,6 +244,15 @@ module Audit
         {
           "id" => record.id, "email_address" => record.email_address, "name" => record.name, "owner" => record.owner, "group_ids" => record.group_ids.sort,
           "notes_sound" => record.notes_sound, "notes_desktop" => record.notes_desktop
+        }
+      when Invitation
+        # Named fields: who it is for, by whom, its dates, the account it
+        # made and the groups it puts the person into. Nothing of its token,
+        # which is made by the mail and stored nowhere.
+        {
+          "id" => record.id, "email_address" => record.email_address, "name" => record.name, "inviter_id" => record.inviter_id,
+          "sent_at" => record.sent_at, "accepted_at" => record.accepted_at, "user_id" => record.user_id,
+          "group_ids" => record.invitation_groups.pluck(:group_id).sort
         }
       when AccessControl::Group
         {

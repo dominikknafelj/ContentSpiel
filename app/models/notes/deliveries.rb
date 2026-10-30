@@ -37,8 +37,7 @@ module Notes
     def followers(thread) = Follow.where(thread_id: thread.id, following: true).pluck(:user_id)
 
     def follow(thread, author_id:, mentioned_ids:)
-      # `can_sign_in`: an invited person follows nothing and is told nothing.
-      mentioned = mentioned_ids.empty? ? [] : User.can_sign_in.where(id: mentioned_ids).pluck(:id)
+      mentioned = mentioned_ids.empty? ? [] : User.where(id: mentioned_ids).pluck(:id)
       user_ids = ([ author_id ] + mentioned).compact.uniq
       rows = Follow.where(thread_id: thread.id, user_id: user_ids).index_by(&:user_id)
       user_ids.each do |user_id|
@@ -71,7 +70,7 @@ module Notes
       reasons = reasons.except(actor_user&.id)
       return [] if reasons.empty?
 
-      User.can_sign_in.where(id: reasons.keys).order(:id).pluck(:id).map do |user_id|
+      User.where(id: reasons.keys).order(:id).pluck(:id).map do |user_id|
         delivery = Delivery.find_or_initialize_by(user_id: user_id, message_id: message.id)
         delivery.update!(thread_id: message.thread_id, reason: reasons.fetch(user_id), read_at: nil)
         Signals.delivery(delivery)

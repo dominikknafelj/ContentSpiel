@@ -106,8 +106,7 @@ module Admin
     end
 
     def users_for_filter
-      # People who can sign in: an invited person has done nothing yet.
-      users = User.can_sign_in.order(:email_address).limit(MAX_USERS).to_a
+      users = User.order(:email_address).limit(MAX_USERS).to_a
       chosen = @filter.user_id
       users << User.find_by(id: chosen) if chosen && users.none? { |user| user.id == chosen }
       users.compact

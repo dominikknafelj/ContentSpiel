@@ -23,7 +23,7 @@
 <%# The Name field is filled only on the refused form's answer (the name
     typed, else the stored one); on the GET it is empty and the check's
     answer fills it, so no parameter of an address reaches the page. %>
-<% name_value = @user && (params[:name].is_a?(String) ? params[:name] : @user.name) %>
+<% name_value = @invitation && (params[:name].is_a?(String) ? params[:name] : @invitation.name) %>
 <%= tag.div class: "flex flex-col gap-[18px]", data: (@state ? {} : { controller: "invitation-token", "invitation-token-check-url-value": admin_check_invitation_path }) do %>
   <%= render "admin/shared/auth_heading", title: t(".title", site: site_name) %>
 
@@ -39,8 +39,8 @@
     <%= form_with url: admin_accept_invitation_path, method: :post, class: "flex flex-col gap-[18px]",
           data: { invitation_token_target: "form" }, html: { hidden: @token.blank? } do |form| %>
       <%= hidden_field_tag :token, @token, id: "invitation-token", autocomplete: "off", data: { invitation_token_target: "token" } %>
-      <p class="text-sm text-dim" data-invitation-token-target="line" <%= "hidden" unless @user %>>
-        <%= t(".finish_html", email: tag.strong(@user&.email_address, class: "font-medium text-ink", data: { invitation_token_target: "email" })) %>
+      <p class="text-sm text-dim" data-invitation-token-target="line" <%= "hidden" unless @invitation %>>
+        <%= t(".finish_html", email: tag.strong(@invitation&.email_address, class: "font-medium text-ink", data: { invitation_token_target: "email" })) %>
       </p>
       <div>
         <%= label_tag "name", t(".name"), class: setup_label_class %>

@@ -169,19 +169,4 @@ class UserTest < ActiveSupport::TestCase
       User.name_or_email_starting_first("ANDERS").by_email.pluck(:email_address)
     assert_equal %w[anders@example.org b@example.org c@example.org zed@example.org], User.by_email.pluck(:email_address)
   end
-
-  # `other_owner_remains?` counts only people who can sign in: an invited row
-  # is never an owner (`Users::Invite` takes no owner), and a row made one
-  # by hand is still not an owner who could take over.
-  test "an invited row does not count as another owner: the last owner is still the last" do
-    invited_user("dana@example.com").update_columns(owner: true)
-
-    last = users(:one)
-    assert_not last.destroy
-    assert_includes last.errors.full_messages, "The last owner can't be deleted"
-
-    last.reload.owner = false
-    assert_not last.save
-    assert_includes last.errors[:owner], "can't demote the last owner"
-  end
 end

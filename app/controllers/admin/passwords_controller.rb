@@ -26,9 +26,7 @@ module Admin
     end
 
     def create
-      # `can_sign_in`: an invited row has no password anybody knows and is
-      # answered as an unknown address (same redirect, no mail).
-      if user = User.can_sign_in.find_by(email_address: params[:email_address])
+      if user = User.find_by(email_address: params[:email_address])
         # The link in the mail is the site's configured address when there
         # is one, and then the request's origin is not handed over at all
         # (it is whatever Host this request named). Without one, and in
@@ -151,11 +149,7 @@ module Admin
         token = params[:token]
         return unless token.is_a?(String) && token.present?
 
-        # `can_sign_in`: no reset mail is ever sent to an invited row
-        # (`create`), so a reset token of one was made outside the app; it
-        # is answered as any bad token is, and never sets a password on a
-        # row whose invite is still open (docs/reference/mail.md).
-        User.can_sign_in.find_by_password_reset_token!(token)
+        User.find_by_password_reset_token!(token)
       rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound
         nil
       end

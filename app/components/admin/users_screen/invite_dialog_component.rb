@@ -10,7 +10,7 @@ module Admin
     # REFUSED, the Users page is drawn again (`Admin::InvitesController#
     # create`) with this dialog open (`open_on_load`), what was typed and the
     # sentence under the field it is about. "This address is already
-    # invited." comes with a Resend button for that row (`resend_user`): a
+    # invited." comes with a Resend button for that invitation (`resend_invitation`): a
     # button of ITS OWN form (`form=`), which stands outside the invite form,
     # so it is never the invite form's default button and Enter in the
     # address field still sends the invite. A refusal that is about no field
@@ -24,19 +24,19 @@ module Admin
       FORM_ID = "invite-person-form".freeze
       RESEND_FORM_ID = "invite-person-resend".freeze
 
-      def initialize(groups:, assignable_ids:, invite: nil, group_ids: [], errors: [], resend_user: nil, url_options: {})
+      def initialize(groups:, assignable_ids:, invite: nil, group_ids: [], errors: [], resend_invitation: nil, url_options: {})
         @groups = groups
         @assignable_ids = assignable_ids
-        @invite = invite || User.new
+        @invite = invite || Invitation.new
         @group_ids = group_ids
         @errors = errors
-        @resend_user = resend_user
+        @resend_invitation = resend_invitation
         @url_options = url_options
       end
 
       private
 
-      attr_reader :groups, :assignable_ids, :invite, :group_ids, :errors, :resend_user, :url_options
+      attr_reader :groups, :assignable_ids, :invite, :group_ids, :errors, :resend_invitation, :url_options
 
       def refused? = errors.any?
 
@@ -55,7 +55,7 @@ module Admin
 
       def create_path = helpers.admin_invites_path(**url_options)
 
-      def resend_path = helpers.resend_admin_invite_path(resend_user, **url_options)
+      def resend_path = helpers.resend_admin_invite_path(resend_invitation, **url_options)
     end
   end
 end

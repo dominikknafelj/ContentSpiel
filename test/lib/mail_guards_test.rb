@@ -90,44 +90,37 @@ class MailGuardsTest < ActiveSupport::TestCase
     assert_empty offenders, "a mail action's arguments go into the queue's row and Active Job's log: hand it a record and make the token in the mailer"
   end
 
-  # ---- can_sign_in -----------------------------------------------------------
+  # ---- an invitation is not a user -----------------------------------------
 
-  # The plan's Places: every query there that finds, counts or lists people
-  # names `User.can_sign_in`; an invited row is a user row nobody can sign in
-  # as. path => { a line's fragment => why it may find any user }.
-  PLACES = {
-    "app/controllers/admin/sessions_controller.rb" => {},
-    "app/controllers/admin/passwords_controller.rb" => {},
-    "app/controllers/admin/note_mentions_controller.rb" => {},
-    "app/models/notes/deliveries.rb" => {},
-    "app/services/notes/authorization.rb" => {},
-    "app/controllers/admin/user_suggestions_controller.rb" => {},
-    "app/models/user.rb" => {
-      "User.where(owner: true).order(:id).lock.pluck(:id, :invited_at)" =>
-        "other_owner_remains? locks EVERY owner row in id order, an invited one included, so two demotions queue rather than deadlock; " \
-        "it then counts only the rows whose invited_at is nil, can_sign_in's own condition"
-    },
-    "app/controllers/admin/users_controller.rb" => {
-      "@user = User.new" => "the New user form: a new row, no query",
-      "Users::Save.call(User.new" => "creating a user: a new row, no query",
-      "User.find(params[:id])" => "the Users screen edits every row, an invited one included (its editor offers no password)"
-    },
-    "app/controllers/admin/audit_events_controller.rb" => {
-      "User.find_by(id: chosen)" => "a person already chosen in the filter (from an event's link) is kept on screen; it offers nobody new"
-    }
+  # An invitation lives in its own table and accepting it creates the user
+  # (the owner's choice of 2026-10-30), so no query of people has to know
+  # that invitations exist. These files are the invitation side, and the
+  # only ones that name it: path => why. A new reader of users that wants to
+  # see invitations is a design change, not a line here.
+  INVITATION_NAMERS = {
+    "app/models/invitation.rb" => "the model",
+    "app/models/invitation_group.rb" => "the model's groups",
+    "app/services/invitations/accept.rb" => "the service that turns an invitation into a user",
+    "app/services/invitations/invite.rb" => "the service that makes one",
+    "app/services/invitations/resend.rb" => "the service that sends a new link",
+    "app/services/invitations/withdraw.rb" => "the service that deletes one",
+    "app/services/invitations/rules.rb" => "what those four share",
+    "app/controllers/admin/invites_controller.rb" => "the Users screen's invite, resend and withdraw",
+    "app/controllers/invitations_controller.rb" => "the accept page",
+    "app/controllers/concerns/admin/users_list.rb" => "the Users screen lists the open invitations among the users",
+    "app/components/admin/users_screen/list_component.rb" => "an invitation's row in that list",
+    "app/components/admin/users_screen/invite_dialog_component.rb" => "the invite dialog's empty form",
+    "app/mailers/invites_mailer.rb" => "the invitation's mail",
+    "app/models/audit/snapshot.rb" => "an invitation event's subject: its label and its snapshot"
   }.freeze
 
-  test "every User query in a sign-in path names can_sign_in" do
-    PLACES.each do |path, allowed|
-      lines = code_lines(ROOT.join(path).read).map(&:strip)
-      offenders = lines.select { |line| line.match?(/\bUser\./) && !line.include?("can_sign_in") }
-        .reject { |line| allowed.keys.any? { |fragment| line.include?(fragment) } }
-      assert_empty offenders, "#{path}: a query of people here reads User.can_sign_in, or is named in PLACES with its reason"
+  INVITATION = /(?<![\w"'])(?:Invitations?|InvitationGroup)\b(?!["'])/
 
-      allowed.each_key do |fragment|
-        assert lines.any? { |line| line.include?(fragment) }, "PLACES[#{path.inspect}] excuses #{fragment.inspect}, which is gone: remove it"
-      end
-      assert lines.any? { |line| line.include?("can_sign_in") }, "#{path} no longer reads can_sign_in: is it still a place?" unless path == "app/models/user.rb"
-    end
+  test "an invitation is not a user: nothing outside the invitation side names Invitation" do
+    namers = sources("app", "lib").select { |_path, source| code_lines(source).any? { |line| line.match?(INVITATION) } }.keys
+
+    assert_empty namers - INVITATION_NAMERS.keys,
+      "these files name Invitation: an invitation is no user, and the users side never learns it exists (docs/reference/mail.md, \"Invites\")"
+    (INVITATION_NAMERS.keys - namers).each { |path| flunk "INVITATION_NAMERS[#{path.inspect}] names no Invitation any more: remove it" }
   end
 end

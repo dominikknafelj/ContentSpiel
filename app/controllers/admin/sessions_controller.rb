@@ -28,9 +28,7 @@ module Admin
     # (final fix wave, Minor 4); an address is cut to the 254 characters
     # an email address can have, so the log can't be stuffed through it.
     def create
-      # `can_sign_in`: an invited row holds the digest of a password nobody was
-      # told, and is never reached by a typed one (docs/reference/mail.md).
-      if user = User.can_sign_in.authenticate_by(params.permit(:email_address, :password))
+      if user = User.authenticate_by(params.permit(:email_address, :password))
         start_new_session_for user
         Current.actor = user
         Audit.record("session.created", subject: user)

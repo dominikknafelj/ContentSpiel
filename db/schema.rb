@@ -152,6 +152,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_090000) do
     t.index ["subject_type", "subject_id"], name: "index_edit_reservations_on_subject", unique: true
   end
 
+  create_table "invitation_groups", force: :cascade do |t|
+    t.bigint "invitation_id", null: false
+    t.bigint "group_id", null: false
+    t.index ["group_id"], name: "index_invitation_groups_on_group_id"
+    t.index ["invitation_id", "group_id"], name: "index_invitation_groups_on_invitation_id_and_group_id", unique: true
+  end
+
+  create_table "invitations", force: :cascade do |t|
+    t.string "email_address", null: false
+    t.string "name"
+    t.bigint "inviter_id"
+    t.datetime "sent_at", null: false
+    t.datetime "accepted_at"
+    t.bigint "user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_address"], name: "index_invitations_on_open_email_address", unique: true, where: "(accepted_at IS NULL)"
+    t.index ["inviter_id"], name: "index_invitations_on_inviter_id"
+    t.index ["user_id"], name: "index_invitations_on_user_id"
+  end
+
   create_table "media_assets", force: :cascade do |t|
     t.string "content_type"
     t.bigint "byte_size"
@@ -468,11 +489,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_090000) do
     t.string "name"
     t.boolean "notes_sound", default: true, null: false
     t.boolean "notes_desktop", default: false, null: false
-    t.datetime "invited_at"
-    t.datetime "invite_sent_at"
-    t.bigint "invited_by_id"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
-    t.index ["invited_by_id"], name: "index_users_on_invited_by_id"
   end
 
   add_foreign_key "access_control_grants", "access_control_groups", column: "group_id", on_delete: :cascade
@@ -486,6 +503,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_090000) do
   add_foreign_key "content_blocks", "media_assets"
   add_foreign_key "edit_reservations", "users", column: "requested_by_id", on_delete: :nullify
   add_foreign_key "edit_reservations", "users", on_delete: :cascade
+  add_foreign_key "invitation_groups", "access_control_groups", column: "group_id", on_delete: :cascade
+  add_foreign_key "invitation_groups", "invitations", on_delete: :cascade
+  add_foreign_key "invitations", "users", column: "inviter_id", on_delete: :nullify
+  add_foreign_key "invitations", "users", on_delete: :nullify
   add_foreign_key "media_assets", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "media_usages", "media_assets"
   add_foreign_key "note_deliveries", "note_messages", column: "message_id", on_delete: :cascade
@@ -513,5 +534,4 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_090000) do
   add_foreign_key "presence_marks", "users", on_delete: :cascade
   add_foreign_key "published_versions", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "sessions", "users"
-  add_foreign_key "users", "users", column: "invited_by_id", on_delete: :nullify
 end

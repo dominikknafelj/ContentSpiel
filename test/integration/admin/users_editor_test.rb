@@ -556,15 +556,4 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     delete "/cs-studio/users/#{fresh.id}"
     assert_redirected_to "/cs-studio/users"
   end
-
-  # `Admin::UsersController#last_owner?` counts people who can sign in: an
-  # invited row made an owner by hand is no second owner.
-  test "an invited owner row does not lift the last owner's protection on the editor" do
-    invited_user("invited-owner@example.com").update_columns(owner: true)
-
-    get "/cs-studio/users/#{users(:one).id}/edit"
-
-    assert_response :success
-    assert_select "[data-owner-zone-reason]"
-  end
 end

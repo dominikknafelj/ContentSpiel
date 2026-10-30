@@ -52,12 +52,10 @@ class MailDeliveryJob < ActionMailer::MailDeliveryJob
 
   private
 
-  # An invite withdrawn before its mail went out (controller ruling T8a):
-  # the invited row is gone, so the job's first record argument cannot be
-  # found. That is an ordinary event, not a failure: the job ends quietly
-  # with one info line that names no address, and nothing is recorded. Only
-  # the INVITED person's absence: an invite whose inviter is gone fails as
-  # any other deleted record does.
+  # An invitation withdrawn before its mail went out (controller ruling
+  # T8a): its row is gone, so the job's one record argument cannot be found.
+  # That is an ordinary event, not a failure: the job ends quietly with one
+  # info line that names no address, and nothing is recorded.
   def withdrawn_invite?(error)
     return false unless error.is_a?(ActiveJob::DeserializationError)
 

@@ -78,9 +78,10 @@ module ServiceCalls
   # either: nobody was refused a permission), and that a good one is recorded
   # as the token's user whoever calls it. The factory returns `call:` (a good
   # token), `bad_call:` (a token that finds nothing) and `owner:` (the user
-  # the token names).
+  # the token names, or a callable that finds it after the call, for a service
+  # that creates it).
   TOKEN_CREDENTIAL = {
-    "Users::AcceptInvite" => "the invite token is the right to finish that one account (spec \"Invites\")"
+    "Invitations::Accept" => "the invitation's token is the right to make that one account (spec \"Invites\")"
   }.freeze
 
   # `ApplicationService` subclasses that are not services of their own (a
@@ -545,32 +546,33 @@ module ServiceCalls
 
     # Invites need mail that works (`MailSettings#ready?`): the control
     # run puts it so, inside the test's transaction.
-    "Users::Invite" => lambda {
+    "Invitations::Invite" => lambda {
       put_mail_state(:working)
-      { call: -> { Users::Invite.call(email_address: "invited@example.com", group_ids: [ access_control_groups(:read_only).id ]) },
-        permission: "users.manage", on: User }
+      { call: -> { Invitations::Invite.call(email_address: "invited@example.com", group_ids: [ access_control_groups(:read_only).id ]) },
+        permission: "users.manage", on: Invitation }
     },
 
-    "Users::ResendInvite" => lambda {
+    "Invitations::Resend" => lambda {
       put_mail_state(:working)
-      target = invited_user("invited@example.com", sent_at: 1.day.ago)
-      { call: -> { Users::ResendInvite.call(target) }, permission: "users.manage", on: target }
+      target = open_invitation("invited@example.com", sent_at: 1.day.ago)
+      { call: -> { Invitations::Resend.call(target) }, permission: "users.manage", on: target }
     },
 
-    "Users::WithdrawInvite" => lambda {
-      target = invited_user("invited@example.com", groups: [ access_control_groups(:read_only) ])
-      { call: -> { Users::WithdrawInvite.call(target) }, permission: "users.manage", on: target }
+    "Invitations::Withdraw" => lambda {
+      target = open_invitation("invited@example.com", groups: [ access_control_groups(:read_only) ])
+      { call: -> { Invitations::Withdraw.call(target) }, permission: "users.manage", on: target }
     },
 
-    # See TOKEN_CREDENTIAL.
-    "Users::AcceptInvite" => lambda {
-      target = invited_user("invited@example.com")
-      gone = invited_user("withdrawn@example.com")
-      gone_token = gone.generate_token_for(:invite)
+    # See TOKEN_CREDENTIAL. The owner is the account accepting makes, so it
+    # is found after the call.
+    "Invitations::Accept" => lambda {
+      target = open_invitation("invited@example.com", groups: [ access_control_groups(:read_only) ])
+      gone = open_invitation("withdrawn@example.com")
+      gone_token = gone.generate_token_for(:accept)
       gone.destroy!
-      accept = ->(token) { Users::AcceptInvite.call(token: token, name: "Invited", password: PASSWORD, password_confirmation: PASSWORD) }
-      token = target.generate_token_for(:invite)
-      { call: -> { accept.call(token) }, bad_call: -> { accept.call(gone_token) }, owner: target }
+      accept = ->(token) { Invitations::Accept.call(token: token, name: "Invited", password: PASSWORD, password_confirmation: PASSWORD) }
+      token = target.generate_token_for(:accept)
+      { call: -> { accept.call(token) }, bad_call: -> { accept.call(gone_token) }, owner: -> { User.find_by!(email_address: "invited@example.com") } }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.

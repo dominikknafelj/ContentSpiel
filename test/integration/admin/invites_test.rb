@@ -4,7 +4,7 @@ require "test_helper"
 # "Invite person" button and its dialog, the refusals the dialog shows, the
 # invited row (its pill, its dates, its menu), resend and withdraw, and the
 # limit of ten invites per person in three minutes. The rules themselves are
-# the services' (test/services/users/*invite*_test.rb); this is what the
+# the services' (test/services/invitations/); this is what the
 # screen does with them.
 class Admin::InvitesTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
@@ -61,7 +61,7 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  test "sending an invite: a row that cannot sign in, the mail queued, and the list says so" do
+  test "sending an invite: an invitation and no user, the mail queued, and the list says so" do
     with_mail_state(:working) do
       assert_enqueued_jobs 1 do
         post "/cs-studio/invites", params: { user: { email_address: " Dana@Example.com ", name: "Dana",
@@ -71,13 +71,14 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
       follow_redirect!
       assert_select "#toasts, [role=status], body", /Invite sent to dana@example\.com\./
 
-      dana = User.find_by!(email_address: "dana@example.com")
-      assert dana.invited?
+      dana = Invitation.open.find_by!(email_address: "dana@example.com")
+      assert_not User.exists?(email_address: "dana@example.com")
       assert_equal [ access_control_groups(:editor) ], dana.groups.to_a
       assert_select "##{ActionView::RecordIdentifier.dom_id(dana)}[data-invited]" do
         assert_select "[data-invite-state=open]", "Invited"
-        sent = I18n.l(dana.invite_sent_at, format: :"admin.short")
-        expires = I18n.l(dana.invite_expires_at, format: :"admin.short")
+        assert_select "[data-column=groups]", /Editor/
+        sent = I18n.l(dana.sent_at, format: :"admin.short")
+        expires = I18n.l(dana.expires_at, format: :"admin.short")
         assert_select "[data-invite-dates]", "Invited #{sent} · expires #{expires}"
         assert_select "[data-invite-menu] button", text: "Resend invite"
         assert_select "[data-invite-menu] button", text: "Withdraw invite…"
@@ -86,15 +87,20 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "an invited row with no name is listed by its address, and an expired one says so instead of its dates" do
-    fresh = invited_user("fresh@example.com")
-    lapsed = invited_user("lapsed@example.com", sent_at: 8.days.ago)
+  test "an invitation with no name is listed by its address among the users, opens no editor, and an expired one says so instead of its dates" do
+    fresh = open_invitation("fresh@example.com")
+    lapsed = open_invitation("lapsed@example.com", sent_at: 8.days.ago)
+    accepted = open_invitation("accepted@example.com").tap { |invitation| invitation.update!(accepted_at: Time.current) }
 
     get USERS
     assert_select "##{ActionView::RecordIdentifier.dom_id(fresh)}" do
-      assert_select "a .admin-user-name", "fresh@example.com"
+      assert_select "span.font-medium", "fresh@example.com"
+      assert_select "a", count: 0
       assert_select "[data-invite-state=open]", "Invited"
     end
+    assert_select "##{ActionView::RecordIdentifier.dom_id(accepted)}", count: 0
+    expected = (User.all.to_a + [ fresh, lapsed ]).sort_by(&:email_address).map { |row| ActionView::RecordIdentifier.dom_id(row) }
+    assert_equal expected, css_select(".admin-users-list li").map { |row| row["id"] }, "the invitations stand among the users in the order of the address"
     assert_select "##{ActionView::RecordIdentifier.dom_id(lapsed)}" do
       assert_select "[data-invite-state=expired]", "Invite expired"
       assert_select "[data-invite-dates]", count: 0
@@ -108,10 +114,10 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
   end
 
   test "the dialog's errors, with Resend on an already invited address" do
-    invited = invited_user("dana@example.com")
+    invited = open_invitation("dana@example.com")
 
     with_mail_state(:working) do
-      assert_no_difference -> { User.count } do
+      assert_no_difference -> { Invitation.count } do
         post "/cs-studio/invites", params: { user: { email_address: "Reader@Example.com ", name: "Someone" } }
       end
       assert_response :unprocessable_entity
@@ -144,11 +150,12 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     post "/cs-studio/invites", params: { user: { email_address: "new@example.com" } }
     assert_response :unprocessable_entity
     assert_select "#{DIALOG}[data-admin--ui--dialog-open-on-load] p[role=alert]", "Invites need mail."
-    assert_not User.exists?(email_address: "new@example.com")
+    assert_not Invitation.exists?(email_address: "new@example.com")
   end
 
-  test "resend gives the row a new link, and withdraw deletes it; neither touches a user who can sign in" do
-    dana = invited_user("dana@example.com", sent_at: 2.days.ago)
+  test "resend gives the invitation a new link, and withdraw deletes it; an accepted invitation is not found" do
+    dana = open_invitation("dana@example.com", sent_at: 2.days.ago)
+    accepted = open_invitation("accepted@example.com").tap { |invitation| invitation.update!(accepted_at: Time.current) }
 
     with_mail_state(:working) do
       assert_enqueued_jobs 1 do
@@ -156,57 +163,33 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
       end
       assert_redirected_to USERS
       assert_equal "New invite sent to dana@example.com.", flash[:notice]
-      assert_in_delta Time.current, dana.reload.invite_sent_at, 5
+      assert_in_delta Time.current, dana.reload.sent_at, 5
 
-      post "/cs-studio/invites/#{users(:reader).id}/resend"
-      assert_redirected_to USERS
-      assert_equal "There is no open invite for this person.", flash[:alert]
+      post "/cs-studio/invites/#{accepted.id}/resend"
+      assert_response :not_found
     end
+
+    assert_no_difference -> { Invitation.count } do
+      delete "/cs-studio/invites/#{accepted.id}"
+    end
+    assert_response :not_found
 
     assert_no_difference -> { User.count } do
-      delete "/cs-studio/invites/#{users(:reader).id}"
-    end
-    assert_equal "There is no open invite for this person.", flash[:alert]
-
-    assert_difference -> { User.count }, -1 do
-      delete "/cs-studio/invites/#{dana.id}"
+      assert_difference -> { Invitation.count }, -1 do
+        delete "/cs-studio/invites/#{dana.id}"
+      end
     end
     assert_redirected_to USERS
     assert_equal "Invite to dana@example.com withdrawn.", flash[:notice]
-    assert_not User.exists?(dana.id)
-  end
-
-  # Controller ruling F1: correcting a typo'd address in the Users editor is
-  # allowed, and the link mailed to the wrong address dies with it.
-  test "after an invited row's address is corrected the old link is expired, and a resend's link works" do
-    dana = invited_user("dnaa@example.com", sent_at: 1.minute.ago)
-    old = dana.generate_token_for(:invite)
-
-    patch "/cs-studio/users/#{dana.id}", params: { user: { email_address: "dana@example.com" } }
-    assert_equal "dana@example.com", dana.reload.email_address
-
-    post "/cs-studio/invitation/check", params: { token: old }
-    assert_response :gone
-
-    with_mail_state(:working) do
-      perform_enqueued_jobs { post "/cs-studio/invites/#{dana.id}/resend" }
-    end
-    mail = ActionMailer::Base.deliveries.last
-    assert_equal [ "dana@example.com" ], mail.to
-    token = mail.text_part.body.to_s[%r{/cs-studio/invitation#([^\s"]+)}, 1]
-
-    post "/cs-studio/invitation/check", params: { token: token }
-    assert_response :ok
-    assert_equal "dana@example.com", response.parsed_body["email_address"]
   end
 
   test "someone who may not manage users cannot invite, resend or withdraw" do
-    dana = invited_user("dana@example.com")
+    dana = open_invitation("dana@example.com")
     sign_out
     sign_in_as(users(:reader))
 
     with_mail_state(:working) do
-      assert_no_difference -> { User.count } do
+      assert_no_difference -> { Invitation.count } do
         post "/cs-studio/invites", params: { user: { email_address: "x@example.com" } }
         delete "/cs-studio/invites/#{dana.id}"
       end
@@ -229,7 +212,7 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
           assert_redirected_to USERS
         end
 
-        assert_no_difference -> { User.count } do
+        assert_no_difference -> { Invitation.count } do
           post "/cs-studio/invites", params: { user: { email_address: "eleventh@example.com" } }
         end
         assert_redirected_to USERS
@@ -254,8 +237,8 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
   test "resend counts in the invites' bucket of ten, and withdraw counts nothing" do
     counts = Hash.new(0)
     counter = ->(key, amount = 1, **) { counts[key] += amount }
-    dana = invited_user("dana@example.com", sent_at: 1.day.ago)
-    lee = invited_user("lee@example.com")
+    dana = open_invitation("dana@example.com", sent_at: 1.day.ago)
+    lee = open_invitation("lee@example.com")
 
     with_mail_state(:working) do
       with_singleton_override(Admin::InvitesController.cache_store, :increment, counter) do
@@ -274,13 +257,13 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
         assert_equal 10, counts[key]
 
         # The eleventh, a resend or an invite, is refused and sends nothing.
-        assert_no_changes -> { dana.reload.invite_sent_at } do
+        assert_no_changes -> { dana.reload.sent_at } do
           assert_no_enqueued_jobs do
             post "/cs-studio/invites/#{dana.id}/resend"
           end
         end
         assert_equal "Try again later.", flash[:alert]
-        assert_no_difference -> { User.count } do
+        assert_no_difference -> { Invitation.count } do
           post "/cs-studio/invites", params: { user: { email_address: "another@example.com" } }
         end
         assert_equal "Try again later.", flash[:alert]
@@ -288,20 +271,15 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the editor of an invited row offers no password, and a group's members mark them Invited" do
-    dana = invited_user("dana@example.com", groups: [ access_control_groups(:editor) ])
-
-    get "/cs-studio/users/#{dana.id}/edit"
-    assert_response :success
-    assert_select "input[name='user[email_address]'][value=?]", "dana@example.com"
-    assert_select "input[name='user[password]']", count: 0
-    assert_select "details.admin-set-password", count: 0
-
-    get "/cs-studio/users/#{users(:reader).id}/edit"
-    assert_select "details.admin-set-password"
+  # An invitation is no user and no member: a group's members, its member
+  # picker and every other list of people know nothing of it until it is
+  # accepted (`Invitations::Accept` makes the memberships).
+  test "an open invitation is in no group's members until it is accepted" do
+    open_invitation("dana@example.com", groups: [ access_control_groups(:editor) ])
 
     get "/cs-studio/groups/#{access_control_groups(:editor).id}/edit"
     assert_response :success
-    assert_select ".admin-group-members", /Invited/
+    assert_select ".admin-group-members", text: /dana@example\.com/, count: 0
+    assert_select ".admin-group-members", text: /Invited/, count: 0
   end
 end

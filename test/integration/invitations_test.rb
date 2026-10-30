@@ -17,8 +17,8 @@ class InvitationsTest < ActionDispatch::IntegrationTest
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
-    @dana = invited_user("dana@example.com", name: "Dana")
-    @token = @dana.generate_token_for(:invite)
+    @dana = open_invitation("dana@example.com", name: "Dana")
+    @token = @dana.generate_token_for(:accept)
   end
 
   def accept(token: @token, name: "Dana Doe", password: PASSWORD, confirmation: PASSWORD)
@@ -61,13 +61,13 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     # A token lapses seven days after it was MADE (the mail makes it when it
     # is sent), so the lapsed one is made that long ago. Seconds, not days:
     # a span of days can cross a clock change.
-    lapsed = invited_user("lapsed@example.com", sent_at: 8.days.ago)
-    lapsed_token = travel_to(Time.current - User::INVITE_VALID_FOR.to_i.seconds - 60) { lapsed.generate_token_for(:invite) }
-    resent = invited_user("resent@example.com")
-    old = resent.generate_token_for(:invite)
-    resent.update_columns(invite_sent_at: 1.minute.from_now) # version: none (a test)
-    withdrawn = invited_user("gone@example.com")
-    gone = withdrawn.generate_token_for(:invite)
+    lapsed = open_invitation("lapsed@example.com", sent_at: 8.days.ago)
+    lapsed_token = travel_to(Time.current - Invitation::VALID_FOR.to_i.seconds - 60) { lapsed.generate_token_for(:accept) }
+    resent = open_invitation("resent@example.com")
+    old = resent.generate_token_for(:accept)
+    resent.update!(sent_at: 1.minute.from_now)
+    withdrawn = open_invitation("gone@example.com")
+    gone = withdrawn.generate_token_for(:accept)
     withdrawn.destroy!
 
     bad = { "lapsed" => lapsed_token, "resent" => old, "withdrawn" => gone,
@@ -101,16 +101,33 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     assert_select "[data-invitation-token-target=expired][hidden]"
   end
 
-  test "accepting signs the person in on the dashboard with Your account is ready." do
+  # An account made for the address meanwhile (the New user form) is the
+  # person's way in: the link is used, and accepting makes no second account.
+  test "a link whose address has an account by now is used: the check's 409 and the used state, and nothing is written" do
+    User.create!(email_address: "dana@example.com", password: PASSWORD)
+
+    post CHECK, params: { token: @token }
+    assert_response :conflict
+
+    assert_no_difference [ -> { User.count }, -> { Audit::Event.count } ] do
+      accept
+    end
+    assert_response :unprocessable_entity
+    assert_select "[data-invitation-token-target=used]:not([hidden])", /#{USED}/
+    assert @dana.reload.open?
+  end
+
+  test "accepting creates the account, signs the person in on the dashboard with Your account is ready." do
     accept
     assert_redirected_to admin_root_path
     assert_equal "Your account is ready.", flash[:notice]
 
-    @dana.reload
-    assert_not @dana.invited?
-    assert_equal "Dana Doe", @dana.name
-    assert @dana.authenticate(PASSWORD)
-    assert_equal 1, @dana.sessions.count
+    assert @dana.reload.accepted?
+    user = User.find_by!(email_address: "dana@example.com")
+    assert_equal user, @dana.user
+    assert_equal "Dana Doe", user.name
+    assert user.authenticate(PASSWORD)
+    assert_equal 1, user.sessions.count
 
     follow_redirect!
     assert_response :success
@@ -128,7 +145,7 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     accept
     assert_redirected_to admin_root_path
     assert_not Session.exists?(other.id), "the other person's session is gone"
-    assert_equal 1, @dana.sessions.count
+    assert_equal 1, @dana.reload.user.sessions.count
     follow_redirect!
     assert_response :success
     assert_select "body", /Your account is ready\./
@@ -142,8 +159,8 @@ class InvitationsTest < ActionDispatch::IntegrationTest
 
     post PAGE, params: { token: @token, name: { "a" => "b" }, password: PASSWORD, password_confirmation: PASSWORD }
     assert_response :bad_request
-    assert @dana.reload.invited?
-    assert_equal "Dana", @dana.name
+    assert @dana.reload.open?
+    assert_nil User.find_by(email_address: "dana@example.com")
   end
 
   test "a refused password draws the form again with the token, the address and the typed name, and the next try takes it" do
@@ -157,11 +174,12 @@ class InvitationsTest < ActionDispatch::IntegrationTest
       assert_select "input[name=name][value=?]", "Dana D"
       assert_select "input[name=password][value]", count: 0
     end
-    assert @dana.reload.invited?
+    assert @dana.reload.open?
+    assert_nil User.find_by(email_address: "dana@example.com")
 
     accept(password: PASSWORD, confirmation: "something-else-123")
     assert_response :unprocessable_entity
-    assert @dana.reload.invited?
+    assert @dana.reload.open?
 
     accept
     assert_redirected_to admin_root_path
@@ -197,7 +215,7 @@ class InvitationsTest < ActionDispatch::IntegrationTest
   end
 
   test "check writes nothing: no user, no session, no audit event, no cookie, and the link still works" do
-    assert_no_difference [ -> { Session.count }, -> { Audit::Event.count } ] do
+    assert_no_difference [ -> { User.count }, -> { Session.count }, -> { Audit::Event.count } ] do
       assert_no_changes -> { @dana.reload.attributes } do
         post CHECK, params: { token: @token }
       end

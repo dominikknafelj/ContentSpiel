@@ -7,7 +7,7 @@ module Admin
   #
   # `all_groups` and `assignable_group_ids` are the group cards' (the user
   # editor's and the invite dialog's): every group, and the ones the actor
-  # may put someone into (`Users::Save` and `Users::Invite` check added groups
+  # may put someone into (`Users::Save` and `Invitations::Invite` check added groups
   # the same way; owners may assign any).
   module UsersList
     extend ActiveSupport::Concern
@@ -18,10 +18,13 @@ module Admin
 
     private
 
+    # The users, and the open invitations listed among them (an invitation is
+    # no user: `Invitation`, read here and on no other screen).
     def load_users_list
       @users = User.includes(:groups).order(:email_address).to_a
       # One grouped query for every listed user (`Users::LastSignIn`), never one per row.
       @last_sign_ins = Users::LastSignIn.for(@users)
+      @invitations = Invitation.open.includes(:groups).order(:email_address).to_a
     end
 
     def all_groups = @all_groups ||= AccessControl::Group.order(:name).to_a
@@ -32,7 +35,7 @@ module Admin
 
     # "Invite person" is offered only when mail works (`MailSettings#ready?`:
     # Working or Last send failed); the whole screen is `users.manage`
-    # already. `Users::Invite` asks again on the request.
+    # already. `Invitations::Invite` asks again on the request.
     def invites_offered? = MailSettings.current.ready?
   end
 end

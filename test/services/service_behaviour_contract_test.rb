@@ -49,12 +49,11 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
   # (and a factory in test/support/service_calls.rb).
   EXPECTED_SERVICES = %w[
     AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Duplicate ContentBlocks::Reorder
-    ContentBlocks::Save Editing::TakeOver Groups::Destroy Groups::EnsureBuiltIns Groups::Save Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
+    ContentBlocks::Save Editing::TakeOver Groups::Destroy Groups::EnsureBuiltIns Groups::Save Invitations::Accept Invitations::Invite Invitations::Resend Invitations::Withdraw Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
     Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::MarkRead Notes::Pin Notes::React Notes::Remove Notes::Reopen Notes::Reply
     Notes::Resolve Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Publishing::CancelScheduledChange Publishing::DiscardChanges Publishing::PublishChanges Settings::Save
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
-    Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::AcceptInvite Users::Destroy Users::Invite Users::ResendInvite Users::Save
-    Users::UpdatePassword Users::UpdateProfile Users::WithdrawInvite
+    Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile
   ].freeze
 
   # The app's own services: classes defined under app/, not the throwaway
@@ -247,7 +246,8 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
         events = Audit::Event.where.not(id: audit_ids).to_a
         assert_not_empty events, "#{klass} recorded no audit event"
         assert_not_includes events.map(&:action), "access.denied"
-        assert(events.all? { |event| event.user_id == built[:owner].id }, "#{klass}'s event is not attributed to the token's user")
+        owner = built[:owner].respond_to?(:call) ? built[:owner].call : built[:owner]
+        assert(events.all? { |event| event.user_id == owner.id }, "#{klass}'s event is not attributed to the token's user")
         assert_not_equal before, digests, "#{klass} changed nothing"
       end
       next

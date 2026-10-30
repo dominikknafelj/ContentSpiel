@@ -53,9 +53,7 @@ module Admin
     def rows
       return [] if query.length < MIN_QUERY_LENGTH
 
-      # Only people who can sign in: an invited person joins groups through
-      # the invite, not through this picker.
-      User.can_sign_in.where(owner: false).where.not(id: excluded)
+      User.where(owner: false).where.not(id: excluded)
         .name_or_email_containing(query)
         .name_or_email_starting_first(query).by_email
         .limit(LIMIT)

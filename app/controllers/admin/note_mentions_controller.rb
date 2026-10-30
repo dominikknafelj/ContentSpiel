@@ -28,9 +28,7 @@ module Admin
 
     def index
       query = params[:q].to_s.strip.first(MAX_QUERY_LENGTH)
-      # Only people who can sign in: an invited person could not read the note.
-      people = User.can_sign_in
-      matching = query.empty? ? people : people.name_or_email_containing(query).name_or_email_starting_first(query)
+      matching = query.empty? ? User.all : User.name_or_email_containing(query).name_or_email_starting_first(query)
       users = matching.by_email.limit(CANDIDATES).select { |user| Notes.readable?(user, @container, channel: :admin) }.first(LIMIT)
       render json: users.map { |user| { id: user.id, label: Notes.name_of(user), hint: user.email_address, initials: PersonName.initials(Notes.name_of(user)) } }
     end

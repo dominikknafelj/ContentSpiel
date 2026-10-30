@@ -39,27 +39,6 @@ module Users
       denied("users.manage", @user, message: "You don't have permission to change an owner's account")
     end
 
-    # Adding someone to a group hands them its grants, so it must be a
-    # group the actor could assign; taking someone out of one is managing
-    # that group as it stands (final fix wave, Important 2) -- the same
-    # test, `AccessControl.can_manage_group?`. For another user `outranked?`
-    # has already required it of every group they're in; this also covers
-    # the actor's own memberships. A token actor is judged on its effective
-    # rights (Minor 1). Shared by `Users::Save` and `Users::Invite`, since an
-    # invite can put the person in groups too.
-    def group_refusal(added_ids, removed_ids)
-      return if (added_ids + removed_ids).empty? || actor_owner?
-
-      groups = AccessControl::Group.includes(:grants).where(id: added_ids + removed_ids).order(:name)
-      groups.each do |group|
-        next if AccessControl.can_manage_group?(actor, group)
-
-        verb = added_ids.include?(group.id) ? "add users to" : "remove users from"
-        return denied("users.manage", @user, message: "You don't have permission to #{verb} the #{group.name} group")
-      end
-      nil
-    end
-
     # Someone changes a password because the old one is, or may be, in the
     # wrong hands -- and whoever holds it may already be signed in, so a new
     # password that left the old sessions alive would lock nobody out. Every

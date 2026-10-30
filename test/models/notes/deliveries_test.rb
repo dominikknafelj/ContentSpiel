@@ -95,16 +95,4 @@ class Notes::DeliveriesTest < ActiveSupport::TestCase
 
     assert_equal [], told(Notes::Deliveries.for_state(@thread, "resolved", actor_user: @eli))
   end
-
-  # `User.can_sign_in`: an invited person is told nothing and follows
-  # nothing, whether mentioned or already a follower.
-  test "an invited person is not told and does not follow, mentioned or following" do
-    invited = invited_user("invited@example.com")
-
-    assert_equal [], told(send_message(@dana, "Hi @[#{invited.id}]"))
-    assert_equal [ @dana.id ], following
-
-    Notes::Follow.create!(thread: @thread, user: invited, following: true)
-    assert_equal [ [ @dana.id, "reply" ] ], told(send_message(@eli, "Hello"))
-  end
 end

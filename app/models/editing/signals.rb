@@ -63,9 +63,9 @@ module Editing
       "tag.merged" => "it touches the posts that carry the tag; their open forms are refused as stale, as before (roadmap)"
     }.merge(
       (Audit::Sentence::NOTE_VERBS.keys + Audit::Sentence::SPECIAL_ACTIONS).index_with { "not a change to a page's or a post's content" },
-      %w[user.created user.updated user.deleted user.invited user.invite_resent user.invite_withdrawn user.invite_accepted
+      %w[user.created user.updated user.deleted invitation.created invitation.resent invitation.withdrawn
         group.created group.updated group.deleted token.issued token.revoked]
-        .index_with { "an account, a group or a token is not content" }
+        .index_with { "an account, an invitation, a group or a token is not content" }
     ).freeze
 
     module_function

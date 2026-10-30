@@ -28,18 +28,6 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "an invited row cannot sign in, whatever is typed" do
-    invited = users(:reader)
-    invited.update!(password: "a-long-password-1", password_confirmation: "a-long-password-1")
-    invited.update_columns(invited_at: Time.current, invite_sent_at: Time.current) # version: none (a test's setup)
-    post admin_sign_in_path, params: { email_address: invited.email_address, password: "a-long-password-1" }
-    assert_redirected_to admin_sign_in_path
-    follow_redirect!
-    assert_select "#alert", text: "Try another email address or password."
-    get admin_root_path
-    assert_redirected_to admin_sign_in_path
-  end
-
   test "sign-in uses the product shell: wordmark, theme switch, labelled fields, token button" do
     get admin_sign_in_path
     assert_select "header a", text: "CONTENT·SPIEL"
