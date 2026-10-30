@@ -170,7 +170,7 @@ module Admin
     helper_method def manageability(user) = Users::Manageability.for(Current.actor, user)
 
     helper_method def last_owner?(user)
-      user.persisted? && user.owner_in_database && User.where(owner: true).count == 1
+      user.persisted? && user.owner_in_database && User.can_sign_in.where(owner: true).count == 1
     end
   end
 end

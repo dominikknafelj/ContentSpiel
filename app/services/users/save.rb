@@ -107,26 +107,6 @@ module Users
       AccessControl::Group.where(id: Array(@attributes[:group_ids]).compact_blank).pluck(:id).sort
     end
 
-    # Adding someone to a group hands them its grants, so it must be a
-    # group the actor could assign; taking someone out of one is managing
-    # that group as it stands (final fix wave, Important 2) -- the same
-    # test, `AccessControl.can_manage_group?`. For another user `outranked?`
-    # has already required it of every group they're in; this also covers
-    # the actor's own memberships. A token actor is judged on its
-    # effective rights (Minor 1).
-    def group_refusal(added_ids, removed_ids)
-      return if (added_ids + removed_ids).empty? || actor_owner?
-
-      groups = AccessControl::Group.includes(:grants).where(id: added_ids + removed_ids).order(:name)
-      groups.each do |group|
-        next if AccessControl.can_manage_group?(actor, group)
-
-        verb = added_ids.include?(group.id) ? "add users to" : "remove users from"
-        return denied("users.manage", @user, message: "You don't have permission to #{verb} the #{group.name} group")
-      end
-      nil
-    end
-
     # Through `Membership` itself so its `after_commit` drops the memoised
     # grants (see `Groups::Save#sync_members`).
     def sync_groups(old_ids, new_ids)

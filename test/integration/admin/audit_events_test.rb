@@ -370,4 +370,17 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
     assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via an API token/
   end
+
+  # The people filter lists people who can sign in: an invited row has done
+  # nothing yet, and its address would only lengthen the list.
+  test "the people filter does not list an invited person" do
+    sign_in_as(users(:one))
+    invited_user("invited-person@example.com")
+
+    get "/cs-studio/audit_events"
+
+    assert_response :success
+    assert_select "select[name=user_id] option", text: "two@example.com"
+    assert_select "select[name=user_id] option", text: "invited-person@example.com", count: 0
+  end
 end

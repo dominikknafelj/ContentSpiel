@@ -27,7 +27,9 @@ class InvitesMailer < ApplicationMailer
   # Built once (a call signs a new token): both parts carry one link. `port: nil` as the reset's does.
   def invite_url = @invite_url ||= admin_invitation_url(port: nil, **@url_options, anchor: @user.generate_token_for(:invite))
 
-  def inviter_name = PersonName.of(@inviter)
+  # An invite made with no person behind it (the console, a trusted code
+  # path) is the site's own.
+  def inviter_name = @inviter ? PersonName.of(@inviter) : site_name
 
   def valid_until = I18n.l(User::INVITE_VALID_FOR.from_now.to_date, format: :long)
 end

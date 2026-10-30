@@ -49,6 +49,7 @@ require_relative "support/built_in_block_types"
 require_relative "support/contract_ledger"
 require_relative "support/site_address_helper"
 require_relative "support/mail_state"
+require_relative "support/invites"
 require_relative "support/smtp_stub"
 require_relative "support/encryption_keys"
 require_relative "support/log_capture"
@@ -114,6 +115,9 @@ module ActiveSupport
     # test/support/site_address_helper.rb.
     include SiteAddressHelper
     include MailState
+    # `invited_user(email)`: a row in the invited state -- see
+    # test/support/invites.rb.
+    include Invites
     # `without_encryption_keys { ... }`: a site with no Active Record
     # encryption keys -- see test/support/encryption_keys.rb.
     include EncryptionKeys

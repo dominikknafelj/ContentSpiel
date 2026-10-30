@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_28_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_29_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -468,7 +468,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_090000) do
     t.string "name"
     t.boolean "notes_sound", default: true, null: false
     t.boolean "notes_desktop", default: false, null: false
+    t.datetime "invited_at"
+    t.datetime "invite_sent_at"
+    t.bigint "invited_by_id"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
+    t.index ["invited_by_id"], name: "index_users_on_invited_by_id"
   end
 
   add_foreign_key "access_control_grants", "access_control_groups", column: "group_id", on_delete: :cascade
@@ -509,4 +513,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_090000) do
   add_foreign_key "presence_marks", "users", on_delete: :cascade
   add_foreign_key "published_versions", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "sessions", "users"
+  add_foreign_key "users", "users", column: "invited_by_id", on_delete: :nullify
 end

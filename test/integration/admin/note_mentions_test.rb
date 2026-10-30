@@ -44,4 +44,13 @@ class Admin::NoteMentionsTest < ActionDispatch::IntegrationTest
 
     assert_response :not_found
   end
+
+  # An invited person cannot sign in yet (`User.can_sign_in`): offering them
+  # would send a note to someone who cannot read it.
+  test "an invited person is never offered, even in a group that may read the record" do
+    invited = invited_user("member-invited@example.com", groups: [ access_control_groups(:read_only) ])
+
+    assert_not_includes suggest("member-invited").map { |row| row["id"] }, invited.id
+    assert_not_includes suggest("").map { |row| row["id"] }, invited.id
+  end
 end

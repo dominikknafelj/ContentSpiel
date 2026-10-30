@@ -93,4 +93,12 @@ class Admin::UserSuggestionsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
   end
+
+  # `User.can_sign_in`: an invite can already put someone in groups, but a
+  # group's member picker offers only people who can sign in.
+  test "an invited person is never offered" do
+    invited = invited_user("member-invited@example.org")
+
+    assert_not_includes suggest("member-invited").map { |row| row["value"] }, invited.id
+  end
 end

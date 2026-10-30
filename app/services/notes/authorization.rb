@@ -100,7 +100,8 @@ module Notes
     def mention_errors(user_ids, container)
       return [] if user_ids.empty?
 
-      users = User.where(id: user_ids).to_a
+      # An invited person is not found, so mentioning one is the same refusal.
+      users = User.can_sign_in.where(id: user_ids).to_a
       return [] if users.size == user_ids.uniq.size && users.all? { |user| Notes.readable?(user, container, channel: :admin) }
 
       [ I18n.t("admin.notes.errors.mention_cannot_read.#{kind_of(container)}") ]

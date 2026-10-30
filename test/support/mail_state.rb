@@ -55,6 +55,20 @@ module MailState
   def with_mail_state(state, **settings)
     site = SiteSetting.instance
     saved = COLUMNS.index_with { |name| LOGIN.include?(name) ? plaintext(site, name) : site.read_attribute(name) }
+    put_mail_state(state, **settings)
+    yield
+  ensure
+    if saved
+      SiteSetting.instance.update_columns(saved) # version: none (a test helper)
+      Current.site = nil
+    end
+  end
+
+  # The state, with nothing put back: for a caller with no block to wrap,
+  # such as a service contract factory, whose test's transaction is what
+  # undoes it.
+  def put_mail_state(state, **settings)
+    site = SiteSetting.instance
     site.update_columns(COLUMNS.index_with { nil }) # version: none (a test helper)
     columns = mail_state_columns(state).merge(settings.stringify_keys)
     site.update_columns(columns) if columns.any? # version: none (a test helper)
@@ -64,12 +78,6 @@ module MailState
       )
     end
     Current.site = nil
-    yield
-  ensure
-    if saved
-      SiteSetting.instance.update_columns(saved) # version: none (a test helper)
-      Current.site = nil
-    end
   end
 
   # Sets host variables (`"MAIL_SMTP_SECURITY" => "none"`) for the block and

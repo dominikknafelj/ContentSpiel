@@ -80,6 +80,8 @@ module Audit
       "tag.merged" => [ "merged another tag into the tag ", "" ],
       "user.created" => [ "added the user ", "" ], "user.updated" => [ "edited the user ", "" ],
       "user.deleted" => [ "deleted the user ", "" ],
+      "user.invited" => [ "invited ", "" ], "user.invite_resent" => [ "sent a new invite to ", "" ],
+      "user.invite_withdrawn" => [ "withdrew the invite to ", "" ],
       "group.created" => [ "created the group ", "" ], "group.updated" => [ "edited the group ", "" ],
       "group.deleted" => [ "deleted the group ", "" ],
       "token.issued" => [ "created the API token ", "" ], "token.revoked" => [ "revoked the API token ", "" ],
@@ -103,7 +105,7 @@ module Audit
 
     # Sentences with no subject or their own shape (`#special`).
     SPECIAL_ACTIONS = %w[
-      starter_content.added trash.emptied user.owner_changed
+      starter_content.added trash.emptied user.owner_changed user.invite_accepted
       language.enabled language.disabled language.configured language.default_changed
       session.created session.destroyed session.failed access.denied
     ].freeze
@@ -359,6 +361,8 @@ module Audit
         when "session.failed" then [ text("Failed sign-in attempt") ]
         when "access.denied" then denied_parts
         when "user.owner_changed" then owner_parts
+        # The actor IS the subject (the invited person, by the link's token).
+        when "user.invite_accepted" then [ text("accepted the invite") ]
         else language_parts
         end
       end

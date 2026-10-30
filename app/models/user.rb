@@ -4,8 +4,15 @@ class User < ApplicationRecord
   # How long an invitation's link works (spec: seven days). The mail names
   # the date from this, so the token and the sentence cannot disagree.
   INVITE_VALID_FOR = 7.days
-  # No block yet: Task 8 adds `{ invite_sent_at }` when that column exists.
-  generates_token_for :invite, expires_in: INVITE_VALID_FOR
+  # Signed over `invite_sent_at` (plan Ruling 3): a resend moves it, so the
+  # old link dies; a withdrawal deletes the row, so nothing is found; and
+  # accepting clears `invited_at` but KEEPS `invite_sent_at`, so a used link
+  # still finds its row and the page can say "already used" rather than
+  # "expired". The token is made only by `InvitesMailer`, in the job.
+  generates_token_for(:invite, expires_in: INVITE_VALID_FOR) { invite_sent_at }
+
+  # Who sent the invite; nulled by the database when they are deleted.
+  belongs_to :invited_by, class_name: "User", optional: true
   has_many :sessions, dependent: :destroy
   has_many :api_tokens, dependent: :destroy
   has_many :memberships, class_name: "AccessControl::Membership", dependent: :destroy
@@ -55,6 +62,23 @@ class User < ApplicationRecord
   }
   # Ordering: by address, capitals and small letters together.
   scope :by_email, -> { order(lowered_email.asc) }
+
+  # INVITED PEOPLE (spec "Invites"; plan Ruling 2). An invited person is a
+  # row with `invited_at` set and the digest of a random password nobody is
+  # told: no way to sign in by any path until they accept. Every place that
+  # counts or lists people who can sign in -- sign-in, the reset request, the
+  # owner checks, mention suggestions and the deliveries of notes, a group's
+  # member picker, the audit log's people filter -- reads `can_sign_in`, and
+  # each has a test of its own that an invited row is not there (the plan's
+  # "Places"). A new such place does the same. The Users screen alone lists
+  # the invited too, with their state.
+  scope :can_sign_in, -> { where(invited_at: nil) }
+  scope :invited, -> { where.not(invited_at: nil) }
+
+  def invited? = invited_at.present?
+
+  # When the current link stops working: seven days after it was sent.
+  def invite_expires_at = invite_sent_at && invite_sent_at + INVITE_VALID_FOR
 
   # `LOWER(users.email_address)`.
   def self.lowered_email = arel_table[:email_address].lower
@@ -122,7 +146,10 @@ class User < ApplicationRecord
   # `owner` column hasn't been written yet (destroy hasn't deleted the row,
   # and the demoting update hasn't saved), so ">1" correctly reads as "at
   # least one other owner besides me."
+  #
+  # An invited row is never an owner (`Users::Invite` takes no owner flag),
+  # and `can_sign_in` keeps one made so by hand from counting as one.
   def other_owner_remains?
-    User.where(owner: true).lock.pluck(:id).size > 1
+    User.can_sign_in.where(owner: true).lock.pluck(:id).size > 1
   end
 end

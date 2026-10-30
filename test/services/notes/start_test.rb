@@ -142,4 +142,13 @@ class Notes::StartTest < ActiveSupport::TestCase
     event = Audit::Event.order(:id).last
     assert_equal [ "media.upload", "Media::Asset", asset.id ], [ event.metadata["permission"], event.subject_type, event.subject_id ]
   end
+
+  # `Notes::Authorization#mention_errors` reads only people who can sign in:
+  # an invited person in a group that may read the page is still refused.
+  test "a mention of an invited person is refused with the same sentence" do
+    invited = invited_user("invited@example.com", groups: [ access_control_groups(:read_only) ])
+
+    assert_equal [ "Someone you mentioned can't see this page." ], start(@page, body: "Look, @[#{invited.id}]").errors
+    assert_equal 0, Notes::Thread.count
+  end
 end
