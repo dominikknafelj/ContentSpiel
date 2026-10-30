@@ -4,12 +4,17 @@ class User < ApplicationRecord
   # How long an invitation's link works (spec: seven days). The mail names
   # the date from this, so the token and the sentence cannot disagree.
   INVITE_VALID_FOR = 7.days
-  # Signed over `invite_sent_at` (plan Ruling 3): a resend moves it, so the
-  # old link dies; a withdrawal deletes the row, so nothing is found; and
-  # accepting clears `invited_at` but KEEPS `invite_sent_at`, so a used link
-  # still finds its row and the page can say "already used" rather than
-  # "expired". The token is made only by `InvitesMailer`, in the job.
-  generates_token_for(:invite, expires_in: INVITE_VALID_FOR) { invite_sent_at }
+  # Signed over `invite_sent_at` and `email_address` (plan Ruling 3,
+  # controller ruling F1): a resend moves the time, so the old link dies; a
+  # withdrawal deletes the row, so nothing is found; an address corrected in
+  # the Users editor (the natural fix of a typo'd invite, which stays
+  # allowed) kills the link mailed to the wrong address, which would
+  # otherwise set the password of the corrected account for seven days, and
+  # a resend mails one that works. Accepting clears `invited_at` but changes
+  # NEITHER of the two, so a used link still finds its row and the page can
+  # say "already used" rather than "expired". The token is made only by
+  # `InvitesMailer`, in the job.
+  generates_token_for(:invite, expires_in: INVITE_VALID_FOR) { [ invite_sent_at, email_address ] }
 
   # Who sent the invite; nulled by the database when they are deleted.
   belongs_to :invited_by, class_name: "User", optional: true

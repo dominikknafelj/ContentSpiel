@@ -176,6 +176,30 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     assert_not User.exists?(dana.id)
   end
 
+  # Controller ruling F1: correcting a typo'd address in the Users editor is
+  # allowed, and the link mailed to the wrong address dies with it.
+  test "after an invited row's address is corrected the old link is expired, and a resend's link works" do
+    dana = invited_user("dnaa@example.com", sent_at: 1.minute.ago)
+    old = dana.generate_token_for(:invite)
+
+    patch "/cs-studio/users/#{dana.id}", params: { user: { email_address: "dana@example.com" } }
+    assert_equal "dana@example.com", dana.reload.email_address
+
+    post "/cs-studio/invitation/check", params: { token: old }
+    assert_response :gone
+
+    with_mail_state(:working) do
+      perform_enqueued_jobs { post "/cs-studio/invites/#{dana.id}/resend" }
+    end
+    mail = ActionMailer::Base.deliveries.last
+    assert_equal [ "dana@example.com" ], mail.to
+    token = mail.text_part.body.to_s[%r{/cs-studio/invitation#([^\s"]+)}, 1]
+
+    post "/cs-studio/invitation/check", params: { token: token }
+    assert_response :ok
+    assert_equal "dana@example.com", response.parsed_body["email_address"]
+  end
+
   test "someone who may not manage users cannot invite, resend or withdraw" do
     dana = invited_user("dana@example.com")
     sign_out

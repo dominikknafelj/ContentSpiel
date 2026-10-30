@@ -1,8 +1,9 @@
 require "test_helper"
 
 # An invited person is a `users` row in an invited state (spec "Invites";
-# plan Rulings 2 and 3): the link's token is signed over `invite_sent_at`,
-# so a resend kills the old link, a withdrawal (the row deleted) finds
+# plan Rulings 2 and 3, ruling F1): the link's token is signed over
+# `invite_sent_at` and the address, so a resend or a corrected address kills
+# the old link, a withdrawal (the row deleted) finds
 # nothing, and an accepted invite still finds its row, which is no longer
 # invited: "used".
 class UserInviteTest < ActiveSupport::TestCase
@@ -38,6 +39,17 @@ class UserInviteTest < ActiveSupport::TestCase
     other.destroy!
     assert_nil User.find_by_token_for(:invite, withdrawn)
     assert_nil User.find_by_token_for(:invite, "junk")
+  end
+
+  # Controller ruling F1: the Users editor may correct an invited row's
+  # address, and the link mailed to the wrong one must die with it.
+  test "an invite link dies when the row's address is changed, and a new one for the corrected address works" do
+    user = invited_user("dnaa@example.com")
+    token = user.generate_token_for(:invite)
+
+    user.update!(email_address: "dana@example.com")
+    assert_nil User.find_by_token_for(:invite, token)
+    assert_equal user, User.find_by_token_for(:invite, user.generate_token_for(:invite))
   end
 
   test "an invited row cannot sign in and is not can_sign_in" do
