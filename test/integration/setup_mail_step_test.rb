@@ -139,6 +139,27 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Spec decision 3 (final review 1): the host's login is a credential. Each
+  # half is checked alone, and the whole body is searched, not one element.
+  { "MAIL_SMTP_USERNAME" => "host-login-user-4711", "MAIL_SMTP_PASSWORD" => "host-login-pass-0815" }.each do |variable, secret|
+    test "the host's #{variable} is Set by the host and its value is nowhere in the step's page" do
+      with_mail_env(variable => secret) do
+        get setup_step_path("mail")
+        assert_response :success
+
+        field = variable.delete_prefix("MAIL_SMTP_").downcase
+        assert_select "input[name='site_setting[mail_#{field}]']", 0
+        assert_select "[data-host-field=#{field}]", /••••••••.*Set by the host/m
+        assert_not_includes response.body, secret
+
+        # A refused save draws the step again: still nowhere.
+        save_mail(FIELDS.except(:mail_username, :mail_password).merge(mail_sender_address: "not one address"))
+        assert_response :unprocessable_entity
+        assert_not_includes response.body, secret
+      end
+    end
+  end
+
   test "test mails from the wizard and from Settings → Mail by the same person count in one bucket of 5" do
     2.times do
       save_mail(FIELDS.slice(:mail_sender_address), send_test: "1")

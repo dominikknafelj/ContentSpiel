@@ -5,7 +5,7 @@
     <% next unless mail_settings.from_host?(field) %>
     <div class="mt-1">
       <span class="<%= setup_label_class %>"><%= t(".#{field}") %></span>
-      <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-dim" aria-hidden="true">••••••••</div>
+      <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-dim" aria-hidden="true"><%= MASK %></div>
       <p class="mt-1 text-sm text-meta"><%= t(".set_by_host") %></p>
     </div>
   <% end %>

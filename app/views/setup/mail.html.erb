@@ -10,13 +10,19 @@
   security = shown.call(:mail_security, MailSettings::DEFAULT_SECURITY)
   security = MailSettings::DEFAULT_SECURITY unless Admin::SettingsScreen::MailCardComponent::SECURITIES.include?(security)
   sender_default = @site_setting.title(locale: @site_setting.default_locale)
+  # A field the host sets: a sunken box with "Set by the host" and no input.
+  # A half of the LOGIN (`MailLoginComponent::FIELDS`) is a credential: its box
+  # is the card's mask and its value is never read here, so it cannot reach
+  # the page, Turbo's snapshot or the browser's cache (spec decision 3,
+  # final review 1). Any other field shows the host's value.
   host_box = ->(field, label) do
+    box = if Admin::SettingsScreen::MailLoginComponent.secret?(field)
+      tag.div(Admin::SettingsScreen::MailLoginComponent::MASK, class: "mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-dim", aria: { hidden: true })
+    else
+      tag.div(mail.value(field).to_s, class: "mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink")
+    end
     tag.div(data: { host_field: field }) do
-      safe_join([
-        tag.span(label, class: setup_label_class),
-        tag.div(mail.value(field).to_s, class: "mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"),
-        tag.p("Set by the host", class: "mt-1 text-sm text-meta")
-      ])
+      safe_join([ tag.span(label, class: setup_label_class), box, tag.p("Set by the host", class: "mt-1 text-sm text-meta") ])
     end
   end
 %>

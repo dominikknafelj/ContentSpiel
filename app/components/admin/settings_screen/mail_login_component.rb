@@ -27,6 +27,12 @@ module Admin
       REMOVE_DIALOG = "settings-mail-remove-login-dialog".freeze
       LOCK = { "admin--saving--pending-lock-target": "control" }.freeze
       FIELDS = { username: "mail_username", password: "mail_password" }.freeze
+      # What a login half the host sets is drawn as, here and in the setup
+      # wizard's Mail step: never its value.
+      MASK = "••••••••".freeze
+
+      # Whether a mail field is a half of the login, whose value no screen shows.
+      def self.secret?(field) = FIELDS.key?(field.to_sym)
 
       def initialize(site_setting:, mail_settings:, error: nil)
         @site_setting = site_setting
