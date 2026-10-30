@@ -108,15 +108,22 @@ en:
             rows:
               one: "%{count} row. A long table is easier to read split into several."
               other: "%{count} rows. A long table is easier to read split into several."
+          # The strips around the grid (the owner's option B of 2026-10-29):
+          # a group of column letters and one of row numbers, each letter or
+          # number the button of its menu, named by the script from `menu`
+          # (`%{letter}` is A, B, … AA; `%{number}` counts from 1).
+          strips:
+            columns: "Columns"
+            rows: "Rows"
           row:
-            menu: "Row actions"
+            menu: "Row %{number} actions"
             insert_above: "Insert above"
             insert_below: "Insert below"
             move_up: "Move up"
             move_down: "Move down"
             delete: "Delete row"
           column:
-            menu: "Column actions"
+            menu: "Column %{letter} actions"
             insert_left: "Insert left"
             insert_right: "Insert right"
             move_left: "Move left"
@@ -135,9 +142,9 @@ en:
                 label: "Right"
                 name: "Align right"
             delete: "Delete column"
-          # The "+" at the end of the row the pointer or the caret is in, the
-          # "+" under its column, and the button under the grid that is
-          # always there (for touch).
+          # The dashed "+" at the end of the column letters and the one under
+          # the row numbers, and the button under the grid that is always
+          # there (for touch).
           add_column: "Add a column"
           add_row_here: "Add a row"
           add_row: "Add row"

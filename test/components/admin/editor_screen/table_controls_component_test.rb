@@ -1,8 +1,9 @@
 require "test_helper"
 
 # What stands around a Table's grid in its card (table block spec decisions 4,
-# 7 and 13): the switches, the warning line, the row's and the column's menus
-# and "+", "Add row", and the delete confirmations outside the form. What they
+# 7 and 13): the switches, the warning line, the strips of column letters and
+# row numbers with their menus and "+", "Add row", and the delete
+# confirmations outside the form. What they
 # DO is the browser's (`test/system/admin/table_block_test.rb`); here, what
 # the server draws and where it draws nothing.
 class Admin::EditorScreen::TableControlsComponentTest < ViewComponent::TestCase
@@ -107,20 +108,32 @@ class Admin::EditorScreen::TableControlsComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-admin--rich-text--editor-starting-content-value]", visible: :all
   end
 
-  test "the menus, the two + and Add row are drawn for someone who may change the table, the dialogs outside the form" do
+  test "the strips' entries are templates the script clones, each a menu with every item, and the two + and Add row are drawn" do
     block = table_block(grid(2, 2))
     render_card(block)
 
     assert_selector "form [data-controller='admin--editor--table'] [data-controller~='admin--rich-text--editor']", visible: :all
-    assert_selector "button[aria-haspopup=menu][aria-label='Row actions']", visible: :all
-    assert_selector "button[aria-haspopup=menu][aria-label='Column actions']", visible: :all
-    row_items = page.all("[data-admin--editor--table-target=rowControls] [role=menu] button", visible: :all).map { |item| item.text(:all) }
-    assert_equal [ "Insert above", "Insert below", "Move up", "Move down", "Delete row" ], row_items
-    column_items = page.all("[data-admin--editor--table-target=columnControls] [role=menu] button", visible: :all).map { |item| item["aria-label"] || item.text(:all) }
-    assert_equal [ "Insert left", "Insert right", "Move left", "Move right", "Align left", "Align centre", "Align right", "Delete column" ], column_items
-    assert_selector "button[aria-label='Add a column'][hidden]", visible: :all
-    assert_selector "button[aria-label='Add a row'][hidden]", visible: :all
+    assert_selector "[role=group][aria-label='Columns'][data-admin--editor--table-target=columnStrip]", visible: :all
+    assert_selector "[role=group][aria-label='Rows'][data-admin--editor--table-target=rowStrip]", visible: :all
+    assert_selector "[data-admin--editor--table-target=corner][aria-hidden=true][hidden]", visible: :all
+    # The strips are empty until the script fills them: before it runs there is no letter, no number and no menu.
+    assert_no_selector "[data-admin--editor--table-target$=Strip] *", visible: :all
+
+    entry = lambda do |kind|
+      template = Nokogiri::HTML5.fragment(rendered_content).at_css("template[data-admin--editor--table-target=#{kind}Template]")
+      assert_equal 1, template.css(".admin-table-strip-entry[data-action='click->admin--editor--table#choose']").size, kind
+      assert_equal 1, template.css("button.admin-table-strip-button[aria-haspopup=menu][data-admin--ui--menu-target=button]").size, kind
+      template.css("[role=menu] button").map { |item| item["aria-label"] || item.text }
+    end
+    assert_equal [ "Insert above", "Insert below", "Move up", "Move down", "Delete row" ], entry.call("row")
+    assert_equal [ "Insert left", "Insert right", "Move left", "Move right", "Align left", "Align centre", "Align right", "Delete column" ], entry.call("column")
+    assert_selector "button.admin-table-strip-add[aria-label='Add a column'][hidden]", visible: :all
+    assert_selector "button.admin-table-strip-add[aria-label='Add a row'][hidden]", visible: :all
     assert_selector "button", text: "Add row"
+
+    messages = JSON.parse(page.find("[data-controller='admin--editor--table']", visible: :all)["data-messages"])
+    assert_equal [ "Column %{letter} actions", "Row %{number} actions" ],
+      messages.values_at("components.editor_screen.table_controls.column.menu", "components.editor_screen.table_controls.row.menu"), "the script names each letter and number in the server's words"
 
     Admin::EditorScreen::TableDeleteDialogsComponent::KINDS.each do |kind|
       id = Admin::EditorScreen::TableDeleteDialogsComponent.dialog_id(block, kind)
@@ -141,7 +154,7 @@ class Admin::EditorScreen::TableControlsComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-controller~='admin--editor--table']", visible: :all
     assert_no_selector "[data-action*='admin--editor--table']", visible: :all
     assert_no_selector "input[role=switch]", visible: :all
-    assert_no_selector "[aria-label='Row actions'], [aria-label='Column actions'], [aria-label='Add a column'], [aria-label='Add a row']", visible: :all
+    assert_no_selector "[aria-label='Add a column'], [aria-label='Add a row'], [aria-label='Columns'], [aria-label='Rows'], template", visible: :all
     assert_no_button "Add row", visible: :all
     assert_no_selector "dialog[id*='table-delete']", visible: :all
     assert_no_selector "[data-admin--rich-text--editor-starting-content-value]", visible: :all

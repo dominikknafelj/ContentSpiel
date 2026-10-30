@@ -8,10 +8,11 @@ require "application_system_test_case"
 # `RichText::Document#validate` and the block's body rule, so whatever the
 # grid can make is something the server accepts.
 #
-# The grid's controls (`admin--editor--table`, Task 6): the two header
-# switches, the warning line, the current row's and column's "⋯" menus and
-# "+", "Add row", the delete confirmation, the starting grid of a new Table
-# and the read-only grid of someone who does not hold the block.
+# The grid's controls (`admin--editor--table`, Task 6; the strips are the
+# owner's option B of 2026-10-29): the two header switches, the warning line,
+# the strips of column letters and row numbers with their menus and "+",
+# "Add row", the delete confirmation, the starting grid of a new Table and
+# the read-only grid of someone who does not hold the block.
 class Admin::TableBlockSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -275,21 +276,26 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
 
   def card(block) = "#content_block_#{block.id}"
 
-  # A menu's item: the menu's "⋯" pressed, then the item, as a person does.
-  # An item is found by its words, an alignment by its name ("Align right":
-  # its words are "Right" and the check mark).
-  def column_menu(block, item) = pick("#{card(block)} [data-admin--editor--table-target=columnControls]", "Column actions", item)
+  # A menu's item: the column's letter or the row's number pressed, then the
+  # item, as a person does. An item is found by its words, an alignment by its
+  # name ("Align right": its words are "Right" and the check mark).
+  def column_menu(block, letter, item) = pick(block, "Column #{letter} actions", item)
 
-  def row_menu(block, item) = pick("#{card(block)} [data-admin--editor--table-target=rowControls]", "Row actions", item)
+  def row_menu(block, number, item) = pick(block, "Row #{number} actions", item)
 
-  def pick(controls, menu, item)
-    within(controls) do
+  def strip_entry(block, menu) = find("#{card(block)} button[aria-label='#{menu}']").ancestor(".admin-table-strip-entry")
+
+  def pick(block, menu, item)
+    within(strip_entry(block, menu)) do
       find("button[aria-label='#{menu}']").click
       within("[role=menu]") do
         (item.start_with?("Align ") ? find("button[aria-label='#{item}']") : find("button", text: /\A#{Regexp.escape(item)}\z/)).click
       end
     end
   end
+
+  # The box of an element, as the browser lays it out.
+  def box_of(element) = element.evaluate_script("(({ left, top, right, bottom }) => ({ left, top, right, bottom }))(this.getBoundingClientRect())").transform_keys(&:to_sym)
 
   def kinds(document) = rows_of(document).map { |row| row.map { |cell| cell["type"] == "tableHeader" ? "th" : "td" } }
 
@@ -321,23 +327,23 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     open_editor
 
     cell(block, 0, 0).click
-    column_menu(block, "Insert right")
+    column_menu(block, "A", "Insert right")
     document = saved(block) { |doc| rows_of(doc).first.size == 3 }
     assert_equal [ [ "Plan", "", "Price" ], [ "Basic", "", "5" ] ], texts(document)
     assert_equal [ %w[th th th], %w[td td td] ], kinds(document), "the new column's first cell is a header like its row"
 
-    column_menu(block, "Move right") # the new column, current after the insert
+    column_menu(block, "B", "Move right") # the new column
     document = saved(block) { |doc| texts(doc).first == [ "Plan", "Price", "" ] }
     assert_equal [ [ "Plan", "Price", "" ], [ "Basic", "5", "" ] ], texts(document)
 
     cell(block, 1, 1).click
-    column_menu(block, "Align right")
+    column_menu(block, "B", "Align right")
     document = saved(block) { |doc| aligns(doc).all? { |row| row[1] == "right" } }
     assert_equal [ [ nil, "right", nil ], [ nil, "right", nil ] ], aligns(document), "every cell of the column, the header's too, and no other"
     assert_equal %w[right right], [ 0, 1 ].map { |row| cell(block, row, 1).evaluate_script("getComputedStyle(this).textAlign") }, "the grid's cells show it"
     assert_equal "left", cell(block, 1, 0).evaluate_script("getComputedStyle(this).textAlign")
-    within("#{card(block)} [data-admin--editor--table-target=columnControls]") do
-      find("button[aria-label='Column actions']").click
+    within(strip_entry(block, "Column B actions")) do
+      find("button[aria-label='Column B actions']").click
       assert_selector "[role=menuitemradio][aria-checked=true]", text: "Right"
       assert_selector "[role=menuitemradio][aria-checked=false]", count: 2
       find("button[aria-haspopup=menu]").send_keys(:escape)
@@ -350,13 +356,13 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     assert_equal "right", aligns(document)[2][1]
 
     cell(block, 0, 2).click
-    column_menu(block, "Delete column") # no text in it: deleted at once
+    column_menu(block, "C", "Delete column") # no text in it: deleted at once
     assert_no_selector "dialog[open]"
     document = saved(block) { |doc| rows_of(doc).first.size == 2 }
     assert_equal [ %w[Plan Price], %w[Basic 5], [ "", "" ] ], texts(document)
 
     cell(block, 0, 0).click
-    column_menu(block, "Delete column")
+    column_menu(block, "A", "Delete column")
     within("dialog[open]") do
       assert_text "Delete this column?"
       press "Cancel"
@@ -364,7 +370,7 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog[open]"
     assert_selector "#{grid_of(block)} tr:first-child > *", count: 2
 
-    column_menu(block, "Delete column")
+    column_menu(block, "A", "Delete column")
     within("dialog[open]") { press "Delete column" }
     document = saved(block) { |doc| rows_of(doc).first.size == 1 }
     assert_equal [ [ "Price" ], [ "5" ], [ "" ] ], texts(document)
@@ -372,36 +378,98 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     every_cell_one_paragraph(document)
   end
 
+  test "the strips: a letter per column above the grid and a number per row beside it, never over a cell, the current cell's inverted, and the + adds" do
+    block = words_block([ %w[Service Format From], [ "Poster", "A2", "45 €" ], [ "Website", "up to 5 pages", "900 €" ] ])
+    open_editor
+
+    letters = all("#{card(block)} [data-admin--editor--table-target=columnStrip] .admin-table-strip-button").map(&:text)
+    numbers = all("#{card(block)} [data-admin--editor--table-target=rowStrip] .admin-table-strip-button").map(&:text)
+    assert_equal %w[A B C], letters
+    assert_equal %w[1 2 3], numbers
+
+    # Nothing of the strips stands over a cell, and each letter is over its column, each number beside its row.
+    cells = all("#{grid_of(block)} th, #{grid_of(block)} td").map { |element| box_of(element) }
+    first_row = box_of(find("#{grid_of(block)} tr:first-child"))
+    all("#{card(block)} .admin-table-strip-button, #{card(block)} .admin-table-strip-add").each do |control|
+      control_box = box_of(control)
+      cells.each do |cell_box|
+        overlap = [ control_box[:right], cell_box[:right] ].min - [ control_box[:left], cell_box[:left] ].max > 1 &&
+          [ control_box[:bottom], cell_box[:bottom] ].min - [ control_box[:top], cell_box[:top] ].max > 1
+        assert_not overlap, "#{control["aria-label"]} stands over a cell"
+      end
+    end
+    [ 0, 1, 2 ].each do |column|
+      letter = box_of(find("#{card(block)} button[aria-label='Column #{%w[A B C][column]} actions']"))
+      header = box_of(cell(block, 0, column))
+      assert_in_delta header[:left], letter[:left], 1.5, "the letter starts where its column does"
+      assert_in_delta first_row[:top], letter[:bottom], 1.5, "the letter sits on the grid's top edge"
+    end
+
+    # The header row: bold, on the sunken ground, left-aligned like the rows, and every cell ruled.
+    header = cell(block, 0, 1)
+    assert_equal "left", header.evaluate_script("getComputedStyle(this).textAlign")
+    assert_equal cell(block, 1, 1).evaluate_script("getComputedStyle(this).borderTopWidth"), "1px"
+    assert_not_equal cell(block, 1, 1).evaluate_script("getComputedStyle(this).backgroundColor"), header.evaluate_script("getComputedStyle(this).backgroundColor")
+
+    cell(block, 1, 1).click
+    assert_selector "#{card(block)} button[aria-label='Column B actions'][aria-current=true]"
+    assert_selector "#{card(block)} button[aria-label='Row 2 actions'][aria-current=true]"
+    assert_selector "#{card(block)} .admin-table-strip-button[aria-current=true]", count: 2
+    ink = find("#{card(block)} .admin-table-strip-button[aria-current=true]", match: :first).evaluate_script("getComputedStyle(this).backgroundColor")
+    assert_equal find("#{card(block)} .ProseMirror").evaluate_script("getComputedStyle(this).color"), ink, "inverted: the ink fill, the colour of the grid's text"
+    assert_equal "2px", cell(block, 1, 1).evaluate_script("getComputedStyle(this).outlineWidth"), "the focused cell has the accent outline inside it"
+
+    press "Add a row"
+    document = saved(block) { |doc| rows_of(doc).size == 4 }
+    assert_equal [ "", "", "" ], texts(document).last
+    assert_equal %w[1 2 3 4], all("#{card(block)} [data-admin--editor--table-target=rowStrip] .admin-table-strip-button").map(&:text)
+    press "Add a column"
+    saved(block) { |doc| rows_of(doc).first.size == 4 }
+    assert_equal %w[A B C D], all("#{card(block)} [data-admin--editor--table-target=columnStrip] .admin-table-strip-button").map(&:text)
+  end
+
   test "a row's menu inserts above, moves and deletes, and the header row stays the first row" do
     block = words_block([ %w[Plan Price], %w[Basic 5], %w[Pro 12] ])
     open_editor
     focused = -> { page.evaluate_script("document.activeElement.getAttribute('aria-label')") }
 
-    # The keyboard's way to the controls: Esc leaves the grid to the row's "⋯", Tab goes on to the column's.
-    cell(block, 2, 0).click
+    # The keyboard's way to the strips: Esc leaves the grid to the current column's letter, Tab goes on to
+    # the column's "+" and the current row's number (one stop per strip), the arrows move along a strip,
+    # and Enter opens the menu of the letter or number that has the focus.
+    cell(block, 2, 1).click
     key(:Escape)
-    assert_eventually(message: -> { "Esc went to #{focused.call.inspect}" }) { focused.call == "Row actions" }
+    assert_eventually(message: -> { "Esc went to #{focused.call.inspect}" }) { focused.call == "Column B actions" }
+    key(:Left)
+    assert_equal "Column A actions", focused.call
     key(:Tab)
-    assert_equal "Column actions", focused.call
+    assert_equal "Add a column", focused.call
+    key(:Tab)
+    assert_equal "Row 3 actions", focused.call
+    key(:Up)
+    assert_equal "Row 2 actions", focused.call
+    key(:Enter)
+    within(strip_entry(block, "Row 2 actions")) { assert_selector "[role=menu] button:focus", text: "Insert above" }
+    key(:Escape)
+    assert_equal "Row 2 actions", focused.call
 
     cell(block, 2, 0).click
-    row_menu(block, "Move up")
+    row_menu(block, 3, "Move up")
     document = saved(block) { |doc| texts(doc)[1] == %w[Pro 12] }
     assert_equal [ %w[Plan Price], %w[Pro 12], %w[Basic 5] ], texts(document)
 
-    row_menu(block, "Move up") # Pro, now the second row: it becomes the first, and the header
+    row_menu(block, 2, "Move up") # Pro, now the second row: it becomes the first, and the header
     document = saved(block) { |doc| texts(doc)[0] == %w[Pro 12] }
     assert_equal [ %w[th th], %w[td td], %w[td td] ], kinds(document), "the header row is the first row, whatever moved"
 
-    row_menu(block, "Insert above")
+    row_menu(block, 1, "Insert above")
     document = saved(block) { |doc| rows_of(doc).size == 4 }
     assert_equal [ [ "", "" ], %w[Pro 12], %w[Plan Price], %w[Basic 5] ], texts(document)
     assert_equal [ %w[th th], %w[td td], %w[td td], %w[td td] ], kinds(document)
 
-    row_menu(block, "Delete row") # empty: at once
+    row_menu(block, 1, "Delete row") # empty: at once
     document = saved(block) { |doc| rows_of(doc).size == 3 }
     cell(block, 2, 0).click
-    row_menu(block, "Delete row")
+    row_menu(block, 3, "Delete row")
     within("dialog[open]") { press "Delete row" }
     document = saved(block) { |doc| rows_of(doc).size == 2 }
     assert_equal [ %w[Pro 12], %w[Plan Price] ], texts(document)
@@ -456,7 +524,7 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     assert_selector warning, text: "6 columns. On a phone, visitors scroll sideways to read this table.", exact_text: true
 
     cell(block, 0, 5).click
-    column_menu(block, "Delete column")
+    column_menu(block, "F", "Delete column")
     assert_no_selector warning
     saved(block) { |doc| rows_of(doc).first.size == 5 }
   end
@@ -491,7 +559,7 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
       assert_no_selector "#{card(block)} [role=toolbar]"
       assert_no_selector "#{card(block)} [data-controller~='admin--editor--table']"
       assert_no_selector "#{card(block)} input[role=switch]"
-      assert_no_selector "button[aria-label='Row actions'], button[aria-label='Column actions'], button[aria-label='Add a column'], button[aria-label='Add a row']", visible: :all
+      assert_no_selector "#{card(block)} .admin-table-strip-button, [aria-label='Columns'], [aria-label='Rows'], button[aria-label='Add a column'], button[aria-label='Add a row']", visible: :all
       assert_no_button "Add row"
 
       cell(block, 0, 0).click
@@ -701,8 +769,8 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
 
     cell(block, 1, 0).click
     press "Add row"
-    row_menu(block, "Insert below")
-    column_menu(block, "Insert right")
+    row_menu(block, 3, "Insert below")
+    column_menu(block, "A", "Insert right")
     document = saved_in(block, :de) { |doc| rows_of(doc).size == 4 && rows_of(doc).first.size == 3 }
     assert_equal [ 3, 3, 3, 3 ], texts(document).map(&:size), "four rows of three columns"
     assert_equal %w[Tarif Preis Einfach 5].sort, texts(document).flatten.reject(&:empty?).sort, "every word kept"

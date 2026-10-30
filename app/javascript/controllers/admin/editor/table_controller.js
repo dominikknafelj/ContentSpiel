@@ -3,15 +3,17 @@ import { TextSelection } from "@tiptap/pm/state"
 import { addRowBefore, addRowAfter, addColumnBefore, addColumnAfter, deleteRow, deleteColumn, moveTableRow, moveTableColumn } from "@tiptap/pm/tables"
 import { editorOf } from "rich_text/editors"
 import {
-  tableNode, gridShape, cellPosition, insideCell, selectedCell, rowHasText, columnHasText,
+  tableNode, gridShape, insideCell, selectedCell, rowHasText, columnHasText,
   columnAlign, alignColumn, headerState, applyHeaders
 } from "rich_text/table"
 import { messages } from "i18n/messages"
 
 // The Table block's grid controls (`Admin::EditorScreen::TableControlsComponent`,
-// table block spec decisions 4, 5, 7 and 12; Claude Design's B5): the two
-// header switches, the warning line, the current row's and column's "⋯"
-// menus and "+", and "Add row".
+// table block spec decisions 4, 5, 7 and 12; Claude Design's B5; the strips
+// are the owner's option B of 2026-10-29, "Row and column strips"): the two
+// header switches, the warning line, a strip of column letters above the grid
+// and of row numbers to its left (each letter and number the button of that
+// column's or row's menu), a dashed "+" at the end of each strip, and "Add row".
 //
 // THE GRID IS THE EDITOR'S. Every control works through the Tiptap editor of
 // the `admin--rich-text--editor` inside this element (found through
@@ -23,14 +25,30 @@ import { messages } from "i18n/messages"
 // the editor's first real change is what writes a starting grid into the
 // field (`startingContent`): a control pressed on a new Table writes it too.
 //
-// THE CURRENT CELL. The controls are for one row and one column: those of
-// the cell under the pointer, else the cell the caret is in. They show while
-// the pointer is over this element or the focus is in it, at the grid's edge
-// on that row and column (`place`), and stay put while one of their menus is
-// open, so a menu never moves under the pointer. Esc in the grid leaves it to
-// the row's "⋯" (the keyboard's way to the controls: Tab moves between cells
-// inside the grid), and Tab goes on from there to the column's "⋯" and the
-// two "+".
+// THE STRIPS. One entry per column and per row, cloned from the server's
+// `<template>`s (`columnTemplate`, `rowTemplate`: a menu with every item) as
+// the grid grows, removed from the end as it shrinks, and named here ("Column
+// B actions", "Row 3 actions", the server's words in `data-messages`). Each
+// entry is placed on its cell's box, measured (`place`): a row's height is its
+// text's, and a table wider than its box scrolls sideways in it
+// (`.tableWrapper`), so a letter follows its column and is cut at the box's
+// edges, gone while its column is scrolled out. They stand in the grid box's
+// padding (`admin-rich-text.css`), so nothing is drawn over a cell's text. A
+// menu acts on ITS column or row (`data-table-column`, `data-table-row` on the
+// entry), whatever the caret does meanwhile.
+//
+// THE CURRENT CELL is the one the caret is in (or was last in), and a letter
+// or number pressed makes its column or row the current one. Its letter and
+// number are inverted and carry `aria-current` (a menu button's own state is
+// `aria-expanded`, so not `aria-pressed`); the cell itself is outlined by the
+// editor's decoration while the grid has the focus (`rich_text/table.js`).
+//
+// THE KEYBOARD. Tab moves between cells inside the grid, so Esc leaves it to
+// the current column's letter; each strip is one stop for Tab (a roving
+// tabindex: the current letter or number, or the one the arrow keys moved to),
+// Left and Right move along the letters, Up and Down along the numbers, and
+// Enter, Space or a press opens the menu. Tab goes on from the letters to the
+// column's "+", the numbers, the row's "+" and "Add row".
 //
 // HEADERS ARE THE FIRST ROW AND THE FIRST COLUMN (decision 4). The switches
 // make the cells of the first row, and of the first column, headers or not
@@ -39,7 +57,7 @@ import { messages } from "i18n/messages"
 // is moved above or out of it. Their state is read back from the cells after
 // every change, as the warning is (`refresh`).
 export default class extends Controller {
-  static targets = [ "headerRow", "headerColumn", "warning", "rowControls", "columnControls", "addColumn", "addRowHere" ]
+  static targets = [ "headerRow", "headerColumn", "warning", "corner", "columnStrip", "rowStrip", "addColumn", "addRowHere", "columnTemplate", "rowTemplate" ]
 
   static values = {
     warnColumns: Number,
@@ -54,20 +72,23 @@ export default class extends Controller {
   connect() {
     this.editor = null
     this.current = null
-    this.hovered = false
-    this.focused = false
     this.changed = () => this.refresh()
     this.scrolled = () => this.place()
-    this.hideControls()
+    // A row grows as its text wraps and the card follows the window: the
+    // strips are placed again whenever the grid's box changes size.
+    this.resized = new ResizeObserver(() => requestAnimationFrame(() => this.place()))
+    this.resized.observe(this.element)
+    this.hideStrips()
     this.element.addEventListener("scroll", this.scrolled, true)
     this.use(editorOf(this.element.querySelector("[data-controller~='admin--rich-text--editor']")))
   }
 
   disconnect() {
     this.element.removeEventListener("scroll", this.scrolled, true)
+    this.resized.disconnect()
     this.withdrawDialog()
     this.use(null)
-    this.hideControls()
+    this.hideStrips()
   }
 
   // `admin--rich-text--editor:attached` / `:detached`, from the editor inside.
@@ -82,9 +103,11 @@ export default class extends Controller {
   use(editor) {
     if (this.editor === editor) return
     this.editor?.off("transaction", this.changed)
+    if (this.editor && !this.editor.isDestroyed) this.resized.unobserve(this.editor.view.dom)
     this.editor = editor
     this.current = null
     this.editor?.on("transaction", this.changed)
+    if (this.editor && !this.editor.isDestroyed) this.resized.observe(this.editor.view.dom)
     this.refresh()
   }
 
@@ -99,10 +122,10 @@ export default class extends Controller {
 
   // After every transaction of the editor (typing, a control, an undo, a
   // suggestion used): the switches and the warning as the cells say, then the
-  // current cell, the menus and their places.
+  // current cell and the strips.
   refresh() {
     const doc = this.editor?.state.doc
-    if (!doc) return this.hideControls()
+    if (!doc) return this.hideStrips()
 
     const headers = headerState(doc)
     if (this.hasHeaderRowTarget) this.headerRowTarget.checked = headers.row
@@ -135,67 +158,113 @@ export default class extends Controller {
     return { row: Math.min(cell.row, rows - 1), column: Math.min(cell.column, columns - 1) }
   }
 
-  // --- Showing the controls -------------------------------------------------
-
-  hover(event) {
-    if (this.menuOpen()) return
-    const element = event.target.closest?.("td, th")
-    const grid = this.gridElement()
-    if (!element || !grid || !grid.contains(element) || !this.editor) return
-
-    const row = element.parentElement
-    const cell = { row: Array.prototype.indexOf.call(row.parentElement.children, row), column: Array.prototype.indexOf.call(row.children, element) }
-    if (this.current?.row === cell.row && this.current?.column === cell.column) return
-    this.current = this.clamped(cell)
-    this.place()
-  }
-
-  enter() {
-    this.hovered = true
-    this.place()
-  }
-
-  leave() {
-    this.hovered = false
-    this.place()
-  }
+  // --- The current cell -------------------------------------------------------
 
   focusIn() {
-    this.focused = true
     if (this.editor?.isFocused) this.current = this.clamped(selectedCell(this.editor.state) || this.current)
     this.place()
   }
 
-  focusOut(event) {
-    this.focused = Boolean(event.relatedTarget && this.element.contains(event.relatedTarget))
+  // A press on a strip's letter or number (not on an item of its menu, which
+  // places the caret itself): that column, or that row, is the current one.
+  choose(event) {
+    const editor = this.usable()
+    if (!editor || !event.target.closest?.(".admin-table-strip-button")) return
+    const cell = this.cellOf(event)
+    if (!cell) return
+    this.current = this.clamped(cell)
     this.place()
   }
 
-  // Esc in the grid (the editor has let go of it, `rich_text/table.js`):
-  // the focus goes to the row's "⋯", from which Tab reaches the rest.
+  // The cell a strip's menu acts on: its own column or row, and the current
+  // cell's other coordinate (the first when there is none).
+  cellOf(event) {
+    const entry = event?.target?.closest?.(".admin-table-strip-entry")
+    const row = entry?.dataset.tableRow
+    const column = entry?.dataset.tableColumn
+    if (row === undefined && column === undefined) return this.current
+    return {
+      row: row !== undefined ? Number(row) : (this.current?.row ?? 0),
+      column: column !== undefined ? Number(column) : (this.current?.column ?? 0)
+    }
+  }
+
+  // A click anywhere in the controls: once a menu has closed (its item's click
+  // has reached its panel), the menus are made right for the grid as it is.
+  settle() {
+    if (!this.menuOpen()) this.place()
+  }
+
+  // --- The keyboard -------------------------------------------------------------
+
   keydown(event) {
-    if (event.key !== "Escape" || !event.target.closest?.(".ProseMirror") || !this.current) return
-    this.focused = true
-    this.place()
-    const button = this.rowControlsTarget.querySelector("button[aria-haspopup]")
-    if (button && !this.rowControlsTarget.hidden) button.focus()
+    if (event.key === "Escape" && event.target.closest?.(".ProseMirror")) return this.leaveGrid()
+    this.moveAlong(event)
   }
 
-  // The button of the row's or the column's menu while its panel is open.
+  // Esc in the grid (the editor has let go of it, `rich_text/table.js`): the
+  // focus goes to the current column's letter, from which Tab reaches the rest.
+  leaveGrid() {
+    if (!this.current) return
+    this.focusEntry("column", this.current.column)
+  }
+
+  // The arrow keys along a strip, on a letter or a number whose menu is
+  // closed (an open menu's arrows are its own, `admin--ui--menu`).
+  moveAlong(event) {
+    const button = event.target
+    if (!button.matches?.(".admin-table-strip-button") || button.getAttribute("aria-expanded") === "true") return
+    const columns = this.columnStripTarget.contains(button)
+    const steps = columns ? { ArrowLeft: -1, ArrowRight: 1 } : { ArrowUp: -1, ArrowDown: 1 }
+    const step = steps[event.key]
+    if (step === undefined) return
+    event.preventDefault()
+    const entries = this.entries(columns ? "column" : "row")
+    const index = entries.indexOf(button.closest(".admin-table-strip-entry"))
+    const next = index + step
+    if (next >= 0 && next < entries.length) this.focusEntry(columns ? "column" : "row", next)
+  }
+
+  // A letter or a number given the focus, its column scrolled into the box
+  // first (a letter whose column is scrolled out is not shown).
+  focusEntry(axis, index) {
+    if (axis === "column") this.revealColumn(index)
+    this.place()
+    const button = this.entries(axis)[index]?.querySelector(".admin-table-strip-button")
+    if (!button || button.closest("[hidden]")) return
+    this.entries(axis).forEach((entry) => entry.querySelector(".admin-table-strip-button")?.setAttribute("tabindex", "-1"))
+    button.setAttribute("tabindex", "0")
+    button.focus()
+  }
+
+  revealColumn(index) {
+    const box = this.wrapperElement()
+    const cell = box?.querySelector("table")?.rows[0]?.cells[index]
+    if (!cell) return
+    const left = cell.offsetLeft
+    const right = left + cell.offsetWidth
+    if (left < box.scrollLeft) box.scrollLeft = left
+    else if (right > box.scrollLeft + box.clientWidth) box.scrollLeft = right - box.clientWidth
+  }
+
+  // --- The strips -------------------------------------------------------------------
+
+  // The button of a strip's menu while its panel is open.
   openMenu() {
-    return this.element.querySelector("[data-admin--editor--table-target$='Controls'] [aria-expanded='true']")
+    return this.element.querySelector(".admin-table-strip-entry [aria-expanded='true']")
   }
 
   menuOpen() {
     return Boolean(this.openMenu())
   }
 
-  floating() {
-    return [ this.rowControlsTarget, this.columnControlsTarget, this.addColumnTarget, this.addRowHereTarget ]
+  entries(axis) {
+    const strip = axis === "column" ? this.columnStripTarget : this.rowStripTarget
+    return Array.from(strip.children)
   }
 
-  hideControls() {
-    this.floating().forEach((element) => {
+  hideStrips() {
+    [ this.cornerTarget, this.columnStripTarget, this.rowStripTarget, this.addColumnTarget, this.addRowHereTarget ].forEach((element) => {
       element.hidden = true
     })
   }
@@ -204,87 +273,132 @@ export default class extends Controller {
     return this.editor && !this.editor.isDestroyed ? this.editor.view.dom : null
   }
 
-  // Puts the four controls on the grid's edges at the current row and
-  // column: the row's "⋯" on the grid's left edge, the column's "⋯" on its
-  // top edge, the "+" for a column at the row's end and the "+" for a row
-  // under the column, each centred on its edge (`FLOATING_CLASS`). The table
-  // scrolls sideways in its box (`.tableWrapper`), so the edges are the box's
-  // where the table is wider, and a column scrolled out of the box has no
-  // controls until it is scrolled back.
+  wrapperElement() {
+    return this.gridElement()?.querySelector(".tableWrapper") || null
+  }
+
+  // As many entries as the grid has columns and rows: the missing ones cloned
+  // from the template and named, the extra ones taken off the end. An entry
+  // stands for a place, not a column's content (moving a column moves its
+  // text, not its letter), so an entry kept is never renamed.
+  syncEntries(axis, count) {
+    const strip = axis === "column" ? this.columnStripTarget : this.rowStripTarget
+    const template = axis === "column" ? this.columnTemplateTarget : this.rowTemplateTarget
+    const text = messages(this.element)
+    while (strip.children.length > count) strip.lastElementChild.remove()
+    while (strip.children.length < count) {
+      const index = strip.children.length
+      const entry = template.content.firstElementChild.cloneNode(true)
+      const button = entry.querySelector("[data-admin--ui--menu-target='button']")
+      const columns = axis === "column"
+      const name = columns ? columnLetter(index) : String(index + 1)
+      entry.dataset[columns ? "tableColumn" : "tableRow"] = String(index)
+      button.textContent = name
+      const label = columns
+        ? text.t("components.editor_screen.table_controls.column.menu", { letter: name })
+        : text.t("components.editor_screen.table_controls.row.menu", { number: name })
+      button.setAttribute("aria-label", label)
+      button.setAttribute("tabindex", "-1")
+      strip.append(entry)
+    }
+  }
+
+  // Puts the strips on the grid's edges: a letter above each column, as wide
+  // as its cell and cut at the scrolling box's edges, a number left of each
+  // row, as tall as it, the corner where the two meet, the column's "+" after
+  // the last letter and the row's "+" under the last number. The sizes of the
+  // corner and of the "+" are the stylesheet's; this measures and places.
   place() {
     const editor = this.usable()
-    const show = editor && this.current && (this.hovered || this.focused || this.menuOpen())
-    if (!show) return this.hideControls()
-
-    const { row, column } = this.current
-    const doc = editor.state.doc
-    const rowCell = this.cellElement(doc, row, 0)
-    const columnCell = this.cellElement(doc, 0, column)
-    const box = this.gridElement()?.querySelector(".tableWrapper")
+    const box = this.wrapperElement()
     const table = box?.querySelector("table")
-    if (!rowCell || !columnCell || !table) return this.hideControls()
+    const doc = editor?.state.doc
+    const { rows, columns } = doc ? gridShape(doc) : { rows: 0, columns: 0 }
+    if (!editor || !table || rows === 0 || table.rows.length !== rows) return this.hideStrips()
+
+    this.syncEntries("column", columns)
+    this.syncEntries("row", rows)
 
     const base = this.element.getBoundingClientRect()
     const visible = box.getBoundingClientRect()
     const edges = table.getBoundingClientRect()
-    const rowBox = rowCell.getBoundingClientRect()
-    const columnBox = columnCell.getBoundingClientRect()
-    const middleOfRow = rowBox.top + rowBox.height / 2
-    const middleOfColumn = columnBox.left + columnBox.width / 2
-    const columnShown = middleOfColumn >= visible.left && middleOfColumn <= visible.right
+    const stripWidth = this.cornerTarget.offsetWidth || 32
+    const stripHeight = this.cornerTarget.offsetHeight || 24
+    const left = Math.max(edges.left, visible.left)
+    const right = Math.min(edges.right, visible.right)
+    const top = edges.top - stripHeight
 
-    // While a menu is open the other controls step aside: each is its own
-    // layer on the grid, and one drawn later would cover the open panel.
-    const open = this.openMenu()?.closest("[data-admin--editor--table-target]") || null
-    const alone = (element) => !open || element === open
+    this.entries("column").forEach((entry, index) => {
+      const cell = table.rows[0].cells[index]?.getBoundingClientRect()
+      const from = cell ? Math.max(cell.left, left) : 0
+      const to = cell ? Math.min(cell.right, right) : 0
+      // The next letter's border is drawn over this one's (one line between two).
+      this.put(entry, from - base.left, top - base.top, to - from + 1, stripHeight, to - from >= 1)
+    })
+    this.entries("row").forEach((entry, index) => {
+      const row = table.rows[index].getBoundingClientRect()
+      this.put(entry, left - stripWidth - base.left, row.top - base.top, stripWidth, row.height + 1, true)
+    })
+    this.put(this.cornerTarget, left - stripWidth - base.left, top - base.top, null, null, true)
+    this.put(this.addColumnTarget, right - base.left, top - base.top, null, null, true)
+    this.put(this.addRowHereTarget, left - stripWidth - base.left, edges.bottom - base.top, null, null, true)
+    this.columnStripTarget.hidden = false
+    this.rowStripTarget.hidden = false
 
-    this.put(this.rowControlsTarget, Math.max(edges.left, visible.left), middleOfRow, base, alone(this.rowControlsTarget))
-    this.put(this.columnControlsTarget, middleOfColumn, edges.top, base, columnShown && alone(this.columnControlsTarget))
-    this.put(this.addColumnTarget, Math.min(edges.right, visible.right), middleOfRow, base, alone(this.addColumnTarget))
-    this.put(this.addRowHereTarget, middleOfColumn, edges.bottom, base, columnShown && alone(this.addRowHereTarget))
+    this.markCurrent()
     // Not while a menu is open: its item's own click is still on its way to
     // the menu, which closes only for an item that is not disabled, and the
     // change it made could disable it (Move up on the row that is now the
-    // first). The focus coming back to the grid refreshes them.
-    if (!open) this.refreshMenus(doc)
+    // first). `settle` makes them right once the menu has closed.
+    if (!this.menuOpen()) this.refreshMenus(doc)
   }
 
-  put(element, x, y, base, shown) {
-    element.style.left = `${x - base.left}px`
-    element.style.top = `${y - base.top}px`
+  put(element, x, y, width, height, shown) {
+    element.style.left = `${x}px`
+    element.style.top = `${y}px`
+    if (width !== null) element.style.width = `${width}px`
+    if (height !== null) element.style.height = `${height}px`
     element.hidden = !shown
   }
 
-  cellElement(doc, row, column) {
-    const position = cellPosition(doc, row, column)
-    if (position === null) return null
-    const node = this.editor.view.nodeDOM(position)
-    return node instanceof Element ? node : null
+  // The current cell's letter and number inverted and marked, and each strip's
+  // one Tab stop: the button that has the focus, else the current one, else
+  // the first.
+  markCurrent() {
+    [ [ "column", this.current?.column ], [ "row", this.current?.row ] ].forEach(([ axis, index ]) => {
+      const buttons = this.entries(axis).map((entry) => entry.querySelector(".admin-table-strip-button"))
+      const stop = buttons.find((button) => button === document.activeElement) || buttons[index ?? 0] || buttons[0]
+      buttons.forEach((button, at) => {
+        if (at === index) button.setAttribute("aria-current", "true")
+        else button.removeAttribute("aria-current")
+        button.setAttribute("tabindex", button === stop ? "0" : "-1")
+      })
+    })
   }
 
-  // What each item can do for the current row and column: a first row
-  // cannot move up, a table's one row cannot be deleted (a grid is emptied
-  // by selecting its cells, as any text is). The column's alignment is
-  // checked, as a radio item (`menuitemradio`, set here after the menu has
-  // made every item a `menuitem`).
+  // What each item can do for its own row or column: a first row cannot move
+  // up, a table's one row cannot be deleted (a grid is emptied by selecting
+  // its cells, as any text is). The column's alignment is checked, as a radio
+  // item (`menuitemradio`, set here after the menu has made every item a
+  // `menuitem`).
   refreshMenus(doc) {
     const { rows, columns } = gridShape(doc)
-    const { row, column } = this.current
-    const off = {
-      move_up: row === 0,
-      move_down: row === rows - 1,
-      delete_row: rows === 1,
-      move_left: column === 0,
-      move_right: column === columns - 1,
-      delete_column: columns === 1
-    }
-    this.element.querySelectorAll("[data-table-command]").forEach((item) => {
-      item.disabled = Boolean(off[item.dataset.tableCommand])
+    this.entries("row").forEach((entry, row) => {
+      this.disable(entry, { move_up: row === 0, move_down: row === rows - 1, delete_row: rows === 1 })
     })
-    const align = columnAlign(doc, column)
-    this.element.querySelectorAll("[data-table-align]").forEach((item) => {
-      item.setAttribute("role", "menuitemradio")
-      item.setAttribute("aria-checked", item.dataset.tableAlign === align ? "true" : "false")
+    this.entries("column").forEach((entry, column) => {
+      this.disable(entry, { move_left: column === 0, move_right: column === columns - 1, delete_column: columns === 1 })
+      const align = columnAlign(doc, column)
+      entry.querySelectorAll("[data-table-align]").forEach((item) => {
+        item.setAttribute("role", "menuitemradio")
+        item.setAttribute("aria-checked", item.dataset.tableAlign === align ? "true" : "false")
+      })
+    })
+  }
+
+  disable(entry, off) {
+    entry.querySelectorAll("[data-table-command]").forEach((item) => {
+      item.disabled = Boolean(off[item.dataset.tableCommand])
     })
   }
 
@@ -313,18 +427,18 @@ export default class extends Controller {
 
   // --- Rows and columns ---------------------------------------------------------
 
-  insertRowAbove() { this.structural(addRowBefore, ({ row, column }) => ({ row, column })) }
-  insertRowBelow() { this.structural(addRowAfter, ({ row, column }) => ({ row: row + 1, column })) }
-  moveRowUp() { this.move("row", -1) }
-  moveRowDown() { this.move("row", 1) }
-  insertColumnLeft() { this.structural(addColumnBefore, ({ row, column }) => ({ row, column })) }
-  insertColumnRight() { this.structural(addColumnAfter, ({ row, column }) => ({ row, column: column + 1 })) }
-  moveColumnLeft() { this.move("column", -1) }
-  moveColumnRight() { this.move("column", 1) }
+  insertRowAbove(event) { this.structural(addRowBefore, ({ row, column }) => ({ row, column }), this.cellOf(event)) }
+  insertRowBelow(event) { this.structural(addRowAfter, ({ row, column }) => ({ row: row + 1, column }), this.cellOf(event)) }
+  moveRowUp(event) { this.move("row", -1, this.cellOf(event)) }
+  moveRowDown(event) { this.move("row", 1, this.cellOf(event)) }
+  insertColumnLeft(event) { this.structural(addColumnBefore, ({ row, column }) => ({ row, column }), this.cellOf(event)) }
+  insertColumnRight(event) { this.structural(addColumnAfter, ({ row, column }) => ({ row, column: column + 1 }), this.cellOf(event)) }
+  moveColumnLeft(event) { this.move("column", -1, this.cellOf(event)) }
+  moveColumnRight(event) { this.move("column", 1, this.cellOf(event)) }
 
-  // The "+" at a row's end: a column after the last. The "+" under a column
-  // and "Add row": a row after the last; into a grid emptied of its table,
-  // the starting grid again.
+  // The "+" after the letters: a column after the last. The "+" under the
+  // numbers and "Add row": a row after the last; into a grid emptied of its
+  // table, the starting grid again.
   addColumn() {
     const editor = this.usable()
     if (!editor) return
@@ -346,49 +460,53 @@ export default class extends Controller {
     this.structural(addRowAfter, () => ({ row: rows, column }), { row: rows - 1, column })
   }
 
-  move(axis, step) {
-    if (!this.current) return
-    const from = this.current[axis]
+  move(axis, step, cell) {
+    if (!cell) return
+    const from = cell[axis]
     const command = axis === "row" ? moveTableRow : moveTableColumn
-    this.structural(command({ from, to: from + step, select: false }), (cell) => ({ ...cell, [axis]: from + step }))
+    this.structural(command({ from, to: from + step, select: false }), (at) => ({ ...at, [axis]: from + step }), cell)
   }
 
-  deleteRow() {
+  deleteRow(event) {
     const editor = this.usable()
-    if (!editor || !this.current) return
-    const { row, column } = this.current
+    const cell = this.cellOf(event)
+    if (!editor || !cell) return
+    const { row, column } = cell
     const remove = () => this.structural(deleteRow, () => ({ row, column }), { row, column })
     rowHasText(editor.state.doc, row) ? this.confirm(this.rowDialogValue, remove, { row, column }) : remove()
   }
 
-  deleteColumn() {
+  deleteColumn(event) {
     const editor = this.usable()
-    if (!editor || !this.current) return
-    const { row, column } = this.current
+    const cell = this.cellOf(event)
+    if (!editor || !cell) return
+    const { row, column } = cell
     const remove = () => this.structural(deleteColumn, () => ({ row, column }), { row, column })
     columnHasText(editor.state.doc, column) ? this.confirm(this.columnDialogValue, remove, { row, column }) : remove()
   }
 
-  // Align: Left, Centre, Right, for every cell of the current column.
-  align({ params }) {
+  // Align: Left, Centre, Right, for every cell of the menu's column.
+  align(event) {
     const editor = this.usable()
-    if (!editor || !this.current) return
-    const { row, column } = this.current
+    const cell = this.cellOf(event)
+    if (!editor || !cell) return
+    const { row, column } = cell
     const at = insideCell(editor.state.doc, row, column)
     if (at === null) return
+    this.current = cell
     editor.chain().focus().setTextSelection(at).command(({ tr }) => {
-      alignColumn(tr, column, params.align)
+      alignColumn(tr, column, event.params.align)
       return true
     }).run()
   }
 
-  // One transaction: the caret into `cell` (the current one unless said),
-  // the prosemirror-tables command, which acts on the selection's cell, the
-  // header kinds as the switches said before (see the top of this file), and
-  // the caret into the cell `after` names in the new shape. `focus()` comes
-  // first in the chain: with no position it puts back the selection the
-  // editor had, so anywhere later it would undo the selection set here.
-  structural(command, after, cell = this.current) {
+  // One transaction: the caret into `cell`, the prosemirror-tables command,
+  // which acts on the selection's cell, the header kinds as the switches said
+  // before (see the top of this file), and the caret into the cell `after`
+  // names in the new shape. `focus()` comes first in the chain: with no
+  // position it puts back the selection the editor had, so anywhere later it
+  // would undo the selection set here.
+  structural(command, after, cell) {
     const editor = this.usable()
     if (!editor || !cell) return
     const at = insideCell(editor.state.doc, cell.row, cell.column)
@@ -444,4 +562,12 @@ export default class extends Controller {
     const at = editor && cell ? insideCell(editor.state.doc, cell.row, cell.column) : null
     if (at !== null) editor.chain().focus().setTextSelection(at).run()
   }
+}
+
+// A column's letter as a spreadsheet writes it: A to Z, then AA, AB, … (a
+// table has at most 30 columns, `TableBody::MAX_COLUMNS`).
+function columnLetter(index) {
+  let letters = ""
+  for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters
+  return letters
 }
