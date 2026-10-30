@@ -124,7 +124,7 @@ A table of cells in the flow of a page: a header row and a header column an edit
 
 **Saving.** A Table's save is an ordinary block save: refused when stale or when another tab holds the block, audited as a body is (two digests) and published with its page's copy. The body rule is `HasRichTextBody`'s, so it holds on every write path: the editor, a service, an import, and AI's Use (`test/models/content_block_table_body_test.rb`).
 
-**Limits as built** (each a row in `docs/roadmap.md`, "Known gaps", "Table block"): the grid's look and its handles are not designed; the reference card and the AI suggestion draw a table in plain rich-text styles; the public label "Table" and the warning sentences are English until the public site is translated; a loader, MCP and a post still flatten a Markdown table (only the AI translation of a table passes `tables: true`); there is no sticky header row on a long table; and no test hovers (CI's browser cannot), so every editor control is reached by focus in the system tests.
+**Limits as built** (each a row in `docs/roadmap.md`, "Known gaps", "Table block"): the grid's look and its handles are not designed; the reference card and the AI suggestion draw a table in plain rich-text styles; the public label "Table" and the warning sentences are English until the public site is translated; MCP and a post still flatten a Markdown table (only the AI translation of a table passes `tables: true`; the documentation site's loader no longer does: it makes Table blocks); there is no sticky header row on a long table; and no test hovers (CI's browser cannot), so every editor control is reached by focus in the system tests.
 
 ## Sections
 

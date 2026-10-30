@@ -151,7 +151,11 @@ module Admin
         token = params[:token]
         return unless token.is_a?(String) && token.present?
 
-        User.find_by_password_reset_token!(token)
+        # `can_sign_in`: no reset mail is ever sent to an invited row
+        # (`create`), so a reset token of one was made outside the app; it
+        # is answered as any bad token is, and never sets a password on a
+        # row whose invite is still open (docs/reference/mail.md).
+        User.can_sign_in.find_by_password_reset_token!(token)
       rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound
         nil
       end

@@ -510,6 +510,22 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_admin_password_path(expired: 1)
   end
 
+  # No reset mail goes to an invited row, so such a token was made outside
+  # the app; the row's open invite must not be finished through the reset.
+  test "a reset token of an invited row is the expired state, sets no password and is a 410 to the check" do
+    invited = invited_user("dana@example.com")
+    token = invited.password_reset_token
+    digest = invited.password_digest
+
+    post admin_check_password_path, params: { token: token }
+    assert_response :gone
+
+    patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    assert_redirected_to new_admin_password_path(expired: 1)
+    assert_equal digest, invited.reload.password_digest
+    assert invited.invited?
+  end
+
   # THE EARLY CHECK (`check`): what the page's script asks once, with the
   # token in the body. A status and nothing else.
   test "check answers 204 for a token update would take, with no body, and is kept by no cache" do
