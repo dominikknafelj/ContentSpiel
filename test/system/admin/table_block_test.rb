@@ -428,6 +428,86 @@ class Admin::TableBlockSystemTest < ApplicationSystemTestCase
     assert_equal %w[A B C D], all("#{card(block)} [data-admin--editor--table-target=columnStrip] .admin-table-strip-button").map(&:text)
   end
 
+  # Every letter's or number's tabindex, in order.
+  def tab_stops(block, strip) = all("#{card(block)} [data-admin--editor--table-target=#{strip}] .admin-table-strip-button", visible: :all).map { |button| button["tabindex"] }
+
+  test "typing that moves no line writes nothing of the strips: the same buttons, left where they were; a line that wraps places them again" do
+    block = words_block([ %w[Plan Price], %w[Basic 5], %w[Pro 12] ])
+    open_editor
+    cell(block, 1, 0).click
+    buttons = -> { all("#{card(block)} .admin-table-strip-button").map(&:native) }
+    before = buttons.call
+    # A mark on every entry where the script would write: a pass that placed them again takes it away.
+    page.execute_script("document.querySelectorAll('#{card(block)} .admin-table-strip-entry').forEach((entry) => { entry.style.left = '-999px' })")
+
+    type_text "ic"
+    saved(block) { |doc| texts(doc).dig(1, 0) == "Basicic" }
+    await_frames
+    assert_equal before, buttons.call, "the strips are not rebuilt by typing"
+    assert_equal [ "-999px" ], page.evaluate_script("[...new Set([...document.querySelectorAll('#{card(block)} .admin-table-strip-entry')].map((entry) => entry.style.left))]"),
+      "a keystroke that moves no box places nothing"
+
+    type_text " and a much longer line that has to wrap onto a second line in its cell"
+    assert_eventually(message: "a row that grows places the strips again") do
+      page.evaluate_script("[...document.querySelectorAll('#{card(block)} .admin-table-strip-entry')].every((entry) => entry.style.left !== '-999px')")
+    end
+    number = box_of(find("#{card(block)} button[aria-label='Row 2 actions']"))
+    row = box_of(find("#{grid_of(block)} tr:nth-child(2)"))
+    assert_in_delta row[:bottom] - row[:top], number[:bottom] - number[:top] - 1, 1.5, "the number is as tall as its grown row"
+  end
+
+  test "each strip has exactly one Tab stop, and it is shown: after its column or row is deleted and while its column is scrolled out" do
+    block = words_block([ %w[A B C D E F G H], %w[1 2 3 4 5 6 7 8], %w[9 10 11 12 13 14 15 16] ])
+    open_editor
+    cell(block, 2, 7).click
+    assert_equal [ "-1", "-1", "-1", "-1", "-1", "-1", "-1", "0" ], tab_stops(block, "columnStrip")
+    assert_equal [ "-1", "-1", "0" ], tab_stops(block, "rowStrip")
+
+    row_menu(block, 3, "Delete row")
+    within("dialog[open]") { press "Delete row" }
+    saved(block) { |doc| rows_of(doc).size == 2 }
+    column_menu(block, "H", "Delete column")
+    within("dialog[open]") { press "Delete column" }
+    saved(block) { |doc| rows_of(doc).first.size == 7 }
+    assert_eventually(message: -> { "one stop each: #{tab_stops(block, "columnStrip")} #{tab_stops(block, "rowStrip")}" }) do
+      tab_stops(block, "columnStrip").count("0") == 1 && tab_stops(block, "rowStrip").count("0") == 1
+    end
+
+    # The current column is the last; with the box scrolled back to its start that column is wholly out
+    # of it, its letter is hidden, and the column strip's stop is a letter that is shown.
+    cell(block, 0, 6).click
+    find("#{grid_of(block)} .tableWrapper").execute_script("this.scrollLeft = 0")
+    assert_eventually(message: "the last letter is hidden while its column is scrolled out") do
+      find("#{card(block)} button[aria-label='Column G actions']", visible: :all).ancestor(".admin-table-strip-entry", visible: :all)[:hidden].present?
+    end
+    stop = find("#{card(block)} [data-admin--editor--table-target=columnStrip] .admin-table-strip-button[tabindex='0']", visible: :all)
+    assert stop.visible?, "the column strip's stop is a letter that is shown"
+    assert_equal 1, tab_stops(block, "columnStrip").count("0")
+  end
+
+  test "arrowing to a letter whose column is scrolled out brings the whole column into the box, on either side" do
+    block = words_block([ %w[A B C D E F], %w[1 2 3 4 5 6] ])
+    open_editor
+    wrapper = find("#{grid_of(block)} .tableWrapper")
+    inside = lambda do |column|
+      outer = box_of(wrapper)
+      cell_box = box_of(cell(block, 0, column))
+      cell_box[:left] >= outer[:left] - 1 && cell_box[:right] <= outer[:right] + 1
+    end
+
+    cell(block, 0, 0).click
+    key(:Escape)
+    assert_eventually { page.evaluate_script("document.activeElement.getAttribute('aria-label')") == "Column A actions" }
+    5.times { key(:Right) }
+    assert_equal "Column F actions", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert inside.call(5), "the last column is wholly in the box"
+
+    5.times { key(:Left) }
+    assert_equal "Column A actions", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert inside.call(0), "the first column is wholly in the box again"
+    assert_in_delta 0, wrapper.evaluate_script("this.scrollLeft"), 1
+  end
+
   test "a row's menu inserts above, moves and deletes, and the header row stays the first row" do
     block = words_block([ %w[Plan Price], %w[Basic 5], %w[Pro 12] ])
     open_editor

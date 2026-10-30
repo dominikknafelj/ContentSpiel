@@ -72,11 +72,19 @@ export default class extends Controller {
   connect() {
     this.editor = null
     this.current = null
+    // What the strips were last drawn for (`place`): the grid's shape and
+    // alignments, and the boxes measured. A pass that finds both unchanged
+    // writes nothing but the current cell's marks.
+    this.drawn = { shape: null, menus: null, geometry: null }
+    this.marked = { column: null, row: null }
+    this.stops = { column: null, row: null }
+    this.frame = null
     this.changed = () => this.refresh()
-    this.scrolled = () => this.place()
+    this.scrolled = () => this.schedule()
     // A row grows as its text wraps and the card follows the window: the
-    // strips are placed again whenever the grid's box changes size.
-    this.resized = new ResizeObserver(() => requestAnimationFrame(() => this.place()))
+    // strips are placed again whenever the grid's box changes size, in the
+    // same one pass per frame as typing and scrolling (`schedule`).
+    this.resized = new ResizeObserver(() => this.schedule())
     this.resized.observe(this.element)
     this.hideStrips()
     this.element.addEventListener("scroll", this.scrolled, true)
@@ -86,6 +94,8 @@ export default class extends Controller {
   disconnect() {
     this.element.removeEventListener("scroll", this.scrolled, true)
     this.resized.disconnect()
+    if (this.frame !== null) cancelAnimationFrame(this.frame)
+    this.frame = null
     this.withdrawDialog()
     this.use(null)
     this.hideStrips()
@@ -134,7 +144,19 @@ export default class extends Controller {
 
     if (this.editor.isFocused) this.current = selectedCell(this.editor.state) || this.current
     this.current = this.clamped(this.current)
-    this.place()
+    this.schedule()
+  }
+
+  // One pass of `place` in the next frame, however many transactions,
+  // scrolls and resizes ask for one before it (typing a word is a
+  // transaction per character). A control that needs the strips right at
+  // once (a menu's command, a letter given the focus) calls `place` itself.
+  schedule() {
+    if (this.frame !== null) return
+    this.frame = requestAnimationFrame(() => {
+      this.frame = null
+      this.place()
+    })
   }
 
   // The warning line (decision 7): from 6 columns, from 40 rows, both in one
@@ -226,25 +248,28 @@ export default class extends Controller {
   }
 
   // A letter or a number given the focus, its column scrolled into the box
-  // first (a letter whose column is scrolled out is not shown).
+  // first (a letter whose column is scrolled out is not shown). The focus
+  // makes it its strip's one Tab stop (`markCurrent`).
   focusEntry(axis, index) {
     if (axis === "column") this.revealColumn(index)
     this.place()
     const button = this.entries(axis)[index]?.querySelector(".admin-table-strip-button")
     if (!button || button.closest("[hidden]")) return
-    this.entries(axis).forEach((entry) => entry.querySelector(".admin-table-strip-button")?.setAttribute("tabindex", "-1"))
-    button.setAttribute("tabindex", "0")
     button.focus()
+    this.markCurrent()
   }
 
+  // The box scrolled sideways so the column's cell is wholly in it. Measured
+  // as boxes on the screen: a cell's `offsetLeft` is counted from the editor
+  // (its `offsetParent`, padding and strips included), not from the box.
   revealColumn(index) {
     const box = this.wrapperElement()
     const cell = box?.querySelector("table")?.rows[0]?.cells[index]
     if (!cell) return
-    const left = cell.offsetLeft
-    const right = left + cell.offsetWidth
-    if (left < box.scrollLeft) box.scrollLeft = left
-    else if (right > box.scrollLeft + box.clientWidth) box.scrollLeft = right - box.clientWidth
+    const visible = box.getBoundingClientRect()
+    const { left, right } = cell.getBoundingClientRect()
+    if (left < visible.left) box.scrollLeft -= visible.left - left
+    else if (right > visible.right) box.scrollLeft += right - visible.right
   }
 
   // --- The strips -------------------------------------------------------------------
@@ -263,10 +288,14 @@ export default class extends Controller {
     return Array.from(strip.children)
   }
 
+  // Everything of the strips hidden, and nothing remembered of where they
+  // stood, so the next `place` draws them whole. Guarded: a controller taken
+  // off its element in place (its `data-controller` removed) finds no target.
   hideStrips() {
-    [ this.cornerTarget, this.columnStripTarget, this.rowStripTarget, this.addColumnTarget, this.addRowHereTarget ].forEach((element) => {
-      element.hidden = true
+    [ "corner", "columnStrip", "rowStrip", "addColumn", "addRowHere" ].forEach((name) => {
+      if (this[`has${name[0].toUpperCase()}${name.slice(1)}Target`]) this[`${name}Target`].hidden = true
     })
+    if (this.drawn) this.drawn.geometry = null
   }
 
   gridElement() {
@@ -308,6 +337,17 @@ export default class extends Controller {
   // row, as tall as it, the corner where the two meet, the column's "+" after
   // the last letter and the row's "+" under the last number. The sizes of the
   // corner and of the "+" are the stylesheet's; this measures and places.
+  //
+  // IT RUNS ON EVERY KEYSTROKE (through `schedule`, once a frame) and a table
+  // may have 500 rows, so it does as little as the change asks: every box is
+  // READ first and every style WRITTEN after (one layout, not one per row);
+  // the entries are added or removed only when the shape changed, the menus
+  // refreshed only when the shape or an alignment did, and the entries
+  // placed only when a measured box moved (the table's, the scrolling box's,
+  // this element's, its scroll). Typing that wraps no line moves no box, so
+  // it writes nothing but the current cell's marks. A row can only grow or
+  // shrink by moving the table's bottom edge, so the table's box stands for
+  // every row's.
   place() {
     const editor = this.usable()
     const box = this.wrapperElement()
@@ -316,41 +356,64 @@ export default class extends Controller {
     const { rows, columns } = doc ? gridShape(doc) : { rows: 0, columns: 0 }
     if (!editor || !table || rows === 0 || table.rows.length !== rows) return this.hideStrips()
 
-    this.syncEntries("column", columns)
-    this.syncEntries("row", rows)
+    const shape = `${rows}x${columns}`
+    if (shape !== this.drawn.shape) {
+      this.syncEntries("column", columns)
+      this.syncEntries("row", rows)
+      this.drawn.shape = shape
+      this.drawn.geometry = null
+    }
+    // Shown before it is measured: a hidden corner has no size.
+    this.cornerTarget.hidden = false
 
+    // --- Read ---
     const base = this.element.getBoundingClientRect()
     const visible = box.getBoundingClientRect()
     const edges = table.getBoundingClientRect()
-    const stripWidth = this.cornerTarget.offsetWidth || 32
-    const stripHeight = this.cornerTarget.offsetHeight || 24
-    const left = Math.max(edges.left, visible.left)
-    const right = Math.min(edges.right, visible.right)
-    const top = edges.top - stripHeight
+    // Relative to this element: the page scrolling moves everything together and is no change.
+    const geometry = [ base.width, visible.left - base.left, visible.width, edges.left - base.left, edges.top - base.top, edges.width, edges.height, box.scrollLeft ].join(",")
+    const menus = `${shape}:${Array.from({ length: columns }, (_, column) => columnAlign(doc, column)).join(",")}`
 
-    this.entries("column").forEach((entry, index) => {
-      const cell = table.rows[0].cells[index]?.getBoundingClientRect()
-      const from = cell ? Math.max(cell.left, left) : 0
-      const to = cell ? Math.min(cell.right, right) : 0
-      // The next letter's border is drawn over this one's (one line between two).
-      this.put(entry, from - base.left, top - base.top, to - from + 1, stripHeight, to - from >= 1)
-    })
-    this.entries("row").forEach((entry, index) => {
-      const row = table.rows[index].getBoundingClientRect()
-      this.put(entry, left - stripWidth - base.left, row.top - base.top, stripWidth, row.height + 1, true)
-    })
-    this.put(this.cornerTarget, left - stripWidth - base.left, top - base.top, null, null, true)
-    this.put(this.addColumnTarget, right - base.left, top - base.top, null, null, true)
-    this.put(this.addRowHereTarget, left - stripWidth - base.left, edges.bottom - base.top, null, null, true)
-    this.columnStripTarget.hidden = false
-    this.rowStripTarget.hidden = false
+    if (geometry !== this.drawn.geometry) {
+      const stripWidth = this.cornerTarget.offsetWidth
+      const stripHeight = this.cornerTarget.offsetHeight
+      const firstRow = table.rows[0].cells
+      const letters = this.entries("column").map((_, index) => firstRow[index]?.getBoundingClientRect() || null)
+      const numbers = Array.from(table.rows, (row) => row.getBoundingClientRect())
+      const left = Math.max(edges.left, visible.left)
+      const right = Math.min(edges.right, visible.right)
+      const top = edges.top - stripHeight
+
+      // --- Write ---
+      this.entries("column").forEach((entry, index) => {
+        const cell = letters[index]
+        const from = cell ? Math.max(cell.left, left) : 0
+        const to = cell ? Math.min(cell.right, right) : 0
+        // The next letter's border is drawn over this one's (one line between two).
+        this.put(entry, from - base.left, top - base.top, to - from + 1, stripHeight, to - from >= 1)
+      })
+      this.entries("row").forEach((entry, index) => {
+        const row = numbers[index]
+        this.put(entry, left - stripWidth - base.left, row.top - base.top, stripWidth, row.height + 1, true)
+      })
+      this.put(this.cornerTarget, left - stripWidth - base.left, top - base.top, null, null, true)
+      this.put(this.addColumnTarget, right - base.left, top - base.top, null, null, true)
+      this.put(this.addRowHereTarget, left - stripWidth - base.left, edges.bottom - base.top, null, null, true)
+      this.columnStripTarget.hidden = false
+      this.rowStripTarget.hidden = false
+      this.drawn.geometry = geometry
+    }
 
     this.markCurrent()
     // Not while a menu is open: its item's own click is still on its way to
     // the menu, which closes only for an item that is not disabled, and the
     // change it made could disable it (Move up on the row that is now the
-    // first). `settle` makes them right once the menu has closed.
-    if (!this.menuOpen()) this.refreshMenus(doc)
+    // first). `settle` makes them right once the menu has closed, since what
+    // they were drawn for is then not remembered as drawn.
+    if (menus !== this.drawn.menus && !this.menuOpen()) {
+      this.refreshMenus(doc)
+      this.drawn.menus = menus
+    }
   }
 
   put(element, x, y, width, height, shown) {
@@ -361,18 +424,31 @@ export default class extends Controller {
     element.hidden = !shown
   }
 
-  // The current cell's letter and number inverted and marked, and each strip's
-  // one Tab stop: the button that has the focus, else the current one, else
-  // the first.
+  // The current cell's letter and number inverted and marked, and each
+  // strip's ONE Tab stop: the button that has the focus, else the current
+  // one while it is shown, else the first one shown (a letter whose column
+  // is scrolled out is hidden, and a strip whose only stop is hidden is
+  // skipped by Tab). Only the buttons that change are written: this runs on
+  // every keystroke.
   markCurrent() {
-    [ [ "column", this.current?.column ], [ "row", this.current?.row ] ].forEach(([ axis, index ]) => {
+    [ "column", "row" ].forEach((axis) => {
       const buttons = this.entries(axis).map((entry) => entry.querySelector(".admin-table-strip-button"))
-      const stop = buttons.find((button) => button === document.activeElement) || buttons[index ?? 0] || buttons[0]
-      buttons.forEach((button, at) => {
-        if (at === index) button.setAttribute("aria-current", "true")
-        else button.removeAttribute("aria-current")
-        button.setAttribute("tabindex", button === stop ? "0" : "-1")
-      })
+      const index = this.current?.[axis]
+      const current = index === undefined ? null : buttons[index] || null
+      if (this.marked[axis] !== current) {
+        this.marked[axis]?.removeAttribute("aria-current")
+        current?.setAttribute("aria-current", "true")
+        this.marked[axis] = current
+      }
+
+      const shown = (button) => Boolean(button) && !button.closest(".admin-table-strip-entry").hidden
+      const focused = buttons.includes(document.activeElement) ? document.activeElement : null
+      const stop = focused || (shown(current) ? current : buttons.find(shown)) || buttons[0] || null
+      const previous = this.stops[axis]
+      if (previous === stop && stop?.getAttribute("tabindex") === "0") return
+      if (previous?.isConnected) previous.setAttribute("tabindex", "-1")
+      stop?.setAttribute("tabindex", "0")
+      this.stops[axis] = stop
     })
   }
 
