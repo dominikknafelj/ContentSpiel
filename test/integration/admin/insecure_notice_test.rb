@@ -11,7 +11,11 @@ require "test_helper"
 class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
   NOTICE = "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address.".freeze
 
-  setup { site_settings(:default).update!(setup_completed_at: Time.current) }
+  # The request page is closed unless mail works; the notice is drawn on it.
+  setup do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    put_mail_state(:working)
+  end
 
   test "in the test environment sign-in, the password pages and CS Studio show nothing" do
     [ "/cs-studio/sign-in", new_admin_password_path, admin_edit_password_path ].each do |path|
@@ -30,7 +34,11 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
   end
 
   test "in production over plain HTTP sign-in and both password pages say so, to everyone" do
-    as_production do
+    # Production's mail needs the site's address to build a link from, or the
+    # request page is closed (`MailSettings`: not set up) and the test draws
+    # it. The notice asks the request, never the address.
+    with_site_address("https://example.test") do
+      as_production do
       [ "/cs-studio/sign-in", new_admin_password_path, new_admin_password_path(sent: 1),
         admin_edit_password_path ].each do |path|
         get path
@@ -38,17 +46,23 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
         assert_response :success
         assert_select "main p#insecure-notice[role=alert]", text: NOTICE, count: 1
       end
+      end
     end
   end
 
   test "in production over an encrypted connection they say nothing" do
     https!
-    as_production do
+    # Production's mail needs the site's address to build a link from, or the
+    # request page is closed (`MailSettings`: not set up) and the test draws
+    # it. The notice asks the request, never the address.
+    with_site_address("https://example.test") do
+      as_production do
       [ "/cs-studio/sign-in", new_admin_password_path ].each do |path|
         get path
 
         assert_response :success
         assert_select "#insecure-notice", count: 0
+      end
       end
     end
   end

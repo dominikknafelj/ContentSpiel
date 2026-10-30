@@ -3,6 +3,7 @@
     are real <label>s: the old placeholders were the fields' only accessible
     names. Field names (email_address, password) are what the controller and
     every test post. %>
+<% mail_ready = MailSettings.current.ready? %>
 <div class="flex flex-col gap-[18px]">
   <%= render "admin/shared/auth_heading", title: "Sign in" %>
 
@@ -23,9 +24,17 @@
     <%# "Forgot your password?" rides the Password label row, right-aligned
         (the field's `label_aside` slot). %>
     <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "Password", autocomplete: "current-password") do |field| %>
-      <% field.with_label_aside do %>
-        <%= link_to "Forgot your password?", new_admin_password_path, class: "text-xs text-accent hover:text-accent-hover" %>
+      <% if mail_ready %>
+        <% field.with_label_aside do %>
+          <%= link_to "Forgot your password?", new_admin_password_path, class: "text-xs text-accent hover:text-accent-hover" %>
+        <% end %>
       <% end %>
+    <% end %>
+
+    <%# Where the link would stand when mail does not work (design answer M7):
+        no console command, this page is shown to anyone. %>
+    <% unless mail_ready %>
+      <p class="text-xs leading-normal text-meta"><%= t(".forgot_without_mail") %></p>
     <% end %>
 
     <%= render Admin::Ui::ButtonComponent.new(label: "Sign in", type: "submit", class: "w-full") %>

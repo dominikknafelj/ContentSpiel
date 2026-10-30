@@ -50,6 +50,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
   end
 
   test "the screen promises what the code does, and links the reset flow from the card's footer" do
+    put_mail_state(:working)
     sign_in_as(users(:reader))
 
     get "/cs-studio/account"
@@ -79,7 +80,21 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select ".admin-save-bar", count: 2
   end
 
+  test "Your account shows the reset link only when mail is ready, and nothing in its place" do
+    sign_in_as(users(:reader))
+    with_mail_state(:untested) do
+      get "/cs-studio/account"
+      assert_select "#password-form .admin-save-bar a", text: /Forgot/, count: 0
+      assert_select "#password-form", text: /Ask the site's owner/, count: 0
+    end
+    with_mail_state(:working) do
+      get "/cs-studio/account"
+      assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
+    end
+  end
+
   test "visiting the reset flow signed in signs nobody out" do
+    put_mail_state(:working)
     user = users(:reader)
     sign_in_as(user)
     session_id = Current.session.id

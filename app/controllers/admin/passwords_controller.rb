@@ -11,6 +11,10 @@ module Admin
     # out of the browser's back/forward cache.
     before_action :no_store, only: %i[ edit legacy check update ]
     before_action :set_user_by_token, only: :update
+    # Only the REQUEST (`new`, `create`) follows mail: `edit`, `check` and
+    # `update` keep working whatever the state, so a person holding a valid
+    # link finishes even if an owner has just changed the settings.
+    before_action :require_mail_ready, only: %i[ new create ]
     rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_admin_password_path, alert: "Try again later." }
     # The early check has the request form's limit, counted on its own
     # (`name:`), so that asking for links and opening them do not use each
@@ -22,7 +26,9 @@ module Admin
     end
 
     def create
-      if user = User.find_by(email_address: params[:email_address])
+      # `can_sign_in`: an invited row has no password anybody knows and is
+      # answered as an unknown address (same redirect, no mail).
+      if user = User.can_sign_in.find_by(email_address: params[:email_address])
         # The link in the mail is the site's configured address when there
         # is one, and then the request's origin is not handed over at all
         # (it is whatever Host this request named). Without one, and in
@@ -114,6 +120,20 @@ module Admin
     end
 
     private
+      # A bookmarked request page must not pretend to send. The one thing
+      # said is that a link has lapsed (`expired`, where `update` or the
+      # page's early check sends someone), because that person otherwise
+      # lands on sign-in with no word about why.
+      def require_mail_ready
+        return if MailSettings.current.ready?
+
+        if params[:expired] == "1" && action_name == "new"
+          redirect_to admin_sign_in_path, alert: t("admin.passwords.expired_without_mail")
+        else
+          redirect_to admin_sign_in_path
+        end
+      end
+
       def reset_mail_origin
         return {} if SiteAddress.current.configured? || !PasswordsMailer.request_origin_used?
 

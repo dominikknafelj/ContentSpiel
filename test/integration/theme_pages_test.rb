@@ -811,6 +811,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # controller alone would be seen by no other test), and a mail is drawn
   # outside any request, by a class that is no controller at all.
   test "nothing of a theme reaches the password pages or a mail: a theme's file named as either's view or layout is never drawn" do
+    put_mail_state(:working) # the request page is closed unless mail works
     with_leaking_theme do
       assert_theme_reached_the_public_page
 
