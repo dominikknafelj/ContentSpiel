@@ -41,24 +41,13 @@ module Admin
 
       def state = mail_settings.state
 
-      def sentence
-        case state
-        when :not_set_up
-          t("admin.mail.states.not_set_up.#{mail_settings.address_missing? ? "no_address" : "sentence"}")
-        when :untested then t("admin.mail.states.untested.sentence")
-        when :working then t("admin.mail.states.working.sentence", at: moment(mail_settings.last_sent_at))
-        when :failed
-          t("admin.mail.states.failed.sentence", at: moment(mail_settings.failed_at), reason: t("admin.mail.reasons.#{failure.key}"))
-        end
-      end
+      def sentence = ::MailStateSentence.for(mail_settings)
 
       private
 
       attr_reader :mail_settings
 
       def failure = (@failure ||= ::MailFailure.load(mail_settings.failure) || ::MailFailure.new(key: "other", line: ""))
-
-      def moment(at) = at ? I18n.l(at.in_time_zone, format: :"admin.short_datetime") : ""
 
       def failure_alert
         return unless state == :failed

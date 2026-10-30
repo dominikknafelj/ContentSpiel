@@ -12,6 +12,13 @@
 <div class="admin-dashboard">
 <h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
 
+<%# Mail's last send failed (plan ruling P3): drawn for settings.manage only
+    (`@mail_settings` is nil for anyone else) and only while it failed. %>
+<% if @mail_settings %>
+  <%= render Admin::Ui::MailFailedNoticeComponent.new(mail_settings: @mail_settings,
+        href: admin_settings_path(anchor: "mail", **admin_url_options), class: "mb-4") %>
+<% end %>
+
 <% quick_create = Admin::DashboardScreen::QuickCreateComponent.new(**(@draft || {})) %>
 <%= render quick_create %>
 

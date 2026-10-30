@@ -265,4 +265,41 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] h2", text: "People", count: 0
     assert_select ".admin-account", text: /No groups/
   end
+
+  # The failed-send notice (spec "The states"; plan ruling P3): the
+  # dashboard's, for whoever holds settings.manage, and only while the last
+  # send failed. It is the sentence of the state, never the server's line.
+  include MailState
+
+  test "the notice is shown to settings.manage only, and only while the last send failed" do
+    sign_in_as users(:one)
+
+    with_mail_state(:failed) do
+      get admin_root_path
+
+      assert_select "#mail-failed-notice[role=alert]", text: /Last send failed .*: the server refused the login\./ do
+        assert_select "a[href=?]", "/cs-studio/settings#mail", text: "Open Mail settings →"
+      end
+      assert_no_match(/535 5\.7\.8/, response.body)
+    end
+
+    %i[working untested not_set_up].each do |state|
+      with_mail_state(state) do
+        get admin_root_path
+
+        assert_select "#mail-failed-notice", count: 0
+      end
+    end
+  end
+
+  test "someone without settings.manage is shown no notice while the last send failed" do
+    sign_in_as users(:reader)
+
+    with_mail_state(:failed) do
+      get admin_root_path
+
+      assert_response :ok
+      assert_select "#mail-failed-notice", count: 0
+    end
+  end
 end

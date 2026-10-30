@@ -4,8 +4,9 @@
     JavaScript, so a Copy button there would do nothing
     (`Admin::Ui::SystemCheckRowComponent`). %>
 <% copyable = local_assigns.fetch(:copyable, false) %>
+<% mail_settings_href = local_assigns[:mail_settings_href] %>
 <ul class="mt-6 divide-y divide-line border-y border-line">
   <% results.sort_by.with_index { |result, index| [ result.ok? ? 1 : 0, index ] }.each do |result| %>
-    <%= render Admin::Ui::SystemCheckRowComponent.new(result: result, copyable: copyable) %>
+    <%= render Admin::Ui::SystemCheckRowComponent.new(result: result, copyable: copyable, mail_settings_href: mail_settings_href) %>
   <% end %>
 </ul>

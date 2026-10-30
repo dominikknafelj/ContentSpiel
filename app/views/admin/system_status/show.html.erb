@@ -16,5 +16,6 @@
           data: { turbo_prefetch: "false" } %>
   </div>
 
-  <%= render "setup/system_check_results", results: @results, copyable: true %>
+  <%= render "setup/system_check_results", results: @results, copyable: true,
+        mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")) %>
 </div>

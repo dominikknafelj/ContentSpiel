@@ -9,26 +9,10 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
   end
 
   # The page has a Copy button for every check that offers a command, and in
-  # the test environment that is two: "Site address" (no PUBLIC_HOST here) and
-  # "Outgoing mail". So a test presses the button of the row it means, and
-  # reads that row: `check_row` below finds it by the button's own name.
+  # the test environment that is one: "Site address" (no PUBLIC_HOST here).
+  # The Mail row has none any more (it links to Settings); `check_row` finds
+  # a row by its Copy button's own name.
   test "Copy writes the command, says Copied, and announces it politely" do
-    visit admin_system_status_path
-    await_admin_controllers
-    stub_clipboard
-
-    within check_row("Outgoing mail") do
-      press "Copy"
-
-      assert_selector "button", text: "Copied"
-      assert_selector "[data-admin--ui--clipboard-target=status][aria-live=polite]", text: "Copied", visible: :all
-      assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.__copied")
-      # The label comes back.
-      assert_selector "button", text: "Copy", exact_text: true
-    end
-  end
-
-  test "each row's Copy copies its own command: the site address's, and the other row is left alone" do
     visit admin_system_status_path
     await_admin_controllers
     stub_clipboard
@@ -37,12 +21,10 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
       press "Copy"
 
       assert_selector "button", text: "Copied"
+      assert_selector "[data-admin--ui--clipboard-target=status][aria-live=polite]", text: "Copied", visible: :all
       assert_equal Setup::SystemCheck::SITE_ADDRESS_COMMAND, page.evaluate_script("window.__copied")
-    end
-
-    within check_row("Outgoing mail") do
+      # The label comes back.
       assert_selector "button", text: "Copy", exact_text: true
-      assert_no_selector "[data-admin--ui--clipboard-target=status]", text: "Copied", visible: :all
     end
   end
 
@@ -51,12 +33,12 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     page.execute_script("Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })")
 
-    within check_row("Outgoing mail") do
+    within check_row("Site address") do
       press "Copy"
 
       assert_selector "[data-admin--ui--clipboard-target=status]", text: "the text is selected", visible: :all
     end
-    assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.getSelection().toString()").strip
+    assert_equal Setup::SystemCheck::SITE_ADDRESS_COMMAND, page.evaluate_script("window.getSelection().toString()").strip
   end
 
   test "the preview bar is fixed at the top and the page starts below it" do
@@ -100,7 +82,7 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
 
   private
     # The row of one check, found by what its Copy button is called for a
-    # screen reader ("Copy command for Outgoing mail"): the check's name,
+    # screen reader ("Copy command for Site address"): the check's name,
     # whole, and nothing another row's message could also say.
     def check_row(label)
       find("li.admin-system-check:has(button[aria-label='Copy command for #{label}'])")

@@ -72,17 +72,43 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     assert_equal statuses.sort_by { |status| status == "warning" ? 0 : 1 }, statuses
   end
 
-  test "the mail warning shows its command, as text, with a Copy button carrying it" do
+  include MailState
+
+  test "the Mail row shows each state's words, and a failure's sentence and never the server's line" do
     sign_in_as(users(:one))
 
-    get "/cs-studio/system_status"
+    with_mail_state(:failed) do
+      Current.site.update_columns(mail_failure: { "key" => "login", "line" => "535 5.7.8 Authentication failed for ana" }) # version: none (a test)
+      Current.site = nil
+      get "/cs-studio/system_status"
 
-    # The test environment sends no real mail, so the warning is always there.
-    command = Setup::SystemCheck::MAIL_FALLBACK_COMMAND
-    assert_select "li[data-status=warning]", text: /Outgoing mail/
-    assert_select "[data-controller='admin--ui--clipboard'][data-admin--ui--clipboard-text-value=?]", command
-    assert_select "code", text: command
-    assert_select "button[data-action='click->admin--ui--clipboard#copy']", text: "Copy"
+      assert_select "li[data-status=warning]", text: /Mail/ do
+        assert_select "p", text: /Last send failed .*: the server refused the login\./
+      end
+      assert_no_match(/535 5\.7\.8|Authentication failed/, response.body)
+      # users(:one) holds settings.manage: the link is offered.
+      assert_select "li[data-status=warning] a[href=?]", "/cs-studio/settings#mail", text: "Open Mail settings →"
+    end
+
+    with_mail_state(:working) do
+      get "/cs-studio/system_status"
+
+      assert_select "li[data-status=ok]", text: /Working\. Last mail sent/
+    end
+  end
+
+  test "someone who may view System status but not manage Settings is shown the state and no link" do
+    viewer = users(:reader)
+    access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
+    sign_in_as(viewer)
+
+    with_mail_state(:untested) do
+      get "/cs-studio/system_status"
+
+      assert_response :ok
+      assert_select "li", text: /Saved, not tested/
+      assert_select "a", text: "Open Mail settings →", count: 0
+    end
   end
 
   test "a status is a dot and a word, never colour alone" do

@@ -7,7 +7,8 @@ module Admin
     before_action -> { require_permission("system_status.view") }
 
     def show
-      @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?)
+      @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?,
+        mail_settings_link: can?("settings.manage"))
     end
   end
 end

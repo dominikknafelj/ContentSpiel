@@ -2,8 +2,8 @@ require "test_helper"
 
 class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
   def result(**overrides)
-    Setup::SystemCheck::Result.new(**{ label: "Outgoing mail", status: :warning, message: "Password reset by email isn't configured.",
-      command: Setup::SystemCheck::MAIL_FALLBACK_COMMAND }.merge(overrides))
+    Setup::SystemCheck::Result.new(**{ label: "Site address", status: :warning, message: "No site address is set.",
+      command: Setup::SystemCheck::SITE_ADDRESS_COMMAND }.merge(overrides))
   end
 
   test "a warning is a dot and the word Warning, with a warn border" do
@@ -11,7 +11,7 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
 
     assert_selector "li[data-status=warning] span.border-warn", text: "Warning"
     assert_selector "li span.bg-warn[aria-hidden=true]"
-    assert_selector "p", text: "Outgoing mail"
+    assert_selector "p", text: "Site address"
   end
 
   test "an OK row is a dot and the word OK" do
@@ -37,7 +37,7 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
   test "not copyable (the setup wizard): the command shows but there is no Copy button or controller" do
     render_inline(Admin::Ui::SystemCheckRowComponent.new(result: result, copyable: false))
 
-    assert_selector "code", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND
+    assert_selector "code", text: Setup::SystemCheck::SITE_ADDRESS_COMMAND
     assert_no_selector "button"
     assert_no_selector "[data-controller]"
   end
@@ -47,6 +47,19 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
     assert_selector "a[href='https://example.org/mail']"
 
     render_inline(Admin::Ui::SystemCheckRowComponent.new(result: result))
+    assert_no_selector "a"
+  end
+
+  test "a Mail row links to Settings at the address the screen hands over, and only then" do
+    mail = result(label: "Mail", command: nil, link: :mail_settings)
+
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(result: mail, mail_settings_href: "/cs-studio/settings#mail"))
+    assert_selector "a[href='/cs-studio/settings#mail']", text: "Open Mail settings →"
+
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(result: mail))
+    assert_no_selector "a"
+
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(result: result(command: nil), mail_settings_href: "/cs-studio/settings#mail"))
     assert_no_selector "a"
   end
 end

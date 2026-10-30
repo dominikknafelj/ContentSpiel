@@ -49,6 +49,9 @@ module Admin
     # (`Dashboard::Feed`, `Activity`, `TranslationNeeds`) and loaded in a
     # constant number of queries.
     def load_dashboard
+      # Only a holder of settings.manage can fix mail, so only they are told
+      # (spec "The states"; the notice draws itself only while the last send failed).
+      @mail_settings = MailSettings.current if can?("settings.manage")
       @feed = Dashboard::Feed.new(actor: Current.actor)
       @activity = Dashboard::Activity.new(actor: Current.actor)
       @translation_needs = Dashboard::TranslationNeeds.new(actor: Current.actor)

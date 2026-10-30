@@ -10,38 +10,15 @@ module Setup
     # checks) and `docs` a link to read more (nil: nothing in the repo is
     # linked yet). Both default to nil so a Result built with only the three
     # original keywords still works.
-    Result = Data.define(:label, :status, :message, :command, :docs) do
-      def initialize(label:, status:, message:, command: nil, docs: nil) = super
+    #
+    # `link` is a symbol naming where a row sends the reader (today
+    # `:mail_settings`), for the component that draws the row to resolve:
+    # this model names no route and no component.
+    Result = Data.define(:label, :status, :message, :command, :docs, :link) do
+      def initialize(label:, status:, message:, command: nil, docs: nil, link: nil) = super
 
       def ok? = status == :ok
     end
-
-    # Shown on the System status page to anyone who may view it, and copied
-    # to a clipboard: so it is this fixed string, a placeholder address and
-    # password, and nothing computed -- never a real address, secret, path
-    # or environment value.
-    #
-    # It goes through `Users::UpdatePassword` rather than `update!` on the
-    # model: the service audits the change and ends every session of that
-    # user (a password reset after a compromise must not leave the other party
-    # signed in). From `bin/rails runner` there is no actor or channel, which
-    # the checker trusts like the console, and no acting session to keep. `p`
-    # prints `true`/`false` so a refusal isn't silent -- and
-    # `MAIL_FALLBACK_MESSAGE`, shown above the command, says what each means.
-    #
-    # The password is typed twice (the service takes a confirmation), inside
-    # double quotes inside the shell's single quotes: a new password
-    # containing either kind of quote would end the string early. Rather than
-    # a more elaborate command, the message says so; everything stays one
-    # fixed string.
-    MAIL_FALLBACK_MESSAGE = "Password reset by email isn't configured. To set a password from the server instead, run this command with the account's email address, " \
-      "replacing “a new password” in both places with the new one (at least #{User::MINIMUM_PASSWORD_LENGTH} characters, with no quotes in it). " \
-      "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).".freeze
-    MAIL_FALLBACK_COMMAND = %(bin/rails runner 'p Users::UpdatePassword.call(User.find_by!(email_address: "you@example.com"), password: "a new password", password_confirmation: "a new password").ok?').freeze
-
-    # Said ahead of `MAIL_FALLBACK_MESSAGE` when a mail server is set and the
-    # site's address is what keeps a reset mail from being sent (`mail`).
-    MAIL_NEEDS_ADDRESS = "A mail server is set, but no site address is, and without one no password reset mail is sent: set PUBLIC_HOST.".freeze
 
     # What the "Site address" warning offers to copy: the variable with a
     # placeholder address, a fixed string like the command above. The check's
@@ -94,24 +71,27 @@ module Setup
     # said (the console) it is false, the wording of everywhere that is not
     # a developer's machine.
     #
+    # `mail_settings` is the mail's state (`MailSettings.current` when
+    # nobody says, handed in so a test can say it) and `mail_settings_link`
+    # whether the viewer may manage Settings: the caller decides
+    # (`can?("settings.manage")`), and only then does the Mail row carry the
+    # link to the Mail card. The wizard has its own Mail step and hands none.
+    #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
     # stylesheet was built for that theme: by default, whether the build's
     # stamp is the theme's fingerprint (`ThemeFolder.stamp`, one small file).
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
-      mail_delivery_method: ActionMailer::Base.delivery_method,
-      mail_smtp_address: ActionMailer::Base.smtp_settings[:address],
-      mail_host: ActionMailer::Base.default_url_options[:host],
       address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
-      reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil)
+      reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil,
+      mail_settings: nil, mail_settings_link: false)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
       @queue_adapter = queue_adapter.to_s
-      @mail_delivery_method = mail_delivery_method.to_s
-      @mail_smtp_address = mail_smtp_address.to_s
-      @mail_host = mail_host.to_s
+      @mail_settings = mail_settings
+      @mail_settings_link = mail_settings_link
       @address = address
       @request_ssl = request_ssl
       @production = production
@@ -300,24 +280,22 @@ module Setup
         end
       end
 
-      # "Configured" asks for a mail server and for a host to put in a
-      # mailed link. In production that host is the site's address and
-      # nothing else (`HostSettings.apply`), and the one mail there is, the
-      # password reset, is not sent without it: so a site with a mail server
-      # and no address is told that the address is what is missing, in one
-      # sentence ahead of the console fallback, instead of being sent to
-      # look at SMTP settings that are right. (Interim: the mail part of
-      # this work replaces this check.)
+      # Outgoing mail's state in its own words (`MailStateSentence`, the
+      # sentence the Settings card shows): Working is OK and the other three
+      # warn, Last send failed included, since a real mail was lost. A
+      # failure is said by its sentence and never the server's line: this
+      # page is open to `system_status.view`, the line to `settings.manage`.
+      # Production without a site address is "Not set up" and the sentence
+      # says the address is what is missing (`MailSettings#complete?`).
       def mail
-        server = @mail_delivery_method == "smtp" && @mail_smtp_address.present? && @mail_smtp_address != "localhost"
-        configured = server && @mail_host.present? && @mail_host != "example.com"
+        settings = @mail_settings || MailSettings.current
+        link = :mail_settings if @mail_settings_link
+        message = MailStateSentence.for(settings)
 
-        if configured
-          ok("Outgoing mail", "Outgoing mail is configured.")
-        elsif server && !@address.configured? && !@reset_link_from_request
-          warning("Outgoing mail", "#{MAIL_NEEDS_ADDRESS} #{MAIL_FALLBACK_MESSAGE}", command: MAIL_FALLBACK_COMMAND)
+        if settings.state == :working
+          Result.new(label: "Mail", status: :ok, message:, link:)
         else
-          warning("Outgoing mail", MAIL_FALLBACK_MESSAGE, command: MAIL_FALLBACK_COMMAND)
+          Result.new(label: "Mail", status: :warning, message:, link:)
         end
       end
 
