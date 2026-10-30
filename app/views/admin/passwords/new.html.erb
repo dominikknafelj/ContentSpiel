@@ -33,8 +33,9 @@
       <%= render Admin::Ui::ButtonComponent.new(label: "Send reset link", type: "submit", class: "w-full") %>
     <% end %>
 
-    <%# No console command is named here on purpose: this repo ships no rake
-        task for resetting a password, and a hint must not invent one. %>
+    <%# No console command is named here on purpose: the command lives on
+        System status's Mail row (`Setup::SystemCheck::MAIL_FALLBACK_COMMAND`),
+        for someone signed in, and this page is shown to anyone. %>
     <p class="text-xs leading-normal text-meta">No outgoing mail on this site? Ask an owner to set a new password for you.</p>
     <p><%= back_link %></p>
   <% end %>

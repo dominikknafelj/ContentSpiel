@@ -302,8 +302,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
         check = result("Mail", Setup::SystemCheck.run(address: SiteAddress.parse("https://cms.example.org")))
 
         assert_equal status, check.status, state.to_s
-        assert_match message, check.message, state.to_s
-        assert_nil check.command, state.to_s
+        assert_match message.is_a?(String) ? Regexp.new("\\A#{Regexp.escape(message)}") : message, check.message, state.to_s
+        if state.in?(%i[not_set_up untested])
+          assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command, state.to_s
+          assert_includes check.message, Setup::SystemCheck::MAIL_FALLBACK_MESSAGE
+        else
+          assert_nil check.command, state.to_s
+        end
       end
     end
   end
@@ -314,7 +319,8 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
         mail_settings: MailSettings.current(env: {}, production: true, address: SiteAddress.parse(nil))))
 
       assert_equal :warning, check.status
-      assert_equal "Not set up: the site's address (PUBLIC_HOST) is missing, so no link can be mailed.", check.message
+      assert_equal "Not set up: the site's address (PUBLIC_HOST) is missing, so no link can be mailed. " \
+        "#{Setup::SystemCheck::MAIL_FALLBACK_MESSAGE}", check.message
     end
   end
 
@@ -329,6 +335,20 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       assert_not_includes check.message, "Connection refused"
       assert_not_includes check.message, "smtp.example.test"
     end
+  end
+
+  test "the fallback command is a fixed string that sets a password, ends the sessions and is audited" do
+    user = users(:reader)
+    user.sessions.create!
+    ruby = Setup::SystemCheck::MAIL_FALLBACK_COMMAND[/runner '(.*)'\z/, 1]
+      .sub("you@example.com", user.email_address).gsub("a new password", "a brand new pass 1")
+
+    output, = capture_io { assert_equal true, eval(ruby) }
+    assert_equal "true\n", output
+    assert user.reload.authenticate("a brand new pass 1")
+    assert_equal 0, user.sessions.count
+    assert Setup::SystemCheck::MAIL_FALLBACK_COMMAND.frozen?
+    assert_equal 2, Setup::SystemCheck::MAIL_FALLBACK_COMMAND.scan("a new password").size
   end
 
   test "the Mail row links to Settings only for a viewer who holds settings.manage, and as data" do
@@ -350,7 +370,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
   # A command is shown to anyone who may view the status page and, in the
   # wizard, before anyone is signed in: each is a fixed string.
-  test "only the site address warning carries a command, a fixed string" do
+  test "only the site address and the not-ready mail warnings carry a command, each a fixed string" do
     results = run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
       storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
       stylesheet_probe: -> { false })
@@ -358,7 +378,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     # Every row that can warn does. The theme's carries no command in
     # production, where the build is the image's and no one command.
     assert results.none?(&:ok?)
-    assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND },
+    assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
       results.select(&:command).to_h { |check| [ check.label, check.command ] })
     assert Setup::SystemCheck::SITE_ADDRESS_COMMAND.frozen?
   end

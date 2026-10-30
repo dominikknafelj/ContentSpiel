@@ -97,16 +97,47 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the Mail row carries the copyable command while mail is not ready, and none once it works" do
+    sign_in_as(users(:one))
+
+    with_mail_state(:untested) do
+      get "/cs-studio/system_status"
+
+      assert_select "[data-controller='admin--ui--clipboard'][data-admin--ui--clipboard-text-value=?]", Setup::SystemCheck::MAIL_FALLBACK_COMMAND
+    end
+    [ :working, :failed ].each do |state|
+      with_mail_state(state) do
+        get "/cs-studio/system_status"
+
+        assert_select "code", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND, count: 0
+      end
+    end
+  end
+
   test "someone who may view System status but not manage Settings is shown the state and no link" do
     viewer = users(:reader)
     access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
     sign_in_as(viewer)
+
+    with_mail_state(:failed) do
+      Current.site.update_columns(mail_failure: { "key" => "login", "line" => "535 5.7.8 Authentication failed for ana" }) # version: none (a test)
+      Current.site = nil
+      get "/cs-studio/system_status"
+
+      assert_response :ok
+      assert_select "li", text: /Last send failed .*: the server refused the login\./
+      assert_no_match(/535 5\.7\.8|Authentication failed/, response.body)
+      assert_select "a", text: "Open Mail settings →", count: 0
+    end
 
     with_mail_state(:untested) do
       get "/cs-studio/system_status"
 
       assert_response :ok
       assert_select "li", text: /Saved, not tested/
+      assert_select "li", text: /Mail/ do
+        assert_select "code", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND
+      end
       assert_select "a", text: "Open Mail settings →", count: 0
     end
   end

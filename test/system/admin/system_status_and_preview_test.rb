@@ -28,6 +28,19 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "the Mail row's Copy writes the console password command while mail is not ready" do
+    visit admin_system_status_path
+    await_admin_controllers
+    stub_clipboard
+
+    within check_row("Mail") do
+      press "Copy"
+
+      assert_selector "button", text: "Copied"
+      assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, page.evaluate_script("window.__copied")
+    end
+  end
+
   test "without a Clipboard API the command is selected instead and nothing raises" do
     visit admin_system_status_path
     await_admin_controllers

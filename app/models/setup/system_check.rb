@@ -20,6 +20,21 @@ module Setup
       def ok? = status == :ok
     end
 
+    # What the Mail row offers to copy while mail is NOT ready (Not set up,
+    # Saved not tested): the way in for a sole owner with no mail who forgot
+    # their password. Shown to anyone who may view System status and copied
+    # to a clipboard, so it is this fixed string with a placeholder address
+    # and password, nothing computed. It goes through `Users::UpdatePassword`
+    # rather than `update!`: the service audits the change and ends every
+    # session of that user. `p` prints true/false so a refusal isn't silent
+    # (`MAIL_FALLBACK_MESSAGE` says what each means). The new password is
+    # typed twice inside double quotes inside the shell's single quotes, so
+    # it must contain no quote. Same command as docs/reference/hosting.md.
+    MAIL_FALLBACK_MESSAGE = "To set a password from the server instead, run this command with the account's email address, " \
+      "replacing “a new password” in both places with the new one (at least #{User::MINIMUM_PASSWORD_LENGTH} characters, with no quotes in it). " \
+      "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).".freeze
+    MAIL_FALLBACK_COMMAND = %(bin/rails runner 'p Users::UpdatePassword.call(User.find_by!(email_address: "you@example.com"), password: "a new password", password_confirmation: "a new password").ok?').freeze
+
     # What the "Site address" warning offers to copy: the variable with a
     # placeholder address, a fixed string like the command above. The check's
     # OK message does name the configured origin, which is the address the
@@ -294,8 +309,11 @@ module Setup
 
         if settings.state == :working
           Result.new(label: "Mail", status: :ok, message:, link:)
-        else
+        elsif settings.ready?
+          # Last send failed: the reset link is there, so no command.
           Result.new(label: "Mail", status: :warning, message:, link:)
+        else
+          Result.new(label: "Mail", status: :warning, message: "#{message} #{MAIL_FALLBACK_MESSAGE}", command: MAIL_FALLBACK_COMMAND, link:)
         end
       end
 
