@@ -1,37 +1,62 @@
-<div class="admin-users-list overflow-hidden rounded-cs border border-line bg-surface">
+<div class="admin-users-list rounded-cs border border-line bg-surface">
   <div class="<%= COLUMNS %> border-b border-line-strong py-2 font-cs-mono text-label uppercase tracking-mono text-meta" aria-hidden="true">
-    <span>User</span><span>Groups</span><span>Last sign-in</span><span></span>
+    <span><%= t(".user") %></span><span><%= t(".groups") %></span><span><%= t(".last_sign_in") %></span><span></span>
   </div>
   <ul>
     <% users.each do |user| %>
-      <li id="<%= helpers.dom_id(user) %>" class="<%= COLUMNS %> relative border-b border-line py-2.5 last:border-b-0 hover:bg-paper">
+      <li id="<%= helpers.dom_id(user) %>" class="<%= COLUMNS %> relative border-b border-line py-2.5 last:rounded-b-cs last:border-b-0 hover:bg-paper" <%= "data-invited" if user.invited? %>>
         <span class="flex min-w-0 items-center gap-2.5">
           <span class="grid size-[26px] flex-none place-items-center rounded-full bg-sunken text-xs font-semibold text-dim" aria-hidden="true"><%= initial(user) %></span>
           <span class="flex min-w-0 flex-col gap-px">
             <span class="flex flex-wrap items-center gap-2">
               <%= link_to helpers.edit_admin_user_path(user, **url_options), data: { turbo_frame: "content" },
                     class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" do %><%= render Admin::Ui::UserNameComponent.new(user: user) %><% end %>
-              <% if you?(user) %><span class="text-sm text-meta">(you)</span><% end %>
-              <% if user.owner? %><%= render Admin::Ui::BadgeComponent.new(label: "Owner") %><% end %>
+              <% if you?(user) %><span class="text-sm text-meta"><%= t(".you") %></span><% end %>
+              <% if user.owner? %><%= render Admin::Ui::BadgeComponent.new(label: t(".owner")) %><% end %>
+              <% if user.invited? %>
+                <%= render Admin::Ui::BadgeComponent.new(label: invite_expired?(user) ? t(".invite_expired") : t(".invited"), data: { invite_state: invite_expired?(user) ? "expired" : "open" }) %>
+              <% end %>
             </span>
             <% if user.name.present? %><span class="truncate text-sm text-meta"><%= user.email_address %></span><% end %>
+            <% if user.invited? && !invite_expired?(user) %><span class="font-cs-mono text-xs text-meta" data-invite-dates><%= invite_dates(user) %></span><% end %>
           </span>
         </span>
         <span class="flex flex-wrap gap-1" data-column="groups">
           <% names = group_names(user) %>
           <% if names.empty? %>
-            <span class="text-sm text-meta">No groups</span>
+            <span class="text-sm text-meta"><%= t(".no_groups") %></span>
           <% else %>
             <% names.each do |name| %><span class="rounded-full bg-sunken px-2 py-0.5 text-xs text-ink"><%= name %></span><% end %>
           <% end %>
         </span>
         <span class="font-cs-mono text-xs text-meta" data-column="last-sign-in">
           <%# The column heading is not a table header (the list is a `ul`), so each row says what its time is. %>
-          <span class="sr-only">Last sign-in: </span><% if last_sign_ins[user.id] %><%= render Admin::Ui::TimeAgoComponent.new(time: last_sign_ins[user.id]) %><% else %>Never<% end %>
+          <span class="sr-only"><%= t(".last_sign_in_label") %> </span><% if last_sign_ins[user.id] %><%= render Admin::Ui::TimeAgoComponent.new(time: last_sign_ins[user.id]) %><% else %><%= t(".never") %><% end %>
         </span>
-        <span class="text-meta" aria-hidden="true">›</span>
+        <% if user.invited? %>
+          <span class="relative z-10 justify-self-end" data-invite-menu>
+            <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions", name: user.display_name), close_on_select: true) do |menu| %>
+              <% menu.with_item do %>
+                <%= button_to t(".resend"), resend_path(user), method: :post %>
+              <% end %>
+              <% menu.with_item do %>
+                <%= tag.button t(".withdraw_menu"), type: "button", class: "text-danger-ink", data: dialog_trigger(withdraw_dialog_id(user)) %>
+              <% end %>
+            <% end %>
+          </span>
+          <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: withdraw_dialog_id(user), title: t(".withdraw_title"),
+                body: t(".withdraw_body", email: user.email_address)) do |dialog| %>
+            <% dialog.with_confirm_action do %>
+              <%= form_with url: withdraw_path(user), method: :delete do %>
+                <%= render Admin::Ui::ButtonComponent.new(label: t(".withdraw"), variant: :danger, type: "submit") %>
+              <% end %>
+            <% end %>
+          <% end %>
+        <% else %>
+          <span class="justify-self-end text-meta" aria-hidden="true">›</span>
+        <% end %>
       </li>
     <% end %>
   </ul>
 </div>
-<p class="mt-3 text-xs text-meta">Delete a user from their edit page. Their pages, posts and media stay; their posts are left without an author.</p>
+<p class="mt-3 text-xs text-meta"><%= t(".delete_hint") %></p>

@@ -1,1 +1,63 @@
-<p><%= t(".expired") %></p>
+<%# The invited person's page (mail spec "Invites", design answer M5; the
+    reset page's shape, app/views/admin/passwords/edit.html.erb, whose
+    comment says why each part is so).
+
+    THE TOKEN. The mailed link is this page's address with the token after a
+    "#", which no server is sent, so the page is drawn without one: the form
+    hidden, its `token` field empty, and the address and name it is for
+    unknown. The script (`invitation-token`) moves the token into the field,
+    takes it out of the address bar and asks once whose link it is
+    (`check_url`): the answer fills the line with the address and the Name
+    field, and shows the form; "used" and "expired" show those states
+    instead. A page opened with no token at all is "expired": an invalid
+    link and a missing one are the same answer.
+
+    `@token` is set only on the 422 of a refused password, where the form
+    comes back open with the token it was sent with, the address and the
+    typed name, and nothing is asked again. `@state` is set when the form's
+    own request found the link no good: that state alone is drawn, with no
+    form and no script.
+
+    The address is text in a sentence: it is not a field of the form (an
+    invite is for that address, and the person cannot change it here). %>
+<% name_value = params.key?(:name) ? params[:name].to_s : @user&.name %>
+<%= tag.div class: "flex flex-col gap-[18px]", data: (@state ? {} : { controller: "invitation-token", "invitation-token-check-url-value": admin_check_invitation_path }) do %>
+  <%= render "admin/shared/auth_heading", title: t(".title", site: site_name) %>
+
+  <% if @state.nil? %>
+    <% if flash[:alert] %>
+      <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
+    <% end %>
+
+    <noscript>
+      <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink"><%= t(".noscript") %></p>
+    </noscript>
+
+    <%= form_with url: admin_accept_invitation_path, method: :post, class: "flex flex-col gap-[18px]",
+          data: { invitation_token_target: "form" }, html: { hidden: @token.blank? } do |form| %>
+      <%= hidden_field_tag :token, @token, id: "invitation-token", autocomplete: "off", data: { invitation_token_target: "token" } %>
+      <p class="text-sm text-dim" data-invitation-token-target="line" <%= "hidden" unless @user %>>
+        <%= t(".finish_html", email: tag.strong(@user&.email_address, class: "font-medium text-ink", data: { invitation_token_target: "email" })) %>
+      </p>
+      <div>
+        <%= label_tag "name", t(".name"), class: setup_label_class %>
+        <%= text_field_tag "name", name_value, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class,
+              data: { invitation_token_target: "name" } %>
+      </div>
+      <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".password"), meter: true, autofocus: true) %>
+      <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: t(".confirm")) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full", data: { password_submit: true }) %>
+    <% end %>
+  <% end %>
+
+  <%# Expired, withdrawn, invalid or missing: one sentence and no way on
+      (M5): only the person who invited them can send a new link. %>
+  <%= tag.div class: "flex flex-col gap-[18px]", data: { invitation_token_target: "expired" }, hidden: @state != :expired do %>
+    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert"><%= t(".expired") %></p>
+  <% end %>
+
+  <%= tag.div class: "flex flex-col gap-[18px]", data: { invitation_token_target: "used" }, hidden: @state != :used do %>
+    <p class="rounded-cs bg-sunken px-3 py-2.5 text-[13px] leading-normal text-ink" role="status"><%= t(".used") %></p>
+    <%= link_to t(".sign_in"), admin_sign_in_path, class: "#{setup_primary_button_class} w-full text-center" %>
+  <% end %>
+<% end %>

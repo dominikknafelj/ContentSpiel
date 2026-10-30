@@ -1,0 +1,45 @@
+<%= render Admin::Ui::DialogComponent.new(id: DIALOG_ID, title: t(".title"), width: :form, open_on_load: refused?) do |dialog| %>
+  <% if general_errors.any? %>
+    <p class="mb-4 rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] text-danger-ink" role="alert"><%= general_errors.to_sentence %><%# i18n-ok: to_sentence joins with the locale's support.array words %></p>
+  <% end %>
+
+  <%= form_with url: create_path, method: :post, id: FORM_ID, class: "flex flex-col gap-4", data: { turbo_frame: "_top" }, html: { novalidate: true } do %>
+    <div>
+      <%= label_tag "invite_email_address", t(".email"), class: setup_label_class %>
+      <%= email_field_tag "user[email_address]", invite.email_address, id: "invite_email_address", required: true, autofocus: true,
+            autocomplete: "off", placeholder: t(".email_placeholder"),
+            aria: { invalid: (email_errors.any? ? "true" : nil), describedby: ("invite_email_address_error" if email_errors.any?) }.compact,
+            class: [ setup_input_class, ("!border-danger" if email_errors.any?) ] %>
+      <% if email_errors.any? %>
+        <p id="invite_email_address_error" class="mt-1 text-[13px] text-danger-ink" role="alert">
+          <%= email_errors.to_sentence %><%# i18n-ok: to_sentence joins with the locale's support.array words %>
+          <% if resend_user %>
+            <%= tag.button t(".resend"), type: "submit", form: RESEND_FORM_ID, class: "cursor-pointer text-accent underline hover:text-accent-hover hover:no-underline" %>
+          <% end %>
+        </p>
+      <% end %>
+    </div>
+    <div>
+      <%= label_tag "invite_name", t(".name"), class: setup_label_class %>
+      <%= text_field_tag "user[name]", invite.name, id: "invite_name", maxlength: 120, autocomplete: "off",
+            aria: { invalid: (name_errors.any? ? "true" : nil), describedby: [ "invite_name_help", ("invite_name_error" if name_errors.any?) ].compact.join(" ") }.compact,
+            class: [ setup_input_class, ("!border-danger" if name_errors.any?) ] %>
+      <p id="invite_name_help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
+      <% if name_errors.any? %>
+        <p id="invite_name_error" class="mt-1 text-[13px] text-danger-ink" role="alert"><%= name_errors.to_sentence %><%# i18n-ok: to_sentence joins with the locale's support.array words %></p>
+      <% end %>
+    </div>
+    <%= render Admin::UsersScreen::GroupCardsComponent.new(groups: groups, selected_ids: group_ids, assignable_ids: assignable_ids) %>
+  <% end %>
+
+  <% if resend_user %>
+    <%= form_with url: resend_path, method: :post, id: RESEND_FORM_ID, data: { turbo_frame: "_top" } do %><% end %>
+  <% end %>
+
+  <% dialog.with_footer do %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
+    <% end %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), variant: :primary, type: "submit", form: FORM_ID) %>
+  <% end %>
+<% end %>

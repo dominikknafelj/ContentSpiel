@@ -7,7 +7,10 @@
     those). It decides what is drawn only: `Users::Save` refuses a forged PATCH
     all the same, with one `access.denied`.
 
-    PASSWORD. On a NEW user the two fields, Show and the strength meter. On an edit
+    PASSWORD. On a NEW user the two fields, Show and the strength meter. An
+    INVITED row has none: the person sets their own on the invitation page,
+    and a password set here would leave the row invited and unable to sign in.
+    On an edit
     they sit behind "Set a new password…" (`<details>`, so it opens without
     script): a blank password means "keep" (`Users::Save`), and closing the
     disclosure clears what was typed (`admin--users--password-disclosure`), so a
@@ -52,7 +55,7 @@
         <div class="max-w-[420px]">
           <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm password") %>
         </div>
-      <% elsif !read_only %>
+      <% elsif !read_only && !user.invited? %>
         <%# No `data-password-submit` on this form's button: a blank password means "keep the current one"
             (Users::Save), so the meter must not hold the submit back; the server still enforces the
             minimum on a typed one. %>

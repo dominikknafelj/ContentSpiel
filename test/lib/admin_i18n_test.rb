@@ -87,6 +87,11 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/controllers/admin/mail_logins_controller.rb
     app/javascript/controllers/admin/settings/mail_controller.js
     app/views/admin/settings/_mail_login_forms.html.erb
+    app/components/admin/users_screen/list_component.rb
+    app/components/admin/users_screen/list_component.html.erb
+    app/components/admin/users_screen/invite_dialog_component.rb
+    app/components/admin/users_screen/invite_dialog_component.html.erb
+    app/controllers/admin/invites_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
     app/components/admin/dashboard_screen/card_component.rb

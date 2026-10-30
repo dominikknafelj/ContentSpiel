@@ -1,6 +1,20 @@
-# The invitation page (`InvitationsController`; lazy-lookup scope of
-# `app/views/invitations/show.html.erb`). Task 9 adds the accept form's words.
+# The invited person's page (`InvitationsController`, design answer M5;
+# lazy-lookup scope of `app/views/invitations/show.html.erb`), and the toast
+# the dashboard shows once they are in (`invitations.update.ready`).
 en:
   invitations:
     show:
+      title: "Welcome to %{site}"
+      finish_html: "Set a password to finish your account for %{email}"
+      name: "Name"
+      password: "Password"
+      confirm: "Confirm password"
+      submit: "Set password and sign in"
+      # Expired, withdrawn, invalid and missing are one answer (M5): the page
+      # does not say whether an invite existed.
       expired: "This invite has expired. Ask the person who invited you to send a new one."
+      used: "This invite has already been used."
+      sign_in: "Sign in"
+      noscript: "Finishing your account needs JavaScript. Turn it on in your browser and open the link again."
+    update:
+      ready: "Your account is ready."

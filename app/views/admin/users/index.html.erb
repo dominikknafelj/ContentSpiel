@@ -1,10 +1,36 @@
 <%# The Users module (cs-studio spec §6.1; round 3 Task 12, handoff `Studio Users`): every
     user as a row that opens their editor, with their groups and last sign-in
-    (`Users::LastSignIn`, one grouped query). Delete lives in the editor. %>
+    (`Users::LastSignIn`, one grouped query). Delete lives in the editor.
+
+    INVITES (mail spec "Invites", design answer M4): "Invite person" beside
+    "New user" while mail works (`invites_offered?`), opening the invite
+    dialog; otherwise an owner reads "Invites need mail. Set up mail →" under
+    the heading (only an owner: mail is set up in Settings). Also drawn by
+    `Admin::InvitesController#create` for a refused invite, with the dialog
+    open: `@invite` and its companions are set only there. %>
 <% content_for :title, "Users" %>
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-h1 text-ink">Users</h1>
-  <%= link_to "New user", new_admin_user_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  <div class="flex flex-col gap-1">
+    <h1 class="text-h1 text-ink">Users</h1>
+    <% if !invites_offered? && Current.user&.owner? %>
+      <p class="text-sm text-meta" data-invites-need-mail>
+        <%= t(".invites_need_mail") %>
+        <%= link_to t(".set_up_mail"), admin_settings_path(anchor: "mail", **admin_url_options), data: { turbo_frame: "_top" } %>
+      </p>
+    <% end %>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <% if invites_offered? %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".invite"), variant: :secondary, data: dialog_trigger(Admin::UsersScreen::InviteDialogComponent::DIALOG_ID)) %>
+    <% end %>
+    <%= link_to "New user", new_admin_user_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  </div>
 </div>
+
+<% if invites_offered? || @invite %>
+  <%= render Admin::UsersScreen::InviteDialogComponent.new(groups: all_groups, assignable_ids: assignable_group_ids, invite: @invite,
+        group_ids: @invite_group_ids || [], errors: @invite_errors || [],
+        resend_user: @invite_resend, url_options: admin_url_options) %>
+<% end %>
 
 <%= render Admin::UsersScreen::ListComponent.new(users: @users, last_sign_ins: @last_sign_ins, current_user: Current.user) %>

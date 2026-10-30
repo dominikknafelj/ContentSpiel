@@ -38,7 +38,14 @@ Rails.application.routes.draw do
     # the reset page, so it shadows no public page slug. The leading slash
     # keeps `InvitationsController` out of the `Admin::` module: like the
     # reset page it is outside the shell's sign-in requirement.
+    #
+    # `invitation/check` is the page's own question, asked once by its script
+    # when it has the token (the reset page's `password/check`, with the
+    # person's address and name in the answer); `invitation` POST is the
+    # accept form. Both carry the token in their body.
     get "invitation", to: "/invitations#show", as: :invitation
+    post "invitation", to: "/invitations#update", as: :accept_invitation
+    post "invitation/check", to: "/invitations#check", as: :check_invitation
     # The password reset. The token of the mailed link is in NO address a
     # server sees: the link is `password/edit#<token>`, a browser keeps what
     # follows the "#" to itself, and the form sends the token in its body,
@@ -247,8 +254,7 @@ Rails.application.routes.draw do
     # `Users::Save`), destroy (refused for the last user, `Users::Destroy`
     # -- `Admin::UsersController#destroy` is also where deleting *yourself*
     # ends your own session, since only the controller knows which request
-    # this is). Invites stay on the roadmap (spec §6.1) -- there is no
-    # separate "invite" action here.
+    # this is). Inviting someone is `invites` below, a module of its own.
     # The group editor's member chip input asks this for suggestions
     # (`Admin::UserSuggestionsController`, needs `groups.manage`); declared before
     # `resources :users` so `suggest` is never read as a user id.
@@ -259,6 +265,15 @@ Rails.application.routes.draw do
       # action of its own, `owner=1|0`, answered by `Users::Save` like any other
       # change to a user -- never a field of the editor's form.
       member { patch :owner }
+    end
+
+    # Invites (mail spec "Invites", `Admin::InvitesController`): "Invite
+    # person" posts `invites`; an invited row's menu resends
+    # (`invites/:id/resend`) and withdraws (DELETE `invites/:id`). The id is
+    # the invited USER's: an invite is a user row in the invited state, not a
+    # record of its own.
+    resources :invites, only: %i[create destroy] do
+      member { post :resend }
     end
 
     # The Groups module (access-control design spec §5): the list, the
