@@ -104,7 +104,7 @@
    here, so nothing covers a cell's text; the script measures the cells and
    places each entry, and reads the corner's and the "+"'s sizes from these
    rules. The letters and numbers are the label face on the paper, outlined in
-   the line; the current cell's are inverted (ink, paper text: "selected means
+   the field line as every button is (the corner with them); the current cell's are inverted (ink, paper text: "selected means
    inverted") and the cell itself has the accent outline inside it while the
    grid has the focus (`is-current-cell`, a decoration of `rich_text/table.js`). */
 .admin-table-controls {
@@ -134,7 +134,7 @@
   font-weight: 500;
   color: var(--cs-meta);
   background: var(--cs-paper);
-  border: 1px solid var(--cs-line);
+  border: 1px solid var(--cs-field-line);
 }
 .admin-table-strip-button:hover { color: var(--cs-ink); background: var(--cs-sunken); }
 .admin-table-strip-button[aria-current="true"] { color: var(--cs-paper); background: var(--cs-ink); border-color: var(--cs-ink); }
@@ -147,7 +147,7 @@
   width: var(--admin-table-strip-width);
   height: var(--admin-table-strip-height);
   background: var(--cs-paper);
-  border: 1px solid var(--cs-line);
+  border: 1px solid var(--cs-field-line);
 }
 .admin-table-strip-add {
   position: absolute;
