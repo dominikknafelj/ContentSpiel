@@ -1,0 +1,133 @@
+<% content_for :title, "Mail" %>
+<h1 class="text-h1 font-semibold">Mail <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
+<p class="mt-2 text-dim">Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider.</p>
+
+<%
+  mail = MailSettings.current(@site_setting)
+  typed = @mail_values || {}
+  # What a field shows: what was typed (after a refused save or a test), else what is stored, else the step's default.
+  shown = ->(name, fallback = nil) { typed.key?(name) ? typed[name].to_s : (@site_setting.public_send(name).presence || fallback).to_s }
+  security = shown.call(:mail_security, MailSettings::DEFAULT_SECURITY)
+  security = MailSettings::DEFAULT_SECURITY unless Admin::SettingsScreen::MailCardComponent::SECURITIES.include?(security)
+  sender_default = @site_setting.title(locale: @site_setting.default_locale)
+  host_box = ->(field, label) do
+    tag.div(data: { host_field: field }) do
+      safe_join([
+        tag.span(label, class: setup_label_class),
+        tag.div(mail.value(field).to_s, class: "mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"),
+        tag.p("Set by the host", class: "mt-1 text-sm text-meta")
+      ])
+    end
+  end
+%>
+
+<%= form_with url: setup_step_path("mail"), method: :patch, scope: :site_setting, class: "mt-6 max-w-[520px] space-y-4",
+      data: { controller: "setup-mail" } do |form| %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
+  <%# Enter in a field submits the form's FIRST submit button: it must be "Continue", never "Send test mail" (which sends a mail). %>
+  <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">Continue</button>
+
+  <div class="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_8rem]">
+    <div>
+      <% if mail.from_host?(:server) %>
+        <%= host_box.call(:server, "Server") %>
+      <% else %>
+        <%= form.label :mail_server, "Server", class: setup_label_class %>
+        <%= form.text_field :mail_server, value: shown.call(:mail_server), placeholder: "smtp.example.com", autocomplete: "off", spellcheck: false, class: setup_input_class %>
+      <% end %>
+    </div>
+    <div>
+      <% if mail.from_host?(:port) %>
+        <%= host_box.call(:port, "Port") %>
+      <% else %>
+        <%= form.label :mail_port, "Port", class: setup_label_class %>
+        <%= form.number_field :mail_port, value: shown.call(:mail_port, 587), min: 1, max: 65_535, step: 1, class: setup_input_class,
+              data: { "setup-mail-target": "port" } %>
+      <% end %>
+    </div>
+  </div>
+
+  <div>
+    <% if mail.from_host?(:security) %>
+      <%= host_box.call(:security, "Security") %>
+    <% else %>
+      <%# The segmented control of Settings → Mail, as radio buttons. %>
+      <fieldset class="m-0 min-w-0 border-0 p-0">
+        <legend class="<%= setup_label_class %> mb-1">Security</legend>
+        <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+          <% Admin::SettingsScreen::MailCardComponent::SECURITIES.each do |option| %>
+            <label for="setup-mail-security-<%= option %>" class="<%= Admin::Fields::SelectField::SEGMENT_CLASS %>">
+              <%= radio_button_tag "site_setting[mail_security]", option, security == option, id: "setup-mail-security-#{option}", class: "sr-only",
+                    data: { action: "change->setup-mail#security", port: Admin::SettingsScreen::MailCardComponent::PORTS.fetch(option) } %>
+              <span><%= option == "tls" ? "TLS" : "STARTTLS" %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
+    <% end %>
+  </div>
+
+  <div class="grid gap-3.5 sm:grid-cols-2">
+    <div>
+      <% if mail.from_host?(:username) %>
+        <%= host_box.call(:username, "Username") %>
+      <% else %>
+        <%= form.label :mail_username, "Username", class: setup_label_class %>
+        <%# Never shown back: the login is written once (a blank half leaves a stored one as it is). %>
+        <%= form.text_field :mail_username, value: nil, autocomplete: "off", spellcheck: false, class: setup_input_class %>
+      <% end %>
+    </div>
+    <div>
+      <% if mail.from_host?(:password) %>
+        <%= host_box.call(:password, "Password") %>
+      <% else %>
+        <%= form.label :mail_password, "Password", class: setup_label_class %>
+        <%= form.password_field :mail_password, value: nil, autocomplete: "new-password", class: setup_input_class %>
+      <% end %>
+    </div>
+  </div>
+  <% if @site_setting.mail_login_set? %>
+    <p class="-mt-2 text-sm text-meta">A login is saved. Leave both blank to keep it.</p>
+  <% end %>
+
+  <div class="grid gap-3.5 sm:grid-cols-2">
+    <div>
+      <% if mail.from_host?(:sender_name) %>
+        <%= host_box.call(:sender_name, "Sender name") %>
+      <% else %>
+        <%= form.label :mail_sender_name, "Sender name", class: setup_label_class %>
+        <%= form.text_field :mail_sender_name, value: shown.call(:mail_sender_name, sender_default), autocomplete: "off", spellcheck: false, class: setup_input_class %>
+      <% end %>
+    </div>
+    <div>
+      <% if mail.from_host?(:sender_address) %>
+        <%= host_box.call(:sender_address, "Sender address") %>
+      <% else %>
+        <%= form.label :mail_sender_address, "Sender address", class: setup_label_class %>
+        <%= form.text_field :mail_sender_address, value: shown.call(:mail_sender_address), placeholder: "no-reply@yourdomain", autocomplete: "off", spellcheck: false, class: setup_input_class %>
+      <% end %>
+    </div>
+  </div>
+
+  <div id="setup-mail-test">
+    <div class="flex flex-wrap items-center gap-3">
+      <%= button_tag "Send test mail", type: "submit", name: "send_test", value: "1", class: setup_secondary_link_class %>
+      <span class="text-sm text-meta">Sends to <%= Current.user&.email_address %> (your address)</span>
+    </div>
+    <% if @mail_result %>
+      <div class="mt-2" <%= @mail_result[:alert] ? "" : 'role=status' %>>
+        <% if @mail_result[:alert] %>
+          <%= render Admin::SettingsScreen::MailAlertComponent.new(sentence: @mail_result[:alert], line: @mail_result[:line]) %>
+        <% else %>
+          <p class="rounded-cs bg-ok-tint px-3 py-2.5 text-[13px] leading-normal text-ok-ink">Test mail sent to <%= Current.user&.email_address %>. Check your inbox.</p>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="flex items-center gap-4">
+    <%= button_tag "Continue", type: "submit", class: setup_primary_button_class %>
+    <%= link_to "Skip for now", setup_step_path("languages"), class: setup_ghost_link_class %>
+    <%= render "setup/back" %>
+  </div>
+<% end %>

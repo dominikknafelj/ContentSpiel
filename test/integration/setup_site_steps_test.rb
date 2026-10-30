@@ -25,7 +25,7 @@ class SetupSiteStepsTest < ActionDispatch::IntegrationTest
       ]
     } }
 
-    assert_redirected_to setup_step_path("languages")
+    assert_redirected_to setup_step_path("mail")
     setting = SiteSetting.instance
     assert_equal "Dana's Notes", setting.title
     assert_equal "Things I learned", setting.tagline
@@ -37,7 +37,7 @@ class SetupSiteStepsTest < ActionDispatch::IntegrationTest
 
     patch setup_step_path("site"), params: { site_setting: { title: "New Title" } }
 
-    assert_redirected_to setup_step_path("languages")
+    assert_redirected_to setup_step_path("mail")
     assert_equal({ "GitHub" => "https://github.com/dana" }, SiteSetting.instance.social_links)
   end
 
@@ -98,7 +98,7 @@ class SetupSiteStepsTest < ActionDispatch::IntegrationTest
 
     patch setup_step_path("site"), params: { site_setting: { title: "Danas Notizen", tagline: "Was ich gelernt habe" } }
 
-    assert_redirected_to setup_step_path("languages")
+    assert_redirected_to setup_step_path("mail")
     setting = SiteSetting.instance
     assert_equal "Danas Notizen", setting.title(locale: "de")
     assert_equal "Was ich gelernt habe", setting.tagline(locale: "de")

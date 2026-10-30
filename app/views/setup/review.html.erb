@@ -3,10 +3,16 @@
 <p class="mt-2 text-dim">Check your choices. Everything here can also be changed later in the admin.</p>
 
 <dl class="mt-6 divide-y divide-line border-y border-line">
-  <% rows = [
+  <%# Skipped means no server: in development and test the stand-in delivery makes a site without one "complete" (plan Ruling 1), which is not a set-up mail. %>
+<%
+  mail = MailSettings.current(@site_setting)
+  mail_row = [ "Mail", mail.value(:server).present? && mail.complete? ? I18n.t("admin.mail.states.#{mail.state}.word") : "Not set up. Password resets and invites stay off until mail works. Set it up later in Settings → Mail.", "mail" ]
+%>
+<% rows = [
        [ "Site title", @site_setting.title(locale: @site_setting.default_locale), "site" ],
        [ "Tagline", @site_setting.tagline(locale: @site_setting.default_locale).presence || "—", "site" ],
        [ "Social links", @site_setting.social_links.keys.to_sentence.presence || "None", "site" ],
+       mail_row,
        [ "Default language", language_name(@site_setting.default_locale), "languages" ],
        [ "Home page", "Always created", nil ],
        [ "MCP token", @mcp_token_name.present? ? "#{@mcp_token_name} (created)" : "Skipped", "mcp_token" ],

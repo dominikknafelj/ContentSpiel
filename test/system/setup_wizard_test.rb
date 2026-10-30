@@ -35,6 +35,10 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_selector "[data-file-drop-target=name]", text: "tiny.png"
     press "Continue"
 
+    # The optional Mail step is skipped; the review says so.
+    assert_selector "h1", text: "Mail"
+    click_link "Skip for now"
+
     assert_selector "h1", text: "Languages"
     select "Deutsch", from: "Default language"
     press "Continue"
@@ -63,6 +67,7 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Review", wait: 10
     assert_text "Blog, Resume and Now pages"
     assert_text "claude-desktop (created)"
+    assert_text "Not set up. Password resets and invites stay off until mail works."
     press "Finish setup"
 
     # The press's own answer is short (`StarterContents::EnsureHome` and
@@ -99,4 +104,30 @@ class SetupWizardTest < ApplicationSystemTestCase
   # `press` (a scripted click -- see its own comment) moved to
   # `ApplicationSystemTestCase` in cs-studio Task 9, shared by every system
   # test that needs it, this one included.
+
+  test "the Mail step's security switch sets the port unless another port was typed" do
+    visit "/setup/token"
+    fill_in "Setup token", with: Setup::Token.value
+    press "Continue"
+    assert_selector "h1", text: "System check"
+    press "Continue"
+    fill_in "Email address", with: "owner@example.com"
+    fill_in "Password", with: "password12345"
+    fill_in "Confirm password", with: "password12345"
+    press "Continue"
+    assert_selector "h1", text: "Site identity"
+    fill_in "Site title", with: "Dana's Notes"
+    press "Continue"
+    assert_selector "h1", text: "Mail"
+    assert_field "Port", with: "587"
+
+    find("label", exact_text: "TLS").click
+    assert_field "Port", with: "465"
+    find("label", exact_text: "STARTTLS").click
+    assert_field "Port", with: "587"
+
+    fill_in "Port", with: "2525"
+    find("label", exact_text: "TLS").click
+    assert_field "Port", with: "2525"
+  end
 end

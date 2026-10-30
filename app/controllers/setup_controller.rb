@@ -6,12 +6,12 @@
 #   - admin exists: only a signed-in user;
 #   - setup completed: 404.
 class SetupController < ApplicationController
-  STEPS = %w[token system_check admin site languages mcp_token starter_content review].freeze
+  STEPS = %w[token system_check admin site mail languages mcp_token starter_content review].freeze
   PRE_ADMIN_STEPS = %w[token system_check admin].freeze
-  OPTIONAL_STEPS = %w[system_check mcp_token starter_content].freeze
+  OPTIONAL_STEPS = %w[system_check mail mcp_token starter_content].freeze
   LABELS = {
     "token" => "Setup token", "system_check" => "System check", "admin" => "Admin account",
-    "site" => "Site identity", "languages" => "Languages", "mcp_token" => "MCP token",
+    "site" => "Site identity", "mail" => "Mail", "languages" => "Languages", "mcp_token" => "MCP token",
     "starter_content" => "Starter content", "review" => "Review"
   }.freeze
 
@@ -19,6 +19,8 @@ class SetupController < ApplicationController
   # (every write a no-op, so the limit would never trip there). Per-process
   # memory is enough: setup runs once, against one server.
   RATE_LIMIT_STORE = ActiveSupport::Cache::MemoryStore.new
+
+  include MailTestLimit
 
   allow_unauthenticated_access
   layout "setup"
@@ -51,6 +53,17 @@ class SetupController < ApplicationController
     if: -> { params[:step] == "token" },
     with: -> { redirect_to setup_step_path("token"), alert: "Too many attempts. Try again in a few minutes." }
 
+  # The mail step's "Send test mail" is limited in the ONE bucket Settings →
+  # Mail counts in (`MailTestLimit`, plan Ruling P2): five per person per three
+  # minutes, whichever screen they were pressed on. Only that button counts, not
+  # "Continue" (which saves and sends nothing) and not the other steps.
+  limit_test_mails only: :update, if: -> { @step == "mail" && params[:send_test].present? }, with: -> {
+    @site_setting = Current.site
+    @mail_values = mail_typed_values
+    @mail_result = { alert: I18n.t("admin.settings.mail_test.too_many") }
+    render :mail, status: :too_many_requests
+  }
+
   helper_method :step_label, :optional_step?, :next_step, :previous_step
 
   def index
@@ -61,7 +74,7 @@ class SetupController < ApplicationController
     case @step
     when "system_check" then @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?)
     when "admin" then @user = User.new
-    when "site", "languages" then @site_setting = Current.site
+    when "site", "languages", "mail" then @site_setting = Current.site
     when "review"
       @site_setting = Current.site
       @starter_added = StarterContent.added?(locale: @site_setting.default_locale)
@@ -76,6 +89,7 @@ class SetupController < ApplicationController
     when "token" then update_token
     when "admin" then update_admin
     when "site" then update_site
+    when "mail" then update_mail
     when "languages" then update_languages
     when "mcp_token" then update_mcp_token
     when "starter_content" then update_starter_content
@@ -204,10 +218,83 @@ class SetupController < ApplicationController
       # step may still change, taking them along (`SiteSetting#carry_
       # translations_into_new_default_locale`).
       if Settings::Save.call(@site_setting, attributes: site, translations: { @site_setting.default_locale => translated }).ok?
-        redirect_to setup_step_path("languages")
+        redirect_to setup_step_path("mail")
       else
         render :site, status: :unprocessable_entity
       end
+    end
+
+    # The optional Mail step (spec "The setup wizard", design answer M1): the
+    # same fields, written by the same service, as Settings → Mail. "Continue"
+    # saves and goes on; "Send test mail" saves, sends to the admin who is
+    # setting the site up and stays on the step with the answer (the ok line,
+    # or the warn alert with the failure's sentence and the server's line).
+    # Skip is a plain link and writes nothing.
+    #
+    # A field the host's environment sets is not on the form (`Settings::Save`
+    # would refuse it); a login half left blank is left as it is (a blank
+    # value would clear a stored half), so a visit back to this step does not
+    # wipe the login.
+    def update_mail
+      @site_setting = Current.site
+      @mail_values = mail_typed_values
+      attributes = mail_attributes
+
+      result = Settings::Save.call(@site_setting, attributes: attributes)
+      return render(:mail, status: :unprocessable_entity) unless result.ok?
+
+      return redirect_to(setup_step_path("languages")) unless params[:send_test].present?
+
+      # Read the row again: the save wrote the login with `update_columns`,
+      # and the send records its outcome the same way.
+      Current.site = nil
+      @site_setting = Current.site
+      send_setup_test_mail
+    end
+
+    def send_setup_test_mail
+      settings = MailSettings.current
+      unless settings.complete?
+        key = settings.address_missing? ? "no_address" : "sentence"
+        @mail_result = { alert: I18n.t("admin.mail.states.not_set_up.#{key}") }
+        return render(:mail, status: :unprocessable_entity)
+      end
+
+      failure = ApplicationMailer.deliver_now_and_record(SystemMailer.test_mail(Current.user))
+      Current.site = nil
+      @site_setting = Current.site
+      if failure
+        @mail_result = { alert: failure.sentence(server: settings.value(:server), port: settings.value(:port)), line: failure.line }
+        render :mail, status: :unprocessable_entity
+      else
+        @mail_result = { sent: true }
+        render :mail
+      end
+    end
+
+    MAIL_FIELDS = %i[mail_server mail_port mail_security mail_sender_name mail_sender_address].freeze
+    MAIL_LOGIN = %i[mail_username mail_password].freeze
+
+    # What was typed, as strings, for the form to show again.
+    def mail_typed_values
+      posted = params[:site_setting]
+      return {} unless posted.is_a?(ActionController::Parameters)
+
+      posted.permit(*MAIL_FIELDS).to_h.symbolize_keys
+    end
+
+    # The attributes `Settings::Save` gets: not a host's field, not a blank
+    # login half. The password is never put back into the form.
+    def mail_attributes
+      mail = MailSettings.current
+      attributes = @mail_values.reject { |name, _| mail.from_host?(Admin::SettingsScreen::MailCardComponent::SETTING.fetch(name)) }
+      posted = params[:site_setting]
+      if posted.is_a?(ActionController::Parameters)
+        login = posted.permit(*MAIL_LOGIN).to_h.symbolize_keys.compact_blank
+        login = login.reject { |name, _| mail.from_host?(name.to_s.delete_prefix("mail_").to_sym) }
+        attributes = attributes.merge(login)
+      end
+      attributes
     end
 
     # The form always renders a few name/URL rows; a row missing either half
