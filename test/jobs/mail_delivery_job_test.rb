@@ -7,6 +7,7 @@ require "test_helper"
 # under, which verifies the settings only when it is still the current one.
 class MailDeliveryJobTest < ActiveJob::TestCase
   include ActionMailer::TestHelper
+  include LogCapture
 
   USERNAME = "job-login@example.test".freeze
   PASSWORD = "job-Pa55-w0rd".freeze
@@ -181,6 +182,41 @@ class MailDeliveryJobTest < ActiveJob::TestCase
         [ USERNAME, PASSWORD, "private-host", "2525", "sender@" ].each { |secret| assert_not_includes serialized, secret }
         assert_equal MailSettings.current.fingerprint, job["arguments"].last.dig("params", "fingerprint")
         assert_includes serialized, @user.to_global_id.to_s, "a record goes as its id"
+      end
+    end
+  end
+
+  # Controller ruling T8a: an invite withdrawn before its mail went out is
+  # an ordinary event. The job ends quietly, logs one info line with no
+  # address, records nothing and raises nothing.
+  test "an invite whose person was withdrawn before the mail went out is discarded quietly" do
+    with_site_address("https://cms.example.test") do
+      with_mail_state(:working) do
+        invited = invited_user("withdrawn-early@example.com")
+        ApplicationMailer.queue(InvitesMailer, :invite, invited, inviter: users(:two))
+        invited.destroy!
+
+        log = capture_log do
+          assert_no_emails { perform_enqueued_jobs }
+        end
+
+        assert_includes log, "An invitation mail was not sent: the invite was withdrawn before it went out."
+        assert_not_includes log, "withdrawn-early"
+        assert_nil site.mail_failed_at
+        assert_equal :working, state
+      end
+    end
+  end
+
+  test "an invite whose inviter is gone still fails as a deleted record does" do
+    with_site_address("https://cms.example.test") do
+      with_mail_state(:working) do
+        inviter = User.create!(email_address: "inviter@example.com", password: "a-long-password-1")
+        ApplicationMailer.queue(InvitesMailer, :invite, invited_user("kept@example.com"), inviter: inviter)
+        inviter.destroy!
+
+        assert_raises(ActiveJob::DeserializationError) { perform_enqueued_jobs }
+        assert_nil site.mail_failed_at
       end
     end
   end

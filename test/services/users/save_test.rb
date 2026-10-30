@@ -354,4 +354,21 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_operator lost.reload.updated_at, :>, 30.minutes.ago
     assert_operator access_control_groups(:editor).reload.updated_at, :<, 30.minutes.ago, "a group that is neither gained nor lost stays put"
   end
+
+  # Spec "Invites": an invited person is counted nowhere an owner is, so
+  # none is made one. Taking the flag from a row made an owner by hand stays
+  # possible while a real owner remains.
+  test "an invited person can't be made an owner, and one made so by hand can be demoted" do
+    invited = invited_user("dana@example.com")
+
+    result = as_owner { Users::Save.call(invited, attributes: { owner: "1" }) }
+    assert_not result.ok?
+    assert_equal [ "An invited person can't be made an owner until they accept the invite." ], result.errors
+    assert_not invited.reload.owner?
+    assert_empty Audit::Event.where(action: "user.owner_changed")
+
+    invited.update_columns(owner: true)
+    assert as_owner { Users::Save.call(invited.reload, attributes: { owner: "0" }) }.ok?
+    assert_not invited.reload.owner?
+  end
 end

@@ -147,9 +147,15 @@ class User < ApplicationRecord
   # and the demoting update hasn't saved), so ">1" correctly reads as "at
   # least one other owner besides me."
   #
-  # An invited row is never an owner (`Users::Invite` takes no owner flag),
-  # and `can_sign_in` keeps one made so by hand from counting as one.
+  # "Another owner" is another owner who can sign in: an invited row is never
+  # an owner (`Users::Invite` takes no owner flag, `Users::Save` refuses to
+  # make one), and one made so by hand still could not take over. The count
+  # is of the OTHER rows, not "more than one", so an invited owner row --
+  # which is itself not counted -- never blocks its own demotion or
+  # withdrawal while a real owner remains. Every owner row is still locked,
+  # self included and in id order, so two concurrent demotions of the last
+  # two owners queue behind each other rather than deadlocking.
   def other_owner_remains?
-    User.can_sign_in.where(owner: true).lock.pluck(:id).size > 1
+    User.where(owner: true).order(:id).lock.pluck(:id, :invited_at).any? { |other_id, invited_at| other_id != id && invited_at.nil? }
   end
 end

@@ -37,7 +37,11 @@ module Users
       end
       return failure(@user, [ NOT_INVITED ]) unless resent
 
-      ApplicationMailer.queue(InvitesMailer, :invite, @user, inviter: actor_user, origin: @origin)
+      # After the commit, as `Users::Invite#queue_mail` says why.
+      user, inviter, origin = @user, actor_user, @origin
+      ActiveRecord.after_all_transactions_commit do
+        ApplicationMailer.queue(InvitesMailer, :invite, user, inviter: inviter, origin: origin)
+      end
       success(@user)
     end
   end

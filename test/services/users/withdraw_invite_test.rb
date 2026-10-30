@@ -39,4 +39,24 @@ class Users::WithdrawInviteTest < ActiveSupport::TestCase
     assert User.exists?(users(:reader).id)
     assert_empty Audit::Event.where(action: "user.invite_withdrawn")
   end
+
+  # `User#other_owner_remains?` counts the OTHER owners who can sign in, so
+  # an invited row made an owner by hand is not stuck while a real owner
+  # remains; and a destroy the model refuses is answered with its own
+  # sentence, not "no open invite".
+  test "an invited row made an owner by hand is withdrawn, and a refused destroy says why" do
+    @invited.update_columns(owner: true)
+    assert withdraw(@invited.reload).ok?
+    assert_nil User.find_by(id: @invited.id)
+
+    # With no real owner left besides it (a state no screen makes), the model
+    # refuses, and the answer is the model's.
+    stuck = invited_user("eli@example.com")
+    stuck.update_columns(owner: true)
+    users(:one).update_columns(owner: false)
+    result = as(nil, channel: :console) { Users::WithdrawInvite.call(stuck.reload) }
+    assert_equal [ "The last owner can't be deleted" ], result.errors
+    assert User.exists?(stuck.id)
+    assert_empty Audit::Event.where(action: "user.invite_withdrawn", subject_id: stuck.id)
+  end
 end

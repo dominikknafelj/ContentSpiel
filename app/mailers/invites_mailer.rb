@@ -31,5 +31,8 @@ class InvitesMailer < ApplicationMailer
   # path) is the site's own.
   def inviter_name = @inviter ? PersonName.of(@inviter) : site_name
 
-  def valid_until = I18n.l(User::INVITE_VALID_FOR.from_now.to_date, format: :long)
+  # The row's own expiry (`invite_sent_at` + seven days), the date the Users
+  # list shows too: never later than the link's own, which counts from when
+  # this job made the token. A row with no date (a preview) counts from now.
+  def valid_until = I18n.l((@user.invite_expires_at || User::INVITE_VALID_FOR.from_now).to_date, format: :long)
 end

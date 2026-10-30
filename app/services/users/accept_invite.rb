@@ -26,6 +26,12 @@ module Users
   #
   # The row is locked and asked again before it is written, so a second press
   # that arrives while the first is in flight reads `:used`.
+  #
+  # A PASSWORD SET OUTSIDE `Users::UpdatePassword` AND `Users::Save`, the one
+  # exception to that rule (CLAUDE.md): those two end the user's sessions and
+  # audit a change; an invited row has no session to end (it has never
+  # signed in), and the change is audited here, as `user.invite_accepted`
+  # with the same "credentials" marker (`OwnerProtection#user_field_changes`).
   class AcceptInvite < ApplicationService
     # authorize: none (the invite token is the credential: a token that finds an invited row is the right to finish that account, and the service acts as that user, as the reset flow does)
     include OwnerProtection
@@ -55,7 +61,12 @@ module Users
         next USED unless @user.invited?
 
         @user.assign_attributes(name: @name, password: @password, password_confirmation: @password_confirmation, invited_at: nil)
-        next :invalid unless @user.save
+        unless @user.save
+          # The form's failure: the record handed back is still invited, as
+          # it is in the database (the page shows the form again, not "used").
+          @user.restore_attributes([ :invited_at ])
+          next :invalid
+        end
 
         record_event("user.invite_accepted", subject: @user, field_changes: user_field_changes(@user))
         :accepted

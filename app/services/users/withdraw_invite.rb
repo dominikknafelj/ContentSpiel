@@ -28,19 +28,24 @@ module Users
       return not_invited unless @user.invited?
 
       group_ids = @user.memberships.pluck(:group_id)
-      withdrawn = User.transaction do
+      outcome = User.transaction do
         @user.lock!
-        raise ActiveRecord::Rollback unless @user.invited?
+        next :not_invited unless @user.invited?
 
         record_event("user.invite_withdrawn", subject: @user)
+        # A refused destroy (a model rule, such as the last owner's) rolls the
+        # event back and answers the model's own sentence.
         @user.destroy || raise(ActiveRecord::Rollback)
         # A group's edit form lists its members (`Admin::StaleForm`).
         AccessControl::Group.where(id: group_ids).touch_all if group_ids.any?
-        true
+        :withdrawn
       end
-      return not_invited unless withdrawn
 
-      success(@user)
+      case outcome
+      when :withdrawn then success(@user)
+      when :not_invited then not_invited
+      else failure(@user)
+      end
     end
 
     private

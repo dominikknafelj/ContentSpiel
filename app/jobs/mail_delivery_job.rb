@@ -32,6 +32,7 @@ class MailDeliveryJob < ActionMailer::MailDeliveryJob
   ATTEMPTS = 4
 
   rescue_from(StandardError) do |error|
+    next discard_withdrawn_invite if withdrawn_invite?(error)
     raise error unless MailFailure.delivery?(error)
 
     ApplicationMailer.record_failed(error)
@@ -47,5 +48,29 @@ class MailDeliveryJob < ActionMailer::MailDeliveryJob
     message = super
     ApplicationMailer.record_sent(message, fingerprint: params&.dig(:fingerprint))
     message
+  end
+
+  private
+
+  # An invite withdrawn before its mail went out (controller ruling T8a):
+  # the invited row is gone, so the job's first record argument cannot be
+  # found. That is an ordinary event, not a failure: the job ends quietly
+  # with one info line that names no address, and nothing is recorded. Only
+  # the INVITED person's absence: an invite whose inviter is gone fails as
+  # any other deleted record does.
+  def withdrawn_invite?(error)
+    return false unless error.is_a?(ActiveJob::DeserializationError)
+
+    serialized = @serialized_arguments || []
+    return false unless serialized[0] == "InvitesMailer"
+
+    gid = serialized.dig(3, "args", 0, "_aj_globalid")
+    gid.present? && GlobalID::Locator.locate(gid).nil?
+  rescue ActiveRecord::RecordNotFound
+    true
+  end
+
+  def discard_withdrawn_invite
+    logger.info "[ContentSpiel] An invitation mail was not sent: the invite was withdrawn before it went out."
   end
 end

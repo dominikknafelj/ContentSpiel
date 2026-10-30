@@ -128,4 +128,25 @@ class Users::InviteTest < ActiveSupport::TestCase
       assert invite(as_user: users(:editor_branch)).ok?
     end
   end
+
+  # The mail is queued once the invite is committed: inside a caller's
+  # transaction it waits for that commit (Active Job's
+  # `enqueue_after_transaction_commit`), and a rollback sends nothing.
+  test "inside an outer transaction the mail is queued only after it commits, and not at all if it rolls back" do
+    with_mail_state(:working) do
+      User.transaction(requires_new: true) do
+        assert invite(email_address: "rolled@example.com").ok?
+        assert_no_enqueued_jobs
+        raise ActiveRecord::Rollback
+      end
+      assert_no_enqueued_jobs
+      assert_nil User.find_by(email_address: "rolled@example.com")
+
+      User.transaction(requires_new: true) do
+        assert invite(email_address: "kept@example.com").ok?
+        assert_no_enqueued_jobs
+      end
+      assert_enqueued_jobs 1, only: MailDeliveryJob
+    end
+  end
 end

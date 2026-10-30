@@ -57,6 +57,7 @@ module Users
 
       owner_change = owner_change?
       return denied("users.manage", @user, message: "Only an owner can change who is an owner") if owner_change && !actor_owner?
+      return invited_owner if owner_change && !@user.owner && @user.invited?
 
       old_group_ids = @user.persisted? ? @user.memberships.pluck(:group_id).sort : []
       new_group_ids = requested_group_ids || old_group_ids
@@ -142,6 +143,17 @@ module Users
       owner = changes.delete("owner")
       record_event("user.owner_changed", subject: @user, field_changes: { "owner" => owner }) if owner
       record_event("user.updated", subject: @user, field_changes: changes) if changes.any?
+    end
+
+    # An invited person is never made an owner (spec "Invites": counted
+    # nowhere a user who can sign in is counted, the owner checks included):
+    # an owner row nobody can sign in to is an owner nobody is. Taking the
+    # flag away from such a row (one made by hand) stays allowed.
+    INVITED_OWNER = "An invited person can't be made an owner until they accept the invite.".freeze
+
+    def invited_owner
+      @user.errors.add(:owner, INVITED_OWNER)
+      failure(@user, [ INVITED_OWNER ])
     end
 
     # Final fix wave (C, P17): a typed password needs a typed confirmation.

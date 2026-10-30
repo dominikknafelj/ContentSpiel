@@ -62,10 +62,19 @@ class Users::AcceptInviteTest < ActiveSupport::TestCase
   end
 
   test "a password that is blank, short or unconfirmed is refused and the invite stays open" do
-    assert_includes accept(password: "", password_confirmation: "").errors, "Password can't be blank"
-    assert_includes accept(password: "short").errors, "Use at least 12 characters."
-    assert_not accept(password: "a-long-password-1", password_confirmation: "another-password").ok?
-    assert_not accept(password: "a-long-password-1", password_confirmation: "").ok?
+    results = [
+      accept(password: "", password_confirmation: ""), accept(password: "short"),
+      accept(password: "a-long-password-1", password_confirmation: "another-password"),
+      accept(password: "a-long-password-1", password_confirmation: ""), accept(name: "x" * 121)
+    ]
+    assert_includes results[0].errors, "Password can't be blank"
+    assert_includes results[1].errors, "Use at least 12 characters."
+    results.each do |result|
+      assert_not result.ok?
+      # The record handed back, not only the row: the page shows the form
+      # again on it, and "used" only for a row that is no longer invited.
+      assert result.record.invited?, "#{result.errors.inspect}: the returned record says it is no longer invited"
+    end
 
     assert @invited.reload.invited?
     assert_equal "Dana", @invited.name

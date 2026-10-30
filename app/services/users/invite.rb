@@ -59,7 +59,7 @@ module Users
       saved = create
       return failure(@user) unless saved
 
-      ApplicationMailer.queue(InvitesMailer, :invite, @user, inviter: actor_user, origin: @origin)
+      queue_mail
       success(@user)
     rescue ActiveRecord::RecordNotUnique
       # Two invites of one address at the same moment: the unique index
@@ -75,7 +75,10 @@ module Users
       @user.assign_attributes(password: password, password_confirmation: password,
         invited_at: now, invite_sent_at: now, invited_by: actor_user)
 
-      User.transaction do
+      # A savepoint of its own (`requires_new`), so the `RecordNotUnique` of a
+      # racing invite leaves a caller's outer transaction usable for
+      # `address_taken`'s read.
+      User.transaction(requires_new: true) do
         @user.save || raise(ActiveRecord::Rollback)
         # Through `Membership` itself, as `Users::Save#sync_groups`, so its
         # `after_commit` drops the memoised grants.
@@ -89,6 +92,17 @@ module Users
         # (`Admin::StaleForm`), as with `Users::Save`.
         AccessControl::Group.where(id: @group_ids).touch_all if @group_ids.any?
         true
+      end
+    end
+
+    # Queued when the invite is committed, not before: inside a caller's
+    # transaction `after_all_transactions_commit` waits for its commit and
+    # sends nothing if it rolls back (this app enqueues at once otherwise:
+    # `enqueue_after_transaction_commit` is not on). Outside one it runs now.
+    def queue_mail
+      user, inviter, origin = @user, actor_user, @origin
+      ActiveRecord.after_all_transactions_commit do
+        ApplicationMailer.queue(InvitesMailer, :invite, user, inviter: inviter, origin: origin)
       end
     end
 
