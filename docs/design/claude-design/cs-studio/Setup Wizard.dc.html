@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,button{font-family:inherit}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="min-height:100vh;display:flex;flex-direction:column;background:var(--cs-paper);color:var(--cs-ink)">
+<header style="display:flex;justify-content:space-between;align-items:center;padding:20px 28px">
+  <span style="font-weight:700;font-size:12px;letter-spacing:0.18em">CONTENT·SPIEL</span>
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:var(--cs-meta)">FIRST-RUN SETUP</span>
+</header>
+
+<main style="flex:1;display:flex;justify-content:center;padding:54px 22px">
+<div style="width:100%;max-width:960px;display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);background:var(--cs-surface);border:1px solid var(--cs-line);align-self:flex-start">
+
+  <aside style="padding:34px 18px;border-right:1px solid var(--cs-line);background:var(--cs-paper);display:flex;flex-direction:column;gap:2px">
+    <sc-for list="{{ steps }}" as="s" hint-placeholder-count="8">
+      <button onClick="{{ s.go }}" style="display:flex;gap:12px;align-items:center;padding:9px 10px;border:0;border-radius:2px;background:{{ s.bg }};text-align:left;cursor:pointer;color:inherit">
+        <span style="font-family:var(--cs-mono);font-size:11px;color:{{ s.numColor }};width:18px">{{ s.num }}</span>
+        <span style="flex:1;font-size:14px;font-weight:{{ s.weight }};color:{{ s.color }}">{{ s.label }}</span>
+        <span style="font-family:var(--cs-mono);font-size:9px;letter-spacing:0.1em;color:var(--cs-meta)">{{ s.opt }}</span>
+      </button>
+    </sc-for>
+  </aside>
+
+  <section style="padding:34px 40px;display:flex;flex-direction:column;gap:26px;min-height:520px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:var(--cs-meta)">STEP {{ stepNum }} OF 7{{ optTag }}</span>
+      <h1 style="margin:0;font-size:28px;font-weight:600">{{ title }}</h1>
+      <p style="margin:0;font-size:15px;line-height:1.55;color:var(--cs-dim);max-width:540px;text-wrap:pretty">{{ lede }}</p>
+    </div>
+
+    <sc-if value="{{ isToken }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:18px;max-width:520px">
+        <div style="background:var(--cs-sunken);border-radius:2px;padding:14px 16px;font-family:var(--cs-mono);font-size:12px;line-height:1.8;color:var(--cs-dim);overflow-x:auto">
+          <div>[setup] No admin account found.</div>
+          <div>[setup] Setup token: <span style="color:var(--cs-ink);font-weight:500">7F3K-Q9MX-2HDP</span></div>
+          <div>[setup] Enter it at /setup to continue.</div>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Setup token</span>
+          <input value="7F3K-Q9MX-2HDP" style="font-family:var(--cs-mono);font-size:16px;letter-spacing:0.14em;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint);border-radius:2px;padding:11px 12px;outline:none"></input>
+          <span style="font-size:12px;color:var(--cs-meta)">The token is printed in the server log on boot and works once. It stops anyone else from claiming a fresh install.</span></label>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isSystem }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:600px">
+        <div style="border-top:1px solid var(--cs-line-strong)">
+          <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid var(--cs-line);align-items:start">
+              <span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid {{ c.border }};color:{{ c.fg }};border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:{{ c.dot }}"></span>{{ c.state }}</span></span>
+              <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:500">{{ c.name }}</span><span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">{{ c.text }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--cs-meta)">Warnings don’t block setup. The same checks live in Studio › System status.</span><button style="font-weight:500;font-size:12px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 11px">Run again</button></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:18px;max-width:520px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Name</span><input value="Mara Lindqvist" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Email</span><input value="mara@mara.dev" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Password</span><span style="display:flex;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;background:var(--cs-surface)"><input type="{{ pwType }}" value="correct horse battery" style="flex:1;min-width:0;font-size:14px;color:var(--cs-ink);background:transparent;border:0;padding:9px 11px;outline:none"></input><button onClick="{{ togglePw }}" style="font-size:12px;font-weight:500;color:var(--cs-accent);background:none;border:0;padding:0 11px;cursor:pointer">{{ pwLabel }}</button></span>
+          <span style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:2px"><span style="height:3px;background:var(--cs-ok)"></span><span style="height:3px;background:var(--cs-ok)"></span><span style="height:3px;background:var(--cs-ok)"></span><span style="height:3px;background:var(--cs-line)"></span></span>
+          <span style="font-size:12px;color:var(--cs-dim)">Good. Use 12 or more characters; a few unrelated words work well.</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Confirm password</span><input type="password" value="correcthorsebattery" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+        <div style="padding:12px;background:var(--cs-sunken);border-radius:2px;font-size:13px;line-height:1.5;color:var(--cs-dim)">This account becomes the first owner. You can add more users in Studio › Users afterwards.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isSite }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:18px;max-width:560px">
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Site title</span><input value="Mara Lindqvist" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Tagline</span><input value="Designer &amp; developer · Malmö" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Logo <span style="font-weight:400;color:var(--cs-meta)">· optional</span></span>
+          <div style="display:flex;align-items:center;gap:14px;border:1px dashed var(--cs-line-strong);border-radius:2px;padding:14px">
+            <span style="width:44px;height:44px;background:var(--cs-sunken);display:grid;place-items:center;font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">SVG</span>
+            <span style="font-size:13px;color:var(--cs-dim)">Drop an SVG or PNG here, or <a href="#">browse</a>. Without one, the site title is used.</span>
+          </div></div>
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Social links <span style="font-weight:400;color:var(--cs-meta)">· optional</span></span>
+          <sc-for list="{{ socials }}" as="so" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:140px minmax(0,1fr) 32px;gap:8px;align-items:center">
+              <input value="{{ so.p }}" placeholder="Name, e.g. GitHub" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none;min-width:0"></input>
+              <input value="{{ so.u }}" placeholder="https://" style="font-family:var(--cs-mono);font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none;min-width:0"></input>
+              <button onClick="{{ so.remove }}" style="height:36px;border:0;background:transparent;color:var(--cs-meta);cursor:pointer;font-size:16px" style-hover="color:var(--cs-danger)">×</button>
+            </div>
+          </sc-for>
+          <button onClick="{{ addSocial }}" style="align-self:flex-start;border:0;background:none;padding:4px 0;color:var(--cs-accent);font-size:13px;cursor:pointer">+ Add link</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isLangs }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:560px">
+        <div style="border-top:1px solid var(--cs-line-strong)">
+          <sc-for list="{{ langRows }}" as="l" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:22px 40px minmax(0,1fr) auto 28px;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--cs-line)">
+              <button onClick="{{ l.makeDefault }}" style="width:16px;height:16px;border-radius:999px;border:1px solid {{ l.radioBorder }};background:var(--cs-surface);padding:0;cursor:pointer;display:grid;place-items:center"><span style="width:8px;height:8px;border-radius:999px;background:{{ l.radioDot }}"></span></button>
+              <span style="font-family:var(--cs-mono);font-size:11px;font-weight:500">{{ l.code }}</span>
+              <span style="font-size:14px">{{ l.name }}</span>
+              <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.1em;color:var(--cs-accent)">{{ l.badge }}</span>
+              <button onClick="{{ l.remove }}" style="border:0;background:transparent;color:var(--cs-meta);cursor:pointer;font-size:16px;visibility:{{ l.removeVis }}" style-hover="color:var(--cs-danger)">×</button>
+            </div>
+          </sc-for>
+        </div>
+        <button onClick="{{ toggleAdd }}" style="align-self:flex-start;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 14px;cursor:pointer">+ Add language</button>
+        <sc-if value="{{ addOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--cs-line);border-radius:2px;background:var(--cs-paper)">
+            <span style="display:flex;align-items:center;gap:10px;border:1px solid var(--cs-line-strong);background:var(--cs-surface);border-radius:2px;padding:8px 10px;font-size:13px;color:var(--cs-meta)">Search languages…</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <sc-for list="{{ pool }}" as="p" hint-placeholder-count="6">
+                <button onClick="{{ p.add }}" style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px;cursor:pointer" style-hover="border-color:var(--cs-accent)">{{ p.name }}<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">{{ p.code }}</span></button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <span style="font-size:12px;line-height:1.5;color:var(--cs-meta)">The default language is served at the root URL; the others under their code, e.g. /de. Admins can add more languages at any time.</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isMcp }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:18px;max-width:560px">
+        <sc-if value="{{ noToken }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Token name</span><input value="claude-desktop" style="font-family:var(--cs-mono);font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input>
+              <span style="font-size:12px;color:var(--cs-meta)">Required. Helps you recognise which assistant is using it. The token acts as you; revoke it any time in Studio › AI assistant.</span></label>
+            <button onClick="{{ genToken }}" style="align-self:flex-start;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 16px;cursor:pointer">Generate token</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasToken }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:10px;padding:10px 12px;background:var(--cs-warn-tint);border-radius:2px;font-size:13px;line-height:1.5;color:var(--cs-warn-ink)"><span style="font-weight:600">!</span><span>This is the only time the full token is shown. Copy it into your agent's config now.</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:500">claude-desktop</span>
+              <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--cs-line-strong);border-radius:2px;background:var(--cs-sunken);padding:9px 9px 9px 12px">
+                <span style="flex:1;font-family:var(--cs-mono);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">cs_mcp_4b1e9c07d2f8a63e5f10c9ab77d2e4c1</span>
+                <button onClick="{{ copy }}" style="font-weight:500;font-size:12px;background:var(--cs-accent);color:var(--cs-on-accent);border:0;border-radius:2px;padding:6px 11px;cursor:pointer">{{ copyLabel }}</button>
+              </div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Endpoint</span>
+              <span style="font-family:var(--cs-mono);font-size:13px;color:var(--cs-dim)">https://mara.dev/mcp</span></div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isStarter }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:18px;max-width:560px">
+        <button onClick="{{ toggleStarter }}" style="display:inline-flex;align-items:center;gap:10px;font-size:14px;color:var(--cs-ink);background:none;border:0;padding:0;cursor:pointer;align-self:flex-start"><span style="width:34px;height:20px;border-radius:999px;background:{{ starterTrack }};position:relative;transition:background 0.2s"><span style="position:absolute;top:2px;left:{{ starterKnob }};width:16px;height:16px;border-radius:999px;background:#fff;transition:left 0.2s cubic-bezier(0.22,1,0.36,1)"></span></span>Add starter content</button>
+        <div style="border-top:1px solid var(--cs-line-strong);opacity:{{ starterOpacity }};transition:opacity 0.2s">
+          <sc-for list="{{ starterRows }}" as="r" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid var(--cs-line);align-items:baseline">
+              <span style="font-family:var(--cs-mono);font-size:12px;color:var(--cs-dim)">{{ r.path }}</span>
+              <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">{{ r.name }}</span><span style="font-size:13px;color:var(--cs-dim)">{{ r.adds }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        <span style="font-size:12px;color:var(--cs-meta)">Created in the default language. Delete the sample posts like any other post when you no longer need them.</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+      <div style="border-top:1px solid var(--cs-line-strong)">
+        <sc-for list="{{ summary }}" as="r" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:14px;padding:12px 0;border-bottom:1px solid var(--cs-line);align-items:baseline">
+            <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:var(--cs-meta)">{{ r.k }}</span>
+            <span style="font-size:14px">{{ r.v }}</span>
+            <button onClick="{{ r.go }}" style="font-size:13px;border:0;background:none;color:var(--cs-accent);cursor:pointer">Edit</button>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:14px;padding-top:22px;border-top:1px solid var(--cs-line)">
+      <button onClick="{{ back }}" style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:0;border-radius:2px;padding:9px 12px;cursor:pointer;visibility:{{ backVis }}">← Back</button>
+      <div style="display:flex;gap:8px">
+        <sc-if value="{{ canSkip }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ skip }}" style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:9px 14px;cursor:pointer" style-hover="background:var(--cs-sunken);color:var(--cs-ink)">Skip</button>
+        </sc-if>
+        <button onClick="{{ next }}" style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:9px 18px;cursor:pointer" style-hover="background:var(--cs-accent-hover)">{{ nextLabel }}</button>
+      </div>
+    </div>
+  </section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;step&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;token&quot;,&quot;system&quot;,&quot;admin&quot;,&quot;site&quot;,&quot;languages&quot;,&quot;mcp&quot;,&quot;starter&quot;,&quot;review&quot;],&quot;default&quot;:&quot;token&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    pw: false, step: null, addOpen: false, token: false, mcpSkipped: false, starter: true, copied: false,
+    langs: [{ code: 'en', name: 'English' }, { code: 'de', name: 'Deutsch' }], def: 'en',
+    socials: [{ p: 'Mastodon', u: 'https://hachyderm.io/@mara' }, { p: 'GitHub', u: 'https://github.com/maral' }]
+  };
+  componentDidUpdate(p) { if (p.step !== this.props.step) this.setState({ step: null }); }
+  renderVals() {
+    const ids = ['token', 'system', 'admin', 'site', 'languages', 'mcp', 'starter', 'review'];
+    const labels = ['Setup token', 'System check', 'Admin account', 'Site identity', 'Languages', 'MCP token', 'Starter content', 'Review'];
+    const optional = [1, 5, 6];
+    const s = this.state;
+    const step = s.step ?? Math.max(0, ids.indexOf(this.props.step ?? 'token'));
+    const go = i => () => this.setState({ step: i, addOpen: false });
+    const copy = [
+      ['Enter your setup token', 'Find the one-time token in the server log from the first boot, and paste it here.'],
+      ['System check', 'Checks storage, image processing, mail and background jobs on this server. Fix warnings now or later; nothing here blocks setup.'],
+      ['Create the admin account', 'You’ll use this to sign in to the backend.'],
+      ['Site identity', 'Shown in the header, browser title and feeds. Everything here can be changed later in settings.'],
+      ['Languages', 'Add every language you plan to publish in and choose the default. Pages, posts and blocks can be translated into each.'],
+      ['Connect an AI agent', 'Create a token for the built-in MCP server so an agent can draft and manage posts. You can skip this and create tokens later.'],
+      ['Starter content', 'Finishing setup always creates the Home page at / with a short welcome block. Optionally, add Blog, Resume and Now pages with a sample of each.'],
+      ['Review', 'Check the details, then finish setup and sign in.']
+    ];
+    const all = [['en', 'English'], ['de', 'Deutsch'], ['sl', 'Slovenščina'], ['fr', 'Français'], ['es', 'Español'], ['it', 'Italiano'], ['nl', 'Nederlands'], ['sv', 'Svenska'], ['pl', 'Polski'], ['pt', 'Português']];
+    const has = c => s.langs.some(l => l.code === c);
+    const defName = (s.langs.find(l => l.code === s.def) || s.langs[0] || {}).name;
+    return {
+      theme: this.props.theme ?? 'light',
+      pwType: s.pw ? 'text' : 'password', pwLabel: s.pw ? 'Hide' : 'Show', togglePw: () => this.setState(st => ({ pw: !st.pw })),
+      steps: labels.map((label, i) => ({
+        label, go: go(i), opt: optional.includes(i) ? 'OPT' : '',
+        num: i < step ? '✓' : String(i + 1).padStart(2, '0'),
+        bg: i === step ? 'var(--cs-surface)' : 'transparent',
+        color: i <= step ? 'var(--cs-ink)' : 'var(--cs-dim)',
+        numColor: i < step ? 'var(--cs-ok)' : i === step ? 'var(--cs-accent)' : 'var(--cs-meta)',
+        weight: i === step ? 600 : 400
+      })),
+      stepNum: step + 1, optTag: optional.includes(step) ? ' · OPTIONAL' : '',
+      title: copy[step][0], lede: copy[step][1],
+      isToken: step === 0, isSystem: step === 1, isAdmin: step === 2, isSite: step === 3, isLangs: step === 4, isMcp: step === 5, isStarter: step === 6, isReview: step === 7,
+      checks: [
+        { state: 'Warning', dot: 'var(--cs-warn)', fg: 'var(--cs-warn-ink)', border: 'var(--cs-warn)', name: 'Outgoing mail', text: 'Not configured. Password reset by email won’t work until it is; System status shows the console fallback.' },
+        { state: 'OK', dot: 'var(--cs-ok)', fg: 'var(--cs-ink)', border: 'var(--cs-line-strong)', name: 'File storage', text: 'Uploads can be stored and read back.' },
+        { state: 'OK', dot: 'var(--cs-ok)', fg: 'var(--cs-ink)', border: 'var(--cs-line-strong)', name: 'Image processing', text: 'Images can be resized.' },
+        { state: 'OK', dot: 'var(--cs-ok)', fg: 'var(--cs-ink)', border: 'var(--cs-line-strong)', name: 'Background jobs', text: 'Jobs run inside the web process.' }
+      ],
+      socials: s.socials.map((so, i) => ({ ...so, remove: () => this.setState(st => ({ socials: st.socials.filter((_, j) => j !== i) })) })),
+      addSocial: () => this.setState(st => ({ socials: [...st.socials, { p: '', u: '' }] })),
+      langRows: s.langs.map(l => {
+        const d = l.code === s.def;
+        return { code: l.code.toUpperCase(), name: l.name, badge: d ? 'DEFAULT · /' : '/' + l.code,
+          radioBorder: d ? 'var(--cs-accent)' : 'var(--cs-line-strong)', radioDot: d ? 'var(--cs-accent)' : 'transparent',
+          removeVis: d ? 'hidden' : 'visible',
+          makeDefault: () => this.setState({ def: l.code }),
+          remove: () => this.setState(st => ({ langs: st.langs.filter(x => x.code !== l.code) })) };
+      }),
+      addOpen: s.addOpen, toggleAdd: () => this.setState(st => ({ addOpen: !st.addOpen })),
+      pool: all.filter(([c]) => !has(c)).map(([code, name]) => ({ code: code.toUpperCase(), name, add: () => this.setState(st => ({ langs: [...st.langs, { code, name }] })) })),
+      noToken: !s.token, hasToken: s.token,
+      genToken: () => this.setState({ token: true, mcpSkipped: false }),
+      copy: () => this.setState({ copied: true }), copyLabel: s.copied ? 'Copied' : 'Copy',
+      toggleStarter: () => this.setState(st => ({ starter: !st.starter })),
+      starterTrack: s.starter ? 'var(--cs-accent)' : 'var(--cs-line-strong)', starterKnob: s.starter ? '16px' : '2px', starterOpacity: s.starter ? 1 : 0.4,
+      starterRows: [
+        { path: '/blog', name: 'Blog', adds: 'Page with a post list, plus one sample blog post' },
+        { path: '/resume', name: 'Resume', adds: 'Page with a post list, plus one sample resume entry' },
+        { path: '/now', name: 'Now', adds: 'Page with a post list, plus one sample now update' }
+      ],
+      summary: [
+        { k: 'SYSTEM CHECK', v: '3 OK · 1 warning (outgoing mail)', s: 1 },
+        { k: 'ADMIN', v: 'Mara Lindqvist · mara@mara.dev', s: 2 },
+        { k: 'SITE', v: 'Mara Lindqvist — Designer & developer · Malmö', s: 3 },
+        { k: 'SOCIAL LINKS', v: s.socials.length ? s.socials.map(x => x.p || 'Untitled').join(', ') : 'None', s: 3 },
+        { k: 'LANGUAGES', v: s.langs.map(l => l.name).join(', ') + ' · default ' + defName, s: 4 },
+        { k: 'MCP TOKEN', v: s.token ? 'claude-desktop (created)' : 'Skipped', s: 5 },
+        { k: 'HOME PAGE', v: '/ with a welcome block (always created)', s: 6 },
+        { k: 'STARTER CONTENT', v: s.starter ? 'Blog, Resume, Now pages + one sample each' : 'Skipped, Home page only', s: 6 }
+      ].map(r => ({ ...r, go: go(r.s) })),
+      canSkip: optional.includes(step),
+      skip: () => this.setState(st => ({ step: step + 1, ...(step === 5 ? { token: false, mcpSkipped: true } : step === 6 ? { starter: false } : {}) })),
+      back: () => this.setState({ step: Math.max(0, step - 1) }),
+      next: () => this.setState({ step: Math.min(7, step + 1), addOpen: false }),
+      backVis: step === 0 ? 'hidden' : 'visible',
+      nextLabel: step === 0 ? 'Verify token' : step === 7 ? 'Finish setup' : 'Continue'
+    };
+  }
+}
+</script>
+</body>
+</html>

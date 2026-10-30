@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+</helmet>
+<div style="width: 100%; max-width: var(--width-text); display: flex; flex-direction: column; gap: var(--space-4); font-family: var(--font-sans); color: var(--color-text); font-size: {{ bodySize }}; line-height: var(--lh-body);">
+  <sc-if value="{{ heading }}" hint-placeholder-val="{{ true }}">
+    <h2 style="margin: 0; font-weight: 700; font-size: {{ hSize }}; line-height: var(--lh-heading); letter-spacing: -0.01em; text-transform: uppercase; text-wrap: balance;">{{ heading }}</h2>
+  </sc-if>
+  <sc-for list="{{ paragraphs }}" as="para" hint-placeholder-count="2">
+    <p style="margin: 0; color: var(--color-text-muted); text-wrap: pretty;">{{ para }}</p>
+  </sc-for>
+  <sc-if value="{{ hasBullets }}" hint-placeholder-val="{{ false }}">
+    <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--color-line);">
+      <sc-for list="{{ bullets }}" as="b" hint-placeholder-count="3">
+        <li style="display: grid; grid-template-columns: 28px minmax(0,1fr); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); color: var(--color-text-muted);">
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent); padding-top: 4px;">{{ b.n }}</span>
+          <span>{{ b.text }}</span>
+        </li>
+      </sc-for>
+    </ul>
+  </sc-if>
+  <sc-if value="{{ linkText }}" hint-placeholder-val="{{ false }}">
+    <p style="margin: 0; color: var(--color-text-muted);">{{ linkLead }} <a href="#" style="color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;" style-hover="color: var(--color-text);">{{ linkText }}</a>.</p>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;half&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;heading&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Rich text heading&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;paragraphs&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string[]&quot;},&quot;bullets&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string[]&quot;},&quot;linkLead&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;linkText&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const size = p.size ?? 'full';
+    const bullets = (p.bullets ?? ['Headings, paragraphs and lists', 'Links, bold and italic text', 'No layout options: width comes from the column']).map((t, i) => ({ n: String(i + 1).padStart(2, '0'), text: t }));
+    return {
+      heading: p.heading ?? 'Rich text heading',
+      paragraphs: p.paragraphs ?? ['Rich text holds the running copy of a page. It sets its own measure, so lines stay readable in a wide column and simply wrap in a narrow one.', 'Editors write headings, paragraphs and lists. Styling comes from the theme, never from the editor.'],
+      bullets, hasBullets: bullets.length > 0,
+      linkLead: p.linkLead ?? 'Links use the accent colour, for example',
+      linkText: p.linkText ?? 'a link to another page',
+      hSize: size === 'narrow' ? '22px' : 'var(--fs-h2)',
+      bodySize: size === 'full' ? '17px' : 'var(--fs-body)',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="users" hint-size="232px,100vh"></dc-import>
+<main style="display:flex;flex-direction:column;min-width:0">
+<div style="padding:28px 32px 32px;display:flex;flex-direction:column;gap:18px;max-width:880px;width:100%;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <span style="font-size:12px;color:var(--cs-meta)"><a href="Studio%20Users.dc.html" style="color:var(--cs-meta)">Users</a> /</span>
+    <h1 style="margin:0;font-size:26px;font-weight:600">{{ heading }}</h1>
+  </div>
+
+  <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:18px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">NAME · OPTIONAL</span><input value="{{ name }}" placeholder="Shown instead of the email" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">EMAIL</span><input value="{{ email }}" placeholder="name@example.com" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+    </div>
+    <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
+      <label style="display:flex;flex-direction:column;gap:6px;max-width:420px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">PASSWORD</span>
+        <span style="display:flex;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;background:var(--cs-surface)"><input type="{{ pwType }}" value="tram ferry orbit" style="flex:1;min-width:0;font-size:14px;color:var(--cs-ink);background:transparent;border:0;padding:9px 11px;outline:none"></input><button onClick="{{ togglePw }}" style="font-size:12px;font-weight:500;color:var(--cs-accent);background:none;border:0;padding:0 11px;cursor:pointer">{{ pwLabel }}</button></span>
+        <span style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px"><span style="height:3px;background:var(--cs-ok)"></span><span style="height:3px;background:var(--cs-ok)"></span><span style="height:3px;background:var(--cs-ok)"></span><span style="height:3px;background:var(--cs-line)"></span></span>
+        <span style="font-size:12px;color:var(--cs-dim)">Good. Share it with them securely; they can change it after signing in.</span></label>
+    </sc-if>
+    <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--cs-dim)"><span>Last signed in 2 days ago.</span><a href="#">Set a new password…</a></div>
+    </sc-if>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:16px;font-weight:600">Groups</span><a href="Studio%20Groups.dc.html" style="font-size:13px">Manage groups →</a></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5">
+        <button onClick="{{ g.toggle }}" style="text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) 18px;gap:10px;padding:12px 14px;background:{{ g.bg }};border:1px solid {{ g.border }};border-radius:2px;color:var(--cs-ink)">
+          <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:500">{{ g.name }}</span><span style="font-size:12px;line-height:1.45;color:var(--cs-dim)">{{ g.desc }}</span></span>
+          <span style="width:16px;height:16px;border-radius:2px;box-sizing:border-box;border:1px solid {{ g.cb }};background:{{ g.cbBg }};color:var(--cs-on-accent);font-size:11px;line-height:14px;text-align:center">{{ g.mark }}</span>
+        </button>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;margin-top:8px;padding:12px 14px;border:1px dashed var(--cs-line-strong);border-radius:2px">
+      <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:500">Owner</span><span style="font-size:12px;line-height:1.45;color:var(--cs-dim)">Every permission, including managing other owners. Group membership is ignored for owners.</span></span>
+      <button style="font-weight:500;font-size:12px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 11px">Make owner…</button>
+    </div>
+  </section>
+
+  <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ true }}">
+    <section style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--cs-line);border-radius:2px;background:var(--cs-surface)">
+      <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:500">Delete user</span><span style="font-size:12px;color:var(--cs-dim)">Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working.</span></span>
+      <button style="font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-danger);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Delete user…</button>
+    </section>
+  </sc-if>
+</div>
+<div style="position:sticky;bottom:0;margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding:12px 32px;background:var(--cs-surface);border-top:1px solid var(--cs-line)">
+  <span style="font-size:13px;color:var(--cs-dim)">{{ barText }}</span>
+  <span style="display:flex;gap:8px"><a href="Studio%20Users.dc.html" style="font-weight:500;font-size:13px;color:var(--cs-dim);padding:7px 12px">Cancel</a><button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 14px">{{ saveLabel }}</button></span>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;edit&quot;,&quot;new&quot;],&quot;default&quot;:&quot;edit&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { sel: null, pw: false, changes: 0 };
+  renderVals() {
+    const isNew = this.props.mode === 'new';
+    const sel = this.state.sel ?? (isNew ? ['Author'] : ['Admin']);
+    const G = [
+      ['Admin', 'Everything except managing owners.'],
+      ['Editor', 'Full access to posts and pages, plus tags and media.'],
+      ['Author', 'Writes and edits their own posts; reads pages.'],
+      ['Read only', 'Reads posts and pages.'],
+      ['Branch editors', 'Edits and publishes pages under Services.']
+    ];
+    return {
+      isNew, isEdit: !isNew, heading: isNew ? 'New user' : 'two@example.com',
+      name: isNew ? '' : '', email: isNew ? '' : 'two@example.com',
+      pwType: this.state.pw ? 'text' : 'password', pwLabel: this.state.pw ? 'Hide' : 'Show', togglePw: () => this.setState(s => ({ pw: !s.pw })),
+      groups: G.map(([name, desc]) => { const on = sel.includes(name); return { name, desc, mark: on ? '✓' : '',
+        bg: on ? 'var(--cs-accent-tint)' : 'var(--cs-surface)', border: on ? 'var(--cs-accent)' : 'var(--cs-line)',
+        cb: on ? 'var(--cs-accent)' : 'var(--cs-line-strong)', cbBg: on ? 'var(--cs-accent)' : 'transparent',
+        toggle: () => this.setState(s => ({ changes: s.changes + 1, sel: on ? sel.filter(x => x !== name) : [...sel, name] })) }; }),
+      barText: isNew ? 'They can sign in as soon as you create the account.' : (this.state.changes ? this.state.changes + ' unsaved change' + (this.state.changes > 1 ? 's' : '') : 'No changes'),
+      saveLabel: isNew ? 'Create user' : 'Save user'
+    };
+  }
+}
+</script>
+</body>
+</html>

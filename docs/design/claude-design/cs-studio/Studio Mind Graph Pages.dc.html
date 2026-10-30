@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="content-spiel.css">
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}button,input{font-family:inherit}</style>
+</helmet>
+<div style="background:#d9d8d2;min-height:100vh;padding:48px;display:flex;flex-direction:column;gap:72px;font-family:var(--cs-font);color:#141417;box-sizing:border-box">
+
+<header style="display:flex;flex-direction:column;gap:8px;max-width:920px">
+  <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;color:#55565b">CS STUDIO · MIND GRAPH · PAGES · STEP ONE</span>
+  <h1 style="margin:0;font-size:34px;font-weight:600">Mind graph with pages</h1>
+  <p style="margin:0;font-size:15px;line-height:1.6;color:#55565b;text-wrap:pretty">Pages join the graph through the page tree and through what their post-list blocks show. Links in text come in a later step and are left out here. The boards are <a href="#a">a</a> whole graph, <a href="#b">b</a> key, <a href="#c">c</a> legend, <a href="#d">d</a> search, <a href="#e">e</a> list (shown in <a href="#a">a</a> and <a href="#f">f</a>), <a href="#f">f</a> local view, <a href="#g">g</a> node cards and <a href="#h">h</a> large site. Use the Theme tweak to switch between light and dark.</p>
+</header>
+
+<sc-for list="{{ screens }}" as="sc" hint-placeholder-count="2">
+<section id="{{ sc.id }}" data-screen-label="{{ sc.label }}" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;max-width:1100px">
+    <span style="font-family:var(--cs-mono);font-size:12px;font-weight:500;background:#141417;color:#f5f4f0;padding:2px 8px;border-radius:2px">{{ sc.badge }}</span>
+    <span style="font-size:20px;font-weight:600">{{ sc.title }}</span>
+    <span style="font-size:14px;line-height:1.55;color:#55565b;flex-basis:100%;max-width:920px;text-wrap:pretty">{{ sc.note }}</span>
+  </div>
+  <div data-theme="{{ theme }}" style="width:1440px;height:900px;display:grid;grid-template-columns:232px minmax(0,1fr);overflow:hidden;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font)">
+    <dc-import name="StudioSidebar" active="graph" hint-size="232px,900px"></dc-import>
+    <main style="padding:28px 32px 24px;display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0;box-sizing:border-box">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <h1 style="margin:0;font-size:26px;font-weight:600">Mind graph</h1>
+        <p style="margin:0;font-size:14px;color:var(--cs-dim)">How your pages, posts and tags relate to each other. Scroll or pinch to zoom, drag to move.</p>
+      </div>
+      <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px;border:1px solid var(--cs-line);border-radius:2px;background:var(--cs-surface);overflow:hidden">
+        <section style="display:flex;flex-direction:column;min-width:0;min-height:0">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:8px 12px;border-bottom:1px solid var(--cs-line);font-size:12px;color:var(--cs-dim)">
+            <sc-for list="{{ legendTypes }}" as="l" hint-placeholder-count="4">
+              <span style="display:flex;gap:6px;align-items:center"><span style="width:12px;height:12px;box-sizing:border-box;border-radius:2px;display:grid;place-items:center;font-size:9px;line-height:1;background:{{ l.cbBg }};border:1.5px solid {{ l.cbBd }};color:var(--cs-paper)">{{ l.tick }}</span><span style="flex:none;box-sizing:border-box;width:{{ l.m.w }};height:{{ l.m.h }};border-radius:{{ l.m.r }};background:{{ l.m.bg }};border:{{ l.m.bd }};box-shadow:{{ l.m.sh }}"></span><span style="color:{{ l.tc }}">{{ l.label }}</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ l.n }}</span></span>
+            </sc-for>
+            <span style="width:1px;height:16px;background:var(--cs-line)"></span>
+            <sc-for list="{{ legendEdges }}" as="l" hint-placeholder-count="4">
+              <span style="display:flex;gap:6px;align-items:center"><span style="width:12px;height:12px;box-sizing:border-box;border-radius:2px;display:grid;place-items:center;font-size:9px;line-height:1;background:var(--cs-ink);border:1.5px solid var(--cs-ink);color:var(--cs-paper)">✓</span><span style="width:18px;height:0;border-top:{{ l.bt }}"></span><span>{{ l.label }}</span></span>
+            </sc-for>
+          </div>
+          <div role="img" aria-label="{{ sc.summary }}" style="position:relative;flex:1;min-height:0;overflow:hidden">
+            <svg viewBox="{{ sc.g.vb }}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%">
+              <sc-for list="{{ sc.g.lines }}" as="p" hint-placeholder-count="10"><line x1="{{ p.x1 }}" y1="{{ p.y1 }}" x2="{{ p.x2 }}" y2="{{ p.y2 }}" style="stroke:{{ p.s }};stroke-width:{{ p.w }};stroke-dasharray:{{ p.d }};stroke-linecap:{{ p.cap }};opacity:{{ p.o }}"></line></sc-for>
+              <sc-for list="{{ sc.g.rects }}" as="p" hint-placeholder-count="8"><rect x="{{ p.x }}" y="{{ p.y }}" width="{{ p.w }}" height="{{ p.h }}" rx="{{ p.rx }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }};opacity:{{ p.o }}"></rect></sc-for>
+              <sc-for list="{{ sc.g.circles }}" as="p" hint-placeholder-count="12"><circle cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ p.r }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }};opacity:{{ p.o }}"></circle></sc-for>
+              <sc-for list="{{ sc.g.texts }}" as="p" hint-placeholder-count="12"><text x="{{ p.x }}" y="{{ p.y }}" text-anchor="{{ p.a }}" style="font-size:{{ p.fs }};font-family:{{ p.ff }};fill:{{ p.f }};font-weight:{{ p.fw }};opacity:{{ p.o }};paint-order:stroke;stroke:var(--cs-surface);stroke-width:3px;stroke-linejoin:round">{{ p.s }}</text></sc-for>
+            </svg>
+            <sc-if value="{{ sc.isLocal }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:12px;top:12px;display:flex;align-items:center;gap:10px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 6px 5px 10px;font-size:13px">
+                <span>Around <b style="font-weight:600">Blog</b></span>
+                <span style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden"><span style="font-size:12px;padding:3px 9px;border-right:1px solid var(--cs-line)">Depth 1</span><span style="font-size:12px;padding:3px 9px;background:var(--cs-ink);color:var(--cs-paper)">Depth 2</span></span>
+                <span style="font-size:12px;color:var(--cs-dim);text-decoration:underline;text-underline-offset:3px">Show everything</span>
+              </div>
+            </sc-if>
+            <div style="position:absolute;right:12px;bottom:12px;display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface)">
+              <span style="font-size:13px;width:30px;padding:5px 0;text-align:center;border-right:1px solid var(--cs-line)">−</span>
+              <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);padding:0 8px;display:flex;align-items:center;border-right:1px solid var(--cs-line)">100%</span>
+              <span style="font-size:13px;width:30px;padding:5px 0;text-align:center;border-right:1px solid var(--cs-line)">+</span>
+              <span style="font-size:12px;padding:5px 10px">Fit</span>
+            </div>
+          </div>
+        </section>
+        <aside style="border-left:1px solid var(--cs-line);display:flex;flex-direction:column;min-height:0">
+          <div style="padding:10px 12px;border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:13px;padding:7px 9px;border:1px solid var(--cs-line-strong);border-radius:2px;background:var(--cs-paper);color:var(--cs-meta)">Find a page, post or tag…</span>
+            <sc-if value="{{ sc.isLocal }}" hint-placeholder-val="{{ false }}">
+              <span style="display:flex;align-items:center;gap:8px;font-size:12px"><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:2px;background:var(--cs-sunken);color:var(--cs-ink)">Listed by Blog · 112 posts</span><span style="margin-left:auto;color:var(--cs-dim);text-decoration:underline;text-underline-offset:3px">Clear</span></span>
+            </sc-if>
+            <sc-if value="{{ sc.isWhole }}" hint-placeholder-val="{{ true }}">
+              <span style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--cs-dim)"><span style="width:12px;height:12px;box-sizing:border-box;border-radius:2px;border:1.5px solid var(--cs-line-strong)"></span>Not listed on any page<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">3</span></span>
+            </sc-if>
+          </div>
+          <div style="flex:1;overflow:hidden;padding:4px 0 8px">
+            <sc-for list="{{ sc.groups }}" as="g" hint-placeholder-count="4">
+              <div style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:12px 12px 5px">{{ g.head }}</div>
+              <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="4">
+                <div aria-label="{{ r.aria }}" style="display:flex;gap:8px;align-items:center;padding:5px 12px 5px {{ r.ind }};font-size:13px;color:{{ r.tc }};font-family:{{ r.ff }}">
+                  <span style="flex:none;box-sizing:border-box;width:{{ r.m.w }};height:{{ r.m.h }};border-radius:{{ r.m.r }};background:{{ r.m.bg }};border:{{ r.m.bd }};box-shadow:{{ r.m.sh }}"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+                  <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);white-space:nowrap">{{ r.right }}</span>
+                </div>
+              </sc-for>
+            </sc-for>
+          </div>
+          <sc-if value="{{ sc.isLocal }}" hint-placeholder-val="{{ false }}">
+            <a href="Studio%20Posts.dc.html" style="display:block;padding:10px 12px;border-top:1px solid var(--cs-line);font-size:13px">Open in Posts →</a>
+          </sc-if>
+        </aside>
+      </div>
+    </main>
+  </div>
+</section>
+</sc-for>
+
+<section id="b" data-screen-label="b Key" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;max-width:1100px">
+    <span style="font-family:var(--cs-mono);font-size:12px;font-weight:500;background:#141417;color:#f5f4f0;padding:2px 8px;border-radius:2px">b</span>
+    <span style="font-size:20px;font-weight:600">Key, at 3× size</span>
+    <span style="font-size:14px;line-height:1.55;color:#55565b;flex-basis:100%;max-width:920px;text-wrap:pretty">Status follows one rule for every mark. Filled means live and dashed means draft. An outline with a centre dot means scheduled. A dot on the bottom-right corner means a live record has more to come: dim for unpublished changes, warn for a change scheduled. Warn means scheduled everywhere, here and in the status chip. A ring type is a filled type drawn inside a ring. Sizes are given at 1×.</span>
+  </div>
+  <div data-theme="{{ theme }}" style="width:1180px;background:var(--cs-surface);color:var(--cs-ink);font-family:var(--cs-font);padding:28px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px;border:1px solid var(--cs-line)">
+    <div style="display:grid;grid-template-columns:180px repeat(5,minmax(0,1fr));border-top:1px solid var(--cs-line)">
+      <span></span>
+      <sc-for list="{{ keyStates }}" as="s" hint-placeholder-count="5"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 8px;border-bottom:1px solid var(--cs-line)">{{ s }}</span></sc-for>
+      <sc-for list="{{ keyRows }}" as="row" hint-placeholder-count="4">
+        <span style="display:flex;flex-direction:column;justify-content:center;gap:2px;padding:10px 8px 10px 0;border-bottom:1px solid var(--cs-line)"><span style="font-size:14px;font-weight:500">{{ row.label }}</span><span style="font-size:12px;color:var(--cs-meta)">{{ row.sub }}</span></span>
+        <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="5">
+          <span style="display:flex;align-items:center;padding:8px;border-bottom:1px solid var(--cs-line)">
+            <svg width="{{ c.pw }}" height="{{ c.ph }}" viewBox="{{ c.g.vb }}">
+              <sc-for list="{{ c.g.rects }}" as="p" hint-placeholder-count="1"><rect x="{{ p.x }}" y="{{ p.y }}" width="{{ p.w }}" height="{{ p.h }}" rx="{{ p.rx }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }}"></rect></sc-for>
+              <sc-for list="{{ c.g.circles }}" as="p" hint-placeholder-count="1"><circle cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ p.r }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }}"></circle></sc-for>
+            </svg>
+          </span>
+        </sc-for>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border-top:1px solid var(--cs-line)">
+      <sc-for list="{{ keySingles }}" as="c" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:12px 8px;border-bottom:1px solid var(--cs-line)">
+          <svg width="{{ c.pw }}" height="{{ c.ph }}" viewBox="{{ c.g.vb }}">
+            <sc-for list="{{ c.g.rects }}" as="p" hint-placeholder-count="1"><rect x="{{ p.x }}" y="{{ p.y }}" width="{{ p.w }}" height="{{ p.h }}" rx="{{ p.rx }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }}"></rect></sc-for>
+            <sc-for list="{{ c.g.circles }}" as="p" hint-placeholder-count="1"><circle cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ p.r }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }}"></circle></sc-for>
+            <sc-for list="{{ c.g.texts }}" as="p" hint-placeholder-count="0"><text x="{{ p.x }}" y="{{ p.y }}" text-anchor="middle" style="font-size:{{ p.fs }};font-family:{{ p.ff }};fill:{{ p.f }}">{{ p.s }}</text></sc-for>
+          </svg>
+          <span style="font-size:14px;font-weight:500">{{ c.label }}</span>
+          <span style="font-size:12px;line-height:1.5;color:var(--cs-dim);text-wrap:pretty">{{ c.sub }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--cs-line)">
+      <sc-for list="{{ keyLines }}" as="l" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:14px 8px;border-bottom:1px solid var(--cs-line)">
+          <svg width="180" height="24" viewBox="0 0 60 8"><line x1="2" y1="4" x2="58" y2="4" style="stroke:{{ l.s }};stroke-width:{{ l.w }};stroke-dasharray:{{ l.d }};stroke-linecap:{{ l.cap }}"></line></svg>
+          <span style="font-size:14px;font-weight:500">{{ l.label }}</span>
+          <span style="font-size:12px;line-height:1.5;color:var(--cs-dim)">{{ l.sub }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.6;color:var(--cs-dim);max-width:900px">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MEASUREMENTS AT 1×</span>
+      <span>Page 14×10 and Home 18×13, both with a 2px radius. Post r 4–9 by links. Ring type r 7: a 1.5px ring with a filled type of r 4 inside it.</span>
+      <span>Scheduled centre dot: 4px across, in --cs-warn. Corner dot: 5px across, its centre 1px in from the mark's bottom-right corner (on the 45° line for circles), with a 1.5px --cs-surface ring.</span>
+      <span>Hub r 6. Its inner ring is 1.5px of --cs-surface, its outer edge 1.5px inside the hub's edge. Draft dash: 2.5 / 1.5 on pages, 2 / 1.5 on circles.</span>
+      <span>Lists line: 1.5px, round caps, dash 0.1 / 3.5, so it draws as dots 1.5px across spaced 3.6px apart. Selection: a 2px accent ring with a 2px gap.</span>
+    </div>
+  </div>
+</section>
+
+<section id="c" data-screen-label="c Legend" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;max-width:1100px">
+    <span style="font-family:var(--cs-mono);font-size:12px;font-weight:500;background:#141417;color:#f5f4f0;padding:2px 8px;border-radius:2px">c</span>
+    <span style="font-size:20px;font-weight:600">Legend as filter</span>
+    <span style="font-size:14px;line-height:1.55;color:#55565b;flex-basis:100%;max-width:920px;text-wrap:pretty">Each entry is a checkbox, so a click on the mark, the name or the count toggles it. Counts are what's on the site, not what's in view. Tags are shown off here: when a type is off, its name goes to text-meta and its nodes and their lines leave the graph. "All posts" goes on and off with Post types. Status isn't a filter. It's explained by a "Status" link that opens the key from <a href="#b">b</a> as a popover.</span>
+  </div>
+  <div data-theme="{{ theme }}" style="width:1180px;background:var(--cs-surface);color:var(--cs-ink);font-family:var(--cs-font);border:1px solid var(--cs-line);box-sizing:border-box">
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;padding:10px 14px;font-size:13px;color:var(--cs-dim)">
+      <sc-for list="{{ legendTypesC }}" as="l" hint-placeholder-count="4">
+        <span style="display:flex;gap:7px;align-items:center;padding:4px 6px;border-radius:2px;outline:{{ l.focus }};outline-offset:1px"><span style="width:14px;height:14px;box-sizing:border-box;border-radius:2px;display:grid;place-items:center;font-size:10px;line-height:1;background:{{ l.cbBg }};border:1.5px solid {{ l.cbBd }};color:var(--cs-paper)">{{ l.tick }}</span><span style="flex:none;box-sizing:border-box;width:{{ l.m.w }};height:{{ l.m.h }};border-radius:{{ l.m.r }};background:{{ l.m.bg }};border:{{ l.m.bd }};box-shadow:{{ l.m.sh }}"></span><span style="color:{{ l.tc }}">{{ l.label }}</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ l.n }}</span></span>
+      </sc-for>
+      <span style="width:1px;height:18px;background:var(--cs-line)"></span>
+      <sc-for list="{{ legendEdges }}" as="l" hint-placeholder-count="4">
+        <span style="display:flex;gap:7px;align-items:center;padding:4px 6px"><span style="width:14px;height:14px;box-sizing:border-box;border-radius:2px;display:grid;place-items:center;font-size:10px;line-height:1;background:var(--cs-ink);border:1.5px solid var(--cs-ink);color:var(--cs-paper)">✓</span><span style="width:20px;height:0;border-top:{{ l.bt }}"></span><span>{{ l.label }}</span></span>
+      </sc-for>
+      <span style="margin-left:auto;font-size:12px;color:var(--cs-dim);text-decoration:underline;text-underline-offset:3px">Status</span>
+    </div>
+  </div>
+</section>
+
+<section id="d" data-screen-label="d Search" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;max-width:1100px">
+    <span style="font-family:var(--cs-mono);font-size:12px;font-weight:500;background:#141417;color:#f5f4f0;padding:2px 8px;border-radius:2px">d</span>
+    <span style="font-size:20px;font-weight:600">Search</span>
+    <span style="font-size:14px;line-height:1.55;color:#55565b;flex-basis:100%;max-width:920px;text-wrap:pretty">This is the existing menu panel under the list's search field. Results are grouped in a fixed order, Pages, Post types, Posts, Tags, with at most 5 per group and "+N more" to see the rest. Pages show their path in mono. ↑↓ moves and Enter selects the node and centres it. Groups with no results are left out.</span>
+  </div>
+  <div data-theme="{{ theme }}" style="width:340px;background:var(--cs-chrome);color:var(--cs-ink);font-family:var(--cs-font);padding:12px;box-sizing:border-box;border:1px solid var(--cs-line);display:flex;flex-direction:column;gap:6px">
+    <span style="font-size:13px;padding:7px 9px;border:1px solid var(--cs-accent);border-radius:2px;background:var(--cs-paper)">work<span style="display:inline-block;width:1px;height:14px;background:var(--cs-ink);vertical-align:-2px"></span></span>
+    <div role="listbox" style="background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px 4px 6px;display:flex;flex-direction:column">
+      <sc-for list="{{ search }}" as="g" hint-placeholder-count="3">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:8px 8px 4px">{{ g.head }}</span>
+        <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="2">
+          <span style="display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:2px;background:{{ r.bg }}">
+            <span style="flex:none;box-sizing:border-box;width:{{ r.m.w }};height:{{ r.m.h }};border-radius:{{ r.m.r }};background:{{ r.m.bg }};border:{{ r.m.bd }};box-shadow:{{ r.m.sh }}"></span>
+            <span style="display:flex;flex-direction:column;min-width:0;flex:1"><span style="font-size:13px;font-family:{{ r.ff }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.pre }}<b style="font-weight:600">{{ r.hit }}</b>{{ r.post }}</span><sc-if value="{{ r.hasPath }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ r.path }}</span></sc-if></span>
+            <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ r.right }}</span>
+          </span>
+        </sc-for>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section id="g" data-screen-label="g Node cards" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;max-width:1100px">
+    <span style="font-family:var(--cs-mono);font-size:12px;font-weight:500;background:#141417;color:#f5f4f0;padding:2px 8px;border-radius:2px">g</span>
+    <span style="font-size:20px;font-weight:600">Node cards: page and post type</span>
+    <span style="font-size:14px;line-height:1.55;color:#55565b;flex-basis:100%;max-width:920px;text-wrap:pretty">This is the existing card, opened beside the node. The status chip keeps its three dot colours: ok for live, meta for draft, warn for scheduled. A second state is added after the label as a "·" suffix in text-dim. A scheduled change gets its own warn dot. Unpublished changes get none, because they aren't scheduled. Below the cards are the five chips.</span>
+  </div>
+  <div data-theme="{{ theme }}" style="width:1180px;background:var(--cs-surface);color:var(--cs-ink);font-family:var(--cs-font);padding:28px;box-sizing:border-box;border:1px solid var(--cs-line);display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:300px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;box-shadow:var(--cs-shadow-menu);padding:14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box">
+        <span style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:9px;border-radius:2px;background:var(--cs-ink)"></span><span style="font-size:12px;color:var(--cs-dim)">Page</span><span style="margin-left:auto;color:var(--cs-meta)">×</span></span>
+        <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600;line-height:1.3">Blog</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">/blog</span></span>
+        <span style="display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>Live<span style="color:var(--cs-dim)">· Unpublished changes</span></span>
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">1 CHILD PAGE · LISTS BLOG POST · 112</span>
+        <span style="display:flex;gap:6px;padding-top:2px"><span style="font-size:13px;font-weight:500;padding:6px 11px;border-radius:2px;background:var(--cs-ink);color:var(--cs-paper)">Open page</span><span style="font-size:13px;padding:6px 11px;border-radius:2px;border:1px solid var(--cs-line-strong)">Focus</span><span style="font-size:13px;padding:6px 11px;border-radius:2px;border:1px solid var(--cs-line-strong)">Pin</span></span>
+      </div>
+      <div style="width:300px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;box-shadow:var(--cs-shadow-menu);padding:14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box">
+        <span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-1);box-shadow:inset 0 0 0 1.5px var(--cs-cat-1),inset 0 0 0 3px var(--cs-surface)"></span><span style="font-size:12px;color:var(--cs-dim)">Post type</span><span style="margin-left:auto;color:var(--cs-meta)">×</span></span>
+        <span style="font-size:15px;font-weight:600;line-height:1.3">Blog post</span>
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">112 POSTS · LISTED ON 2 PAGES</span>
+        <span style="display:flex;flex-direction:column;gap:4px;font-size:13px"><span style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:7px;border-radius:2px;background:var(--cs-ink)"></span>Blog<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">/blog</span></span><span style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:7px;border-radius:2px;background:var(--cs-ink)"></span>Workshops<span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">/work/workshops</span></span></span>
+        <span style="display:flex;gap:6px;padding-top:2px"><span style="font-size:13px;font-weight:500;padding:6px 11px;border-radius:2px;background:var(--cs-ink);color:var(--cs-paper)">Open in Posts</span><span style="font-size:13px;padding:6px 11px;border-radius:2px;border:1px solid var(--cs-line-strong)">Focus</span><span style="font-size:13px;padding:6px 11px;border-radius:2px;border:1px solid var(--cs-line-strong)">Pin</span></span>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:{{ c.dot }}"></span>{{ c.label }}<sc-if value="{{ c.hasSuf }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:5px;color:var(--cs-dim)">·<sc-if value="{{ c.warnDot }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-warn)"></span></sc-if>{{ c.suf }}</span></sc-if></span>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section id="h" data-screen-label="h Large site" style="display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;max-width:1100px">
+    <span style="font-family:var(--cs-mono);font-size:12px;font-weight:500;background:#141417;color:#f5f4f0;padding:2px 8px;border-radius:2px">h</span>
+    <span style="font-size:20px;font-weight:600">Large site, opened around Home</span>
+    <span style="font-size:14px;line-height:1.55;color:#55565b;flex-basis:100%;max-width:920px;text-wrap:pretty">This shows when the graph would draw more than about 3,000 lines. It's the existing info alert, inside the canvas at the top left. "Show everything" turns the button into a "Laying out 2,316 nodes…" status, then closes the alert. The alert comes back when you reload, because the graph doesn't remember the choice.</span>
+  </div>
+  <div data-theme="{{ theme }}" style="position:relative;width:908px;height:500px;background:var(--cs-surface);color:var(--cs-ink);font-family:var(--cs-font);border:1px solid var(--cs-line);overflow:hidden">
+    <svg viewBox="{{ gH.vb }}" style="position:absolute;inset:0;width:100%;height:100%">
+      <sc-for list="{{ gH.lines }}" as="p" hint-placeholder-count="6"><line x1="{{ p.x1 }}" y1="{{ p.y1 }}" x2="{{ p.x2 }}" y2="{{ p.y2 }}" style="stroke:{{ p.s }};stroke-width:{{ p.w }};stroke-dasharray:{{ p.d }};stroke-linecap:{{ p.cap }};opacity:{{ p.o }}"></line></sc-for>
+      <sc-for list="{{ gH.rects }}" as="p" hint-placeholder-count="6"><rect x="{{ p.x }}" y="{{ p.y }}" width="{{ p.w }}" height="{{ p.h }}" rx="{{ p.rx }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }};opacity:{{ p.o }}"></rect></sc-for>
+      <sc-for list="{{ gH.circles }}" as="p" hint-placeholder-count="4"><circle cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ p.r }}" style="fill:{{ p.f }};stroke:{{ p.s }};stroke-width:{{ p.sw }};stroke-dasharray:{{ p.d }};opacity:{{ p.o }}"></circle></sc-for>
+      <sc-for list="{{ gH.texts }}" as="p" hint-placeholder-count="8"><text x="{{ p.x }}" y="{{ p.y }}" text-anchor="{{ p.a }}" style="font-size:{{ p.fs }};font-family:{{ p.ff }};fill:{{ p.f }};font-weight:{{ p.fw }};paint-order:stroke;stroke:var(--cs-surface);stroke-width:3px;stroke-linejoin:round">{{ p.s }}</text></sc-for>
+    </svg>
+    <div role="status" style="position:absolute;left:12px;top:12px;max-width:520px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--cs-accent-tint);border-radius:2px;font-size:13px;line-height:1.5">
+      <span style="color:var(--cs-accent);font-weight:600">i</span>
+      <span style="flex:1;min-width:240px">This site has 212 pages, 2,040 posts and 64 tags. To keep the graph quick, it opens around Home.</span>
+      <span style="font-weight:500;font-size:12px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 10px">Show everything</span>
+    </div>
+  </div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const T = { ink: 'var(--cs-ink)', dim: 'var(--cs-dim)', meta: 'var(--cs-meta)', sur: 'var(--cs-surface)', warn: 'var(--cs-warn)', acc: 'var(--cs-accent)', ls: 'var(--cs-line-strong)', line: 'var(--cs-line)', mono: 'var(--cs-mono)', sans: 'var(--cs-font)' };
+    const cat = i => `var(--cs-cat-${i})`;
+    const ES = { tree: { s: T.ls, w: 1, d: 'none' }, lists: { s: T.dim, w: 1.5, d: '0.1 3.5', cap: 'round' }, rel: { s: T.ink, w: 1.5, d: 'none' }, tag: { s: T.meta, w: 1, d: '4 3' }, faint: { s: T.line, w: 1, d: 'none' } };
+
+    const draw = (S, n) => {
+      const o = n.op ?? 1, { x, y } = n;
+      const R = (cx, cy, w, h, rx, f, s, sw, d) => S.rects.push({ x: cx - w / 2, y: cy - h / 2, w, h, rx, f, s: s || 'none', sw: sw || 0, d: d || 'none', o });
+      const C = (cx, cy, r, f, s, sw, d) => S.circles.push({ cx, cy, r, f, s: s || 'none', sw: sw || 0, d: d || 'none', o });
+      const corner = (cx, cy, col) => C(cx, cy, 2.5, col, T.sur, 1.5);
+      const statusRect = (w, h, col, st) => {
+        if (st === 'draft') R(x, y, w, h, 2, T.sur, col, 1.5, '2.5 1.5');
+        else if (st === 'sched') { R(x, y, w, h, 2, T.sur, col, 1.5); C(x, y, 2, T.warn); }
+        else R(x, y, w, h, 2, col);
+        if (st === 'changes') corner(x + w / 2 - 1, y + h / 2 - 1, T.dim);
+        if (st === 'chsched') corner(x + w / 2 - 1, y + h / 2 - 1, T.warn);
+      };
+      const statusCirc = (r, col, st, cornerR) => {
+        if (st === 'draft') C(x, y, r, T.sur, col, 1.5, '2 1.5');
+        else if (st === 'sched') { C(x, y, r, T.sur, col, 1.5); C(x, y, 2, T.warn); }
+        else C(x, y, r, col);
+        const k = (cornerR || r) * 0.707;
+        if (st === 'changes') corner(x + k, y + k, T.dim);
+        if (st === 'chsched') corner(x + k, y + k, T.warn);
+      };
+      let hw = 7, hh = 5;
+      if (n.k === 'page' || n.k === 'home') {
+        const [w, h] = n.k === 'home' ? [18, 13] : [14, 10]; hw = w / 2; hh = h / 2;
+        statusRect(w, h, T.ink, n.st || 'live');
+        if (n.sel) R(x, y, w + 8, h + 8, 4, 'none', T.acc, 2);
+      } else if (n.k === 'post') {
+        const r = n.r || 6; hw = hh = r;
+        if (n.ring) {
+          C(x, y, 7, T.sur, n.c, 1.5); hw = hh = 7;
+          if (n.st === 'draft') C(x, y, 4, T.sur, n.c, 1.5, '2 1.5');
+          else if (n.st === 'sched') { C(x, y, 4, T.sur, n.c, 1.5); C(x, y, 2, T.warn); }
+          else C(x, y, 4, n.c);
+          if (n.st === 'changes') corner(x + 5, y + 5, T.dim);
+          if (n.st === 'chsched') corner(x + 5, y + 5, T.warn);
+        } else statusCirc(r, n.c, n.st || 'live');
+      } else if (n.k === 'tag') { R(x, y, 10, 10, 0, T.sur, T.meta, 1.5); hw = hh = 5; }
+      else if (n.k === 'hub' || n.k === 'all') { const col = n.k === 'all' ? T.dim : n.c; C(x, y, 6, col); C(x, y, 3.75, 'none', T.sur, 1.5); hw = hh = 6; }
+      else if (n.k === 'retired') { C(x, y, 6, T.sur, T.dim, 1.5); C(x, y, 2, T.dim); hw = hh = 6; }
+      else if (n.k === 'more') { R(x, y, 60, 16, 8, T.sur, T.ls, 1); S.texts.push({ x, y: y + 3.5, s: n.label, fs: '10px', ff: T.mono, f: T.dim, a: 'middle', fw: 400, o }); return; }
+      if (n.label) {
+        const isTag = n.k === 'tag', isPost = n.k === 'post';
+        const lp = n.lp || 'r';
+        const tx = lp === 'r' ? x + hw + 6 : lp === 'l' ? x - hw - 6 : x;
+        const ty = lp === 't' ? y - hh - 6 : lp === 'b' ? y + hh + 14 : y + 4;
+        S.texts.push({ x: tx, y: ty, s: n.label, a: lp === 'r' ? 'start' : lp === 'l' ? 'end' : 'middle', fs: isTag ? '11px' : '12px', ff: isTag ? T.mono : T.sans, f: n.sel ? T.ink : isTag ? T.meta : isPost ? T.dim : T.ink, fw: n.sel ? 600 : n.k === 'home' ? 600 : 400, o });
+      }
+    };
+    const build = (nodes, edges, vb) => {
+      const S = { vb, lines: [], rects: [], circles: [], texts: [] }, N = {};
+      nodes.forEach(n => N[n.id] = n);
+      edges.forEach(([a, b, k]) => { const e = ES[k]; S.lines.push({ x1: N[a].x, y1: N[a].y, x2: N[b].x, y2: N[b].y, s: e.s, w: e.w, d: e.d, cap: e.cap || 'butt', o: Math.min(N[a].op ?? 1, N[b].op ?? 1) }); });
+      nodes.forEach(n => draw(S, n));
+      return S;
+    };
+    const P = (id, x, y, st, label, lp, k) => ({ id, x, y, k: k || 'page', st, label, lp });
+    const Po = (id, x, y, c, st, r, label, lp, ring) => ({ id, x, y, k: 'post', c, st, r, label, lp, ring });
+
+    // a: whole graph
+    const A = [
+      P('home', 440, 300, 'live', 'Home', 'b', 'home'), P('about', 300, 210, 'live', 'About', 'l'), P('team', 205, 145, 'draft', 'Team', 'l'),
+      P('contact', 440, 160, 'chsched', 'Contact', 't'), P('blog', 580, 205, 'changes', 'Blog', 't'), P('work', 300, 405, 'live', 'Work', 'l'),
+      P('cases', 185, 465, 'live', 'Case studies', 'l'), P('workshops', 330, 510, 'sched', 'Workshops', 'l'), P('now', 590, 405, 'live', 'Now', 'b'),
+      { id: 'tBlog', x: 715, y: 140, k: 'hub', c: cat(1), label: 'Blog post', lp: 'l' }, { id: 'tNow', x: 720, y: 470, k: 'hub', c: cat(2), label: 'Now update', lp: 'l' },
+      { id: 'tRes', x: 140, y: 315, k: 'hub', c: cat(3), label: 'Resume entry', lp: 't' }, { id: 'all', x: 520, y: 335, k: 'all', label: 'All posts', lp: 'r' },
+      { id: 'workshop', x: 450, y: 555, k: 'tag', label: 'workshop (2)', lp: 'r' },
+      Po('p1', 650, 62, cat(1), 'live', 8, 'Translating Everything With Mobility', 't'), Po('p2', 800, 78, cat(1), 'live', 6), Po('p3', 830, 175, cat(1), 'live', 5),
+      Po('p4', 790, 245, cat(1), 'draft', 5), Po('p5', 630, 125, cat(1), 'live', 6), Po('p6', 860, 120, cat(1), 'live', 7, null, null, true), Po('p7', 700, 270, cat(1), 'changes', 5),
+      Po('pw', 575, 540, cat(1), 'sched', 6, 'Autumn workshop dates', 'r'),
+      Po('n1', 810, 420, cat(2), 'live', 6, 'Now: shipping translations', 'l'), Po('n2', 830, 515, cat(2), 'chsched', 5), Po('n3', 705, 545, cat(2), 'draft', 5),
+      Po('r1', 60, 255, cat(3), 'live', 6), Po('r2', 70, 385, cat(3), 'live', 5),
+      { id: 'ruby', x: 745, y: 330, k: 'tag', label: 'ruby (4)', lp: 'b' }, { id: 'i18n', x: 860, y: 300, k: 'tag', label: 'i18n (3)', lp: 'l' }, { id: 'hotwire', x: 770, y: 18, k: 'tag', label: 'hotwire (2)', lp: 'r' }
+    ];
+    const AE = [['home', 'about', 'tree'], ['home', 'contact', 'tree'], ['home', 'blog', 'tree'], ['home', 'work', 'tree'], ['home', 'now', 'tree'], ['about', 'team', 'tree'], ['work', 'cases', 'tree'], ['work', 'workshops', 'tree'],
+      ['blog', 'tBlog', 'lists'], ['now', 'tNow', 'lists'], ['work', 'tRes', 'lists'], ['workshops', 'workshop', 'lists'], ['home', 'all', 'lists'],
+      ['p1', 'ruby', 'tag'], ['p1', 'i18n', 'tag'], ['p5', 'ruby', 'tag'], ['p7', 'ruby', 'tag'], ['p3', 'i18n', 'tag'], ['n1', 'i18n', 'tag'], ['pw', 'workshop', 'tag'], ['p2', 'hotwire', 'tag'], ['p6', 'hotwire', 'tag'], ['n1', 'ruby', 'tag'],
+      ['p1', 'p5', 'rel'], ['p1', 'p2', 'rel'], ['p2', 'p6', 'rel'], ['n1', 'n2', 'rel']];
+    const gA = build(A, AE, '0 0 900 600');
+
+    // f: local view around Blog, depth 2
+    const STS = ['live', 'live', 'draft', 'live', 'sched', 'changes', 'live', 'chsched', 'live', 'live'];
+    const F = [P('blog', 400, 300, 'changes', 'Blog', 't'), P('home', 230, 300, 'live', 'Home', 'b', 'home'), P('about', 120, 205, 'live', 'About', 'l'), P('contact', 210, 150, 'chsched', 'Contact', 't'),
+      P('work', 110, 390, 'live', 'Work', 'l'), P('now', 210, 450, 'live', 'Now', 'b'), P('archive', 400, 430, 'live', 'Archive', 'b'),
+      { id: 'tBlog', x: 590, y: 300, k: 'hub', c: cat(1), label: 'Blog post', lp: 'b' }];
+    F[0].sel = true;
+    const FE = [['home', 'blog', 'tree'], ['home', 'about', 'tree'], ['home', 'contact', 'tree'], ['home', 'work', 'tree'], ['home', 'now', 'tree'], ['blog', 'archive', 'tree'], ['blog', 'tBlog', 'lists']];
+    const fTitles = ['Translating Everything With Mobility', 'Building ContentSpiel', 'Locale fallbacks in Rails', 'Turbo frames without tears', 'A small Stimulus controller', 'Deploying with Kamal', 'Five lenses we actually use', 'Notes on editing in the dark', 'Autumn workshop dates', 'Welcome to our new site', 'Why I left WordPress', 'Writing for two languages', 'A year of Now updates', 'Image sizes, honestly', 'The case for fewer plugins', 'Shipping on Fridays', 'Tags that age well', 'Drafts are cheap', 'On redirects', 'Small sites, long lives'];
+    fTitles.forEach((t, i) => {
+      const inner = i < 8, k = inner ? i : i - 8, cnt = inner ? 8 : 12, rad = inner ? 115 : 195;
+      const a = (-100 + (200 / (cnt - 1)) * k) * Math.PI / 180;
+      const id = 'f' + i;
+      F.push(Po(id, 590 + rad * Math.cos(a), 300 + rad * Math.sin(a), cat(1), STS[i % 10], inner ? 6 : 5, i < 2 ? t : null, 'r', i === 11));
+      FE.push(['tBlog', id, 'faint']);
+    });
+    F.push({ id: 'more', x: 815, y: 520, k: 'more', label: '+92 more' }); FE.push(['tBlog', 'more', 'faint']);
+    const gF = build(F, FE, '0 0 900 600');
+
+    const H = [P('home', 450, 270, 'live', 'Home', 'b', 'home'), P('h1', 320, 190, 'live', 'About', 'l'), P('h2', 450, 150, 'live', 'Work', 't'), P('h3', 590, 190, 'changes', 'Blog', 'r'),
+      P('h4', 600, 340, 'live', 'Events', 'r'), P('h5', 450, 400, 'live', 'Shop', 'b'), P('h6', 300, 350, 'live', 'Press', 'l'),
+      { id: 'tb', x: 720, y: 140, k: 'hub', c: cat(1), label: 'Blog post', lp: 'r' }, { id: 'te', x: 740, y: 390, k: 'hub', c: cat(4), label: 'Event', lp: 'r' }, { id: 'all', x: 380, y: 280, k: 'all', label: 'All posts', lp: 'l' },
+      { id: 'm1', x: 790, y: 190, k: 'more', label: '+1,460 more' }, { id: 'm2', x: 800, y: 440, k: 'more', label: '+380 more' }, { id: 'm3', x: 180, y: 250, k: 'more', label: '+199 pages' }];
+    const HE = [['home', 'h1', 'tree'], ['home', 'h2', 'tree'], ['home', 'h3', 'tree'], ['home', 'h4', 'tree'], ['home', 'h5', 'tree'], ['home', 'h6', 'tree'], ['h3', 'tb', 'lists'], ['h4', 'te', 'lists'], ['home', 'all', 'lists'], ['tb', 'm1', 'faint'], ['te', 'm2', 'faint'], ['h1', 'm3', 'faint']];
+    const gH = build(H, HE, '0 0 908 500');
+
+    // span marks for legend, list, search
+    const M = (k, st, c) => {
+      const b = { w: '8px', h: '8px', r: '999px', bg: 'transparent', bd: '0', sh: 'none' };
+      if (k === 'page' || k === 'home') { Object.assign(b, { w: k === 'home' ? '13px' : '11px', h: k === 'home' ? '9px' : '8px', r: '2px', bg: T.ink }); if (st === 'draft') Object.assign(b, { bg: T.sur, bd: '1.5px dashed ' + T.ink }); if (st === 'sched') Object.assign(b, { bg: T.sur, bd: '1.5px solid ' + T.ink }); return b; }
+      if (k === 'post') { b.bg = c; if (st === 'draft') Object.assign(b, { bg: T.sur, bd: '1.5px dashed ' + c }); if (st === 'sched') Object.assign(b, { bg: T.sur, bd: '1.5px solid ' + c }); return b; }
+      if (k === 'tag') return Object.assign(b, { r: '0', bg: T.sur, bd: '1.5px solid ' + T.meta });
+      if (k === 'hub' || k === 'all') { const col = k === 'all' ? T.dim : c; return Object.assign(b, { w: '10px', h: '10px', bg: col, sh: `inset 0 0 0 1.5px ${col}, inset 0 0 0 3px ${T.sur}` }); }
+      return b;
+    };
+    const lt = (label, n, m, on, focus) => ({ label, n, m, tick: on ? '✓' : '', cbBg: on ? T.ink : 'transparent', cbBd: on ? T.ink : T.ls, tc: on ? T.dim : T.meta, focus: focus ? '2px solid ' + T.acc : 'none' });
+    const legendTypes = [lt('Pages', 9, M('page')), lt('Post types', 3, M('hub', null, cat(1))), lt('Posts', 13, M('post', 'live', cat(1))), lt('Tags', 4, M('tag'), true)];
+    const legendTypesC = [lt('Pages', 212, M('page'), true), lt('Post types', 6, M('hub', null, cat(1)), true), lt('Posts', '2,040', M('post', 'live', cat(1)), true, true), lt('Tags', 64, M('tag'), false)];
+    legendTypes.forEach(l => { l.tick = '✓'; l.cbBg = T.ink; l.cbBd = T.ink; });
+    const legendEdges = [{ label: 'Tree', bt: '1px solid ' + T.ls }, { label: 'Lists', bt: '2px dotted ' + T.dim }, { label: 'Related', bt: '1.5px solid ' + T.ink }, { label: 'Shares a tag', bt: '1px dashed ' + T.meta }];
+
+    const row = (label, m, right, ind, extra) => Object.assign({ label, m, right: right ?? '', ind: (ind || 12) + 'px', tc: T.ink, ff: T.sans, aria: label }, extra || {});
+    const groupsA = [
+      { head: 'PAGES · 9', rows: [row('Home', M('home'), '6'), row('About', M('page'), '2', 26), row('Team', M('page', 'draft'), '1', 40), row('Contact', M('page'), '1', 26), row('Blog', M('page'), '2', 26), row('Work', M('page'), '4', 26), row('Case studies', M('page'), '1', 40), row('Workshops', M('page', 'sched'), '2', 40), row('Now', M('page'), '2', 26)] },
+      { head: 'POST TYPES · 3', rows: [row('Blog post', M('hub', null, cat(1)), '112'), row('Now update', M('hub', null, cat(2)), '24'), row('Resume entry', M('hub', null, cat(3)), '6'), row('All posts', M('all'), '142')] },
+      { head: 'POSTS · 13', rows: [row('Translating Everything With Mobility', M('post', 'live', cat(1)), '4'), row('Now: shipping translations', M('post', 'live', cat(2)), '4'), row('Autumn workshop dates', M('post', 'sched', cat(1)), '1'), row('Building ContentSpiel', M('post', 'live', cat(1)), '2')] },
+      { head: 'TAGS · 4', rows: [row('ruby', M('tag'), '4', 12, { ff: T.mono, tc: T.dim }), row('i18n', M('tag'), '3', 12, { ff: T.mono, tc: T.dim })] }
+    ];
+    const nivRows = fTitles.slice(0, 3).map((t, i) => row(t, M('post', STS[i], cat(1)), '', 12, { aria: t + ', blog post' }))
+      .concat(['Small sites, long lives', 'Notes from the workshop', 'Plain text forever', 'What the analytics said', 'Moving off Heroku'].map(t => row(t, M('post', 'live', cat(1)), 'not in view', 12, { tc: T.dim, aria: t + ', blog post, not in view. Activate to add it to the graph.' })));
+    const groupsF = [{ head: 'IN VIEW · 20', rows: nivRows.slice(0, 3) }, { head: 'NOT IN VIEW · 92', rows: nivRows.slice(3) }];
+
+    const sr = (pre, hit, post, m, path, right, sel, mono) => ({ pre, hit, post, m, path: path || '', hasPath: !!path, right: right || '', bg: sel ? 'var(--cs-sunken)' : 'transparent', ff: mono ? T.mono : T.sans });
+    const search = [
+      { head: 'PAGES', rows: [sr('', 'Work', '', M('page'), '/work', '', true), sr('', 'Work', 'shops', M('page', 'sched'), '/work/workshops')] },
+      { head: 'POSTS', rows: [sr('Autumn ', 'work', 'shop dates', M('post', 'sched', cat(1))), sr('How we ', 'work', ' with translators', M('post', 'live', cat(1)))] },
+      { head: 'TAGS', rows: [sr('', 'work', 'shop', M('tag'), '', '2', false, true)] }
+    ];
+
+    // key
+    const cell = (n, vbw, vbh, scale) => { const g = build([Object.assign({ x: 0, y: 0 }, n)], [], `${-vbw / 2} ${-vbh / 2} ${vbw} ${vbh}`); return { g, pw: vbw * scale, ph: vbh * scale }; };
+    const states = ['live', 'draft', 'sched', 'changes', 'chsched'];
+    const keyRows = [
+      { label: 'Page', sub: '14×10, ink', make: st => ({ k: 'page', st }) },
+      { label: 'Home', sub: '18×13, ink', make: st => ({ k: 'home', st }) },
+      { label: 'Post, filled type', sub: 'Slots 1–6, e.g. Blog post', make: st => ({ k: 'post', st, c: cat(1), r: 7 }) },
+      { label: 'Post, ring type', sub: 'Slots 7–12 and retired types', make: st => ({ k: 'post', st, c: cat(1), ring: true }) }
+    ].map(r => ({ label: r.label, sub: r.sub, cells: states.map(st => cell(r.make(st), 28, 22, 3)) }));
+    const keySingles = [
+      Object.assign(cell({ k: 'tag' }, 28, 22, 3), { label: 'Tag', sub: '10×10 square, 1.5px meta outline. Unchanged.' }),
+      Object.assign(cell({ k: 'hub', c: cat(1) }, 28, 22, 3), { label: 'Post-type hub', sub: '12px circle in the type colour with a surface inner ring. Joined only to pages that list it.' }),
+      Object.assign(cell({ k: 'retired' }, 28, 22, 3), { label: 'Retired type hub', sub: 'Outline in dim with a 4px dim centre. Label ends “(retired)”.' }),
+      Object.assign(cell({ k: 'all' }, 28, 22, 3), { label: 'All posts', sub: 'A hub filled with dim. One on the graph, for every block that has no filter.' }),
+      Object.assign(cell({ k: 'more', label: '+92 more' }, 66, 22, 3), { label: '“+N more”', sub: '60×16 pill, surface, 1px line-strong, 10px mono dim. Opens the list filtered.' })
+    ];
+    const keyLines = [
+      { label: 'Tree', sub: 'Parent and child page. 1px line-strong.', ...ES.tree, cap: 'butt' },
+      { label: 'Lists', sub: 'Page to the tag, type or All posts it lists. Dots.', ...ES.lists },
+      { label: 'Related', sub: 'Related posts. 1.5px ink. Unchanged.', ...ES.rel, cap: 'butt' },
+      { label: 'Shares a tag', sub: 'Post to tag. 1px dashed meta. Unchanged.', ...ES.tag, cap: 'butt' }
+    ];
+
+    const chips = [
+      { label: 'Live', dot: 'var(--cs-ok)' }, { label: 'Draft', dot: T.meta }, { label: 'Scheduled', dot: T.warn },
+      { label: 'Live', dot: 'var(--cs-ok)', hasSuf: true, suf: 'Unpublished changes' },
+      { label: 'Live', dot: 'var(--cs-ok)', hasSuf: true, warnDot: true, suf: 'Change scheduled 14 Oct' }
+    ];
+
+    return {
+      theme: this.props.theme ?? 'light',
+      legendTypes, legendTypesC, legendEdges, search, keyStates: ['LIVE', 'DRAFT', 'SCHEDULED', 'LIVE · UNPUBLISHED CHANGES', 'LIVE · CHANGE SCHEDULED'], keyRows, keySingles, keyLines, chips, gH,
+      screens: [
+        { id: 'a', badge: 'a · e', label: 'a Whole graph', title: 'Whole graph, small site', isWhole: true, isLocal: false, g: gA, groups: groupsA,
+          summary: 'Mind graph: 9 pages, 3 post types, 13 posts and 4 tags, 27 connections. Showing everything.',
+          note: 'Home is held at the centre while the layout settles. The tree pulls each page’s children close. Blog lists the Blog post type, Work lists Resume entry, and Workshops lists the tag “workshop”. Home lists everything through the single “All posts” node. Type hubs connect only to pages, so their posts gather around them through shared tags and related posts, and their colour shows the rest. In the list beside it, pages are in tree order with indents, then post types, posts by number of links, and tags.' },
+        { id: 'f', badge: 'f · e', label: 'f Local view', title: 'Around Blog, depth 2, after clicking “+92 more”', isWhole: false, isLocal: true, g: gF, groups: groupsF,
+          summary: 'Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts. 92 more are in the list.',
+          note: 'Depth 2 around a page shows its parent, siblings, children and grandchildren, plus the 20 most recent posts it lists, with “+92 more”. Only in the local view, a hub draws faint 1px lines to the posts it brings in, so they read as belonging to it. Clicking “+92 more” filters the list. Rows that aren’t drawn say “not in view”, and clicking one adds it to the graph and selects it. “Open in Posts →” goes to the table with the same filter.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

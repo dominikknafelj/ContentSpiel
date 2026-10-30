@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="graph" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 40px;display:flex;flex-direction:column;gap:16px;min-width:0">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:26px;font-weight:600">Mind graph</h1><p style="margin:0;font-size:14px;color:var(--cs-dim)">Posts connected through Related posts and shared tags.</p></div>
+    <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface)">
+      <sc-for list="{{ modes }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.go }}" style="font-size:13px;padding:6px 11px;border:0;border-right:1px solid var(--cs-line);cursor:pointer;background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button></sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ hasData }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 220px;border:1px solid var(--cs-line);background:var(--cs-surface);border-radius:2px;min-height:520px">
+      <svg viewBox="0 0 700 500" style="width:100%;height:100%;min-height:520px;display:block">
+        <sc-for list="{{ edges }}" as="e" hint-placeholder-count="8">
+          <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="{{ e.stroke }}" stroke-width="{{ e.w }}" stroke-dasharray="{{ e.dash }}"></line>
+        </sc-for>
+        <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="10">
+          <g>
+            <circle cx="{{ n.x }}" cy="{{ n.y }}" r="{{ n.r }}" fill="{{ n.fill }}" stroke="{{ n.stroke }}" stroke-width="{{ n.sw }}"></circle>
+            <text x="{{ n.tx }}" y="{{ n.ty }}" font-size="{{ n.fs }}" font-family="{{ n.ff }}" fill="{{ n.tc }}" text-anchor="middle">{{ n.label }}</text>
+          </g>
+        </sc-for>
+      </svg>
+      <aside style="border-left:1px solid var(--cs-line);padding:16px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">CONTENT TYPES</span>
+          <sc-for list="{{ legend }}" as="l" hint-placeholder-count="3"><span style="display:flex;gap:8px;align-items:center;font-size:13px"><span style="width:9px;height:9px;border-radius:999px;background:{{ l.c }}"></span>{{ l.name }}<span style="margin-left:auto;font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ l.n }}</span></span></sc-for>
+          <span style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--cs-dim)"><span style="width:9px;height:9px;border-radius:999px;border:1.5px solid var(--cs-meta);box-sizing:border-box"></span>Tag</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">LINKS</span>
+          <span style="display:flex;gap:8px;align-items:center;font-size:13px"><span style="width:22px;height:2px;background:var(--cs-ink)"></span>Related post</span>
+          <span style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--cs-dim)"><span style="width:22px;border-top:1px dashed var(--cs-meta)"></span>Shares a tag</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:14px;border-top:1px solid var(--cs-line);font-size:12px;line-height:1.5;color:var(--cs-meta)">
+          <span>Node size = number of links. Drafts are drawn hollow.</span>
+          <span>Click a post to open it; drag to rearrange (not saved).</span>
+        </div>
+      </aside>
+    </div>
+  </sc-if>
+  <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="border:1px solid var(--cs-line);background:var(--cs-surface);border-radius:2px;padding:56px 24px;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center">
+      <span style="font-size:16px;font-weight:600">No connections yet</span>
+      <span style="font-size:14px;line-height:1.55;color:var(--cs-dim);max-width:420px">Link posts with Related posts, or give them shared tags, to see how they connect.</span>
+      <a href="Studio%20Post%20Editor.dc.html" style="margin-top:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Open a post</a>
+    </div>
+  </sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;empty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { mode: 'both' };
+  renderVals() {
+    const C = { b: 'var(--cs-cat-1)', n: 'var(--cs-cat-2)', r: 'var(--cs-cat-3)' };
+    const P = {
+      welcome: [330, 220, 'b', 'Welcome to our new site', 3, false], lenses: [180, 140, 'b', 'Five lenses we actually use', 2, false],
+      dark: [190, 330, 'b', 'Notes on editing in the dark', 1, true], autumn: [500, 120, 'b', 'Autumn workshop dates', 1, false],
+      shipping: [520, 320, 'n', 'Now: shipping translations', 2, false], resume: [400, 420, 'r', 'Studio assistant, 2024–', 1, false]
+    };
+    const Tg = { news: [430, 220], studio: [270, 260], gear: [120, 230], workshops: [610, 200] };
+    const rel = [['welcome', 'lenses'], ['welcome', 'shipping'], ['welcome', 'autumn'], ['lenses', 'dark'], ['shipping', 'resume']];
+    const tag = [['welcome', 'news'], ['autumn', 'news'], ['shipping', 'news'], ['welcome', 'studio'], ['dark', 'studio'], ['lenses', 'gear'], ['autumn', 'workshops']];
+    const m = this.state.mode;
+    const pos = k => P[k] ? [P[k][0], P[k][1]] : Tg[k];
+    const edges = [
+      ...(m !== 'tags' ? rel.map(([a, b]) => ({ a, b, stroke: 'var(--cs-ink)', w: 1.5, dash: '' })) : []),
+      ...(m !== 'related' ? tag.map(([a, b]) => ({ a, b, stroke: 'var(--cs-meta)', w: 1, dash: '4 4' })) : [])
+    ].map(e => { const [x1, y1] = pos(e.a), [x2, y2] = pos(e.b); return { ...e, x1, y1, x2, y2 }; });
+    const nodes = [
+      ...Object.values(P).map(([x, y, t, label, links, draft]) => { const r = 7 + links * 3;
+        return { x, y, r, fill: draft ? 'var(--cs-surface)' : C[t], stroke: C[t], sw: draft ? 2 : 0, label, tx: x, ty: y + r + 14, fs: 12, ff: 'Archivo, sans-serif', tc: 'var(--cs-ink)' }; }),
+      ...(m !== 'related' ? Object.entries(Tg).map(([label, [x, y]]) => ({ x, y, r: 5, fill: 'var(--cs-surface)', stroke: 'var(--cs-meta)', sw: 1.5, label: '#' + label, tx: x, ty: y - 10, fs: 10, ff: 'IBM Plex Mono, monospace', tc: 'var(--cs-meta)' })) : [])
+    ];
+    const empty = !!this.props.empty;
+    return {
+      hasData: !empty, empty, edges, nodes,
+      modes: [['both', 'Both'], ['related', 'Related only'], ['tags', 'Tags only']].map(([id, label]) => ({ label, go: () => this.setState({ mode: id }),
+        bg: m === id ? 'var(--cs-ink)' : 'transparent', fg: m === id ? 'var(--cs-paper)' : 'var(--cs-ink)' })),
+      legend: [{ name: 'Blog post', c: C.b, n: 4 }, { name: 'Now update', c: C.n, n: 1 }, { name: 'Resume entry', c: C.r, n: 1 }]
+    };
+  }
+}
+</script>
+</body>
+</html>

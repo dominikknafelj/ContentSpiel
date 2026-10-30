@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+</helmet>
+<figure style="margin: 0; width: 100%; display: flex; flex-direction: column; gap: var(--space-3); font-family: var(--font-sans);">
+  <x-import component-from-global-scope="PhotoSpielDesignSystem_db45b1.Placeholder" seed="{{ seed }}" ratio="{{ ratio }}" hint-size="100%,300px"></x-import>
+  <sc-if value="{{ hasCaption }}" hint-placeholder-val="{{ true }}">
+    <figcaption style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-4); padding: 0 {{ capPad }}; border-top: 0;">
+      <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted); max-width: 640px; text-wrap: pretty;">{{ caption }}</span>
+      <sc-if value="{{ credit }}" hint-placeholder-val="{{ true }}">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); padding-top: 2px;">{{ credit }}</span>
+      </sc-if>
+    </figcaption>
+  </sc-if>
+</figure>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;half&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;caption&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Caption describing what the image shows.&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;credit&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Photo · Credit name&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;ratio&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;16/9&quot;,&quot;3/2&quot;,&quot;4/3&quot;,&quot;1/1&quot;,&quot;4/5&quot;,&quot;21/9&quot;],&quot;default&quot;:&quot;16/9&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;bleed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;seed&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:1,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const caption = p.caption ?? 'Caption describing what the image shows, in one sentence.';
+    return {
+      seed: p.seed ?? 1,
+      ratio: p.ratio ?? ((p.size ?? 'full') === 'full' ? '16/9' : '3/2'),
+      caption, credit: p.credit ?? 'Photo · Credit name',
+      hasCaption: !!caption,
+      capPad: p.bleed ? 'var(--pad-page)' : '0',
+    };
+  }
+}
+</script>
+</body>
+</html>

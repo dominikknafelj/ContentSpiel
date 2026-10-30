@@ -1,0 +1,9 @@
+/* ============================================================
+   PHOTO·SPIEL — Design System entry point  (theme: VANTAGE)
+   Link this single file; it @imports the full token + font closure.
+   Keep this file as @import lines only — no rules.
+   ============================================================ */
+@import "tokens/fonts.css";
+@import "tokens/colors.css";
+@import "tokens/typography.css";
+@import "tokens/spacing.css";

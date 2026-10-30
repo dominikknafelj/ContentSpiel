@@ -1,0 +1,41 @@
+/* ============================================================
+   TYPOGRAPHY
+   Display/UI: Archivo (grotesk, wide tracking).
+   Mono: IBM Plex Mono — the "instrumentation" layer: EXIF, labels,
+   captions, counts, dates, the "by Dominik" credit, all caps meta.
+   ============================================================ */
+:root {
+  --font-display: "Archivo", system-ui, -apple-system, sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  /* tracking */
+  --track:        0.06em;   /* @kind spacing */
+  --track-wide:   0.18em;   /* @kind spacing */
+  --track-mono:   0.14em;   /* @kind spacing */
+
+  /* type scale (px) — page headlines, hero, titles, body, mono labels */
+  --t-display:    clamp(34px, 5vw, 68px);   /* @kind font */
+  --t-h1:         clamp(40px, 6.2vw, 84px); /* @kind font */
+  --t-h2:         30px;   /* @kind font */
+  --t-h3:         18px;   /* @kind font */
+  --t-lead:       clamp(23px, 2.8vw, 38px); /* @kind font */
+  --t-body:       16px;   /* @kind font */
+  --t-small:      13px;   /* @kind font */
+  --t-label:      11px;   /* @kind font */
+  --t-micro:      10px;   /* @kind font */
+
+  /* weights */
+  --w-light:      300; /* @kind font */
+  --w-regular:    400; /* @kind font */
+  --w-medium:     500; /* @kind font */
+  --w-semibold:   600; /* @kind font */
+  --w-bold:       700; /* @kind font */
+
+  --leading:      1.5; /* @kind font */
+  --leading-tight:1.02; /* @kind font */
+
+  /* ---- semantic aliases ---- */
+  --text-display:  var(--w-bold) var(--t-display)/var(--leading-tight) var(--font-display);
+  --text-title:    var(--w-semibold) var(--t-h3)/1.2 var(--font-display);
+  --text-body-font:var(--w-regular) var(--t-body)/var(--leading) var(--font-display);
+}

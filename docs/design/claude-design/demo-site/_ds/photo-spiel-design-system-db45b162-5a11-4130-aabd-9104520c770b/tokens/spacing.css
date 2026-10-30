@@ -1,0 +1,48 @@
+/* ============================================================
+   SPACING · STRUCTURE · MOTION
+   Vantage is edge-to-edge: page padding & grid gaps collapse to 0
+   and 1px hairline rules do the dividing. Radius is 0 (hard edges).
+   The admin softens inputs/buttons by 2px only, for tap clarity.
+   ============================================================ */
+:root {
+  /* spacing scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 14px;
+  --sp-4: 22px;
+  --sp-5: 34px;
+  --sp-6: 54px;
+  --sp-7: 80px;
+
+  /* structure */
+  --radius: 0px;          /* Vantage = hard edges */
+  --radius-admin: 2px;    /* admin inputs/buttons soften by 2px only */
+  --radius-pill: 999px;   /* tag pills, toggles, count badges */
+  --hairline: 1px;
+
+  /* gutters (Vantage runs edge-to-edge; these are the "soft" layouts) */
+  --pad-page: 34px;       /* Vantage header / section inset */
+  --gap: 0px;             /* grid gap — rules instead of gaps */
+
+  /* masonry column width by density (per-album appearance) */
+  --colw: 300px;          /* standard */
+  --colw-spacious: 360px;
+  --colw-standard: 300px;
+  --colw-dense:    245px;
+
+  /* motion — one ease, fades + short translates only */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1); /* @kind other */
+  --dur-fast: 0.2s; /* @kind other */
+  --dur:      0.35s; /* @kind other */
+  --dur-slow: 0.7s; /* @kind other */
+
+  /* effects — grain opacity, tile hover zoom, tile vignette strength */
+  --grain: 0.05; /* @kind other */
+  --tile-hover-scale: 1.035; /* @kind other */
+  --tile-vignette: 0.45; /* @kind other */
+
+  /* elevation — used sparingly (menus, lightbox, panels) */
+  --shadow-menu:  0 24px 60px rgba(0,0,0,0.55);
+  --shadow-panel: 0 30px 90px rgba(0,0,0,0.65);
+  --shadow-img:   0 40px 120px rgba(0,0,0,0.6);
+}

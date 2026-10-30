@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/styles.css">
+<script src="_ds/photo-spiel-design-system-db45b162-5a11-4130-aabd-9104520c770b/_ds_bundle.js"></script>
+<style>*,*::before,*::after{box-sizing:border-box;} body{margin:0;background:#060607;} a{color:inherit;} a:hover{color:inherit;}</style>
+</helmet>
+<div style="{{ themeStyle }}">
+<div style="width: 2744px; padding: 80px; box-sizing: border-box; font-family: var(--font-sans);">
+  <header style="display: grid; grid-template-columns: 280px 1200px minmax(0,1fr); gap: 0 48px; align-items: end; padding-bottom: 56px;">
+    <div style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-wide); text-transform: uppercase; color: var(--color-accent);">Content Spiel · Default theme · Sheet 2 / 3</div>
+    <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+      <h1 style="margin: 0; font-weight: 700; font-size: 68px; line-height: var(--lh-tight); letter-spacing: -0.01em; text-transform: uppercase;">Block inventory</h1>
+      <p style="margin: 0; font-size: 17px; line-height: var(--lh-body); color: var(--color-text-muted); max-width: 760px;">Each of the ten blocks alone, in the three column widths it must fit. The third-width layout is also the phone and quarter-width layout. Sample content is generic; fields marked ◆ are options I propose adding.</p>
+    </div>
+    <div style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle); line-height: 1.8;">Page column 1200 · gap 34<br>Half 583 · Third 377</div>
+  </header>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; padding: var(--space-3) 0; border-top: 1px solid var(--color-line-strong); font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--color-text-subtle);">
+    <span>Block · fields</span><span>Full · 1200</span><span>Half · 583</span><span>Third · 377 (= phone)</span>
+  </div>
+
+
+  <div id="hero" style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">01</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Hero</h2>
+        <span style="font-size: var(--fs-small); color: var(--color-text-muted);">Image as background</span>
+      </div>
+      <sc-for list="{{ fields.hero }}" as="f" hint-placeholder-count="8">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockHero" size="full" image="background" seed="0" hint-size="100%,620px"></dc-import>
+    <dc-import name="BlockHero" size="half" image="background" seed="0" hint-size="100%,460px"></dc-import>
+    <dc-import name="BlockHero" size="narrow" image="background" seed="0" hint-size="100%,400px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+      <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">01 b</span>
+      <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Hero</h2>
+      <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Image beside the text. Side by side only at full width; in columns and on phones the image stacks above.</span>
+    </div>
+    <dc-import name="BlockHero" size="full" image="beside" seed="3" hint-size="100%,600px"></dc-import>
+    <dc-import name="BlockHero" size="half" image="beside" seed="3" hint-size="100%,600px"></dc-import>
+    <dc-import name="BlockHero" size="narrow" image="beside" seed="3" hint-size="100%,560px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">02</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Rich text</h2>
+      </div>
+      <sc-for list="{{ fields.rich }}" as="f" hint-placeholder-count="2">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockRichText" size="full" hint-size="100%,420px"></dc-import>
+    <dc-import name="BlockRichText" size="half" hint-size="100%,480px"></dc-import>
+    <dc-import name="BlockRichText" size="narrow" hint-size="100%,560px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">03</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Image with caption</h2>
+      </div>
+      <sc-for list="{{ fields.image }}" as="f" hint-placeholder-count="5">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockImage" size="full" seed="1" hint-size="100%,700px"></dc-import>
+    <dc-import name="BlockImage" size="half" seed="1" hint-size="100%,420px"></dc-import>
+    <dc-import name="BlockImage" size="narrow" seed="1" hint-size="100%,300px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">04</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Call to action</h2>
+        <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">No own background: emphasis comes from the section (tinted or strong).</span>
+      </div>
+      <sc-for list="{{ fields.cta }}" as="f" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockCTA" size="full" hint-size="100%,200px"></dc-import>
+    <dc-import name="BlockCTA" size="half" hint-size="100%,260px"></dc-import>
+    <dc-import name="BlockCTA" size="narrow" hint-size="100%,300px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">05</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Teaser card</h2>
+        <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Whole card is the link. Without an image, a strong top rule bounds it.</span>
+      </div>
+      <sc-for list="{{ fields.teaser }}" as="f" hint-placeholder-count="5">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockTeaser" size="full" seed="2" hint-size="100%,480px"></dc-import>
+    <dc-import name="BlockTeaser" size="half" seed="2" hint-size="100%,560px"></dc-import>
+    <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+      <dc-import name="BlockTeaser" size="narrow" seed="2" hint-size="100%,440px"></dc-import>
+      <dc-import name="BlockTeaser" size="narrow" show-image="{{ false }}" heading="Without image" hint-size="100%,180px"></dc-import>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">06</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Quote / testimonial</h2>
+      </div>
+      <sc-for list="{{ fields.quote }}" as="f" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockQuote" size="full" hint-size="100%,300px"></dc-import>
+    <dc-import name="BlockQuote" size="half" hint-size="100%,300px"></dc-import>
+    <dc-import name="BlockQuote" size="narrow" hint-size="100%,300px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">07</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Gallery</h2>
+        <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">4 / 3 / 2 columns. Click a frame to open it larger; captions move into the viewer at third width.</span>
+      </div>
+      <sc-for list="{{ fields.gallery }}" as="f" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockGallery" size="full" hint-size="100%,760px"></dc-import>
+    <dc-import name="BlockGallery" size="half" hint-size="100%,640px"></dc-import>
+    <dc-import name="BlockGallery" size="narrow" hint-size="100%,900px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">08</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">FAQ / accordion</h2>
+      </div>
+      <sc-for list="{{ fields.faq }}" as="f" hint-placeholder-count="3">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockFAQ" size="full" hint-size="100%,320px"></dc-import>
+    <dc-import name="BlockFAQ" size="half" hint-size="100%,360px"></dc-import>
+    <dc-import name="BlockFAQ" size="narrow" hint-size="100%,400px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">09</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Video / embed</h2>
+        <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Nothing loads from the provider until the visitor clicks. Click a poster to see the loaded state.</span>
+      </div>
+      <sc-for list="{{ fields.video }}" as="f" hint-placeholder-count="5">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <dc-import name="BlockVideo" size="full" hint-size="100%,720px"></dc-import>
+    <dc-import name="BlockVideo" size="half" hint-size="100%,360px"></dc-import>
+    <dc-import name="BlockVideo" size="narrow" hint-size="100%,260px"></dc-import>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 280px 1200px 583px 377px; gap: 0 48px; align-items: start; padding: 48px 0 72px; border-top: 1px solid var(--color-line-strong);">
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+        <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--track-mono); color: var(--color-accent);">10</span>
+        <h2 style="margin: 0; font-weight: 700; font-size: var(--fs-h2); text-transform: uppercase;">Post list</h2>
+        <span style="font-size: var(--fs-small); line-height: var(--lh-body); color: var(--color-text-muted);">Cards: 3 / 2 columns. At third width and on phones it always shows rows.</span>
+      </div>
+      <sc-for list="{{ fields.posts }}" as="f" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-small);">
+          <span style="color: {{ f.color }};">{{ f.name }}</span>
+          <span style="font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle);">{{ f.type }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+      <dc-import name="BlockPostList" size="full" layout="cards" hint-size="100%,460px"></dc-import>
+      <dc-import name="BlockPostList" size="full" layout="rows" hint-size="100%,220px"></dc-import>
+    </div>
+    <dc-import name="BlockPostList" size="half" layout="cards" hint-size="100%,760px"></dc-import>
+    <dc-import name="BlockPostList" size="narrow" hint-size="100%,300px"></dc-import>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  static BASE = {
+    '--font-sans': '"Archivo", system-ui, -apple-system, sans-serif', '--font-mono': '"IBM Plex Mono", ui-monospace, monospace',
+    '--fs-display': 'clamp(34px, 5vw, 68px)', '--fs-h2': '30px', '--fs-h3': '18px', '--fs-quote': 'clamp(23px, 2.8vw, 38px)', '--fs-lead': '19px', '--fs-body': '16px', '--fs-small': '13px', '--fs-label': '11px',
+    '--lh-body': '1.5', '--lh-heading': '1.15', '--lh-tight': '1.02',
+    '--track': '0.06em', '--track-wide': '0.18em', '--track-mono': '0.14em',
+    '--space-1': '4px', '--space-2': '8px', '--space-3': '14px', '--space-4': '22px', '--space-5': '34px', '--space-6': '54px', '--space-7': '80px',
+    '--radius': '0px', '--radius-control': '2px', '--radius-pill': '999px', '--radius-admin': '2px',
+    '--width-page': '1200px', '--width-text': '680px', '--pad-page': '34px', '--gap-col': '34px', '--space-section': '80px',
+    '--ease': 'cubic-bezier(0.22, 1, 0.36, 1)',
+  };
+  static DARK = { bg: '#060607', surface: '#101013', text: '#f5f5f6', muted: '#8c8d92', subtle: '#76777c', line: 'rgba(255,255,255,0.10)', lineStrong: 'rgba(255,255,255,0.22)', accent: 'oklch(0.74 0.10 236)', primary: 'oklch(0.76 0.14 62)', onPrimary: '#1a1206', field: '#0d0d10' };
+  static LIGHT = { bg: '#f5f5f6', surface: '#e8e8ea', text: '#0b0b0d', muted: '#55565b', subtle: '#6b6c71', line: 'rgba(6,6,7,0.12)', lineStrong: 'rgba(6,6,7,0.28)', accent: 'oklch(0.50 0.11 236)', primary: 'oklch(0.76 0.14 62)', onPrimary: '#1a1206', field: '#ffffff' };
+  static scheme(c) {
+    return { '--color-bg': c.bg, '--color-surface': c.surface, '--color-text': c.text, '--color-text-muted': c.muted, '--color-text-subtle': c.subtle, '--color-line': c.line, '--color-line-strong': c.lineStrong, '--color-accent': c.accent, '--color-primary': c.primary, '--color-on-primary': c.onPrimary, '--color-field': c.field,
+      '--bg': c.bg, '--fg': c.text, '--fg-dim': c.muted, '--fg-faint': c.subtle, '--line': c.line, '--line-strong': c.lineStrong, '--accent': c.accent, '--accent-amber': c.primary, '--on-accent': c.onPrimary, '--panel': c.field, '--panel-2': c.surface,
+      background: c.bg, color: c.text };
+  }
+  renderVals() {
+    const C = Component;
+    const light = this.props.theme === 'light';
+    const F = (name, type, proposed) => ({ name: (proposed ? '◆ ' : '') + name, type, color: proposed ? 'var(--color-accent)' : 'var(--color-text)' });
+    return {
+      themeStyle: { ...C.BASE, '--fs-display': '68px', '--fs-quote': '38px', ...C.scheme(light ? C.LIGHT : C.DARK), minHeight: '100vh' },
+      rows: [],
+      fields: {
+        hero: [F('Heading', 'text · req'), F('Kicker', 'text · opt'), F('Text', 'text · opt'), F('Button 1', 'label+link · opt'), F('Button 2', 'label+link · opt'), F('Image', 'image · opt'), F('Image mode', 'background / beside'), F('Image side', 'right / left', true), F('Alt text', 'text', true)],
+        rich: [F('Body', 'rich text · req'), F('Allowed: H2–H4, P, lists, links, bold, italic', '')],
+        image: [F('Image', 'image · req'), F('Alt text', 'text · req'), F('Caption', 'text · opt'), F('Credit', 'text · opt'), F('Crop', 'orig/16:9/3:2/1:1', true)],
+        cta: [F('Heading', 'text · req'), F('Text', 'text · opt'), F('Button 1', 'label+link · req'), F('Button 2', 'label+link · opt')],
+        teaser: [F('Image', 'image · opt'), F('Heading', 'text · req'), F('Text', 'text · opt'), F('Link', 'page · req'), F('Link label', 'text · opt', true), F('Meta line', 'text · opt', true)],
+        quote: [F('Quote', 'text · req'), F('Name', 'text · req'), F('Role', 'text · opt'), F('Portrait', 'image · opt')],
+        gallery: [F('Images', 'list · req'), F('· Caption', 'text · opt'), F('· Alt text', 'text · req'), F('Crop', '4:5 / 1:1 / 3:2', true)],
+        faq: [F('Items', 'list · req'), F('· Question', 'text · req'), F('· Answer', 'rich text · req'), F('First item open', 'yes / no', true)],
+        video: [F('Video URL', 'url · req'), F('Poster', 'image · opt'), F('Title', 'text · opt'), F('Provider', 'from URL', true), F('Duration', 'from provider', true)],
+        posts: [F('Number of posts', 'int · 3'), F('Layout', 'cards / rows'), F('Category', 'filter · opt', true), F('“All posts” label', 'text · opt', true)],
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>
