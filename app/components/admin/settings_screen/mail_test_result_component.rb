@@ -43,18 +43,8 @@ module Admin
               ])
             end,
             tag.p(t(".pending"), class: "mt-1 text-sm text-meta", hidden: true, data: { "admin--saving--pending-lock-target": "hint" }),
-            tag.div(role: (@alert ? nil : "status"), class: "mt-2 empty:hidden") { result }
+            render(MailTestOutcomeComponent.new(address: @address, sent: @sent, alert: @alert, line: @line))
           ])
-        end
-      end
-
-      private
-
-      def result
-        if @alert
-          render(MailAlertComponent.new(sentence: @alert, line: @line))
-        elsif @sent
-          tag.p(t(".sent", address: @address), class: "rounded-cs bg-ok-tint px-3 py-2.5 text-[13px] leading-normal text-ok-ink")
         end
       end
     end

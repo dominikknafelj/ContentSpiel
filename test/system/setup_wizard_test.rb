@@ -1,6 +1,9 @@
 require "application_system_test_case"
+require "support/held_test_mail"
 
 class SetupWizardTest < ApplicationSystemTestCase
+  include HeldTestMail
+
   setup do
     # `delete_all`, not `destroy_all` -- see `SetupTestHelper#start_fresh_
     # install`'s own comment (Task 8's `User#ensure_not_last_owner`).
@@ -129,5 +132,36 @@ class SetupWizardTest < ApplicationSystemTestCase
     fill_in "Port", with: "2525"
     find("label", exact_text: "TLS").click
     assert_field "Port", with: "2525"
+  end
+
+  test "Send test mail shows it is working and a second press while waiting sends nothing" do
+    visit "/setup/token"
+    fill_in "Setup token", with: Setup::Token.value
+    press "Continue"
+    assert_selector "h1", text: "System check"
+    press "Continue"
+    fill_in "Email address", with: "owner@example.com"
+    fill_in "Password", with: "password12345"
+    fill_in "Confirm password", with: "password12345"
+    press "Continue"
+    assert_selector "h1", text: "Site identity"
+    fill_in "Site title", with: "Dana's Notes"
+    press "Continue"
+    assert_selector "h1", text: "Mail"
+    fill_in "Sender address", with: "hello@site.test"
+    MailTestLimit.store.clear
+
+    with_held_test_mail do |entered, release, calls|
+      press "Send test mail"
+      entered.pop
+      assert_selector "button[disabled]", text: "Sending…"
+      assert_equal 1, calls.value
+      find("button[name=send_test]").click # a native click on the disabled button: nothing is sent
+      await_frames
+      assert_equal 1, calls.value
+      release << true
+      assert_selector "#setup-mail-test [role=status]", text: "Test mail sent to owner@example.com"
+      assert_equal 1, calls.value
+    end
   end
 end

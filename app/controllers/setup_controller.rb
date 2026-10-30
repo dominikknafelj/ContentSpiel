@@ -21,6 +21,7 @@ class SetupController < ApplicationController
   RATE_LIMIT_STORE = ActiveSupport::Cache::MemoryStore.new
 
   include MailTestLimit
+  include MailTestSending
 
   allow_unauthenticated_access
   layout "setup"
@@ -74,7 +75,10 @@ class SetupController < ApplicationController
     case @step
     when "system_check" then @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?)
     when "admin" then @user = User.new
-    when "site", "languages", "mail" then @site_setting = Current.site
+    when "site", "languages" then @site_setting = Current.site
+    when "mail"
+      @site_setting = Current.site
+      @mail_result = { sent: true } if flash[:mail_test_sent]
     when "review"
       @site_setting = Current.site
       @starter_added = StarterContent.added?(locale: @site_setting.default_locale)
@@ -253,23 +257,19 @@ class SetupController < ApplicationController
     end
 
     def send_setup_test_mail
-      settings = MailSettings.current
-      unless settings.complete?
-        key = settings.address_missing? ? "no_address" : "sentence"
-        @mail_result = { alert: I18n.t("admin.mail.states.not_set_up.#{key}") }
-        return render(:mail, status: :unprocessable_entity)
-      end
-
-      failure = ApplicationMailer.deliver_now_and_record(SystemMailer.test_mail(Current.user))
+      result = deliver_test_mail
       Current.site = nil
       @site_setting = Current.site
-      if failure
-        @mail_result = { alert: failure.sentence(server: settings.value(:server), port: settings.value(:port)), line: failure.line }
-        render :mail, status: :unprocessable_entity
-      else
-        @mail_result = { sent: true }
-        render :mail
+      # Turbo refuses a 2xx answer to a form that is not a redirect, so the
+      # success goes back to the step (the flag is the whole flash: no text,
+      # no address); a refusal is a 4xx and is rendered where it is.
+      if result[:sent]
+        flash[:mail_test_sent] = true
+        return redirect_to(setup_step_path("mail"))
       end
+
+      @mail_result = result.except(:status)
+      render :mail, status: result.fetch(:status)
     end
 
     MAIL_FIELDS = %i[mail_server mail_port mail_security mail_sender_name mail_sender_address].freeze

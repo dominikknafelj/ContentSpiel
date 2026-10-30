@@ -82,6 +82,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/mail_login_component.html.erb
     app/components/admin/settings_screen/mail_state_component.rb
     app/components/admin/settings_screen/mail_alert_component.rb
+    app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/settings_screen/mail_test_result_component.rb
     app/controllers/admin/mail_logins_controller.rb
     app/javascript/controllers/admin/settings/mail_controller.js

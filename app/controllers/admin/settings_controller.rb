@@ -23,6 +23,7 @@ module Admin
     include FileParams
     include StaleForm
     include MailTestLimit
+    include MailTestSending
 
     # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
     # changed it and when where the audit log says, and the message is the whole
@@ -131,19 +132,8 @@ module Admin
     # for settings that are not complete (nothing would be sent), the state's
     # own sentence.
     def send_test_mail
-      settings = MailSettings.current
-      unless settings.complete?
-        return render turbo_stream: mail_test_streams(alert: t("admin.mail.states.not_set_up.#{settings.address_missing? ? "no_address" : "sentence"}")),
-          status: :unprocessable_entity
-      end
-
-      failure = ApplicationMailer.deliver_now_and_record(SystemMailer.test_mail(Current.user))
-      if failure
-        render turbo_stream: mail_test_streams(alert: failure.sentence(server: settings.value(:server), port: settings.value(:port)), line: failure.line),
-          status: :unprocessable_entity
-      else
-        render turbo_stream: mail_test_streams(sent: true)
-      end
+      result = deliver_test_mail
+      render turbo_stream: mail_test_streams(**result.except(:status)), status: result.fetch(:status)
     end
 
     private

@@ -97,6 +97,9 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
   test "Send test mail saves, sends to the admin's address and says so" do
     save_mail(FIELDS.except(:mail_server, :mail_port, :mail_username, :mail_password), send_test: "1")
 
+    # Turbo refuses a non-redirect 2xx to a form: the success goes back to the step.
+    assert_redirected_to setup_step_path("mail")
+    follow_redirect!
     assert_response :success
     assert_equal [ "owner@example.com" ], ActionMailer::Base.deliveries.last.to
     assert_select "#setup-mail-test [role=status]", /Test mail sent to owner@example\.com\. Check your inbox\./
@@ -139,7 +142,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
   test "test mails from the wizard and from Settings → Mail by the same person count in one bucket of 5" do
     2.times do
       save_mail(FIELDS.slice(:mail_sender_address), send_test: "1")
-      assert_response :success
+      assert_redirected_to setup_step_path("mail")
     end
 
     # Setup is over: the same signed-in person presses Settings' button.
@@ -158,7 +161,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
   test "the wizard's own sixth test mail is refused with the sentence, 429, and Continue is not limited" do
     5.times do
       save_mail(FIELDS.slice(:mail_sender_address), send_test: "1")
-      assert_response :success
+      assert_redirected_to setup_step_path("mail")
     end
     save_mail(FIELDS.slice(:mail_sender_address), send_test: "1")
 

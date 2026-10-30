@@ -48,6 +48,7 @@ en:
           sending: "Sending…"
           sends_to: "Sends to %{address} (your address)"
           pending: "Save your changes first"
+        mail_test_outcome:
           sent: "Test mail sent to %{address}. Check your inbox."
         mail_state:
           label: "Mail state"
