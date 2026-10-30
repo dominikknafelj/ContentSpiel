@@ -117,6 +117,35 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     assert_select "body", /Your account is ready\./
   end
 
+  # Plan ruling T9a: the browser is the invited person's from here on, so a
+  # session that was signed in in it is ended on the server, not only
+  # replaced in the cookie.
+  test "accepting in a browser where someone else is signed in ends their session first" do
+    sign_in_as(users(:one))
+    other = Current.session
+    assert Session.exists?(other.id)
+
+    accept
+    assert_redirected_to admin_root_path
+    assert_not Session.exists?(other.id), "the other person's session is gone"
+    assert_equal 1, @dana.sessions.count
+    follow_redirect!
+    assert_response :success
+    assert_select "body", /Your account is ready\./
+  end
+
+  test "the page takes no name from an address, and the form takes a name only as a string" do
+    get PAGE, params: { name: "Mallory" }
+    assert_response :success
+    assert_not_includes response.body, "Mallory"
+    assert_select "input[name=name]:not([value])"
+
+    post PAGE, params: { token: @token, name: { "a" => "b" }, password: PASSWORD, password_confirmation: PASSWORD }
+    assert_response :bad_request
+    assert @dana.reload.invited?
+    assert_equal "Dana", @dana.name
+  end
+
   test "a refused password draws the form again with the token, the address and the typed name, and the next try takes it" do
     accept(name: "Dana D", password: "short", confirmation: "short")
     assert_response :unprocessable_entity

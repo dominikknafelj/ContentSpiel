@@ -39,6 +39,15 @@ import { Controller } from "@hotwired/stimulus"
 // and `connect` decides what a restored snapshot shows. The browser's own
 // cache restores a page without connecting anything again, so there the
 // message is switched as well.
+//
+// SHARED WITH THE INVITATION PAGE. `invitation-token`
+// (invitation_token_controller.js) extends this class: everything about the
+// token itself -- moving it out of the address, emptying the field, the
+// read-only wait, the POST that asks -- is written here once. What differs
+// is three hooks it overrides: `show()` (which parts the page has without an
+// answer), `read(response)` and `unknown()` (what an answer, or none, means)
+// and `answered(answer)` (what the page then does). Here an answer is
+// `true` (show the form) or `false` (the expired page).
 export default class extends Controller {
   static targets = ["token", "form", "incomplete"]
   static values = { checkUrl: String, expiredUrl: String }
@@ -82,11 +91,15 @@ export default class extends Controller {
 
   async check(token) {
     this.hold(true)
-    const good = await this.ask(token)
+    const answer = await this.ask(token)
     // The page was left or put away while the answer was on its way: it
     // has no token any more, and what is on screen is no longer this form.
     if (!this.element.isConnected || this.tokenTarget.value !== token) return
 
+    this.answered(answer)
+  }
+
+  answered(good) {
     if (good) {
       this.hold(false)
       this.focus()
@@ -105,10 +118,20 @@ export default class extends Controller {
         headers: { "X-CSRF-Token": document.querySelector("meta[name='csrf-token']")?.content || "" },
         body: new URLSearchParams({ token }),
       })
-      return response.status !== 410
+      return await this.read(response)
     } catch {
-      return true
+      return this.unknown()
     }
+  }
+
+  // 410 is the one "not good"; anything else shows the form.
+  read(response) {
+    return response.status !== 410
+  }
+
+  // No answer at all (no network): the form, which decides anyway.
+  unknown() {
+    return true
   }
 
   hold(held) {

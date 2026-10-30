@@ -24,8 +24,11 @@ module Admin
     before_action :set_user, only: %i[resend destroy]
     # Ten invites per person per three minutes (mail spec "Rate limits"), by
     # the signed-in person, not the address: everyone behind one office's
-    # address invites on their own count.
-    rate_limit to: 10, within: 3.minutes, by: -> { Current.user.id }, only: :create,
+    # address invites on their own count. A resend sends an invite mail too,
+    # so it counts in the SAME bucket (plan ruling T9a: one declaration, so
+    # one cache key for both actions); withdrawing sends nothing and is not
+    # counted.
+    rate_limit to: 10, within: 3.minutes, by: -> { Current.user.id }, only: %i[create resend],
       with: -> { redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: t("admin.invites.too_many") }
 
     def create

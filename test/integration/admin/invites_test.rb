@@ -219,10 +219,47 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
         post "/cs-studio/invites", params: { user: { email_address: "eleventh@example.com" } }
         assert_equal "Invite sent to eleventh@example.com.", flash[:notice]
         assert_equal 2, counts.size
+        two = counts.keys.find { |key| key.end_with?(":#{users(:two).id}") }
+        assert_equal 1, counts[two]
+      end
+    end
+  end
 
-        # Resend and withdraw are not counted.
-        post "/cs-studio/invites/#{User.find_by!(email_address: "person0@example.com").id}/resend"
-        assert_equal 2, counts.size
+  # Plan ruling T9a: a resend sends an invite mail too, so it is counted in
+  # the invites' one bucket; a withdrawal sends nothing and is not counted.
+  test "resend counts in the invites' bucket of ten, and withdraw counts nothing" do
+    counts = Hash.new(0)
+    counter = ->(key, amount = 1, **) { counts[key] += amount }
+    dana = invited_user("dana@example.com", sent_at: 1.day.ago)
+    lee = invited_user("lee@example.com")
+
+    with_mail_state(:working) do
+      with_singleton_override(Admin::InvitesController.cache_store, :increment, counter) do
+        post "/cs-studio/invites", params: { user: { email_address: "person@example.com" } }
+        post "/cs-studio/invites/#{dana.id}/resend"
+        assert_equal "New invite sent to dana@example.com.", flash[:notice]
+        assert_equal 1, counts.size, "create and resend share one key"
+        key = counts.keys.sole
+        assert_equal 2, counts[key]
+
+        delete "/cs-studio/invites/#{lee.id}"
+        assert_equal "Invite to lee@example.com withdrawn.", flash[:notice]
+        assert_equal({ key => 2 }, counts)
+
+        8.times { post "/cs-studio/invites/#{dana.id}/resend" }
+        assert_equal 10, counts[key]
+
+        # The eleventh, a resend or an invite, is refused and sends nothing.
+        assert_no_changes -> { dana.reload.invite_sent_at } do
+          assert_no_enqueued_jobs do
+            post "/cs-studio/invites/#{dana.id}/resend"
+          end
+        end
+        assert_equal "Try again later.", flash[:alert]
+        assert_no_difference -> { User.count } do
+          post "/cs-studio/invites", params: { user: { email_address: "another@example.com" } }
+        end
+        assert_equal "Try again later.", flash[:alert]
       end
     end
   end

@@ -63,12 +63,21 @@ class InvitationsController < ApplicationController
   # drawn with no form; a refused password draws the form again with the
   # token it was sent with, the address and the typed name (a password never
   # comes back). Accepted, the person is signed in and lands on the
-  # dashboard with the toast "Your account is ready.".
+  # dashboard with the toast "Your account is ready.". The token and the
+  # name are read as strings only.
   def update
-    result = Users::AcceptInvite.call(token: token_param, name: params[:name].to_s, password: params[:password],
+    # A name that is not a string (a list, a hash) is no form a page sent.
+    return head(:bad_request) unless params[:name].nil? || params[:name].is_a?(String)
+
+    result = Users::AcceptInvite.call(token: token_param, name: params[:name], password: params[:password],
       password_confirmation: params[:password_confirmation])
 
     if result.ok?
+      # Someone else signed in in this browser (a colleague's machine, the
+      # inviter testing their own invite) is signed out first, their session
+      # ended on the server and not only replaced in the cookie: the browser
+      # is the invited person's from here on (plan ruling T9a).
+      terminate_session if resume_session
       start_new_session_for(result.record)
       redirect_to admin_root_path, status: :see_other, notice: t(".ready")
     elsif (state = LINK_STATES[result.errors])

@@ -20,7 +20,10 @@
 
     The address is text in a sentence: it is not a field of the form (an
     invite is for that address, and the person cannot change it here). %>
-<% name_value = params.key?(:name) ? params[:name].to_s : @user&.name %>
+<%# The Name field is filled only on the refused form's answer (the name
+    typed, else the stored one); on the GET it is empty and the check's
+    answer fills it, so no parameter of an address reaches the page. %>
+<% name_value = @user && (params[:name].is_a?(String) ? params[:name] : @user.name) %>
 <%= tag.div class: "flex flex-col gap-[18px]", data: (@state ? {} : { controller: "invitation-token", "invitation-token-check-url-value": admin_check_invitation_path }) do %>
   <%= render "admin/shared/auth_heading", title: t(".title", site: site_name) %>
 
