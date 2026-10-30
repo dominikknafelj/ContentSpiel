@@ -57,11 +57,11 @@
    animations there is no fade and the grid scrolls all the same.
 
    A cell shows its column's alignment by the class the server writes
-   (`align-*`). The lines and the header's weight are the plainest the
-   editor's tokens give; the grid's look beyond the floor and the fade is
-   Claude Design's to answer (Task 5's report, open question). A selection of
-   several cells (prosemirror-tables' `selectedCell`) is tinted with the
-   accent tint. */
+   (`align-*`). The look is the owner's option B of 2026-10-29 ("Row and
+   column strips"): every cell ruled in the strong line, the header row bold
+   on the sunken ground and left-aligned like the rows. A selection of several
+   cells (prosemirror-tables' `selectedCell`) is tinted with the accent tint.
+   A held or a reader's grid is ruled the same way and has no strips. */
 @property --admin-table-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --admin-table-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
 
@@ -85,14 +85,90 @@
 .admin-rich-text-table th,
 .admin-rich-text-table td {
   position: relative;
-  border: 1px solid var(--cs-line);
-  padding: 6px 8px;
+  border: 1px solid var(--cs-line-strong);
+  padding: 8px 12px;
   vertical-align: top;
   text-align: left;
   overflow-wrap: anywhere;
 }
-.admin-rich-text-table th { font-weight: 600; }
+.admin-rich-text-table th { font-weight: 600; background: var(--cs-sunken); }
 .admin-rich-text-table .align-left { text-align: left; }
 .admin-rich-text-table .align-center { text-align: center; }
 .admin-rich-text-table .align-right { text-align: right; }
 .admin-rich-text-table .selectedCell { background: var(--cs-accent-tint); }
+
+/* The strips around an editable grid (`Admin::EditorScreen::TableControlsComponent`,
+   `admin--editor--table`): column letters above, row numbers to the left, the
+   corner where they meet, a dashed "+" after the letters and one under the
+   numbers. They stand in the grid box's padding, which is made room for them
+   here, so nothing covers a cell's text; the script measures the cells and
+   places each entry, and reads the corner's and the "+"'s sizes from these
+   rules. The letters and numbers are the label face on the paper, outlined in
+   the field line as every button is (the corner with them); the current cell's are inverted (ink, paper text: "selected means
+   inverted") and the cell itself has the accent outline inside it while the
+   grid has the focus (`is-current-cell`, a decoration of `rich_text/table.js`). */
+.admin-table-controls {
+  --admin-table-strip-width: 2rem;   /* the numbers' strip, and the row's "+" */
+  --admin-table-strip-height: 1.5rem; /* the letters' strip, and both "+" */
+  --admin-table-strip-add: 1.75rem;  /* the column's "+" */
+}
+.admin-table-controls .admin-rich-text-table .ProseMirror {
+  padding: calc(0.75rem + var(--admin-table-strip-height)) calc(0.75rem + var(--admin-table-strip-add)) calc(0.75rem + var(--admin-table-strip-height) + 0.25rem) calc(0.75rem + var(--admin-table-strip-width));
+}
+.admin-table-controls .ProseMirror-focused .is-current-cell { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+
+.admin-table-strip-entry { position: absolute; z-index: 10; }
+/* The menu's own box (`relative inline-block`) fills the entry, so its panel hangs under the button. */
+.admin-table-strip-entry > div { display: block; width: 100%; height: 100%; }
+.admin-table-strip-button {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: var(--cs-mono);
+  font-size: var(--cs-t-label);
+  font-weight: 500;
+  color: var(--cs-meta);
+  background: var(--cs-paper);
+  border: 1px solid var(--cs-field-line);
+}
+.admin-table-strip-button:hover { color: var(--cs-ink); background: var(--cs-sunken); }
+.admin-table-strip-button[aria-current="true"] { color: var(--cs-paper); background: var(--cs-ink); border-color: var(--cs-ink); }
+.admin-table-strip-button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.admin-table-strip-entry:has(.admin-table-strip-button:focus-visible),
+.admin-table-strip-entry:has([aria-expanded="true"]) { z-index: 20; }
+
+.admin-table-strip-corner {
+  position: absolute;
+  width: var(--admin-table-strip-width);
+  height: var(--admin-table-strip-height);
+  background: var(--cs-paper);
+  border: 1px solid var(--cs-field-line);
+}
+.admin-table-strip-add {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--admin-table-strip-add);
+  height: var(--admin-table-strip-height);
+  margin-top: 0.25rem;
+  cursor: pointer;
+  font-size: var(--cs-t-small);
+  line-height: 1;
+  color: var(--cs-dim);
+  background: var(--cs-surface);
+  border: 1px dashed var(--cs-field-line);
+}
+.admin-table-strip-add[data-admin--editor--table-target="addColumn"] { margin-top: 0; }
+.admin-table-strip-add[data-admin--editor--table-target="addRowHere"] { width: var(--admin-table-strip-width); }
+.admin-table-strip-add:hover { color: var(--cs-ink); border-color: var(--cs-ink); }
+.admin-table-strip-add:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.admin-table-strip-corner[hidden],
+.admin-table-strip-entry[hidden],
+.admin-table-strip-add[hidden] { display: none; }

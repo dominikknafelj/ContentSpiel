@@ -1,6 +1,7 @@
 import { Extension } from "@tiptap/core"
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table"
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state"
+import { Decoration, DecorationSet } from "@tiptap/pm/view"
 import { Fragment, Slice } from "@tiptap/pm/model"
 import { TableMap, cellAround } from "@tiptap/pm/tables"
 
@@ -135,6 +136,22 @@ export const TableKeys = Extension.create({
       new Plugin({
         key: new PluginKey("tableCellPaste"),
         props: { transformPasted: (slice, view) => inlineSlice(slice, view.state.schema) }
+      }),
+      // The cell the caret is in carries `is-current-cell`, a decoration (the
+      // cells are ProseMirror's to draw, so no script may set a class on
+      // one): the card outlines it while the grid has the focus
+      // (`.ProseMirror-focused`, `admin-rich-text.css`). The strips invert its
+      // letter and number from the same selection (`admin--editor--table`,
+      // `selectedCell`).
+      new Plugin({
+        key: new PluginKey("tableCurrentCell"),
+        props: {
+          decorations: (state) => {
+            const $cell = cellAround(state.selection.$head)
+            const cell = $cell && state.doc.nodeAt($cell.pos)
+            return cell ? DecorationSet.create(state.doc, [ Decoration.node($cell.pos, $cell.pos + cell.nodeSize, { class: "is-current-cell" }) ]) : null
+          }
+        }
       })
     ]
   }

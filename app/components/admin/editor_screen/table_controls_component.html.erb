@@ -1,4 +1,4 @@
-<%# `relative`: the floating "⋯" and "+" are placed against this box by the script (see the class comment). %>
+<%# `relative`: the strips' letters, numbers and "+" are placed against this box by the script (see the class comment). %>
 <%= tag.div class: "admin-table-controls relative", data: controller_data, "data-messages": messages do %>
   <%# The options row: two switches, checkboxes with no name (nothing of them is sent: the grid's cells
       are what a header IS, decision 4), which the script applies to the grid and reads back from it. %>
@@ -22,35 +22,36 @@
 
   <%= content %>
 
-  <%# The current row's "⋯", centred on the grid's left edge at that row. %>
-  <%= tag.div hidden: true, class: FLOATING_CLASS, data: { "admin--editor--table-target": "rowControls" } do %>
-    <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".row.menu"), align: :left, close_on_select: true, button_class: HANDLE_CLASS) do |menu| %>
-      <% ROW_ITEMS.each do |key, action| %>
-        <% menu.with_item { item(t(".row.#{key}"), action, table_command: key) } %>
-      <% end %>
-      <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
-      <% menu.with_item { item(t(".row.delete"), "deleteRow", danger: true, table_command: "delete_row") } %>
-    <% end %>
-  <% end %>
+  <%# The strips, after the grid in the document: Esc in the grid comes to the current column's letter,
+      and Tab goes on from there to the column's "+", the current row's number, the row's "+", "Add row"
+      and out of the card's grid. Each strip is ONE stop for Tab (the current letter or number, a roving
+      tabindex), and the arrow keys move along it. The corner is the square where the two strips meet. %>
+  <%= tag.span class: "admin-table-strip-corner", hidden: true, "aria-hidden": "true", data: { "admin--editor--table-target": "corner" } %>
+  <%= tag.div role: "group", "aria-label": t(".strips.columns"), data: { "admin--editor--table-target": "columnStrip" } %>
+  <%= add_button(t(".add_column"), "addColumn", "addColumn") %>
+  <%= tag.div role: "group", "aria-label": t(".strips.rows"), data: { "admin--editor--table-target": "rowStrip" } %>
+  <%= add_button(t(".add_row_here"), "addRow", "addRowHere") %>
 
-  <%# The current column's "⋯", centred on the grid's top edge at that column. %>
-  <%= tag.div hidden: true, class: FLOATING_CLASS, data: { "admin--editor--table-target": "columnControls" } do %>
-    <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".column.menu"), align: :left, close_on_select: true, button_class: HANDLE_CLASS) do |menu| %>
-      <% COLUMN_ITEMS.each do |key, action| %>
-        <% menu.with_item { item(t(".column.#{key}"), action, table_command: key) } %>
-      <% end %>
-      <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
-      <% menu.with_item { tag.p(t(".column.align"), class: "px-2 pt-1 text-label text-meta", "aria-hidden": "true") } %>
-      <% ALIGNS.each do |align| %>
-        <% menu.with_item { align_item(align) } %>
-      <% end %>
-      <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
-      <% menu.with_item { item(t(".column.delete"), "deleteColumn", danger: true, table_command: "delete_column") } %>
+  <%# What the script clones into the strips: one column's entry and one row's, each a menu with every item. %>
+  <%= strip_entry(:column) do |menu| %>
+    <% COLUMN_ITEMS.each do |key, action| %>
+      <% menu.with_item { item(t(".column.#{key}"), action, table_command: key) } %>
     <% end %>
+    <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
+    <% menu.with_item { tag.p(t(".column.align"), class: "px-2 pt-1 text-label text-meta", "aria-hidden": "true") } %>
+    <% ALIGNS.each do |align| %>
+      <% menu.with_item { align_item(align) } %>
+    <% end %>
+    <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
+    <% menu.with_item { item(t(".column.delete"), "deleteColumn", danger: true, table_command: "delete_column") } %>
   <% end %>
-
-  <%= handle(t(".add_column"), "addColumn", "addColumn") %>
-  <%= handle(t(".add_row_here"), "addRow", "addRowHere") %>
+  <%= strip_entry(:row) do |menu| %>
+    <% ROW_ITEMS.each do |key, action| %>
+      <% menu.with_item { item(t(".row.#{key}"), action, table_command: key) } %>
+    <% end %>
+    <% menu.with_item { tag.div(role: "separator", class: "my-1 h-px bg-line") } %>
+    <% menu.with_item { item(t(".row.delete"), "deleteRow", danger: true, table_command: "delete_row") } %>
+  <% end %>
 
   <%# For touch, where nothing is hovered: always there. %>
   <div class="mt-2">
