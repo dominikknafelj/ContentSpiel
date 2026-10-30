@@ -7,8 +7,9 @@ module Admin
   # a pending change), each action is its own form beside it, and the answer
   # is Turbo Streams that replace ONLY the login component and its forms
   # (plus the main form's base, the card's state and a toast), so whatever
-  # the main form holds unsaved is left alone. The carried base
-  # (`main_base_updated_at`) follows the same rule as there.
+  # the main form holds unsaved is left alone. The write, the carried base
+  # (`main_base_updated_at`) and the answer's tail are `Admin::CarriedBase`'s,
+  # shared with the AI key's controller.
   #
   # `settings.manage` only. `Settings::Save` is the writer: the permission
   # check, the encryption, "Set on", the audit event that says THAT the login
@@ -16,6 +17,8 @@ module Admin
   # the sentence a site without encryption keys gets. A refusal is shown in
   # the login's slot with the entry open; a denial as the toast and the 403.
   class MailLoginsController < BaseController
+    include CarriedBase
+
     before_action -> { require_permission("settings.manage") }
 
     # Username and password together; either may be left blank, not both. A
@@ -42,22 +45,7 @@ module Admin
 
     private
 
-    def write(attributes, notice:)
-      site = Current.site
-      before = site.updated_at
-      carried = params[:main_base_updated_at].to_s
-      result = Settings::Save.call(site, attributes: attributes)
-      site.reload
-
-      if result.ok?
-        moved = !base_older_than?(before, carried) && carried_parseable?(carried)
-        answer(site, base: carried, moved_to: (site.updated_at.iso8601(6) if moved), notice: notice)
-      elsif result.denied?
-        answer(site, base: carried, error: result.errors.join(" "), status: :forbidden, toast: true)
-      else
-        answer(site, base: carried, error: result.errors.join(" "), status: :unprocessable_entity)
-      end
-    end
+    def write(attributes, notice:) = write_carrying_base(attributes, notice: notice)
 
     # `moved_to:` is the new base for the main form, nil to leave it alone.
     def answer(site, base: params[:main_base_updated_at].to_s, error: nil, moved_to: nil, notice: nil, status: :ok, toast: false)
@@ -72,30 +60,7 @@ module Admin
         # verified site is untested again (`MailSettings`' fingerprint).
         turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: settings))
       ]
-      streams << turbo_stream.replace("settings-base-updated-at", partial: "admin/shared/base_updated_at_field",
-        locals: { id: "settings-base-updated-at", value: moved_to }) if moved_to
-      streams << turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: notice, kind: :success)) if notice
-      streams << turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: error, kind: :error)) if toast && error
-      if request.accepts.any? { |type| type.symbol == :turbo_stream }
-        render turbo_stream: streams, status: status
-      else
-        flash[error ? :alert : :notice] = error || notice if error || notice
-        redirect_to admin_settings_path(**admin_url_options, anchor: "mail"), status: :see_other
-      end
-    end
-
-    # The same comparison the Settings form makes (`SettingsController#stale?`).
-    def base_older_than?(updated_at, base)
-      Time.iso8601(base) < updated_at
-    rescue ArgumentError
-      false
-    end
-
-    def carried_parseable?(base)
-      Time.iso8601(base)
-      true
-    rescue ArgumentError
-      false
+      respond_with_streams(streams, anchor: "mail", moved_to: moved_to, notice: notice, error: error, toast: toast, status: status)
     end
   end
 end
