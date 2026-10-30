@@ -101,7 +101,8 @@ module Admin
       end
 
       def messages
-        messages_data(%w[warning.columns warning.rows row.menu column.menu].map { |key| "components.editor_screen.table_controls.#{key}" })
+        messages_data("components.editor_screen.table_controls.warning.columns", "components.editor_screen.table_controls.warning.rows",
+          "components.editor_screen.table_controls.row.menu", "components.editor_screen.table_controls.column.menu")
       end
 
       def switch(target, checked)
