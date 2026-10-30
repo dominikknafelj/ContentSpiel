@@ -187,6 +187,42 @@ class MailSettingsTest < ActiveSupport::TestCase
     assert_not settings(site, env: { "MAIL_SMTP_SECURITY" => "ssl" }).complete?, "a value the host mistyped is not guessed at"
   end
 
+  # Ruling F3: a host's value is read whatever its case.
+  test "the host's security is read whatever its case: TLS is tls, STARTTLS is starttls, None is none" do
+    site = site_with(mail_server: "smtp.test", mail_port: 587, mail_sender_address: "a@example.test")
+    { "TLS" => "tls", "STARTTLS" => "starttls", "StartTLS" => "starttls", "None" => "none" }.each do |typed, read|
+      host = settings(site, env: { "MAIL_SMTP_SECURITY" => typed })
+      assert_equal read, host.value(:security), typed
+      assert host.complete?, typed
+    end
+    assert settings(site, env: { "MAIL_SMTP_SECURITY" => "TLS" }).smtp_options[:tls]
+    assert_not settings(site, env: { "MAIL_SMTP_SECURITY" => "SSL" }).complete?, "a value outside the three is still not guessed at"
+  end
+
+  # Ruling F2: the mail gem raises on such an address while it builds the
+  # From, so it must never be complete, and nothing here may raise on it.
+  test "a sender address that is not one address is Not set up, says whose it is, and sender raises nothing" do
+    site = site_with(mail_server: "smtp.test", mail_port: 587, mail_sender_address: "a@example.test")
+    [ "no-reply@", "foo bar", "a@example.test, b@example.test", "Name <a@example.test>" ].each do |bad|
+      host = settings(site, env: { "MAIL_SENDER_ADDRESS" => bad })
+      assert_not host.complete?, bad
+      assert_equal :not_set_up, host.state, bad
+      assert_equal "sender_address_host", host.not_set_up_key, bad
+      assert_nil host.sender, bad
+      assert_equal "Not set up: the sender address the host sets (MAIL_SENDER_ADDRESS) is not one address, like no-reply@example.com.",
+        MailStateSentence.for(host)
+    end
+
+    # A site value written around the model's validation is said as the site's.
+    stored = settings(site_with(mail_server: "smtp.test", mail_port: 587, mail_sender_address: "no-reply@"))
+    assert_equal "sender_address_site", stored.not_set_up_key
+    assert_equal "Not set up: the sender address is not one address, like no-reply@example.com.", MailStateSentence.for(stored)
+
+    assert_equal "sentence", settings(site_with(mail_sender_address: nil)).not_set_up_key
+    assert_equal "no_address", settings(site, address: nil, env: { "MAIL_SENDER_ADDRESS" => "no-reply@" }).not_set_up_key, "the missing site address comes first"
+    assert settings(site, env: { "MAIL_SENDER_ADDRESS" => "host@example.test" }).complete?
+  end
+
   test "smtp_options: STARTTLS is required, TLS is TLS, and the timeouts are 5 and 10" do
     base = { mail_server: "smtp.test", mail_port: 587, mail_sender_address: "a@example.test" }
 

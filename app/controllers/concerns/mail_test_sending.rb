@@ -20,8 +20,7 @@ module MailTestSending
   def deliver_test_mail
     settings = MailSettings.current
     unless settings.complete?
-      key = settings.address_missing? ? "no_address" : "sentence"
-      return { alert: I18n.t("admin.mail.states.not_set_up.#{key}"), status: :unprocessable_entity }
+      return { alert: MailStateSentence.for(settings), status: :unprocessable_entity }
     end
 
     failure = ApplicationMailer.deliver_now_and_record(SystemMailer.test_mail(Current.user))

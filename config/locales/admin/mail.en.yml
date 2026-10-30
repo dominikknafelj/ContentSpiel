@@ -11,6 +11,8 @@ en:
           word: "Not set up"
           sentence: "Not set up. Password resets and invites are off."
           no_address: "Not set up: the site's address (PUBLIC_HOST) is missing, so no link can be mailed."
+          sender_address_host: "Not set up: the sender address the host sets (MAIL_SENDER_ADDRESS) is not one address, like no-reply@example.com."
+          sender_address_site: "Not set up: the sender address is not one address, like no-reply@example.com."
         untested:
           word: "Saved, not tested"
           sentence: "Saved, not tested. Send a test mail to turn on resets and invites."

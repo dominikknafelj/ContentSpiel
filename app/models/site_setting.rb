@@ -206,7 +206,7 @@ class SiteSetting < ApplicationRecord
   def mail_sender_address_is_one_address
     return if mail_sender_address.blank?
 
-    errors.add(:mail_sender_address, :one_address) unless mail_sender_address.match?(URI::MailTo::EMAIL_REGEXP)
+    errors.add(:mail_sender_address, :one_address) unless MailSettings.one_address?(mail_sender_address)
   end
 
   # Read before the cast: the integer column would read "abc" as 0 and

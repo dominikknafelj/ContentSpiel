@@ -19,8 +19,17 @@ require "openssl"
 # network can strip) or `tls`. `none` exists for a host's own relay, comes only
 # from `MAIL_SMTP_SECURITY=none` and only without a login (a login sent in the
 # clear is refused by never being complete); the `mail_security` column never
-# accepts it. Unset, security is `starttls`. A host value that is none of the
-# three is not guessed at: the settings are incomplete.
+# accepts it. Unset, security is `starttls`. The host's value is read whatever
+# its case (`TLS` is `tls`, `STARTTLS` is `starttls`: ruling F3); one that is
+# none of the three is not guessed at: the settings are incomplete.
+#
+# THE SENDER ADDRESS must be exactly one plain address (`one_address?`, the
+# rule the screens' column is validated by), from whichever source it comes:
+# a host's `MAIL_SENDER_ADDRESS=no-reply@` is never validated by a screen, and
+# the mail gem raises on it while it builds the From, before any delivery
+# (ruling F2). Such a value is "Not set up", and `not_set_up_key` says which
+# of the host's variable or the site's field is wrong; `sender` answers nil
+# rather than raise.
 #
 # THE STAND-IN. Outside production the delivery method Rails is configured
 # with (`:test` in test, `:file` into tmp/mails in development) stands in for
@@ -67,6 +76,12 @@ class MailSettings
   READ_TIMEOUT = 10
 
   FINGERPRINT_KEY = "content_spiel mail fingerprint".freeze
+
+  # The one rule for "one plain address" (`local@domain`, no name, no list,
+  # no angle brackets): the site's column is validated by it
+  # (`SiteSetting#mail_sender_address_is_one_address`) and `complete?` asks it
+  # of the effective value, the host's included.
+  def self.one_address?(text) = text.to_s.match?(URI::MailTo::EMAIL_REGEXP)
 
   def self.current(site = Current.site, env: ENV, production: Rails.env.production?, address: SiteAddress.current,
     stand_in: (production ? nil : ActionMailer::Base.delivery_method))
@@ -132,11 +147,13 @@ class MailSettings
   def stand_in? = @stand_in.present? && value(:server).blank?
 
   # Server, port and sender address are present (a stand-in needs no server),
-  # the security is one we know and, for `none`, there is no login, and in
-  # production the site has an address to build links from.
+  # the sender address is one address, the security is one we know and, for
+  # `none`, there is no login, and in production the site has an address to
+  # build links from.
   def complete?
     return false if address_missing?
     return false if value(:sender_address).blank?
+    return false if sender_address_malformed?
     return false unless security_acceptable?
 
     stand_in? || (value(:server).present? && value(:port).present?)
@@ -146,6 +163,23 @@ class MailSettings
   # mailed, so mail is "Not set up" whatever the fields hold, and the state's
   # sentence says why.
   def address_missing? = @production && !@address&.configured?
+
+  # A sender address that is there but is not one address (ruling F2).
+  def sender_address_malformed?
+    value(:sender_address).present? && !self.class.one_address?(value(:sender_address))
+  end
+
+  # Which "Not set up" sentence the state is told in
+  # (`admin.mail.states.not_set_up.<key>`): the missing site address, a
+  # malformed sender address from the host or from the site, else the plain
+  # one. Read by `MailStateSentence` (the card, System status) and the test
+  # mail's refusal, so the three say the same.
+  def not_set_up_key
+    if address_missing? then "no_address"
+    elsif sender_address_malformed? then from_host?(:sender_address) ? "sender_address_host" : "sender_address_site"
+    else "sentence"
+    end
+  end
 
   def fingerprint
     key = Rails.application.key_generator.generate_key(FINGERPRINT_KEY, 32)
@@ -169,7 +203,12 @@ class MailSettings
   def failure = site.mail_failure
 
   # "Name <address>", quoted by the mail gem; the address alone with no name.
+  # Nil when there is no one address to send from: Action Mailer evaluates
+  # the default From before `ApplicationMailer` asks `complete?`, and the
+  # mail gem raises on a malformed address (ruling F2).
   def sender
+    return unless self.class.one_address?(value(:sender_address))
+
     address = Mail::Address.new(value(:sender_address).to_s)
     address.display_name = value(:sender_name) if value(:sender_name).present?
     address.format
@@ -223,13 +262,13 @@ class MailSettings
     host = host_value(field)
     case field
     when :port then host ? Integer(host, 10, exception: false)&.then { |port| port if (1..65_535).cover?(port) } : site.mail_port
-    when :security then security(host)
+    when :security then security(host&.downcase)
     when :username, :password then host || stored_secret(field)
     else host || site.public_send(:"mail_#{field}")
     end
   end
 
-  # A host value outside the three is returned as it is, so
+  # The host's value comes downcased (ruling F3). One outside the three is returned as it is, so
   # `security_acceptable?` can refuse it; the column's `none` (or anything
   # else) is not accepted and reads as the default.
   def security(host)

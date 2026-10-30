@@ -13,7 +13,7 @@ module MailStateSentence
   def self.for(settings)
     case settings.state
     when :not_set_up
-      I18n.t("admin.mail.states.not_set_up.#{settings.address_missing? ? "no_address" : "sentence"}")
+      I18n.t("admin.mail.states.not_set_up.#{settings.not_set_up_key}")
     when :untested then I18n.t("admin.mail.states.untested.sentence")
     when :working then I18n.t("admin.mail.states.working.sentence", at: moment(settings.last_sent_at))
     when :failed

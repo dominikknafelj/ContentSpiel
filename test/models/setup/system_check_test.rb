@@ -324,6 +324,17 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
+  test "a host's sender address that is not one address is Not set up, and the row names the variable" do
+    with_mail_state(:untested) do
+      check = result("Mail", Setup::SystemCheck.run(address: SiteAddress.parse("https://cms.example.org"),
+        mail_settings: MailSettings.current(env: { "MAIL_SENDER_ADDRESS" => "no-reply@" })))
+
+      assert_equal :warning, check.status
+      assert_equal "Not set up: the sender address the host sets (MAIL_SENDER_ADDRESS) is not one address, like no-reply@example.com. " \
+        "#{Setup::SystemCheck::MAIL_FALLBACK_MESSAGE}", check.message
+    end
+  end
+
   test "System status shows a failure's sentence and never the server's line" do
     with_mail_state(:failed) do
       Current.site.update_columns(mail_failure: { "key" => "connect", "line" => "Connection refused - connect(2) for smtp.example.test:587" }) # version: none (a test)

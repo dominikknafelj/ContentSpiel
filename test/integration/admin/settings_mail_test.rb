@@ -175,6 +175,24 @@ class Admin::SettingsMailTest < ActionDispatch::IntegrationTest
     assert_empty ActionMailer::Base.deliveries
   end
 
+  # Ruling F2: the mail gem raised on such an address before the delivery,
+  # which answered 500 under the card's own "Send a test mail" sentence.
+  test "a host's sender address that is not one address: the card says so, and Send test mail answers it and sends nothing" do
+    sentence = "Not set up: the sender address the host sets (MAIL_SENDER_ADDRESS) is not one address, like no-reply@example.com."
+    with_mail_env("MAIL_SENDER_ADDRESS" => "no-reply@") do
+      with_mail_state(:untested) do
+        get "/cs-studio/settings"
+        assert_select "#settings-mail-card", /#{Regexp.escape(sentence)}/
+
+        send_test_mail
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target=settings-mail-test] template", /#{Regexp.escape(sentence)}/
+    assert_empty ActionMailer::Base.deliveries
+  end
+
   test "test mails are limited to 5 per person per 3 minutes" do
     with_mail_state(:untested) do
       5.times do
