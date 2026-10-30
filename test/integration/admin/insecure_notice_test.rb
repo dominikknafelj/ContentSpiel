@@ -5,9 +5,13 @@ require "test_helper"
 # each is drawn, for whom, and that nothing is said outside production.
 #
 # `as_production` changes `Rails.env` for one block in this process (a
-# parallel worker is a process of its own). Nothing else in the app reads
-# the environment while a page is drawn but `PasswordsMailer`, which no
-# request here reaches.
+# parallel worker is a process of its own). Besides the notice itself, the
+# one other reader while a page is drawn is `MailSettings.current`, whose
+# production rule makes mail "Not set up" without a site address: so a test
+# that draws the password request page in production also sets an address
+# (`with_site_address`), or the page is closed and redirects to sign-in.
+# The mailers read it too (`ApplicationMailer.request_origin_used?`), and no
+# request here sends a mail.
 class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
   NOTICE = "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address.".freeze
 

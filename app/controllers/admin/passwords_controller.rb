@@ -160,8 +160,10 @@ module Admin
         nil
       end
 
-      # `expired` selects the "This link has expired" state of the request
-      # page (a bad signature and a lapsed 15 minutes look the same).
+      # `expired` selects the "This reset link has expired" state of the
+      # request page (a bad signature and a lapsed 15 minutes look the same);
+      # while mail is not ready that page is closed, and `require_mail_ready`
+      # says the same on sign-in instead (`expired_without_mail`).
       def set_user_by_token
         @user = user_for_token
         redirect_to new_admin_password_path(expired: 1) unless @user

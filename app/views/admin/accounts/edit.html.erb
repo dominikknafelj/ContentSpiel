@@ -161,10 +161,11 @@
       </div>
       <%# The card's own footer, inside it (the notes handoff's decision 34). %>
       <%= render Admin::Ui::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }, contained: true) do %>
-      <%# The reset flow is public and signs nobody out by being visited; it
-          asks for an email, so it is only useful where mail is configured
-          (System status says when it isn't). Opened in the page, not the
-          frame: it is a different layout. %>
+      <%# The reset flow is public and signs nobody out by being visited. It
+          mails a link, so the link is offered only while mail works
+          (`MailSettings#ready?`: Working or Last send failed), as on the
+          sign-in page; the request page is closed otherwise. Opened in the
+          page, not the frame: it is a different layout. %>
         <% if MailSettings.current.ready? %>
           <%= link_to "Forgot your current password?", new_admin_password_path, data: { turbo_frame: "_top" }, class: "text-[13px] text-accent hover:text-accent-hover hover:underline" %>
         <% end %>
