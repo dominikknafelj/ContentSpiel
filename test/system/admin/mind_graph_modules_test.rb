@@ -1129,9 +1129,14 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal({
       "ink" => "the-ink", "meta" => "the-meta", "dim" => "the-dim", "warn" => "the-warn", "surface" => "the-surface", "sunken" => "the-sunken", "accent" => "the-accent",
       "line" => "the-line-strong", "faint" => "the-line", "page" => "the-graph-page", "tree" => "the-graph-tree", "categories" => (1..6).map { |slot| "the-cat-#{slot}" },
-      "font" => "12px SansFace", "strongFont" => "600 12px SansFace", "countFont" => "10px MonoFace", "monoFont" => "12px MonoFace", "strongMonoFont" => "600 12px MonoFace",
+      "font" => "12px SansFace", "strongFont" => "600 12px SansFace", "countFont" => "11px MonoFace", "monoFont" => "12px MonoFace", "strongMonoFont" => "600 12px MonoFace",
       "radius" => 7
     }, theme)
+    # The brand book's rule, held where the canvas's sizes are chosen: no
+    # text under 11px in CS Studio, a canvas's own words included.
+    theme.select { |key, _| key.match?(/font\z/i) }.each do |key, font|
+      assert_operator font[/(\d+(?:\.\d+)?)px/, 1].to_f, :>=, 11, "#{key} is #{font}: CS Studio draws no text under 11px"
+    end
   end
 
   # A press INSIDE a drawn shape is a press on that shape, whatever else has

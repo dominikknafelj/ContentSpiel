@@ -13,9 +13,10 @@ module Admin
     # viewer has no fuller list to open).
     #
     # With no rows the card says `empty` as one quiet line in dim, left-aligned
-    # where the first row would be (Claude Design's O6), and not with
-    # `Admin::Ui::EmptyStateComponent` (a centred bold title in 48px of padding;
-    # its 16 other uses stay as they are, layout points spec decision 12). The
+    # where the first row would be (Claude Design's O6). It is the look
+    # `Admin::Ui::EmptyStateComponent` has had since 2026-10-31 (the brand
+    # book's empty-state rule), drawn here by hand because the card's action
+    # is a link inside the line, not under it. The
     # `empty_action` slot is drawn after that line, only while the card has no rows.
     #
     # Two optional slots in the header, for the notes cards (notes spec §5):

@@ -794,7 +794,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
       assert_not_includes response.body, "Gone post", "filters #{params}"
     end
     get "/cs-studio/posts", params: { q: "gone" }
-    assert_select "h3", text: "No matches"
+    assert_select "[data-empty-state-title]", text: "No matches."
     get "/cs-studio/posts", params: { scope: "drafts" }
     assert_select "label[for=posts-scope-all] span", text: "1"
     assert_select "label[for=posts-scope-live] span", text: "1"

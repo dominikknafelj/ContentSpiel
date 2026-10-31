@@ -12,9 +12,12 @@ module Admin
     # reaches the site only with "Publish changes", so a live record has no
     # primary button until its rows differ from what is published (the
     # button is `Publishing::State`'s `publish_changes`) -- while a draft
-    # offers Publish and a scheduled record Publish now plus Edit schedule. Everything else (Activity, Schedule…,
-    # Unpublish, Move to trash) sits in the ⋯ menu, the destructive item last
-    # and after a divider.
+    # offers Publish and a scheduled record Publish now plus Edit schedule…. Everything else (Activity, Schedule…,
+    # Cancel scheduled change…, Unpublish…, Move to trash…) sits in the ⋯ menu, the destructive item last
+    # and after a divider. Every item that opens a dialog ends with an
+    # ellipsis (the brand book: "an action that opens a dialog ends with
+    # …"); Activity is a link and has none. A dialog's own confirm button
+    # names the act without one ("Unpublish", "Move to trash"): it does it.
     #
     # Every publish/unpublish/schedule/delete form carries `data-turbo-frame=
     # "_top"`: each redirects, and left to the layout's `<turbo-frame

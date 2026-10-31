@@ -46,6 +46,6 @@
       <%= render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, selected: selected, locale: locale, url_options: url_options, root: true) %>
     </ul>
   <% else %>
-    <%= render Admin::Ui::EmptyStateComponent.new(title: "No pages yet") %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: "No pages yet.") %>
   <% end %>
 </turbo-frame>

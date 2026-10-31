@@ -21,7 +21,7 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     # The suite's default: saved, not tested. An owner is told why, and where.
     get USERS
     assert_response :success
-    assert_select "button", text: "Invite person", count: 0
+    assert_select "button", text: "Invite person…", count: 0
     assert_select DIALOG, count: 0
     assert_select "[data-invites-need-mail]", text: /Invites need mail\./ do
       assert_select "a[href=?]", "/cs-studio/settings#mail", text: "Set up mail →"
@@ -29,7 +29,7 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
 
     with_mail_state(:working) do
       get USERS
-      assert_select "button[data-admin--ui--dialog-id-param=?]", "invite-person", text: "Invite person"
+      assert_select "button[data-admin--ui--dialog-id-param=?]", "invite-person", text: "Invite person…"
       assert_select DIALOG do
         assert_select "h2", "Invite a person"
         assert_select "input[type=email][name='user[email_address]'][required]"
@@ -48,10 +48,10 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     get USERS
     assert_response :success
     assert_select "[data-invites-need-mail]", count: 0
-    assert_select "button", text: "Invite person", count: 0
+    assert_select "button", text: "Invite person…", count: 0
     with_mail_state(:failed) do
       get USERS
-      assert_select "button", text: "Invite person"
+      assert_select "button", text: "Invite person…"
     end
 
     # Without users.manage there is no Users screen at all.

@@ -786,17 +786,17 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     [ {}, { filter: "bogus" }, { filter: "untranslated" }, { filter: "all" } ].each do |params|
       get "/cs-studio/media", params: params
-      assert_select "p, h2, h3", text: "No images"
-      assert_select "p, h2, h3", text: "No matches", count: 0
+      assert_select "[data-empty-state-title]", text: "No images."
+      assert_select "[data-empty-state-title]", text: "No matches.", count: 0
     end
 
     [ { filter: "unused" }, { filter: "mine" }, { q: "zzz" } ].each do |params|
       get "/cs-studio/media", params: params
-      assert_select "p, h2, h3", text: "No matches"
+      assert_select "[data-empty-state-title]", text: "No matches."
     end
 
     get "/cs-studio/media", params: { picker: 1, filter: "bogus" }
-    assert_select "p, h2, h3", text: "No images"
+    assert_select "[data-empty-state-title]", text: "No images."
   end
 
   test "the Media screen is never restored from Turbo's cache or prefetched, like the editors" do

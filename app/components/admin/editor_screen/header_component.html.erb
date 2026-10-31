@@ -55,7 +55,7 @@
       <%= render Admin::EditorScreen::PublishingStateComponent.new(record: record, part: :actions, url_options: url_options, state: state) unless draft? %>
 
       <% if can_edit_schedule? %>
-        <%= render Admin::Ui::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Edit schedule…", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
       <% end %>
 
       <% if menu_items? %>
@@ -71,7 +71,7 @@
             <% menu.with_item do %><%= tag.button t(".cancel_scheduled_change"), type: "button", data: dialog_trigger(cancel_scheduled_change_dialog_id) %><% end %>
           <% end %>
           <% if can_unpublish? %>
-            <% menu.with_item do %><%= tag.button "Unpublish", type: "button", data: dialog_trigger(unpublish_dialog_id) %><% end %>
+            <% menu.with_item do %><%= tag.button "Unpublish…", type: "button", data: dialog_trigger(unpublish_dialog_id) %><% end %>
           <% end %>
           <% if may_delete? %>
             <%# The divider is an item of its own (a `role="separator"`, which
@@ -79,9 +79,9 @@
             <% menu.with_item do %><div role="separator" class="my-1 border-t border-line"></div><% end %>
             <% menu.with_item do %>
               <% if can_delete? %>
-                <%= tag.button "Move to trash", type: "button", class: "text-danger-ink", data: dialog_trigger(delete_dialog_id) %>
+                <%= tag.button "Move to trash…", type: "button", class: "text-danger-ink", data: dialog_trigger(delete_dialog_id) %>
               <% else %>
-                <%= tag.button "Move to trash", type: "button", disabled: true, title: delete_disabled_reason, class: "text-danger-ink disabled:cursor-not-allowed disabled:opacity-50" %>
+                <%= tag.button "Move to trash…", type: "button", disabled: true, title: delete_disabled_reason, class: "text-danger-ink disabled:cursor-not-allowed disabled:opacity-50" %>
               <% end %>
             <% end %>
           <% end %>

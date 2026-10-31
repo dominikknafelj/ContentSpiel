@@ -2,7 +2,7 @@ module Admin
   module PostsScreen
     # The posts list's bulk bar (design pass round 2, Task 17, handoff §4.3):
     # accent-tint, hidden until rows are ticked, then "3 selected · Publish ·
-    # Move to trash · Clear". The count is announced by an always-present
+    # Move to trash… · Clear" (the ellipsis: it opens the confirmation). The count is announced by an always-present
     # `role="status"` (`aria-live="polite"`) beside it, which `admin--posts--bulk-select`
     # writes ("2 posts selected"); the bar itself toggles `hidden`. It holds no checkboxes of its own: `admin--posts--bulk-select`
     # (on the list's wrapper) tracks the ticked rows and fills each `ids`

@@ -107,7 +107,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/tags"
     assert_response :success
     assert_select "h1", "Tags"
-    assert_select "h3", "No tags yet"
+    assert_select "[data-empty-state-title]", "No tags yet."
   end
 
   test "inline rename answers a saved status stream and resyncs listed posts" do

@@ -147,6 +147,13 @@ export function topCorner(node, radius) {
 // the room beside the text (`px-1`), and how far a POST's pill reaches over
 // the corner (the handoff's "overlapping by 4px").
 //
+// THE COUNT IS DRAWN AT 11px since 2026-10-31 (`theme.countFont`: no text
+// under 11px in CS Studio), and the pill was left as it was measured for
+// 10px on purpose: IBM Plex Mono advances 0.6em, so "99+" is 19.8px wide in
+// a 26px pill (3px each side where `px-1` gave 4) and "12" is 13.2 in 20,
+// and the 11px line sits in the 14px height. Grow NOTES_CHARACTER only if a
+// wider mono font is put on `--cs-mono`.
+//
 // A PAGE'S CARD'S BADGE STANDS OUTSIDE IT (Claude Design's K3, 2026-10-12;
 // the "count badges overlap the page cards" of the 2026-10-15 review): its
 // right edge NOTES_CLEAR px clear of the card's left edge, centred on its top

@@ -40,7 +40,7 @@ en:
           submit: "Send invite"
     users:
       index:
-        invite: "Invite person"
+        invite: "Invite person…"
         invites_need_mail: "Invites need mail."
         set_up_mail: "Set up mail →"
     invites:

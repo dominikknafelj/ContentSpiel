@@ -28,7 +28,7 @@ en:
         title: "Tags"
         intro: "Tags are created when you add them to a post. Click a name to rename it."
         empty:
-          title: "No tags yet"
+          title: "No tags yet."
           description: "Tags appear here once a post uses one."
         columns:
           name: "Name"

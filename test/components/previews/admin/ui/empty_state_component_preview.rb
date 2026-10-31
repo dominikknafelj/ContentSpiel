@@ -4,7 +4,7 @@ module Admin
     # with a description plus an action slot.
     class EmptyStateComponentPreview < ViewComponent::Preview
       def title_only
-        render Admin::Ui::EmptyStateComponent.new(title: "No tags yet")
+        render Admin::Ui::EmptyStateComponent.new(title: "No tags yet.")
       end
 
       def with_description_and_action

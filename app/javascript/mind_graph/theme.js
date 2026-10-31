@@ -23,9 +23,12 @@ export function readTheme(element) {
   theme.font = `12px ${style.fontFamily}`
   // The selected node's label.
   theme.strongFont = `600 12px ${style.fontFamily}`
-  // The notes count on a node: the small mono label style, read from the
-  // mono token so the canvas and the page agree.
-  theme.countFont = `10px ${read("--cs-mono") || style.fontFamily}`
+  // The notes count on a node and a "+N more" pill's words: the small mono
+  // label style (`text-label`), read from the mono token so the canvas and
+  // the page agree. 11px, never less: the brand book allows no text under
+  // 11px in CS Studio, and a canvas's text is text. (It was 10px until
+  // 2026-10-31; the badge's geometry in `marks.js` still holds "99+".)
+  theme.countFont = `11px ${read("--cs-mono") || style.fontFamily}`
   // A tag's label: mono, like a tag everywhere else in CS Studio, and still
   // mono when its node is selected.
   theme.monoFont = `12px ${read("--cs-mono") || style.fontFamily}`

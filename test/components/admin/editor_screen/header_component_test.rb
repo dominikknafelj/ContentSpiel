@@ -21,8 +21,8 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "button.bg-accent", text: "Publish", count: 1
     assert_selector "[role=menu] a", text: "Activity", visible: :all
     assert_selector "[role=menu] button", text: "Schedule…", visible: :all
-    assert_selector "[role=menu] button", text: "Move to trash", visible: :all
-    assert_no_selector "[role=menu] button", text: "Unpublish", visible: :all
+    assert_selector "[role=menu] button", text: "Move to trash…", visible: :all
+    assert_no_selector "[role=menu] button", text: "Unpublish…", visible: :all
   end
 
   test "the Pages crumb links on a subpage but is plain text on Home, which /pages would reopen" do
@@ -42,7 +42,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     # for whoever may publish and shown by a mark (CSS), so no mark is no primary button.
     assert_no_selector "header [data-publish-changes-offered]", visible: :all
     assert_selector "[role=status]", text: "This page is live. Changes are published with “Publish changes…”."
-    assert_selector "[role=menu] button", text: "Unpublish", visible: :all
+    assert_selector "[role=menu] button", text: "Unpublish…", visible: :all
     assert_selector "a[href='/about']", text: "View on site"
   end
 
@@ -51,7 +51,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
     render_header(post.reload)
     assert_selector "button.bg-accent", text: "Publish now"
-    assert_selector "button", text: "Edit schedule"
+    assert_selector "button", text: "Edit schedule…"
     assert_selector ".admin-status-chip[data-status=scheduled]"
   end
 
@@ -64,7 +64,7 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     post = create_post(title: "Later", published: false)
     as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
     render_header(post.reload)
-    assert_selector "button[data-admin--ui--dialog-id-param='schedule-post-#{post.id}']", text: "Edit schedule"
+    assert_selector "button[data-admin--ui--dialog-id-param='schedule-post-#{post.id}']", text: "Edit schedule…"
     assert_selector "dialog#schedule-post-#{post.id} button", text: "Remove schedule", visible: :all
   end
 
@@ -76,8 +76,8 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
   test "the menu's last item is Move to trash, after a divider; the homepage has it disabled with the reason" do
     render_header(root_page)
     items = page.all("[role=menu] a, [role=menu] button", visible: :all).map { |i| i.text(:all).strip }
-    assert_equal "Move to trash", items.last
-    assert_selector "[role=menu] button[disabled][title='The homepage can’t be deleted']", text: "Move to trash", visible: :all
+    assert_equal "Move to trash…", items.last
+    assert_selector "[role=menu] button[disabled][title='The homepage can’t be deleted']", text: "Move to trash…", visible: :all
     assert_no_selector "dialog#delete-page-#{root_page.id}", visible: :all
   end
 
@@ -197,17 +197,17 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     render_header(live.reload)
 
     assert_selector "header #publishing-chip [data-change-scheduled]", text: "Changes scheduled for 12 Oct 2031, 09:00"
-    assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='cancel-scheduled-change-page-#{live.id}']", text: "Cancel scheduled change", visible: :all
+    assert_selector "[role=menu] button[data-admin--ui--dialog-id-param='cancel-scheduled-change-page-#{live.id}']", text: "Cancel scheduled change…", visible: :all
     assert_selector "dialog#cancel-scheduled-change-page-#{live.id} form[action='/cs-studio/publishing/page/#{live.id}/cancel_scheduled_change']", visible: :all
     items = page.all("[role=menu] a, [role=menu] button", visible: :all).map { |item| item.text(:all).strip }
-    assert_equal [ "Cancel scheduled change", "Unpublish" ], items[items.index("Cancel scheduled change"), 2]
+    assert_equal [ "Cancel scheduled change…", "Unpublish…" ], items[items.index("Cancel scheduled change…"), 2]
   end
 
   test "with no change scheduled there is no such item, no such dialog and no such line" do
     live = edit_title(create_page(title: "About"))
     render_header(live)
 
-    assert_no_selector "[role=menu] button", text: "Cancel scheduled change", visible: :all
+    assert_no_selector "[role=menu] button", text: "Cancel scheduled change…", visible: :all
     assert_no_selector "dialog[id^=cancel-scheduled-change-]", visible: :all
     assert_no_selector "[data-change-scheduled]"
   end
@@ -388,8 +388,8 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     create_page(title: "Child one", parent: parent)
     create_page(title: "Child two", parent: parent)
     render_header(parent.reload)
-    assert_selector "[role=menu] button", text: "Move to trash", visible: :all
-    assert_no_selector "[role=menu] button[disabled]", text: "Move to trash", visible: :all
+    assert_selector "[role=menu] button", text: "Move to trash…", visible: :all
+    assert_no_selector "[role=menu] button[disabled]", text: "Move to trash…", visible: :all
     assert_text :all, "This also moves 2 subpages to the trash."
 
     render_header(create_page(title: "Leaf"))

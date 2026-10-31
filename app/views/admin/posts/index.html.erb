@@ -48,13 +48,13 @@
   <% elsif @posts.empty? %>
     <div class="rounded-cs border border-line bg-surface">
       <% if filtered %>
-        <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches", description: "No posts match the current filters (#{filter_summary("scope" => :scope, "status" => :status, "type" => :type, "tag" => :tag, "translation" => :translation, "title" => :q)}).") do |empty_state| %>
+        <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No posts match the current filters (#{filter_summary("scope" => :scope, "status" => :status, "type" => :type, "tag" => :tag, "translation" => :translation, "title" => :q)}).") do |empty_state| %>
           <% empty_state.with_action do %>
             <%= link_to "Clear filters", admin_posts_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
           <% end %>
         <% end %>
       <% else %>
-        <%= render Admin::Ui::EmptyStateComponent.new(title: "No posts yet", description: (creatable_types.any? ? "Choose a content type to create your first post." : nil)) do |empty_state| %>
+        <%= render Admin::Ui::EmptyStateComponent.new(title: "No posts yet.", description: (creatable_types.any? ? "Choose a content type to create your first post." : nil)) do |empty_state| %>
           <% if creatable_types.any? %>
             <% empty_state.with_action do %>
               <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: dialog_trigger("new-post-dialog").merge(turbo_frame: "content"), class: setup_primary_button_class %>

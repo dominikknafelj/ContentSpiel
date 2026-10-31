@@ -59,7 +59,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     visit admin_posts_path
     await_admin_controllers
     tick(@third)
-    within("[data-admin--posts--bulk-select-target=bar]") { press "Move to trash" }
+    within("[data-admin--posts--bulk-select-target=bar]") { press "Move to trash…" }
     within("dialog#bulk-trash-dialog[open]") do
       assert_text "1 post"
       press "Move to trash"
@@ -79,7 +79,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     visit admin_posts_path(q: "draft")
     await_admin_controllers
     find("tr#post_#{@second.id} button[aria-label^='Actions for']").click
-    find("tr#post_#{@second.id} [role=menu] button", text: "Move to trash").click
+    find("tr#post_#{@second.id} [role=menu] button", text: "Move to trash…").click
     within("dialog#bulk-trash-dialog[open]") do
       assert_text "This moves 1 post to the trash."
       press "Move to trash"
@@ -105,7 +105,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_selector "[data-admin--posts--bulk-select-target=bar]", text: "2 selected"
 
     find("tr#post_#{@second.id} button[aria-label^='Actions for']").click
-    find("tr#post_#{@second.id} [role=menu] button", text: "Move to trash").click
+    find("tr#post_#{@second.id} [role=menu] button", text: "Move to trash…").click
     within("dialog#bulk-trash-dialog[open]") do
       assert_text "This moves 1 post to the trash."
       press "Cancel"

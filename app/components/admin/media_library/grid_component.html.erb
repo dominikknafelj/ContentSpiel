@@ -8,13 +8,13 @@
 <% if assets.empty? %>
   <div class="rounded-cs border border-line bg-surface" data-media-empty>
     <% if filtered? %>
-      <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches", description: "No images match the current search or filter.") do |empty_state| %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No images match the current search or filter.") do |empty_state| %>
         <% empty_state.with_action do %>
           <%= link_to "Clear filters", clear_filters_path, class: setup_secondary_link_class, data: clear_filters_data %>
         <% end %>
       <% end %>
     <% else %>
-      <%= render Admin::Ui::EmptyStateComponent.new(title: "No images", description: pick? ? "Use Upload above to add one." : "Upload one above.") %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: "No images.", description: pick? ? "Use Upload above to add one." : "Upload one above.") %>
     <% end %>
   </div>
 <% end %>

@@ -15,7 +15,7 @@ class ToastSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     open_editor_menu
-    press "Move to trash"
+    press "Move to trash…"
     within("dialog[open]") { press "Move to trash" }
     assert_selector "#toasts .admin-toast", text: /trash/i, wait: 10
     assert @post.reload.trashed?
@@ -41,7 +41,7 @@ class ToastSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     open_editor_menu
-    press "Move to trash"
+    press "Move to trash…"
     within("dialog[open]") { press "Move to trash" }
     assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10
     assert_current_path admin_posts_path

@@ -380,7 +380,7 @@ en:
           waiting_lister: "Not listed on the site yet: the page “%{title}” lists this post, and its changes are not published."
           waiting_lister_unnamed: "Not listed on the site yet: a page lists this post, and its changes are not published."
           # The ⋯ menu's item, while a change waits for its time.
-          cancel_scheduled_change: "Cancel scheduled change"
+          cancel_scheduled_change: "Cancel scheduled change…"
           # Under the address of a live record, and of a scheduled one: the
           # plan's wording, with the button's name as it reads.
           live_hint: "This %{type} is live. Changes are published with “Publish changes…”."

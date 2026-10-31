@@ -32,12 +32,12 @@ class Admin::FiltersTest < ActionDispatch::IntegrationTest
 
   test "a filtered list with no matches says which filters, and offers Clear filters" do
     get "/cs-studio/posts", params: { q: "zzz-no-such-title", status: "draft" }
-    assert_select "h3", text: "No matches"
+    assert_select "[data-empty-state-title]", text: "No matches."
     assert_select "p", text: /status draft and title zzz-no-such-title/
     assert_select "a[href='/cs-studio/posts']", text: "Clear filters"
 
     get "/cs-studio/audit_events", params: { event_action: "no.such.action" }
-    assert_select "h3", text: "No matches"
+    assert_select "[data-empty-state-title]", text: "No matches."
     assert_select "a", text: "Clear filters"
   end
 

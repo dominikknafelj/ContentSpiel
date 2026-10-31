@@ -20,7 +20,7 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     open_editor_menu
-    press "Move to trash"
+    press "Move to trash…"
     within("dialog#delete-page-#{@section.id}[open]") { press "Move to trash" }
     # A longer wait than Capybara's default: the first page move of a run
     # (branch flagged, subtree's URLs and listed posts resynced, redirect to
@@ -53,7 +53,7 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     open_editor_menu
-    press "Move to trash"
+    press "Move to trash…"
     within("dialog#delete-page-#{@child.id}[open]") { press "Move to trash" }
     # The redirect goes through /pages to Home's editor; wait for that landing
     # (not just any status text) before reaching for the toast's button.

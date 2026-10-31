@@ -1,7 +1,7 @@
 <section class="rounded-cs border border-line bg-surface">
   <h2 class="px-4 pt-4 text-h2 text-ink">Tokens</h2>
   <% if tokens.empty? %>
-    <%= render Admin::Ui::EmptyStateComponent.new(title: "No tokens yet", description: "Create a token to connect an assistant.") %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: "No tokens yet.", description: "Create a token to connect an assistant.") %>
   <% else %>
     <table class="admin-api-tokens-table admin-card-table mt-2 w-full border-collapse text-sm">
       <thead>

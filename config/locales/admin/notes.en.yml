@@ -304,7 +304,7 @@ en:
             post: "New note on this post"
             media: "New note on this image"
           new_on_block: "New note on %{block}"
-          empty_title: "No notes yet"
+          empty_title: "No notes yet."
           empty:
             page: "Ask a question about this page or one of its blocks."
             post: "Ask a question about this post."

@@ -1,9 +1,8 @@
-<div class="admin-empty-state px-6 py-12 text-center">
-  <h3 class="text-base font-semibold text-ink"><%= title %></h3>
-  <% if description.present? %>
-    <p class="mt-1 text-sm text-meta"><%= description %></p>
-  <% end %>
+<%# One dim line where the first row would be, then the action: the brand
+    book's empty state, and the dashboard card's (`DashboardScreen::CardComponent`). %>
+<div class="admin-empty-state px-4 py-2.5">
+  <p class="text-sm text-dim"><span data-empty-state-title><%= title %></span><% if description.present? %> <%= description %><% end %></p>
   <% if action? %>
-    <div class="mt-4 flex justify-center"><%= action %></div>
+    <div class="mt-2 flex justify-start"><%= action %></div>
   <% end %>
 </div>
