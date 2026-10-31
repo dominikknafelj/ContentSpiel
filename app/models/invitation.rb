@@ -37,7 +37,8 @@ class Invitation < ApplicationRecord
   # database when that user is deleted.
   belongs_to :inviter, class_name: "User", optional: true
   belongs_to :user, optional: true
-  has_many :invitation_groups, dependent: :delete_all
+  # The join rows go with the invitation by the database's cascade.
+  has_many :invitation_groups
   has_many :groups, through: :invitation_groups, class_name: "AccessControl::Group"
 
   # As `User`'s, so an address is compared as it would be stored on the
