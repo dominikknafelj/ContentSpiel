@@ -781,7 +781,6 @@ Left by the Mail part (spec "As built"; `docs/reference/mail.md`). Each line say
 - **Some Users-screen strings** are still literals beside the converted list and dialog ("Next", item 7).
 - **Accepted invitations are kept** (so a used link says "already used"), with the address they were for, also after that account is deleted; nothing removes them. A retention rule, if one is wanted, is a cleanup job.
 - **A typo'd invitation is corrected by withdrawing it and inviting again**: an invitation has no editor (the users' editor no longer reaches it), and its address is changed by nothing on screen.
-- **An invitation whose address got an account meanwhile** (the New user form) stays on the Users list as open until it is withdrawn, and its link says "already used"; nothing closes it by itself.
 
 ### Theming
 
