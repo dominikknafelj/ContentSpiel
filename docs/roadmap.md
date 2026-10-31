@@ -314,6 +314,9 @@ Deliberately not planned: AI tools over MCP. MCP clients are already AIs and can
 
 All Could (media library spec §8).
 
+- **Image delivery (Should; owner, 2026-10-31).** A small screenshot on the documentation site takes seconds to appear. Measure first (time to first byte, which file is served, whether Cloudflare caches it), then fix what the measure shows. Likely causes from the code: until a variant's job has run, a page serves the full original (`Media::Asset#srcset` lists only processed variants), so a phone can get a 2,880px PNG; every image is an Active Storage request through Rails and a redirect, behind Cloudflare Access on that site; and long cache headers or a CDN in front are not set up. Options: make the variants at upload rather than in a job, serve them through a proxy or the CDN with long cache headers. The guide's own screenshots could also be taken at 1× as WebP (`bin/screenshots`).
+- **Images in Settings (Should; owner, 2026-10-31).** An "Images" card for owners: the variants' format and quality (WebP or AVIF), which widths are made (today fixed at 480/960/1600/2400 in `Media::Asset::VARIANT_WIDTHS`), the largest upload (today 10 MB), and "Regenerate images" with its progress on the card and as a System status row. What should simply be right stays a default, not a setting: `width`/`height` on every image, when variants are made, the cache headers.
+- **Image loading state (Should; owner, 2026-10-31).** An image that is still loading reserves its space (`width`/`height`) and shows the loading look the Design System's "Image loading" page decides (three options drawn there: a quiet sunken box, an outlined box with an image mark, a blurred tiny preview), fading the image in; under reduced motion it appears at once.
 - Video and document files, not only images.
 - Cropping and a focal point.
 - Folders and tags for organising assets.
