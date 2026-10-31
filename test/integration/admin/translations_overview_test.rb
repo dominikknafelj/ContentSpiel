@@ -237,7 +237,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "tbody tr", count: 0
-    assert_select "h3", text: "Everything is translated."
+    assert_select "[data-empty-state-title]", text: "Everything is translated."
   end
 
   test "filters by type, the segments carrying counts" do
