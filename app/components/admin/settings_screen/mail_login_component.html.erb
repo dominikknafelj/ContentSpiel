@@ -1,0 +1,54 @@
+<div id="<%= ID %>" class="admin-column">
+  <p class="<%= setup_label_class %>"><%= t(".heading") %></p>
+
+  <% FIELDS.each_key do |field| %>
+    <% next unless mail_settings.from_host?(field) %>
+    <div class="mt-1">
+      <span class="<%= setup_label_class %>"><%= t(".#{field}") %></span>
+      <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-dim" aria-hidden="true"><%= MASK %></div>
+      <p class="mt-1 text-sm text-meta"><%= t(".set_by_host") %></p>
+    </div>
+  <% end %>
+
+  <% unless all_from_host? %>
+    <% if login_set? %>
+      <div class="mt-1 flex flex-wrap items-center gap-2" data-admin--settings--mail-target="chip" <%= "hidden" if entry_open? %>>
+        <span class="text-sm text-meta" data-mail-login-state="set"><%= set_on %></span>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".replace"), variant: :secondary, size: :small, data: LOCK.merge(action: "admin--settings--mail#edit")) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".remove"), variant: :danger_text, size: :small, data: dialog_trigger(REMOVE_DIALOG).merge(LOCK)) %>
+      </div>
+    <% end %>
+
+    <%# The login's own form (`form=`, never the Settings form): never pre-filled. %>
+    <div class="mt-1 flex flex-col gap-2" data-admin--settings--mail-target="entry" data-mail-login-state="<%= login_set? ? "set" : "unset" %>"
+         <%= "hidden" unless entry_open? %>>
+      <div class="grid gap-3.5 sm:grid-cols-2">
+        <% editable_fields.each do |field| %>
+          <div class="admin-column">
+            <%= label_tag input_id(field), t(".#{field}"), class: setup_label_class %>
+            <% options = { id: input_id(field), form: LOGIN_FORM, autocomplete: "off", spellcheck: false,
+                           aria: { describedby: ("settings-mail-login-errors" if error.present?), invalid: (true if error.present?) },
+                           class: setup_input_class,
+                           data: LOCK.merge("admin--settings--mail-target": "input", action: "keydown.esc->admin--settings--mail#cancel input->admin--settings--mail#holdLogin") } %>
+            <% if field == :password %>
+              <%= password_field_tag "site_setting[#{FIELDS[field]}]", nil, options %>
+            <% else %>
+              <%= text_field_tag "site_setting[#{FIELDS[field]}]", nil, options %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".save"), variant: :primary, type: "submit", form: LOGIN_FORM, data: LOCK) %>
+        <% if login_set? %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, data: { action: "admin--settings--mail#cancel" }) %>
+        <% end %>
+      </div>
+    </div>
+
+    <div id="settings-mail-login-errors" class="mt-1 text-sm text-danger-ink" role="alert">
+      <% if error.present? %><p class="flex gap-1.5"><span aria-hidden="true" class="font-cs-mono font-semibold">!</span><span><%= error %></span></p><% end %>
+    </div>
+    <p class="mt-1 text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
+  <% end %>
+</div>

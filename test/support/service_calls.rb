@@ -71,6 +71,19 @@ module ServiceCalls
     "Publishing::PublishChanges" => "the update_post tool's publish_changes argument"
   }.freeze
 
+  # Services whose credential is a token a person was mailed, not an actor's
+  # rights: whoever is signed in, the token decides, and the service acts as
+  # the user it names. Instead of the refusal run, the contract proves that a
+  # token that is no good is refused and changes nothing (no audit event
+  # either: nobody was refused a permission), and that a good one is recorded
+  # as the token's user whoever calls it. The factory returns `call:` (a good
+  # token), `bad_call:` (a token that finds nothing) and `owner:` (the user
+  # the token names, or a callable that finds it after the call, for a service
+  # that creates it).
+  TOKEN_CREDENTIAL = {
+    "Invitations::Accept" => "the invitation's token is the right to make that one account (spec \"Invites\")"
+  }.freeze
+
   # `ApplicationService` subclasses that are not services of their own (a
   # base class other services inherit from).
   ABSTRACT = [].freeze
@@ -92,7 +105,8 @@ module ServiceCalls
   def self.variants(service_class) = VARIANTS.fetch(service_class.name, {}).keys
 
   def self.exempt?(service_class)
-    SELF_SERVICE.key?(service_class.name) || OWN_RESULT.key?(service_class.name) || ABSTRACT.include?(service_class.name)
+    SELF_SERVICE.key?(service_class.name) || OWN_RESULT.key?(service_class.name) || TOKEN_CREDENTIAL.key?(service_class.name) ||
+      ABSTRACT.include?(service_class.name)
   end
 
   # One digest per table: md5 over every row's text, in a stable order. Any
@@ -528,6 +542,37 @@ module ServiceCalls
       { call: -> { Users::UpdateProfile.call(target, name: "Renamed") }, permission: "users.manage", on: target,
         control_actor: target,
         owner: mine, own: -> { Users::UpdateProfile.call(mine, name: "Me") }, own_event: "user.updated" }
+    },
+
+    # Invites need mail that works (`MailSettings#ready?`): the control
+    # run puts it so, inside the test's transaction.
+    "Invitations::Invite" => lambda {
+      put_mail_state(:working)
+      { call: -> { Invitations::Invite.call(email_address: "invited@example.com", group_ids: [ access_control_groups(:read_only).id ]) },
+        permission: "users.manage", on: Invitation }
+    },
+
+    "Invitations::Resend" => lambda {
+      put_mail_state(:working)
+      target = open_invitation("invited@example.com", sent_at: 1.day.ago)
+      { call: -> { Invitations::Resend.call(target) }, permission: "users.manage", on: target }
+    },
+
+    "Invitations::Withdraw" => lambda {
+      target = open_invitation("invited@example.com", groups: [ access_control_groups(:read_only) ])
+      { call: -> { Invitations::Withdraw.call(target) }, permission: "users.manage", on: target }
+    },
+
+    # See TOKEN_CREDENTIAL. The owner is the account accepting makes, so it
+    # is found after the call.
+    "Invitations::Accept" => lambda {
+      target = open_invitation("invited@example.com", groups: [ access_control_groups(:read_only) ])
+      gone = open_invitation("withdrawn@example.com")
+      gone_token = gone.generate_token_for(:accept)
+      gone.destroy!
+      accept = ->(token) { Invitations::Accept.call(token: token, name: "Invited", password: PASSWORD, password_confirmation: PASSWORD) }
+      token = target.generate_token_for(:accept)
+      { call: -> { accept.call(token) }, bad_call: -> { accept.call(gone_token) }, owner: -> { User.find_by!(email_address: "invited@example.com") } }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.

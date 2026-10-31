@@ -20,8 +20,15 @@ module Audit
   module Snapshot
     # `ai_api_key` (translation helpers spec §6.2) already matches the
     # `_key` filter; it's listed here too so it stays out even if that
-    # filter entry is ever narrowed.
-    NEVER_STORED = %w[password password_confirmation password_digest token token_digest lookup_digest ai_api_key].freeze
+    # filter entry is ever narrowed. The mail login (docs/reference/mail.md)
+    # likewise: its username is a credential for several providers, and
+    # leaving the columns out also means a snapshot never decrypts them. The
+    # mail settings' fingerprint is an HMAC of the delivery settings, login
+    # included: never shown, logged or audited.
+    NEVER_STORED = %w[
+      password password_confirmation password_digest token token_digest lookup_digest ai_api_key
+      mail_username mail_password mail_verified_fingerprint
+    ].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
     # addresses out of *request logs*. The audit log is different: the spec
@@ -36,8 +43,11 @@ module Audit
     # digests nobody reads in a changes row. It stays in the full snapshot,
     # which is the version basis, not a diff. `translation_original_changed_at`
     # is the same kind of bookkeeping (a per-field time derived from the
-    # original's own listed change).
-    IGNORED_CHANGES = %w[created_at updated_at unpublished_changes_at translation_sources translation_original_changed_at ai_api_key_saved_at].freeze
+    # original's own listed change). The mail columns here are its state
+    # (when the login was saved, the last success and failure), written by
+    # sends, never a setting someone changed.
+    IGNORED_CHANGES = %w[created_at updated_at unpublished_changes_at translation_sources translation_original_changed_at ai_api_key_saved_at
+      mail_login_saved_at mail_verified_at mail_last_sent_at mail_failed_at mail_failure].freeze
 
     # The columns that hold a type's schema fields (`ContentBlock#settings`,
     # `Post#metadata`), whose changes are read with the record's
@@ -172,7 +182,7 @@ module Audit
       case record
       when nil then nil
       when Post, Page then translated_label(record, "title")
-      when User then record.email_address
+      when User, Invitation then record.email_address
       when AccessControl::Group, Tag then record.name
       when ContentBlock then "#{record.block_type.to_s.humanize} block ##{record.id}"
       when Media::Asset then record.title.presence || "Image ##{record.id}"
@@ -234,6 +244,15 @@ module Audit
         {
           "id" => record.id, "email_address" => record.email_address, "name" => record.name, "owner" => record.owner, "group_ids" => record.group_ids.sort,
           "notes_sound" => record.notes_sound, "notes_desktop" => record.notes_desktop
+        }
+      when Invitation
+        # Named fields: who it is for, by whom, its dates, the account it
+        # made and the groups it puts the person into. Nothing of its token,
+        # which is made by the mail and stored nowhere.
+        {
+          "id" => record.id, "email_address" => record.email_address, "name" => record.name, "inviter_id" => record.inviter_id,
+          "sent_at" => record.sent_at, "accepted_at" => record.accepted_at, "user_id" => record.user_id,
+          "group_ids" => record.invitation_groups.pluck(:group_id).sort
         }
       when AccessControl::Group
         {

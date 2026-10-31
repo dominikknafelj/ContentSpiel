@@ -6,13 +6,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Mail" ], labels
   end
 
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Background jobs", "Outgoing mail" ], labels
+    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Background jobs", "Mail" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -283,88 +283,93 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert result("Background jobs", run_check(queue_adapter: "solid_queue", worker_alive_probe: -> { true })).ok?
   end
 
-  test "unconfigured mail is a warning with a copyable command for the console fallback" do
-    check = result("Outgoing mail", run_check(mail_host: "example.com"))
+  include MailState
 
-    assert_equal :warning, check.status
-    # The message is the command's instructions (final fix wave): what to
-    # replace, the one thing a pasted password must not contain, and what the
-    # printed `true`/`false` mean -- a bare "false" told nobody anything.
-    assert_equal Setup::SystemCheck::MAIL_FALLBACK_MESSAGE, check.message
-    assert_equal "Password reset by email isn't configured. To set a password from the server instead, run this command with the account's email address, " \
-      "replacing “a new password” in both places with the new one (at least 12 characters, with no quotes in it). " \
-      "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).", check.message
-    # Static text with a placeholder address and password: it is shown to
-    # anyone who may view the status page, so it never carries a real value.
-    assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command
-    assert_match(/\Abin\/rails runner '.*Users::UpdatePassword/, check.command)
-    assert_nil check.docs
-  end
+  # The Mail row is `MailSettings#state` in the state's own words
+  # (`admin.mail.states.*`), the same line the Settings card shows. It is
+  # the model's data: the link to Settings is a symbol the row's component
+  # resolves, never a path.
+  test "the Mail row answers each state with its words" do
+    expected = {
+      not_set_up: [ :warning, "Not set up. Password resets and invites are off." ],
+      untested: [ :warning, "Saved, not tested. Send a test mail to turn on resets and invites." ],
+      working: [ :ok, /\AWorking\. Last mail sent \d+ \w+, \d\d:\d\d\.\z/ ],
+      failed: [ :warning, /\ALast send failed \d+ \w+, \d\d:\d\d: the server refused the login\.\z/ ]
+    }
 
-  # Production's mailed links take their host from the site's address
-  # (`HostSettings.apply`), so with none set a mail server that is perfectly
-  # set up still counts as "not configured". The warning says which half is
-  # missing instead of sending the reader to their SMTP settings.
-  test "a mail server without a site address: the warning names the address as what is missing" do
-    check = result("Outgoing mail", run_check(address: SiteAddress.parse(nil), mail_host: "", reset_link_from_request: false))
+    expected.each do |state, (status, message)|
+      with_mail_state(state) do
+        check = result("Mail", Setup::SystemCheck.run(address: SiteAddress.parse("https://cms.example.org")))
 
-    assert_equal :warning, check.status
-    assert_equal "A mail server is set, but no site address is, and without one no password reset mail is sent: set PUBLIC_HOST. " +
-      Setup::SystemCheck::MAIL_FALLBACK_MESSAGE, check.message
-    assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command
-  end
-
-  test "the address is not named where it is not the cause: no mail server, a link from the request, an address that is set" do
-    no_server = run_check(address: SiteAddress.parse(nil), mail_host: "", mail_smtp_address: "localhost", reset_link_from_request: false)
-    local = run_check(address: SiteAddress.parse(nil), mail_host: "", reset_link_from_request: true)
-    with_address = run_check(mail_host: "example.com", reset_link_from_request: false)
-
-    [ no_server, local, with_address ].each do |results|
-      assert_equal Setup::SystemCheck::MAIL_FALLBACK_MESSAGE, result("Outgoing mail", results).message
+        assert_equal status, check.status, state.to_s
+        assert_match message.is_a?(String) ? Regexp.new("\\A#{Regexp.escape(message)}") : message, check.message, state.to_s
+        if state.in?(%i[not_set_up untested])
+          assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command, state.to_s
+          assert_includes check.message, Setup::SystemCheck::MAIL_FALLBACK_MESSAGE
+        else
+          assert_nil check.command, state.to_s
+        end
+      end
     end
-    # And with the request's origin for the link, a mail server and a host for it are all it takes.
-    assert result("Outgoing mail", run_check(address: SiteAddress.parse(nil), mail_host: "localhost", reset_link_from_request: true)).ok?
   end
 
-  # The command is a static string, so prove it works: put a real address and
-  # password where the placeholders are, run the Ruby inside the quotes (not a
-  # subprocess) and look at what it did.
-  test "the mail fallback command sets the password, ends every session and is audited" do
+  test "in production without a site address the Mail row says the address is what is missing" do
+    with_mail_state(:untested) do
+      check = result("Mail", Setup::SystemCheck.run(address: SiteAddress.parse(nil), production: true,
+        mail_settings: MailSettings.current(env: {}, production: true, address: SiteAddress.parse(nil))))
+
+      assert_equal :warning, check.status
+      assert_equal "Not set up: the site's address (PUBLIC_HOST) is missing, so no link can be mailed. " \
+        "#{Setup::SystemCheck::MAIL_FALLBACK_MESSAGE}", check.message
+    end
+  end
+
+  test "a host's sender address that is not one address is Not set up, and the row names the variable" do
+    with_mail_state(:untested) do
+      check = result("Mail", Setup::SystemCheck.run(address: SiteAddress.parse("https://cms.example.org"),
+        mail_settings: MailSettings.current(env: { "MAIL_SENDER_ADDRESS" => "no-reply@" })))
+
+      assert_equal :warning, check.status
+      assert_equal "Not set up: the sender address the host sets (MAIL_SENDER_ADDRESS) is not one address, like no-reply@example.com. " \
+        "#{Setup::SystemCheck::MAIL_FALLBACK_MESSAGE}", check.message
+    end
+  end
+
+  test "System status shows a failure's sentence and never the server's line" do
+    with_mail_state(:failed) do
+      Current.site.update_columns(mail_failure: { "key" => "connect", "line" => "Connection refused - connect(2) for smtp.example.test:587" }) # version: none (a test)
+      Current.site = nil
+
+      check = result("Mail", Setup::SystemCheck.run(address: SiteAddress.parse("https://cms.example.org")))
+
+      assert_includes check.message, "could not reach the server"
+      assert_not_includes check.message, "Connection refused"
+      assert_not_includes check.message, "smtp.example.test"
+    end
+  end
+
+  test "the fallback command is a fixed string that sets a password, ends the sessions and is audited" do
     user = users(:reader)
-    user.sessions.create!
     user.sessions.create!
     ruby = Setup::SystemCheck::MAIL_FALLBACK_COMMAND[/runner '(.*)'\z/, 1]
       .sub("you@example.com", user.email_address).gsub("a new password", "a brand new pass 1")
 
-    assert_difference -> { Audit::Event.where(action: "user.updated", subject: user).count }, 1 do
-      output, = capture_io { assert_equal true, eval(ruby) }
-      assert_equal "true\n", output
-    end
-
+    output, = capture_io { assert_equal true, eval(ruby) }
+    assert_equal "true\n", output
     assert user.reload.authenticate("a brand new pass 1")
     assert_equal 0, user.sessions.count
+    assert Setup::SystemCheck::MAIL_FALLBACK_COMMAND.frozen?
+    assert_equal 2, Setup::SystemCheck::MAIL_FALLBACK_COMMAND.scan("a new password").size
   end
 
-  # What the message promises about the command, proved on the command itself.
-  test "the mail fallback command prints false, changes nothing and ends no session when the password is refused" do
-    user = users(:reader)
-    user.sessions.create!
-    digest = user.password_digest
-    ruby = Setup::SystemCheck::MAIL_FALLBACK_COMMAND[/runner '(.*)'\z/, 1].sub("you@example.com", user.email_address)
+  test "the Mail row links to Settings only for a viewer who holds settings.manage, and as data" do
+    with_mail_state(:failed) do
+      address = SiteAddress.parse("https://cms.example.org")
 
-    # Too short (the rule the message names).
-    output, = capture_io { assert_equal false, eval(ruby.gsub("a new password", "short")) }
-    assert_equal "false\n", output
-    # Replaced in one place only: the two don't match.
-    output, = capture_io { assert_equal false, eval(ruby.sub("a new password", "a brand new pass 1")) }
-    assert_equal "false\n", output
-
-    assert_equal digest, user.reload.password_digest
-    assert_equal 1, user.sessions.count
-    # The placeholder appears exactly twice, and the constant has no value of anyone's.
-    assert_equal 2, Setup::SystemCheck::MAIL_FALLBACK_COMMAND.scan("a new password").size
-    assert Setup::SystemCheck::MAIL_FALLBACK_COMMAND.frozen?
-    assert Setup::SystemCheck::MAIL_FALLBACK_MESSAGE.frozen?
+      assert_equal :mail_settings, result("Mail", Setup::SystemCheck.run(address: address, mail_settings_link: true)).link
+      assert_nil result("Mail", Setup::SystemCheck.run(address: address)).link
+      assert_nil result("Mail", Setup::SystemCheck.run(address: address, mail_settings_link: false)).link
+    end
   end
 
   test "a Result built without a command or docs link has neither" do
@@ -376,32 +381,24 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
   # A command is shown to anyone who may view the status page and, in the
   # wizard, before anyone is signed in: each is a fixed string.
-  test "only the site address and the mail warnings carry a command, each a fixed string" do
+  test "only the site address and the not-ready mail warnings carry a command, each a fixed string" do
     results = run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
       storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
-      mail_host: "example.com", stylesheet_probe: -> { false })
+      stylesheet_probe: -> { false })
 
     # Every row that can warn does. The theme's carries no command in
     # production, where the build is the image's and no one command.
     assert results.none?(&:ok?)
-    assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Outgoing mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
+    assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
       results.select(&:command).to_h { |check| [ check.label, check.command ] })
     assert Setup::SystemCheck::SITE_ADDRESS_COMMAND.frozen?
-  end
-
-  test "configured SMTP with a real host is ok" do
-    check = result("Outgoing mail",
-      run_check(mail_delivery_method: :smtp, mail_smtp_address: "smtp.mailgun.org", mail_host: "cms.example.org"))
-
-    assert check.ok?
   end
 
   private
     def run_check(**overrides)
       defaults = {
         storage_probe: -> { true }, image_probe: -> { true }, worker_alive_probe: -> { true },
-        queue_adapter: "async", mail_delivery_method: :smtp, mail_smtp_address: "smtp.example.org",
-        mail_host: "cms.example.org", address: SiteAddress.parse("https://cms.example.org"), stylesheet_probe: -> { true }
+        queue_adapter: "async", address: SiteAddress.parse("https://cms.example.org"), stylesheet_probe: -> { true }
       }
       Setup::SystemCheck.run(**defaults.merge(overrides))
     end

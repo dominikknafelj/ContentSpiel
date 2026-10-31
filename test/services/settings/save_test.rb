@@ -382,4 +382,66 @@ class Settings::SaveTest < ActiveSupport::TestCase
       assert_equal 1, locks, "#{name} locks the settings row once"
     end
   end
+
+  # --- the mail settings (docs/reference/mail.md) ---
+
+  test "the five mail fields are saved as attributes" do
+    result = as_owner do
+      Settings::Save.call(Current.site, attributes: { mail_server: "smtp.x.test", mail_port: "2525", mail_security: "tls",
+        mail_sender_name: "Site", mail_sender_address: "hi@x.test" })
+    end
+
+    assert result.ok?, result.errors.inspect
+    site = Current.site.reload
+    assert_equal [ "smtp.x.test", 2525, "tls", "Site", "hi@x.test" ],
+      [ site.mail_server, site.mail_port, site.mail_security, site.mail_sender_name, site.mail_sender_address ]
+  end
+
+  test "the mail login is written to its columns with its date, audited as set or not set, and removed with its date" do
+    as_owner { assert Settings::Save.call(Current.site, attributes: { mail_username: " user ", mail_password: "secret-pw" }).ok? }
+    site = Current.site.reload
+    assert_equal [ "user", "secret-pw" ], [ site.mail_username, site.mail_password ]
+    assert_in_delta Time.current, site.mail_login_saved_at, 5.seconds
+    event = Audit::Event.where(action: "settings.updated").order(:id).last
+    assert_equal [ "not set", "set" ], event.field_changes["Mail login"]
+    assert_not_includes event.to_json, "secret-pw"
+
+    as_owner { assert Settings::Save.call(Current.site, attributes: { mail_username: nil, mail_password: nil }).ok? }
+    site = Current.site.reload
+    assert_not site.mail_login_set?
+    assert_nil site.mail_login_saved_at
+  end
+
+  test "only the given half of the login is written" do
+    as_owner { Settings::Save.call(Current.site, attributes: { mail_username: "user", mail_password: "pw" }) }
+    as_owner { assert Settings::Save.call(Current.site, attributes: { mail_password: "new-pw" }).ok? }
+
+    site = Current.site.reload
+    assert_equal [ "user", "new-pw" ], [ site.mail_username, site.mail_password ]
+  end
+
+  test "a mail field the host sets is refused, and nothing of the call is written" do
+    with_mail_env("MAIL_SENDER_ADDRESS" => "host@x.test") do
+      result = as_owner { Settings::Save.call(Current.site, attributes: { mail_server: "smtp.x.test", mail_sender_address: "me@x.test" }) }
+
+      assert_not result.ok?
+      assert_equal [ "Sender address is set by the host and can't be changed here." ], result.errors
+      assert_nil Current.site.reload.mail_server
+    end
+  end
+
+  test "without encryption keys the login and the AI key are refused with one sentence, and the rest of the call is not written" do
+    [ { mail_password: "pw" }, { ai_api_key: "sk-test" } ].each do |secret|
+      result = without_encryption_keys do
+        as_owner { Settings::Save.call(Current.site, attributes: { mail_server: "smtp.rolled-back.test", **secret }) }
+      end
+
+      assert_equal [ Settings::Save.no_encryption_keys ], result.errors
+      site = Current.site.reload
+      assert_nil site.mail_server
+      assert_not site.mail_login_set?
+      assert_not site.ai_api_key_set?
+    end
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
 end

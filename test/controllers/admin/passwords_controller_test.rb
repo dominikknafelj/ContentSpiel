@@ -6,20 +6,72 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
 
   ADMIN = "/#{ContentSpiel::ADMIN_PATH}".freeze
 
-  setup { @user = User.take }
+  # The suite's default mail state is "Saved, not tested", where the request
+  # page is closed. This file is about the reset, so mail works for it (the
+  # change is undone with the test's transaction); the tests of the closed
+  # state say so themselves.
+  setup do
+    @user = User.take
+    put_mail_state(:working)
+  end
 
   test "new" do
     get new_admin_password_path
     assert_response :success
   end
 
-  test "new is the request state: email field, send button, and the no-mail hint" do
+  test "new is the request state: email field and send button, and no hint about missing mail" do
     get new_admin_password_path
     assert_select "h1", text: "Reset password"
     assert_select "label[for=email_address]", text: "Email"
     assert_select "button.bg-accent", text: "Send reset link"
-    assert_select "main", text: /No outgoing mail on this site\? Ask an owner to set a new password for you\./
+    assert_select "main", text: /No outgoing mail/, count: 0
     assert_select "a", text: /Back to sign in/
+  end
+
+  # Only the REQUEST follows mail (spec "Sign-in and the reset"): a
+  # bookmarked request page must not pretend to send.
+  test "the request page and its POST redirect to sign-in unless mail is ready, and send nothing" do
+    %i[ not_set_up untested ].each do |state|
+      with_mail_state(state) do
+        get new_admin_password_path
+        assert_redirected_to admin_sign_in_path
+        get new_admin_password_path(sent: 1)
+        assert_redirected_to admin_sign_in_path
+        assert_no_enqueued_emails do
+          post admin_password_path, params: { email_address: @user.email_address }
+        end
+        assert_redirected_to admin_sign_in_path
+      end
+    end
+  end
+
+  test "a lapsed link met without mail lands on sign-in with the one fact" do
+    with_mail_state(:untested) do
+      get new_admin_password_path(expired: 1)
+      assert_redirected_to admin_sign_in_path
+      follow_redirect!
+      assert_select "#alert", text: "This reset link has expired. Ask the site's owner to reset your password."
+    end
+  end
+
+  test "a link already mailed still shows the form, checks and sets the password when mail is not ready" do
+    token = @user.password_reset_token
+    with_mail_state(:not_set_up) do
+      get admin_edit_password_path
+      assert_response :success
+      post admin_check_password_path, params: { token: token }
+      assert_response :no_content
+      patch admin_update_password_path, params: { token: token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+      assert_redirected_to admin_sign_in_path
+      assert @user.reload.authenticate("a-new-password-1")
+    end
+  end
+
+  test "the expired state says one sentence for a lapsed, a used and an invalid link" do
+    get new_admin_password_path(expired: "1")
+    assert_select "h1", text: "This reset link has expired"
+    assert_select "[role=alert]", text: "This reset link has expired. Ask for a new one."
   end
 
   # Handoff "Studio Password Reset": the form on the page itself (no card), the
@@ -44,7 +96,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   test "create" do
     with_site_address(nil) do
       post admin_password_path, params: { email_address: @user.email_address }
-      assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user, { origin: "http://www.example.com" } ]
+      assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user, { origin: "http://www.example.com" } ]
       assert_redirected_to new_admin_password_path(sent: 1)
 
       follow_redirect!
@@ -59,7 +111,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     with_site_address("https://docs.example.org") do
       post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
 
-      assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user ]
+      assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user ]
       assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
     end
   end
@@ -72,7 +124,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
       with_site_address(nil) do
         post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
 
-        assert_enqueued_email_with PasswordsMailer, :reset, args: [ @user ]
+        assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user ]
         assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
         assert_no_emails { perform_enqueued_jobs }
         assert_redirected_to new_admin_password_path(sent: 1)
@@ -120,11 +172,11 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     get new_admin_password_path(sent: "0")
     assert_select "h1", text: "Check your email", count: 0
     get new_admin_password_path(expired: "false")
-    assert_select "h1", text: "This link has expired", count: 0
+    assert_select "h1", text: "This reset link has expired", count: 0
     get new_admin_password_path(sent: "1")
     assert_select "h1", text: "Check your email"
     get new_admin_password_path(expired: "1")
-    assert_select "h1", text: "This link has expired"
+    assert_select "h1", text: "This reset link has expired"
   end
 
   # The token is not in the address, so the page cannot know whether the
@@ -135,8 +187,8 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_admin_password_path(expired: 1)
 
     follow_redirect!
-    assert_select "h1", text: "This link has expired"
-    assert_select "main", text: /Reset links work for 15 minutes and only once\./
+    assert_select "h1", text: "This reset link has expired"
+    assert_select "main", text: /This reset link has expired\. Ask for a new one\./
     assert_select "a", text: "Send a new link"
   end
 
@@ -283,7 +335,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert Session.exists?(session.id)
 
     follow_redirect!
-    assert_notice "This link has expired"
+    assert_notice "This reset link has expired"
   end
 
   test "a refused update ends no session" do
@@ -586,6 +638,11 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+    # A mail is queued with the fingerprint of the mail settings it was asked
+    # under (`ApplicationMailer.queue`), a param of the mailer.
+    def queued(mailer) = mailer.with(fingerprint: MailSettings.current.fingerprint)
+
     def assert_notice(text)
       assert_select "main", /#{text}/
     end

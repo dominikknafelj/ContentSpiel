@@ -1,0 +1,81 @@
+<section id="settings-mail-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="mail"
+         data-controller="admin--settings--mail admin--saving--pending-lock"
+         data-messages="<%= messages_data("components.settings_screen.mail_login.hold") %>">
+  <div class="border-b border-line px-4 py-3.5">
+    <h2 id="mail" class="text-h2 text-ink"><%= t(".title") %></h2>
+    <p class="mt-1 text-sm text-dim"><%= t(".intro") %></p>
+    <%= render Admin::SettingsScreen::MailStateComponent.new(mail_settings: mail_settings) %>
+  </div>
+
+  <div class="flex flex-col gap-4 p-4">
+    <% if all_from_host? %>
+      <p class="text-sm text-ink"><%= t(".all_from_host") %></p>
+    <% end %>
+
+    <div class="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_8rem]">
+      <% %i[mail_server mail_port].each do |name| %>
+        <div class="admin-column" data-field-name="<%= name %>">
+          <% if from_host?(name) %>
+            <span class="<%= setup_label_class %>"><%= t(".#{name.to_s.delete_prefix("mail_")}") %></span>
+            <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"><%= host_value(name) %></div>
+            <p class="mt-1 text-sm text-meta"><%= t(".set_by_host") %></p>
+          <% else %>
+            <%= label_tag input_id(name), t(".#{name.to_s.delete_prefix("mail_")}"), class: setup_label_class %>
+            <% if name == :mail_port %>
+              <%= number_field_tag "site_setting[mail_port]", value(:mail_port), id: input_id(name), min: 1, max: 65_535, step: 1, placeholder: "587",
+                    class: setup_input_class, data: { "admin--settings--mail-target": "port" } %>
+            <% else %>
+              <%= text_field_tag "site_setting[mail_server]", value(:mail_server), id: input_id(name), placeholder: t(".server_placeholder"),
+                    autocomplete: "off", spellcheck: false, class: setup_input_class %>
+            <% end %>
+          <% end %>
+          <%= helpers.render "admin/shared/field_errors", id: "#{input_id(name)}-errors", messages: field_errors(name) %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="admin-column" data-field-name="mail_security">
+      <% if from_host?(:mail_security) %>
+        <span class="<%= setup_label_class %>"><%= t(".security") %></span>
+        <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"><%= host_value(:mail_security) %></div>
+        <p class="mt-1 text-sm text-meta"><%= t(".set_by_host") %></p>
+      <% else %>
+        <%# The segmented control of a schema field's `control: :segmented` (`Admin::Fields::SelectField`). %>
+        <%= tag.fieldset id: input_id(:mail_security), class: "m-0 min-w-0 border-0 p-0" do %>
+          <legend class="<%= setup_label_class %> mb-1"><%= t(".security") %></legend>
+          <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+            <% SECURITIES.each do |option| %>
+              <label for="<%= input_id(:mail_security) %>-<%= option %>" class="<%= segment_class %>">
+                <%= radio_button_tag "site_setting[mail_security]", option, security == option, id: "#{input_id(:mail_security)}-#{option}", class: "sr-only",
+                      data: { action: "change->admin--settings--mail#security", port: PORTS[option] } %>
+                <span><%= t(".#{option}") %></span>
+              </label>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+      <%= helpers.render "admin/shared/field_errors", id: "#{input_id(:mail_security)}-errors", messages: field_errors(:mail_security) %>
+    </div>
+
+    <%= render Admin::SettingsScreen::MailLoginComponent.new(site_setting: site_setting, mail_settings: mail_settings) %>
+
+    <div class="grid gap-3.5 sm:grid-cols-2">
+      <% %i[mail_sender_name mail_sender_address].each do |name| %>
+        <div class="admin-column" data-field-name="<%= name %>">
+          <% if from_host?(name) %>
+            <span class="<%= setup_label_class %>"><%= t(".#{name.to_s.delete_prefix("mail_")}") %></span>
+            <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"><%= host_value(name) %></div>
+            <p class="mt-1 text-sm text-meta"><%= t(".set_by_host") %></p>
+          <% else %>
+            <%= label_tag input_id(name), t(".#{name.to_s.delete_prefix("mail_")}"), class: setup_label_class %>
+            <%= text_field_tag "site_setting[#{name}]", value(name), id: input_id(name), autocomplete: "off", spellcheck: false, class: setup_input_class,
+                  placeholder: (t(".sender_address_placeholder") if name == :mail_sender_address) %>
+          <% end %>
+          <%= helpers.render "admin/shared/field_errors", id: "#{input_id(name)}-errors", messages: field_errors(name) %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%= render Admin::SettingsScreen::MailTestResultComponent.new(address: address) %>
+</section>

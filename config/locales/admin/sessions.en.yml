@@ -1,0 +1,12 @@
+# The sign-in page's words that follow mail (docs/reference/i18n.md):
+# `admin.sessions.new` is the lazy-lookup scope of
+# `app/views/admin/sessions/new.html.erb`. The rest of the page still holds
+# its words in the view.
+en:
+  admin:
+    sessions:
+      new:
+        # Where "Forgot your password?" would stand when mail does not work
+        # (design answer M7). It names no console command: the page is shown
+        # to anyone.
+        forgot_without_mail: "Forgot your password? Ask the site's owner to reset it."

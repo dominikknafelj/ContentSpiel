@@ -1,0 +1,30 @@
+# Outgoing mail's state in CS Studio's words (spec "The states", design
+# answer M3; docs/reference/mail.md), shared by the Settings card's header
+# (`Admin::SettingsScreen::MailStateComponent`) and, later, the System status
+# row: one sentence per `MailSettings#state` and the short word its dot
+# stands beside. `failed`'s reason is the failure's key said short.
+en:
+  admin:
+    mail:
+      states:
+        not_set_up:
+          word: "Not set up"
+          sentence: "Not set up. Password resets and invites are off."
+          no_address: "Not set up: the site's address (PUBLIC_HOST) is missing, so no link can be mailed."
+          sender_address_host: "Not set up: the sender address the host sets (MAIL_SENDER_ADDRESS) is not one address, like no-reply@example.com."
+          sender_address_site: "Not set up: the sender address is not one address, like no-reply@example.com."
+        untested:
+          word: "Saved, not tested"
+          sentence: "Saved, not tested. Send a test mail to turn on resets and invites."
+        working:
+          word: "Working"
+          sentence: "Working. Last mail sent %{at}."
+        failed:
+          word: "Last send failed"
+          sentence: "Last send failed %{at}: %{reason}."
+      reasons:
+        login: "the server refused the login"
+        connect: "could not reach the server"
+        security: "the server expects a different security setting"
+        sender: "the server refused the sender address"
+        other: "the mail could not be sent"

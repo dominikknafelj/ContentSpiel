@@ -10,7 +10,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     get setup_step_path("system_check")
 
     assert_response :success
-    %w[Site\ address File\ storage Image\ processing Background\ jobs Outgoing\ mail].each do |label|
+    %w[Site\ address File\ storage Image\ processing Background\ jobs Mail].each do |label|
       assert_includes response.body, label
     end
     assert_select "a[href=?]", setup_step_path("admin"), text: "Continue"
@@ -18,10 +18,10 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
 
   # The wizard loads `application` only, where `admin--ui--clipboard` doesn't
   # exist: the shared rows must not draw a Copy button there.
-  test "the system check shows the mail command but no dead Copy button" do
+  test "the system check shows the site address command but no dead Copy button" do
     get setup_step_path("system_check")
 
-    assert_select "code", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND
+    assert_select "code", text: Setup::SystemCheck::SITE_ADDRESS_COMMAND
     assert_select "button", text: "Copy", count: 0
     assert_select "[data-controller='admin--ui--clipboard']", count: 0
   end

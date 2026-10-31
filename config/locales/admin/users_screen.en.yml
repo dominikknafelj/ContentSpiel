@@ -1,0 +1,50 @@
+# The Users screen (docs/reference/i18n.md): `admin.components.users_screen.*`
+# are its components' keys (the list and the invite dialog; the group cards,
+# the owner and delete zones still hold their words as literals);
+# `admin.users.index` is the list page's lazy-lookup scope (only the invite
+# strings so far); `admin.invites` what `Admin::InvitesController` answers.
+#
+# The invite words are the mail spec's and design answer M4's; the toasts
+# and the dialog's Name help are this build's (a design question each).
+en:
+  admin:
+    components:
+      users_screen:
+        list:
+          user: "User"
+          groups: "Groups"
+          last_sign_in: "Last sign-in"
+          last_sign_in_label: "Last sign-in:"
+          you: "(you)"
+          owner: "Owner"
+          no_groups: "No groups"
+          never: "Never"
+          delete_hint: "Delete a user from their edit page. Their pages, posts and media stay; their posts are left without an author."
+          invited: "Invited"
+          invite_expired: "Invite expired"
+          invited_dates: "Invited %{sent} · expires %{expires}"
+          actions: "Actions for %{name}"
+          resend: "Resend invite"
+          withdraw_menu: "Withdraw invite…"
+          withdraw_title: "Withdraw invite"
+          withdraw_body: "Withdraw the invite to %{email}? The link stops working."
+          withdraw: "Withdraw invite"
+        invite_dialog:
+          title: "Invite a person"
+          email: "Email"
+          email_placeholder: "name@example.com"
+          name: "Name"
+          name_help: "Optional. The person can change it."
+          resend: "Resend"
+          cancel: "Cancel"
+          submit: "Send invite"
+    users:
+      index:
+        invite: "Invite person"
+        invites_need_mail: "Invites need mail."
+        set_up_mail: "Set up mail →"
+    invites:
+      sent: "Invite sent to %{email}."
+      resent: "New invite sent to %{email}."
+      withdrawn: "Invite to %{email} withdrawn."
+      too_many: "Try again later."

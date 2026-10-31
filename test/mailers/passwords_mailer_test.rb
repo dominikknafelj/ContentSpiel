@@ -135,7 +135,7 @@ class PasswordsMailerTest < ActionMailer::TestCase
       end
 
       assert_equal [ NOT_SENT ], log.lines.map(&:strip).grep(/ContentSpiel/)
-      assert_includes log, "ActionMailer::MailDeliveryJob", "the job's own lines are in the capture"
+      assert_includes log, "MailDeliveryJob", "the job's own lines are in the capture"
       assert_no_token_in log
     end
   end
@@ -150,7 +150,7 @@ class PasswordsMailerTest < ActionMailer::TestCase
         perform_enqueued_jobs { PasswordsMailer.reset(@user).deliver_later }
       end
 
-      assert_includes log, "ActionMailer::MailDeliveryJob"
+      assert_includes log, "MailDeliveryJob"
       assert_includes log, @user.email_address
       assert_match TOKEN, log
     end
@@ -186,6 +186,25 @@ class PasswordsMailerTest < ActionMailer::TestCase
       perform_enqueued_jobs { PasswordsMailer.reset(@user, origin: "http://localhost:3000").deliver_later }
 
       links_of(ActionMailer::Base.deliveries.sole).each { |link| assert_operator link, :start_with?, "http://localhost:3000/cs-studio/password/" }
+    end
+  end
+
+  test "subject and body are the keys' words with the site's name, in both parts, with the minutes and the footer" do
+    with_site_address(SITE) do
+      mail = PasswordsMailer.reset(@user)
+
+      assert_equal "Reset your password for Test Site", mail.subject
+      [ mail.text_part, mail.html_part ].each do |part|
+        body = Nokogiri::HTML5(part.body.to_s).text
+        assert_includes body, "Someone asked to reset the password for your account on Test Site. Use this link within 15 minutes:"
+        assert_includes body, "If this wasn't you, ignore this mail. Your password stays the same."
+        assert_includes body, "Sent by Test Site via Content Spiel"
+      end
+      html = Nokogiri::HTML5(mail.html_part.body.to_s)
+      assert_equal "Reset password", html.at_css("a").text
+      assert_includes html.text, html.at_css("a")["href"], "the whole address is in the text under the button"
+      assert_includes mail.html_part.body.to_s, "max-width:560px"
+      assert_no_match(/<img/, mail.html_part.body.to_s)
     end
   end
 

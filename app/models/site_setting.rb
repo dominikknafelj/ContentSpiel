@@ -24,9 +24,41 @@ class SiteSetting < ApplicationRecord
   # (`Audit::Snapshot::NEVER_STORED`).
   encrypts :ai_api_key
 
+  # The mail login (docs/reference/mail.md), encrypted the same way, and
+  # for the same reasons: never rendered (`mail_login_set?` says only
+  # whether one is stored), logged or audited. The username is a credential
+  # too for several providers (Postmark's server token, SES's access key id).
+  encrypts :mail_username, :mail_password
+
   # A select's "None" posts "", a pasted key often carries a trailing
   # newline: stored as nil / stripped instead.
   normalizes :ai_provider, :ai_model, :ai_api_key, with: ->(value) { value.to_s.strip.presence }
+
+  # The same for the mail fields: a blank form field is "not set", and a
+  # pasted value often carries a space or a newline at either end.
+  normalizes :mail_server, :mail_security, :mail_sender_name, :mail_sender_address,
+    :mail_username, :mail_password, with: ->(value) { value.to_s.strip.presence }
+
+  # Settings → Mail's fields (spec "Settings → Mail", plan Review Focus 2),
+  # each a sentence of its own (config/locales/en.yml). Checked only when the
+  # field changes, like the time zone: a value written around the model must
+  # not block an unrelated save.
+  #
+  # The sender name goes into the From header: a line break in it would
+  # start a header of the sender's choosing (`Bcc:`), so any control
+  # character is refused, not stripped. A quote is let through: the mail gem
+  # quotes and escapes a display name (`MailSettings#sender`), so it reaches
+  # the header as part of the name and nothing else.
+  #
+  # The sender address is ONE plain address: "a@x, b@y" or "Name <a@x>"
+  # would put two senders, or a name the sender-name field doesn't show, into
+  # the From. The port is 1-65535 (blank is "not set"); the security is one
+  # of the two the screens offer (`none` is the host's alone, see
+  # `MailSettings`).
+  validate :mail_sender_name_is_one_line, if: :will_save_change_to_mail_sender_name?
+  validate :mail_sender_address_is_one_address, if: :will_save_change_to_mail_sender_address?
+  validate :mail_port_is_a_port, if: :will_save_change_to_mail_port?
+  validate :mail_security_is_offered, if: :will_save_change_to_mail_security?
 
   # Only a provider somebody registered (`AI::Providers`); blank means AI
   # is off. Checked only when it changes, like `time_zone` below: a plugin
@@ -131,6 +163,12 @@ class SiteSetting < ApplicationRecord
     ai_api_key_saved_at&.in_time_zone(effective_time_zone)&.to_date
   end
 
+  # Whether a mail login is stored, read off the raw columns -- never
+  # decrypting (see `ai_api_key_set?`). The Settings screen and
+  # `MailSettings#login_set?` ask this, so a login the current keys can't
+  # read still shows as set and can still be removed.
+  def mail_login_set? = mail_username_before_type_cast.present? || mail_password_before_type_cast.present?
+
   def locale_codes
     Array(locales).map { |entry| entry["code"].to_s }
   end
@@ -159,6 +197,32 @@ class SiteSetting < ApplicationRecord
     return if ai_provider.blank? || AI::Providers.find(ai_provider)
 
     errors.add(:ai_provider, "isn't an available provider")
+  end
+
+  def mail_sender_name_is_one_line
+    errors.add(:mail_sender_name, :line_break) if mail_sender_name.to_s.match?(/[[:cntrl:]]/)
+  end
+
+  def mail_sender_address_is_one_address
+    return if mail_sender_address.blank?
+
+    errors.add(:mail_sender_address, :one_address) unless MailSettings.one_address?(mail_sender_address)
+  end
+
+  # Read before the cast: the integer column would read "abc" as 0 and
+  # "587x" as 587.
+  def mail_port_is_a_port
+    raw = mail_port_before_type_cast
+    return if raw.blank?
+
+    port = Integer(raw.to_s.strip, 10, exception: false)
+    errors.add(:mail_port, :port_range) unless port && (1..65_535).cover?(port)
+  end
+
+  def mail_security_is_offered
+    return if mail_security.blank?
+
+    errors.add(:mail_security, :security_choice) unless MailSettings::STORED_SECURITY.include?(mail_security)
   end
 
   def only_one_record_exists

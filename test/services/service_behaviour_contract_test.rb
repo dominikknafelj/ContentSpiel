@@ -49,7 +49,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
   # (and a factory in test/support/service_calls.rb).
   EXPECTED_SERVICES = %w[
     AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Duplicate ContentBlocks::Reorder
-    ContentBlocks::Save Editing::TakeOver Groups::Destroy Groups::EnsureBuiltIns Groups::Save Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
+    ContentBlocks::Save Editing::TakeOver Groups::Destroy Groups::EnsureBuiltIns Groups::Save Invitations::Accept Invitations::Invite Invitations::Resend Invitations::Withdraw Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
     Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::MarkRead Notes::Pin Notes::React Notes::Remove Notes::Reopen Notes::Reply
     Notes::Resolve Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Publishing::CancelScheduledChange Publishing::DiscardChanges Publishing::PublishChanges Settings::Save
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
@@ -214,6 +214,45 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
       next
     end
 
+    if ServiceCalls::TOKEN_CREDENTIAL.key?(klass.name)
+      # A token that finds nothing is refused like a wrong password: nothing
+      # written, and no `access.denied`, since no permission was asked.
+      test "#{klass} refuses a token that is no good and changes nothing" do
+        built = ServiceCalls.for(klass, self)
+        nobody # created before the snapshot, not by it
+        audit_before = Audit::Event.count
+        before = digests
+
+        result = Current.set(actor: nobody, channel: :admin) { built[:bad_call].call }
+
+        assert_respond_to result, :ok?, "#{klass} did not answer with an ApplicationService::Result"
+        assert_not_predicate result, :ok?, "#{klass} accepted a token that finds nothing"
+        assert_not_predicate result, :denied?
+        assert_equal audit_before, Audit::Event.count, "#{klass} wrote an audit event for a token that is no good"
+        assert_equal before, digests
+      end
+
+      # Whoever is signed in (here someone with no grants at all), the token
+      # decides and the event is its user's.
+      test "#{klass} acts as the token's user whoever calls it, and audits it" do
+        built = ServiceCalls.for(klass, self)
+        nobody
+        audit_ids = Audit::Event.pluck(:id)
+        before = digests
+
+        result = Current.set(actor: nobody, channel: :admin) { built[:call].call }
+
+        assert_predicate result, :ok?, "#{klass} refused a good token: #{result.errors.inspect}"
+        events = Audit::Event.where.not(id: audit_ids).to_a
+        assert_not_empty events, "#{klass} recorded no audit event"
+        assert_not_includes events.map(&:action), "access.denied"
+        owner = built[:owner].respond_to?(:call) ? built[:owner].call : built[:owner]
+        assert(events.all? { |event| event.user_id == owner.id }, "#{klass}'s event is not attributed to the token's user")
+        assert_not_equal before, digests, "#{klass} changed nothing"
+      end
+      next
+    end
+
     variants = [ nil ] + ServiceCalls.variants(klass)
     variants.each do |variant|
       label = variant ? "#{klass} (#{variant})" : klass.name
@@ -311,7 +350,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
 
   test "every exemption and factory names a real service" do
     names = self.class.services.map(&:name)
-    (ServiceCalls::SELF_SERVICE.keys + ServiceCalls::OWN_RESULT.keys + ServiceCalls::FACTORIES.keys + ServiceCalls::MCP_REACHABLE.keys +
+    (ServiceCalls::SELF_SERVICE.keys + ServiceCalls::OWN_RESULT.keys + ServiceCalls::TOKEN_CREDENTIAL.keys + ServiceCalls::FACTORIES.keys + ServiceCalls::MCP_REACHABLE.keys +
       ServiceCalls::VARIANTS.keys).each do |name|
       assert_includes names, name, "#{name} in test/support/service_calls.rb is not an ApplicationService"
     end

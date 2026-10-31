@@ -11,6 +11,10 @@ module Admin
     # out of the browser's back/forward cache.
     before_action :no_store, only: %i[ edit legacy check update ]
     before_action :set_user_by_token, only: :update
+    # Only the REQUEST (`new`, `create`) follows mail: `edit`, `check` and
+    # `update` keep working whatever the state, so a person holding a valid
+    # link finishes even if an owner has just changed the settings.
+    before_action :require_mail_ready, only: %i[ new create ]
     rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_admin_password_path, alert: "Try again later." }
     # The early check has the request form's limit, counted on its own
     # (`name:`), so that asking for links and opening them do not use each
@@ -31,8 +35,10 @@ module Admin
         # knows: a String, because a job delivers the mail, which
         # `PasswordsMailer` parses before it uses any of it. Anywhere else
         # without an address the mailer builds no mail and logs why; the
-        # answer below is the same words either way.
-        PasswordsMailer.reset(user, **reset_mail_origin).deliver_later
+        # answer below is the same words either way. Queued through
+        # `ApplicationMailer.queue`, so the job carries the fingerprint of
+        # the mail settings it was asked under.
+        ApplicationMailer.queue(PasswordsMailer, :reset, user, **reset_mail_origin)
       end
 
       # The "sent" state is a param on the request page, not a flash and not
@@ -112,6 +118,20 @@ module Admin
     end
 
     private
+      # A bookmarked request page must not pretend to send. The one thing
+      # said is that a link has lapsed (`expired`, where `update` or the
+      # page's early check sends someone), because that person otherwise
+      # lands on sign-in with no word about why.
+      def require_mail_ready
+        return if MailSettings.current.ready?
+
+        if params[:expired] == "1" && action_name == "new"
+          redirect_to admin_sign_in_path, alert: t("admin.passwords.expired_without_mail")
+        else
+          redirect_to admin_sign_in_path
+        end
+      end
+
       def reset_mail_origin
         return {} if SiteAddress.current.configured? || !PasswordsMailer.request_origin_used?
 
@@ -134,8 +154,10 @@ module Admin
         nil
       end
 
-      # `expired` selects the "This link has expired" state of the request
-      # page (a bad signature and a lapsed 15 minutes look the same).
+      # `expired` selects the "This reset link has expired" state of the
+      # request page (a bad signature and a lapsed 15 minutes look the same);
+      # while mail is not ready that page is closed, and `require_mail_ready`
+      # says the same on sign-in instead (`expired_without_mail`).
       def set_user_by_token
         @user = user_for_token
         redirect_to new_admin_password_path(expired: 1) unless @user

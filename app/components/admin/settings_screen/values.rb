@@ -8,8 +8,8 @@ module Admin
     #
     # One object for the three cards that hold fields of the one form (Site,
     # Publishing, AI), so "typed beats stored" is decided in one place and
-    # the cards can't drift. Never touches the AI key: it is not a field of
-    # this form and is never rendered.
+    # the cards can't drift. Never touches the AI key or the mail login:
+    # neither is a field of this form, and neither is ever rendered.
     class Values
       attr_reader :site, :submitted
 
@@ -37,6 +37,10 @@ module Admin
       def ai_provider = field(:ai_provider) { site.ai_provider }
 
       def ai_model = field(:ai_model) { site.ai_model }
+
+      # The Mail card's five fields of this form (never the login, which is
+      # not a field of it and never rendered).
+      def mail(name) = field(name) { site.public_send(name) }
 
       def remove_logo? = ActiveModel::Type::Boolean.new.cast(submitted&.dig(:remove_logo)) || false
 

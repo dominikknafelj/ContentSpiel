@@ -23,6 +23,8 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     @user = users(:one)
+    # The request page is closed unless mail works (undone with the test).
+    put_mail_state(:working)
   end
 
   # Asks for a reset as a person does and answers the link of the mail. The
@@ -166,8 +168,8 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
 
     visit link_for(token)
 
-    assert_selector "h1", text: "This link has expired"
-    assert_text "Reset links work for 15 minutes and only once."
+    assert_selector "h1", text: "This reset link has expired"
+    assert_text "This reset link has expired. Ask for a new one."
     assert_current_path new_admin_password_path(expired: 1)
     assert_no_selector FORM, visible: :all
     assert_not_includes address, token
@@ -182,7 +184,7 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
 
     page.execute_script("Turbo.visit(#{"#{link_for(@user.password_reset_token)}tampered".to_json})")
 
-    assert_selector "h1", text: "This link has expired"
+    assert_selector "h1", text: "This reset link has expired"
     assert_no_selector FORM, visible: :all
 
     page.go_back
@@ -247,7 +249,7 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
     fill_in "Repeat new password", with: NEW_PASSWORD
     press "Set password"
 
-    assert_selector "h1", text: "This link has expired"
+    assert_selector "h1", text: "This reset link has expired"
     assert_not @user.reload.authenticate(NEW_PASSWORD)
   end
 
@@ -257,7 +259,7 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
   # WHAT THIS PINS: the one line of `check` that returns when the page is no
   # longer this form (`!this.element.isConnected || this.tokenTarget.value !==
   # token`). With the line taken out the test fails: the late 410 replaces
-  # the sign-in page with "This link has expired" (seen, three runs of
+  # the sign-in page with "This reset link has expired" (seen, three runs of
   # three). It does not tell the line's two halves apart: leaving by a Turbo
   # visit disconnects the element AND empties the field
   # (`turbo:before-cache`), so either half alone passes here. The second
@@ -280,7 +282,7 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
     page.execute_script("window.answerCheck()")
     sleep 1 # sleep: a navigation the guard failed to stop needs time to commit, and when the guard works nothing happens to wait for
 
-    assert_no_selector "h1", text: "This link has expired"
+    assert_no_selector "h1", text: "This reset link has expired"
     assert_selector "h1", text: "Sign in"
     assert_current_path admin_sign_in_path
     assert_equal 1, page.evaluate_script("window.checksAsked")

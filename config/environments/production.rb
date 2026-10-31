@@ -51,18 +51,11 @@ Rails.application.configure do
   config.active_job.queue_adapter = :solid_queue
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
-  # Ignore bad email addresses and do not raise email delivery errors.
-  # Set this to true and configure the email server for immediate delivery to raise delivery errors.
-  # config.action_mailer.raise_delivery_errors = false
-
-  # Specify outgoing SMTP server. Remember to add smtp/* credentials via bin/rails credentials:edit.
-  # config.action_mailer.smtp_settings = {
-  #   user_name: Rails.application.credentials.dig(:smtp, :user_name),
-  #   password: Rails.application.credentials.dig(:smtp, :password),
-  #   address: "smtp.example.com",
-  #   port: 587,
-  #   authentication: :plain
-  # }
+  # Mail is SMTP with the site's settings, given to each message by
+  # ApplicationMailer from MailSettings (Settings -> Mail, or the host's
+  # MAIL_* variables): no smtp_settings here, and no credential in this file
+  # or in the credentials. A failure raises and is recorded (MailDeliveryJob).
+  config.action_mailer.delivery_method = :smtp
 
   # Locale fallbacks are not an environment setting: public output falls back
   # along the site's own per-language chain (`Locales.fallback_chain`, read

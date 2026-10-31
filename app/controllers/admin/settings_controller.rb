@@ -22,6 +22,8 @@ module Admin
   class SettingsController < BaseController
     include FileParams
     include StaleForm
+    include MailTestLimit
+    include MailTestSending
 
     # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
     # changed it and when where the audit log says, and the message is the whole
@@ -32,7 +34,13 @@ module Admin
     before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
     # The AI test is a `settings.manage` action; the module gate above would
     # also let a languages-only viewer reach it.
-    before_action -> { require_permission("settings.manage") }, only: :test_ai_connection
+    before_action -> { require_permission("settings.manage") }, only: %i[test_ai_connection send_test_mail]
+    # Five test mails per person per three minutes, in one bucket with the
+    # setup wizard's (`MailTestLimit`). Declared after the permission check,
+    # so a refused press does not count.
+    limit_test_mails only: :send_test_mail, with: -> {
+      render turbo_stream: mail_test_streams(alert: t("admin.settings.mail_test.too_many")), status: :too_many_requests
+    }
 
     def show
       @site_setting = Current.site
@@ -65,6 +73,7 @@ module Admin
       posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
       permitted = posted.permit(
         :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
+        *Admin::SettingsScreen::MailCardComponent::FIELDS,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],
         # `language_order` is the one tracked field that makes a reorder a
@@ -112,14 +121,38 @@ module Admin
       render turbo_stream: ai_test_result_stream(message: error.message), status: :unprocessable_entity
     end
 
+    # Send test mail (spec "Settings → Mail", design answer M2): one mail to
+    # the person pressing it, sent now and in this request with the SAVED
+    # settings (`ApplicationMailer.deliver_now_and_record`, bounded by
+    # `MailSettings`' timeouts), its outcome recorded as any send's is. Saves
+    # nothing and records no audit event: like Test connection it is no
+    # service. Answered in place, as Turbo Streams replacing the card's foot
+    # and its state: "Test mail sent to <address>. Check your inbox.", or
+    # the warn alert with the failure's sentence and the server's line, or,
+    # for settings that are not complete (nothing would be sent), the state's
+    # own sentence.
+    def send_test_mail
+      result = deliver_test_mail
+      render turbo_stream: mail_test_streams(**result.except(:status)), status: result.fetch(:status)
+    end
+
     private
+
+    # The card's foot and its state, as they are after a test mail.
+    def mail_test_streams(**result)
+      [
+        turbo_stream.replace(Admin::SettingsScreen::MailTestResultComponent::ID,
+          Admin::SettingsScreen::MailTestResultComponent.new(address: Current.user.email_address, **result)),
+        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: MailSettings.current))
+      ]
+    end
 
     # `[attributes, translations]` for `Settings::Save` from the permitted
     # params: the logo (a blank file input is dropped; the remove box detaches
     # unless a new file came with it), the social link rows in the order the
     # form numbered them, and only the languages/fields actually posted.
     def site_arguments(permitted)
-      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model).to_h
+      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, *Admin::SettingsScreen::MailCardComponent::FIELDS).to_h
       attributes = drop_blank_file_params(attributes, fields: %w[logo])
       attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(permitted[:remove_logo])
       if rows_posted?(permitted[:social_links]) || permitted[:social_links_present] == "1"

@@ -36,6 +36,7 @@ module Audit
       "AccessControl::Group" => "Group",
       "Tag" => "Tag",
       "User" => "User",
+      "Invitation" => "Invitation",
       "SiteSetting" => "Settings",
       "ApiToken" => "API token",
       "Media::Asset" => "Media asset"

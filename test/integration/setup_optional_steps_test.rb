@@ -7,6 +7,14 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     create_setup_admin
   end
 
+  test "the Mail step is optional and says so, and its Skip goes on to Languages" do
+    get setup_step_path("mail")
+
+    assert_response :success
+    assert_select "h1 span", text: "optional"
+    assert_select "a[href=?]", setup_step_path("languages"), text: "Skip for now"
+  end
+
   test "the MCP token step can be skipped" do
     get setup_step_path("mcp_token")
 

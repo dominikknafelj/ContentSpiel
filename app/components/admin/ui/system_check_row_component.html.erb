@@ -21,6 +21,9 @@
         <% end %>
       </div>
     <% end %>
+    <% if mail_settings_link? %>
+      <p class="mt-2"><%= link_to t(".open_mail_settings"), @mail_settings_href, class: "text-accent hover:text-accent-hover hover:underline" %></p>
+    <% end %>
     <% if result.docs.present? %>
       <p class="mt-2"><%= link_to "Learn more →", result.docs, class: "text-accent hover:text-accent-hover hover:underline" %></p>
     <% end %>

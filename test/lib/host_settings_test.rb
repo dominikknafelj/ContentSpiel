@@ -163,9 +163,9 @@ class HostSettingsTest < ActiveSupport::TestCase
 
   # Action Mailer writes every mail it delivers into the log at debug, whole:
   # the reset mail's link and its token with it.
-  test "a log level of debug gets a warning that names what it writes, and no other level does" do
-    warning = "[ContentSpiel] RAILS_LOG_LEVEL=debug: Rails logs every mail it sends in full, a password reset link and its " \
-              "token included. Use info or above on a site other people use."
+  test "the debug warning names reset and invite links, and no other level gets one" do
+    warning = "[ContentSpiel] RAILS_LOG_LEVEL=debug: Rails logs every mail it sends in full, a password reset link or an invite link " \
+              "and its token included. Use info or above on a site other people use."
 
     [ "debug", "DEBUG", " debug " ].each do |level|
       assert_equal warning, HostSettings.log_level_warning({ "RAILS_LOG_LEVEL" => level }), level.inspect

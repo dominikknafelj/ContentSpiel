@@ -1,0 +1,64 @@
+# The Settings screen's Mail card (spec "Settings → Mail", design answer M2;
+# docs/reference/mail.md): `admin.components.settings_screen.*` are its
+# components' keys (docs/reference/i18n.md: one file per component folder).
+# The screen's older cards still hold their words as literals; only the mail
+# card and the encryption-keys sentence are keys so far.
+#
+# `admin.settings.*` are what the controllers and `Settings::Save` answer:
+# toasts, the login's refusal, the sentence a site without encryption keys
+# gets for the mail login and the AI key alike, and a host-set field's.
+en:
+  admin:
+    components:
+      settings_screen:
+        mail_card:
+          title: "Mail"
+          intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
+          server: "Server"
+          server_placeholder: "smtp.example.com"
+          port: "Port"
+          security: "Security"
+          starttls: "STARTTLS"
+          tls: "TLS"
+          none: "None"
+          sender_name: "Sender name"
+          sender_address: "Sender address"
+          sender_address_placeholder: "no-reply@yourdomain"
+          set_by_host: "Set by the host"
+          all_from_host: "These settings come from the host's environment."
+        mail_login:
+          heading: "Login"
+          username: "Username"
+          password: "Password"
+          save: "Save login"
+          cancel: "Cancel"
+          set_on: "Set on %{date}"
+          replace: "Replace"
+          remove: "Remove…"
+          set_by_host: "Set by the host"
+          # Written into the login's entry while it holds text, and shown by
+          # the footer in place of its Save (`admin--settings--mail`).
+          hold: "Save or cancel the mail login first."
+          remove_dialog:
+            title: "Remove the mail login?"
+            body: "Mail is sent without a login until a new one is saved."
+            confirm: "Remove login"
+        mail_test_result:
+          send: "Send test mail"
+          sending: "Sending…"
+          sends_to: "Sends to %{address} (your address)"
+          pending: "Save your changes first"
+        mail_test_outcome:
+          sent: "Test mail sent to %{address}. Check your inbox."
+        mail_state:
+          label: "Mail state"
+    settings:
+      mail_login:
+        saved: "Mail login saved"
+        removed: "Mail login removed"
+        blank: "Enter a username or a password first."
+      mail_test:
+        too_many: "Too many test mails. Try again in a few minutes."
+      save:
+        no_encryption_keys: "This site has no encryption keys, so a password can't be stored. See Hosting: encryption keys."
+        set_by_host: "%{field} is set by the host and can't be changed here."

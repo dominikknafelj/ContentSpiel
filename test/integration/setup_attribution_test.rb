@@ -50,6 +50,8 @@ class SetupAttributionTest < ActionDispatch::IntegrationTest
     since = Audit::Event.maximum(:id).to_i
 
     patch setup_step_path("site"), params: { site_setting: { title: "Owner's site" } }
+    assert_redirected_to setup_step_path("mail")
+    patch setup_step_path("mail"), params: { site_setting: { mail_sender_address: "hello@owner.test" } }
     assert_redirected_to setup_step_path("languages")
     patch setup_step_path("languages"), params: { site_setting: { default_locale: "en", extra_locales: [ "de" ] } }
     assert_redirected_to setup_step_path("mcp_token")

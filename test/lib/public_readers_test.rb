@@ -47,6 +47,7 @@ class PublicReadersTest < ActiveSupport::TestCase
     "component_previews_controller.rb" => "development previews of components",
     "mcp_controller.rb" => "the token-guarded MCP endpoint, not the public site",
     "setup_controller.rb" => "the setup wizard",
+    "invitations_controller.rb" => "the invitation page of someone with no account yet: no site content, no record read",
     "preview_controller.rb" => "the preview shows the working version by design; the concern it shares is scanned"
   }.freeze
 

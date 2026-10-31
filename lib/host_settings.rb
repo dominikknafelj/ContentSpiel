@@ -115,8 +115,8 @@ module HostSettings
 
   # What the boot says, at warn, when production's log level is debug, nil
   # otherwise. At debug Action Mailer writes every mail it delivers into the
-  # log, whole (`ActionMailer::LogSubscriber`): the password reset mail with
-  # its link, and so the one token this application otherwise keeps out of
+  # log, whole (`ActionMailer::LogSubscriber`): the password reset mail and the
+  # invite mail with their links, and so the one token this application otherwise keeps out of
   # every address and every log line. That is Rails' behaviour and nothing
   # here changes it; the line is so that nobody runs a public site that way
   # without having been told. The level is read where `production.rb` reads
@@ -124,8 +124,8 @@ module HostSettings
   def self.log_level_warning(env = ENV)
     return nil unless env["RAILS_LOG_LEVEL"].to_s.strip.downcase == "debug"
 
-    "[ContentSpiel] RAILS_LOG_LEVEL=debug: Rails logs every mail it sends in full, a password reset link and its " \
-      "token included. Use info or above on a site other people use."
+    "[ContentSpiel] RAILS_LOG_LEVEL=debug: Rails logs every mail it sends in full, a password reset link or an invite link " \
+      "and its token included. Use info or above on a site other people use."
   end
 
   HOW_TO_SET = "Make a value with `bin/rails secret` and set it as the environment variable SECRET_KEY_BASE; " \

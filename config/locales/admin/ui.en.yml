@@ -26,6 +26,15 @@ en:
         insecure_notice:
           body: "This connection is not encrypted. Passwords and sessions can be read on the way. Set PUBLIC_HOST to an https address."
 
+        # The dashboard's alert while mail's last send failed; the sentence is
+        # `MailStateSentence`'s (config/locales/admin/mail.en.yml).
+        mail_failed_notice:
+          open_settings: "Open Mail settings →"
+
+        # System status's Mail row.
+        system_check_row:
+          open_mail_settings: "Open Mail settings →"
+
         toast:
           dismiss: "Dismiss"
           # What the layout's `<template id="toast-error-template">` is cloned

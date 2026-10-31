@@ -1,0 +1,28 @@
+en:
+  mail:
+    # A failed send's sentence, by its key (`MailFailure::KEYS`; spec, "A
+    # failure's sentence"). Shown in CS Studio: System status shows the
+    # sentence alone, the Mail card the sentence and the server's line.
+    failure:
+      login: "The server refused the login. Check username and password."
+      connect: "Could not reach %{server} on port %{port}. Check server and port."
+      security: "The server expects a different security setting. Try STARTTLS with port 587, or TLS with port 465."
+      sender: "The server refused the sender address."
+      other: "The mail could not be sent."
+    # The mails (spec, "The mails"; design answer M6). Every line of a mail
+    # is a key here, read in `I18n.default_locale` for now; interpolations
+    # are %{site}, %{inviter}, %{minutes} and %{date}.
+    footer: "Sent by %{site} via Content Spiel"
+    reset:
+      subject: "Reset your password for %{site}"
+      intro: "Someone asked to reset the password for your account on %{site}. Use this link within %{minutes} minutes:"
+      button: "Reset password"
+      outro: "If this wasn't you, ignore this mail. Your password stays the same."
+    invite:
+      subject: "%{inviter} invited you to %{site}"
+      intro: "%{inviter} invited you to work on %{site} in Content Spiel. Set a password to finish your account:"
+      button: "Set password"
+      outro: "This link works until %{date}. If you weren't expecting this, ignore this mail."
+    test:
+      subject: "Test mail from %{site}"
+      body: "Mail from Content Spiel works."

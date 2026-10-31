@@ -13,8 +13,8 @@
     <p class="text-sm leading-relaxed text-dim">If that address belongs to an account, we've sent a link. It expires in 15 minutes.</p>
     <p><%= back_link %></p>
   <% elsif params[:expired] == "1" %>
-    <%= render "admin/shared/auth_heading", title: "This link has expired" %>
-    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert">Reset links work for 15 minutes and only once.</p>
+    <%= render "admin/shared/auth_heading", title: t(".expired_title") %>
+    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert"><%= t(".expired") %></p>
     <%= link_to "Send a new link", new_admin_password_path, class: "#{setup_primary_button_class} w-full text-center" %>
     <p><%= back_link %></p>
   <% else %>
@@ -33,9 +33,6 @@
       <%= render Admin::Ui::ButtonComponent.new(label: "Send reset link", type: "submit", class: "w-full") %>
     <% end %>
 
-    <%# No console command is named here on purpose: this repo ships no rake
-        task for resetting a password, and a hint must not invent one. %>
-    <p class="text-xs leading-normal text-meta">No outgoing mail on this site? Ask an owner to set a new password for you.</p>
     <p><%= back_link %></p>
   <% end %>
 </div>

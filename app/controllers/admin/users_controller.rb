@@ -7,9 +7,10 @@ module Admin
   # (refused for the last owner, `Users::Destroy` ->
   # `User#ensure_not_last_owner`). A permission refusal from `Users::Save` (a
   # group the actor can't assign, an owner or an outranking user changed by
-  # someone who may not) is the 403 page. Invites stay on the roadmap (spec
-  # §6.1) -- there is no separate "invite" action here, only `new`/`create`
-  # with a password set up front.
+  # someone who may not) is the 403 page. Inviting someone is
+  # `Admin::InvitesController`: an invitation is no user until it is
+  # accepted (`Invitation`); `new`/`create` here make a user with a password
+  # set up front.
   #
   # Plain redirect-with-flash throughout, not autosave: a user's email and
   # password are exactly the kind of field an accidental keystroke-triggered
@@ -17,6 +18,7 @@ module Admin
   # silently -- an edit here is a deliberate "Save changes" submit.
   class UsersController < BaseController
     include StaleForm
+    include UsersList
 
     # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
     # changed it and when where the audit log says, and the message is the whole
@@ -30,9 +32,7 @@ module Admin
     before_action :set_user, only: %i[edit update destroy owner]
 
     def index
-      @users = User.includes(:groups).order(:email_address).to_a
-      # One grouped query for every listed user (`Users::LastSignIn`), never one per row.
-      @last_sign_ins = Users::LastSignIn.for(@users)
+      load_users_list
     end
 
     def new
@@ -152,23 +152,14 @@ module Admin
       params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, group_ids: [])
     end
 
-    # For the forms: every group, and whether the owner toggle is locked
-    # because `@user` is the last owner (demoting them is refused anyway,
-    # by `User`'s own validation).
-    helper_method def all_groups = @all_groups ||= AccessControl::Group.order(:name).to_a
-
-    # The groups the actor may put someone into (`Users::Save` checks
-    # added groups the same way); owners may assign any.
-    helper_method def assignable_group_ids
-      @assignable_group_ids ||= AccessControl.permitted_groups_for(Current.user).map(&:id).to_set
-    end
-
     # What the editor may draw for `@user` (round 3 Task 12, D17): `:editable`,
     # `:owner_protected` or `:outranked` -- the very answer the services enforce,
     # so the page and the writes can't drift. It decides only what is rendered;
     # every refusal stays in `Users::Save`/`Users::Destroy`, which ask again.
     helper_method def manageability(user) = Users::Manageability.for(Current.actor, user)
 
+    # Whether the owner toggle is locked because `user` is the last owner
+    # (demoting them is refused anyway, by `User`'s own validation).
     helper_method def last_owner?(user)
       user.persisted? && user.owner_in_database && User.where(owner: true).count == 1
     end

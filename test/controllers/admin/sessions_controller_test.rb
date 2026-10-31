@@ -8,6 +8,26 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "sign-in shows Forgot your password? only when mail is ready, and the owner line otherwise" do
+    with_mail_state(:working) do
+      get admin_sign_in_path
+      assert_select "a[href='#{new_admin_password_path}']", text: "Forgot your password?"
+      assert_select "main", text: /Ask the site's owner/, count: 0
+    end
+    with_mail_state(:failed) do
+      get admin_sign_in_path
+      assert_select "a", text: "Forgot your password?"
+    end
+    %i[ not_set_up untested ].each do |state|
+      with_mail_state(state) do
+        get admin_sign_in_path
+        assert_select "a", text: "Forgot your password?", count: 0
+        assert_select "p.text-meta", text: "Forgot your password? Ask the site's owner to reset it."
+        assert_select "main", text: /console|bin\/rails/i, count: 0
+      end
+    end
+  end
+
   test "sign-in uses the product shell: wordmark, theme switch, labelled fields, token button" do
     get admin_sign_in_path
     assert_select "header a", text: "CONTENT·SPIEL"
@@ -15,7 +35,6 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_select "label[for=email_address]", text: "Email"
     assert_select "label[for=password]", text: "Password"
     assert_select "button.bg-accent", text: "Sign in"
-    assert_select "a", text: "Forgot your password?"
     assert_no_match(/bg-blue|rounded-(md|lg|xl)/, response.body)
   end
 
@@ -23,6 +42,7 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
   # card; the site name (default language) above a 28px heading; "Forgot your
   # password?" right-aligned on the Password label row, 12px, not underlined.
   test "sign-in has no card, the site name above the heading, and the forgot link on the password label row" do
+    put_mail_state(:working)
     get admin_sign_in_path
     assert_select "main div.bg-surface.border", count: 0
     assert_select "main > div.max-w-\\[360px\\]"

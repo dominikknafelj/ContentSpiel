@@ -19,8 +19,8 @@ module Admin
       private
 
       def mail_warning
-        Setup::SystemCheck::Result.new(label: "Outgoing mail", status: :warning, message: "Password reset by email isn't configured.",
-          command: Setup::SystemCheck::MAIL_FALLBACK_COMMAND)
+        Setup::SystemCheck::Result.new(label: "Site address", status: :warning, message: "No site address is set.",
+          command: Setup::SystemCheck::SITE_ADDRESS_COMMAND)
       end
     end
   end
