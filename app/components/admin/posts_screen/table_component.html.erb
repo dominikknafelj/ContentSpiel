@@ -93,7 +93,7 @@
                     (`admin--posts--bulk-select#only`): one path for trashing, with
                     its confirmation, its filters and its Undo. %>
                 <% menu.with_item do %>
-                  <%= tag.button "Move to trash", type: "button", class: "text-danger-ink",
+                  <%= tag.button "Move to trash…", type: "button", class: "text-danger-ink",
                         data: { action: "admin--posts--bulk-select#only admin--ui--dialog#open", "admin--posts--bulk-select-id-param": post.id,
                                 "admin--posts--bulk-select-dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID,
                                 "admin--ui--dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID } %>

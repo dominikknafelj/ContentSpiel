@@ -312,7 +312,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   test "a keyboard reorder is one pending change, locks the instant actions, and Save puts the tabs in the new order" do
     visit admin_settings_path
     await_admin_controllers
-    assert_selector "#settings-languages-card button:not([disabled])", text: "Make default", count: 2
+    assert_selector "#settings-languages-card button:not([disabled])", text: "Make default…", count: 2
 
     handle = find("button[aria-label='Move English']")
     handle.send_keys(:space)
@@ -324,7 +324,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /\b1 unsaved change\b/i
 
     # D10: Default, Turn off and Add wait for Save or Cancel, and say so.
-    assert_selector "#settings-languages-card button[disabled]", text: "Make default", count: 2
+    assert_selector "#settings-languages-card button[disabled]", text: "Make default…", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Turn off…", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Add language"
     assert_selector "#settings-languages-card select#language-add-code[disabled]"
@@ -336,7 +336,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal %w[de en es], site_settings(:default).reload.locale_codes
     assert_language_order %w[de en es]
     assert_equal "Deutsch", language_tab_names.first
-    assert_selector "#settings-languages-card button:not([disabled])", text: "Make default", count: 2
+    assert_selector "#settings-languages-card button:not([disabled])", text: "Make default…", count: 2
     assert_no_text "Save or cancel your changes first."
   end
 
@@ -479,7 +479,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_operator lefts.max - lefts.min, :<, 1, "the fallback selects start at #{lefts.inspect}"
 
     tag = page.evaluate_script("document.querySelector('#settings-languages-card [data-default-tag]').getBoundingClientRect().left")
-    button = page.evaluate_script("Array.from(document.querySelectorAll('#settings-languages-card button')).find((b) => b.textContent.trim() === 'Make default').getBoundingClientRect().left")
+    button = page.evaluate_script("Array.from(document.querySelectorAll('#settings-languages-card button')).find((b) => b.textContent.trim() === 'Make default…').getBoundingClientRect().left")
     assert_in_delta button, tag, 1
   end
 end

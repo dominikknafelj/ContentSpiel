@@ -61,7 +61,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     # trigger with no name on the others -- nothing the form could submit.
     assert_select "#settings-languages-card input[type=radio]", count: 0
     assert_select "#language-en [data-default-tag]", text: "Default"
-    assert_select "#settings-languages-card button[type=button]:not([name])", text: "Make default", count: 2
+    assert_select "#settings-languages-card button[type=button]:not([name])", text: "Make default…", count: 2
     assert_select "#language-de button[data-admin--ui--dialog-id-param='language-default-dialog-de'][aria-label='Make Deutsch the default language']"
     assert_select "form#settings-form form", count: 0
     assert_select "form#language-default-form", count: 0
@@ -80,7 +80,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
 
     assert_select "#settings-languages-card[data-controller~='admin--saving--pending-lock']"
     assert_select "#settings-languages-card [data-admin--saving--pending-lock-target=hint]"
-    assert_select "#settings-languages-card button[data-admin--saving--pending-lock-target=control]", text: "Make default", count: 2
+    assert_select "#settings-languages-card button[data-admin--saving--pending-lock-target=control]", text: "Make default…", count: 2
     assert_select "#settings-languages-card button[data-admin--saving--pending-lock-target=control]", text: "Turn off…", count: 2
     assert_select "#settings-languages-card #language-add-code[data-admin--saving--pending-lock-target=control]"
     assert_select "#settings-languages-card button[type=submit][form='language-add-form'][data-admin--saving--pending-lock-target=control]", text: "Add language"

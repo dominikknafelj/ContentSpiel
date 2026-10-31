@@ -3,7 +3,7 @@ module Admin
     # The Languages card (round 3, Task 6; handoff §4.5, A8, A9): one row per
     # enabled language -- a drag handle, the native name with its public path
     # (`/` for the default, `/<code>` for the rest), a "Default" tag or a
-    # "Make default" button, a "Falls back to" select and "Turn off…" -- and
+    # "Make default…" button, a "Falls back to" select and "Turn off…" -- and
     # "Add language" below. Rendered
     # only for `languages.manage` (decision D9).
     #
@@ -27,7 +27,7 @@ module Admin
     # handoff drew radios): a radio moves on every arrow key, and each move
     # opened the "Make <Name> the default?" dialog -- a keyboard user could not
     # walk the group without being asked. The default row carries a "Default"
-    # tag; every other row a "Make default" button that opens that dialog.
+    # tag; every other row a "Make default…" button that opens that dialog.
     #
     # `values:` -- `Values` (typed order and fallbacks beat stored).
     class LanguagesCardComponent < Admin::AdminComponent

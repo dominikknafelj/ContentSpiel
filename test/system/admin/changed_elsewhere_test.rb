@@ -551,7 +551,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
 
     fill_in "Title", with: ""
     open_editor_menu
-    press "Move to trash"
+    press "Move to trash…"
     within("dialog#delete-page-#{@page.id}[open]") { press "Move to trash" }
 
     assert_text "Your last change wasn't saved, so this didn't run.", wait: 10
@@ -569,7 +569,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     open_editor_menu
-    press "Move to trash"
+    press "Move to trash…"
     assert_selector "dialog#delete-page-#{@page.id}[open]"
     # One tick: the confirmed submission goes out, then an edit starts its
     # debounce -- still outstanding when the redirect is answered.
@@ -604,7 +604,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
     open_editor_menu
-    press "Move to trash"
+    press "Move to trash…"
     within("dialog#delete-page-#{@page.id}[open]") { press "Move to trash" }
     assert_current_path(admin_page_path(root_page), wait: 10)
     assert_selector "#toasts button", text: "Undo"

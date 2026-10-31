@@ -120,7 +120,7 @@ class DialogSystemTest < ApplicationSystemTestCase
 
     # The editor header's menu; Escape closes like Cancel.
     open_editor_menu
-    find("header.admin-editor-header [role=menu] button", text: "Unpublish").click
+    find("header.admin-editor-header [role=menu] button", text: "Unpublish…").click
     assert_selector "dialog[open]", text: "Unpublish this page?"
     find("dialog[open]").send_keys(:escape)
     assert_no_selector "dialog[open]"

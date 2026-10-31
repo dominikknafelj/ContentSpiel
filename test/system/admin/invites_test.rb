@@ -27,7 +27,7 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
   test "inviting, accepting from the mailed link, and signing in" do
     visit admin_users_path
     await_admin_controllers
-    press "Invite person"
+    press "Invite person…"
 
     within("dialog#invite-person") do
       fill_in "Email", with: "dana@example.com"

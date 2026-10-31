@@ -661,7 +661,7 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_select "#publishing-chip [data-discard-changes-offered]", count: 1
     assert_select "#publishing-chip [data-change-scheduled]", count: 1
     assert_select "dialog#cancel-scheduled-change-page-#{page.id} form[action='#{admin_publishing_cancel_scheduled_change_path(kind: "page", id: page.id)}']"
-    assert_select "button", text: "Cancel scheduled change"
+    assert_select "button", text: "Cancel scheduled change…"
   end
 
   test "a scheduled page's change published again at another time moves the change and leaves the page scheduled" do

@@ -218,7 +218,7 @@ class Admin::DraftsSystemTest < ApplicationSystemTestCase
     end
 
     open_editor_menu
-    press "Cancel scheduled change"
+    press "Cancel scheduled change…"
     within "dialog[open]" do
       assert_text "They stay in the editor as unpublished changes."
       press "Cancel scheduled change"
@@ -241,7 +241,7 @@ class Admin::DraftsSystemTest < ApplicationSystemTestCase
     type_while_the_save_is_held
 
     open_editor_menu
-    press "Cancel scheduled change"
+    press "Cancel scheduled change…"
     within("dialog[open]") { press "Cancel scheduled change" }
     await_frames
     assert Publishing.pending(@page), "the press waits for the save that is out"

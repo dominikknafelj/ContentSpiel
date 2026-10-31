@@ -40,7 +40,7 @@
           <% if default?(code) %>
             <%= render Admin::Ui::BadgeComponent.new(label: "Default", data: { default_tag: true }) %>
           <% else %>
-            <%= render Admin::Ui::ButtonComponent.new(label: "Make default", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
+            <%= render Admin::Ui::ButtonComponent.new(label: "Make default…", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
                   data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
           <% end %>
         </div>

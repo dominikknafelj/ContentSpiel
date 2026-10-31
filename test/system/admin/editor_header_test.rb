@@ -47,7 +47,7 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
 
     await_admin_controllers
     open_editor_menu
-    press "Unpublish"
+    press "Unpublish…"
     within("dialog#unpublish-page-#{@draft.id}[open]") do
       assert_text "Unpublish this page?"
       press "Unpublish"
@@ -112,7 +112,7 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     assert_equal "scheduled", @draft.reload.status
 
     await_admin_controllers
-    find("header.admin-editor-header button", text: "Edit schedule").click
+    find("header.admin-editor-header button", text: "Edit schedule…").click
     assert_selector "#{dialog}[open]"
     assert_selector "#{dialog}[open] button", text: "Remove schedule"
     within("#{dialog}[open]") { press "Remove schedule" }
@@ -127,7 +127,7 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     dialog = "dialog#schedule-page-#{@draft.id}"
 
-    find("header.admin-editor-header button", text: "Edit schedule").click
+    find("header.admin-editor-header button", text: "Edit schedule…").click
     assert_selector "#{dialog}[open] button", text: "Remove schedule"
     new_time = (Time.current + 6.days).change(sec: 0, usec: 0)
     set_schedule_value("schedule-page-#{@draft.id}", new_time.in_time_zone(Current.site.effective_time_zone).strftime("%Y-%m-%dT%H:%M"))

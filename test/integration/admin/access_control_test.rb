@@ -252,7 +252,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages"
 
     assert_response :success
-    assert_select "h2, p, div", text: "Choose a page from the tree"
+    assert_select "[data-empty-state-title]", text: "Choose a page from the tree."
     assert_select "turbo-frame#tree li[data-page-id='#{@inside.id}']"
   end
 
@@ -482,8 +482,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:two))
     get "/cs-studio/pages/#{@outside.id}"
 
-    assert_select "button", text: "Unpublish"
-    assert_select "button", text: "Move to trash"
+    assert_select "button", text: "Unpublish…"
+    assert_select "button", text: "Move to trash…"
     assert_select "#block-picker-end"
   end
 
