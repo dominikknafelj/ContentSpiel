@@ -1,6 +1,7 @@
 require "test_helper"
 
 class InvitesMailerTest < ActionMailer::TestCase
+  include LogCapture
   SITE = "https://docs.example.org".freeze
 
   setup do
@@ -71,6 +72,15 @@ class InvitesMailerTest < ActionMailer::TestCase
     assert_includes args, @invitation.to_global_id.to_s
     assert_no_match(/[A-Za-z0-9_=-]{40,}/, args.gsub(/gid:\/\/[\w\/-]+/, "").gsub(/[a-f0-9]{64}/, ""), "no signed token among the arguments")
     assert_nil args[@invitation.generate_token_for(:accept)]
+  end
+
+  # Ruling T8a's rule for an invitation that can no longer be accepted: the
+  # job sends nothing and says so in one line with no address.
+  test "an invitation accepted since it was queued sends nothing" do
+    @invitation.update!(accepted_at: Time.current)
+    log = capture_log { assert_no_emails { with_site_address(SITE) { InvitesMailer.invite(@invitation).deliver_now } } }
+    assert_includes log, "An invitation mail was not sent: the invite is no longer open."
+    assert_not_includes log, "dana@example.com"
   end
 
   test "an invitation whose inviter was deleted is the site's own" do

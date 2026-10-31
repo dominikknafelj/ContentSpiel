@@ -105,6 +105,7 @@ class MailGuardsTest < ActiveSupport::TestCase
     "app/services/invitations/resend.rb" => "the service that sends a new link",
     "app/services/invitations/withdraw.rb" => "the service that deletes one",
     "app/services/invitations/rules.rb" => "what those four share",
+    "app/services/invitations/accounts.rb" => "an account made for an invited address closes its open invitation (the audit log's seam)",
     "app/controllers/admin/invites_controller.rb" => "the Users screen's invite, resend and withdraw",
     "app/controllers/invitations_controller.rb" => "the accept page",
     "app/controllers/concerns/admin/users_list.rb" => "the Users screen lists the open invitations among the users",

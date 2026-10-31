@@ -81,6 +81,11 @@ class InvitationsController < ApplicationController
       # is the invited person's from here on (plan ruling T9a).
       terminate_session if resume_session
       start_new_session_for(result.record)
+      # Recorded as sign-in records it (`Admin::SessionsController#create`):
+      # the user's own event, actor and subject both, so their last sign-in
+      # and the log say they signed in.
+      Current.actor = result.record
+      Audit.record("session.created", subject: result.record)
       redirect_to admin_root_path, status: :see_other, notice: t(".ready")
     elsif (state = LINK_STATES[result.errors])
       @state = state

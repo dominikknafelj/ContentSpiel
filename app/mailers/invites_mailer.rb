@@ -14,6 +14,15 @@ class InvitesMailer < ApplicationMailer
 
   def invite(invitation, origin: nil)
     @invitation = invitation
+    # Accepted (or closed by an account) since the mail was queued: there is
+    # nothing to invite to any more, and the job ends quietly as for one
+    # withdrawn (ruling T8a). A withdrawn one never gets here: it cannot be
+    # found (`MailDeliveryJob`).
+    unless invitation.open?
+      Rails.logger.info "[ContentSpiel] An invitation mail was not sent: the invite is no longer open."
+      return
+    end
+
     @url_options = link_origin(origin)
 
     if @url_options.empty?

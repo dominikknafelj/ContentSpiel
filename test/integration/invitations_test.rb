@@ -101,6 +101,28 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     assert_select "[data-invitation-token-target=expired][hidden]"
   end
 
+  # The review of the rework, Important 1: an account made for the address
+  # closes the invitation, so deleting that account later does not bring the
+  # old link back to life.
+  test "invite, an account made on New user, the account deleted: the old link is expired and creates nothing" do
+    sign_in_as(users(:one))
+    post "#{ADMIN}/users", params: { user: { email_address: "dana@example.com", password: PASSWORD, password_confirmation: PASSWORD } }
+    account = User.find_by!(email_address: "dana@example.com")
+    assert_not Invitation.exists?(@dana.id)
+
+    delete "#{ADMIN}/users/#{account.id}"
+    assert_not User.exists?(account.id)
+    reset!
+
+    post CHECK, params: { token: @token }
+    assert_response :gone
+    assert_no_difference [ -> { User.count }, -> { Session.count }, -> { AccessControl::Membership.count } ] do
+      accept
+    end
+    assert_response :unprocessable_entity
+    assert_select "[data-invitation-token-target=expired]:not([hidden])"
+  end
+
   # An account made for the address meanwhile (the New user form) is the
   # person's way in: the link is used, and accepting makes no second account.
   test "a link whose address has an account by now is used: the check's 409 and the used state, and nothing is written" do
@@ -121,6 +143,13 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     accept
     assert_redirected_to admin_root_path
     assert_equal "Your account is ready.", flash[:notice]
+
+    # The sign-in is recorded as sign-in records it: the user's own event.
+    signed_in = Audit::Event.where(action: "session.created").sole
+    account = User.find_by!(email_address: "dana@example.com")
+    assert_equal [ account, account.id ], [ signed_in.subject, signed_in.user_id ]
+    assert_empty signed_in.metadata
+    assert_equal account.id, Users::LastSignIn.for([ account ]).keys.sole
 
     assert @dana.reload.accepted?
     user = User.find_by!(email_address: "dana@example.com")
