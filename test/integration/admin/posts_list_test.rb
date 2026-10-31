@@ -143,7 +143,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_equal 3, row_titles.size
     get "/cs-studio/posts", params: { page: "9" }
     assert_response :ok
-    assert_select "h3", text: "Nothing on this page"
+    assert_select "[data-empty-state-title]", text: "Nothing on this page."
     assert_select "a[href=?]", "/cs-studio/posts?page=1", text: "Back to page 1"
     assert_select "tbody", count: 0
   end
@@ -387,7 +387,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: ids, page: "2", q: "More" }
     assert_redirected_to "/cs-studio/posts?q=More"
     get "/cs-studio/posts", params: { page: "9" }
-    assert_select "h3", text: "Nothing on this page"
+    assert_select "[data-empty-state-title]", text: "Nothing on this page."
   end
 
   # The `page = total_pages` branch: more than one page is left, so the
