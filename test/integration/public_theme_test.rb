@@ -11,9 +11,9 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
       "GitHub" => "HTTPS://github.com/dana", "Mail" => "mailto:dana@example.com",
       "Evil" => "javascript:alert(1)", "Broken" => "ht tp://nope"
     })
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    @about = Page.create!(parent: @root, page_type: :standard, title_en: "About", title_de: "Über", published_at: Time.current)
-    Page.create!(parent: @root, page_type: :standard, title: "Secret draft")
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    @about = Page.create!(parent: @root, title_en: "About", title_de: "Über", published_at: Time.current)
+    Page.create!(parent: @root, title: "Secret draft")
   end
 
   test "the header shows the site title and published top-level pages" do
@@ -52,7 +52,7 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
   end
 
   test "the switcher link for a post without a German slug still resolves" do
-    blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
+    blog = Page.create!(parent: @root, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title_en: "Hello", published_at: 1.day.ago)
     # Since Task 8c every post gets a German slug by LocalizedSlug's

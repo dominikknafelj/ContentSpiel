@@ -7,7 +7,7 @@ require "test_helper"
 # `store_accessor`s this file used to test directly.
 class ResumeFieldsTest < ActiveSupport::TestCase
   test "alt texts are translated" do
-    root = Page.create!(page_type: :landing, title: "Home", slug: "", published_at: Time.current,
+    root = Page.create!(template: "landing", title: "Home", slug: "", published_at: Time.current,
       hero_alt_en: "A desk", hero_alt_de: "Ein Schreibtisch")
     block = root.content_blocks.create!(block_type: :image, position: 0, alt_en: "Chart", alt_de: "Diagramm")
 

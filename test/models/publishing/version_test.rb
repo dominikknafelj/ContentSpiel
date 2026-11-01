@@ -20,7 +20,7 @@ class Publishing::VersionTest < ActiveSupport::TestCase
     assert_equal 1, version.number
     assert_equal [ section.id, inner.id, last.id ], version.blocks.map { |block| block["id"] }
     assert_equal({ "en" => "Pricing" }, version.snapshot.dig("fields", "title"))
-    assert_equal %w[hero_alt hero_media_asset_id meta_description meta_title page_type subtitle title translation_original_changed_at translation_sources],
+    assert_equal %w[hero_alt hero_media_asset_id meta_description meta_title settings subtitle title translation_original_changed_at translation_sources],
       version.snapshot.fetch("fields").keys.sort
     assert_not version.lists_posts
     assert_operator version.live_at, :<=, Time.current

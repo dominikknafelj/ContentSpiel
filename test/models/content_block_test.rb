@@ -4,7 +4,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   include TestTypes
 
   setup do
-    @page = Page.create!(page_type: :standard, title: "Home", slug: "")
+    @page = Page.create!(title: "Home", slug: "")
   end
 
   test "block_type is required" do

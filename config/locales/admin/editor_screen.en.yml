@@ -428,7 +428,7 @@ en:
             meta_description: "Meta description"
             hero_alt: "Hero image alt text"
             hero_media_asset_id: "Hero image"
-            page_type: "Page type"
+            settings: "Template"
             excerpt: "Excerpt"
             body: "Body"
             metadata: "Fields"

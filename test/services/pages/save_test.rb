@@ -182,7 +182,7 @@ class Pages::SaveTest < ActiveSupport::TestCase
     forbidden = {
       parent_id: other.id, position: 0, trashed_at: Time.current, trashed_by_id: users(:one).id, trashed_by: users(:one),
       trash_root_id: page.id, id: 1, created_at: 1.year.ago, updated_at: 1.year.ago, translation_sources: {},
-      title: "Smuggled", slug: "smuggled"
+      title: "Smuggled", slug: "smuggled", settings: { "template" => "landing" }, page_type: "landing"
     }
     forbidden.each do |key, value|
       error = assert_raises(ArgumentError, "#{key} was accepted") { Pages::Save.call(page, attributes: { key => value, published: true }) }
@@ -199,7 +199,7 @@ class Pages::SaveTest < ActiveSupport::TestCase
   test "every attribute the service is meant to take is still taken" do
     asset = create_media_asset
     result = as_owner do
-      Pages::Save.call(attributes: { parent: root_page, page_type: "standard", hero_media_asset_id: asset.id, published_at: 1.day.from_now },
+      Pages::Save.call(attributes: { parent: root_page, template: "standard", hero_media_asset_id: asset.id, published_at: 1.day.from_now },
         translations: { "en" => { title: "Allowed" } })
     end
     assert result.ok?, result.errors.to_sentence
@@ -213,5 +213,25 @@ class Pages::SaveTest < ActiveSupport::TestCase
     other = create_page(title: "Elsewhere")
     assert as_owner { Pages::Save.call(result.record, attributes: { parent: other }) }.ok?
     assert_equal root_page, result.record.reload.parent
+  end
+
+  test "a template is saved, audited as a change of settings and marks a live page as changed" do
+    page = create_page(title: "Pricing")
+    publish_changes(page)
+    assert_not page.reload.unpublished_changes?
+
+    result = Pages::Save.call(page, attributes: { template: "landing" })
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal({ "template" => "landing" }, page.reload.settings)
+    assert page.unpublished_changes?
+    event = Audit::Event.where(action: "page.updated", subject: page).order(:id).last
+    assert_equal({ "template" => "landing" }, event.field_changes.dig("settings", 1))
+    assert_equal({}, Publishing.current(page).snapshot.dig("fields", "settings"), "the copy is not touched by a save")
+
+    refused = Pages::Save.call(page, attributes: { template: "gallery" })
+    assert_not refused.ok?
+    assert refused.record.errors.of_kind?(:template, :inclusion)
+    assert_equal "landing", page.reload.template
   end
 end

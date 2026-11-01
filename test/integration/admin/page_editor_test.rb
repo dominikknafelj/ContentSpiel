@@ -230,7 +230,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
 
   test "a later save that did not touch the hero leaves its refusal message in place; acting on the hero clears it" do
     landing = create_page(title: "Landing 2")
-    assert Pages::Save.call(landing, attributes: { page_type: "landing" }).ok?
+    assert Pages::Save.call(landing, attributes: { template: "landing" }).ok?
     chosen = create_media_asset
 
     patch admin_page_path(landing), params: { page: { subtitle: "Other field", hero_media_asset_id: "" }, base_updated_at: landing.reload.updated_at.iso8601(6) }, as: :turbo_stream
@@ -599,28 +599,28 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   private
 
   def landing_page_with_hero_image
-    Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true, hero_media_asset_id: create_media_asset.id },
+    Pages::Save.call(attributes: { parent: root_page, template: "landing", published: true, hero_media_asset_id: create_media_asset.id },
       translations: { Locales.default => { title: "Landing" } }).record
   end
 
-  test "the page type is a select on the default tab and a read-only shared line on a translation tab" do
+  test "the template is a select on the default tab and a read-only shared line on a translation tab" do
     get "/cs-studio/pages/#{@page.id}"
     # `main`: the layout's New page dialog has a select of the same name.
-    assert_select "main form select[name='page[page_type]']"
+    assert_select "main form select[name='page[template]']"
 
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
     assert_select "form.admin-translation-form"
-    assert_select "main form select[name='page[page_type]']", count: 0
-    assert_select "[data-field-name='page_type']", text: /Page type:\s*Standard\s*— Shared by all languages\./
+    assert_select "main form select[name='page[template]']", count: 0
+    assert_select "[data-field-name='template']", text: /Page type:\s*Standard\s*— Shared by all languages\./
   end
 
-  test "a translation-tab save without the page type leaves it untouched" do
-    @page.update!(page_type: "landing")
+  test "a translation-tab save without the template leaves it untouched" do
+    @page.update!(template: "landing")
 
     patch "/cs-studio/pages/#{@page.id}", params: { locale: "de", page: { title: "Über uns" }, base_updated_at: @page.reload.updated_at.iso8601(6) }, as: :turbo_stream
 
     assert_response :success
-    assert_equal "landing", @page.reload.page_type
+    assert_equal "landing", @page.reload.template
     assert_equal "Über uns", @page.title(locale: :de)
   end
 

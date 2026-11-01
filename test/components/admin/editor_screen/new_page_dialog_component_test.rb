@@ -52,7 +52,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_selector "label[for=new-page-title]", text: "Title"
     assert_selector "input#new-page-title[name='page[title]'][autofocus]"
     assert_selector "select#new-page-inside[name='page[parent_id]']"
-    assert_selector "select#new-page-type[name='page[page_type]'] option[value=standard]", text: "Standard"
+    assert_selector "select#new-page-type[name='page[template]'] option[value=standard]", text: "Standard"
     assert_selector "select#new-page-type option[value=landing]", text: "Landing"
     assert_selector "[data-admin--editor--new-record-target=url]", text: "URL: /"
   end
@@ -77,7 +77,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
   end
 
   test "a page with no title in this language reads (untitled), as in the tree" do
-    blank = Page.create!(parent: root_page, page_type: :standard, title: "x", slug: "blank-one")
+    blank = Page.create!(parent: root_page, title: "x", slug: "blank-one")
     blank.update_columns(title: {})
     render_form
     assert_selector "#new-page-inside option[value='#{blank.id}']", text: /\(untitled\)/
@@ -134,7 +134,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
   test "the form alone shows the typed values and an error summary linked to the title" do
     page_record = Page.new
     page_record.errors.add(:title, "can't be blank")
-    render_form(parent_id: @about.id, title: "Typed", page_type: "landing", errors: page_record.errors)
+    render_form(parent_id: @about.id, title: "Typed", template: "landing", errors: page_record.errors)
     assert_selector ".admin-error-summary", text: "1 thing needs fixing"
     assert_selector ".admin-error-summary a[href='#new-page-title']", text: "Title can't be blank"
     assert_selector "input#new-page-title[value=Typed][aria-invalid=true]"

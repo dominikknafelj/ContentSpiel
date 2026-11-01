@@ -58,6 +58,19 @@ module PublicSite
       path_from(path, locale)
     end
 
+    # Reads the current paths of `records` in `locale` in one statement and
+    # keeps them for `path_for` (nil for a record that has none), so a list
+    # drawn as links costs one read for its addresses and not one per link.
+    # Records of several types are read type by type. Answers self.
+    def prefetch(records, locale = I18n.locale)
+      records.group_by { |record| record.class.polymorphic_name }.each do |type, group|
+        ids = group.map(&:id)
+        paths = PublicSite::Paths.current_paths(type, ids)
+        ids.each { |id| @paths[[ group.first.class.name, id, locale.to_s ]] = paths.dig(id, locale.to_s) }
+      end
+      self
+    end
+
     # The address made of a path ALREADY READ from `public_paths` (several
     # at once, `PublicSite::Paths.current_paths`): the same prefix, here and
     # nowhere else. nil for no path.

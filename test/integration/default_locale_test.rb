@@ -8,8 +8,8 @@ require "test_helper"
 # the sitemap on the very next request.
 class DefaultLocaleTest < ActionDispatch::IntegrationTest
   setup do
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    @about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: @root,
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    @about = Page.create!(title: "About", slug: "about", parent: @root,
       published_at: Time.current)
     Mobility.with_locale(:de) { @about.update!(title: "Über uns", slug: "ueber-uns") }
 
@@ -63,7 +63,7 @@ class DefaultLocaleTest < ActionDispatch::IntegrationTest
   # "/en" and "/es" -- instead of getting a path of their own.
   test "a page titled only in the default locale still gets its own path in every other locale" do
     kontakt = Mobility.with_locale(:de) do
-      Page.create!(page_type: :standard, title: "Kontakt", parent: @root, published_at: Time.current)
+      Page.create!(title: "Kontakt", parent: @root, published_at: Time.current)
     end
 
     # The slug (this task's fix) is what's under test -- reading the title

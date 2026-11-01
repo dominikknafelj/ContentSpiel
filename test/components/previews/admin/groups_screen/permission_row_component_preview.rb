@@ -26,8 +26,8 @@ module Admin
 
       def pages_tree
         home = PreviewFixtures.page(title: "Home")
-        about = home.children.create!(page_type: :standard, title: "About #{SecureRandom.hex(4)}", published_at: Time.current)
-        about.children.create!(page_type: :standard, title: "Team #{SecureRandom.hex(4)}", published_at: Time.current)
+        about = home.children.create!(title: "About #{SecureRandom.hex(4)}", published_at: Time.current)
+        about.children.create!(title: "Team #{SecureRandom.hex(4)}", published_at: Time.current)
         tree = Admin::GroupsScreen::BranchTree.for(nil, locale: "en")
         render Admin::GroupsScreen::PermissionRowComponent.new(permission: AccessControl::Permissions.fetch("pages.edit"),
           scope: { "page_ids" => [ about.id ] }, tree: tree, open: true)

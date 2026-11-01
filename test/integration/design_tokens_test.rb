@@ -129,7 +129,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "the public layout links only the theme stylesheet" do
-    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "Home", slug: "", published_at: Time.current)
     get "/"
 
     assert_select "link[rel=stylesheet][href*='/theme-']"

@@ -3,7 +3,7 @@ require "test_helper"
 class PublicBlocksTest < ActionDispatch::IntegrationTest
   setup do
     SiteSetting.instance.update!(tagline: "Writing about Rails")
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
   end
 
   test "the homepage shows the tagline eyebrow and rich text in prose" do
@@ -153,7 +153,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "a post detail shows date, excerpt and tags" do
-    blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
+    blog = Page.create!(parent: @root, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title: "Hello", excerpt: "Short summary",
       published_at: Time.zone.local(2026, 9, 12), body: rich_doc("Body text"))
@@ -287,7 +287,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "a post's permalink shows the post in place of its listing when the listing sits in a column" do
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 0, body: rich_doc("Beside the list"))
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 2, position: 0, settings: { "content_type" => "blog" })
@@ -316,7 +316,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   # two of them can tie. Asked three times: an order the database happens to
   # return must not decide it.
   test "a post's permalink stands in for the first listing in reading order, in a column or not, on every request" do
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 4, body: rich_doc("Before the first listing"))
     in_column = blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 5, settings: { "content_type" => "blog" })
@@ -344,7 +344,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   # draws from the same one (`PublicPageRendering#assign_record` hands it
   # over): a permalink builds one outline, as a page does.
   test "a post's permalink builds one outline, the one its page is drawn from" do
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 0, settings: { "content_type" => "blog" })
     post = create_post(title: "Counted")

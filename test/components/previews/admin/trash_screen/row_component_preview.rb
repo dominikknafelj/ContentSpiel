@@ -43,7 +43,7 @@ module Admin
       # its own root, with nowhere to go back to.
       def orphaned_child
         section = PreviewFixtures.page(title: "Section")
-        child = section.children.create!(page_type: :standard, title: "Child #{SecureRandom.hex(4)}", published_at: Time.current)
+        child = section.children.create!(title: "Child #{SecureRandom.hex(4)}", published_at: Time.current)
         child.update_columns(trashed_at: 1.day.ago, trash_root_id: child.id)
         section.update_columns(trashed_at: 1.hour.ago, trash_root_id: section.id)
         child.reload

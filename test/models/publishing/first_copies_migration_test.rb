@@ -27,9 +27,17 @@ class FirstCopiesMigrationTest < ActiveSupport::TestCase
     [ frozen, app ]
   end
 
+  # Narrowed for a page's type: the frozen copy reads `page_type`, which
+  # `ReplacePageTypeWithPageSettings` replaced with `settings` (in the rows and
+  # in every copy, so a copy this migration took is rewritten by that one).
+  # Neither column is compared; everything else still is.
+  PAGE_TYPE_FIELDS = %w[page_type settings].freeze
+
+  def without_page_type(snapshot) = snapshot.merge("fields" => snapshot.fetch("fields", {}).except(*PAGE_TYPE_FIELDS))
+
   def assert_same_copy(frozen, app)
     assert_equal app.number, frozen.number
-    assert_equal app.snapshot, frozen.snapshot
+    assert_equal without_page_type(app.snapshot), without_page_type(frozen.snapshot)
     assert_equal app.blocks, frozen.blocks
     assert_equal app.lists_posts, frozen.lists_posts
     assert_equal app.tag_ids, frozen.tag_ids
@@ -38,7 +46,7 @@ class FirstCopiesMigrationTest < ActiveSupport::TestCase
   test "the migration's copy of a page is the application's: sections, columns, a list block with its tag, a landing page with its hero" do
     tag = Tag.create!(name: "ruby")
     asset = create_media_asset
-    page = Pages::Save.call(attributes: { parent: root_page, published: true, page_type: "landing", hero_media_asset_id: asset.id },
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, template: "landing", hero_media_asset_id: asset.id },
       translations: { "en" => { title: "Landing", subtitle: "Be quick", hero_alt: "A room" }, "de" => { title: "Landung", slug: "landung" } }).record
     add_block(page, translations: { "en" => { body: rich_doc("Hello") }, "de" => { body: rich_doc("Hallo") } })
     add_block(page, block_type: "image", media_asset_id: asset.id, translations: { "en" => { caption: "Cap", alt: "Alt" } })
@@ -53,7 +61,6 @@ class FirstCopiesMigrationTest < ActiveSupport::TestCase
 
     assert_same_copy(frozen, app)
     assert frozen.lists_posts
-    assert_equal "landing", frozen.snapshot.dig("fields", "page_type")
   end
 
   test "the migration's copy of a post is the application's, with its tags and its type's fields" do

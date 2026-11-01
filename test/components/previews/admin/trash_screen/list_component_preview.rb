@@ -9,7 +9,7 @@ module Admin
       def with_items
         section = PreviewFixtures.page(title: "Spring campaign")
         members = %w[Landing Offer FAQ Terms].map do |title|
-          section.children.create!(page_type: :standard, title: "#{title} #{SecureRandom.hex(4)}", published_at: Time.current)
+          section.children.create!(title: "#{title} #{SecureRandom.hex(4)}", published_at: Time.current)
         end
         ([ section ] + members).each { |page| page.update_columns(trashed_at: 3.hours.ago, trash_root_id: section.id) }
         post = PreviewFixtures.post(title: "Retired announcement").tap { |record| record.update_columns(trashed_at: 1.day.ago) }

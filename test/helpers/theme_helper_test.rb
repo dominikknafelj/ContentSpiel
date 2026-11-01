@@ -23,8 +23,8 @@ class ThemeHelperTest < ActionView::TestCase
   # (config/application.rb) -- so an integration test can't reach this text;
   # a direct helper test is the only way to pin it.
   test "language_links names each locale natively, not in English" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    page = Page.create!(parent: root, page_type: :standard, title_en: "About", title_de: "Über",
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    page = Page.create!(parent: root, title_en: "About", title_de: "Über",
       published_at: Time.current)
 
     links = language_links(page)
@@ -361,5 +361,32 @@ class ThemeHelperTest < ActionView::TestCase
     assert_equal [ home.id ], page_ancestors(below).map(&:id)
     assert_nil page_section(hidden)
     assert_nil page_section(home)
+  end
+
+  test "page_template is the stored name when declared, the first template otherwise, never nil" do
+    @page = Page.new(title: "Shown", template: "landing")
+    assert_equal "landing", page_template
+
+    @page = Page.new(title: "Shown")
+    assert_equal "standard", page_template, "no stored name is the theme's first template"
+
+    @page = Page.new(title: "Shown").tap { |page| page.settings = { "template" => "gallery" } }
+    assert_equal "standard", page_template, "a name the theme does not declare is drawn by the first"
+
+    with_page_templates("gallery", "landing") do
+      assert_equal "gallery", page_template
+      @page = Page.new(title: "Shown", template: "landing")
+      assert_equal "landing", page_template
+      @page = Page.new(title: "Shown")
+      assert_equal "gallery", page_template
+    end
+
+    with_page_templates do
+      assert_equal "standard", page_template, "a theme that declares none is drawn by the default's first"
+    end
+
+    @page = nil
+    assert_equal "standard", page_template
+    assert_includes Theme::Contract::HELPERS, "page_template"
   end
 end

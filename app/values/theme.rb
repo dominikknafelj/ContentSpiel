@@ -202,6 +202,18 @@ class Theme
 
   def choice(list, name) = choices(list).find { |entry| entry.name == name.to_s }
 
+  # The page template to draw for a page that stores `stored` (a name or nil):
+  # that name while the theme declares it, otherwise the theme's first
+  # template, and the default theme's first for a theme that declares none.
+  # Always a declared name with a file to draw, never nil and never the
+  # unknown one: a name the theme does not know is drawn as the default and
+  # nothing stored changes.
+  def page_template(stored)
+    templates = choices(:page_templates)
+    templates = Declarations.default.fetch("page_templates") if templates.empty?
+    (templates.find { |entry| entry.name == stored } || templates.first).name
+  end
+
   # The declared icon `name` as the public site draws it: the file inlined
   # (`Theme::IconFile.inline`), safe markup, or nil for a blank name, a name
   # the theme does not declare and a file that does not pass the fence. Read

@@ -54,10 +54,12 @@ module Pages
     # Everything `attributes:` may carry. `parent` (a `Page`, never
     # `parent_id`) places a NEW page and is dropped on an update (see
     # `#assign`); `published`/`published_at` are the publish state
-    # (`#assign_publishing`); the hero goes through `Media::Choosing`. A new
+    # (`#assign_publishing`); the hero goes through `Media::Choosing`;
+    # `template` is a template's name or nil, written into the page's
+    # `settings` by `Page#template=` and checked there. A new
     # page's rank among its siblings is not on the list: it joins at the
     # end, and `Pages::Move` puts it anywhere else.
-    ATTRIBUTES = %i[parent page_type hero_media_asset_id published published_at].freeze
+    ATTRIBUTES = %i[parent template hero_media_asset_id published published_at].freeze
     # The attributes a publish-only call may carry (`#publish_only?`).
     PUBLISH_STATE = %i[published published_at].freeze
 

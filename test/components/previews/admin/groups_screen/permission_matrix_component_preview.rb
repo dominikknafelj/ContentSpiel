@@ -13,7 +13,7 @@ module Admin
       # An author-like group: own blog posts, one page branch, a mixed row open.
       def scoped
         about = PreviewFixtures.page(title: "About")
-        about.children.create!(page_type: :standard, title: "Team #{SecureRandom.hex(4)}", published_at: Time.current)
+        about.children.create!(title: "Team #{SecureRandom.hex(4)}", published_at: Time.current)
         render Admin::GroupsScreen::PermissionMatrixComponent.new(grants: [
           { permission: "posts.read", scope: {} },
           { permission: "posts.edit", scope: { "content_types" => [ "blog", "now_update" ], "own" => true } },

@@ -48,7 +48,7 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
   end
 
   test "changed fields and changed text go back, in every language, and the mark is gone" do
-    assert Pages::Save.call(@page, attributes: { page_type: "landing" }, translations: { "en" => { title: "Typed", subtitle: "" }, "de" => { title: "Getippt" }, "es" => { title: "Nuevo" } }).ok?
+    assert Pages::Save.call(@page, attributes: { template: "landing" }, translations: { "en" => { title: "Typed", subtitle: "" }, "de" => { title: "Getippt" }, "es" => { title: "Nuevo" } }).ok?
     assert ContentBlocks::Save.call(@first, translations: { "en" => { body: rich_doc("Typed") }, "de" => { body: rich_doc("Getippt") } }).ok?
 
     discard
@@ -153,6 +153,61 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal @published, shape
     assert_not ContentBlock.exists?(fresh.id)
     assert_equal [ "services" ], ContentBlock.where(owner: @page).containers.map { |block| block.settings["anchor"] }
+  end
+
+  test "discard writes the template back from the copy" do
+    assert Pages::Save.call(@page, attributes: { template: "landing" }).ok?
+    publish_changes(@page)
+    @published = shape
+    assert Pages::Save.call(@page, attributes: { template: "standard" }).ok?
+
+    discard
+
+    assert_equal "landing", @page.reload.template
+    assert_equal @published, shape
+
+    assert Pages::Save.call(@page, attributes: { template: nil }).ok?
+    assert_equal({}, @page.reload.settings)
+    discard
+    assert_equal({ "template" => "landing" }, @page.reload.settings)
+  end
+
+  # Review Focus 3: the copy's name is carried, not chosen. A theme that
+  # dropped it must not make the discard fail and roll back.
+  test "discard writes back a template the theme no longer declares" do
+    with_page_templates("standard", "gallery") do
+      assert Pages::Save.call(@page, attributes: { template: "gallery" }).ok?
+      publish_changes(@page)
+    end
+    @published = shape
+    assert Pages::Save.call(@page, attributes: { template: "landing" }).ok?
+
+    discard
+
+    assert_equal "gallery", @page.reload.template
+    assert_equal @published, shape
+    assert_not @page.tap { |page| page.template = "other" }.valid?, "the carried name is the discard's alone"
+  end
+
+  # The same rule for a block: a section's published style the theme no
+  # longer declares is written back, onto a section that stayed and onto one
+  # that is made again.
+  test "discard writes back a section style the theme no longer declares, onto a section that stayed and one made again" do
+    gone = add(nil, block_type: "section", settings: { "layout" => "one" })
+    with_choices_theme do
+      assert ContentBlocks::Save.call(@section.reload, attributes: { settings: { "style" => "services" } }).ok?
+      assert ContentBlocks::Save.call(gone.reload, attributes: { settings: { "style" => "contact" } }).ok?
+      publish_changes(@page)
+    end
+    @published = shape
+    assert ContentBlocks::Save.call(@section.reload, attributes: { settings: { "style" => nil } }).ok?
+    assert ContentBlocks::Destroy.call(gone.reload).ok?
+
+    discard
+
+    assert_equal @published, shape
+    assert_equal "services", @section.reload.settings["style"]
+    assert_equal %w[contact services], ContentBlock.where(owner: @page).containers.map { |block| block.settings["style"] }.sort
   end
 
   test "a section deleted with its blocks comes back with new blocks inside" do
@@ -525,12 +580,12 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert Translations::Confirm.call(@page.reload, field: "title", locale: "de").ok?
     confirmed = @page.reload.translation_sources
     assert_not_equal Publishing.current(@page).snapshot.dig("fields", "translation_sources"), confirmed, "the confirmation is newer than the copy"
-    assert Pages::Save.call(@page, attributes: { page_type: "landing" }).ok?
+    assert Pages::Save.call(@page, attributes: { template: "landing" }).ok?
 
     discard
 
     assert_equal confirmed, @page.reload.translation_sources
-    assert_equal "standard", @page.page_type
+    assert_nil @page.template
   end
 
   test "where the original's text goes back, the services mark it as for any edit: the time is theirs, not the copy's" do

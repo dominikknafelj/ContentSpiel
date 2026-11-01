@@ -39,7 +39,7 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
   # `bin/rails test`'s forked parallel workers. ActiveRecord instrumentation
   # is a separate gem/code path and unaffected; this is what proves that.
   test "a database query within a request produces its own span" do
-    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "Home", slug: "", published_at: Time.current)
     @exporter.reset
 
     get "/"
@@ -59,7 +59,7 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
   # query with no request and no job around it, on the test's thread and on
   # a thread of its own.
   test "a request is recorded with its database spans, in one trace under the request's server span" do
-    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "Home", slug: "", published_at: Time.current)
     @exporter.reset
 
     get "/"

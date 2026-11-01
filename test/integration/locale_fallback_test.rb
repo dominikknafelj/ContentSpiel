@@ -13,12 +13,12 @@ require "test_helper"
 class LocaleFallbackTest < ActionDispatch::IntegrationTest
   setup do
     SiteSetting.instance.update!(title: "Dana's Notes", default_locale: "de")
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
   end
 
   test "a page titled only in the site's default locale renders that title in <title>, <h1> and the nav link" do
     kontakt = Mobility.with_locale(:de) do
-      Page.create!(page_type: :standard, title: "Kontaktprobe", parent: @root, published_at: Time.current)
+      Page.create!(title: "Kontaktprobe", parent: @root, published_at: Time.current)
     end
     # en/es slugs come from LocalizedSlug's fallback, not an
     # editor typing one -- confirms the page really is reachable at /en/...
@@ -34,7 +34,7 @@ class LocaleFallbackTest < ActionDispatch::IntegrationTest
 
   test "a post titled only in the site's default locale shows that title in an /en/... listing" do
     blog = Mobility.with_locale(:de) do
-      Page.create!(page_type: :standard, title: "Blog", parent: @root, published_at: Time.current)
+      Page.create!(title: "Blog", parent: @root, published_at: Time.current)
     end
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     Mobility.with_locale(:de) do
@@ -49,7 +49,7 @@ class LocaleFallbackTest < ActionDispatch::IntegrationTest
   end
 
   test "an existing English title wins over the German one" do
-    both = Page.create!(page_type: :standard, title_en: "Contact", title_de: "Kontakt", parent: @root,
+    both = Page.create!(title_en: "Contact", title_de: "Kontakt", parent: @root,
       published_at: Time.current, slug_en: "contact")
 
     get "/en/contact"
@@ -64,7 +64,7 @@ class LocaleFallbackTest < ActionDispatch::IntegrationTest
   # applied to a rich text block's body before this task.
   test "a German-only rich text block renders its body on the English page" do
     seite = Mobility.with_locale(:de) do
-      page = Page.create!(page_type: :standard, title: "Kontaktseite", parent: @root, published_at: Time.current)
+      page = Page.create!(title: "Kontaktseite", parent: @root, published_at: Time.current)
       page.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("German body"))
       page
     end

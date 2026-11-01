@@ -62,6 +62,14 @@ module ThemeTestHelper
 
   def with_section_grid_theme(&block) = Theme.with(section_grid_theme, &block)
 
+  # The default theme with its page templates replaced by `names` (no fields,
+  # no files), for the length of a block: a theme that dropped a template a
+  # page stores, or one that offers another. Every other list is the default's.
+  def with_page_templates(*names, &block)
+    templates = names.map { |name| Theme::Choice.new(list: "page_templates", name: name, labels: { "en" => name.humanize }, fields: [], file: nil, from: :theme) }
+    Theme.with(Theme.new(declarations: Theme::Declarations.default.merge("page_templates" => templates)), &block)
+  end
+
   # A copy of the second theme in a directory of its own, for a test that
   # adds, changes or removes a file. Yields the directory as a Pathname.
   def with_theme_copy

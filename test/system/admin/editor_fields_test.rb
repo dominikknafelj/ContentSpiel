@@ -62,7 +62,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
   test "Reset empties an overridden hero alt, shows the library alt as the placeholder and saves the cleared value" do
     asset = create_media_asset
     asset.update!(alt: "A dog on a beach")
-    landing = Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true, hero_media_asset_id: asset.id },
+    landing = Pages::Save.call(attributes: { parent: root_page, template: "landing", published: true, hero_media_asset_id: asset.id },
       translations: { Locales.default => { title: "Landing", hero_alt: "My own alt" } }).record
 
     visit "/cs-studio/pages/#{landing.id}"

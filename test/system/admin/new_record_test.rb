@@ -73,7 +73,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     fill_in "new-page-title", with: "Fixed"
     click_button "Create page"
     assert_selector "header.admin-editor-header", wait: 10
-    assert Page.order(:id).last.landing?
+    assert_equal "landing", Page.order(:id).last.template
   end
 
   test "a title typed in the editor and still waiting to save is saved before the new page opens" do

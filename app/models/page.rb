@@ -135,11 +135,40 @@ class Page < ApplicationRecord
   scope :trash_roots, -> { where(arel_table[:trash_root_id].eq(arel_table[:id])) }
   scope :trash_branch_members, -> { where.not(trash_root_id: nil).where(arel_table[:trash_root_id].not_eq(arel_table[:id])) }
 
-  # `validate: true`: an unknown value (a forged `page[page_type]`) is an
-  # ordinary "is not included in the list" validation failure on the field,
-  # for every caller of `Pages::Save`, instead of the `ArgumentError` a plain
-  # enum raises on assignment (a 500 from a request).
-  enum :page_type, { standard: 0, landing: 1 }, validate: true
+  # THE PAGE'S SETTINGS: what the theme draws the page with, a jsonb hash of
+  # names (decision 11, "pages have no extensible fields": a column that can
+  # take more keys, not one column per choice). Today it holds one key,
+  # `template`, the name of the page template the theme declares
+  # (`Theme#choices(:page_templates)`); `{}` is the theme's first template.
+  # A closed set of keys: anything else is refused, so a forged key never
+  # reaches a copy. It is content, in the published copy
+  # (`Publishing::CONTENT`), and a change of it moves the settings form's
+  # base (`settings_changed_at`, below: `settings` is not in
+  # `SETTINGS_BASE_IGNORES`).
+  SETTINGS_KEYS = %w[template].freeze
+
+  # Settings carried from another record or from a copy (a discard writing
+  # back what was published), whose names count as stored: a template the
+  # page was never saved with, which the theme may no longer declare, is the
+  # copy's to restore (the stored-name rule, as `ContentBlock#carried_settings`).
+  # Not stored.
+  attr_accessor :carried_settings
+
+  validate :settings_are_known
+
+  # The stored template's name, or nil for none (the theme's first). Never
+  # raises, whatever shape a write around the model left in the column.
+  def template
+    value = settings_hash["template"]
+    value.is_a?(String) ? value.presence : value
+  end
+
+  # A blank name removes the key, so "no template" is `{}` and never
+  # `{"template" => ""}`. Surrounding white space is no part of a name.
+  def template=(name)
+    name = name.strip if name.is_a?(String)
+    self.settings = name.blank? ? settings_hash.except("template") : settings_hash.merge("template" => name)
+  end
 
   # "Titled" means *some* locale has a title, not "the locale that happens to
   # be ambient when this record is saved" -- a page may legitimately exist in
@@ -291,6 +320,24 @@ class Page < ApplicationRecord
 
       errors.add(accessor, "is reserved for the admin")
     end
+  end
+
+  def settings_hash = settings.is_a?(Hash) ? settings : {}
+
+  # The keys are `SETTINGS_KEYS`, and the template is blank, a name the theme
+  # declares now, the one already stored (a theme that drops a template must
+  # not make every page that has it unsaveable) or the one carried. Only a NEW
+  # unknown name is refused.
+  def settings_are_known
+    return errors.add(:settings, :invalid) unless settings.is_a?(Hash) && (settings.keys - SETTINGS_KEYS).empty?
+
+    name = template
+    return if name.nil?
+    return if persisted? && settings_in_database.is_a?(Hash) && settings_in_database["template"] == name
+    return if carried_settings.to_h["template"] == name
+    return if ContentModel.theme_choices.call(:page_templates).any? { |entry| entry.name == name }
+
+    errors.add(:template, :inclusion)
   end
 
   # Raw jsonb hash, not the Mobility reader: see the comment above

@@ -82,7 +82,7 @@ class PublicReadersTest < ActiveSupport::TestCase
   # Files that name the components the public draws without a template doing so.
   REGISTRIES = %w[app/models/block_types app/models/content_types config/initializers/rich_text.rb].freeze
 
-  CLASSES = /\b(?:Page|Post|ContentBlock|Tag|PostTag)\.(?!polymorphic_name|name\b|model_name|human|table_name|column_names|columns|statuses|page_types)\w+/
+  CLASSES = /\b(?:Page|Post|ContentBlock|Tag|PostTag)\.(?!polymorphic_name|name\b|model_name|human|table_name|column_names|columns|statuses)\w+/
   WALKS = /\.(?:owner|parent|ancestors|self_and_ancestors|self_and_descendants|siblings|descendants|children|record|posts|listed_posts|canonical_pages?|title_matching\w*)\b|\.content_blocks\.(?!to_a\b)\w+|\bcanonical_pages?\(/
   ROWS = Regexp.union(CLASSES, WALKS)
   MARK = /public:\s*rows\s*\((?<reason>[^)]*)\)/

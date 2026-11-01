@@ -75,6 +75,30 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     assert_equal WITHDRAWERS.keys.sort, callers_of("withdraw_pending!").sort
   end
 
+  # The guards above read `app` and `lib`. A migration writes copies too, and
+  # each that does is named here with what it writes: a copy is otherwise
+  # never updated (only `take!`, `repoint_tag!`, `settle!` and
+  # `withdraw_pending!` write one), so a migration that rewrites a copy's
+  # content is a decision somebody made, not a backfill to slip in.
+  COPY_MIGRATIONS = {
+    "20261011120000_create_published_versions" => "takes the first copy of every published and scheduled record, by logic frozen in the file",
+    "20261011122000_add_settled_at_to_published_versions" => "marks the copies already shown as settled: bookkeeping, nothing a copy shows",
+    "20261101100000_replace_page_type_with_page_settings" =>
+      "rewrites every page copy's page_type as its settings (current, pending and superseded): the one rewrite of a copy's content besides repoint_tag!"
+  }.freeze
+  COPY_WRITES = /\b(?:UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+published_versions\b|\bMigrationVersion\b[^\n]*#{WRITES}|\bMigrationVersion\.create!?\(/i
+
+  test "a migration writes published_versions only where it is named: the first copies, their settling and the page settings rewrite" do
+    writing = Rails.root.glob("db/migrate/*.rb").select do |file|
+      file.read.lines.any? { |line| !line.strip.start_with?("#") && line.match?(COPY_WRITES) }
+    end.map { |file| file.basename(".rb").to_s }
+
+    assert_equal COPY_MIGRATIONS.keys.sort, writing.sort, "a migration that writes published copies: name it in COPY_MIGRATIONS with what it writes"
+    assert_match COPY_WRITES, "      UPDATE published_versions"
+    assert_match COPY_WRITES, "    MigrationVersion.create!(record_type: type)"
+    assert_no_match COPY_WRITES, "    add_index :published_versions, :live_at"
+  end
+
   # "A live record has a copy" is not enforced by the database or by a
   # callback: a record written around the services is served, listed and
   # given its address from its ROWS (`Publishing.published_all`,

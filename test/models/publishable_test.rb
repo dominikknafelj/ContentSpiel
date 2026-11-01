@@ -18,7 +18,7 @@ class PublishableTest < ActiveSupport::TestCase
   end
 
   test "listed_posts includes unpublished posts only when asked" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
     block = root.content_blocks.create!(block_type: :post_list, position: 0)
     scheduled = Post.create!(content_type: :blog, title: "Soon", published_at: 1.day.from_now)
 

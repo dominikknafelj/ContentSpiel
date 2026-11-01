@@ -64,7 +64,7 @@ module Admin
       def field_html_name(field) = "page[#{field}]"
 
       # The one non-`Admin::Columns::*` field this form renders by hand
-      # (`page_type`'s `<select>`) still needs an error slot id that agrees
+      # (the template's `<select>`) still needs an error slot id that agrees
       # with `Admin::AutosaveResponses`, so it goes through the exact same
       # formula every other field's id already matches.
       def errors_id(field) = Admin::Ui::FieldComponent.error_id(ID_PREFIX, field)
@@ -125,9 +125,24 @@ module Admin
 
       def translation_tab? = locale.to_s != ::Locales.default
 
-      def page_type_options = Page.page_types.keys.map { |key| [ key.humanize, key ] }
+      # The theme's page templates, by their labels in the interface's
+      # language, and first, by its name, a stored one the theme does not
+      # declare: the form sends the select with every save, and a name that
+      # were not offered would be replaced without anyone choosing to.
+      def template_options
+        declared = ::Theme.current.choices(:page_templates).map { |entry| [ entry.label_for(I18n.locale), entry.name ] }
+        stored = page.template
+        stored.nil? || declared.any? { |_, name| name == stored } ? declared : [ [ stored, stored ], *declared ]
+      end
 
-      def landing? = page.landing?
+      # The template selected: the stored one, else the theme's first. On the
+      # site the page is drawn with `Theme#page_template`.
+      def template = page.template || ::Theme.current.page_template(nil)
+
+      def template_label = ::Theme.current.choice(:page_templates, template)&.label_for(I18n.locale) || template
+
+      # The hero fields are offered for a template that draws the hero.
+      def hero? = Array(::Theme.current.choice(:page_templates, template)&.fields).include?("hero")
 
       # A page the user can read but not edit (access-control design spec §5,
       # `can_edit?`: `pages.edit`, plus `pages.publish` once published): every

@@ -144,7 +144,7 @@ class Theme
     # What a page or layout template may call. `public_urls.preview?` is the
     # one question a template may ask of `public_urls`.
     HELPERS = %w[
-      theme_site translated rich_text render_block block_outline published_views navigation_pages
+      theme_site translated rich_text render_block block_outline published_views navigation_pages page_template
       language_links safe_social_links home_url_path page_url_path post_url_path post_date resume_period
       page_found? page_ancestors page_section page_tree pages_in_reading_order neighbouring_pages with_heading_ids site_string
     ].freeze

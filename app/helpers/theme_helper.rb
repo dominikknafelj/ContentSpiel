@@ -107,8 +107,24 @@ module ThemeHelper
   # as published (`Publishing.published_all`, one statement per record type).
   # The preview shows the rows. The CALLER narrows first, on the rows
   # (`kept.published`): whether a record is shown at all is not in a copy.
+  #
+  # Their addresses in the language shown are read here too, in one statement
+  # (`PublicSite::Urls#prefetch`): a list of pages is drawn as links, and
+  # `page_url_path` of each would otherwise read its own.
   def published_views(records)
-    public_urls.preview? ? records.to_a : Publishing.published_all(records)
+    views = public_urls.preview? ? records.to_a : Publishing.published_all(records)
+    public_urls.prefetch(views)
+    views
+  end
+
+  # The name of the page template `pages/show` draws the shown page with
+  # (`views/pages/templates/_<name>.html.erb`): the page's stored template
+  # while the theme declares it, the theme's first otherwise (`Theme#page_template`).
+  # Read from the page the controller resolved, which on the site is rebuilt
+  # from its copy, so a template changed and not published is not drawn.
+  # Never nil, also with no page.
+  def page_template
+    Theme.current.page_template(@page&.template)
   end
 
   # Memoised for the render: a theme may draw the menu more than once (a

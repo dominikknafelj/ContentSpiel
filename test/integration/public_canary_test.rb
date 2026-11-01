@@ -58,7 +58,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
   end
 
   def live_page(title, parent: root_page, type: "standard")
-    page = Pages::Save.call(attributes: { parent: parent, published: false, page_type: type },
+    page = Pages::Save.call(attributes: { parent: parent, published: false, template: type },
       translations: LOCALES.index_with { |locale| { title: "#{title} #{locale}", subtitle: "Sub #{title} #{locale}", meta_description: "Meta #{title} #{locale}", hero_alt: "Hero #{title}" } }).record
     yield page if block_given?
     assert Pages::Save.call(page, attributes: { published: true }).ok?
@@ -170,7 +170,8 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     column = record.class.columns_hash.fetch(name)
     current = record.read_attribute_before_type_cast(name)
     return nil if name == "updated_at"
-    return (record.read_attribute(name).to_i.zero? ? 1 : 0) if name == "page_type"
+    # The other template: a landing page's rows say Standard and a standard page's Landing.
+    return { "template" => record.template == "landing" ? "standard" : "landing" } if record.is_a?(Page) && name == "settings"
     return @decoy.id if name.end_with?("media_asset_id") && record.read_attribute(name)
     return nil if name.end_with?("_id")
     return LOCALES.index_with { rich_doc(CANARY) } if name == "body"

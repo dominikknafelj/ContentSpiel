@@ -44,12 +44,14 @@ module Admin
 
       # `errors` is an `ActiveModel::Errors`, a hash or an array of sentences
       # (`Admin::Ui::ErrorSummaryComponent` takes all three).
-      def initialize(url_options: {}, locale: ::Locales.default, parent_id: nil, title: nil, page_type: nil, errors: nil)
+      def initialize(url_options: {}, locale: ::Locales.default, parent_id: nil, title: nil, template: nil, errors: nil)
         @url_options = url_options
         @locale = locale.to_s
         @requested_parent_id = parent_id.presence&.to_i
         @title = title.to_s
-        @page_type = Page.page_types.key?(page_type.to_s) ? page_type.to_s : "standard"
+        # A name the theme does not declare (a forged one, sent back with the
+        # refusal) is shown as the theme's first.
+        @template = ::Theme.current.page_template(template.to_s)
         @errors = errors
       end
 
@@ -97,9 +99,10 @@ module Admin
         @selected_choice ||= choices.find { |choice| choice.id == requested_parent_id } || choices.first
       end
 
-      def page_type_options = Page.page_types.keys.map { |key| [ key.humanize, key ] }
+      # The theme's page templates, by their labels in the interface's language.
+      def template_options = ::Theme.current.choices(:page_templates).map { |entry| [ entry.label_for(I18n.locale), entry.name ] }
 
-      attr_reader :title, :page_type, :locale
+      attr_reader :title, :template, :locale
 
       def title_value = title
 
@@ -117,7 +120,7 @@ module Admin
         @error_summary ||= normalise(errors)
       end
 
-      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "parent" => INSIDE_ID, "page_type" => TYPE_ID }
+      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "parent" => INSIDE_ID, "template" => TYPE_ID }
 
       def inside_invalid? = error_summary.is_a?(Hash) && error_summary.key?("parent")
 

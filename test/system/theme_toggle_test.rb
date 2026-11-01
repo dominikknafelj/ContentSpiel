@@ -29,7 +29,7 @@ class ThemeToggleTest < ApplicationSystemTestCase
   test "the public site's toggle flips the theme and survives a reload" do
     # Must not be sent through Setup::RedirectConstraint's /setup redirect.
     site_settings(:default).update!(setup_completed_at: Time.current)
-    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "Home", slug: "", published_at: Time.current)
     visit "/"
     initial = current_theme
     other = initial == "dark" ? "light" : "dark"
