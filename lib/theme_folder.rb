@@ -305,6 +305,31 @@ class ThemeFolder
   # a folder). No stamp is no build.
   def built?(root) = self.class.stamp(root) == fingerprint
 
+  # Whether the public stylesheet in `root` is older than the theme that
+  # draws the site, for the development notice (`PublicPageRendering`).
+  # A CONFIGURED theme is stale when it is not built (the stamp is its
+  # fingerprint, which digests every file). THE DEFAULT THEME'S FINGERPRINT
+  # IS A CONSTANT, so `built?` cannot see a change to it: its styles are the
+  # CMS's own `app/assets/tailwind/themes/default/`, and a change there is
+  # seen by time, the newest file under it against the built stylesheet's.
+  # A stylesheet that is not there is stale. The answer is kept for
+  # `STALE_FOR` seconds (monotonic clock) per root: a page asks on every
+  # request and the configured theme's fingerprint reads every file.
+  STALE_FOR = 2
+  DEFAULT_STYLES = "app/assets/tailwind/themes/default".freeze
+  BUILT_STYLESHEET = "app/assets/builds/theme.css".freeze
+
+  def stylesheet_stale?(root)
+    now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    @stale ||= {}
+    asked, answer = @stale[root.to_s]
+    return answer if asked && now - asked < STALE_FOR
+
+    answer = configured? ? !built?(root) : default_styles_newer?(root)
+    @stale[root.to_s] = [ now, answer ]
+    answer
+  end
+
   # How the theme's Stimulus controllers are pinned (`config/importmap.rb`):
   # every file under javascript/controllers as `controllers/theme/<name>`,
   # so `copy_controller.js` is the identifier `theme--copy` and cannot be
@@ -317,6 +342,14 @@ class ThemeFolder
   end
 
   private
+
+  def default_styles_newer?(root)
+    built = File.join(root.to_s, BUILT_STYLESHEET)
+    return true unless File.file?(built)
+
+    built_at = File.mtime(built)
+    Dir.glob(File.join(root.to_s, DEFAULT_STYLES, "**", "*")).any? { |f| File.file?(f) && File.mtime(f) > built_at }
+  end
 
   def existing_file(relative)
     return nil unless configured?

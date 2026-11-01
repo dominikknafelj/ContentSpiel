@@ -1,0 +1,7 @@
+<%# Development only (`PublicPageRendering#note_stale_stylesheet`): the theme
+    changed after the public stylesheet was built. The CMS's own notice,
+    outside the theme's frame, and no theme replaces it. In the flow, not
+    fixed, so it moves nothing it does not have to. %>
+<p role="status" class="border-b border-line bg-sunken px-4 py-2 text-center text-sm text-ink" data-stale-stylesheet>
+  The public stylesheet is older than the theme. Run <code>bin/rails tailwindcss:build</code> to see the change.
+</p>

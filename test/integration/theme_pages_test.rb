@@ -1418,4 +1418,50 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   ensure
     Rails.application.reloader.prepare!
   end
+
+  def stale_folder(answer)
+    ThemeFolder.new(nil).tap { |folder| folder.define_singleton_method(:stylesheet_stale?) { |_root| answer } }
+  end
+
+  def in_environment(name, &block)
+    with_singleton_override(Rails, :env, -> { ActiveSupport::EnvironmentInquirer.new(name) }, &block)
+  end
+
+  test "in development a theme changed since its stylesheet was built says so on the public page, naming the rebuild command, and the page still draws" do
+    in_environment("development") do
+      folder = stale_folder(true)
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        get "/about"
+
+        assert_response :success
+        assert_select "[data-stale-stylesheet]", text: /bin\/rails tailwindcss:build/
+        assert_select "head link[rel=stylesheet]"
+      end
+    end
+  end
+
+  test "a freshly built stylesheet says nothing" do
+    in_environment("development") do
+      folder = stale_folder(false)
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        get "/about"
+
+        assert_response :success
+        assert_select "[data-stale-stylesheet]", count: 0
+      end
+    end
+  end
+
+  test "production and test never say it, whatever the stylesheet is" do
+    folder = stale_folder(true)
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+      get "/about"
+      assert_select "[data-stale-stylesheet]", count: 0
+
+      in_environment("production") do
+        get "/about"
+        assert_select "[data-stale-stylesheet]", count: 0
+      end
+    end
+  end
 end

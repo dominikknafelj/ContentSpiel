@@ -47,6 +47,17 @@ module PublicPageRendering
     # `test/values/theme/check_test.rb` for each name).
     before_action :look_in_the_theme_first
 
+    # DEVELOPMENT ONLY: a theme (or the default theme's styles) changed
+    # after the public stylesheet was last built is said on the page, which
+    # is still drawn: the stylesheet is not rebuilt by a request, so a
+    # change to a theme's CSS shows nothing until `bin/rails
+    # tailwindcss:build`, and nothing said why. The notice is the layout's
+    # (`layouts/public/_stale_stylesheet`, outside the theme's frame, as the
+    # preview bar is), so no theme replaces it. Production refuses to start
+    # under a stylesheet built for another theme, and the test environment
+    # builds nothing: neither says it.
+    before_action :note_stale_stylesheet
+
     # A request's budget for colouring Code blocks that are in no cache
     # (`CodeHighlight.start_request`: a page of blocks that each run to the
     # lexer's deadline must not hold a thread for all of them), and what
@@ -167,6 +178,10 @@ module PublicPageRendering
 
     views = Theme.current.views_directory
     prepend_view_path(views) if views
+  end
+
+  def note_stale_stylesheet
+    @stale_stylesheet = Rails.env.development? && ThemeFolder.current.stylesheet_stale?(Rails.root)
   end
 
   def render_in_requested_locale(&block)

@@ -119,6 +119,7 @@
       rule of its own, which comes later in the one stylesheet. %>
   <body class="min-h-screen overflow-x-clip bg-paper font-cs text-ink scheme-light dark:scheme-dark<%= " pt-9" if @preview_record %>">
     <%= render "layouts/public/preview_banner" if @preview_record %>
+    <%= render "layouts/public/stale_stylesheet" if @stale_stylesheet %>
     <%= render layout: "layouts/public/frame" do %><%= yield %><% end %>
   </body>
 </html>

@@ -391,4 +391,46 @@ class ThemeFolderTest < ActiveSupport::TestCase
       assert_not_equal before, ThemeFolder.new(dir).fingerprint
     end
   end
+
+  # A root of its own: the stamp and the stylesheet are the working tree's
+  # and a test must not write them (two tests read them).
+  def with_built_root
+    Dir.mktmpdir("root") do |root|
+      FileUtils.mkdir_p(File.join(root, "app/assets/builds"))
+      FileUtils.mkdir_p(File.join(root, ThemeFolder::DEFAULT_STYLES))
+      yield Pathname(root)
+    end
+  end
+
+  test "the default theme's changed stylesheet file says so, and a freshly built stylesheet says nothing" do
+    with_built_root do |root|
+      source = root.join(ThemeFolder::DEFAULT_STYLES, "tokens.css")
+      built = root.join(ThemeFolder::BUILT_STYLESHEET)
+      source.write("a")
+      built.write("b")
+      source.utime(Time.now - 60, Time.now - 60)
+
+      assert_not ThemeFolder.new(nil).stylesheet_stale?(root), "built after the newest source"
+
+      source.utime(Time.now + 60, Time.now + 60)
+      assert ThemeFolder.new(nil).stylesheet_stale?(root), "a source newer than the build"
+
+      built.delete
+      assert ThemeFolder.new(nil).stylesheet_stale?(root), "no stylesheet is a stale one"
+    end
+  end
+
+  test "a configured theme is stale when its stamp is not its fingerprint, and the answer is kept for two seconds" do
+    with_built_root do |root|
+      folder = ThemeFolder.new(PLAIN)
+      assert folder.stylesheet_stale?(root), "no stamp"
+
+      ThemeCss.stamp!(folder, root: root)
+      assert folder.stylesheet_stale?(root), "kept: the answer of a moment ago"
+      assert_not ThemeFolder.new(PLAIN).stylesheet_stale?(root), "a fresh question is answered afresh"
+
+      ThemeCss.stamp!(folder, root: root, fingerprint: "another")
+      assert ThemeFolder.new(PLAIN).stylesheet_stale?(root)
+    end
+  end
 end
