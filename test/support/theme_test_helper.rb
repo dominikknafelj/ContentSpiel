@@ -42,9 +42,10 @@ module ThemeTestHelper
 
   def with_table_theme(&block) = Theme.with(table_theme, &block)
 
-  # A sixth theme, of one file (`test/fixtures/themes/choices`): a theme.yml
-  # declaring two section styles (the second labelled in en and de), the two
-  # page templates, and no icons.
+  # A sixth theme (`test/fixtures/themes/choices`): a theme.yml declaring two
+  # section styles (the second labelled in en and de), the two page
+  # templates, and one icon of its own (`brush`, labelled Design, a 24-unit
+  # outline in currentColor under assets/images/icons).
   CHOICES = Rails.root.join("test/fixtures/themes/choices")
 
   def choices_theme = Theme.load(ThemeFolder.new(CHOICES))

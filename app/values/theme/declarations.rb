@@ -34,7 +34,9 @@ class Theme
 
     # [lists, problems]. `file` is how the problems name the source. `against`
     # is the default's lists, which an icon may name to take its file.
-    def read(source, file: FILE, against: nil)
+    # `folder` is the theme whose icon files are checked (`Theme::IconFile`);
+    # without one only the file's own text is read.
+    def read(source, file: FILE, against: nil, folder: nil)
       against ||= default
       problems = []
       data = load_yaml(source, file, problems)
@@ -56,18 +58,21 @@ class Theme
           problems << "#{file}: `settings` is not available. Appearance settings are not built yet. Remove it from #{file}."
           next
         end
-        lists[key] = entries_of(key, entries, file, against, problems)
+        lists[key] = entries_of(key, entries, file, against, folder, problems)
       end
       [ lists, problems ]
     end
 
     # The default theme's lists, read once per process from its file. A
-    # problem in it is the CMS's own fault and stops the boot.
+    # problem in it is the CMS's own fault and stops the boot. Its icons are
+    # `from: :default`, so a theme that inherits the list draws their files
+    # from the CMS's images and not from its own folder.
     def default
       @default ||= begin
         lists, problems = read(Rails.root.join(DEFAULT_FILE).read, file: DEFAULT_FILE, against: {})
         raise ArgumentError, "#{DEFAULT_FILE} is not sound: #{problems.join(" ")}" if problems.any?
 
+        lists["icons"] = lists.fetch("icons", []).map { |icon| icon.with(from: :default) }
         Contract::CHOICE_LISTS.index_with { |list| lists.fetch(list, []) }.freeze
       end
     end
@@ -83,7 +88,7 @@ class Theme
 
     def problems(folder)
       source = source_of(folder)
-      source ? read(source).last : []
+      source ? read(source, folder: folder).last : []
     end
 
     def source_of(folder)
@@ -151,7 +156,7 @@ class Theme
       problems.any?
     end
 
-    def entries_of(list, entries, file, against, problems)
+    def entries_of(list, entries, file, against, folder, problems)
       unless entries.is_a?(Array)
         problems << "#{file}: #{list} must be a list of entries, not #{kind(entries)}. Write each entry as `- name: …` with a `label:`, " \
                     "or `#{list}: []` for none."
@@ -160,13 +165,13 @@ class Theme
 
       seen = Set.new
       entries.each_with_index.filter_map do |entry, index|
-        choice = entry_of(list, entry, index, file, against, seen, problems)
+        choice = entry_of(list, entry, index, file, against, folder, seen, problems)
         seen.add(choice.name) if choice
         choice
       end
     end
 
-    def entry_of(list, entry, index, file, against, seen, problems)
+    def entry_of(list, entry, index, file, against, folder, seen, problems)
       where = "#{file}: #{list}, entry #{index + 1}"
       unless entry.is_a?(Hash)
         problems << "#{where} must be a mapping with a `name` and a `label`, not #{kind(entry)}. Write it as `- name: …`."
@@ -196,6 +201,7 @@ class Theme
       labels = labels_of(entry["label"], where, problems)
       fields = fields_of(list, entry["fields"], entry.key?("fields"), where, problems)
       file_name, from = file_of(list, entry, name, against, where, problems)
+      icon_file(folder, file_name, where, problems) if folder && from == :theme && file_name && problems.size == before
 
       return nil if problems.size > before
 
@@ -253,6 +259,37 @@ class Theme
 
       problems << "#{where}: `file` must be a text, the SVG's path under assets/images, not #{kind(file)}. Correct it."
       [ nil, :theme ]
+    end
+
+    # A theme's icon file: a path under its assets/images (where Propshaft
+    # serves it from, and the check of every image already looks), with no
+    # part that starts with a dot (a dot file is outside the folder's files
+    # and its fingerprint), an SVG, there, inside the folder once links are
+    # followed, and through the fence (`Theme::IconFile`).
+    def icon_file(folder, file, where, problems)
+      parts = file.split("/")
+      if file.start_with?("/") || file.include?("\\") || parts.any? { |part| part.empty? || part.start_with?(".") }
+        problems << "#{where}: `file` must be a path under assets/images (icons/brush.svg), with no part that starts with a dot, " \
+                    "not #{file.inspect}. Correct it."
+        return
+      end
+      unless File.extname(file).casecmp?(".svg")
+        problems << "#{where}: `file` must name an SVG (a file ending in .svg), not #{file.inspect}. Draw the icon as an SVG."
+        return
+      end
+
+      images = folder.path.join("assets/images")
+      path = images.join(file)
+      unless path.file?
+        problems << "#{where}: assets/images/#{file} is not there. Add the file, or correct the path."
+        return
+      end
+      unless File.realpath(path).start_with?("#{File.realpath(images)}/")
+        problems << "#{where}: `file` must be a path under assets/images, and assets/images/#{file} leads outside it. Put the file itself there."
+        return
+      end
+
+      problems.concat(IconFile.problems(path, file: "assets/images/#{file} (#{where})"))
     end
 
     def kind(value)

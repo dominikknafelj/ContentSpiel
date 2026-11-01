@@ -186,4 +186,48 @@ class Theme::DeclarationsTest < ActiveSupport::TestCase
     one_problem("section_styles:\n  - name: a\n    label: { not a code: A }\n", "`label`")
     assert_empty problems("section_styles:\n  - name: a\n    label: { pt-BR: A, de: B }\n")
   end
+
+  test "an icon with a name the default does not have must bring its file; a file that is missing, not under assets/images or not an svg is refused" do
+    with_theme_copy do |dir|
+      dir.join("assets/images/icons").mkpath
+      dir.join("assets/images/icons/brush.svg").write(%(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0"/></svg>))
+      dir.join("assets/images/icons/bad.svg").write(%(<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>))
+      dir.join("assets/images/icons/brush.png").binwrite("png")
+      icon = ->(file) { "icons:\n  - name: brush\n    label: Brush\n#{"    file: #{file}\n" if file}" }
+      problems_for = lambda do |file|
+        dir.join("theme.yml").write(icon.(file))
+        Theme::Declarations.problems(ThemeFolder.new(dir))
+      end
+
+      assert_empty problems_for.("icons/brush.svg")
+      assert_equal "icons/brush.svg", Theme::Declarations.of(ThemeFolder.new(dir))["icons"].first.file
+
+      {
+        nil => "`file` is missing",
+        "icons/gone.svg" => "assets/images/icons/gone.svg",
+        "../../outside.svg" => "under assets/images",
+        "/etc/hosts.svg" => "under assets/images",
+        "icons/.hidden.svg" => "under assets/images",
+        "icons/brush.png" => "an SVG",
+        "icons/bad.svg" => "<script>"
+      }.each do |file, part|
+        found = problems_for.(file)
+
+        assert_equal 1, found.size, "#{file.inspect}: #{found.inspect}"
+        assert found.first.start_with?("theme.yml") || found.first.start_with?("assets/images/"), found.first
+        assert_includes found.first, part, file.inspect
+        assert_includes found.first, "icons, entry 1 (brush)", file.inspect unless file.nil?
+      end
+    end
+  end
+
+  test "a theme's icon file that fails the fence stops the folder's check" do
+    with_theme_copy do |dir|
+      dir.join("assets/images/icons").mkpath
+      dir.join("assets/images/icons/bad.svg").write(%(<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>))
+      dir.join("theme.yml").write("icons:\n  - name: bad\n    label: Bad\n    file: icons/bad.svg\n")
+
+      assert Theme::Check.problems(ThemeFolder.new(dir)).any? { |problem| problem.include?("onload") }
+    end
+  end
 end

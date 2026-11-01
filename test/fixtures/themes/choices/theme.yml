@@ -11,3 +11,7 @@ page_templates:
   - name: landing
     label: Landing
     fields: [hero]
+icons:
+  - name: brush
+    label: Design
+    file: icons/brush.svg

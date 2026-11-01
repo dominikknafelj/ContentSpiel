@@ -190,6 +190,7 @@ class Theme
     @fingerprint = fingerprint
     @template_count = template_count
     @components = Concurrent::Map.new
+    @icons = Concurrent::Map.new
   end
 
   def configured? = !path.nil?
@@ -200,6 +201,36 @@ class Theme
   def choices(list) = declarations.fetch(list.to_s, [])
 
   def choice(list, name) = choices(list).find { |entry| entry.name == name.to_s }
+
+  # The declared icon `name` as the public site draws it: the file inlined
+  # (`Theme::IconFile.inline`), safe markup, or nil for a blank name, a name
+  # the theme does not declare and a file that does not pass the fence. Read
+  # once per Theme: the icon files are in the fingerprint, so a changed one
+  # is a new Theme (a reload in development, a deploy in production). The
+  # bytes inlined are the bytes fenced, here, and not only those the check
+  # read when the theme was loaded.
+  def icon_svg(name)
+    icon = name.to_s.strip.empty? ? nil : choice(:icons, name)
+    return nil unless icon&.file
+
+    @icons.compute_if_absent(icon.name) do
+      source = icon_path(icon).binread
+      IconFile.problems_in(source, file: icon.file).empty? ? IconFile.inline(source).html_safe : nil
+    rescue SystemCallError
+      nil
+    end
+  end
+
+  # The logical asset path of the declared icon `name`, for `image_path`
+  # (CS Studio shows an icon as an image and never inlines it): the entry's
+  # file, which Propshaft serves from the theme's assets/images, or from the
+  # CMS's app/assets/images for one of the default theme's icons. nil for a
+  # blank or undeclared name.
+  def icon_asset(name)
+    return nil if name.to_s.strip.empty?
+
+    choice(:icons, name)&.file
+  end
 
   # The folder's base name, for a log line and System status.
   def name = path ? path.basename.to_s : "default"
@@ -247,6 +278,10 @@ class Theme
   private
 
   def declarations = @declarations ||= Declarations.default
+
+  def icon_path(icon)
+    icon.from == :default || path.nil? ? Rails.root.join("app/assets/images", icon.file) : path.join("assets/images", icon.file)
+  end
 
   def subclass_with(component, template)
     Class.new(component) do

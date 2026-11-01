@@ -289,7 +289,8 @@ class Theme::CheckTest < ActiveSupport::TestCase
     reasons = {
       Rails.root.join(Theme::Check::BUILDS).to_s => "built files: there or not by whether a build has run, and no name a theme may bring",
       ThemeTestHelper::PLAIN.join("assets/images").to_s => "the second theme's, on the path in the test environment only",
-      ThemeTestHelper::PLAIN.join("javascript").to_s => "the second theme's, on the path in the test environment only"
+      ThemeTestHelper::PLAIN.join("javascript").to_s => "the second theme's, on the path in the test environment only",
+      ThemeTestHelper::CHOICES.join("assets/images").to_s => "the choices theme's icons, on the path in the test environment only"
     }
 
     unknown = Rails.application.config.assets.paths.map(&:to_s) - known - reasons.keys
