@@ -42,6 +42,13 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     ContractLedger::CLASSES.each { |name, meaning| assert_includes table.fetch(name), meaning, "what #{name} is for" }
   end
 
+  test "the attributes table names exactly the contract's attributes, each with what it marks" do
+    table = rows("Attributes")
+
+    assert_equal ContractLedger::ATTRIBUTES.keys.sort, table.keys.sort
+    ContractLedger::ATTRIBUTES.each { |name, meaning| assert_includes table.fetch(name), meaning, "what #{name} marks" }
+  end
+
   test "the templates table names exactly the contract's templates" do
     assert_equal (Theme::Contract::TEMPLATES.keys + [ "#{ContractLedger::PAGE_TEMPLATES}_<name>.html.erb" ]).sort, rows("Templates").keys.sort
   end

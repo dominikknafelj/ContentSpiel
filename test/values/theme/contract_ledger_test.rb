@@ -13,12 +13,13 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
 
   def built_in(list, reader) = list - outside.flat_map(&reader)
 
-  def assert_ledger(components: built_in_components, themed: built_in(Theme::Contract.themed_tokens, :themed_tokens), fixed: built_in(Theme::Contract.fixed_tokens, :fixed_tokens), classes: Theme::Contract.classes)
+  def assert_ledger(components: built_in_components, themed: built_in(Theme::Contract.themed_tokens, :themed_tokens), fixed: built_in(Theme::Contract.fixed_tokens, :fixed_tokens), classes: Theme::Contract.classes, attributes: Theme::Contract.attributes)
     note = "Theme::Contract no longer says what the ledger says. A theme outside this repository relies on every name here: " \
            "if the change is meant, write the release note and change the ledger in test/support/contract_ledger.rb with it"
     assert_equal COMPONENTS.keys, components.keys, "#{note} (the components, in order)"
     COMPONENTS.each { |path, methods| assert_equal methods, components.fetch(path), "#{note} (the methods of #{path})" }
     assert_equal CLASSES, classes, "#{note} (the classes)"
+    assert_equal ATTRIBUTES, attributes, "#{note} (the attributes)"
     assert_equal THEMED_TOKENS, themed, "#{note} (the themed tokens, in order)"
     assert_equal FIXED_TOKENS, fixed, "#{note} (the fixed tokens, in order)"
   end

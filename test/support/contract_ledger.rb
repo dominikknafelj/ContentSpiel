@@ -33,6 +33,13 @@ module ContractLedger
     "content-section--style-<name>" => "on the section, for a style the theme declares"
   }.freeze
 
+  # The attributes a theme's stylesheet may select that a CMS template
+  # writes: a library image's two loading states (`Theme::Contract::ATTRIBUTES`).
+  ATTRIBUTES = {
+    "img[data-image-preview]" => "an image whose widths are not made yet: `src` is its ~24px preview",
+    "img[data-image-empty]" => "an image with neither widths nor a preview: no `src`, a box of the image's size"
+  }.freeze
+
   # The locals every page template is handed, and the folder of the templates
   # (`Theme::Contract::PAGE_TEMPLATE_LOCALS`, `PAGE_TEMPLATES`).
   PAGE_TEMPLATE_LOCALS = %w[page post list_block].freeze

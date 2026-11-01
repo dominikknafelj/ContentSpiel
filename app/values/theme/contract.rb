@@ -73,6 +73,17 @@ class Theme
 
     def self.classes = CLASSES
 
+    # The attributes a CMS template writes on an element a theme's stylesheet
+    # may select, with what each marks: the two loading states of a library
+    # image's `<img>` (`Media::PictureComponent`), which the default theme's
+    # `images.css` blurs and sinks and a theme may restyle.
+    ATTRIBUTES = {
+      "img[data-image-preview]" => "an image whose widths are not made yet: `src` is its ~24px preview",
+      "img[data-image-empty]" => "an image with neither widths nor a preview: no `src`, a box of the image's size"
+    }.freeze
+
+    def self.attributes = ATTRIBUTES
+
     # The templates a theme may replace through its `views/` folder, by
     # their path under it, with what each is. The default is the file of the
     # same path under app/views.
