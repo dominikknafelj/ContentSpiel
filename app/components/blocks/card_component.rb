@@ -55,14 +55,19 @@ module Blocks
     #
     # `alt` is as the Image block's: the override goes in whole so that one
     # written in another language never beats the library's in this one
-    # (`Blocks::ImageComponent#alt`). It may be "", and then an image that is
-    # a card's only link has no name: reported, not refused, as for any image.
+    # (`Blocks::ImageComponent#alt`). It may be "" for an image that is
+    # decoration beside the card's words. It is never blank for an image that
+    # is the card's only link, whose alt is the link's name: there the library
+    # image's title stands in, so the public link always has a name, and the
+    # tile tells the editor (`BlockTypes::Card.unnamed_image_link?`).
     def image
       return @image if defined?(@image)
 
       asset = block.media_asset
       @image = if asset&.file&.attached?
-        { asset: asset, alt: asset.alt_text(override: block.read_attribute(:alt)), sizes: Blocks::ImageComponent.sizes_for(block) }.freeze
+        alt = asset.alt_text(override: block.read_attribute(:alt))
+        alt = asset.title.to_s if alt.to_s.strip.empty? && link && !title && !text
+        { asset: asset, alt: alt, sizes: Blocks::ImageComponent.sizes_for(block) }.freeze
       end
     end
   end

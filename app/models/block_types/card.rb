@@ -50,8 +50,11 @@ module BlockTypes
     # The tile's line: the icon's label (in the language of CS Studio's
     # listing, as the theme labels it), " · " and the title; with no words of
     # those the image's library title (the tile draws its thumbnail beside
-    # it), or Empty.
+    # it), or Empty. An image that is the card's only link and has no alt says
+    # that first (`unnamed_image_link?`).
     def self.summary(block, locale:)
+      return [ [ :hint, :image_link_without_alt ] ] if unnamed_image_link?(block, locale: locale)
+
       settings = block.settings_object(locale: locale)
       title = settings&.title.to_s.strip.truncate(SUMMARY_LENGTH)
       icon = Theme.current.choice(:icons, settings&.icon)&.label_for(locale) if settings&.icon.present?
@@ -61,6 +64,22 @@ module BlockTypes
       end
 
       [ ([ :text, "#{icon} · " ] if icon.present? && title.present?), [ :text, title.presence || icon ] ].compact
+    end
+
+    # The default template puts the link on the image only when the language
+    # shown has no title and no text, read with the site's fallback as the
+    # public component reads them, or the tile would warn of a link that has
+    # the fallback's words. Then the image's alt is the link's name, and a blank
+    # one is said here to the editor, while a visitor gets the library's title
+    # in its place (`Blocks::CardComponent#image`): a file's name is a poor name
+    # for a link, and better than none.
+    def self.unnamed_image_link?(block, locale:)
+      asset = block.media_asset
+      return false unless asset&.file&.attached?
+
+      settings = block.settings_object(locale: locale, fallback: true)
+      ContentModel::FieldTypes.link?(settings&.link) && settings.title.to_s.strip.empty? && settings.text.to_s.strip.empty? &&
+        asset.alt_text(override: block.read_attribute(:alt), locale: locale).to_s.strip.empty?
     end
 
     SUMMARY_LENGTH = ContentModel::BlockTypeDefinition::SUMMARY_LENGTH

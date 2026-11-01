@@ -111,16 +111,47 @@ class CardImageTest < ActionDispatch::IntegrationTest
     assert_select "img[alt='Bibliothek']", count: 1, message: "an override in another language never beats the library's in this one"
   end
 
-  test "a page of cards reads its images in one batch" do
+  test "a page of cards costs the same statements for one card and for four" do
     card
     publish_changes(@page)
     get "/projects"
-    one = capture_sql { get "/projects" }.grep(/FROM "media_assets"/).size
+    one = capture_sql { get "/projects" }
 
     3.times { card(asset: create_media_asset(filename: "wide.png")) }
     publish_changes(@page)
     get "/projects"
-    assert_equal one, capture_sql { get "/projects" }.grep(/FROM "media_assets"/).size
+    four = capture_sql { get "/projects" }
+    assert_equal one.size, four.size, "one card:\n#{one.join("\n")}\n\nfour cards:\n#{four.join("\n")}"
+  end
+
+  test "a discard returns a live card's image and alt to the published ones" do
+    block = card(translations: { "en" => { alt: "Copied words" } })
+    publish_changes(@page)
+    other = create_media_asset(filename: "wide.png")
+    assert ContentBlocks::Save.call(block.reload, attributes: { media_asset_id: other.id }, translations: { "en" => { alt: "New words" } }).ok?
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+    assert result.ok?, result.errors.to_sentence
+
+    block.reload
+    assert_equal @asset.id, block.media_asset_id
+    assert_equal "Copied words", block.alt(locale: "en")
+    assert_nil @page.reload.unpublished_changes_at
+  end
+
+  test "a change to the library's alt of a card's shown image moves the content version, and of an unused image moves nothing" do
+    unused = create_media_asset(filename: "wide.png")
+    card
+    publish_changes(@page)
+
+    before = PublicSite::Version.current
+    unused.update!(alt: "Nobody sees this")
+    assert_equal before, PublicSite::Version.current
+
+    @asset.update!(alt: "New library words")
+    assert_not_equal before, PublicSite::Version.current
+    get "/projects"
+    assert_select ".content-block--card img[alt='New library words']", count: 1
   end
 
   # --- A theme's template -------------------------------------------------
@@ -155,7 +186,7 @@ class CardImageTest < ActionDispatch::IntegrationTest
     assert_select "article.tile[data-block='#{alone.id}'] > *", count: 0
   end
 
-  test "the eighth theme's template draws image from the contract's names alone, with its one link on the image only without words" do
+  test "the eighth theme's template draws image through the one picture, with its one link on the image only without words" do
     worded = card(settings: { "title" => "A project", "link" => "/projects" }, translations: { "en" => { alt: "My words" } })
     linked = card(settings: { "link" => "/projects" })
     bare = card(asset: nil, settings: { "title" => "No picture" })

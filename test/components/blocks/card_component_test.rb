@@ -155,6 +155,23 @@ class Blocks::CardComponentTest < ActiveSupport::TestCase
     assert_selector "img[alt='']"
   end
 
+  test "an image that is a card's only link is named by the library's title when no alt exists; anywhere else a blank alt stays blank" do
+    asset = asset_with_alt("")
+    asset.update!(title: "Harbour photo")
+
+    draw imaged({ "link" => "/about" }, asset: asset)
+    assert_selector "a[href='/about'] img[alt='Harbour photo']", count: 1
+
+    draw imaged({ "link" => "/about" }, asset: asset, alt: "My words")
+    assert_selector "a[href='/about'] img[alt='My words']", count: 1
+
+    draw imaged({ "link" => "/about" }, asset: asset, title: "T")
+    assert_selector "img[alt='']", count: 1
+
+    draw imaged(asset: asset)
+    assert_selector "img[alt='']", count: 1
+  end
+
   test "image is nil without one, and otherwise the words the Image block's picture takes, in a column as wide as its column" do
     assert_nil Blocks::CardComponent.new(block: block_with(title: "T"), page: root_page).send(:image)
 
