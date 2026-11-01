@@ -144,4 +144,8 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_equal [ "page_found?", "page_tree(top)" ], self.class.rows("Helpers", text).keys
     assert_nil self.class.rows("Tokens", text)
   end
+
+  test "the default icons table names exactly the ledger's icon names" do
+    assert_equal ContractLedger::DEFAULT_ICONS.sort, rows("Default icons").keys.sort
+  end
 end

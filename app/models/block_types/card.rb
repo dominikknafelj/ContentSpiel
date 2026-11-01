@@ -26,10 +26,9 @@ module BlockTypes
         t.summary ->(block, locale:) { Card.summary(block, locale: locale) }
         t.tokens themed: %w[card-ground card-line card-icon]
         t.stylesheet "card.css"
-        # The icon is left out until the default theme declares one (the
-        # choices theme's tests draw one); the link is a site address, which
-        # every theme draws.
-        t.sample settings: { "link" => "/about" },
+        # The icon is one of the default theme's; the link is a site address,
+        # which every theme draws.
+        t.sample settings: { "icon" => "star", "link" => "/about" },
                  translations: { "en" => { title: "Card title en", text: "Card text en" },
                                  "de" => { title: "Card title de", text: "Card text de" },
                                  "es" => { title: "Card title es", text: "Card text es" } },

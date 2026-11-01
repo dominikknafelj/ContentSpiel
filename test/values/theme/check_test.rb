@@ -982,4 +982,13 @@ class Theme::CheckTest < ActiveSupport::TestCase
     assert_empty problems_with({ "views/pages/templates/_standard.html.erb" => '<%= "@page" %><%# @post %>' }, deep: true)
     assert_empty problems_with({ "views/pages/show.html.erb" => "<%= @page.id %>" }, deep: true)
   end
+
+  test "no default icon is shadowed by a theme's file of the same path" do
+    Theme::Declarations.default["icons"].each do |icon|
+      problems = problems_with("assets/images/#{icon.file}" => %(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>))
+
+      assert_equal 1, problems.size, problems.inspect
+      assert_includes problems.first, "assets/images/#{icon.file}"
+    end
+  end
 end

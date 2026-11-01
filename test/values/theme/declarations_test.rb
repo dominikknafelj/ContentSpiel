@@ -230,4 +230,37 @@ class Theme::DeclarationsTest < ActiveSupport::TestCase
       assert Theme::Check.problems(ThemeFolder.new(dir)).any? { |problem| problem.include?("onload") }
     end
   end
+
+  DEFAULT_ICON_DIR = Rails.root.join("app/assets/images")
+
+  test "the default theme's icons pass the fence and are drawn by their names" do
+    icons = Theme::Declarations.default["icons"]
+
+    assert_equal ContractLedger::DEFAULT_ICONS, icons.map(&:name)
+    icons.each do |icon|
+      assert_equal :default, icon.from
+      assert_empty Theme::IconFile.problems(DEFAULT_ICON_DIR.join(icon.file), file: icon.file), icon.name
+      drawn = Theme.current.icon_svg(icon.name)
+
+      assert_includes drawn.to_s, "<svg", icon.name
+      assert_includes drawn.to_s, 'aria-hidden="true"', icon.name
+    end
+    assert_equal "Map pin", icons.find { |icon| icon.name == "map_pin" }.label_for("en")
+  end
+
+  # The drawing rules bind the default set only: a theme's own icon keeps
+  # what it is drawn with (Theme::IconFile).
+  test "the default theme's icons follow the drawing rules: 24 by 24, stroke 2 in currentColor, round, no fill, no id, style or script" do
+    Theme::Declarations.default["icons"].each do |icon|
+      svg = Nokogiri::XML(DEFAULT_ICON_DIR.join(icon.file).read).root
+      all = svg.xpath("//*")
+
+      assert_equal "0 0 24 24", svg["viewBox"], icon.name
+      assert_equal [ "none", "currentColor", "2", "round", "round" ],
+                   %w[fill stroke stroke-width stroke-linecap stroke-linejoin].map { |name| svg[name] }, icon.name
+      assert_empty all.select { |node| node["id"] || node["style"] || node["fill"] && node != svg || node["stroke"] && node != svg }, icon.name
+      assert_empty all.map(&:name) & %w[script style foreignObject], icon.name
+      assert_empty all.flat_map { |node| node.attribute_nodes.map(&:name) }.grep(/\Aon/i), icon.name
+    end
+  end
 end

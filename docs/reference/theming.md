@@ -384,6 +384,25 @@ A theme's own partials go under `views/theme/`, by any name ending in `.html.erb
 
 Declarations and files agree both ways: a file with no entry in `page_templates` is refused, and so is a declared name the default theme lacks with no file. A list that is declared empty is refused (omit the list to use the default's). `theme:new` copies the default's two templates (`standard`, `landing`) and writes a `theme.yml` that is comments only.
 
+### Default icons
+
+The default theme declares twelve icons, a card's choices when a theme declares no `icons` list of its own, and a theme's entry of one of these names with no `file` draws the default's file. They are Lucide outlines (lucide-static v0.460.0, ISC; the licence is `app/assets/images/icons/LICENSE-lucide`). A name is a promise like any in the contract: a stored name keeps drawing. The names follow the name rule, so Lucide's hyphen is an underscore here and stays a hyphen in the file's name. **The drawing rules bind this set only**: a 24 by 24 view box, `stroke-width` 2, `stroke="currentColor"` (so a card's `--th-card-icon` colours it), round caps and joins, no fill, no id, no style, no script. A theme's own icon keeps what it is drawn with (`Theme::IconFile`). A theme cannot bring a file at one of these paths: the load-path check refuses it as shadowing the CMS's.
+
+| Name | Label (file) |
+|---|---|
+| `arrow_right` | Arrow right (`icons/arrow-right.svg`) |
+| `check` | Check (`icons/check.svg`) |
+| `star` | Star (`icons/star.svg`) |
+| `heart` | Heart (`icons/heart.svg`) |
+| `mail` | Mail (`icons/mail.svg`) |
+| `map_pin` | Map pin (`icons/map-pin.svg`) |
+| `calendar` | Calendar (`icons/calendar.svg`) |
+| `user` | User (`icons/user.svg`) |
+| `shield` | Shield (`icons/shield.svg`) |
+| `briefcase` | Briefcase (`icons/briefcase.svg`) |
+| `clock` | Clock (`icons/clock.svg`) |
+| `globe` | Globe (`icons/globe.svg`) |
+
 ### Components
 
 Under the theme's `components/`, as `<path>.html.erb`. The methods are what the template may call, each safe for an empty block (`alt` and `caption` answer nil without an image; the Code block's answer nil, and `lines` an empty list, without code); a method not listed is the CMS's to change. Beside its own methods every component's template may also call `translated`, `rich_text`, `post_date`, `resume_period`, `post_url_path`, `page_url_path`, `render_block`, `site_string` and `helpers`. Through `helpers` the rest of the helpers table is reached.

@@ -696,9 +696,17 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     page = create_page(title: "Card card")
     block = page.content_blocks.create!(block_type: "card", position: 0)
 
+    with_theme_copy do |dir|
+      dir.join("theme.yml").write("icons: []\n")
+      Theme.with(Theme.load(ThemeFolder.new(dir))) do
+        render_card(block, page: page)
+        assert_no_selector "select#block-#{block.id}-icon"
+        assert_selector "input#block-#{block.id}-title"
+      end
+    end
+
     render_card(block, page: page)
-    assert_no_selector "select#block-#{block.id}-icon"
-    assert_selector "input#block-#{block.id}-title"
+    assert_selector "select#block-#{block.id}-icon option", text: "Map pin"
 
     with_choices_theme do
       render_card(block, page: page)

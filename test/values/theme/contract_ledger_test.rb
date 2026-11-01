@@ -45,4 +45,8 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
     error = assert_raises(Minitest::Assertion) { assert_ledger(components: ledgered, themed: renamed) }
     assert_includes error.message, "the themed tokens, in order"
   end
+
+  test "the default theme's icon names are the ledger's" do
+    assert_equal DEFAULT_ICONS, Theme::Declarations.default["icons"].map(&:name), "an icon name added, renamed or removed is a release note"
+  end
 end

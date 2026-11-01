@@ -7,6 +7,7 @@
 - Added `theme.yml` at a theme folder's top: the lists `section_styles`, `page_templates` and `icons`.
 - The Section's template may call `style`; the default template writes `content-section--style-<name>`.
 - Added the Card block's component line: `block page title text link icon icon_name`.
+- Added the default theme's icon names: arrow_right, check, star, heart, mail, map_pin, calendar, user, shield, briefcase, clock, globe (Lucide outlines).
 - Added the helper `page_template`.
 - Added `views/pages/templates/_<name>.html.erb` and its locals `page`, `post`, `list_block`.
 

@@ -60,4 +60,8 @@ module ContractLedger
     sp-1 sp-2 sp-3 sp-4 sp-5 sp-6 sp-7
     radius radius-pill ease
   ].freeze
+
+  # The default theme's icon names (a promise: a theme outside this
+  # repository may store one, and a card keeps drawing it).
+  DEFAULT_ICONS = %w[arrow_right check star heart mail map_pin calendar user shield briefcase clock globe].freeze
 end
