@@ -19,10 +19,11 @@ require_relative "../support/schema_loaded_database"
 #   database with no content has nothing to compute.
 # - `lazy:` a row the application makes itself the first time it is asked.
 #
-# A backfill that writes derived values into existing rows through a model,
-# one record at a time (`update_columns`), is named too, as `derived:`: it is
-# the same question, what a schema-loaded database has instead, with the same
-# answer, nothing to compute. A plain SQL `UPDATE` is not looked for.
+# A backfill that writes derived values into existing rows through a model
+# (`update_columns`, `update_all`, `update`/`update!`) is named too, as
+# `derived:`: it is the same question, what a schema-loaded database has
+# instead, with the same answer, nothing to compute. A plain SQL `UPDATE` is
+# not looked for.
 #
 # A new migration that inserts rows fails "every migration that inserts rows
 # is accounted for" until it has an entry, which is the moment to ask what a
@@ -38,7 +39,7 @@ require_relative "../support/schema_loaded_database"
 class BuiltInDataTest < ActiveSupport::TestCase
   include SchemaLoadedDatabase
 
-  INSERTS = /\bINSERT\s+INTO\b|\.(?:create|insert|insert_all|upsert|upsert_all|find_or_create_by|create_or_find_by|first_or_create|save|update_columns)!?(?![\w?])|\bSeeds\.|\.rebuild\w*[!?]?|\.instance\b/i
+  INSERTS = /\bINSERT\s+INTO\b|\.(?:create|insert|insert_all|upsert|upsert_all|find_or_create_by|create_or_find_by|first_or_create|save|update_columns|update_all|update)!?(?![\w?])|\bSeeds\.|\.rebuild\w*[!?]?|\.instance\b/i
 
   ACCOUNTED = {
     "20260926120000_add_setup_completed_at_to_site_settings" => { lazy: "the settings row of a site that already had users; a new site's is made by SiteSetting.instance at its first request, with setup pending" },
@@ -103,6 +104,8 @@ class BuiltInDataTest < ActiveSupport::TestCase
     assert found.call("AccessControl::Seeds.ensure_built_in_groups!")
     assert found.call("Translations::StateIndex.rebuild_all")
     assert found.call("asset.update_columns(renditions: made)")
+    assert found.call("Thing.where(n: nil).update_all(n: 0)")
+    assert found.call("thing.update!(n: 0)")
     assert_not found.call("create_table :things do |t|\n  t.string :name\nend\nadd_index :things, :name")
     assert_not found.call("# Thing.create!(name: 1)\nadd_column :things, :n, :integer # then Thing.insert_all(rows)")
     assert_not found.call(%(execute "UPDATE things SET n = 0"))

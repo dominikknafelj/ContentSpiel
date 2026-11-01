@@ -17,7 +17,9 @@ module Media
   # it was and the next run finishes it (a variant already made is found, not
   # made again). The generation before the one that was current is deleted
   # afterwards: two generations are kept so a page cached under the old one
-  # still finds its files.
+  # still finds its files. An adopted generation (`Media::Generation::ADOPTED`)
+  # is the exception: it is deleted, not kept, because its widths carry camera
+  # data, and a failed remake withdraws it.
   #
   # The content version moves once per image, at the end, and only for an
   # image a live page can show, because the library's widths change the
@@ -44,7 +46,34 @@ module Media
     def self.record_failure(asset, error)
       return unless asset.is_a?(Media::Asset)
 
-      asset.update_columns(renditions_failed_at: Time.current, renditions_error: error.class.name) # version: none (the failure is shown in CS Studio only; no page reads it)
+      asset.reload
+      if asset.renditions_fingerprint == Media::Generation::ADOPTED
+        withdraw_adopted(asset, error)
+      else
+        asset.update_columns(renditions_failed_at: Time.current, renditions_error: error.class.name) # version: none (the failure is shown in CS Studio only; no page reads it)
+      end
+    rescue ActiveRecord::RecordNotFound
+      nil
+    end
+
+    # An adopted image whose remake failed is not left serving its adopted
+    # widths, which carry camera data: the generation is emptied and its
+    # variant records deleted, so a page draws the preview or the box, and
+    # `media:regenerate` (which selects an image with no generation) tries
+    # again. The srcset a cached page holds changes, so a live image bumps.
+    def self.withdraw_adopted(asset, error)
+      adopted = asset.generation
+      asset.update_columns( # version: bumped below when a live page can show the image
+        renditions: {}, renditions_fingerprint: nil, renditions_failed_at: Time.current, renditions_error: error.class.name
+      )
+      drop_variant_records(asset, adopted&.files.to_a.map(&:digest))
+      PublicSite.bump_version! if asset.shown_publicly?
+    end
+
+    def self.drop_variant_records(asset, digests)
+      return if digests.blank? || !asset.file.attached?
+
+      ActiveStorage::VariantRecord.where(blob_id: asset.file.blob.id, variation_digest: digests).find_each(&:destroy)
     end
 
     def perform(asset)
@@ -110,11 +139,17 @@ module Media
       old_previous = renditions["previous"]
       current = { "fingerprint" => fingerprint, "files" => files }
 
+      # An adopted generation is never kept as the previous one (its widths
+      # carry camera data): it goes with the generation before it, and a page
+      # cached under it is drawn again after the bump below.
+      kept_previous = old_current unless adopted?(old_current)
+
       asset.update_columns( # version: bumped at the end of this method, once for the image, when a live page can show it
-        renditions: { "current" => current, "previous" => old_current }.compact,
+        renditions: { "current" => current, "previous" => kept_previous }.compact,
         renditions_fingerprint: fingerprint, renditions_failed_at: nil, renditions_error: nil
       )
-      drop_generation(asset, old_previous, kept: [ current, old_current ])
+      drop_generation(asset, old_previous, kept: [ current, kept_previous ])
+      drop_generation(asset, old_current, kept: [ current ]) if kept_previous.nil?
       # A finished image moves the content version once, when a live page can
       # show it: the generation just written changes the srcset a cached page
       # holds. The write above is committed before this question, so a page
@@ -122,14 +157,14 @@ module Media
       PublicSite.bump_version! if asset.shown_publicly?
     end
 
-    # The variant records of the generation before the one that was current,
-    # unless a kept generation shares the file (the same variation).
+    def adopted?(generation) = generation.is_a?(Hash) && generation["fingerprint"] == Media::Generation::ADOPTED
+
+    # The variant records of a generation no longer kept, unless a kept
+    # generation shares the file (the same variation).
     def drop_generation(asset, generation, kept:)
       digests = Array(generation && generation["files"]).map { |file| file["digest"] }
       digests -= kept.flat_map { |kept_generation| Array(kept_generation && kept_generation["files"]).map { |file| file["digest"] } }
-      return if digests.empty?
-
-      ActiveStorage::VariantRecord.where(blob_id: asset.file.blob.id, variation_digest: digests).find_each(&:destroy)
+      self.class.drop_variant_records(asset, digests)
     end
   end
 end

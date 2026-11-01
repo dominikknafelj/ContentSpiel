@@ -7,6 +7,13 @@ module Media
   class Generation
     File = Data.define(:width, :key, :digest)
 
+    # The fingerprint of the widths an existing site's images had before this
+    # delivery (`AdoptExistingImageVariants`), which no settings produce. They
+    # carry a JPEG's camera data, and the public gets only widths without it,
+    # so an adopted generation is never kept as the previous one: it is
+    # dropped when the image is made again, and withdrawn when that fails.
+    ADOPTED = "adopted"
+
     def self.from(hash)
       return nil unless hash.respond_to?(:to_h) && hash.present?
 

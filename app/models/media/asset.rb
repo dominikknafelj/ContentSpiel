@@ -75,11 +75,16 @@ class Media::Asset < ApplicationRecord
 
   scope :with_file, -> { includes(FILE_INCLUDES) }
 
-  # A kept image with no preview or no size yet (a row from before the decode
-  # at upload) whose job has not failed: what `Media::BackfillJob` queues. The
-  # partial index `index_media_assets_missing_decode` has this predicate, so
-  # on a site with nothing missing the question is answered from the index.
-  scope :missing_decode, -> { kept.where(renditions_failed_at: nil).and(where(preview: nil).or(where(width: nil))) }
+  # What `Media::BackfillJob` queues: a kept image whose job has not failed
+  # and that has no preview or no size yet (a row from before the decode at
+  # upload), or whose widths are still the adopted ones, which carry camera
+  # data. The partial index `index_media_assets_backfill_due` has this
+  # predicate, so on a site with nothing due the question is answered from
+  # the index.
+  scope :backfill_due, lambda {
+    kept.where(renditions_failed_at: nil)
+      .and(where(preview: nil).or(where(width: nil)).or(where(renditions_fingerprint: Media::Generation::ADOPTED)))
+  }
 
   # A kept image whose recorded generation was not made with these settings,
   # or that has none: what `media:regenerate` queues.

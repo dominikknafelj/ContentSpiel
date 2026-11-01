@@ -195,7 +195,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
     t.datetime "renditions_failed_at"
     t.string "renditions_error"
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
-    t.index ["id"], name: "index_media_assets_missing_decode", where: "((trashed_at IS NULL) AND (renditions_failed_at IS NULL) AND ((preview IS NULL) OR (width IS NULL)))"
+    t.index ["id"], name: "index_media_assets_backfill_due", where: "((trashed_at IS NULL) AND (renditions_failed_at IS NULL) AND ((preview IS NULL) OR (width IS NULL) OR ((renditions_fingerprint)::text = 'adopted'::text)))"
     t.index ["renditions_fingerprint"], name: "index_media_assets_on_renditions_fingerprint"
     t.index ["trashed_at"], name: "index_media_assets_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_media_assets_on_trashed_by_id"

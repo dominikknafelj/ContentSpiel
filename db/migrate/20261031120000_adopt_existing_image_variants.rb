@@ -26,17 +26,19 @@
 # JPEG carrying GPS keeps its camera data in them (checked with libvips 8.18:
 # `exif-data` and the `exif-ifd3-GPS*` fields are in the old width;
 # `test/migrations/adopt_existing_image_variants_test.rb` checks it again). So
-# the generation is recorded under the fingerprint "adopted", which no settings
-# produce: the image counts as made with other settings, and the next
-# `Media::RenditionJob` (the backfill queues one for every image without a
-# preview) makes it again, keeping this generation as the previous one, which
-# pages cached before still find.
+# the generation is recorded under the fingerprint "adopted"
+# (`Media::Generation::ADOPTED`), which no settings produce. The public gets
+# only widths without camera data, so these serve only until the image is made
+# again: `Media::BackfillJob` selects every adopted row, `Media::RenditionJob`
+# makes it with the current settings and deletes the adopted generation rather
+# than keeping it as the previous one, and a remake that fails withdraws it
+# (the page then shows the preview).
 #
 # A new database loads db/schema.rb and has no image to adopt.
 class AdoptExistingImageVariants < ActiveRecord::Migration[8.1]
   OLD_WIDTHS = [ 480, 960, 1600, 2400 ].freeze
   FINGERPRINT = "adopted"
-  MISSING_DECODE_INDEX = "index_media_assets_missing_decode"
+  BACKFILL_INDEX = "index_media_assets_backfill_due"
 
   class Asset < ActiveRecord::Base
     self.table_name = "media_assets"
@@ -45,14 +47,16 @@ class AdoptExistingImageVariants < ActiveRecord::Migration[8.1]
   def up
     # What `Media::BackfillJob` asks every ten minutes, answered from the index
     # alone on a site where nothing is missing.
-    add_index :media_assets, :id, name: MISSING_DECODE_INDEX,
-      where: "trashed_at IS NULL AND renditions_failed_at IS NULL AND (preview IS NULL OR width IS NULL)" # sql: a partial index's predicate
+    # Not concurrently: it is built inside the migration's transaction, which
+    # holds a library of a few thousand rows for a moment.
+    add_index :media_assets, :id, name: BACKFILL_INDEX,
+      where: "trashed_at IS NULL AND renditions_failed_at IS NULL AND (preview IS NULL OR width IS NULL OR renditions_fingerprint = '#{FINGERPRINT}')" # sql: a partial index's predicate
     adopt
   end
 
   def down
     forget
-    remove_index :media_assets, name: MISSING_DECODE_INDEX
+    remove_index :media_assets, name: BACKFILL_INDEX
   end
 
   def self.old_transformations(width) = { resize_to_limit: [ width, nil ], format: :webp }
