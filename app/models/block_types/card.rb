@@ -24,6 +24,7 @@ module BlockTypes
         t.component Blocks::CardComponent
         t.theme_methods :block, :page, :title, :text, :link, :icon, :icon_name
         t.summary ->(block, locale:) { Card.summary(block, locale: locale) }
+        t.tokens themed: %w[card-ground card-line card-icon]
         t.stylesheet "card.css"
         # The icon is left out until the default theme declares one (the
         # choices theme's tests draw one); the link is a site address, which

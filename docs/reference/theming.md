@@ -266,7 +266,7 @@ The overrides and the callback are private, so none is an action. Nothing public
 
 ### Tokens
 
-Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothing and names no block. A theme changes one by declaring it again in its own stylesheet. The first group (`Theme::Contract.themed_tokens`, `--th-paper` to `--th-table-ground`) has a value for the light scheme and one for the dark, and is declared again under both `:root, [data-theme="light"]` and `[data-theme="dark"]`; the rest (`.fixed_tokens`) have one value.
+Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothing and names no block. A theme changes one by declaring it again in its own stylesheet. The first group (`Theme::Contract.themed_tokens`, `--th-paper` to `--th-card-icon`) has a value for the light scheme and one for the dark, and is declared again under both `:root, [data-theme="light"]` and `[data-theme="dark"]`; the rest (`.fixed_tokens`) have one value.
 
 | Token | What it is |
 |---|---|
@@ -325,6 +325,9 @@ Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothi
 | `--th-table-head` | a table's header text |
 | `--th-table-caption` | a table's caption |
 | `--th-table-ground` | what a table stands on: its sticky header column's ground and its edge fade |
+| `--th-card-ground` | a Card's ground |
+| `--th-card-line` | a Card's frame |
+| `--th-card-icon` | a Card's icon |
 | `--th-font` | the text face |
 | `--th-mono` | the monospaced face |
 | `--th-t-display` | the homepage's title size |

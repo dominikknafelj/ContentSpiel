@@ -388,6 +388,49 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_equal 16, pairs
   end
 
+  CARD_TOKENS = %w[--th-card-ground --th-card-line --th-card-icon].freeze
+
+  # Theme choices spec, design question A (b): the Card's ground, frame and
+  # icon are three tokens of its own; the title stays --th-ink and the text
+  # --th-dim.
+  test "the card's tokens are defined from the theme's base tokens in both schemes, never a literal" do
+    theme_tokens.each do |theme, tokens|
+      CARD_TOKENS.each do |name|
+        value = tokens.fetch(name) { flunk("#{name} is not defined for #{theme}") }
+        assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/, value, "#{theme} #{name} is #{value}")
+      end
+    end
+    assert_equal CARD_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:card).themed_tokens
+    css = Rails.root.join("app/assets/tailwind/themes/default/card.css").read.gsub(%r{/\*.*?\*/}m, "")
+    CARD_TOKENS.each { |name| assert_includes css, "var(#{name})", "card.css draws with #{name}" }
+  end
+
+  # The title (--th-ink) and the text (--th-dim) at 4.5:1 on the card's
+  # ground, the icon at 3:1 on it and the frame at 3:1 against what the card
+  # stands on, on the page, in a tinted band and in a strong band, in both
+  # schemes. (2 + 1) x 3 places x 2 schemes = 18, plus 6 frames.
+  test "a card's title, text, icon and frame are readable on the page, in a tinted band and in a strong band, in both themes" do
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+        "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.each do |place, (inside, around)|
+        outside = resolve_colour(tokens, around, inside: inside)
+        ground = resolve_colour(tokens, "--th-card-ground", inside: inside, under: outside)
+        { "--th-ink" => 4.5, "--th-dim" => 4.5, "--th-card-icon" => 3.0 }.each do |token, least|
+          ratio = contrast(ground, resolve_colour(tokens, token, inside: inside, under: ground))
+          puts "card #{theme} #{place} #{token}: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+          assert_operator ratio, :>=, least, "#{token} on the card ground in #{place} (#{theme}) is #{ratio.round(2)}:1"
+          pairs += 1
+        end
+        frame = contrast(outside, resolve_colour(tokens, "--th-card-line", inside: inside, under: outside))
+        puts "card #{theme} #{place} frame: #{frame.round(2)}" if ENV["SHOW_RATIOS"]
+        assert_operator frame, :>=, 3.0, "the card's frame against #{place} (#{theme}) is #{frame.round(2)}:1"
+        pairs += 1
+      end
+    end
+    assert_equal 24, pairs
+  end
+
   test "the measuring reads a colour mixed of two tokens as the two mixed" do
     tokens = { "--th-paper" => "#ffffff", "--th-ink" => "#000000",
                "--th-quarter" => "color-mix(in srgb, var(--th-ink) 25%, var(--th-paper))",

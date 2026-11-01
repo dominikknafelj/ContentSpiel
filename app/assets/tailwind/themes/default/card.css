@@ -1,25 +1,22 @@
-/* The Card block's public styles. Every colour is a --th- token.
-   The card's own three tokens (ground, line, icon) are not defined yet: until
-   they are, a card is drawn with base tokens, and the rules marked
-   "card tokens" below take their place. */
+/* The Card block's public styles. Every colour is a --th- token: the card's
+   own three (ground, line, icon), the title's --th-ink and the text's
+   --th-dim. */
 .content-block--card {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 1.25rem;
-  /* card tokens: ground and line */
-  background: var(--th-surface);
-  border: 1px solid var(--th-line);
+  background: var(--th-card-ground);
+  border: 1px solid var(--th-card-line);
   border-radius: 0.5rem;
 }
 .content-block--card__icon {
   display: inline-flex;
   width: 2rem;
   height: 2rem;
-  /* card tokens: icon */
-  color: var(--th-accent);
+  color: var(--th-card-icon);
 }
 .content-block--card__icon > svg { width: 100%; height: 100%; }
 .content-block--card__title { margin: 0; color: var(--th-ink); }
 .content-block--card__title a { color: inherit; }
-.content-block--card__text { margin: 0; color: var(--th-ink); }
+.content-block--card__text { margin: 0; color: var(--th-dim); }

@@ -117,6 +117,16 @@
   --th-table-head: var(--th-ink);
   --th-table-caption: var(--th-meta);
   --th-table-ground: var(--th-paper);
+
+  /* The Card block's three tokens (theme choices spec, design question A):
+     the ground is the accent at 5% over the page, the frame --th-meta (a
+     --th-line-strong frame is 1.5:1, under the 3:1 a frame that marks the
+     card needs) and the icon the accent.
+     The title stays --th-ink and the text --th-dim.
+     test/integration/design_tokens_test.rb holds the pairs. */
+  --th-card-ground: color-mix(in srgb, var(--th-accent) 5%, var(--th-paper));
+  --th-card-line: var(--th-meta);
+  --th-card-icon: var(--th-accent);
 }
 
 [data-theme="dark"] {
@@ -196,6 +206,14 @@
   --th-table-head: var(--th-ink);
   --th-table-caption: var(--th-meta);
   --th-table-ground: var(--th-paper);
+
+  /* The Card block's three tokens (theme choices spec, design question A):
+     the same three, from the dark base.
+     The title stays --th-ink and the text --th-dim.
+     test/integration/design_tokens_test.rb holds the pairs. */
+  --th-card-ground: color-mix(in srgb, var(--th-accent) 5%, var(--th-paper));
+  --th-card-line: var(--th-meta);
+  --th-card-icon: var(--th-accent);
 }
 
 :root {

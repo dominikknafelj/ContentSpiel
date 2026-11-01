@@ -50,6 +50,7 @@ module ContractLedger
     note-important-ground note-important-line note-important-ink note-important-border
     note-warning-ground note-warning-line note-warning-ink note-warning-border
     table-rule table-line table-head table-caption table-ground
+    card-ground card-line card-icon
   ].freeze
 
   FIXED_TOKENS = %w[
