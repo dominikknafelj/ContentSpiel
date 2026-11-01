@@ -6,6 +6,6 @@
     <h3 class="content-block--card__title"><% if link %><%= tag.a title, href: link %><% else %><%= title %><% end %></h3>
   <% end %>
   <% if text %>
-    <p class="content-block--card__text"><%= text %></p>
+    <p class="content-block--card__text"><% if link && !title %><%= tag.a text, href: link %><% else %><%= text %><% end %></p>
   <% end %>
 </div>

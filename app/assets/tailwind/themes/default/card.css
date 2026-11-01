@@ -1,9 +1,7 @@
 /* The Card block's public styles. Every colour is a --th- token.
    The card's own three tokens (ground, line, icon) are not defined yet: until
    they are, a card is drawn with base tokens, and the rules marked
-   "card tokens" below take their place. Written by bin/rails generate
-   block_type: while this line stands, bin/rails destroy block_type card
-   removes this file. Take it out once the stylesheet is yours. */
+   "card tokens" below take their place. */
 .content-block--card {
   display: flex;
   flex-direction: column;

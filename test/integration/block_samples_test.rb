@@ -17,7 +17,6 @@ class BlockSamplesTest < ActionDispatch::IntegrationTest
   # holds: a field the sample leaves out is never compared with the rows.
   UNFILLED_FIELDS = {
     "card" => { "icon" => "the default theme declares no icon until its icon set exists; the choices theme's tests draw one" },
-    "card" => { "icon" => "the default theme declares no icon until its icon set exists; the choices theme's tests draw one" },
     "section" => { "style" => "the default theme declares no section style; the choices theme's tests fill and draw one" },
     "post_list" => { "tag" => "a listing filtered by a tag is the canary's own row on Alpha (\"tag\" => \"ruby\"), which also lists a tagged post" }
   }.freeze

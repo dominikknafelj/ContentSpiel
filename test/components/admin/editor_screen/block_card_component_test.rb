@@ -724,6 +724,16 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "a section style choice draws no img beside its select" do
+    page = create_page(title: "Section style")
+    with_choices_theme do
+      block = page.content_blocks.create!(block_type: "section", position: 0, settings: { "style" => "services" })
+      render_card(block, page: page)
+      assert_selector "select[name='block[settings][style]']"
+      assert_no_selector "img[data-theme-icon]"
+    end
+  end
+
   test "on a translation tab a note's title is an input beside its English original, and its kind is a shared field" do
     with_locales(%w[en de], default: "en") do
       page = create_page(title: "Note tab")

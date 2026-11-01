@@ -1740,9 +1740,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       base = block.updated_at.iso8601(6)
       save_card(block, { title: "One" }, base: base, tab: "tab-aaaaaaaa")
       assert_response :success
-      travel 1.minute do
-        save_card(block, { title: "Two" }, base: base, tab: "tab-aaaaaaaa")
-      end
+      save_card(block, { title: "Two" }, base: base, tab: "tab-aaaaaaaa")
       assert_response :conflict
       assert_equal "One", block.reload.settings_object.title
 

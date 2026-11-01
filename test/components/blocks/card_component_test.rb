@@ -76,4 +76,10 @@ class Blocks::CardComponentTest < ActiveSupport::TestCase
     I18n.with_locale(:es) { draw block }
     assert_selector "h3", text: "English title"
   end
+
+  test "a card with a link and a text but no title draws the link on the text, never drops it" do
+    draw block_with({ "link" => "/about" }, text: "Only text")
+    assert_selector "p a[href='/about']", text: "Only text"
+    assert_no_selector "h3"
+  end
 end
