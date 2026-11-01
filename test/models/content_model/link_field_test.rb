@@ -35,6 +35,14 @@ class ContentModel::LinkFieldTest < ActiveSupport::TestCase
     end
   end
 
+  test "Unicode white space and invisible characters are refused wherever they stand" do
+    [ "\u{A0}", "\u{2003}", "\u{2028}", "\u{3000}", "\u{200B}", "\u{200D}", "\u{202E}", "\u{2066}", "\u{FEFF}", "\u{AD}" ].each do |char|
+      [ "#{char}/about", "/#{char}/evil", "/ab#{char}cd", "/about#{char}", "https://example.com/a#{char}b", "mailto:a#{char}@b.example" ].each do |value|
+        assert_not link?(value), "#{value.inspect} is no link"
+      end
+    end
+  end
+
   test "link? never raises: a malformed address, bad bytes and a long one are no link" do
     [ "mailto:", "mailto:javascript:x", "https://", "http://[", "/a\xFF", "https://x.example/\xFF".b, "/#{"a" * 2048}" ].each do |value|
       assert_not link?(value), "#{value.inspect} is no link"

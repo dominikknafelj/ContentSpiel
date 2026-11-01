@@ -16,11 +16,11 @@ module ContentModel
     # week dates, which is not what the editor's placeholder promises.
     DATE_FORMAT = /\A\d{4}-\d{2}-\d{2}\z/
 
-    # What no link holds, wherever it stands: white space (Unicode's too),
-    # a control or invisible format character, a backslash.
     # A link longer than this is refused, never cut.
     LINK_MAX = 2048
 
+    # What no link holds, wherever it stands: white space (Unicode's too),
+    # a control or invisible format character, a backslash.
     LINK_REFUSED = /[[:space:]\p{Cc}\p{Cf}\\]/
 
     # Text with its outer white space taken off, nil when nothing is left.
