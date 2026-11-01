@@ -1454,7 +1454,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
 
   test "production and test never say it, whatever the stylesheet is" do
     folder = stale_folder(true)
-      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+    with_singleton_override(ThemeFolder, :current, -> { folder }) do
       get "/about"
       assert_select "[data-stale-stylesheet]", count: 0
 

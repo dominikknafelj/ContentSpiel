@@ -308,7 +308,9 @@ class ThemeFolder
   # Whether the public stylesheet in `root` is older than the theme that
   # draws the site, for the development notice (`PublicPageRendering`).
   # A CONFIGURED theme is stale when it is not built (the stamp is its
-  # fingerprint, which digests every file). THE DEFAULT THEME'S FINGERPRINT
+  # fingerprint, which digests every file), AND, as any theme is, when the
+  # default styles (which every build includes first) are newer than the
+  # stylesheet. THE DEFAULT THEME'S FINGERPRINT
   # IS A CONSTANT, so `built?` cannot see a change to it: its styles are the
   # CMS's own `app/assets/tailwind/themes/default/`, and a change there is
   # seen by time, the newest file under it against the built stylesheet's.
@@ -325,7 +327,9 @@ class ThemeFolder
     asked, answer = @stale[root.to_s]
     return answer if asked && now - asked < STALE_FOR
 
-    answer = configured? ? !built?(root) : default_styles_newer?(root)
+    # Both: the build of a configured theme reads the default theme's
+    # styles too (they come first in the one stylesheet).
+    answer = default_styles_newer?(root) || (configured? && !built?(root))
     @stale[root.to_s] = [ now, answer ]
     answer
   end

@@ -56,6 +56,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
       "views/pages/_seo_meta.html.erb" => "the CMS's head tags",
       "views/shared/_theme_head.html.erb" => "the light/dark script",
       "views/layouts/public/_preview_banner.html.erb" => "the preview bar",
+      "views/layouts/public/_stale_stylesheet.html.erb" => "the development notice of a stale stylesheet",
       "views/layouts/admin.html.erb" => "CS Studio's layout",
       "views/admin/dashboard/show.html.erb" => "a CS Studio view",
       "components/blocks/image_component.rb" => "Ruby",

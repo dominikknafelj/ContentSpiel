@@ -422,6 +422,7 @@ class ThemeFolderTest < ActiveSupport::TestCase
 
   test "a configured theme is stale when its stamp is not its fingerprint, and the answer is kept for two seconds" do
     with_built_root do |root|
+      root.join(ThemeFolder::BUILT_STYLESHEET).write("b")
       folder = ThemeFolder.new(PLAIN)
       assert folder.stylesheet_stale?(root), "no stamp"
 
@@ -430,6 +431,23 @@ class ThemeFolderTest < ActiveSupport::TestCase
       assert_not ThemeFolder.new(PLAIN).stylesheet_stale?(root), "a fresh question is answered afresh"
 
       ThemeCss.stamp!(folder, root: root, fingerprint: "another")
+      assert ThemeFolder.new(PLAIN).stylesheet_stale?(root)
+    end
+  end
+
+  test "a configured theme that is built is still stale when the default theme's styles changed after the build" do
+    with_built_root do |root|
+      folder = ThemeFolder.new(PLAIN)
+      source = root.join(ThemeFolder::DEFAULT_STYLES, "tokens.css")
+      built = root.join(ThemeFolder::BUILT_STYLESHEET)
+      source.write("a")
+      built.write("b")
+      source.utime(Time.now - 60, Time.now - 60)
+      ThemeCss.stamp!(folder, root: root)
+
+      assert_not ThemeFolder.new(PLAIN).stylesheet_stale?(root)
+
+      source.utime(Time.now + 60, Time.now + 60)
       assert ThemeFolder.new(PLAIN).stylesheet_stale?(root)
     end
   end
