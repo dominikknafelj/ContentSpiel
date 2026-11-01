@@ -4,7 +4,7 @@ require "test_helper"
 # purge: `default` for everything, `images` for the jobs that decode and
 # encode pictures (and only those), served by a worker of one thread.
 class JobQueuesTest < ActiveSupport::TestCase
-  IMAGE_JOBS = %w[Media::RenditionJob ActiveStorage::AnalyzeJob ActiveStorage::TransformJob].freeze
+  IMAGE_JOBS = %w[Media::RenditionJob Media::BackfillJob ActiveStorage::AnalyzeJob ActiveStorage::TransformJob].freeze
 
   # The app's own jobs, the mail job and Active Storage's: not the gems'
   # background jobs, whose queues are theirs (Solid Queue's, Turbo's).

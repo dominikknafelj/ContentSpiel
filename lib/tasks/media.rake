@@ -16,6 +16,24 @@ namespace :media do
     end
   end
 
+  # Queues the widths of every kept image not made with the current image
+  # settings: one whose recorded generation has another fingerprint (an
+  # adopted one, a setting changed since) or none at all. It looks at what is
+  # made, never at what is queued, so running it again queues the same images
+  # again and the job, which reads the settings when it runs and does nothing
+  # for an image already made with them, makes each once.
+  desc "Queue the widths of every image not made with the current image settings"
+  task regenerate: :environment do
+    fingerprint = ImageSettings.current.fingerprint
+    count = 0
+    Media::Asset.not_made_with(fingerprint).find_each do |asset|
+      Media::RenditionJob.perform_later(asset)
+      count += 1
+    end
+
+    puts "media:regenerate: #{count} image(s) queued"
+  end
+
   # Design spec §3.4 step 5: every `ActiveStorage::Blob` no attachment row
   # points at -- a duplicate file the Task 4 data migration deduped onto
   # another asset (it deletes attachment rows, never blobs), a leftover

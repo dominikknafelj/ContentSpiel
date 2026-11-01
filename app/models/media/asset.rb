@@ -75,6 +75,16 @@ class Media::Asset < ApplicationRecord
 
   scope :with_file, -> { includes(FILE_INCLUDES) }
 
+  # A kept image with no preview or no size yet (a row from before the decode
+  # at upload) whose job has not failed: what `Media::BackfillJob` queues. The
+  # partial index `index_media_assets_missing_decode` has this predicate, so
+  # on a site with nothing missing the question is answered from the index.
+  scope :missing_decode, -> { kept.where(renditions_failed_at: nil).and(where(preview: nil).or(where(width: nil))) }
+
+  # A kept image whose recorded generation was not made with these settings,
+  # or that has none: what `media:regenerate` queues.
+  scope :not_made_with, ->(fingerprint) { kept.where.not(renditions_fingerprint: fingerprint).or(kept.where(renditions_fingerprint: nil)) }
+
   # No variant is declared here: the widths of an image are made by
   # `Media::RenditionJob`, recorded in `renditions`, and addressed through
   # the blob's representation proxy by the keys that generation holds.

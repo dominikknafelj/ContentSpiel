@@ -19,6 +19,11 @@ require_relative "../support/schema_loaded_database"
 #   database with no content has nothing to compute.
 # - `lazy:` a row the application makes itself the first time it is asked.
 #
+# A backfill that writes derived values into existing rows through a model,
+# one record at a time (`update_columns`), is named too, as `derived:`: it is
+# the same question, what a schema-loaded database has instead, with the same
+# answer, nothing to compute. A plain SQL `UPDATE` is not looked for.
+#
 # A new migration that inserts rows fails "every migration that inserts rows
 # is accounted for" until it has an entry, which is the moment to ask what a
 # schema-loaded database gets instead (for a built-in row: add it to the
@@ -33,7 +38,7 @@ require_relative "../support/schema_loaded_database"
 class BuiltInDataTest < ActiveSupport::TestCase
   include SchemaLoadedDatabase
 
-  INSERTS = /\bINSERT\s+INTO\b|\.(?:create|insert|insert_all|upsert|upsert_all|find_or_create_by|create_or_find_by|first_or_create|save)!?(?![\w?])|\bSeeds\.|\.rebuild\w*[!?]?|\.instance\b/i
+  INSERTS = /\bINSERT\s+INTO\b|\.(?:create|insert|insert_all|upsert|upsert_all|find_or_create_by|create_or_find_by|first_or_create|save|update_columns)!?(?![\w?])|\bSeeds\.|\.rebuild\w*[!?]?|\.instance\b/i
 
   ACCOUNTED = {
     "20260926120000_add_setup_completed_at_to_site_settings" => { lazy: "the settings row of a site that already had users; a new site's is made by SiteSetting.instance at its first request, with setup pending" },
@@ -45,7 +50,8 @@ class BuiltInDataTest < ActiveSupport::TestCase
     "20261002120100_grant_ai_translate_to_built_in_groups" => { built_in: "Groups::EnsureBuiltIns" },
     "20261004110000_create_translation_states" => { derived: "translation states of the pages, posts and blocks that existed" },
     "20261005150000_create_public_site_versions" => { lazy: "the counter's row: no row reads as 0 and the first PublicSite.bump_version! upserts it" },
-    "20261011120000_create_published_versions" => { derived: "a first copy of each page and post that was published" }
+    "20261011120000_create_published_versions" => { derived: "a first copy of each page and post that was published" },
+    "20261031120000_adopt_existing_image_variants" => { derived: "the widths images already had" }
   }.freeze
 
   # What each `built_in:` migration gave a group, as it is written in the
@@ -96,6 +102,7 @@ class BuiltInDataTest < ActiveSupport::TestCase
     assert found.call("thing.save!")
     assert found.call("AccessControl::Seeds.ensure_built_in_groups!")
     assert found.call("Translations::StateIndex.rebuild_all")
+    assert found.call("asset.update_columns(renditions: made)")
     assert_not found.call("create_table :things do |t|\n  t.string :name\nend\nadd_index :things, :name")
     assert_not found.call("# Thing.create!(name: 1)\nadd_column :things, :n, :integer # then Thing.insert_all(rows)")
     assert_not found.call(%(execute "UPDATE things SET n = 0"))
