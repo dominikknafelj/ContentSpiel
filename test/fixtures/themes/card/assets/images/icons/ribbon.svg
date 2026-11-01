@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <g class="ribbon-back">
+    <rect x="6" y="6" width="36" height="36" rx="8" fill="url(#tile-wash)"/>
+  </g>
+  <g class="ribbon-front">
+    <path d="M16 34 24 14l8 20" fill="none"/>
+    <circle class="ribbon-dot" cx="24" cy="30" r="4" fill="currentColor"/>
+  </g>
+</svg>

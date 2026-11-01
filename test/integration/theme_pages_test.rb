@@ -650,6 +650,56 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_equal "services", section.settings["style"]
   end
 
+  test "a theme replaces the Card's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    about = create_page(title: "About cards")
+    # The icon is the theme's own, so the save that stores its name is made under that theme.
+    result = with_card_theme do
+      ContentBlocks::Save.call(ContentBlock.new(owner: about),
+        attributes: { block_type: "card", settings: { "icon" => "ribbon", "link" => "/about-cards", "title" => "<b>Tile</b>", "text" => "Words & more" } })
+    end
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(about)
+    source = Rails.root.join("test/fixtures/themes/card/assets/images/icons/ribbon.svg").read
+    root = source[/<svg[^>]*>/]
+    inner = source.sub(root, "").sub("</svg>", "").strip
+
+    with_card_theme { get "/about-cards" }
+
+    assert_response :success
+    assert_select "article.tile[data-icon='ribbon'][data-block='#{block.id}'][data-page='#{about.id}']" do
+      assert_select "h3.tile__title a[href='/about-cards']", text: "<b>Tile</b>"
+      assert_select "p.tile__text", text: "Words & more"
+      assert_select "span.tile__icon[aria-hidden=true] svg[width='48'][height='48'][viewBox='0 0 48 48'][aria-hidden=true][focusable=false]", count: 1
+    end
+    assert_select "div.content-block--card", count: 0
+    assert_select "article.tile b", count: 0
+
+    # The icon is drawn as its author wrote it: its layers and their classes, the filled dot, the fill that
+    # names the layout's gradient, its own size. Nothing was rewritten but the root's two added attributes.
+    assert_includes response.body, inner
+    assert_includes response.body, %(class="ribbon-back")
+    assert_includes response.body, %(<circle class="ribbon-dot" cx="24" cy="30" r="4" fill="currentColor"/>)
+    assert_includes response.body, %(fill="url(#tile-wash)")
+    assert_equal 1, response.body.scan(/\bid="tile-wash"/).size, "the gradient is defined once, by the layout, and the icon holds no id"
+    assert_not_includes inner, " id="
+
+    # Both schemes draw the same markup; what differs is the tokens it reads. The layout's gradient and the icon's
+    # classes take their colours from the Card's tokens, which the stylesheet declares for light and for dark.
+    css = Rails.root.join("test/fixtures/themes/card/assets/stylesheets/theme.css").read
+    assert_select "linearGradient#tile-wash stop[style*='var(--th-card-icon)']", minimum: 1
+    assert_match(/:root, \[data-theme="light"\]\s*\{[^}]*--th-card-ground:[^}]*--th-card-line:[^}]*--th-card-icon:/m, css)
+    assert_match(/\[data-theme="dark"\]\s*\{[^}]*--th-card-ground:[^}]*--th-card-line:[^}]*--th-card-icon:/m, css)
+    assert_match(/\.ribbon-back\s*\{[^}]*var\(--th-card-icon\)/, css)
+
+    with_plain_theme { get "/about-cards" }
+
+    assert_response :success
+    assert_select "div.content-block--card h3.content-block--card__title a[href='/about-cards']", text: "<b>Tile</b>"
+    assert_select "article.tile", count: 0
+    assert_select "div.content-block--card svg", count: 0
+  end
+
   test "a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one" do
     guide = create_page(title: "Guide")
     result = ContentBlocks::Save.call(ContentBlock.new(owner: guide), attributes: { block_type: "note", settings: { "kind" => "warning", "title" => "<b>Mind</b>" } },
@@ -684,6 +734,16 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     template = folder.read("components/blocks/note_component.html.erb")
     Theme::Contract.components.fetch("blocks/note_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
     assert_no_match(/settings|title\b|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name (the kind's word is `word`, not a key looked up), and no string marked safe")
+  end
+
+  test "the eighth theme is sound, checked deeply too: a Card template of the contract's names and an icon of its own" do
+    folder = ThemeFolder.new(ThemeTestHelper::CARD)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    template = folder.read("components/blocks/card_component.html.erb")
+    Theme::Contract.components.fetch("blocks/card_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
+    assert_no_match(/settings|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
+    assert_empty Theme::IconFile.problems(ThemeTestHelper::CARD.join("assets/images/icons/ribbon.svg"), file: "icons/ribbon.svg")
   end
 
   test "a theme replaces the Table block's template from the contract's names alone, and a theme that does not is drawn the default one" do

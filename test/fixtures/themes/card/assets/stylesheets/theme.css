@@ -1,0 +1,18 @@
+/* The eighth theme's stylesheet: its own Card template's rules, the Card's
+   three tokens declared again for both schemes, and the classes its own icon
+   is drawn with. */
+:root, [data-theme="light"] {
+  --th-card-ground: #fff8ee;
+  --th-card-line: #8a6a3a;
+  --th-card-icon: #9a4d00;
+}
+[data-theme="dark"] {
+  --th-card-ground: #241c10;
+  --th-card-line: #c9a66b;
+  --th-card-icon: #ffb866;
+}
+.tile { background: var(--th-card-ground); border: 2px solid var(--th-card-line); padding: var(--th-sp-3); }
+.tile__title { color: var(--th-ink); }
+.tile__text { color: var(--th-dim); }
+.ribbon-back { stroke: var(--th-card-icon); stroke-width: 2; }
+.ribbon-front { stroke: var(--th-card-icon); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; color: var(--th-card-icon); }

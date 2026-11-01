@@ -85,6 +85,15 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     BlockTypes::Note::ICONS.each_value { |icon| assert_includes section, "`#{icon}`" }
   end
 
+  # The Card block's section: what its template is handed, held to its line
+  # of the ledger, its three tokens named.
+  test "the Card block's table names exactly the methods of its entry, and the section names its tokens" do
+    section = section("The Card block")
+
+    assert_equal ContractLedger::COMPONENTS.fetch("blocks/card_component").sort, section.scan(/^\| `([^`]+)` \|/).flatten.sort
+    BlockTypes.fetch(:card).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
+  end
+
   # The Code block's own section: what its template is handed, the four
   # words and the markup the copy script reads, each table held to the code
   # it describes. The script's side is read from its file (`static targets`

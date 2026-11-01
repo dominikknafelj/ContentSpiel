@@ -42,6 +42,18 @@ module ThemeTestHelper
 
   def with_table_theme(&block) = Theme.with(table_theme, &block)
 
+  # An eighth theme (`test/fixtures/themes/card`): its own template for the
+  # Card block, written from the reference's section alone
+  # (docs/reference/theming.md, "The Card block"), one icon of its own that
+  # is drawn with classes, a filled shape, its own size and a gradient its
+  # layout defines, and a stylesheet that declares the Card's tokens again
+  # for both schemes.
+  CARD = Rails.root.join("test/fixtures/themes/card")
+
+  def card_theme = Theme.load(ThemeFolder.new(CARD))
+
+  def with_card_theme(&block) = Theme.with(card_theme, &block)
+
   # A sixth theme (`test/fixtures/themes/choices`): a theme.yml declaring two
   # section styles (the second labelled in en and de), the two page
   # templates, and one icon of its own (`brush`, labelled Design, a 24-unit
