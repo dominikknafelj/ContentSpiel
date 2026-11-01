@@ -120,7 +120,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a cached body picks up an image's media asset being deleted" do
+  test "a cached body stops showing an image once its page stops using it and the image is deleted" do
     with_memory_cache do
       asset = create_media_asset
       block = @root.content_blocks.create!(block_type: :rich_text, position: 0,

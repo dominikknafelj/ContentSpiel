@@ -19,8 +19,10 @@ module Media
   # afterwards: two generations are kept so a page cached under the old one
   # still finds its files.
   #
-  # The content version moves once per image, at the end, and only for an image a live page can show, because the library's
-  # widths change the `srcset` a cached page holds. The variant records the
+  # The content version moves once per image, at the end, and only for an
+  # image a live page can show, because the library's widths change the
+  # `srcset` a cached page holds; a failure after the size and preview were
+  # written moves it too, since a cached page holds neither. The variant records the
   # job makes do not bump (`config/initializers/public_site_version.rb`).
   #
   # A failure is retried twice and then recorded on the row by its class
@@ -54,11 +56,20 @@ module Media
 
       settings = ImageSettings.current
       fingerprint = settings.fingerprint
-      decode(asset)
-      return if asset.made_with?(fingerprint)
+      @decoded = false
+      begin
+        decode(asset)
+        return if asset.made_with?(fingerprint)
 
-      files = make_widths(asset, settings, span)
-      record(asset, fingerprint, files)
+        files = make_widths(asset, settings, span)
+        record(asset, fingerprint, files)
+      rescue StandardError
+        # A failure after the size and preview were written leaves no
+        # generation to bump for, but a cached page of a live image holds
+        # neither: the version moves here instead.
+        PublicSite.bump_version! if @decoded && asset.shown_publicly?
+        raise
+      end
     rescue Media::Decoding::Unreadable, Media::Decoding::TooManyPixels => e
       self.class.record_failure(asset, e)
     end
@@ -71,7 +82,8 @@ module Media
       return if asset.preview.present? && asset.width.present? && asset.height.present?
 
       result = asset.file.blob.open { |file| Media::Decoding.read(file, content_type: asset.content_type) }
-      asset.update_columns(width: result.width, height: result.height, preview: result.preview, has_alpha: result.alpha) # version: none (a derived size and preview of a file whose generation does not exist yet; the end of the job bumps)
+      @decoded = true
+      asset.update_columns(width: result.width, height: result.height, preview: result.preview, has_alpha: result.alpha) # version: none (a derived size and preview of a file whose generation does not exist yet; the end of the job bumps, a failure after this bumps too)
     end
 
     def make_widths(asset, settings, span)
@@ -98,7 +110,7 @@ module Media
       old_previous = renditions["previous"]
       current = { "fingerprint" => fingerprint, "files" => files }
 
-      asset.update_columns( # version: bumped at the end of this method, once for the image
+      asset.update_columns( # version: bumped at the end of this method, once for the image, when a live page can show it
         renditions: { "current" => current, "previous" => old_current }.compact,
         renditions_fingerprint: fingerprint, renditions_failed_at: nil, renditions_error: nil
       )

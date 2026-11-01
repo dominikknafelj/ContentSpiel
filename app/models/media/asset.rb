@@ -120,7 +120,6 @@ class Media::Asset < ApplicationRecord
     true
   end
 
-
   # The widths are made once the upload has committed, on the images queue
   # (`Media::RenditionJob`); until then the preview stands in for the image.
   after_create_commit { Media::RenditionJob.perform_later(self) }

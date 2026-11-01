@@ -61,27 +61,45 @@ class Media::AssetVersionTest < ActiveSupport::TestCase
     assert_equal before + 1, version
   end
 
-  test "an image a live page's block shows moves it, through the block" do
+  test "an image a live page's block shows moves it, through the block alone: a live page with no copy" do
     asset = upload
     page = create_page(title: "Blocks")
-    ContentBlock.create!(owner: page, block_type: :image, position: 0, media_asset: asset)
-    publish_changes(page)
+    block = ContentBlock.create!(owner: page, block_type: :image, position: 0, media_asset: asset)
+    Publishing::Version.of(page).delete_all
+    Media::Usage.where(media_asset_id: asset.id).delete_all
+    Media::UsageIndex.refresh(block)
 
-    assert Media::Usage.shown_publicly.where(media_asset_id: asset.id).exists?
+    usages = Media::Usage.where(media_asset_id: asset.id)
+    assert_equal [ "block_image" ], usages.pluck(:role)
+    assert usages.shown_publicly.exists?
     before = version
     asset.update!(alt: { "en" => "Block picture" })
     assert_equal before + 1, version
+
+    page.update_columns(published_at: nil) # version: none (a test)
+    assert_not asset.shown_publicly?
   end
 
   test "an image only a trashed page uses is not shown" do
     asset = upload
-    page = create_page(title: "Gone")
-    page.update!(hero_media_asset: asset)
-    Media::UsageIndex.refresh(page)
+    page = live_page_with(asset)
     assert asset.shown_publicly?
     page.update_columns(trashed_at: Time.current) # version: none (a test)
 
     assert_not asset.shown_publicly?
+  end
+
+  test "a job that fails after writing the size and preview still moves the version for a live image" do
+    asset = upload
+    live_page_with(asset)
+    asset.update_columns(preview: nil, width: nil, height: nil) # version: none (a row from before previews)
+    before = version
+    with_singleton_override(asset, :made_with?, ->(_fingerprint) { raise "boom" }) do
+      assert_raises(RuntimeError) { Media::RenditionJob.new.perform(asset) }
+    end
+
+    assert asset.reload.preview.present?
+    assert_equal before + 1, version
   end
 
   test "when the question raises the asset bumps" do
