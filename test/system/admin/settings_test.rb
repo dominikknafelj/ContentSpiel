@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The Settings screen in a real browser (round 3, Task 5): one form, one save
+# The Settings screen in a real browser: one form, one save
 # footer. Switching the language tabs is not a change and asks nothing, a
 # sidebar link or Back with a typed change asks first, a social link row added
 # and removed is counted and uncounted, Save toasts "Settings saved" with both
@@ -271,7 +271,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{footer} a[data-turbo-action]"
   end
 
-  # Task 9 M14: a file dropped beside a drop zone must not navigate away.
+  # A file dropped beside a drop zone must not navigate away.
   test "a file dropped on a screen that takes none is refused, not navigated to" do
     visit admin_settings_path
     await_admin_controllers
@@ -295,7 +295,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal [ true, true, false ], prevented
   end
 
-  # -- Languages (round 3, Task 6) ---------------------------------------------------
+  # -- Languages ---------------------------------------------------
 
   def language_tab_names = page.all("#settings-site-card nav.admin-language-tabs [role=tab]").map(&:text)
 

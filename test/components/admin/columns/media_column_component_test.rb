@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A library image field (media library Task 8): the hidden id input
+# A library image field: the hidden id input
 # autosave sends, the thumbnail, Choose/Change and Remove.
 class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
   include ActiveJob::TestHelper
@@ -23,7 +23,7 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_no_selector "input[type=file]", visible: :all
   end
 
-  # Round 3 Task 9: no `media.upload` means no picker on the page, so the field
+  # No `media.upload` means no picker on the page, so the field
   # offers Remove only and says why Choose is missing.
   test "without media.upload there is no Choose, Remove stays, and the field says why" do
     asset = Media::Asset.new(title: "Lake")
@@ -42,7 +42,7 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_no_text "You can't choose images."
   end
 
-  # Final fix wave (M12): a refused choice's message is announced.
+  # A refused choice's message is announced.
   test "the error slot is a polite live region" do
     render_column(nil, errors: [ "Hero image doesn't exist" ])
 

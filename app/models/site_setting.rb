@@ -39,7 +39,7 @@ class SiteSetting < ApplicationRecord
   normalizes :mail_server, :mail_security, :mail_sender_name, :mail_sender_address,
     :mail_username, :mail_password, with: ->(value) { value.to_s.strip.presence }
 
-  # Settings → Mail's fields (spec "Settings → Mail", plan Review Focus 2),
+  # Settings → Mail's fields (spec "Settings → Mail"),
   # each a sentence of its own (config/locales/en.yml). Checked only when the
   # field changes, like the time zone: a value written around the model must
   # not block an unrelated save.
@@ -105,7 +105,7 @@ class SiteSetting < ApplicationRecord
   # option values are Rails names -- a stored "Europe/Berlin" matched no
   # option, the browser showed the first one instead, and the next autosave
   # of *any* field (the form resends everything) silently wrote
-  # "International Date Line West" back (final fix wave, I2).
+  # "International Date Line West" back.
   #
   # Validated only when it changes: a value written around the model that
   # no Rails name covers (raw SQL, a restored backup) is still shown and
@@ -299,7 +299,7 @@ class SiteSetting < ApplicationRecord
     end
   end
 
-  # Final fix wave (E): a link the footer can't render -- `github.com/dana`
+  # A link the footer can't render -- `github.com/dana`
   # typed without its scheme, most often -- is an error where it's typed,
   # rather than saving fine and then silently never appearing.
   def social_links_are_safe

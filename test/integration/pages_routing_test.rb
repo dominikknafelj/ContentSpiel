@@ -533,7 +533,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "English only"
   end
 
-  # `format: false` on the route (added earlier) only stops a URL segment like
+  # `format: false` on the route only stops a URL segment like
   # ".json" from being read as a format -- it says nothing about a request that
   # names a format through its `Accept` header instead. Without pinning the
   # format, `render :show` still negotiates against the header, finds no
@@ -566,7 +566,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_select "header img[src^='/rails/active_storage/representations/proxy/']"
   end
 
-  # Media library Task 5 fix round 1 (I2): the hero's alt text is
+  # The hero's alt text is
   # `Media::Asset#alt_text(override:, locale:)`'s own "override, then the
   # asset's default" chain (`app/views/pages/show.html.erb`), same as an
   # image block's -- pinned here at the public HTTP layer since no
@@ -585,7 +585,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_select "header img[alt='Library default alt']"
   end
 
-  # Final fix wave (I1): the override counts only in the locale it's written
+  # The override counts only in the locale it's written
   # in. On a `de` page, a `hero_alt` set only in `en` must not beat the
   # asset's own `de` default -- per locale, the override and then the
   # asset, walking the fallback chain.
@@ -602,7 +602,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_select "header img[alt='English override']"
   end
 
-  # Final fix wave (M4): the hero is the first thing a landing page shows,
+  # The hero is the first thing a landing page shows,
   # so it loads eagerly at high priority; every other image stays lazy.
   test "the hero image loads eagerly with a high fetch priority" do
     root = Page.create!(page_type: :landing, title: "Welcome", slug: "", published_at: Time.current,
@@ -728,7 +728,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "youtube-nocookie.com/embed/dQw4w9WgXcQ"
   end
 
-  # Task 11 fix round 1: a title with no Latin letters (Japanese, here) gets a
+  # A title with no Latin letters (Japanese, here) gets a
   # Unicode slug (`LocalizedSlug#slugify`'s fallback for a blank
   # `parameterize`), and `PublicPath.path` stores that slug literally, raw
   # UTF-8 -- not percent-encoded. What actually crosses the wire in a real

@@ -1,5 +1,5 @@
 module Admin
-  # The Media module (media library design spec §6, Task 7; round 3 Task 8): the
+  # The Media module (media library design spec §6): the
   # grid (search, segments with counts, pagination) with one image's side panel
   # beside it (`/media?selected=ID`), and its own
   # multi-file upload -- every write still goes through `Media::Upload`/
@@ -26,8 +26,8 @@ module Admin
     PER_PAGE = 48
 
     before_action -> { require_permission("media.upload") }, only: %i[index show create]
-    # `update` and `destroy` are gated too, BEFORE the asset is looked up
-    # (final fix wave, S-M7): left to the services alone, a user with no media
+    # `update` and `destroy` are gated too, BEFORE the asset is looked up:
+    # left to the services alone, a user with no media
     # right at all got the 404 for an id that names nothing and the service's
     # 403 for one that exists -- which tells them which ids exist. The gate is
     # "holds a right that could ever let these through", so it changes nothing
@@ -37,7 +37,7 @@ module Admin
     before_action -> { forbidden! unless holds_any?(%w[media.upload media.manage]) }, only: %i[update destroy]
     before_action :set_asset, only: %i[show update destroy]
 
-    # The grid (design spec §6, round 3 Task 8): search (title, alt in any
+    # The grid (design spec §6): search (title, alt in any
     # locale, filename) and the segments All / Unused / Missing alt /
     # Untranslated / Mine, newest first, 48 tiles a page, each segment with its
     # count (`Media::Search#counts`: respects the search, not the segment).
@@ -57,8 +57,8 @@ module Admin
     # and a trashed image only ever opens from the Trash); it is NOT "the grid
     # without a panel", which would hide that a link has gone stale.
     #
-    # `picker=1` is the same listing for `Media::PickerComponent` (round 3,
-    # Task 9): the toolbar, the grid and the pagination, rendered on their own
+    # `picker=1` is the same listing for `Media::PickerComponent`: the
+    # toolbar, the grid and the pagination, rendered on their own
     # inside the picker's `<turbo-frame id="media-picker-grid">`
     # (`admin/media/picker`, no layout) with select buttons instead of panel
     # links. Deliberately this endpoint rather than a second one: one search,

@@ -32,7 +32,7 @@ class Media::UploadTest < ActiveSupport::TestCase
     assert_not Audit::Event.exists?(action: "media.uploaded")
   end
 
-  # Design spec Review Focus 1: the library never silently dedupes an
+  # The library never silently dedupes an
   # upload -- only the one-off data migration collapses identical files.
   test "uploading the same file twice makes two assets" do
     assert_difference "Media::Asset.count", 2 do

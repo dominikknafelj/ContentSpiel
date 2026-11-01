@@ -1,9 +1,9 @@
 require_relative "../preview_fixtures"
 
 module Media
-  # `Media::PictureComponent` (media library design spec §4, Task 5): a
+  # `Media::PictureComponent` (media library design spec §4): a
   # processed asset with a real `srcset`, an unprocessed one (no `srcset`
-  # attribute at all, Review Focus 3), and a missing asset (renders
+  # attribute at all), and a missing asset (renders
   # nothing).
   class PictureComponentPreview < ViewComponent::Preview
     def with_srcset

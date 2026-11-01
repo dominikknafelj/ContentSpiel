@@ -58,7 +58,7 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_selector "a[data-turbo-frame='content'][data-turbo-action='advance']"
   end
 
-  # Round 3 Task 9: the picker's tile is a button that selects, not a link.
+  # The picker's tile is a button that selects, not a link.
   test "a pick tile is a button with the picker's id, the select actions and the payload" do
     asset = create_media_asset
     Mobility.with_locale(:en) { asset.update!(alt: "A dune", caption: "At dusk") }

@@ -292,7 +292,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
 
     # A tab left open on a page someone else trashed keeps autosaving, in
-    # the exact shape the page editor sends (Review Focus 4).
+    # the exact shape the page editor sends.
     patch "/cs-studio/pages/#{@gone_page.id}", params: { page: { title: "Revived?" }, base_updated_at: @gone_page.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :not_found
     patch "/cs-studio/posts/#{@gone_post.id}", params: { post: { title: "Revived?" }, base_updated_at: @gone_post.updated_at.iso8601(6) }, as: :turbo_stream
@@ -466,7 +466,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # --- Final fix wave (S-M8): four readers added in round 3 --------------------
+  # --- four more readers -------------------------------------------------------
 
   # The Settings screen's "(N items)" in the default-language dialog
   # (`Translations::StateIndex.translated_record_count`): a trashed record's
@@ -617,7 +617,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ 1 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }
     get "/cs-studio/notes/post/#{@kept_post.id}/threads"
     assert_equal [ 1, 1 ], [ response.parsed_body["open"], response.parsed_body["threads"].size ]
-    # The search (pages in the mind graph, Task 7) finds pages too, and a tag
+    # The search (pages in the mind graph) finds pages too, and a tag
     # a page's list block names: neither the trashed page ("Gone page") nor
     # the trashed post, nor a tag only a trashed page lists, is a row.
     listed = Tag.create!(name: "gone-listed")
@@ -631,7 +631,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ "tag-#{listed.id}" ], response.parsed_body.map { |row| row["id"] }
   end
 
-  # The mind graph's tag nodes (round 3, Task 17): a tag counts only the KEPT
+  # The mind graph's tag nodes: a tag counts only the KEPT
   # readable posts carrying it, so a trashed one neither lists it nor makes a tag
   # that only it shared a node.
   test "the mind graph's tag nodes count kept posts only" do
@@ -669,7 +669,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   end
 
   # A page as the mind graph's focus, and the list's two reads (pages in the
-  # mind graph, Task 4): a trashed page is no focus, from the page, from
+  # mind graph): a trashed page is no focus, from the page, from
   # `data` and from `listed` alike; a trashed post is no row of either read
   # and in no total; a trashed page lists nothing, so its posts are unlisted;
   # and a kept page's local view names no trashed page and no trashed post.
@@ -725,7 +725,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  # What the mind graph loads of the site (pages in the mind graph, Task 2):
+  # What the mind graph loads of the site (pages in the mind graph):
   # `PostGraph::Site` holds no trashed page and no trashed post, so no line
   # of a trashed page's list block, no count and no "listed" comes from one.
   test "what the mind graph loads of the site holds no trashed page, no trashed post and no line of a trashed page's list block" do
@@ -751,7 +751,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ @blog.id, @kept_page.id ].sort, PostGraph.paths(Page.pluck(:id), locale: :en).keys.sort - [ root_page.id ], "a trashed page has no current address to hand up"
   end
 
-  # The Tags list (round 3, Task 13): its "Posts" column counts the KEPT posts the
+  # The Tags list: its "Posts" column counts the KEPT posts the
   # viewer may read, and links to the posts list for the tag, which shows the same
   # ones. The dialogs' number is the one place a trashed post is counted on
   # purpose -- a delete or merge reaches it too (what `tag.merged` records) -- so
@@ -774,7 +774,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   end
 
   # The posts list's own filters, search, scope counts and pagination, and the
-  # bulk endpoints (design pass round 2, Task 17): every one of them is kept
+  # bulk endpoints (design pass round 2): every one of them is kept
   # posts only, a trashed id is "not found", and Undo restores only trashed ones.
   test "the posts list's search, scope, type, tag and translation filters, counts and pager never include a trashed post" do
     sign_in_as users(:one)
@@ -875,7 +875,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{@gone_asset.id}", count: 0
   end
 
-  # Round 3 Task 9: the picker's frame answers a query and a segment too, and
+  # The picker's frame answers a query and a segment too, and
   # an upload's answer counts only what is kept.
   test "the picker's searched and segmented frame hides trashed images, and an upload's counts skip them" do
     sign_in_as users(:one)

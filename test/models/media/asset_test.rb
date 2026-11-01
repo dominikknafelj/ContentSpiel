@@ -150,7 +150,7 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert asset.reload.display_url(min_width: 480).start_with?("data:image/webp")
   end
 
-  # Fix round 1's I3: this class only knows how to sniff bytes out of a
+  # This class only knows how to sniff bytes out of a
   # `Hash`/`UploadedFile`-shaped attachable -- a signed blob id String
   # (Active Storage's own "attach an already-uploaded blob" shape, e.g. a
   # direct upload) resolves to an *already*-persisted, already-uploaded
@@ -181,7 +181,7 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert asset.valid?
   end
 
-  # Fix round 1's I4: the served Content-Type (`file.blob.content_type`) --
+  # The served Content-Type (`file.blob.content_type`) --
   # not just this record's own cached `content_type` column -- must equal
   # the sniffed type, even when the upload's own declared Content-Type and
   # filename both lie about it. A `.png` extension with a `text/html`
@@ -193,12 +193,12 @@ class Media::AssetTest < ActiveSupport::TestCase
     asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "x.html", content_type: "text/html")
     assert asset.save, asset.errors.full_messages.to_sentence
 
-    # From the database (final fix wave, P4): the in-memory blob could hold
+    # From the database: the in-memory blob could hold
     # the forced value without it ever having been written.
     assert_equal "image/png", ActiveStorage::Blob.find(asset.file.blob.id).content_type
   end
 
-  # Final fix wave (C, P5): an already-persisted blob attached by signed id
+  # An already-persisted blob attached by signed id
   # keeps its stored `content_type` -- which is what it's served with -- and
   # this class never rewrites another record's blob. So when that stored
   # type disagrees with the bytes, the attachment is refused rather than
@@ -214,7 +214,7 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_includes asset.errors[:file], "doesn't match its stored content type"
   end
 
-  # Task 2 (media library sub-project): `title` is the one field a library
+  # `title` is the one field a library
   # listing/picker always has *something* to show, so it defaults from the
   # upload's own filename the moment it's blank -- but only then, so an
   # editor's own title (or a deliberate rename) always sticks.
@@ -258,7 +258,7 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_equal "", asset.alt_text(override: nil, locale: "de")
   end
 
-  # Final fix wave (I1): a translated override (a block's `alt`, a page's
+  # A translated override (a block's `alt`, a page's
   # `hero_alt`) arrives as its `{locale => value}` hash and is interleaved
   # per locale -- the override in a locale, then the asset in that locale,
   # then the next locale in the fallback chain -- so another locale's

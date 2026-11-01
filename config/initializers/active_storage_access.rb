@@ -1,4 +1,4 @@
-# Final fix wave (C, P6): Active Storage's *write* endpoints require a
+# Active Storage's *write* endpoints require a
 # signed-in user.
 #
 # Rails draws `POST /rails/active_storage/direct_uploads` (creates a blob

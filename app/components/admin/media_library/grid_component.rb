@@ -13,7 +13,7 @@ module Admin
   # write `::Media::` on its own account. `test/lib/admin_namespace_shadow_
   # test.rb` guards against this regressing, for every domain module.
   module MediaLibrary
-    # The Media module's own grid (media library design spec §6, round 3 Task 8):
+    # The Media module's own grid (media library design spec §6):
     # one `TileComponent` per asset, each linking to `/media?selected=ID` (the
     # side panel, `PanelComponent`) with the grid's own state (`link_params`:
     # `q`, `filter`, `page`) kept; `selected_id` is the tile with the ring.

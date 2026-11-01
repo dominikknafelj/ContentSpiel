@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The one media picker (media library design spec §6, Task 8; round 3 Task 9):
+# The one media picker (media library design spec §6):
 # `Media::PickerComponent`, a modal that is the Media grid in miniature -- instant
 # search, segments, selectable tiles, a header Upload and a footer "N selected ·
 # Cancel · Use image" -- opened from the page hero field, an image block's image
@@ -69,7 +69,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     # The public page renders it responsively. The site shows the page's
     # published copy, so the hero chosen in the editor is published first
-    # (setup fix, Task 5).
+    # (setup fix).
     publish_changes(@landing)
     visit "/landing"
     assert_selector "header img[src='#{@asset.src}'][srcset*='480w']"
@@ -86,12 +86,11 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     find(".ProseMirror").click
     press_insert "Image"
-    # Picking opens the image dialog (Task 13), so not `pick_from_library`,
+    # Picking opens the image dialog, so not `pick_from_library`,
     # which waits for every dialog to close.
     within("dialog[open]") { click_on @asset.title; click_on "Use image" }
     assert_selector "dialog#rich-text-image-dialog[open]"
-    # The per-use fields show the image's own defaults as placeholders
-    # (fix round 1, I1).
+    # The per-use fields show the image's own defaults as placeholders.
     within("dialog#rich-text-image-dialog[open]") do
       assert_field "Alt text", with: "", placeholder: "A wide view"
       assert_field "Caption", with: "", placeholder: "Wide"
@@ -307,7 +306,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_no_image_chosen after_a_save: "Landing, nothing chosen"
   end
 
-  # Fix round 1 (I2), with a realistic trigger: the image is deleted
+  # With a realistic trigger: the image is deleted
   # between opening the picker and picking it. The save is refused
   # ("doesn't exist"), the field goes back to the stored hero with the
   # message showing, and the next autosave doesn't resend the refused id.
@@ -322,7 +321,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert delete_for_good(doomed)
     pick_from_library(doomed)
 
-    # Waited for outside `within` first (final fix wave): the refusal
+    # Waited for outside `within` first: the refusal
     # replaces the whole section, and a `within` scope found before that
     # stream lands goes stale (Cuprite's ObsoleteNode) instead of retrying.
     # A longer wait than Capybara's 2s default: picking runs an autosave

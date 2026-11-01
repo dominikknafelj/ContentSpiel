@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `Media::PictureComponent` (media library design spec §4, Task 5): the one
+# `Media::PictureComponent` (media library design spec §4): the one
 # place every image render on this site builds its `<img>` tag from. Every
 # other image component (`Blocks::ImageComponent`, `RichText::ImageComponent`,
 # the page hero) renders through this one, so its own contract -- what ends
@@ -38,7 +38,7 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     assert(candidates.none? { |candidate| candidate.include?("/blobs/") })
   end
 
-  # Final fix wave (M4): lazy by default; a caller (the hero) can ask for
+  # Lazy by default; a caller (the hero) can ask for
   # eager loading at a high fetch priority.
   test "loading and fetchpriority can be set, and default to lazy and none" do
     render_inline(Media::PictureComponent.new(asset: create_media_asset, alt: "x"))
@@ -56,7 +56,7 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     assert_equal "(min-width: 768px) 768px, 100vw", page.find("img")["sizes"]
   end
 
-  # Review Focus 3: a variant that hasn't finished processing (or never
+  # A variant that hasn't finished processing (or never
   # will -- a GIF, or a corrupt upload `Media::Asset#srcset` caught and
   # logged) must never keep the page from rendering an image at all, just
   # from offering a `srcset` for it.

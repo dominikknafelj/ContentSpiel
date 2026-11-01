@@ -1,7 +1,7 @@
 # One library image (media library design spec §3.1): what a page's hero
 # (`Page#hero_media_asset`), an image block (`ContentBlock#media_asset`) and
 # a rich-text `image` node's `asset_id` (`RichText::BuiltIns`) all reference
-# -- since Task 4 there is one storage path for all three. Uploaded through
+# -- there is one storage path for all three. Uploaded through
 # `Media::Upload`; where it's used is indexed in `media_usages`
 # (`Media::UsageIndex`), and the FKs into `media_assets` keep a used
 # asset from being deleted. Cleanup of unused assets is manual only.
@@ -10,8 +10,8 @@ class Media::Asset < ApplicationRecord
   include Trashable
 
   # Zeitwerk infers a namespaced model's table name by demodulizing it
-  # (`Media::Asset` -> `assets`), so this has to be explicit: Task 1 (media
-  # library sub-project) renamed the bare `MediaAsset` to `Media::Asset` for
+  # (`Media::Asset` -> `assets`), so this has to be explicit: the media
+  # library renamed the bare `MediaAsset` to `Media::Asset` for
   # the constant alone, keeping the existing `media_assets` table (global
   # constraints: "the table `media_assets` is unchanged") -- the data, and
   # every foreign key/polymorphic `record_type`/`subject_type` string that
@@ -46,7 +46,7 @@ class Media::Asset < ApplicationRecord
   # whenever an owner's own state might have changed, never written to
   # directly. `dependent:` is deliberately left unset: the database's own
   # FK (NO ACTION, see `MediaForeignKeysNoAction`) is what actually backs "can't delete an
-  # asset that's in use" (global constraints, Review Focus 4) -- an
+  # asset that's in use" (global constraints) -- an
   # `:restrict_with_exception` here would only intercept an ordinary
   # `#destroy` with a *different* exception (`DeleteRestrictionError`)
   # before the query ever reaches Postgres, which would both duplicate the
@@ -117,10 +117,11 @@ class Media::Asset < ApplicationRecord
   # callback is piggybacking on.
   #
   # Both this and `image_type_and_size` run only when a file is being
-  # attached (`#file_changing?`, final fix wave I2): the file never changes
-  # after upload, so re-checking it on an edit of the title or alt text
-  # re-read it from the storage service -- a download of up to 10 MB per
-  # autosave, and a failed save whenever the stored file was unreachable.
+  # attached (`#file_changing?`): the file never changes after upload, so
+  # an edit of the title or alt text never reads it from the storage
+  # service again -- that would be a download of up to the largest upload
+  # (Settings → Images) per autosave, and a failed save whenever the stored
+  # file was unreachable.
   before_save :cache_metadata_from_file, if: :file_changing?
 
   # A committed change to a library image (an upload, its title, alt or
@@ -221,7 +222,7 @@ class Media::Asset < ApplicationRecord
   #   on their own, config/initializers/mobility.rb);
   # - a `{locale => value}` Hash -- a *translated* override column read
   #   whole (`block.read_attribute(:alt)`, `page.read_attribute(:hero_alt)`).
-  #   Final fix wave (I1): the two are interleaved per locale -- the
+  #   The two are interleaved per locale -- the
   #   override in a locale, then this asset in that locale, then the next
   #   locale in `Locales.fallback_chain`. Resolving the override through the
   #   chain first (what `translated(block, :alt)` did) let an `en`-only
@@ -334,7 +335,7 @@ class Media::Asset < ApplicationRecord
   def in_use_message(kept_only: false, actor: Current.actor)
     scope = kept_only ? usages.by_kept_owner : usages
     loaded = scope.includes(:owner).order(:id).to_a
-    # Fix round 1 (review of `0695e7a`): batches the `ContentBlock#owner`
+    # Batches the `ContentBlock#owner`
     # second hop for every block-owned row in one shot, one query per
     # owner type (Page, Post) -- see `.preload_usage_places`'s own comment
     # for why this can't just share `#usages_summary`'s own query (this
@@ -355,7 +356,7 @@ class Media::Asset < ApplicationRecord
   # Batches the second hop every caller of a `media_usages` row's owner
   # needs for a `block_image`/`rich_text` usage: which page or post the
   # owning `ContentBlock` actually sits on (`ContentBlock#owner`, itself
-  # polymorphic). Fix round 1 (review of `0695e7a`): `#usages_summary`'s
+  # polymorphic). `#usages_summary`'s
   # own `owner: group.first.owner` and `#in_use_message`'s
   # own `usage_place_of` both used to call that bare `.owner` once per
   # `ContentBlock`-owned usage -- fine for the "and 2 more" case `#in_use_
@@ -442,8 +443,8 @@ class Media::Asset < ApplicationRecord
     attachment_changes["file"].present? && file.attached?
   end
 
-  # The one rule design spec §4.2 states (global constraints: "png/jpeg/gif/
-  # webp only, max 10 MB") -- checked against the blob's *actual* bytes, not
+  # The one rule design spec §4.2 states: png/jpeg/gif/webp only, and no
+  # larger than the largest upload (Settings → Images) -- checked against the blob's *actual* bytes, not
   # whatever the upload's own Content-Type header or filename claimed (see
   # `#sniffed_content_type`'s own comment: that's exactly the pair an
   # attacker controls, and exactly the pair Marcel's own sniffing falls back
@@ -473,7 +474,7 @@ class Media::Asset < ApplicationRecord
     errors.add(:file, :unreadable)
   end
 
-  # Final fix wave (C, P5): an already-persisted blob (attached by signed id,
+  # An already-persisted blob (attached by signed id,
   # or as an `ActiveStorage::Blob`) is served with *its own* stored
   # `content_type`, which `#force_blob_content_type` deliberately never
   # rewrites (it's some other record's committed row). So the sniff passing
@@ -497,9 +498,9 @@ class Media::Asset < ApplicationRecord
   # the one answer this validation is willing to trust.
   #
   # `nil` (never a raise) when `#with_attachable_io` can't get at the bytes
-  # at all -- an attachable this class doesn't know how to read yet (fix
-  # round 1's I3: a signed blob id String, or an `ActiveStorage::Blob`
-  # that's itself still unsaved). `ALLOWED_CONTENT_TYPES.include?(nil)` is
+  # at all -- an attachable this class doesn't know how to read yet (an
+  # unsaved `ActiveStorage::Blob`, or a bare `File` or `Pathname`, for a
+  # blob not yet uploaded: see `#with_attachable_io`). `ALLOWED_CONTENT_TYPES.include?(nil)` is
   # `false`, so that's just an ordinary "must be a PNG, JPEG, GIF, or WEBP
   # image" validation failure, exactly like a real file of some other type
   # would produce -- not a distinct error message, since from a caller's
@@ -548,7 +549,7 @@ class Media::Asset < ApplicationRecord
   # sniff is exactly as safe as Active Storage's own eventual upload
   # reading it a third time once this record is actually saved.
   #
-  # Any *other* attachable shape for a still-new blob (fix round 1's I3: a
+  # Any *other* attachable shape for a still-new blob (a
   # bare `File`/`Pathname` passed directly, say -- `.attach` accepts both,
   # this class just has no reader taught for either yet) has no safe way to
   # read bytes from at all -- yielding `nil` here, not calling an arbitrary
@@ -583,7 +584,7 @@ class Media::Asset < ApplicationRecord
     self.has_alpha = @decoded.alpha
   end
 
-  # Fix round 1's I4: `file.blob.content_type` -- the column that actually
+  # `file.blob.content_type` -- the column that actually
   # decides what Content-Type this asset gets *served* with
   # (`ActiveStorage::Blob#service_metadata`) -- otherwise still comes from
   # Rails' own `unfurl`, which (by default, `identify: true`) re-derives it

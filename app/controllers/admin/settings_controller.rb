@@ -1,5 +1,5 @@
 module Admin
-  # The Settings module (cs-studio spec §6.1; round 3, Task 5): one screen of
+  # The Settings module (cs-studio spec §6.1): one screen of
   # cards -- Site, Languages, Publishing, AI translation -- and ONE form
   # (`#settings-form`) with ONE save footer. Settings no longer autosaves
   # (design pass spec §4, handoff B12): `PATCH /settings` is an ordinary form
@@ -51,7 +51,7 @@ module Admin
     # `Locales::MakeDefault`; the service still accepts `default_locale` for
     # the setup wizard, so this list is what keeps a settings-only user from
     # changing it from here), and neither is `locales`. The language ORDER and
-    # fallbacks are `languages` (rows of `code` and `fallback`; round 3, Task 6).
+    # fallbacks are `languages` (rows of `code` and `fallback`).
     # Every enabled language's title and tagline arrive together,
     # `translations[<code>][title|tagline]`.
     #

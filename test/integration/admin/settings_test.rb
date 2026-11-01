@@ -1,7 +1,7 @@
 require "test_helper"
 
-# The Settings screen is one form with one save footer (round 3, Task 5,
-# decisions D4/D6/D9): every enabled language's title and tagline are in the
+# The Settings screen is one form with one save footer (decisions
+# D4/D6/D9): every enabled language's title and tagline are in the
 # page at once, a save is an ordinary PATCH that redirects (303) with a toast,
 # a refusal re-renders at 422 with the error summary, and a save on a stale
 # base is refused at 409. Nothing here answers a Turbo Stream.
@@ -397,7 +397,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "[role=alert]", text: /Settings were changed in another tab or window\s+just now\.\s+Reload to see the latest — your changes are still in the form\./
   end
 
-  # -- the key's instant action and the form's base (I2) ------------------------
+  # -- the key's instant action and the form's base -----------------------------
 
   def save_key(carried_base, key = "sk-ant-new-key")
     patch "/cs-studio/settings/ai_key", params: { site_setting: { ai_api_key: key }, main_base_updated_at: carried_base }, as: :turbo_stream

@@ -1,7 +1,7 @@
 require "test_helper"
 
 # `Admin::MediaLibrary::PanelComponent`'s trash-aware "Used on" panel (trash
-# spec §4.1/§5.1, Task 4): a trashed owner is never listed as a place the image
+# spec §4.1/§5.1): a trashed owner is never listed as a place the image
 # is used, and an asset used only by trashed owners says so (naming only the
 # ones the viewer may read) instead of the ordinary "Not used anywhere yet".
 # These tests set `trashed_at` directly the same way
@@ -131,7 +131,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_text "Not used anywhere yet."
   end
 
-  # Task 10: Move to trash is disabled only while a *kept* owner uses the
+  # Move to trash is disabled only while a *kept* owner uses the
   # image -- an asset used solely by something already in the trash is the
   # same "trash_only" state as the first test above, and `Trash::Move`
   # itself would let this one through, so the button must too.

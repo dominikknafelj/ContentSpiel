@@ -80,7 +80,7 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
     assert_no_active_storage_url(response.body)
   end
 
-  # The pinned cost of the thread view (Task 16): ONE read more than before
+  # The pinned cost of the thread view: ONE read more than before
   # files, for the attachments of all its messages with their blobs joined
   # in -- whatever the number of messages and of files. The list reads none.
   test "the thread view reads its files in one statement, with three files on one message or eleven on eight" do

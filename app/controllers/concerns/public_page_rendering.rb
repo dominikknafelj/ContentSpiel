@@ -133,7 +133,7 @@ module PublicPageRendering
   # A page's rendered body (`pages/show.html.erb`) reads its hero and every
   # image block's own `media_asset` -- one association access each, per
   # block, that `Blocks::ImageComponent`/the hero render would otherwise
-  # send to the database one at a time (Task 4 review: a page with N image
+  # send to the database one at a time (a page with N image
   # blocks cost N queries just to find each block's asset, before
   # `Media::PictureComponent` even asks that asset for its `srcset`).
   # `ActiveRecord::Associations::Preloader`, not `.includes(...)` on a fresh

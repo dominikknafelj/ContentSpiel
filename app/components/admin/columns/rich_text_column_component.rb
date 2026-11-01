@@ -45,7 +45,7 @@ module Admin
     # `locale:`, `id:`, `html_name:` -- is exactly `Admin::Columns::Base`'s.
     # `value`/`original` are a `RichText::Document`, a document Hash, or nil.
     #
-    # Images come from the library (media library Task 8): the Image button
+    # Images come from the library: the Image button
     # opens `Media::PickerComponent` (rendered once by the admin layout) and
     # the picked asset is inserted as `image{asset_id}` -- the picker's
     # `media-picker:picked` event bubbles from the button to this

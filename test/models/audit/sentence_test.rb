@@ -1,7 +1,6 @@
 require "test_helper"
 
-# `Audit::Sentence` words one audit event as plain data (design pass round 3,
-# Task 15): the log, the event page and the dashboard all use it.
+# `Audit::Sentence` words one audit event as plain data: the log, the event page and the dashboard all use it.
 class Audit::SentenceTest < ActiveSupport::TestCase
   setup { @me = users(:one) }
 

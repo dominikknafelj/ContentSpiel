@@ -92,7 +92,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
     assert_select ".content-block--rich-text a[href='/preview/draft']", text: "the draft"
   end
 
-  # Fix round 1 (I1): with a real cache store (the suite otherwise runs on
+  # With a real cache store (the suite otherwise runs on
   # :null_store), a cached render must not outlive a change to what its
   # internal links point at -- publishing the target, deleting it, renaming
   # its slug -- none of which changes the document's own digest.

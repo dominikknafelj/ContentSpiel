@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 // A library image field -- a page's hero, an image block's image
-// (`Admin::Columns::MediaColumnComponent`, media library Task 8; see that
+// (`Admin::Columns::MediaColumnComponent`; see that
 // component for the markup and the save contract).
 //
 // Choose/Change opens the one picker (`admin--media--picker`, via

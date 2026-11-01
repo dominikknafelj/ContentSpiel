@@ -448,7 +448,8 @@ module RichText
     # One `Media::Asset` per blob, however many bodies (or languages) embed
     # it: an existing asset already holding this blob is reused, and one
     # created earlier in this run is remembered in `@assets`. The asset's
-    # own validation (bytes sniffed, png/jpeg/gif/webp, 10 MB) decides
+    # own validation (bytes sniffed, png/jpeg/gif/webp, no larger than the
+    # largest upload in Settings → Images) decides
     # whether the blob is an image at all -- the attachment's own
     # `content-type` attribute is just what the editor claimed.
     def image_from_blob(element, blob_id)

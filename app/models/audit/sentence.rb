@@ -1,6 +1,5 @@
 module Audit
-  # One audit event told as one English sentence (design pass round 3, Task
-  # 15) -- the audit log's rows, the event page's title and the dashboard's
+  # One audit event told as one English sentence -- the audit log's rows, the event page's title and the dashboard's
   # "Recent activity" all word an event through here, so they can't tell one
   # event two ways.
   #

@@ -4,7 +4,7 @@ module Audit
   # 3's versioning will build on), what changed (`.field_changes_for`), and a
   # human label that outlives the record (`.label_for`).
   #
-  # Secrets never reach the log (Review Focus 5). Two layers:
+  # Secrets never reach the log. Two layers:
   # - each serializer below names what it stores rather than dumping
   #   `attributes` for the sensitive models (users, tokens), so a column
   #   added to `users` later isn't logged until someone decides it should be;
@@ -123,7 +123,7 @@ module Audit
     # bounded, but every snapshot of it on the append-only log would repeat
     # those copies next to the body they were taken from. The snapshot keeps
     # what says *which* version a translation was made against (`digest`,
-    # `saved_at`, `from`), not the text (final review A, M6).
+    # `saved_at`, `from`), not the text.
     def without_source_text(hash)
       sources = hash["translation_sources"]
       return hash unless sources.is_a?(Hash)

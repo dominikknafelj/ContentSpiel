@@ -285,7 +285,7 @@ class RichText::HtmlImportTest < ActiveSupport::TestCase
     assert_includes document.to_h.to_json, "deep"
   end
 
-  # Final fix wave (A): imported HTML goes through `RichText::ContentRepair`
+  # Imported HTML goes through `RichText::ContentRepair`
   # too, so a migrated body is one the editor can load -- a code face
   # inside bold, an empty quote, a list item opening with an embed.
   test "imported documents satisfy the editor's content model" do

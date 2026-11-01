@@ -1,5 +1,5 @@
 # Gets a single library image by id, including where it's used (media
-# library design spec §5.2/§6, Task 9) -- an agent choosing an image (or
+# library design spec §5.2/§6) -- an agent choosing an image (or
 # deciding whether one is safe to stop using) wants more than the summary
 # `list_media_tool` gives.
 #
@@ -32,7 +32,7 @@ module Mcp
         title: "Get media")
 
       def self.call(id:, locale: nil, server_context:)
-        # `allowed?`, not `holds?` (final fix wave, M9): `holds?` answers
+        # `allowed?`, not `holds?`: `holds?` answers
         # "anywhere, under any scope" for navigation and buttons only
         # (`AccessControl.holds?`'s own comment); an authorization check
         # goes through `allowed?`. `media.upload` is an admin-area key with
@@ -65,7 +65,7 @@ module Mcp
           id: asset.id,
           title: asset.title,
           alt: asset.alt_text(override: nil, locale: locale),
-          # The default caption (final fix wave, M5), nil when there's none
+          # The default caption, nil when there's none
           # in any language -- what a directive without `caption=` shows.
           caption: asset.caption_text(override: nil, locale: locale),
           width: asset.width,

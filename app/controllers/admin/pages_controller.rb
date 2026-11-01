@@ -1,6 +1,6 @@
 module Admin
   # The Pages module (cs-studio spec §4.1/§5.1), at its own `/pages`
-  # (dashboard spec Task 2 -- CS Studio's home is now the dashboard): the
+  # (CS Studio's home is the dashboard): the
   # tree, creating a page from just a title, and the page editor itself --
   # its record header (publish state, delete) and its autosaving "Page
   # settings" form.
@@ -29,7 +29,7 @@ module Admin
     # editor's own PATCH may ever set -- anything else, e.g.
     # `published`/`parent_id`, must never arrive by way of a form field with
     # that name). `hero_media_asset_id` is the hero field's hidden input
-    # (`Admin::Columns::MediaColumnComponent`, media library Task 8): an id
+    # (`Admin::Columns::MediaColumnComponent`): an id
     # chosen in the picker, or "" to clear it -- `Pages::Save`
     # (`Media::Choosing`) checks `media.upload` and that the asset exists
     # for a new one.
@@ -65,8 +65,8 @@ module Admin
       @page = nil
     end
 
-    # The no-JS fallback of the New page dialog (design pass round 2, Task
-    # 15): the same form (`Admin::EditorScreen::NewPageFormComponent`) as a
+    # The no-JS fallback of the New page dialog: the same
+    # form (`Admin::EditorScreen::NewPageFormComponent`) as a
     # page of its own. With JavaScript every "+ New page" trigger opens the
     # dialog in the layout instead and never gets here. `parent_id` presets
     # Inside; none means Home (the form's own default).
@@ -145,7 +145,7 @@ module Admin
     #
     # The editor asks `can?` about this one page many times (header
     # buttons, settings, every block card); its branch is loaded once, up
-    # front (final fix wave, Minor 10), so no check pays for a closure
+    # front, so no check pays for a closure
     # query. Only here: a write action hands `@page` to a service, which
     # must judge the page's position as stored, not a snapshot
     # (`AccessControl.preload_branches`).
@@ -153,7 +153,7 @@ module Admin
     # The hero and every image block's image are preloaded with their
     # variant records (`Media::Asset::FILE_INCLUDES`): each image field
     # reads `#srcset` for its thumbnail, which would otherwise be a query
-    # per block (media library Task 8: every list of assets loads that way).
+    # per block (every list of assets loads that way).
     def show
       AccessControl.preload_branches([ @page ])
       ActiveRecord::Associations::Preloader.new(records: [ @page ], associations: [
@@ -235,7 +235,7 @@ module Admin
     # kept descendant, so counting after would just see them all already
     # gone): it's both the notice's own "and N subpages" and, unlike a
     # kept-vs-trashed check on `@page.children` alone, the exact number a
-    # later Undo (Task 9's `Trash::Restore`) brings back with it. The Undo
+    # later Undo (`Trash::Restore`) brings back with it. The Undo
     # link's own URL carries `from: "undo"` (`Admin::TrashController#restore`)
     # so restoring lands the actor back on this page's editor, not the
     # Trash screen.
@@ -408,7 +408,7 @@ module Admin
     # raises on `page=x` (a String has no `dig`), and a hash or array where a
     # scalar belongs reached `parameterize` / `find` and 500ed; `permit`
     # drops anything non-scalar, so a forged shape is the ordinary blank-title
-    # 422 or the default parent (final review A, M3).
+    # 422 or the default parent.
     def new_page_params
       @new_page_params ||= (params[:page].respond_to?(:permit) ? params[:page] : ActionController::Parameters.new).permit(:title, :parent_id, :page_type)
     end

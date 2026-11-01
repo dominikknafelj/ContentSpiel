@@ -33,9 +33,8 @@ module Media
   #
   # `loading="lazy"` by default, with `decoding="async"` always. The page
   # hero (`app/views/pages/show.html.erb`) passes `loading: "eager",
-  # fetchpriority: "high"` instead (final fix wave, M4): it's the first
-  # thing a landing page shows and usually its largest paint, so lazy-
-  # loading it only delays it. `fetchpriority` is omitted unless given.
+  # fetchpriority: "high"` instead: it's the first thing a landing page
+  # shows and usually its largest paint, so lazy-loading it only delays it. `fetchpriority` is omitted unless given.
   class PictureComponent < ApplicationComponent
     # The one style an `<img>` here carries, and the only one the rich-text
     # scrubber keeps on an `img` (`RichTextScrubber`): the preview as the
@@ -57,9 +56,9 @@ module Media
       @fetchpriority = fetchpriority
     end
 
-    # A missing asset, or one whose file is somehow gone (Review Focus 4's
-    # "a page still points at it" is guarded against at the database layer,
-    # but a caller can still hand this component a stale in-memory
+    # A missing asset, or one whose file is somehow gone (an image a page
+    # still points at cannot be deleted: the database's foreign key refuses
+    # it, but a caller can still hand this component a stale in-memory
     # reference, or `nil` outright, e.g. `page.hero_media_asset` when no
     # hero is set) -- renders nothing rather than a broken `<img>`, the same
     # posture every caller already took before this component existed

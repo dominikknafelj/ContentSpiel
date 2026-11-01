@@ -1,7 +1,7 @@
 module Admin
   module SettingsScreen
-    # The in-page nav at the left of the Settings screen (round 3, Task 5,
-    # handoff §4.5): one link per card, to its anchor on the same screen --
+    # The in-page nav at the left of the Settings screen (handoff
+    # §4.5): one link per card, to its anchor on the same screen --
     # `#site`, `#languages`, `#publishing`, `#ai`, `#mail`, `#images` (the ids sit on the cards'
     # headings, so a jump lands on the title rather than the middle of a tall
     # card). Only the links for cards the viewer may manage (decision D9):

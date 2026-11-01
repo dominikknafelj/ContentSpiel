@@ -18,7 +18,7 @@
 # inline HTML document and would bypass this whole sanitizer if allowed
 # through) is scrubbed like any other disallowed element.
 #
-# Media library Task 5: `srcset`/`sizes`/`loading`/`decoding` are added for
+# `srcset`/`sizes`/`loading`/`decoding` are added for
 # `Media::PictureComponent`'s own `<img>` -- the built-in safe-list already
 # has `src`/`width`/`height`/`alt` (every plain `<img>` this app ever
 # rendered before needed only those), but a responsive image's extra

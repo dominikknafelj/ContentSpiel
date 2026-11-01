@@ -84,7 +84,7 @@ Rails.application.routes.draw do
         patch :slug
       end
 
-      # A page's blocks (cs-studio spec §5.1/§6.1, Task 5): nested under the
+      # A page's blocks (cs-studio spec §5.1/§6.1): nested under the
       # page rather than a top-level resource, since a block is meaningless
       # without the page it's on and every one of these actions already
       # needs `page_id` to scope its lookup (`Admin::ContentBlocksController
@@ -122,7 +122,7 @@ Rails.application.routes.draw do
     # JSON-in-JSON-out contract, not the module's own browse/edit screens.
     resources :media_assets, only: :create
 
-    # The Media module (media library design spec §6, Task 7): browse,
+    # The Media module (media library design spec §6): browse,
     # upload, edit and delete library images, all through `Media::Upload`/
     # `Save`/`Destroy`. `index` is the grid (search, filters, pagination);
     # `show` is one image's detail panel; `create` is the grid's own
@@ -145,7 +145,7 @@ Rails.application.routes.draw do
     # into a routing 404 before `Admin::TrashController` is ever reached.
     get "trash", to: "trash#index", as: :trash
     delete "trash", to: "trash#empty", as: :empty_trash
-    # A bulk trash's Undo (Task 17): restores exactly the posts it names.
+    # A bulk trash's Undo: restores exactly the posts it names.
     post "trash/restore_many", to: "trash#restore_many", as: :restore_many_trash
     post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
     delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
@@ -162,7 +162,7 @@ Rails.application.routes.draw do
     # optionally narrowed by `?type=page|post|media|settings` and
     # `?language=` and paged by `?page=`. A plain
     # `get` rather than `resources :translations, only: :index`, so the
-    # AI suggestion action (Task 8) can join the same controller on a
+    # AI suggestion action can join the same controller on a
     # route of its own without a resource's implied member routes.
     get "translations", to: "translations#index", as: :translations
 
@@ -187,7 +187,7 @@ Rails.application.routes.draw do
     # (Publish now / Unpublish / Schedule…, `Admin::PagesController`'s own
     # comment explains why each is a one-shot POST kept deliberately outside
     # the post form's own autosave, not folded into `update`).
-    # The posts list's bulk bar (Task 17): publish or trash the ticked posts,
+    # The posts list's bulk bar: publish or trash the ticked posts,
     # one `Posts::Bulk` call. Declared before the resource so "bulk" can never
     # be read as a post id.
     post "posts/bulk", to: "posts#bulk", as: :posts_bulk
@@ -214,7 +214,7 @@ Rails.application.routes.draw do
       member { post :merge }
     end
 
-    # The Settings module (cs-studio spec §6.1, Task 8): the `SiteSetting`
+    # The Settings module (cs-studio spec §6.1): the `SiteSetting`
     # singleton's own autosaving form (title, tagline, logo, social links,
     # default language) -- `resource` (singular), like the page tree's own
     # `resource :tree`, since there's exactly one settings row to show or
@@ -239,8 +239,8 @@ Rails.application.routes.draw do
       resource :mail_login, only: %i[update destroy]
     end
 
-    # Languages (cs-studio spec §6.1; round 3, Task 6 moved them INTO the
-    # Settings screen as its `#languages` card). Still under "settings" by
+    # Languages (cs-studio spec §6.1; they live INSIDE the
+    # Settings screen, as its `#languages` card). Still under "settings" by
     # *path* only (`scope`, not `namespace`: a plain `Admin::LanguagesController`).
     # What is left is the card's INSTANT actions, each answering with a 303 back
     # to the card: `create` is `Locales::Enable`, `destroy` `Locales::Disable`
@@ -257,7 +257,7 @@ Rails.application.routes.draw do
       patch "languages/:id/default", to: "languages#make_default", as: :default_language
     end
 
-    # The Users module (cs-studio spec §6.1, Task 8): list, new/create,
+    # The Users module (cs-studio spec §6.1): list, new/create,
     # edit/update (email, and a password only when one was typed --
     # `Users::Save`), destroy (refused for the last user, `Users::Destroy`
     # -- `Admin::UsersController#destroy` is also where deleting *yourself*
@@ -269,7 +269,7 @@ Rails.application.routes.draw do
     get "users/suggest", to: "user_suggestions#index", as: :user_suggestions
 
     resources :users, only: %i[index new create edit update destroy] do
-      # "Make owner…" / "Remove owner rights…" (round 3 Task 12, D18): an instant
+      # "Make owner…" / "Remove owner rights…": an instant
       # action of its own, `owner=1|0`, answered by `Users::Save` like any other
       # change to a user -- never a field of the editor's form.
       member { patch :owner }
@@ -304,7 +304,7 @@ Rails.application.routes.draw do
     patch "account/password", to: "accounts#update", as: :account_password
     patch "account/profile", to: "accounts#update_profile", as: :account_profile
 
-    # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
+    # "Connect an AI assistant" (design spec §6.1): the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list
     # that POSTs straight to `create`, and `create` *renders* the one-time
     # reveal itself (never a redirect to a `show`, which would need the raw
@@ -314,7 +314,7 @@ Rails.application.routes.draw do
     # own "last used / IP" history.
     resources :api_tokens, only: %i[index create destroy]
 
-    # System status and the mind graph (design spec §6.1, Task 9): one
+    # System status and the mind graph (design spec §6.1): one
     # read-only screen each, `resource` (singular) since neither has an
     # `:id` to route on. "Run again" on the status screen is a plain reload
     # of `show` -- `Setup::SystemCheck` runs on every request.
@@ -331,15 +331,15 @@ Rails.application.routes.draw do
       get :listed, defaults: { format: :json }
     end
 
-    # The audit log (access-control design spec §5 "Audit log module",
-    # Task 9): a paginated, filterable list plus one event's own page.
+    # The audit log (access-control design spec §5 "Audit log module"):
+    # a paginated, filterable list plus one event's own page.
     # `resources` (plural, unlike `system_status`/`mind_graph` above) since
     # each row has its own `:id` to route `show` on -- but only `:index`/
     # `:show`: `Audit::Event` is append-only (its own class comment), never
     # created, edited or destroyed through a CS Studio form.
     resources :audit_events, only: %i[index show]
 
-    # "Create starter pages" on the Pages home (design spec §6.1, Task 9):
+    # "Create starter pages" on the Pages home (design spec §6.1):
     # one POST, `StarterContents::Add`, idempotent.
     resources :starter_contents, only: :create
 
@@ -358,7 +358,7 @@ Rails.application.routes.draw do
     # a tab asks for when a signal names its id, before it says anything.
     get "notes/deliveries/:id", to: "note_inbox#delivery", as: :note_delivery, constraints: { id: /\d+/ }, defaults: { format: :json }
 
-    # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):
+    # The dashboard is CS Studio's home (dashboard spec §3-§4):
     # quick create, "Your drafts", "Going live next", "Needs translation"
     # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at
     # its own `/pages` (`resources :pages` above), no longer at the root.
@@ -535,7 +535,7 @@ Rails.application.routes.draw do
   # -- but here there's no static segment ahead of the glob to wrap it against,
   # so the homepage gets its own route instead.
   #
-  # The constraint (final fix wave, C) keeps Active Storage's own URLs out of
+  # The constraint keeps Active Storage's own URLs out of
   # this catch-all: Rails draws the Active Storage routes *after* this file,
   # so without it `/rails/active_storage/blobs/...` -- every image a page,
   # post or rich-text body embeds -- was routed here and answered 404.

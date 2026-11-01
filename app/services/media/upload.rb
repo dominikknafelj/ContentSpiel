@@ -6,12 +6,12 @@ module Media
   # image block and the Tiptap editor, which then set their reference to
   # the new asset's id like any library pick) and the Media module's own
   # multi-file upload (`Admin::MediaController#create`). It replaced the editor's original
-  # `MediaAssets::Create` (media library Task 6). `file` is an uploaded file
+  # `MediaAssets::Create`. `file` is an uploaded file
   # (`ActionDispatch::Http::UploadedFile`, or anything with `tempfile`,
   # `original_filename` and `content_type`).
   #
   # Never deduplicated: uploading a file that's already in the library makes
-  # a second asset (design spec Review Focus 1) -- only the one-off data
+  # a second asset -- only the one-off data
   # migration collapses identical files.
   #
   # Needs `media.upload`: an asset isn't attached to any page or post when

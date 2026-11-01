@@ -1,4 +1,4 @@
-# Lists library images (media library design spec §6/§5.2, Task 9),
+# Lists library images (media library design spec §6/§5.2),
 # searchable the same way the CS Studio grid is and filterable to unused
 # ones -- a summary view, one page at a time, so an agent can find an id to
 # reference from a rich-text ::image{} directive without dumping the whole
@@ -40,7 +40,7 @@ module Mcp
         title: "List media")
 
       def self.call(query: nil, unused: false, locale: nil, page: 1, server_context:)
-        # `allowed?`, not `holds?` (final fix wave, M9): `holds?` answers
+        # `allowed?`, not `holds?`: `holds?` answers
         # "anywhere, under any scope" for navigation and buttons only
         # (`AccessControl.holds?`'s own comment); an authorization check
         # goes through `allowed?`. `media.upload` is an admin-area key with

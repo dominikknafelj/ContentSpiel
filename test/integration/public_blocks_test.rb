@@ -22,7 +22,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "figcaption", text: /Our studio/
   end
 
-  # Task 4 review, addressed in Task 5: an image block's own `media_asset`
+  # An image block's own `media_asset`
   # was one query per block (`Blocks::ImageComponent#asset` ->
   # `block.media_asset`) until `PublicPageRendering#preload_page_images`
   # started preloading every block's asset (and the page's hero) in one

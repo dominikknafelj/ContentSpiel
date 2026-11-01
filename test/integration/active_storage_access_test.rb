@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Final fix wave (C, P6): Active Storage's direct-upload endpoints are
+# Active Storage's direct-upload endpoints are
 # Rails defaults the app never uses -- every upload goes through CS
 # Studio's own controllers (`Admin::MediaAssetsController`, the settings
 # logo, image blocks). Left open, anyone signed out could create blobs and

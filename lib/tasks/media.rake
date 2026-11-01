@@ -1,7 +1,7 @@
 namespace :media do
   # Design spec §3.2: rebuilds `media_usages` from scratch, for whenever it
   # needs to be caught up with reality outside the ordinary save/destroy
-  # path that keeps it current -- after the Task 4 data migration
+  # path that keeps it current -- after the media library's data migration
   # backfills `hero_media_asset_id`/`media_asset_id` for existing rows, or
   # any time the table is suspected stale (a bug, a direct SQL edit, a
   # restored backup).
@@ -29,7 +29,7 @@ namespace :media do
   end
 
   # Design spec §3.4 step 5: every `ActiveStorage::Blob` no attachment row
-  # points at -- a duplicate file the Task 4 data migration deduped onto
+  # points at -- a duplicate file the media library's data migration deduped onto
   # another asset (it deletes attachment rows, never blobs), a leftover
   # from the ActionText import, a blob whose record was deleted without its
   # purge job ever running. Cleanup is manual only (global constraints):
@@ -54,8 +54,7 @@ namespace :media do
       puts "  blob ##{blob.id}  #{blob.filename}  #{blob.content_type}  #{blob.byte_size} bytes  created #{blob.created_at.iso8601}"
       next unless confirmed
 
-      # Counted as purged only once the row is confirmed gone (fix round 1,
-      # M5) -- a purge that raised, or one a concurrent attach raced, is
+      # Counted as purged only once the row is confirmed gone -- a purge that raised, or one a concurrent attach raced, is
       # reported instead of silently counted.
       begin
         blob.purge

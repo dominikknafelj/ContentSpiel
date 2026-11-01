@@ -70,7 +70,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_selector "[role=toolbar] button[aria-label='Link'][aria-haspopup=dialog]"
   end
 
-  # Media library Task 8: the Image button opens the media picker (a
+  # The Image button opens the media picker (a
   # dialog) and the picked asset arrives as `media-picker:picked` -- the
   # editor has no file input or upload endpoint of its own any more.
   test "the Image button opens the media picker instead of a file input" do
@@ -139,7 +139,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_text Locales.name(Locales.default, native: true)
   end
 
-  # Fix round 1 (m2): the read-only original is rendered HTML, so markup
+  # The read-only original is rendered HTML, so markup
   # typed as *text* in the primary language must come out escaped, never
   # live.
   test "the original escapes script tags and event handlers typed as text" do

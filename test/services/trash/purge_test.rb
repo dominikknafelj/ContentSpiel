@@ -290,7 +290,7 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert_not Audit::Event.exists?(action: "media.purged")
   end
 
-  # Review Focus 4 of the media library: the usage index is behind (a race,
+  # The usage index is behind (a race,
   # a raw write) -- the service's own check passes, the FK still restricts,
   # and the database error becomes a failure rather than a 500.
   test "an unindexed reference is caught by the foreign key and fails cleanly" do

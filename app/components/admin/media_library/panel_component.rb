@@ -2,7 +2,7 @@ module Admin
   # See `Admin::MediaLibrary::GridComponent`'s own class comment for why
   # this namespace is `MediaLibrary`, not `Media`.
   module MediaLibrary
-    # One image's side panel (round 3, Task 8, handoff §4.6 and B19; it replaced
+    # One image's side panel (handoff §4.6 and B19; it replaced
     # the detail page, `Admin::MediaController#show`, which now redirects to
     # `/media?selected=ID`): the preview, the file's facts in mono, the
     # language tabs, an autosaving title/alt/caption form (`Media::Save`,
@@ -195,7 +195,7 @@ module Admin
 
       # `:unused` / `:in_use` / `:trash_only` (trash spec §4.1/§5.1) --
       # memoized for the same reason `#usage_entries` is: the template reads
-      # it more than once (the "Used on" empty-state branch, Task 10's
+      # it more than once (the "Used on" empty-state branch, the
       # Move-to-trash gate).
       def usage_state = defined?(@usage_state) ? @usage_state : (@usage_state = asset.usage_state)
 
@@ -241,7 +241,7 @@ module Admin
       # (text-only) `#in_use_message` is built to hand back a
       # clickable link.
       #
-      # Memoized (final fix wave, M7): the template reads it twice (the
+      # Memoized: the template reads it twice (the
       # empty check and the list), and each call ran `#usages_summary`'s
       # queries again.
       #
@@ -271,10 +271,10 @@ module Admin
         end
       end
 
-      # Used, but by nothing this panel can name (final fix wave, M7): a
+      # Used, but by nothing this panel can name: a
       # `media_usages` row whose owner is gone entirely, or a block with no
       # page/post of its own -- `place_for` reads `nil` in both cases. Kept
-      # deliberately separate from `#usage_state`'s `:trash_only` (Task 4):
+      # deliberately separate from `#usage_state`'s `:trash_only`:
       # a *trashed* owner still resolves fine (`place_for` returns it,
       # `#usage_entries` just chooses not to list it), so it takes the more
       # specific "used only by items in the trash" message instead of this
@@ -319,7 +319,7 @@ module Admin
 
       def place_path(place, kind) = kind == "post" ? helpers.admin_post_path(place, **url_options) : helpers.admin_page_path(place, **url_options)
 
-      # Fix round 1 (review of `0695e7a`): every role this owner's group
+      # Every role this owner's group
       # actually has, not just the first -- `Media::UsageIndex`'s own
       # comment on `#rows_for` is explicit that a single `ContentBlock` can
       # in principle contribute both a `block_image` and a `rich_text` row

@@ -58,7 +58,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_includes html, "C</figcaption>"
   end
 
-  # Final fix wave (M6): an id stored as a String (an older import, a hand
+  # An id stored as a String (an older import, a hand
   # edit) renders -- `Media::UsageIndex` already counts it as a usage, so
   # the page must show it too -- both through the document's preload and
   # through a context built without a document.
@@ -72,7 +72,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_nil context.media_asset("abc")
   end
 
-  # Media library Task 5: an image node's alt/caption fall back to the
+  # An image node's alt/caption fall back to the
   # asset's own defaults (`Media::Asset#alt_text`/`#caption_text`) when the
   # node doesn't override them -- the same "override, then the asset's
   # default" chain `Blocks::ImageComponentTest` already covers for a block's
@@ -136,7 +136,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_includes html, "<p>plain</p>"
   end
 
-  # Fix round 1 (I2): a page/post that exists but isn't publicly visible --
+  # A page/post that exists but isn't publicly visible --
   # unpublished, here -- renders exactly like a missing target outside
   # preview, but keeps its link in preview, where editors need to see and
   # click it. `PublicSite::Resolver.visible?` is the shared rule; see
@@ -154,7 +154,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_includes preview_html, %(href="/preview/draft-page")
   end
 
-  # Fix round 1 (m3): `safe_href?` decodes HTML/numeric-character-reference
+  # `safe_href?` decodes HTML/numeric-character-reference
   # entities and strips control characters before checking the scheme, so
   # an encoded `javascript:` can't sneak past a check that only ever looked
   # at the literal (still-encoded) String.
@@ -168,7 +168,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_not_includes hex_entity, "javascript:"
   end
 
-  # Fix round 1 (m5): same document, three renders differing only in
+  # Same document, three renders differing only in
   # locale/preview -- with a real cache store (the test suite otherwise
   # runs on :null_store, which would never expose a cache key collision)
   # the render cache key has to fold in both, or the second and third
@@ -244,7 +244,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     end
   end
 
-  # Final fix wave (C): the HTML also depends on code -- a renderer or
+  # The HTML also depends on code -- a renderer or
   # component markup change must not keep serving the old HTML out of Solid
   # Cache after a deploy. `RichText.code_revision` (the deploy's revision)
   # is part of the key.
@@ -273,7 +273,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     end
   end
 
-  # Media library Task 5 fix round 1 (I1): a rendered body's `<img>` bakes
+  # A rendered body's `<img>` bakes
   # in which of its image's variants exist yet (`Media::PictureComponent`'s
   # `srcset`, built from `Media::Asset#srcset`'s own "only variants that
   # have actually finished processing" rule) -- and a `TransformJob`
@@ -333,7 +333,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_match(/\Aboot-\h{16}\z/, RichText.resolve_code_revision(env: {}, revision_file: Pathname("/nonexistent/REVISION")))
   end
 
-  # Fix round 1 (I1): a document that never passed `RichText::Document
+  # A document that never passed `RichText::Document
   # #validate` can hand the renderer any JSON shape at all -- these are
   # exactly the malformed shapes `RichText::DocumentTest` proves `#validate`
   # itself survives. `#to_html` must be equally total: every case below
@@ -359,7 +359,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_kind_of String, attrs_doc.to_html(locale: "en", urls: urls)
   end
 
-  # Fix round 1 (addendum): `#to_html` computes `#digest` (part of the cache
+  # `#to_html` computes `#digest` (part of the cache
   # key) *before* `RichText::HtmlRenderer` ever runs, so a pathologically
   # deep document has to survive both `RichText::Document#digest` and the
   # renderer's own recursion guard -- 5000 nested `blockquote`s is well past
@@ -367,7 +367,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
   # ceiling) and what `RichText::DocumentTest`'s own 500-deep regression
   # test uses, to prove this isn't merely "deep enough to dodge the exact
   # number that test happens to check." `#digest` itself has no depth
-  # ceiling at all as of fix round 2 (`RichText::Document#write_canonical`
+  # ceiling at all (`RichText::Document#write_canonical`
   # is iterative, not recursive, precisely so it never needs one) -- this
   # test is really only exercising `RichText::HtmlRenderer`'s guard at this
   # point; the digest-side regression net lives in the test below.
@@ -379,7 +379,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_kind_of String, html
   end
 
-  # Fix round 2: re-review of the round-1 addendum found a Critical --
+  # A recursion cap is not a safe canonical form --
   # `RichText::Document#canonicalize` capped recursion at `MAX_DEPTH` and
   # replaced everything past it with a fixed placeholder, which sounds
   # safe but silently collapsed every leaf value past ~25 nesting levels
@@ -400,7 +400,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
   # past it, to prove this isn't merely "past the exact number the old bug
   # happened to hit." 60 is *also* past `RichText::HtmlRenderer`'s own,
   # separate `MAX_DEPTH` (50, one unit per tree level there, not two) --
-  # a legitimate, unrelated guard (fix round 1's I1) that intentionally
+  # a legitimate, unrelated guard that intentionally
   # drops content beyond it, so `to_html` for both 60-deep documents
   # renders identically (both empty past that point) with no leaf text in
   # either. That's the renderer's own guard doing its job, not a digest

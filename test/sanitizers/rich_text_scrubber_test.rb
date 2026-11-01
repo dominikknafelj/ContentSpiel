@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `RichTextScrubber` directly (Task 5 fix round 1, m1): since rich text is
+# `RichTextScrubber` directly: since rich text is
 # rendered from JSON documents, no public path can hand the scrubber raw
 # iframe HTML any more (`rich_text_sanitizing_test.rb`), so the scrubber's
 # own rules are pinned here instead -- it's still the last line of defence
@@ -59,7 +59,7 @@ class RichTextScrubberTest < ActiveSupport::TestCase
     assert_not_includes scrub(%(<p>ok</p><script>alert(1)</script>)), "<script"
   end
 
-  # Media library Task 5: `Media::PictureComponent`'s own `<img>` carries
+  # `Media::PictureComponent`'s own `<img>` carries
   # four attributes the built-in Rails safe-list never had reason to allow
   # (`src`/`width`/`height`/`alt` were already there) -- all four must
   # survive the scrub, or every responsive image on the site would render
