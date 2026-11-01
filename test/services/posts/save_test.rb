@@ -315,4 +315,46 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert as_owner { Posts::Save.call(result.record, attributes: { published: true }) }.ok?
     assert result.record.reload.live?
   end
+
+  # Unknown keys under a language are refused by name (#147's rule, for Posts::Save):
+  # the assignment reads only what it knows, so anything else was dropped without
+  # a word and the save answered ok.
+  test "a key under a language that Posts::Save would drop is refused by name, as a string and as a symbol, and nothing is written or audited" do
+    [ { "en" => { subtitle_x: "S", "nonsense" => "N" } }, { "en" => { "subtitle_x" => "S", nonsense: "N" } } ].each do |translations|
+      result = nil
+      assert_no_difference [ -> { Post.count }, -> { Audit::Event.count } ] do
+        result = Posts::Save.call(Post.new, attributes: { content_type: "blog" }, translations: translations)
+      end
+      assert_not result.ok?
+      assert_match(/subtitle_x/, result.errors.join)
+      assert_match(/nonsense/, result.errors.join)
+    end
+  end
+
+  test "a valid key beside an invalid one writes neither, on a stored record too" do
+    record = create_post(title: "Kept")
+    updated_at = record.reload.updated_at
+
+    result = nil
+    assert_no_difference -> { Audit::Event.count } do
+      result = Posts::Save.call(record, translations: { "en" => { title: "Changed", wrong: "x" }, "de" => { other_wrong: "y" } })
+    end
+
+    assert_not result.ok?
+    assert_match(/\ANot saved: wrong, other_wrong are not saved/, result.errors.join)
+    assert_equal "Kept", record.reload.title
+    assert_equal updated_at, record.updated_at
+  end
+
+  test "every key Posts::Save reads under a language still saves" do
+    result = Posts::Save.call(create_post(title: "Kept"), translations: { "en" => { title: "All", slug: "all", excerpt: "E", body: rich_doc("B"), fields: {} } })
+    assert result.ok?, result.errors.inspect
+    assert_equal "All", result.record.reload.title
+  end
+
+  test "someone who may not edit is denied before the keys are judged" do
+    record = create_post(title: "Kept")
+    result = Posts::Save.call(record, translations: { "en" => { wrong: "x" } }, actor: users(:reader))
+    assert result.denied?, "denied, and the keys told nothing"
+  end
 end

@@ -246,4 +246,50 @@ class Pages::SaveTest < ActiveSupport::TestCase
     assert Pages::Save.call(page, attributes: { template: "" }).ok?
     assert_equal({}, page.reload.settings)
   end
+
+  # Unknown keys under a language are refused by name (#147's rule, for Pages::Save):
+  # the assignment reads only what it knows, so anything else was dropped without
+  # a word and the save answered ok.
+  test "a key under a language that Pages::Save would drop is refused by name, as a string and as a symbol, and nothing is written or audited" do
+    root_page
+    [ { "en" => { subtitle_x: "S", "nonsense" => "N" } }, { "en" => { "subtitle_x" => "S", nonsense: "N" } } ].each do |translations|
+      result = nil
+      assert_no_difference [ -> { Page.count }, -> { Audit::Event.count } ] do
+        result = Pages::Save.call(Page.new, attributes: { parent: root_page }, translations: translations)
+      end
+      assert_not result.ok?
+      assert_match(/subtitle_x/, result.errors.join)
+      assert_match(/nonsense/, result.errors.join)
+    end
+  end
+
+  test "a valid key beside an invalid one writes neither, on a stored record too" do
+    root_page
+    record = create_page(title: "Kept")
+    updated_at = record.reload.updated_at
+
+    result = nil
+    assert_no_difference -> { Audit::Event.count } do
+      result = Pages::Save.call(record, translations: { "en" => { title: "Changed", wrong: "x" }, "de" => { other_wrong: "y" } })
+    end
+
+    assert_not result.ok?
+    assert_match(/\ANot saved: wrong, other_wrong are not saved/, result.errors.join)
+    assert_equal "Kept", record.reload.title
+    assert_equal updated_at, record.updated_at
+  end
+
+  test "every key Pages::Save reads under a language still saves" do
+    root_page
+    result = Pages::Save.call(create_page(title: "Kept"), translations: { "en" => { title: "All", slug: "all", subtitle: "S", meta_title: "M", meta_description: "D", hero_alt: "A" } })
+    assert result.ok?, result.errors.inspect
+    assert_equal "All", result.record.reload.title
+  end
+
+  test "someone who may not edit is denied before the keys are judged" do
+    root_page
+    record = create_page(title: "Kept")
+    result = Pages::Save.call(record, translations: { "en" => { wrong: "x" } }, actor: users(:reader))
+    assert result.denied?, "denied, and the keys told nothing"
+  end
 end

@@ -81,6 +81,11 @@ module Pages
         return denied("pages.publish", @page) if @page.published_at.present? && !authorize!("pages.publish", @page)
       end
 
+      # What `#assign` reads under a language is `TRANSLATED`; any other key is
+      # refused by name.
+      unknown_keys = unknown_language_keys_refusal(@page, @translations, TRANSLATED)
+      return unknown_keys if unknown_keys
+
       hero_refusal = media_choice_result(@page, :hero_media_asset_id, :hero_image)
       return hero_refusal if hero_refusal
 

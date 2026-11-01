@@ -59,6 +59,10 @@ module Posts
     include Media::Choosing
 
     TRANSLATED = %i[title slug excerpt body].freeze
+    # What `#assign` reads under a language: the translated columns and `fields`,
+    # the type's translated fields. Any other key is refused by name
+    # (`ApplicationService#unknown_language_keys_refusal`).
+    LANGUAGE_KEYS = (TRANSLATED + %i[fields]).freeze
     # Everything `attributes:` may carry. `content_type` and `author_id` are
     # the two columns assigned as they are -- both scope-changing, and both
     # re-checked in pass 2 (the class comment above; a new post without an
@@ -88,6 +92,9 @@ module Posts
         return denied("posts.edit", @post) unless authorize!("posts.edit", @post)
         return denied("posts.publish", @post) if @post.published_at.present? && !authorize!("posts.publish", @post)
       end
+
+      unknown_keys = unknown_language_keys_refusal(@post, @translations, LANGUAGE_KEYS, hint: "A post type's own fields go in fields.")
+      return unknown_keys if unknown_keys
 
       refused = nil
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal

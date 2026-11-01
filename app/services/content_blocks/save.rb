@@ -54,8 +54,8 @@ module ContentBlocks
       refused = owner_refusal(@block.owner) { |key| authorize!(key, @block) }
       return denied(refused, @block) if refused
 
-      unknown = unknown_translation_keys
-      return Result.failure(@block, [ unknown_keys_message(unknown) ]) if unknown.any?
+      unknown_keys = unknown_language_keys_refusal(@block, @translations, LANGUAGE_KEYS, hint: "A block type's own fields go in settings.")
+      return unknown_keys if unknown_keys
 
       image_refusal = media_choice_result(@block, :media_asset_id, :image)
       return image_refusal if image_refusal
@@ -237,15 +237,6 @@ module ContentBlocks
     # Every key under a language that `#assign` would drop, as strings, checked
     # before a lock is taken or a row assigned, so a refusal writes and audits
     # nothing.
-    def unknown_translation_keys
-      @translations.values.flat_map { |values| values.to_h.keys.map(&:to_sym) }.uniq.map(&:to_s) - LANGUAGE_KEYS.map(&:to_s)
-    end
-
-    def unknown_keys_message(keys)
-      "Not saved: #{keys.join(', ')} #{keys.one? ? 'is' : 'are'} not saved under a language " \
-        "(only #{TRANSLATED.join(', ')} and settings are). A block type's own fields go in settings."
-    end
-
     def assign
       # `block_type` is assigned first: `settings`/`assign_settings` below
       # both need it to know which type's schema they're casting against.
