@@ -24,8 +24,6 @@ class Media::Asset < ApplicationRecord
   # regardless of what a client's Content-Type header or filename claims.
   ALLOWED_CONTENT_TYPES = %w[image/png image/jpeg image/gif image/webp].freeze
 
-  MAX_BYTE_SIZE = 10.megabytes
-
   # The exact responsive widths this app ever serves (global constraints:
   # "Variant names are exactly w480, w960, w1600 and w2400"). Doubles as
   # both the variant *name* Active Storage keys each transformation under
@@ -493,9 +491,25 @@ class Media::Asset < ApplicationRecord
   # to *trusting* when asked to guess from a name/declared type it hasn't
   # ruled out with real magic bytes).
   def image_type_and_size
-    errors.add(:file, "must be 10 MB or smaller") if file.blob.byte_size > MAX_BYTE_SIZE
+    max = ImageSettings.current.max_bytes
+    errors.add(:file, :too_large, size: "#{max / 1.megabyte} MB") if file.blob.byte_size > max
     errors.add(:file, "must be a PNG, JPEG, GIF, or WEBP image") unless ALLOWED_CONTENT_TYPES.include?(sniffed_content_type)
     errors.add(:file, "doesn't match its stored content type") if stored_type_mismatch?
+    # Decoded only once everything above passed: a file the byte sniff or the
+    # size refuses is never handed to libvips.
+    decode_file if errors.empty?
+  end
+
+  # The one decode of the upload (`Media::Decoding`), kept for
+  # `#cache_metadata_from_file`, which writes its size, preview and alpha
+  # flag in the same save.
+  def decode_file
+    @decoded = with_attachable_io { |io| io && Media::Decoding.read(io, content_type: sniffed_content_type) }
+    errors.add(:file, :unreadable) if @decoded.nil?
+  rescue Media::Decoding::TooManyPixels
+    errors.add(:file, :too_many_pixels)
+  rescue Media::Decoding::Unreadable
+    errors.add(:file, :unreadable)
   end
 
   # Final fix wave (C, P5): an already-persisted blob (attached by signed id,
@@ -595,33 +609,17 @@ class Media::Asset < ApplicationRecord
     end
   end
 
-  # `width`/`height` come from the blob's own `metadata`, written by
-  # `file.analyze` (design spec §4.2's "Implement" step) -- but *not* by
-  # this callback: `Media::Upload#analyze_dimensions` calls
-  # `analyze` (and writes these two columns) in a second pass, strictly
-  # after this record's own save has actually committed and Active
-  # Storage's own `after_commit` hook has uploaded the blob's bytes --
-  # analysis needs the real file on the storage service, which isn't there
-  # yet at `before_save` time (`#with_attachable_io`'s own comment). So
-  # this callback leaves both nil on every ordinary save; that's fine,
-  # neither is a NOT NULL column, and `Media::PictureComponent` (media
-  # library Task 5, the one place every image render reads these) just
-  # omits the `<img width height>` attributes it would otherwise set from
-  # them -- `image_tag` drops a `nil` attribute rather than rendering it
-  # empty.
+  # The size, preview and alpha flag are the validation's one decode
+  # (`#decode_file`); the file's bytes are not read again.
   def cache_metadata_from_file
     self.byte_size = file.blob.byte_size
     self.content_type = sniffed_content_type
     force_blob_content_type
 
-    # Merged onto whatever's already there, not overwritten outright: a
-    # second save of an already-analyzed asset (nothing about this model
-    # re-attaches a file after the fact today, but nothing rules it out
-    # later either) must not blank out real `width`/`height` this callback
-    # itself has no way to recompute yet.
-    metadata = file.blob.metadata || {}
-    self.width = metadata["width"] if metadata.key?("width")
-    self.height = metadata["height"] if metadata.key?("height")
+    self.width = @decoded.width
+    self.height = @decoded.height
+    self.preview = @decoded.preview
+    self.has_alpha = @decoded.alpha
   end
 
   # Fix round 1's I4: `file.blob.content_type` -- the column that actually

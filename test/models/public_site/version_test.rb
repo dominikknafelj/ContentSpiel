@@ -500,14 +500,6 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_not asset.reload.trashed?
   end
 
-  # The dimensions are written with `update_columns` after the upload has
-  # committed (and bumped): a write of its own.
-  test "an upload's dimensions, written around the callbacks, move" do
-    asset = create_media_asset
-
-    assert_moves { Media::Upload.new(file: png_upload).send(:analyze_dimensions, asset) }
-  end
-
   test "a variant record created or removed moves" do
     asset = create_media_asset
     record = nil

@@ -40,6 +40,18 @@ class Media::UploadTest < ActiveSupport::TestCase
     end
   end
 
+  test "an upload that cannot be decoded is a failure with the sentence, and no asset or blob row remains attached" do
+    broken = Rack::Test::UploadedFile.new(file_fixture("not_an_image.png"), "image/png")
+    result = nil
+    assert_no_difference [ "Media::Asset.count", "ActiveStorage::Attachment.count" ] do
+      result = as(users(:author)) { Media::Upload.call(file: broken) }
+    end
+
+    assert_not result.ok?
+    assert_includes result.errors, "File can't be read as an image"
+    assert_not Audit::Event.exists?(action: "media.uploaded")
+  end
+
   test "an explicit actor is credited, not Current.actor" do
     result = Media::Upload.call(file: upload, actor: users(:author))
 

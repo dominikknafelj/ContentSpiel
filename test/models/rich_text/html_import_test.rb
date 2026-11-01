@@ -176,6 +176,26 @@ class RichText::HtmlImportTest < ActiveSupport::TestCase
     assert_includes unmapped.first, "notes.pdf"
   end
 
+  test "an imported image has its size" do
+    blob = upload_blob
+    import(%(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png"></action-text-attachment>))
+
+    asset = Media::Asset.last
+    assert_equal [ 1, 1 ], [ asset.width, asset.height ]
+    assert_not_nil asset.preview
+  end
+
+  test "an imported image that cannot be decoded is reported, not kept" do
+    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("not_an_image.png")), filename: "broken.png", content_type: "image/png")
+    html = %(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png" filename="broken.png" caption="Broken"></action-text-attachment>)
+
+    document, unmapped = assert_no_difference(-> { Media::Asset.count }) { import(html) }
+
+    assert_equal [ paragraph(text("Broken")) ], document.to_h["content"]
+    assert_equal 1, unmapped.size
+    assert_includes unmapped.first, "can't be read as an image"
+  end
+
   test "a forged sgid is reported and not resolved" do
     document, unmapped = import(%(<p>Hi</p><action-text-attachment sgid="forged--abc" content-type="image/png"></action-text-attachment>))
 

@@ -27,7 +27,7 @@ module Audit
     # included: never shown, logged or audited.
     NEVER_STORED = %w[
       password password_confirmation password_digest token token_digest lookup_digest ai_api_key
-      mail_username mail_password mail_verified_fingerprint
+      mail_username mail_password mail_verified_fingerprint preview renditions
     ].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
@@ -47,7 +47,8 @@ module Audit
     # (when the login was saved, the last success and failure), written by
     # sends, never a setting someone changed.
     IGNORED_CHANGES = %w[created_at updated_at unpublished_changes_at translation_sources translation_original_changed_at ai_api_key_saved_at
-      mail_login_saved_at mail_verified_at mail_last_sent_at mail_failed_at mail_failure].freeze
+      mail_login_saved_at mail_verified_at mail_last_sent_at mail_failed_at mail_failure
+      has_alpha renditions_fingerprint renditions_failed_at renditions_error].freeze
 
     # The columns that hold a type's schema fields (`ContentBlock#settings`,
     # `Post#metadata`), whose changes are read with the record's

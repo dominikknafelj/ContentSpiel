@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_31_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_31_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -188,7 +188,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_100000) do
     t.bigint "trashed_by_id"
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.binary "preview"
+    t.boolean "has_alpha", default: false, null: false
+    t.jsonb "renditions", default: {}, null: false
+    t.string "renditions_fingerprint"
+    t.datetime "renditions_failed_at"
+    t.string "renditions_error"
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
+    t.index ["renditions_fingerprint"], name: "index_media_assets_on_renditions_fingerprint"
     t.index ["trashed_at"], name: "index_media_assets_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_media_assets_on_trashed_by_id"
   end
