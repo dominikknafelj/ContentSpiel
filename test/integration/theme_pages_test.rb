@@ -551,6 +551,59 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  def styled_section(style, texts = [ "Styled words" ])
+    section = with_choices_theme { @home.content_blocks.create!(block_type: "section", position: 5, settings: { "layout" => "one", "style" => style }) }
+    texts.each_with_index { |text, index| @home.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: index, body: rich_doc(text)) }
+    publish_changes(@home)
+    section
+  end
+
+  test "a theme that declares styles and writes CSS styles a section by its class alone" do
+    styled_section("services")
+    folder = ThemeFolder.new(ThemeTestHelper::CHOICES)
+
+    with_choices_theme { get "/" }
+
+    assert_response :success
+    assert_select "section.content-section.content-section--style-services", text: /Styled words/
+    assert_includes folder.read("assets/stylesheets/theme.css"), ".content-section--style-services"
+    assert_empty folder.files.grep(%r{\Acomponents/|\Aviews/}), "the theme replaces no template: the class is all it asks for"
+    assert_empty Theme::Check.problems(folder, deep: true)
+  end
+
+  test "a theme that replaces the Section's template draws its own six-column grid from the section's blocks in reading order" do
+    section = with_section_grid_theme { @home.content_blocks.create!(block_type: "section", position: 5, settings: { "layout" => "two", "style" => "grid_six" }) }
+    [ [ 2, "Fourth" ], [ 1, "First" ], [ 1, "Second" ], [ 2, "Third" ] ].each_with_index do |(column, text), index|
+      @home.content_blocks.create!(block_type: "rich_text", section: section, section_column: column, position: index, body: rich_doc(text))
+    end
+    publish_changes(@home)
+    folder = ThemeFolder.new(ThemeTestHelper::SECTION_GRID)
+
+    with_section_grid_theme { get "/" }
+
+    assert_response :success
+    assert_select "div.grid-six[data-block='#{section.id}'][data-page='#{@home.id}']" do
+      assert_equal %w[First Second Fourth Third].sort, css_select("div.grid-six__cell").map { |cell| cell.text.squish }.sort
+      assert_equal 4, css_select("div.grid-six__cell").size
+    end
+    assert_select "section.content-section", 0
+    assert_empty Theme::Check.problems(folder, deep: true)
+    Theme::Contract.components.fetch("blocks/section_component").each { |name| assert_includes folder.read("components/blocks/section_component.html.erb"), name }
+  end
+
+  test "a stored style the theme does not know draws the section as the default draws it and changes nothing stored" do
+    section = styled_section("services")
+    before = section.reload.attributes
+
+    with_plain_theme { get "/" }
+
+    assert_response :success
+    assert_select "section.content-section", text: /Styled words/
+    assert_select "section[class*='style-']", 0
+    assert_equal before, section.reload.attributes
+    assert_equal "services", section.settings["style"]
+  end
+
   test "a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one" do
     guide = create_page(title: "Guide")
     result = ContentBlocks::Save.call(ContentBlock.new(owner: guide), attributes: { block_type: "note", settings: { "kind" => "warning", "title" => "<b>Mind</b>" } },

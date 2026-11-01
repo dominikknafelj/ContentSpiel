@@ -65,6 +65,14 @@ class Theme
     # preview bar's two colours and the image placeholder's two.
     OWN_TOKENS = /\A--th-(?:preview|ph)-/
 
+    # The classes a CMS template writes from a choice the theme declared, which
+    # the theme's stylesheet may rely on: the name pattern and what it marks.
+    CLASSES = {
+      "content-section--style-<name>" => "on the section, for a style the theme declares"
+    }.freeze
+
+    def self.classes = CLASSES
+
     # The templates a theme may replace through its `views/` folder, by
     # their path under it, with what each is. The default is the file of the
     # same path under app/views.

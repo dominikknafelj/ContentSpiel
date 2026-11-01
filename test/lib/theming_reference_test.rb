@@ -35,6 +35,13 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_equal (ContractLedger::THEMED_TOKENS + ContractLedger::FIXED_TOKENS).map { "--th-#{_1}" }.sort, rows("Tokens").keys.sort
   end
 
+  test "the classes table names exactly the contract's classes, each with what it is for" do
+    table = rows("Classes")
+
+    assert_equal ContractLedger::CLASSES.keys.sort, table.keys.sort
+    ContractLedger::CLASSES.each { |name, meaning| assert_includes table.fetch(name), meaning, "what #{name} is for" }
+  end
+
   test "the templates table names exactly the contract's templates" do
     assert_equal Theme::Contract::TEMPLATES.keys.sort, rows("Templates").keys.sort
   end

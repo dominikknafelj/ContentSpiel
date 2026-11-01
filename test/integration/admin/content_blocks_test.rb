@@ -272,6 +272,41 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--editor--section-layout-param='one_two'][aria-current='true']"
   end
 
+  test "a section's style is saved and audited as a setting, its select drawn only under the choices theme, and an autosave after the theme dropped the style saves" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    save = ->(style) { patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "none", width: "content", style: style } }, base_updated_at: section.reload.updated_at.iso8601(6) }, as: :turbo_stream }
+
+    get admin_page_path(@page)
+    assert_select "#section-#{section.id}-header select[name='block[settings][style]']", 0
+    assert_select "#section-#{section.id}-header select[name='block[settings][width]']", 1
+
+    with_choices_theme do
+      get admin_page_path(@page)
+      assert_select "#section-#{section.id}-header select[name='block[settings][style]'][id='block-#{section.id}-style']" do
+        assert_select "option", count: 3
+        assert_select "option[value='']", text: "Default"
+        assert_select "option[value=services]", text: "Services"
+      end
+
+      save.call("services")
+      assert_response :success
+      assert_equal "services", section.reload.settings["style"]
+      assert_select "turbo-stream[target='block-#{section.id}-style-errors']", 1
+      event = Audit::Event.where(action: "block.updated").order(:id).last
+      assert_equal [ nil, "services" ], event.field_changes["settings"].map { |settings| settings["style"] }
+    end
+
+    # The theme no longer declares it: the stored name is shown first, marked,
+    # and a save that keeps it is not refused; another unknown name is.
+    get admin_page_path(@page)
+    assert_select "#section-#{section.id}-header select[name='block[settings][style]'] option[selected][value=services]", text: "services (not in this theme)"
+    save.call("services")
+    assert_response :success
+    save.call("elsewhere")
+    assert_response :unprocessable_entity
+    assert_equal "services", section.reload.settings["style"]
+  end
+
   test "the first save of a section that stores no settings yet is no change of layout" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     section.update_column(:settings, {})

@@ -65,6 +65,16 @@ module Blocks
 
     def width = BlockTypes::Section::WIDTHS.include?(settings.width.to_s) ? settings.width : "content"
 
+    # The section's style: the stored name when the theme declares it, else
+    # nil. A name the theme no longer knows (or another theme's) is drawn as
+    # no style and left as stored; nothing here writes it. The name is a
+    # `Theme::Declarations` name (lowercase letters, digits, underscores), so
+    # it is safe as a class suffix.
+    def style
+      name = settings.style.to_s.strip
+      name if name.present? && Theme.current.choice(:section_styles, name)
+    end
+
     private
 
     attr_reader :block, :page

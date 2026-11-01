@@ -1,7 +1,7 @@
 <%# The column's tags are closed up against its blocks on purpose: a column
     with no block is then `:empty` for `sections.css`, which hides it while
     the section is stacked (whitespace alone would defeat the selector). %>
-<section class="content-section content-section--<%= background %> content-section--<%= width %>">
+<section class="content-section content-section--<%= background %> content-section--<%= width %><%= " content-section--style-#{style}" if style %>">
   <div class="content-section__inner">
     <div class="content-section__grid content-section__grid--<%= layout %>">
       <% columns.each do |blocks| %>

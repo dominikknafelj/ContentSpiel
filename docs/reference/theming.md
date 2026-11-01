@@ -380,11 +380,19 @@ Under the theme's `components/`, as `<path>.html.erb`. The methods are what the 
 | `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body` |
 | `blocks/table_component` | `block`, `page`, `rows`, `header_row?`, `header_column?`, `column_count`, `caption` |
 | `blocks/post_list_component` | `block`, `page`, `list_component` |
-| `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width` |
+| `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width`, `style` |
 | `posts/blog_list_component` | `posts`, `page` |
 | `posts/resume_list_component` | `posts`, `page` |
 | `posts/now_list_component` | `posts`, `page` |
 | `posts/detail_component` | `post` |
+
+### Classes
+
+A class the CMS's own templates write from a choice the theme declared in `theme.yml`, for the theme's stylesheet to rely on (`Theme::Contract::CLASSES`). `<name>` is the entry's name. The Section's `style` is the stored name when the theme declares it and nil otherwise (a name the theme dropped is drawn as no style and stays as stored); the default template writes the class beside the band's, a theme that replaces the Section's template reads `style` itself.
+
+| Class | Where |
+|---|---|
+| `content-section--style-<name>` | on the section, for a style the theme declares |
 
 ### Helpers
 

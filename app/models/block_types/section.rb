@@ -22,10 +22,13 @@ module BlockTypes
         t.field :layout, :select, options: LAYOUTS.keys, default: "two", required: true
         t.field :background, :select, options: BACKGROUNDS, default: "none", required: true
         t.field :width, :select, options: WIDTHS, default: "content", required: true
+        # A name from the theme's `section_styles` (theme.yml): the theme
+        # draws it, the default theme declares none and draws nothing for it.
+        t.field :style, :theme_choice, of: :section_styles
         t.capability :container
         t.columns ->(settings) { weights(settings["layout"]).size }
         t.component Blocks::SectionComponent
-        t.theme_methods :block, :page, :columns, :layout, :background, :width
+        t.theme_methods :block, :page, :columns, :layout, :background, :width, :style
         # No `stylesheet` and no `summary` (block types plan, departure 1):
         # sections.css is the default theme's own file, imported by
         # theme.css before every type's, and a section's tile is its lanes.

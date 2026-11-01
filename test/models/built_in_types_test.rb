@@ -133,7 +133,7 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     section = BlockTypes.fetch(:section)
 
     assert_equal %w[block page list_component], list.theme_methods
-    assert_equal %w[block page columns layout background width], section.theme_methods
+    assert_equal %w[block page columns layout background width style], section.theme_methods
     assert list.summary
     assert_nil section.summary, "a section's tile is its lanes"
     assert_nil section.stylesheet, "sections.css is the default theme's own stylesheet, imported by theme.css before every type's"

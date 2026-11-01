@@ -19,11 +19,17 @@ module ContractLedger
     "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/table_component" => %w[block page rows header_row? header_column? column_count caption],
     "blocks/post_list_component" => %w[block page list_component],
-    "blocks/section_component" => %w[block page columns layout background width],
+    "blocks/section_component" => %w[block page columns layout background width style],
     "posts/blog_list_component" => %w[posts page],
     "posts/resume_list_component" => %w[posts page],
     "posts/now_list_component" => %w[posts page],
     "posts/detail_component" => %w[post]
+  }.freeze
+
+  # The classes a theme's stylesheet may rely on that a template of the CMS
+  # writes from a choice of the theme's own (`Theme::Contract::CLASSES`).
+  CLASSES = {
+    "content-section--style-<name>" => "on the section, for a style the theme declares"
   }.freeze
 
   THEMED_TOKENS = %w[

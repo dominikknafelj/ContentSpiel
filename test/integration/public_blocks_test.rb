@@ -189,6 +189,35 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     section
   end
 
+  # The page is live with a copy; a save of the style writes the rows and the
+  # visitor reads the copy until the changes are published.
+  test "a section's style is read from the published copy: a save shows nothing until it is published" do
+    section = with_choices_theme { section_with_texts([ 1, "Styled words" ], layout: "one") }
+    publish_changes(@root)
+    with_choices_theme { ContentBlocks::Save.call(section, attributes: { settings: { "style" => "services" } }, actor: nil) }
+    with_choices_theme { get "/" }
+
+    assert_select "section.content-section", 1
+    assert_select "section.content-section--style-services", 0
+
+    publish_changes(@root)
+    with_choices_theme { get "/" }
+
+    assert_select "section.content-section--style-services", text: /Styled words/
+  end
+
+  test "a style in a tinted and in a strong band keeps the band's class beside the style's" do
+    with_choices_theme do
+      section_with_texts([ 1, "Tinted words" ], layout: "one", background: "tinted").update!(settings: { "layout" => "one", "background" => "tinted", "width" => "content", "style" => "services" })
+      section_with_texts([ 1, "Strong words" ], layout: "one", background: "strong").update!(settings: { "layout" => "one", "background" => "strong", "width" => "full", "style" => "contact" })
+    end
+    publish_changes(@root)
+    with_choices_theme { get "/" }
+
+    assert_select "section.content-section.content-section--tinted.content-section--content.content-section--style-services"
+    assert_select "section.content-section.content-section--strong.content-section--full.content-section--style-contact"
+  end
+
   # Design answer, first reply: Home drew an empty tinted band. A section
   # whose blocks draw nothing is no band (Ruling 19); one that draws
   # anything is.

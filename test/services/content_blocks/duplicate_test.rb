@@ -66,6 +66,26 @@ class ContentBlocks::DuplicateTest < ActiveSupport::TestCase
     Rails.application.reloader.prepare!
   end
 
+  # The real Section, not a test type: the style the theme declared when the
+  # section was made and no longer does is the original's, and the copy is
+  # saved with it; the carried name is the copy's alone.
+  test "duplicating a Section whose style the theme no longer declares copies the style, its blocks too, and saves" do
+    styled = with_choices_theme { @page.content_blocks.create!(block_type: "section", position: 3, settings: { "layout" => "one", "style" => "services" }) }
+    @page.content_blocks.create!(block_type: "rich_text", section: styled, section_column: 1, position: 0, body: rich_doc("In the style"))
+
+    result = nil
+    assert_difference -> { ContentBlock.count }, 2 do
+      result = ContentBlocks::Duplicate.call(styled, actor: nil)
+    end
+
+    assert_predicate result, :ok?
+    copy = result.record.reload
+    assert_equal "services", copy.settings["style"]
+    assert_equal 1, copy.section_blocks.size
+    assert_equal "services", styled.reload.settings["style"]
+    assert_not copy.tap { |block| block.settings = { "style" => "other" } }.valid?
+  end
+
   test "a copy refused part-way leaves nothing behind" do
     # May edit this draft page, may not choose images: the image block's copy is refused.
     result = as(page_editor_without_media) { ContentBlocks::Duplicate.call(@section) }

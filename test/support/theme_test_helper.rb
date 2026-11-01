@@ -52,6 +52,16 @@ module ThemeTestHelper
 
   def with_choices_theme(&block) = Theme.with(choices_theme, &block)
 
+  # A seventh theme (`test/fixtures/themes/section_grid`): a theme.yml declaring
+  # the section style `grid_six`, and its own template for the Section, written
+  # from the reference's Section row alone: with that style it draws the
+  # section's blocks in reading order in a grid of its own.
+  SECTION_GRID = Rails.root.join("test/fixtures/themes/section_grid")
+
+  def section_grid_theme = Theme.load(ThemeFolder.new(SECTION_GRID))
+
+  def with_section_grid_theme(&block) = Theme.with(section_grid_theme, &block)
+
   # A copy of the second theme in a directory of its own, for a test that
   # adds, changes or removes a file. Yields the directory as a Pathname.
   def with_theme_copy

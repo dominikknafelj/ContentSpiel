@@ -175,6 +175,8 @@ en:
           widths:
             content: "Content width"
             full: "Full width"
+          # The theme's section style, drawn only when the theme declares one.
+          style: "Style"
           # The section's "⋯" menu and the dialog its last item opens.
           actions: "Section actions"
           move_up: "Move up"

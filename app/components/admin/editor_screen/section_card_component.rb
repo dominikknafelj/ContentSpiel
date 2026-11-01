@@ -230,6 +230,21 @@ module Admin
 
       def width_options = BlockTypes::Section::WIDTHS.map { |value| [ t(".widths.#{value}"), value ] }
 
+      # The Style select's field, drawn by `Fields::ThemeChoiceField`'s rule:
+      # a select when the theme declares a style or the section stores a name
+      # (an unknown one first, marked), nothing when there is nothing to
+      # choose. Its id is the form's `field_id("style")`.
+      def style_field
+        @style_field ||= begin
+          field = section.definition.fields.find { |each| each.name == "style" }
+          field && Admin::Fields::ThemeChoiceField.new(field: field, form_name: "block[settings]", value: setting("style"), locale: ::Locales.default, id_prefix: error_prefix)
+        end
+      end
+
+      def style_options = style_field.option_pairs
+
+      def style? = style_field&.render? || false
+
       # `.cs-select` without the full width `setup_select_class` gives it on
       # a form's own line: these two stand side by side in a header.
       def select_class = "cs-select py-1 text-sm"
