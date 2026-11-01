@@ -3,6 +3,7 @@ require "test_helper"
 class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
   include ContentHelper
   include TestTypes
+  include ThemeTestHelper
 
   # The items of the card's own "⋯" menu, in its header (a rich-text field
   # has an Insert menu further down).
@@ -689,6 +690,38 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "p#block-#{block.id}-title-help", text: "kind"
     order = rendered_content.index("block-#{block.id}-kind") < rendered_content.index("block-#{block.id}-title") && rendered_content.index("block-#{block.id}-title") < rendered_content.index("admin-rich-text")
     assert order, "kind, then title, then the text"
+  end
+
+  test "a card's card draws Icon only where the theme declares icons, then Title, Text and Link" do
+    page = create_page(title: "Card card")
+    block = page.content_blocks.create!(block_type: "card", position: 0)
+
+    render_card(block, page: page)
+    assert_no_selector "select#block-#{block.id}-icon"
+    assert_selector "input#block-#{block.id}-title"
+
+    with_choices_theme do
+      render_card(block, page: page)
+      ids = %w[icon title text link].map { |name| "block-#{block.id}-#{name}" }
+      assert_selector "select##{ids[0]}"
+      assert_selector "input##{ids[1]}"
+      assert_selector "textarea##{ids[2]}"
+      assert_selector "input##{ids[3]}"
+      positions = ids.map { |id| rendered_content.index(%(id="#{id}")) }
+      assert_equal positions.sort, positions, "icon, title, text, link"
+    end
+  end
+
+  test "the chosen icon is shown in CS Studio as an <img> of its served address, never inlined" do
+    page = create_page(title: "Card icon")
+    with_choices_theme do
+      block = page.content_blocks.create!(block_type: "card", position: 0, settings: { "icon" => "brush" })
+      render_card(block, page: page)
+      assert_selector "img[data-theme-icon=brush][alt='']"
+      assert_match %r{/assets/icons/brush-\h+\.svg}, self.page.find("img[data-theme-icon=brush]")[:src]
+      assert_no_selector "select#block-#{block.id}-icon svg"
+      assert_no_selector "svg[viewBox='0 0 24 24'] path[d^='M0']", visible: :all
+    end
   end
 
   test "on a translation tab a note's title is an input beside its English original, and its kind is a shared field" do

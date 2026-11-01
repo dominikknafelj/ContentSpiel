@@ -965,6 +965,22 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     Rails.application.reloader.prepare!
   end
 
+  test "nothing of a theme reaches CS Studio through a Card's icon: a picture of its served address, never the file's markup" do
+    with_choices_theme do
+      page = create_page(title: "Card icons", published: false)
+      page.content_blocks.create!(block_type: "card", position: 0, settings: { "icon" => "brush" })
+      sign_in_as users(:one)
+      get admin_page_path(page)
+
+      assert_response :success
+      assert_select "img[data-theme-icon=brush][src*='/assets/icons/brush-']", count: 1
+      assert_select "select option[value=brush]", text: "Design"
+      assert_select "select svg, option svg", count: 0
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   # The two the three tests above never asked: the password pages are a
   # second controller under the product layout (a path given to that
   # controller alone would be seen by no other test), and a mail is drawn

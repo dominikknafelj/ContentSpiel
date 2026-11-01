@@ -1,0 +1,27 @@
+/* The Card block's public styles. Every colour is a --th- token.
+   The card's own three tokens (ground, line, icon) are not defined yet: until
+   they are, a card is drawn with base tokens, and the rules marked
+   "card tokens" below take their place. Written by bin/rails generate
+   block_type: while this line stands, bin/rails destroy block_type card
+   removes this file. Take it out once the stylesheet is yours. */
+.content-block--card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  /* card tokens: ground and line */
+  background: var(--th-surface);
+  border: 1px solid var(--th-line);
+  border-radius: 0.5rem;
+}
+.content-block--card__icon {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  /* card tokens: icon */
+  color: var(--th-accent);
+}
+.content-block--card__icon > svg { width: 100%; height: 100%; }
+.content-block--card__title { margin: 0; color: var(--th-ink); }
+.content-block--card__title a { color: inherit; }
+.content-block--card__text { margin: 0; color: var(--th-ink); }

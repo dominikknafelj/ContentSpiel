@@ -1704,4 +1704,52 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_not ContentBlock.exists?(copy.id)
   end
+  # ---- The Card block ------------------------------------------------------
+
+  def save_card(block, settings, base: block.reload.updated_at.iso8601(6), tab: nil)
+    patch "#{blocks_path}/#{block.id}", params: { block: { settings: settings }, base_updated_at: base }, as: :turbo_stream, headers: { "X-Notes-Tab" => tab }.compact
+  end
+
+  test "a Card added from the picker saves its four values, a bad link is refused with the field's error and nothing is written, and its save is refused when stale and under another tab's hold" do
+    with_choices_theme do
+      post blocks_path, params: { block: { block_type: "card" } }, as: :turbo_stream
+      assert_response :success
+      block = @page.content_blocks.sole
+      assert_equal "card", block.block_type
+      assert_select "turbo-stream template select[name='block[settings][icon]']"
+      assert_select "turbo-stream template input[name='block[settings][title]']"
+      assert_select "turbo-stream template textarea[name='block[settings][text]']"
+      assert_select "turbo-stream template input[name='block[settings][link]']"
+
+      save_card(block, { icon: "brush", title: "Hello", text: "Some words", link: "/about" })
+      assert_response :success
+      block = block.reload
+      assert_equal "brush", block.settings["icon"]
+      assert_equal "/about", block.settings["link"]
+      assert_equal [ "Hello", "Some words" ], block.settings_object.then { |settings| [ settings.title, settings.text ] }
+
+      events = Audit::Event.count
+      version = PublicSite.content_version
+      save_card(block, { icon: "brush", title: "Other", text: "Other", link: "javascript:alert(1)" })
+      assert_response :unprocessable_entity
+      assert_select "turbo-stream[target='block-#{block.id}-link-errors']", text: /link|valid/i
+      assert_equal "/about", block.reload.settings["link"]
+      assert_equal "Hello", block.settings_object.title
+      assert_equal [ events, version ], [ Audit::Event.count, PublicSite.content_version ]
+
+      base = block.updated_at.iso8601(6)
+      save_card(block, { title: "One" }, base: base, tab: "tab-aaaaaaaa")
+      assert_response :success
+      travel 1.minute do
+        save_card(block, { title: "Two" }, base: base, tab: "tab-aaaaaaaa")
+      end
+      assert_response :conflict
+      assert_equal "One", block.reload.settings_object.title
+
+      sign_in_as users(:two)
+      save_card(block, { title: "Theirs" }, tab: "tab-bbbbbbbb")
+      assert_response :conflict
+      assert_equal "One", block.reload.settings_object.title
+    end
+  end
 end

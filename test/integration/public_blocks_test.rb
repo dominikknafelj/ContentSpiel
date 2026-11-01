@@ -624,6 +624,30 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a card on a live page is read from its published copy" do
+    with_locales(%w[en de es], default: "en") do
+      page = create_page(title: "Guide")
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "card", settings: { "link" => "/about", "title" => "First title", "text" => "First text" } },
+        translations: { "de" => { settings: { "title" => "Erster Titel" } } }).record
+      publish_changes(page)
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "link" => "/contact", "title" => "Changed title", "text" => "Changed text" } },
+        translations: { "de" => { settings: { "title" => "Geaenderter Titel" } } }).ok?
+
+      get PublicSite::Urls.new.path_for(page, "en")
+      assert_select ".content-block--card h3 a[href='/about']", text: "First title"
+      assert_select ".content-block--card p", text: "First text"
+      get PublicSite::Urls.new.path_for(page, "de")
+      assert_select ".content-block--card h3", text: "Erster Titel"
+
+      publish_changes(page)
+      get PublicSite::Urls.new.path_for(page, "en")
+      assert_select ".content-block--card h3 a[href='/contact']", text: "Changed title"
+      get PublicSite::Urls.new.path_for(page, "de")
+      assert_select ".content-block--card h3", text: "Geaenderter Titel"
+    end
+  end
+
   test "a note at the top level and in a section's column is drawn from the copy, in the column once" do
     page = create_page(title: "Guide")
     section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record

@@ -46,6 +46,17 @@ module Admin
         unknown + [ [ self.class.blank_word(field), "" ] ] + known
       end
 
+      # The served address of the stored icon's file, for the picture beside
+      # the select: an `<img>`, so the theme's SVG is never inlined into CS
+      # Studio (it is shown as a picture, which runs no script). nil for any
+      # other list and for a blank or undeclared name.
+      def icon_source
+        return unless field.options[:of] == :icons
+
+        asset = Theme.current.icon_asset(value)
+        helpers.image_path(asset) if asset
+      end
+
       def entries = @entries ||= self.class.entries(field)
     end
   end

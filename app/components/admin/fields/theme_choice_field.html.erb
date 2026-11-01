@@ -1,1 +1,8 @@
-<%= select_tag input_name, options_for_select(option_pairs, value.to_s), id: input_id, class: setup_select_class %>
+<% if icon_source %>
+  <div class="flex items-center gap-2">
+    <img src="<%= icon_source %>" alt="" width="24" height="24" class="size-6 shrink-0" data-theme-icon="<%= value %>">
+    <%= select_tag input_name, options_for_select(option_pairs, value.to_s), id: input_id, class: setup_select_class %>
+  </div>
+<% else %>
+  <%= select_tag input_name, options_for_select(option_pairs, value.to_s), id: input_id, class: setup_select_class %>
+<% end %>

@@ -33,6 +33,7 @@ Rails.application.config.to_prepare do
     BlockTypes::Code.register
     BlockTypes::Note.register
     BlockTypes::Table.register
+    BlockTypes::Card.register
     BlockTypes::PostList.register
     BlockTypes::Section.register
     # bin/rails generate block_type adds a built-in's line above this one.

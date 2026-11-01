@@ -1,0 +1,11 @@
+<div class="content-block content-block--card">
+  <% if icon %>
+    <span class="content-block--card__icon" aria-hidden="true"><%= icon %></span>
+  <% end %>
+  <% if title %>
+    <h3 class="content-block--card__title"><% if link %><%= tag.a title, href: link %><% else %><%= title %><% end %></h3>
+  <% end %>
+  <% if text %>
+    <p class="content-block--card__text"><%= text %></p>
+  <% end %>
+</div>
