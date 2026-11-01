@@ -17,8 +17,10 @@ module ContentModel
   #   the field or nil, `translations` the object's `{ locale => values }`.
   # - `translatable`: whether a translated field of the type is offered to
   #   AI translation (prose is; a code, a date or a choice is not).
-  # - `audit`: `:value` (the audit log records it as it is) or `:digest`
-  #   (two digests and two lengths in an event's changes: `Audit::Snapshot`).
+  # - `audit`: `:value` (the audit log records it as it is), `:digest` (two
+  #   digests and two lengths in an event's changes: `Audit::Snapshot`) or
+  #   `:reference` (as it is, unless it is a `LinkReference`, which a person
+  #   must never read: then as digests, which the log words "Changed").
   #
   # It names no component: a type's input and its read-only display are its
   # `Admin::Fields::<Type>Field`, found by name, because the content model

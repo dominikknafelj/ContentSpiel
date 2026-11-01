@@ -106,6 +106,12 @@ module ContentModel
         false
       end
 
+      # What a `:link` field may hold: an address `link?` accepts, or a
+      # reference to a page or a post (`LinkReference`). `link?` itself stays
+      # the rule for what a browser may follow, so nothing that asks it can be
+      # handed a reference to print.
+      def link_value?(value) = link?(value) || LinkReference.parse(value).present?
+
       # What every type refuses that only a select, a content type field or
       # a string takes: a group field refuses it too (`Definition#field`).
       def refuse_choice_and_string_options(options)
@@ -304,17 +310,20 @@ module ContentModel
 
       def tag = plain(:tag, translatable: false)
 
-      # An address a visitor follows; see `link?`. The same on every
-      # language, so never translated.
+      # An address a visitor follows (see `link?`), or a well formed reference
+      # to a page or a post (`LinkReference`), whatever the actor may read: the
+      # editor shows the title only of what they may read, and a target that
+      # is gone or was never there draws nothing. The same on every language,
+      # so never translated.
       def link
         FieldType.new(
-          name: :link, cast: STRIPPED, translatable: false, audit: :value,
+          name: :link, cast: STRIPPED, translatable: false, audit: :reference,
           options: lambda { |options, _earlier|
             raise ArgumentError, "link fields can't be translated (the address is the same in every language)" if options[:translated]
             refuse_choice_and_string_options(options)
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
-            errors.add(field.name, :invalid) if value && !link?(value)
+            errors.add(field.name, :invalid) if value && !link_value?(value)
           }
         )
       end

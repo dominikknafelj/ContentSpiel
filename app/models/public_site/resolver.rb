@@ -21,23 +21,30 @@ module PublicSite
     # `canonical_page` prefers a published listing (spec §5.3), so this only
     # turns a post away when no published page lists it at all -- then its
     # URL runs through a draft page, reachable in preview only. One closure-table
-    # query per record: `self_and_ancestors` is a scope, not a loaded array,
-    # so this stays a single indexed lookup rather than N ancestor checks.
+    # query however many records are asked about, rather than N ancestor checks.
     #
     # A trashed record is never visible (trash spec §5.2). It has no
     # `public_paths` row to be found by in the first place -- this is the
     # belt to that pair of braces, and what the sitemap relies on too.
-    def self.visible?(record)
-      return false if record.trashed?
+    #
+    # `visible_among` is that rule for several records in a constant number of
+    # statements (`canonical_pages` is one pass, and one closure query asks
+    # which chains hold anything unpublished); `visible?` is the same rule for
+    # one, so the two can't drift apart. It answers the records that are visible.
+    def self.visible?(record) = visible_among([ record ]).any?
 
-      pages = case record
-      when Page then record.self_and_ancestors # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
-      when Post then (page = PublicSite::Paths.canonical_page(record)) ? page.self_and_ancestors : nil # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
+    def self.visible_among(records)
+      kept = records.select { |record| (record.is_a?(Page) || record.is_a?(Post)) && !record.trashed? }
+      posts = kept.select { |record| record.is_a?(Post) }
+      canonical = posts.empty? ? {} : PublicSite::Paths.canonical_pages(posts) # public: rows (an address is the rows')
+      chains = kept.filter_map do |record|
+        page = record.is_a?(Post) ? (canonical.fetch(record) if record.live?) : record
+        [ record, page.id ] if page
       end
-      return false if pages.nil?
-      return false if record.is_a?(Post) && !record.live?
+      return [] if chains.empty?
 
-      pages.where.not(id: Page.published.select(:id)).none? # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
+      hidden = PageHierarchy.where(descendant_id: chains.map(&:last)).where.not(ancestor_id: Page.published.select(:id)).distinct.pluck(:descendant_id).to_set # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
+      chains.reject { |_, page_id| hidden.include?(page_id) }.map(&:first)
     end
 
     def initialize(scope:, urls: PublicSite::Urls.new(preview: scope == :preview))

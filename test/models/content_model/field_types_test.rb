@@ -20,7 +20,7 @@ class ContentModel::FieldTypesTest < ActiveSupport::TestCase
       assert_kind_of ContentModel::FieldType, type
       %i[cast options validate].each { |question| assert_respond_to type.public_send(question), :call, "#{type.name} answers #{question}" }
       assert_includes [ true, false ], type.translatable, "#{type.name} says whether it is translatable"
-      assert_includes %i[value digest], type.audit, "#{type.name} says how it is audited"
+      assert_includes %i[value digest reference], type.audit, "#{type.name} says how it is audited"
     end
   end
 
