@@ -16,8 +16,7 @@ class BlockSamplesTest < ActionDispatch::IntegrationTest
   # type is filled, because the canary overwrites only the values a block
   # holds: a field the sample leaves out is never compared with the rows.
   UNFILLED_FIELDS = {
-    "section" => { "style" => "the default theme declares no section style; the choices theme's tests fill and draw one",
-      "anchor" => "one per page: every shared test builds a section of the sample in more than one place on a page; test/integration/public_blocks_test.rb draws it from the copy" },
+    "section" => { "style" => "the default theme declares no section style; the choices theme's tests fill and draw one" },
     "post_list" => { "tag" => "a listing filtered by a tag is the canary's own row on Alpha (\"tag\" => \"ruby\"), which also lists a tagged post" }
   }.freeze
 

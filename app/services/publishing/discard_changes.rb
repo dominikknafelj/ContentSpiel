@@ -198,6 +198,7 @@ module Publishing
       extras.select(&:container?).each { |block| step ContentBlocks::Destroy.call(block.reload, keep_blocks: true, actor: actor) }
 
       rows = ContentBlock.where(owner: @record).index_by { |row| stands_for.fetch(row.id, row.id) }
+      release_changed_anchors(rows, copied)
       ids = {} # a copy's block id => the id of the row that stands for it now
       sections, others = copied.partition { |block| BlockTypes.find(block["block_type"])&.capability?(:container) }
       (sections + others).each do |attributes|
@@ -206,6 +207,21 @@ module Publishing
       end
 
       place(copied, ids)
+    end
+
+    # A section's anchor is unique on the page and the sections are restored one
+    # at a time, so restoring one section's anchor while another row still holds
+    # it would be refused. Every anchor that differs from the copy's is cleared
+    # first (under the page lock the discard holds); the restore then writes
+    # each copy anchor back onto a free name.
+    def release_changed_anchors(rows, copied)
+      copied.each do |attributes|
+        row = rows[attributes["id"]]
+        next unless row&.container? && row.settings["anchor"].present?
+        next if row.settings["anchor"] == attributes["settings"].to_h["anchor"]
+
+        step ContentBlocks::Save.call(row, attributes: { settings: { "anchor" => nil } }, actor: actor)
+      end
     end
 
     # A block both sides have: what differs is written, the rest is left. A

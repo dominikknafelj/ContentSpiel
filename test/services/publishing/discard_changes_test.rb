@@ -122,6 +122,39 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal [ @left.id, @middle.id, @right.id ].sort, ContentBlock.where(owner: @page).where.not(section_id: nil).ids.sort, "the blocks that were kept are the ones put back"
   end
 
+  def anchor(section, name) = assert(ContentBlocks::Save.call(section.reload, attributes: { settings: { "anchor" => name } }).ok?)
+
+  test "two sections that swapped their anchors since the publish are discarded cleanly: each has its published anchor again" do
+    second = add(nil, block_type: "section", settings: { "layout" => "one" })
+    anchor(@section, "services")
+    anchor(second, "contact")
+    publish_changes(@page)
+    @published = shape
+    anchor(@section, "other")
+    anchor(second, "services")
+    anchor(@section, "contact")
+
+    discard
+
+    assert_equal @published, shape
+    assert_equal "services", @section.reload.settings["anchor"]
+    assert_equal "contact", second.reload.settings["anchor"]
+  end
+
+  test "a published section deleted since, whose anchor a new section took, comes back with it and the new section goes" do
+    anchor(@section, "services")
+    publish_changes(@page)
+    @published = shape
+    assert ContentBlocks::Destroy.call(@section.reload, keep_blocks: true).ok?
+    fresh = add(nil, block_type: "section", settings: { "layout" => "one", "anchor" => "services" })
+
+    discard
+
+    assert_equal @published, shape
+    assert_not ContentBlock.exists?(fresh.id)
+    assert_equal [ "services" ], ContentBlock.where(owner: @page).containers.map { |block| block.settings["anchor"] }
+  end
+
   test "a section deleted with its blocks comes back with new blocks inside" do
     assert ContentBlocks::Destroy.call(@section).ok?
 

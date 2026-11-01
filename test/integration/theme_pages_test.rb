@@ -678,6 +678,21 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_no_match(/settings|I18n|\bt\(|PublicStrings|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
   end
 
+  test "the preview reads the rows' anchors for a heading's id, and the public page the copy's" do
+    sign_in_as users(:one)
+    ContentBlocks::Save.call(ContentBlock.new(owner: @about), attributes: { block_type: "rich_text", position: 0 },
+      translations: { "en" => { body: rich_doc("## Contact") } })
+    publish_changes(@about)
+    section = @about.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+
+    with_plain_theme { get "/preview/about" }
+    assert_select "article.plain-page h2#contact-2", text: "Contact"
+
+    with_plain_theme { get "/about" }
+    assert_select "article.plain-page h2#contact", text: "Contact"
+  end
+
   test "the preview is drawn by the theme too, with the CMS's preview bar" do
     sign_in_as users(:one)
 

@@ -42,7 +42,10 @@ module ContentModel
     #
     # `format:` is the shape a string must have (a Regexp, tested against the whole
     # cast value; a blank value has none to test) and `format_message:` the I18n
-    # key of the sentence that refuses it, shown whole, with no field prefix.
+    # key of the sentence that refuses it. The sentence is the whole message only
+    # where the model's locale entry for the field says `format: "%{message}"`
+    # (the anchor's, `activerecord.errors.models.content_block/settings`); without
+    # one it reads after the field's label.
     OPTIONS = %i[required default min max translated options of blank label control help placeholder_from format format_message].freeze
     CONTROLS = %i[segmented].freeze
 

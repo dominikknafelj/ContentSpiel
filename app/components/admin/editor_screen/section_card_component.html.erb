@@ -64,7 +64,7 @@
         <% end %>
         <%# The address of a link that jumps here. Its help line is the field's description
             for a screen reader and its tooltip; the header has no room for it in sight. %>
-        <%= text_field_tag "block[settings][anchor]", setting("anchor"), id: field_id("anchor"), maxlength: BlockTypes::Section::ANCHOR_MAX, autocomplete: "off", spellcheck: false,
+        <%= text_field_tag "block[settings][anchor]", setting("anchor"), id: field_id("anchor"), autocomplete: "off", spellcheck: false,
               placeholder: t(".anchor"), title: t(".anchor_help"), "aria-label": t(".anchor"), "aria-describedby": field_id("anchor-help"),
               class: "w-32 rounded-cs border border-field-line bg-surface px-2.5 py-1 font-cs-mono text-sm text-ink placeholder:text-meta focus-visible:outline-2 focus-visible:outline-accent" %>
         <span id="<%= field_id("anchor-help") %>" class="sr-only"><%= t(".anchor_help") %></span>

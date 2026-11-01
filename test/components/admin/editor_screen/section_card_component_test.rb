@@ -385,7 +385,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     @section.update!(settings: @section.settings.merge("anchor" => "services"))
     render_card
 
-    assert_selector "#section-#{@section.id}-form input[type=text][name='block[settings][anchor]'][value=services][id='block-#{@section.id}-anchor'][maxlength='40'][autocomplete=off]"
+    assert_selector "#section-#{@section.id}-form input[type=text][name='block[settings][anchor]'][value=services][id='block-#{@section.id}-anchor'][autocomplete=off]:not([maxlength])"
     assert_selector "#section-#{@section.id}-form input[name='block[settings][anchor]'][aria-label='Anchor'][aria-describedby='block-#{@section.id}-anchor-help']"
     assert_selector "#block-#{@section.id}-anchor-help", text: "Lets a link jump here, as #anchor. Leave empty for none.", visible: :all
     assert_selector "#block-#{@section.id}-anchor-errors", visible: :all
