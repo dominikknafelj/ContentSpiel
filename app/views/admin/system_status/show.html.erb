@@ -17,5 +17,6 @@
   </div>
 
   <%= render "setup/system_check_results", results: @results, copyable: true,
-        mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")) %>
+        mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")),
+        image_settings_href: (admin_settings_path(anchor: "images", **admin_url_options) if can?("settings.manage")) %>
 </div>

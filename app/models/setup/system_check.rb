@@ -12,7 +12,7 @@ module Setup
     # original keywords still works.
     #
     # `link` is a symbol naming where a row sends the reader (today
-    # `:mail_settings`), for the component that draws the row to resolve:
+    # `:mail_settings` and `:image_settings`), for the component that draws the row to resolve:
     # this model names no route and no component.
     Result = Data.define(:label, :status, :message, :command, :docs, :link) do
       def initialize(label:, status:, message:, command: nil, docs: nil, link: nil) = super
@@ -92,6 +92,11 @@ module Setup
     # (`can?("settings.manage")`), and only then does the Mail row carry the
     # link to the Mail card. The wizard has its own Mail step and hands none.
     #
+    # `image_progress` answers `counts` (`Media::RenditionProgress`, the
+    # kept images by default) and `image_settings_link` is whether the viewer
+    # may manage Settings, as `mail_settings_link` is: only then does the
+    # Images row carry the link to the Images card.
+    #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
     # stylesheet was built for that theme: by default, whether the build's
@@ -100,13 +105,15 @@ module Setup
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil,
-      mail_settings: nil, mail_settings_link: false)
+      mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
       @queue_adapter = queue_adapter.to_s
       @mail_settings = mail_settings
       @mail_settings_link = mail_settings_link
+      @image_progress = image_progress
+      @image_settings_link = image_settings_link
       @address = address
       @request_ssl = request_ssl
       @production = production
@@ -127,7 +134,7 @@ module Setup
     end
 
     def run
-      [ site_address, https, theme, storage, image_processing, background_jobs, mail ].compact
+      [ site_address, https, theme, storage, image_processing, images, background_jobs, mail ].compact
     end
 
     private
@@ -279,9 +286,25 @@ module Setup
         if probe(@image_probe)
           ok("Image processing", "Images can be resized.")
         else
-          warning("Image processing", "Images can't be resized, so image variants and logo resizing will fail. " \
-            "Install libvips on the server.")
+          warning("Image processing", "Install libvips on the server: images can't be resized without it, so images can't be made and pages show their previews.")
         end
+      end
+
+      # How far the library is from the current image settings
+      # (`Media::RenditionProgress`: the kept images, so a trashed image is in
+      # no count). Image processing above says whether images CAN be made;
+      # this says whether they have been. A failed image is also one still
+      # to be made, so both sentences show when any failed. A probe that
+      # raises is not a warning about images: the row is left out.
+      def images
+        counts = @image_progress ? @image_progress.counts : Media::RenditionProgress.new.counts
+        total, made, failed = counts.values_at(:total, :made, :failed)
+        link = :image_settings if @image_settings_link
+        return Result.new(label: "Images", status: :ok, message: "Every image is made with the current settings.", link:) if made == total
+
+        message = "#{total - made} of #{total} #{total == 1 ? "image" : "images"} still to be made."
+        message += " #{failed} #{failed == 1 ? "image" : "images"} could not be made." if failed.positive?
+        Result.new(label: "Images", status: :warning, message:, link:)
       end
 
       def background_jobs

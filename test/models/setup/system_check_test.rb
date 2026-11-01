@@ -6,13 +6,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Mail" ], labels
+    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail" ], labels
   end
 
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Background jobs", "Mail" ], labels
+    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -372,6 +372,43 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
+  test "the Images row is OK when every kept image is made with the current settings, and warns with the counts otherwise" do
+    ok = result("Images", run_check(image_progress: progress(total: 4, made: 4, failed: 0)))
+    assert ok.ok?
+    assert_equal "Every image is made with the current settings.", ok.message
+
+    none = result("Images", run_check(image_progress: progress(total: 0, made: 0, failed: 0)))
+    assert none.ok?
+
+    behind = result("Images", run_check(image_progress: progress(total: 10, made: 7, failed: 0)))
+    assert_not behind.ok?
+    assert_equal "3 of 10 images still to be made.", behind.message
+    assert_nil behind.command
+  end
+
+  test "a failed image is counted as could not be made" do
+    only_failed = result("Images", run_check(image_progress: progress(total: 10, made: 8, failed: 2)))
+    assert_equal "2 of 10 images still to be made. 2 images could not be made.", only_failed.message
+
+    both = result("Images", run_check(image_progress: progress(total: 10, made: 7, failed: 2)))
+    assert_not both.ok?
+    assert_equal "3 of 10 images still to be made. 2 images could not be made.", both.message
+  end
+
+  test "the Images row links to Settings only when the caller says the viewer may manage them, and as data" do
+    behind = progress(total: 2, made: 1, failed: 0)
+
+    assert_equal :image_settings, result("Images", run_check(image_progress: behind, image_settings_link: true)).link
+    assert_nil result("Images", run_check(image_progress: behind)).link
+  end
+
+  test "the Image processing warning says pages show previews and no longer names the original" do
+    message = result("Image processing", run_check(image_probe: -> { false })).message
+
+    assert_match(/so images can't be made and pages show their previews\.\z/, message)
+    assert_no_match(/variant|original/i, message)
+  end
+
   test "a Result built without a command or docs link has neither" do
     check = Setup::SystemCheck::Result.new(label: "x", status: :ok, message: "fine")
 
@@ -384,7 +421,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "only the site address and the not-ready mail warnings carry a command, each a fixed string" do
     results = run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
       storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
-      stylesheet_probe: -> { false })
+      stylesheet_probe: -> { false }, image_progress: progress(total: 3, made: 0, failed: 1))
 
     # Every row that can warn does. The theme's carries no command in
     # production, where the build is the image's and no one command.
@@ -395,6 +432,8 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   end
 
   private
+    def progress(**counts) = Struct.new(:counts).new(counts)
+
     def run_check(**overrides)
       defaults = {
         storage_probe: -> { true }, image_probe: -> { true }, worker_alive_probe: -> { true },
